@@ -162,4 +162,16 @@
     <string name="suspended_contact_placeholder">Erkläre, warum du die Sperrung für falsch hältst...</string>
     <string name="suspended_contact_send">Nachricht senden</string>
     <string name="suspended_contact_success">Deine Nachricht wurde erfolgreich gesendet. Wir prüfen deinen Fall und melden uns bald bei dir.</string>
+    <string name="feed_for_you">Für dich</string>
+    <string name="feed_following">Gefolgt</string>
+    <string name="stories_your_story">Deine Story</string>
+    <string name="feed_activity">Aktivität</string>
+    <string name="feed_messages">Nachrichten</string>
+    <string name="feed_loading">Momente werden geladen…</string>
+    <string name="feed_error">Feed konnte nicht geladen werden.</string>
+    <string name="time_now">jetzt</string>
+    <string name="time_min">Min.</string>
+    <string name="time_hour">Std.</string>
+    <string name="time_day">T.</string>
+    <string name="time_week">Wo.</string>
 </resources>

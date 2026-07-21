@@ -162,4 +162,16 @@
     <string name="suspended_contact_placeholder">Explique por que você acredita que a suspensão está incorreta...</string>
     <string name="suspended_contact_send">Enviar Mensagem</string>
     <string name="suspended_contact_success">Sua mensagem foi enviada com sucesso. Analisaremos seu caso e entraremos em contato em breve.</string>
+    <string name="feed_for_you">Para você</string>
+    <string name="feed_following">Seguindo</string>
+    <string name="stories_your_story">Seu story</string>
+    <string name="feed_activity">Atividade</string>
+    <string name="feed_messages">Mensagens</string>
+    <string name="feed_loading">Carregando momentos…</string>
+    <string name="feed_error">Não foi possível carregar o feed.</string>
+    <string name="time_now">agora</string>
+    <string name="time_min">min</string>
+    <string name="time_hour">h</string>
+    <string name="time_day">d</string>
+    <string name="time_week">sem</string>
 </resources>
