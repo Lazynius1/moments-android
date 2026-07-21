@@ -6,6 +6,66 @@ import java.util.UUID
 
 // Port incremental de Models.swift de iOS. Se van añadiendo tipos poco a poco.
 
+// MARK: - FilterSettings
+data class FilterSettings(val name: String, val intensity: Double)
+
+// MARK: - Seguimiento y solicitudes
+enum class FollowRequestStatus(val raw: String) {
+    PENDING("pending"), ACCEPTED("accepted"), REJECTED("rejected"), CANCELLED("cancelled");
+    companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: PENDING }
+}
+
+data class FollowRequest(
+    val id: String,
+    val senderId: String,
+    val senderUsername: String,
+    val recipientId: String,
+    val status: FollowRequestStatus,
+    val timestamp: Date,
+    val expirationDate: Date?,
+) {
+    val isExpired: Boolean get() = expirationDate?.let { Date().after(it) } ?: false
+    val isValid: Boolean get() = status == FollowRequestStatus.PENDING && !isExpired
+
+    companion object {
+        /** Nueva solicitud (id/timestamp/expiración a 30 días), equivalente al init de conveniencia de iOS. */
+        fun create(senderId: String, senderUsername: String, recipientId: String): FollowRequest {
+            val now = Date()
+            val expiry = Calendar.getInstance().apply { time = now; add(Calendar.DAY_OF_YEAR, 30) }.time
+            return FollowRequest(UUID.randomUUID().toString(), senderId, senderUsername, recipientId, FollowRequestStatus.PENDING, now, expiry)
+        }
+
+        fun from(data: Map<String, Any?>): FollowRequest = FollowRequest(
+            id = data["id"] as? String ?: "",
+            senderId = data["senderId"] as? String ?: "",
+            senderUsername = data["senderUsername"] as? String ?: "",
+            recipientId = data["recipientId"] as? String ?: "",
+            status = FollowRequestStatus.from(data["status"] as? String),
+            timestamp = MediaItem.anyToDate(data["timestamp"]) ?: Date(),
+            expirationDate = MediaItem.anyToDate(data["expirationDate"]),
+        )
+    }
+}
+
+// MARK: - Conexiones legacy (id == userId, como en iOS)
+data class Connection(val id: String, val userId: String, val timestamp: Date) {
+    companion object {
+        fun from(data: Map<String, Any?>): Connection {
+            val userId = data["userId"] as? String ?: ""
+            return Connection(userId, userId, MediaItem.anyToDate(data["timestamp"]) ?: Date())
+        }
+    }
+}
+
+data class FollowerRecord(val id: String, val userId: String, val timestamp: Date) {
+    companion object {
+        fun from(data: Map<String, Any?>): FollowerRecord {
+            val userId = data["userId"] as? String ?: ""
+            return FollowerRecord(userId, userId, MediaItem.anyToDate(data["timestamp"]) ?: Date())
+        }
+    }
+}
+
 // MARK: - PhotoTag (etiqueta espacial sobre una imagen)
 data class PhotoTag(
     val id: String = UUID.randomUUID().toString(),
@@ -296,6 +356,67 @@ data class Moment(
             disableComments = data["disableComments"] as? Boolean ?: false,
             hideLikeCounts = data["hideLikeCounts"] as? Boolean ?: false,
             allowSharing = data["allowSharing"] as? Boolean ?: true,
+        )
+    }
+}
+
+// MARK: - CommentMentionEntity (mención dentro de un comentario)
+data class CommentMentionEntity(
+    val userId: String,
+    val username: String,
+    val rangeStart: Int,
+    val rangeLength: Int,
+) {
+    val id: String get() = userId
+
+    companion object {
+        fun from(data: Map<String, Any?>): CommentMentionEntity = CommentMentionEntity(
+            userId = data["userId"] as? String ?: "",
+            username = data["username"] as? String ?: "",
+            rangeStart = (data["rangeStart"] as? Number)?.toInt() ?: 0,
+            rangeLength = (data["rangeLength"] as? Number)?.toInt() ?: 0,
+        )
+    }
+}
+
+// MARK: - Comment (comentario de un momento)
+data class Comment(
+    val id: String? = null,
+    val authorId: String,
+    val username: String,
+    val content: String,
+    val timestamp: Date,
+    val profileImagePath: String? = null,
+    val updatedAt: Date? = null,
+    val reactions: Map<String, List<String>> = emptyMap(),
+    val parentCommentId: String? = null,
+    val isEdited: Boolean? = false,
+    val editedTimestamp: Date? = null,
+    val mentions: List<CommentMentionEntity> = emptyList(),
+) {
+    // Flag offline, fuera de la igualdad (como en iOS).
+    var isPending: Boolean? = false
+
+    val isEditedFlag: Boolean get() = isEdited ?: false
+    val wasEdited: Boolean get() = editedTimestamp != null
+
+    companion object {
+        fun from(id: String?, data: Map<String, Any?>): Comment = Comment(
+            id = id ?: data["id"] as? String,
+            authorId = data["authorId"] as? String ?: "",
+            username = data["username"] as? String ?: "",
+            content = data["content"] as? String ?: "",
+            timestamp = MediaItem.anyToDate(data["timestamp"]) ?: Date(),
+            profileImagePath = data["profileImagePath"] as? String,
+            updatedAt = MediaItem.anyToDate(data["updatedAt"]),
+            reactions = (data["reactions"] as? Map<*, *>)?.entries?.mapNotNull { entry ->
+                val k = entry.key as? String ?: return@mapNotNull null
+                k to ((entry.value as? List<*>)?.filterIsInstance<String>() ?: emptyList<String>())
+            }?.toMap() ?: emptyMap(),
+            parentCommentId = data["parentCommentId"] as? String,
+            isEdited = data["isEdited"] as? Boolean ?: false,
+            editedTimestamp = MediaItem.anyToDate(data["editedTimestamp"]),
+            mentions = (data["mentions"] as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(CommentMentionEntity::from) } ?: emptyList(),
         )
     }
 }
