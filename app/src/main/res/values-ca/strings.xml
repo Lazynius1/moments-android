@@ -174,4 +174,7 @@
     <string name="time_hour">h</string>
     <string name="time_day">d</string>
     <string name="time_week">set</string>
+    <string name="user_activity_time_spent_limit_reached_title">Moments</string>
+    <string name="user_activity_time_spent_limit_reached_body">Has arribat al teu límit diari de temps a Moments.</string>
+    <string name="user_activity_time_spent_limit_reached_in_app_title">Límit diari assolit</string>
 </resources>

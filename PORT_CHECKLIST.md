@@ -63,7 +63,7 @@ Orden sugerido (de más núcleo a más periférico):
 ### Capas de datos / lógica (no-UI) — `Moments/*` fuera de `Views/`
 Hasta ahora se han portado **a demanda** (inline en cada pantalla, p. ej. `EmailRegistration.kt` cubre parte de `Services/Auth`). Falta portarlas de forma estructurada:
 
-- [ ] **Services** (69) — Auth, Firestore repos, Storage, etc. La columna vertebral. *Parcial (auth/registro inline).*
+- [~] **Services** (69) — Auth, Firestore repos, Storage, etc. La columna vertebral. *En curso: Activity ✅ (`TimeSpentManager`); resto pendiente. Stub mínimo de `NotificationPresentationCoordinator` para el banner de límite diario.*
 - [x] **Models** (21) — COMPLETA (100%, leer + escribir): User/AppUser, Models.kt (Moment, MediaItem, Comment, follow, hidden layers, Story, StickerData, Notification, Questions…), Echo, ChatSecurity, StickerItem (datos), UserAffinity, AccountHistoryItem, OutboxPayloads, y `models/cache/*` (entidades). Cada modelo Firestore tiene `from(map)` **y** `toMap()`/`asFirestoreData()`. Descartado: badges/Plus/ProfileTheme. Pendiente (capa de caché, no del modelo): Room + conversiones from/to de `cache/*` (algunas dependen de Messaging: Conversation/EnhancedMessage). UI helpers (displayName/iconos de enums) → capa de UI.
 - [ ] **Notifications** (24) — FCM / push (aún sin tocar en Android).
 - [ ] **Utilities** (11) — helpers varios.
