@@ -60,6 +60,18 @@ Orden sugerido (de más núcleo a más periférico):
 - [ ] **comments** (3), **Echoes** (3), **Misc** (1)
 - [ ] **Components / Shared** (22+10) — se portan a demanda según los vaya necesitando cada pantalla.
 
+### Capas de datos / lógica (no-UI) — `Moments/*` fuera de `Views/`
+Hasta ahora se han portado **a demanda** (inline en cada pantalla, p. ej. `EmailRegistration.kt` cubre parte de `Services/Auth`). Falta portarlas de forma estructurada:
+
+- [ ] **Services** (69) — Auth, Firestore repos, Storage, etc. La columna vertebral. *Parcial (auth/registro inline).*
+- [ ] **Models** (21) — `User`, `Moment`, `Story`, … Ahora se usan `HashMap` ad-hoc; convendría modelos Kotlin tipados.
+- [ ] **Notifications** (24) — FCM / push (aún sin tocar en Android).
+- [ ] **Utilities** (11) — helpers varios.
+- [ ] **Coordinators** (5) — coordinación de flujos.
+- [ ] **Extensions** (5) — extensiones Swift → equivalentes Kotlin a demanda.
+- [ ] **ad** (4) — AdMob + ATT (en iOS ya integrado; en Android sin empezar).
+- [ ] **Reportes** (7), **Moderation** (2), **Activities** (3), **ViewModels** (1)
+
 ### Navegación / estructura
 - [ ] `MomentsApp.kt` tiene la barra inferior (Inicio/Buscar/Crear/Actividad/Perfil) con placeholders — falta conectar cada destino a su pantalla real conforme se porten.
 
