@@ -7,6 +7,19 @@ import java.util.UUID
 
 // Port incremental de Models.swift de iOS. Se van añadiendo tipos poco a poco.
 
+// MARK: - Point (equivalente a CGPoint de iOS en modelos)
+data class Point(val x: Double, val y: Double) {
+    companion object {
+        /** Lee un punto desde un mapa {x,y}. */
+        fun from(data: Any?): Point? {
+            val m = data as? Map<*, *> ?: return null
+            val x = (m["x"] as? Number)?.toDouble() ?: return null
+            val y = (m["y"] as? Number)?.toDouble() ?: return null
+            return Point(x, y)
+        }
+    }
+}
+
 // MARK: - FilterSettings
 data class FilterSettings(val name: String, val intensity: Double)
 
@@ -570,4 +583,437 @@ data class HiddenLayerMetricsSnapshot(
     val topLayer: MomentHiddenLayer?
         get() = layers.maxWithOrNull(compareBy<MomentHiddenLayer> { it.discoverCount ?: 0 }
             .thenBy { it.lastDiscoveredAt?.time ?: Long.MIN_VALUE })
+}
+
+// MARK: - StickerData (sticker interactivo de una historia/momento)
+// Nota: from(StickerItem)/extractContent (render a base64) son lógica del editor → módulo Creator.
+data class StickerData(
+    val stickerId: String? = null,
+    val type: String,
+    val content: String,
+    val position: Point,
+    val scale: Double,
+    val rotation: Double,
+    val zIndex: Int? = null,
+    val username: String? = null,
+    val userId: String? = null,
+    val hashtag: String? = null,
+    val location: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val styleVariant: Int? = null,
+    val questionText: String? = null,
+    val pollOptions: List<String>? = null,
+    val weatherSymbol: String? = null,
+    val linkURL: String? = null,
+    val linkTitle: String? = null,
+    val countdownTitle: String? = null,
+    val countdownTargetAtMs: Double? = null,
+    val sliderEmoji: String? = null,
+    val sliderPrompt: String? = null,
+    val caption: String? = null,
+    val profileImagePath: String? = null,
+    val momentId: String? = null,
+    val mediaCount: Int? = null,
+    val quizQuestion: String? = null,
+    val quizOptions: List<String>? = null,
+    val quizCorrectIndex: Int? = null,
+    val revealType: String? = null,
+    val revealPattern: String? = null,
+    val revealPrimaryColor: String? = null,
+    val revealSecondaryColor: String? = null,
+    val revealEffectColor: String? = null,
+    val frameStyle: String? = null,
+    val contentScale: Double? = null,
+    val contentOffsetX: Double? = null,
+    val contentOffsetY: Double? = null,
+    val moderationState: String? = null,
+    val moderationReason: String? = null,
+    val moderationCategory: String? = null,
+    val audioURL: String? = null,
+    val audioDuration: Double? = null,
+    val isAnimated: Boolean = false,
+    val gifURL: String? = null,
+    val videoURL: String? = null,
+) {
+    companion object {
+        fun from(data: Map<String, Any?>): StickerData {
+            // position: mapa {x,y} nuevo, o positionX/positionY antiguo (compat, como iOS).
+            val position = Point.from(data["position"]) ?: Point(
+                (data["positionX"] as? Number)?.toDouble() ?: 0.0,
+                (data["positionY"] as? Number)?.toDouble() ?: 0.0,
+            )
+            fun strList(key: String) = (data[key] as? List<*>)?.filterIsInstance<String>()
+            return StickerData(
+                stickerId = data["stickerId"] as? String,
+                type = data["type"] as? String ?: "",
+                content = data["content"] as? String ?: "",
+                position = position,
+                scale = (data["scale"] as? Number)?.toDouble() ?: 1.0,
+                rotation = (data["rotation"] as? Number)?.toDouble() ?: 0.0,
+                zIndex = (data["zIndex"] as? Number)?.toInt(),
+                username = data["username"] as? String,
+                userId = data["userId"] as? String,
+                hashtag = data["hashtag"] as? String,
+                location = data["location"] as? String,
+                latitude = (data["latitude"] as? Number)?.toDouble(),
+                longitude = (data["longitude"] as? Number)?.toDouble(),
+                styleVariant = (data["styleVariant"] as? Number)?.toInt(),
+                questionText = data["questionText"] as? String,
+                pollOptions = strList("pollOptions"),
+                weatherSymbol = data["weatherSymbol"] as? String,
+                linkURL = data["linkURL"] as? String,
+                linkTitle = data["linkTitle"] as? String,
+                countdownTitle = data["countdownTitle"] as? String,
+                countdownTargetAtMs = (data["countdownTargetAtMs"] as? Number)?.toDouble(),
+                sliderEmoji = data["sliderEmoji"] as? String,
+                sliderPrompt = data["sliderPrompt"] as? String,
+                caption = data["caption"] as? String,
+                profileImagePath = data["profileImagePath"] as? String,
+                momentId = data["momentId"] as? String,
+                mediaCount = (data["mediaCount"] as? Number)?.toInt(),
+                quizQuestion = data["quizQuestion"] as? String,
+                quizOptions = strList("quizOptions"),
+                quizCorrectIndex = (data["quizCorrectIndex"] as? Number)?.toInt(),
+                revealType = data["revealType"] as? String,
+                revealPattern = data["revealPattern"] as? String,
+                revealPrimaryColor = data["revealPrimaryColor"] as? String,
+                revealSecondaryColor = data["revealSecondaryColor"] as? String,
+                revealEffectColor = data["revealEffectColor"] as? String,
+                frameStyle = data["frameStyle"] as? String,
+                contentScale = (data["contentScale"] as? Number)?.toDouble(),
+                contentOffsetX = (data["contentOffsetX"] as? Number)?.toDouble(),
+                contentOffsetY = (data["contentOffsetY"] as? Number)?.toDouble(),
+                moderationState = data["moderationState"] as? String,
+                moderationReason = data["moderationReason"] as? String,
+                moderationCategory = data["moderationCategory"] as? String,
+                audioURL = data["audioURL"] as? String,
+                audioDuration = (data["audioDuration"] as? Number)?.toDouble(),
+                isAnimated = data["isAnimated"] as? Boolean ?: false,
+                gifURL = data["gifURL"] as? String,
+                videoURL = data["videoURL"] as? String,
+            )
+        }
+    }
+}
+
+// MARK: - StoryTextOverlayMetadata (overlay de texto vivo en una historia)
+// El factory build(...) es del editor (StoryEditingView) → módulo Creator.
+data class StoryTextOverlayMetadata(
+    val id: String,
+    val text: String,
+    val normalizedPosition: Point,
+    val layerOrder: Int,
+    val styleRaw: String,
+    val colorHex: String,
+    val fontSize: Double,
+    val alignmentRaw: String,
+    val backgroundFillRaw: String,
+    val strokeRaw: String,
+    val visualEffectRaw: String,
+    val motionRaw: String,
+    val forcesAllCaps: Boolean,
+    val isLiveOverlay: Boolean = true,
+    val gradientStopHexes: List<String>? = null,
+    val gradientAngle: Int? = null,
+) {
+    companion object {
+        fun from(data: Map<String, Any?>): StoryTextOverlayMetadata = StoryTextOverlayMetadata(
+            id = data["id"] as? String ?: UUID.randomUUID().toString(),
+            text = data["text"] as? String ?: "",
+            normalizedPosition = Point.from(data["normalizedPosition"]) ?: Point(0.0, 0.0),
+            layerOrder = (data["layerOrder"] as? Number)?.toInt() ?: 0,
+            styleRaw = data["styleRaw"] as? String ?: "",
+            colorHex = data["colorHex"] as? String ?: "",
+            fontSize = (data["fontSize"] as? Number)?.toDouble() ?: 0.0,
+            alignmentRaw = data["alignmentRaw"] as? String ?: "",
+            backgroundFillRaw = data["backgroundFillRaw"] as? String ?: "",
+            strokeRaw = data["strokeRaw"] as? String ?: "",
+            visualEffectRaw = data["visualEffectRaw"] as? String ?: "",
+            motionRaw = data["motionRaw"] as? String ?: "",
+            forcesAllCaps = data["forcesAllCaps"] as? Boolean ?: false,
+            isLiveOverlay = data["isLiveOverlay"] as? Boolean ?: true,
+            gradientStopHexes = (data["gradientStopHexes"] as? List<*>)?.filterIsInstance<String>(),
+            gradientAngle = (data["gradientAngle"] as? Number)?.toInt(),
+        )
+    }
+}
+
+// MARK: - HighlightedStory (destacados)
+data class HighlightedStory(
+    val id: String? = null,
+    val title: String,
+    val coverImageUrl: String? = null,
+    val storiesCount: Int,
+    val createdAt: Date,
+    val storyIds: List<String>,
+    val authorId: String,
+) {
+    companion object {
+        fun from(id: String?, data: Map<String, Any?>): HighlightedStory = HighlightedStory(
+            id = id ?: data["id"] as? String,
+            title = data["title"] as? String ?: "",
+            coverImageUrl = data["coverImageUrl"] as? String,
+            storiesCount = (data["storiesCount"] as? Number)?.toInt() ?: 0,
+            createdAt = MediaItem.anyToDate(data["createdAt"]) ?: Date(),
+            storyIds = (data["storyIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            authorId = data["authorId"] as? String ?: "",
+        )
+    }
+}
+
+// MARK: - Story (historia)
+data class Story(
+    val id: String? = null,
+    val authorId: String,
+    val duration: Double,
+    val expirationHours: Int? = null,
+    val expirationDate: Date,
+    val mediaItem: MediaItem,
+    val profileImagePath: String? = null,
+    val timestamp: Date,
+    val username: String,
+    val audience: String? = null,
+    val customListId: String? = null,
+    val text: String? = null,
+    val textPosition: Point? = null,
+    val textStyle: String? = null,
+    val textPositionNormX: Double? = null,
+    val textPositionNormY: Double? = null,
+    val textColorHex: String? = null,
+    val textFontSize: Double? = null,
+    val textAlignment: String? = null,
+    val textBackgroundFill: String? = null,
+    val textStroke: String? = null,
+    val textVisualEffect: String? = null,
+    val textMotion: String? = null,
+    val forcesAllCaps: Boolean? = null,
+    val textLayerOrder: Int? = null,
+    val textOverlayLive: Boolean? = null,
+    val textOverlays: List<StoryTextOverlayMetadata>? = null,
+    val stickers: List<StickerData>? = null,
+    val drawingData: ByteArray? = null,
+    val aspectRatio: String? = null,
+    val backgroundFrameURL: String? = null,
+    val backgroundBlurredFrameURL: String? = null,
+    val chainId: String? = null,
+    val chainPosition: Int? = null,
+    val chainTitle: String? = null,
+) {
+    companion object {
+        /** Devuelve null si no hay media válido (imagen/vídeo), como el throw de iOS. */
+        fun from(id: String?, data: Map<String, Any?>): Story? {
+            val chainId = data["chainId"] as? String
+            val mediaItem = (data["mediaItem"] as? Map<String, Any?>)?.let(MediaItem::from)
+                ?: (data["imagePath"] as? String)?.takeIf { it.isNotEmpty() }?.let { MediaItem(type = MediaItem.MediaType.IMAGE, url = it) }
+                ?: (data["videoUrl"] as? String)?.takeIf { it.isNotEmpty() }?.let { MediaItem(type = MediaItem.MediaType.VIDEO, url = it) }
+                ?: return null
+
+            val textPosition = Point.from(data["textPosition"]) ?: run {
+                val x = (data["textPositionX"] as? Number)?.toDouble()
+                val y = (data["textPositionY"] as? Number)?.toDouble()
+                if (x != null && y != null) Point(x, y) else null
+            }
+
+            return Story(
+                id = id ?: data["id"] as? String,
+                authorId = data["authorId"] as? String ?: "",
+                duration = (data["duration"] as? Number)?.toDouble() ?: 0.0,
+                expirationHours = (data["expirationHours"] as? Number)?.toInt() ?: (if (chainId != null) 48 else 24),
+                expirationDate = MediaItem.anyToDate(data["expirationDate"]) ?: Date(),
+                mediaItem = mediaItem,
+                profileImagePath = data["profileImagePath"] as? String,
+                timestamp = MediaItem.anyToDate(data["timestamp"]) ?: Date(),
+                username = data["username"] as? String ?: "",
+                audience = data["audience"] as? String,
+                customListId = data["customListId"] as? String,
+                text = data["text"] as? String,
+                textPosition = textPosition,
+                textStyle = data["textStyle"] as? String,
+                textPositionNormX = (data["textPositionNormX"] as? Number)?.toDouble(),
+                textPositionNormY = (data["textPositionNormY"] as? Number)?.toDouble(),
+                textColorHex = data["textColorHex"] as? String,
+                textFontSize = (data["textFontSize"] as? Number)?.toDouble(),
+                textAlignment = data["textAlignment"] as? String,
+                textBackgroundFill = data["textBackgroundFill"] as? String,
+                textStroke = data["textStroke"] as? String,
+                textVisualEffect = data["textVisualEffect"] as? String,
+                textMotion = data["textMotion"] as? String,
+                forcesAllCaps = data["forcesAllCaps"] as? Boolean,
+                textLayerOrder = (data["textLayerOrder"] as? Number)?.toInt(),
+                textOverlayLive = data["textOverlayLive"] as? Boolean,
+                textOverlays = (data["textOverlays"] as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(StoryTextOverlayMetadata::from) },
+                stickers = (data["stickers"] as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(StickerData::from) },
+                drawingData = (data["drawingData"] as? com.google.firebase.firestore.Blob)?.toBytes() ?: (data["drawingData"] as? ByteArray),
+                aspectRatio = data["aspectRatio"] as? String,
+                backgroundFrameURL = data["backgroundFrameURL"] as? String,
+                backgroundBlurredFrameURL = data["backgroundBlurredFrameURL"] as? String,
+                chainId = chainId,
+                chainPosition = (data["chainPosition"] as? Number)?.toInt(),
+                chainTitle = data["chainTitle"] as? String,
+            )
+        }
+    }
+}
+
+// MARK: - Visibilidad de contenido (ContentProtocol)
+enum class ContentVisibilityType { EVERYONE, MUTUALS, BEST_FRIENDS, CUSTOM }
+
+private fun visibilityFrom(audience: String?): ContentVisibilityType = when (audience) {
+    "everyone" -> ContentVisibilityType.EVERYONE
+    "mutuals" -> ContentVisibilityType.MUTUALS
+    "bestFriends" -> ContentVisibilityType.BEST_FRIENDS
+    "custom" -> ContentVisibilityType.CUSTOM
+    else -> ContentVisibilityType.EVERYONE
+}
+
+val Moment.visibilityType: ContentVisibilityType get() = visibilityFrom(audience)
+val Story.visibilityType: ContentVisibilityType get() = visibilityFrom(audience)
+
+// MARK: - NotificationType
+enum class NotificationType(val raw: String) {
+    LIKE("like"),
+    REACTION("reaction"),
+    COMMENT("comment"),
+    MENTION("mention"),
+    NEW_FOLLOWER("newFollower"),
+    FOLLOW_REQUEST("followRequest"),
+    REQUEST_ACCEPTED("requestAccepted"),
+    MUTUAL_CONNECTION("mutualConnection"),
+    STORY_REACTION("storyReaction"),
+    MESSAGE("message"),
+    MESSAGE_REACTION("messageReaction"),
+    CHAT_BUZZ("chatBuzz"),
+    GENTLE_REMINDER("gentleReminder"),
+    PHOTO_TAG("photoTag"),
+    ECHO_SUGGESTION("echoSuggestion"),
+    DATA_EXPORT_READY("data_export_ready"),
+    STORY_CHAIN_CONTINUED("storyChainContinued"),
+    MEDIA_MODERATION("mediaModeration");
+
+    companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } }
+    // displayName / systemIconName (localizados + SF Symbols) → capa de UI.
+}
+
+// MARK: - Notification
+data class MomentsNotification(
+    val id: String? = null,
+    val type: NotificationType,
+    val senderId: String,
+    val senderUsername: String,
+    val timestamp: Date = Date(),
+    val isPending: Boolean = true,
+    val title: String? = null,
+    val message: String? = null,
+    val downloadURL: String? = null,
+    val momentId: String? = null,
+    val visitCount: Int? = null,
+    val storyId: String? = null,
+    val storyAuthorId: String? = null,
+    val storyPreviewUrl: String? = null,
+    val mentionContext: String? = null,
+    val targetAuthorId: String? = null,
+    val targetAuthorUsername: String? = null,
+    val reaction: String? = null,
+    val reactionCount: Int? = null,
+    val commentId: String? = null,
+    val conversationId: String? = null,
+    val echoId: String? = null,
+    val moderationScope: String? = null,
+    val chainId: String? = null,
+    val chainTitle: String? = null,
+    val chainPosition: Int? = null,
+    val totalParts: Int? = null,
+    val chainRole: String? = null,
+    val messageId: String? = null,
+    val messageType: String? = null,
+    val buzzEventId: String? = null,
+    val reminderVariant: String? = null,
+    val isReactionPlural: Boolean? = null,
+) {
+    companion object {
+        /** null si el tipo es desconocido (como el throw del decoder de iOS). */
+        fun from(id: String?, data: Map<String, Any?>): MomentsNotification? {
+            val type = NotificationType.from(data["type"] as? String) ?: return null
+            val isPending = data["isPending"] as? Boolean
+                ?: (data["isRead"] as? Boolean)?.let { !it }
+                ?: true
+            // reaction: reaction → reactionType → commentText (compat Cloud Functions).
+            val reaction = data["reaction"] as? String ?: data["reactionType"] as? String ?: data["commentText"] as? String
+            val isReactionPlural = data["isReactionPlural"] as? Boolean
+                ?: (data["isReactionPlural"] as? String)?.let { it == "1" || it.lowercase() == "true" }
+            return MomentsNotification(
+                id = id ?: data["id"] as? String,
+                type = type,
+                senderId = data["senderId"] as? String ?: "",
+                senderUsername = data["senderUsername"] as? String ?: "",
+                timestamp = MediaItem.anyToDate(data["timestamp"]) ?: Date(),
+                isPending = isPending,
+                title = data["title"] as? String,
+                message = data["message"] as? String,
+                downloadURL = data["downloadURL"] as? String,
+                momentId = data["momentId"] as? String,
+                visitCount = (data["visitCount"] as? Number)?.toInt(),
+                storyId = data["storyId"] as? String,
+                storyAuthorId = data["storyAuthorId"] as? String,
+                storyPreviewUrl = data["storyPreviewUrl"] as? String,
+                mentionContext = data["mentionContext"] as? String,
+                targetAuthorId = data["targetAuthorId"] as? String,
+                targetAuthorUsername = data["targetAuthorUsername"] as? String,
+                reaction = reaction,
+                reactionCount = (data["reactionCount"] as? Number)?.toInt(),
+                commentId = data["commentId"] as? String,
+                conversationId = data["conversationId"] as? String,
+                echoId = data["echoId"] as? String,
+                moderationScope = data["moderationScope"] as? String,
+                chainId = data["chainId"] as? String,
+                chainTitle = data["chainTitle"] as? String,
+                chainPosition = (data["chainPosition"] as? Number)?.toInt(),
+                totalParts = (data["totalParts"] as? Number)?.toInt(),
+                chainRole = data["chainRole"] as? String,
+                messageId = data["messageId"] as? String,
+                messageType = data["messageType"] as? String,
+                buzzEventId = data["buzzEventId"] as? String,
+                reminderVariant = data["reminderVariant"] as? String,
+                isReactionPlural = isReactionPlural,
+            )
+        }
+    }
+}
+
+// MARK: - Sticker Questions
+data class QuestionResponse(
+    val id: String,
+    val userId: String,
+    val response: String,
+    val timestamp: Date,
+    val isAnonymous: Boolean = true,
+) {
+    companion object {
+        fun create(userId: String, response: String) = QuestionResponse(UUID.randomUUID().toString(), userId, response, Date(), true)
+
+        fun from(data: Map<String, Any?>): QuestionResponse = QuestionResponse(
+            id = data["id"] as? String ?: UUID.randomUUID().toString(),
+            userId = data["userId"] as? String ?: "",
+            response = data["response"] as? String ?: "",
+            timestamp = MediaItem.anyToDate(data["timestamp"]) ?: Date(),
+            isAnonymous = data["isAnonymous"] as? Boolean ?: true,
+        )
+    }
+}
+
+data class QuestionData(
+    val questionText: String,
+    val responses: List<QuestionResponse> = emptyList(),
+    val responseCount: Int = 0,
+    val createdAt: Date = Date(),
+) {
+    companion object {
+        fun from(data: Map<String, Any?>): QuestionData = QuestionData(
+            questionText = data["questionText"] as? String ?: "",
+            responses = (data["responses"] as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(QuestionResponse::from) } ?: emptyList(),
+            responseCount = (data["responseCount"] as? Number)?.toInt() ?: 0,
+            createdAt = MediaItem.anyToDate(data["createdAt"]) ?: Date(),
+        )
+    }
 }
