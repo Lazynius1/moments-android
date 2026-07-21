@@ -1,0 +1,56 @@
+{
+  "project_info": {
+    "project_number": "543287427123",
+    "firebase_url": "https://glowsy-6a40e-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "glowsy-6a40e",
+    "storage_bucket": "glowsy-6a40e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:543287427123:android:3c6963012c4276fa1b6346",
+        "android_client_info": {
+          "package_name": "com.moments.android"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "543287427123-vt2l35235kclb6ktcmp2efvlii6jfmj0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.moments.android",
+            "certificate_hash": "cd5a3b73edda9f6e54754624acce9cdf218c381e"
+          }
+        },
+        {
+          "client_id": "543287427123-jqme1m9j9ubrnt7hc37hse2dd7ibl7hu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAY9jab9NKUtMj37SMb5w-gr153Ih7RAas"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "543287427123-jqme1m9j9ubrnt7hc37hse2dd7ibl7hu.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "543287427123-0q3ou1nue8b83dpbv5elb76vpaome5om.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.glowsyapp",
+                "app_store_id": "6749241395"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
