@@ -48,7 +48,7 @@ Port nativo de la app iOS (SwiftUI) a Android (Jetpack Compose) sobre el **mismo
 
 Orden sugerido (de más núcleo a más periférico):
 
-- [ ] **Feed** (47) — `ui/feed/FeedScreen.kt` es placeholder; falta el feed real, tarjetas de post, historias. *Parcial.*
+- [~] **Feed** (47) — `ui/feed/FeedScreen.kt` ya funciona: trae datos reales (Cloud Functions `getFeedPage`/`getStoryRingPage`), story rings, selector Para ti/Siguiendo, carrusel de media, acciones, textos **localizados (8 idiomas)**. *Falta bastante vs iOS:* diseño fiel de `ModernPostCardView`, reproducción de vídeo real, likes/comentarios funcionales, historias reales, refresh, paginación.
 - [ ] **Profile** (50) — perfil propio y de otros, editor, etc.
 - [ ] **Creator** (70) — creación de moments/stories (cámara, editor). *Grande.*
 - [ ] **Messaging** (85) — chat/DMs. *La más grande.*

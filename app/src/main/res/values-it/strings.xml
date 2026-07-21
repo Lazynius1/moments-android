@@ -162,4 +162,16 @@
     <string name="suspended_contact_placeholder">Spiega perché ritieni che la sospensione sia errata...</string>
     <string name="suspended_contact_send">Invia messaggio</string>
     <string name="suspended_contact_success">Il tuo messaggio è stato inviato correttamente. Valuteremo il tuo caso e ti risponderemo presto.</string>
+    <string name="feed_for_you">Per te</string>
+    <string name="feed_following">Seguiti</string>
+    <string name="stories_your_story">La tua storia</string>
+    <string name="feed_activity">Attività</string>
+    <string name="feed_messages">Messaggi</string>
+    <string name="feed_loading">Caricamento momenti…</string>
+    <string name="feed_error">Impossibile caricare il feed.</string>
+    <string name="time_now">ora</string>
+    <string name="time_min">min</string>
+    <string name="time_hour">h</string>
+    <string name="time_day">g</string>
+    <string name="time_week">sett</string>
 </resources>

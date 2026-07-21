@@ -44,9 +44,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.moments.android.R
 import com.moments.android.data.BackendFeedService
 import com.moments.android.data.FeedMoment
 import com.moments.android.data.FeedMediaItem
@@ -70,8 +72,8 @@ fun FeedScreen(padding: PaddingValues) {
     LazyColumn(modifier = Modifier.fillMaxSize().padding(padding).background(Canvas), contentPadding = PaddingValues(bottom = 22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { FeedHeader(stories) }
         item { FeedSelector(following) { following = it } }
-        if (moments.isEmpty() && error == null) item { Text("Cargando momentos…", Modifier.padding(24.dp), color = Ink.copy(alpha = .58f)) }
-        error?.let { item { Text("No se ha podido cargar el feed.", Modifier.padding(24.dp), color = Ink.copy(alpha = .58f)) } }
+        if (moments.isEmpty() && error == null) item { Text(stringResource(R.string.feed_loading), Modifier.padding(24.dp), color = Ink.copy(alpha = .58f)) }
+        error?.let { item { Text(stringResource(R.string.feed_error), Modifier.padding(24.dp), color = Ink.copy(alpha = .58f)) } }
         items(moments.size, key = { moments[it].id }) { index -> MomentCard(moments[index]) }
     }
 }
@@ -80,12 +82,12 @@ fun FeedScreen(padding: PaddingValues) {
     Column {
         Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
-                item { StoryRing("Tu historia", true) }
+                item { StoryRing(stringResource(R.string.stories_your_story), true) }
                 items(stories.size) { StoryRing(stories[it].username, false) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HeaderAction(Icons.Filled.FavoriteBorder, "Actividad")
-                HeaderAction(Icons.AutoMirrored.Filled.Send, "Mensajes")
+                HeaderAction(Icons.Filled.FavoriteBorder, stringResource(R.string.feed_activity))
+                HeaderAction(Icons.AutoMirrored.Filled.Send, stringResource(R.string.feed_messages))
             }
         }
     }
@@ -101,7 +103,7 @@ fun FeedScreen(padding: PaddingValues) {
 @Composable private fun HeaderAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) = Box(Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(Ink.copy(alpha = .035f)).clickable { }, contentAlignment = Alignment.Center) { Icon(icon, label, tint = Ink, modifier = Modifier.size(20.dp)) }
 
 @Composable private fun FeedSelector(following: Boolean, setFollowing: (Boolean) -> Unit) = Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.Center) {
-    FeedChip("Para ti", !following) { setFollowing(false) }; Spacer(Modifier.width(4.dp)); FeedChip("Siguiendo", following) { setFollowing(true) }
+    FeedChip(stringResource(R.string.feed_for_you), !following) { setFollowing(false) }; Spacer(Modifier.width(4.dp)); FeedChip(stringResource(R.string.feed_following), following) { setFollowing(true) }
 }
 
 @Composable private fun FeedChip(label: String, selected: Boolean, onClick: () -> Unit) = Text(label, Modifier.clip(RoundedCornerShape(18.dp)).clickable(onClick = onClick).background(if (selected) Brush.linearGradient(listOf(Teal, Violet)) else Brush.linearGradient(listOf(Ink.copy(alpha=.055f), Ink.copy(alpha=.055f)))).padding(horizontal = 14.dp, vertical = 7.dp), color = if (selected) Color.White else Ink.copy(alpha=.72f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
@@ -183,13 +185,14 @@ fun FeedScreen(padding: PaddingValues) {
 @Composable private fun MomentAction(icon: androidx.compose.ui.graphics.vector.ImageVector, count: String?) = Row(verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = Ink, modifier = Modifier.size(21.dp)); count?.let { Spacer(Modifier.width(5.dp)); Text(it, color = Ink.copy(alpha=.62f), style = MaterialTheme.typography.labelMedium) } }
 private fun mediaHeight(ratio: String?): androidx.compose.ui.unit.Dp = when (ratio?.lowercase()) { "9:16" -> 510.dp; "4:5" -> 430.dp; "16:9" -> 230.dp; else -> 390.dp }
 
+@Composable
 private fun relativeTime(timestamp: Long): String {
     val elapsed = System.currentTimeMillis() - timestamp
     return when {
-        elapsed < TimeUnit.MINUTES.toMillis(1) -> "ahora"
-        elapsed < TimeUnit.HOURS.toMillis(1) -> "${TimeUnit.MILLISECONDS.toMinutes(elapsed)} min"
-        elapsed < TimeUnit.DAYS.toMillis(1) -> "${TimeUnit.MILLISECONDS.toHours(elapsed)} h"
-        elapsed < TimeUnit.DAYS.toMillis(7) -> "${TimeUnit.MILLISECONDS.toDays(elapsed)} d"
-        else -> "${TimeUnit.MILLISECONDS.toDays(elapsed) / 7} sem"
+        elapsed < TimeUnit.MINUTES.toMillis(1) -> stringResource(R.string.time_now)
+        elapsed < TimeUnit.HOURS.toMillis(1) -> "${TimeUnit.MILLISECONDS.toMinutes(elapsed)} ${stringResource(R.string.time_min)}"
+        elapsed < TimeUnit.DAYS.toMillis(1) -> "${TimeUnit.MILLISECONDS.toHours(elapsed)} ${stringResource(R.string.time_hour)}"
+        elapsed < TimeUnit.DAYS.toMillis(7) -> "${TimeUnit.MILLISECONDS.toDays(elapsed)} ${stringResource(R.string.time_day)}"
+        else -> "${TimeUnit.MILLISECONDS.toDays(elapsed) / 7} ${stringResource(R.string.time_week)}"
     }
 }

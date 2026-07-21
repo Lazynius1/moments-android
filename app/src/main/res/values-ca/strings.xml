@@ -162,4 +162,16 @@
     <string name="suspended_contact_placeholder">Explica\'ns per què consideres que la suspensió és incorrecta...</string>
     <string name="suspended_contact_send">Enviar Missatge</string>
     <string name="suspended_contact_success">El teu missatge s\'ha enviat correctament. Revisarem el teu cas i et respondrem aviat.</string>
+    <string name="feed_for_you">Per a Tu</string>
+    <string name="feed_following">Seguint</string>
+    <string name="stories_your_story">La teva història</string>
+    <string name="feed_activity">Activitat</string>
+    <string name="feed_messages">Missatges</string>
+    <string name="feed_loading">Carregant moments…</string>
+    <string name="feed_error">No s’ha pogut carregar el feed.</string>
+    <string name="time_now">ara</string>
+    <string name="time_min">min</string>
+    <string name="time_hour">h</string>
+    <string name="time_day">d</string>
+    <string name="time_week">set</string>
 </resources>

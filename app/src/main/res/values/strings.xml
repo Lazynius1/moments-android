@@ -163,4 +163,16 @@
     <string name="suspended_contact_placeholder">Explain why you believe the suspension is incorrect...</string>
     <string name="suspended_contact_send">Send Message</string>
     <string name="suspended_contact_success">Your message has been sent successfully. We will review your case and get back to you soon.</string>
+    <string name="feed_for_you">For You</string>
+    <string name="feed_following">Following</string>
+    <string name="stories_your_story">Your story</string>
+    <string name="feed_activity">Activity</string>
+    <string name="feed_messages">Messages</string>
+    <string name="feed_loading">Loading moments…</string>
+    <string name="feed_error">Couldn’t load the feed.</string>
+    <string name="time_now">now</string>
+    <string name="time_min">min</string>
+    <string name="time_hour">h</string>
+    <string name="time_day">d</string>
+    <string name="time_week">w</string>
 </resources>
