@@ -64,7 +64,7 @@ Orden sugerido (de más núcleo a más periférico):
 Hasta ahora se han portado **a demanda** (inline en cada pantalla, p. ej. `EmailRegistration.kt` cubre parte de `Services/Auth`). Falta portarlas de forma estructurada:
 
 - [ ] **Services** (69) — Auth, Firestore repos, Storage, etc. La columna vertebral. *Parcial (auth/registro inline).*
-- [ ] **Models** (21) — `User`, `Moment`, `Story`, … Ahora se usan `HashMap` ad-hoc; convendría modelos Kotlin tipados.
+- [x] **Models** (21) — COMPLETA (100%): User/AppUser, Models.kt (Moment, MediaItem, Comment, follow, hidden layers, Story, StickerData, Notification, Questions…), Echo, ChatSecurity, StickerItem (datos), UserAffinity, AccountHistoryItem, OutboxPayloads, y `models/cache/*` (entidades). Descartado: badges/Plus/ProfileTheme. Pendiente de cablear: Room + conversiones de cache, y deps de Messaging (Conversation/EnhancedMessage) y Creator (StickerItem UI).
 - [ ] **Notifications** (24) — FCM / push (aún sin tocar en Android).
 - [ ] **Utilities** (11) — helpers varios.
 - [ ] **Coordinators** (5) — coordinación de flujos.
