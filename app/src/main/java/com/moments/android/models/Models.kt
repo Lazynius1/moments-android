@@ -1017,3 +1017,253 @@ data class QuestionData(
         )
     }
 }
+
+// ==========================================================================
+// MARK: - Serialización a Firestore (equivalente a encode(to:) de iOS)
+// Omite nulls (como encodeIfPresent), fechas → Timestamp, enums → raw.
+// ==========================================================================
+
+fun FilterSettings.toMap(): Map<String, Any> = mapOf("name" to name, "intensity" to intensity)
+
+fun Point.toMap(): Map<String, Any> = mapOf("x" to x, "y" to y)
+
+fun PhotoTag.toMap(): Map<String, Any> = mapOf("id" to id, "userId" to userId, "username" to username, "x" to x, "y" to y)
+
+fun VideoVariants.toMap(): Map<String, Any> = buildMap {
+    low?.let { put("low", it) }
+    medium?.let { put("medium", it) }
+    high?.let { put("high", it) }
+}
+
+fun MediaItem.toMap(): Map<String, Any> = buildMap {
+    put("id", id); put("type", type.raw); put("url", url)
+    aspectRatio?.let { put("aspectRatio", it) }
+    thumbnailUrl?.let { put("thumbnailUrl", it) }
+    videoDuration?.let { put("videoDuration", it) }
+    videoFileSize?.let { put("videoFileSize", it) }
+    videoResolution?.let { put("videoResolution", it) }
+    videoProcessingStatus?.let { put("videoProcessingStatus", it.raw) }
+    originalVideoUrl?.let { put("originalVideoUrl", it) }
+    videoVariants?.let { put("videoVariants", it.toMap()) }
+    tags?.let { put("tags", it.map { t -> t.toMap() }) }
+    moderationState?.let { put("moderationState", it.raw) }
+    moderationReason?.let { put("moderationReason", it) }
+    moderationCategory?.let { put("moderationCategory", it) }
+    moderationConfidence?.let { put("moderationConfidence", it) }
+    moderatedAt?.let { put("moderatedAt", Timestamp(it)) }
+}
+
+fun CommentMentionEntity.toMap(): Map<String, Any> =
+    mapOf("userId" to userId, "username" to username, "rangeStart" to rangeStart, "rangeLength" to rangeLength)
+
+fun Comment.toMap(): Map<String, Any> = buildMap {
+    id?.let { put("id", it) }
+    put("authorId", authorId); put("username", username); put("content", content)
+    put("timestamp", Timestamp(timestamp))
+    profileImagePath?.let { put("profileImagePath", it) }
+    updatedAt?.let { put("updatedAt", Timestamp(it)) }
+    put("reactions", reactions)
+    parentCommentId?.let { put("parentCommentId", it) }
+    isEdited?.let { put("isEdited", it) }
+    editedTimestamp?.let { put("editedTimestamp", Timestamp(it)) }
+    put("mentions", mentions.map { it.toMap() })
+    // isPending no se serializa (como iOS).
+}
+
+fun FollowRequest.toMap(): Map<String, Any> = buildMap {
+    put("id", id); put("senderId", senderId); put("senderUsername", senderUsername)
+    put("recipientId", recipientId); put("status", status.raw); put("timestamp", Timestamp(timestamp))
+    expirationDate?.let { put("expirationDate", Timestamp(it)) }
+}
+
+fun Connection.toMap(): Map<String, Any> = mapOf("userId" to userId, "timestamp" to Timestamp(timestamp))
+fun FollowerRecord.toMap(): Map<String, Any> = mapOf("userId" to userId, "timestamp" to Timestamp(timestamp))
+
+fun Moment.LocationCoordinate.toMap(): Map<String, Any> = mapOf("latitude" to latitude, "longitude" to longitude)
+
+fun MomentHiddenLayer.toMap(): Map<String, Any> = buildMap {
+    put("id", id); put("type", type.raw); put("anchorX", anchorX); put("anchorY", anchorY)
+    put("width", width); put("height", height); put("shape", shape.raw); put("zIndex", zIndex)
+    text?.let { put("text", it) }
+    mediaURL?.let { put("mediaURL", it) }
+    thumbnailURL?.let { put("thumbnailURL", it) }
+    duration?.let { put("duration", it) }
+    caption?.let { put("caption", it) }
+    imageOffsetX?.let { put("imageOffsetX", it) }
+    imageOffsetY?.let { put("imageOffsetY", it) }
+    imageScale?.let { put("imageScale", it) }
+    imageFrameStyle?.let { put("imageFrameStyle", it.raw) }
+    textStyle?.let { put("textStyle", it.raw) }
+    put("presentationStyle", presentationStyle.raw)
+    put("unlockMode", unlockMode.raw)
+    unlockAt?.let { put("unlockAt", Timestamp(it)) }
+    authorTimezoneIdentifier?.let { put("authorTimezoneIdentifier", it) }
+    discoverCount?.let { put("discoverCount", it) }
+    uniqueDiscovererCount?.let { put("uniqueDiscovererCount", it) }
+    lastDiscoveredAt?.let { put("lastDiscoveredAt", Timestamp(it)) }
+    moderationState?.let { put("moderationState", it.raw) }
+    moderationReason?.let { put("moderationReason", it) }
+    moderationCategory?.let { put("moderationCategory", it) }
+    moderatedAt?.let { put("moderatedAt", Timestamp(it)) }
+    put("createdAt", Timestamp(createdAt))
+}
+
+fun HiddenLayerDiscovery.toMap(): Map<String, Any> = buildMap {
+    put("viewerId", viewerId)
+    username?.let { put("username", it) }
+    profileImagePath?.let { put("profileImagePath", it) }
+    put("discoveredAt", Timestamp(discoveredAt))
+}
+
+fun Moment.toMap(): Map<String, Any> = buildMap {
+    id?.let { put("id", it) }
+    put("authorId", authorId); put("username", username); put("content", content)
+    imagePath?.let { put("imageUrl", it) } // clave Firestore "imageUrl"
+    videoUrl?.let { put("videoUrl", it) }
+    put("timestamp", Timestamp(timestamp))
+    put("reactions", reactions); put("commentCount", commentCount)
+    profileImagePath?.let { put("profileImagePath", it) }
+    taggedUsers?.let { put("taggedUsers", it) }
+    mentionedUsers?.let { put("mentionedUsers", it) }
+    location?.let { put("location", it) }
+    locationCoordinate?.let { put("locationCoordinate", it.toMap()) }
+    audience?.let { put("audience", it) }
+    mediaItems?.let { put("mediaItems", it.map { m -> m.toMap() }) }
+    aspectRatio?.let { put("aspectRatio", it) }
+    customListId?.let { put("customListId", it) }
+    thumbnailUrl?.let { put("thumbnailUrl", it) }
+    videoDuration?.let { put("videoDuration", it) }
+    videoFileSize?.let { put("videoFileSize", it) }
+    videoResolution?.let { put("videoResolution", it) }
+    scheduledDate?.let { put("scheduledDate", Timestamp(it)) }
+    archivedAt?.let { put("archivedAt", Timestamp(it)) }
+    isArchived?.let { put("isArchived", it) }
+    pinnedAt?.let { put("pinnedAt", Timestamp(it)) }
+    isPinned?.let { put("isPinned", it) }
+    gridPreviewScale?.let { put("gridPreviewScale", it) }
+    gridPreviewOffsetX?.let { put("gridPreviewOffsetX", it) }
+    gridPreviewOffsetY?.let { put("gridPreviewOffsetY", it) }
+    gridPreviewFitMode?.let { put("gridPreviewFitMode", it) }
+    gridPreviewBackground?.let { put("gridPreviewBackground", it) }
+    put("disableComments", disableComments); put("hideLikeCounts", hideLikeCounts); put("allowSharing", allowSharing)
+    put("hasHiddenLayers", hasHiddenLayers); put("hiddenLayerCount", hiddenLayerCount)
+    isModerationHidden?.let { put("isModerationHidden", it) }
+    originalAudience?.let { put("originalAudience", it) }
+    reviewRequired?.let { put("reviewRequired", it) }
+    canRestore?.let { put("canRestore", it) }
+}
+
+fun HighlightedStory.toMap(): Map<String, Any> = buildMap {
+    id?.let { put("id", it) }
+    put("title", title)
+    coverImageUrl?.let { put("coverImageUrl", it) }
+    put("storiesCount", storiesCount); put("createdAt", Timestamp(createdAt))
+    put("storyIds", storyIds); put("authorId", authorId)
+}
+
+fun StoryTextOverlayMetadata.toMap(): Map<String, Any> = buildMap {
+    put("id", id); put("text", text); put("normalizedPosition", normalizedPosition.toMap())
+    put("layerOrder", layerOrder); put("styleRaw", styleRaw); put("colorHex", colorHex)
+    put("fontSize", fontSize); put("alignmentRaw", alignmentRaw); put("backgroundFillRaw", backgroundFillRaw)
+    put("strokeRaw", strokeRaw); put("visualEffectRaw", visualEffectRaw); put("motionRaw", motionRaw)
+    put("forcesAllCaps", forcesAllCaps); put("isLiveOverlay", isLiveOverlay)
+    gradientStopHexes?.let { put("gradientStopHexes", it) }
+    gradientAngle?.let { put("gradientAngle", it) }
+}
+
+fun StickerData.toMap(): Map<String, Any> = buildMap {
+    stickerId?.let { put("stickerId", it) }
+    put("type", type); put("content", content); put("position", position.toMap())
+    put("scale", scale); put("rotation", rotation)
+    zIndex?.let { put("zIndex", it) }
+    username?.let { put("username", it) }; userId?.let { put("userId", it) }
+    hashtag?.let { put("hashtag", it) }; location?.let { put("location", it) }
+    latitude?.let { put("latitude", it) }; longitude?.let { put("longitude", it) }
+    styleVariant?.let { put("styleVariant", it) }; questionText?.let { put("questionText", it) }
+    pollOptions?.let { put("pollOptions", it) }; weatherSymbol?.let { put("weatherSymbol", it) }
+    linkURL?.let { put("linkURL", it) }; linkTitle?.let { put("linkTitle", it) }
+    countdownTitle?.let { put("countdownTitle", it) }; countdownTargetAtMs?.let { put("countdownTargetAtMs", it) }
+    sliderEmoji?.let { put("sliderEmoji", it) }; sliderPrompt?.let { put("sliderPrompt", it) }
+    caption?.let { put("caption", it) }; profileImagePath?.let { put("profileImagePath", it) }
+    momentId?.let { put("momentId", it) }; mediaCount?.let { put("mediaCount", it) }
+    quizQuestion?.let { put("quizQuestion", it) }; quizOptions?.let { put("quizOptions", it) }
+    quizCorrectIndex?.let { put("quizCorrectIndex", it) }
+    revealType?.let { put("revealType", it) }; revealPattern?.let { put("revealPattern", it) }
+    revealPrimaryColor?.let { put("revealPrimaryColor", it) }; revealSecondaryColor?.let { put("revealSecondaryColor", it) }
+    revealEffectColor?.let { put("revealEffectColor", it) }; frameStyle?.let { put("frameStyle", it) }
+    contentScale?.let { put("contentScale", it) }; contentOffsetX?.let { put("contentOffsetX", it) }
+    contentOffsetY?.let { put("contentOffsetY", it) }
+    moderationState?.let { put("moderationState", it) }; moderationReason?.let { put("moderationReason", it) }
+    moderationCategory?.let { put("moderationCategory", it) }
+    audioURL?.let { put("audioURL", it) }; audioDuration?.let { put("audioDuration", it) }
+    put("isAnimated", isAnimated)
+    gifURL?.let { put("gifURL", it) }; videoURL?.let { put("videoURL", it) }
+}
+
+fun Story.toMap(): Map<String, Any> = buildMap {
+    id?.let { put("id", it) }
+    put("authorId", authorId); put("username", username); put("mediaItem", mediaItem.toMap())
+    put("duration", duration)
+    expirationHours?.let { put("expirationHours", it) }
+    put("timestamp", Timestamp(timestamp)); put("expirationDate", Timestamp(expirationDate))
+    profileImagePath?.let { put("profileImagePath", it) }
+    audience?.let { put("audience", it) }
+    customListId?.let { put("customListId", it) }
+    text?.let { put("text", it) }
+    // Guardamos posición como x/y (compat con el lado de lectura).
+    textPosition?.let { put("textPositionX", it.x); put("textPositionY", it.y) }
+    textStyle?.let { put("textStyle", it) }
+    textPositionNormX?.let { put("textPositionNormX", it) }
+    textPositionNormY?.let { put("textPositionNormY", it) }
+    textColorHex?.let { put("textColorHex", it) }
+    textFontSize?.let { put("textFontSize", it) }
+    textAlignment?.let { put("textAlignment", it) }
+    textBackgroundFill?.let { put("textBackgroundFill", it) }
+    textStroke?.let { put("textStroke", it) }
+    textVisualEffect?.let { put("textVisualEffect", it) }
+    textMotion?.let { put("textMotion", it) }
+    forcesAllCaps?.let { put("forcesAllCaps", it) }
+    textLayerOrder?.let { put("textLayerOrder", it) }
+    textOverlayLive?.let { put("textOverlayLive", it) }
+    textOverlays?.let { put("textOverlays", it.map { o -> o.toMap() }) }
+    stickers?.let { put("stickers", it.map { s -> s.toMap() }) }
+    drawingData?.let { put("drawingData", com.google.firebase.firestore.Blob.fromBytes(it)) }
+    aspectRatio?.let { put("aspectRatio", it) }
+    backgroundFrameURL?.let { put("backgroundFrameURL", it) }
+    backgroundBlurredFrameURL?.let { put("backgroundBlurredFrameURL", it) }
+    chainId?.let { put("chainId", it) }
+    chainPosition?.let { put("chainPosition", it) }
+    chainTitle?.let { put("chainTitle", it) }
+    // Compat: imagePath/videoUrl según el tipo del media.
+    if (mediaItem.type == MediaItem.MediaType.IMAGE) put("imagePath", mediaItem.url) else put("videoUrl", mediaItem.url)
+}
+
+fun MomentsNotification.toMap(): Map<String, Any> = buildMap {
+    id?.let { put("id", it) }
+    put("type", type.raw); put("senderId", senderId); put("senderUsername", senderUsername)
+    put("timestamp", Timestamp(timestamp)); put("isPending", isPending)
+    title?.let { put("title", it) }; message?.let { put("message", it) }
+    downloadURL?.let { put("downloadURL", it) }; momentId?.let { put("momentId", it) }
+    visitCount?.let { put("visitCount", it) }; storyId?.let { put("storyId", it) }
+    storyAuthorId?.let { put("storyAuthorId", it) }; storyPreviewUrl?.let { put("storyPreviewUrl", it) }
+    mentionContext?.let { put("mentionContext", it) }; targetAuthorId?.let { put("targetAuthorId", it) }
+    targetAuthorUsername?.let { put("targetAuthorUsername", it) }
+    reaction?.let { put("reaction", it) }; reactionCount?.let { put("reactionCount", it) }
+    commentId?.let { put("commentId", it) }; conversationId?.let { put("conversationId", it) }
+    echoId?.let { put("echoId", it) }; moderationScope?.let { put("moderationScope", it) }
+    chainId?.let { put("chainId", it) }; chainTitle?.let { put("chainTitle", it) }
+    chainPosition?.let { put("chainPosition", it) }; totalParts?.let { put("totalParts", it) }
+    chainRole?.let { put("chainRole", it) }; messageId?.let { put("messageId", it) }
+    messageType?.let { put("messageType", it) }; buzzEventId?.let { put("buzzEventId", it) }
+    reminderVariant?.let { put("reminderVariant", it) }; isReactionPlural?.let { put("isReactionPlural", it) }
+}
+
+fun QuestionResponse.toMap(): Map<String, Any> =
+    mapOf("id" to id, "userId" to userId, "response" to response, "timestamp" to Timestamp(timestamp), "isAnonymous" to isAnonymous)
+
+fun QuestionData.toMap(): Map<String, Any> = mapOf(
+    "questionText" to questionText,
+    "responses" to responses.map { it.toMap() },
+    "responseCount" to responseCount,
+    "createdAt" to Timestamp(createdAt),
+)
