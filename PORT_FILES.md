@@ -2,7 +2,7 @@
 
 Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalente en Android. Generado desde `../Moments/Moments`. Complementa a [PORT_CHECKLIST.md](PORT_CHECKLIST.md) (vista por carpeta).
 
-**Progreso: 12 / 574 archivos** (2%). Marcado `[x]` = portado o N/A. La lógica no-UI (Services/Models/…) se ha portado en parte inline.
+**Progreso: 13 / 574 archivos** (2%). Marcado `[x]` = portado o N/A. La lógica no-UI (Services/Models/…) se ha portado en parte inline.
 
 ## Views  (12/421)
 
@@ -592,7 +592,7 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] NotificationExtensions.swift
 - [ ] NotificationNavigationService.swift
 - [ ] NotificationOpenIntentStore.swift
-- [ ] NotificationPresentationCoordinator.swift
+- [~] NotificationPresentationCoordinator.swift → `notifications/NotificationPresentationCoordinator.kt` (stub mínimo para banners; port completo pendiente)
 - [ ] Notificationservice.swift
 
 ## Reportes  (0/7)
@@ -605,13 +605,16 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] ReportBottomSheet.swift
 - [ ] UserReportContent.swift
 
-## Services  (0/69)
+## Services  (1/69)
 
-- [ ] TimeSpentManager.swift
+**`Activity`**
+- [x] TimeSpentManager.swift → `services/activity/TimeSpentManager.kt`
+**`Auth`**
 - [ ] AuthService.swift
 - [ ] LoginActivityService.swift
 - [ ] OnboardingDraftStore.swift
 - [ ] PasskeyService.swift
+**`Cache`**
 - [ ] CacheManager.swift
 - [ ] ImagePrefetchManager.swift
 - [ ] PersistentAudioCache.swift
@@ -619,11 +622,14 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] UserCacheService.swift
 - [ ] VideoPreloader.swift
 - [ ] VideoThumbnailCache.swift
+**`Camera`**
 - [ ] SnapCameraKitConfiguration.swift
+**`Content`**
 - [ ] BackendFeedService.swift
 - [ ] FilterService.swift
 - [ ] ForYouDiscoveryService.swift
 - [ ] ProfileVisitsService.swift
+**`Firestore`**
 - [ ] FirestoreActivityRepository.swift
 - [ ] FirestoreAudienceRepository.swift
 - [ ] FirestoreCommentsRepository.swift
@@ -634,7 +640,9 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] FirestoreSearchRepository.swift
 - [ ] FirestoreService.swift
 - [ ] FirestoreStoriesRepository.swift
+**`Incognito`**
 - [ ] IncognitoModeService.swift
+**`Messaging`**
 - [ ] ChatCacheStore.swift
 - [ ] ChatCommunicationNotificationService.swift
 - [ ] ChatMediaChunkedCipher.swift
@@ -649,29 +657,38 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] MessageRequestService.swift
 - [ ] OnlineStatusService.swift
 - [ ] VanishMessageTimer.swift
+**`Network`**
 - [ ] NetworkMonitor.swift
 - [ ] OfflineSyncService.swift
+**`Nova`**
 - [ ] NovaEmbeddingService.swift
+**`Performance`**
 - [ ] FeedVisibilityCoordinator.swift
 - [ ] MotionPolicy.swift
 - [ ] PerformanceSignposts.swift
 - [ ] VideoMomentsIndex.swift
+**`Persistence`**
 - [ ] LocalPersistenceService.swift
 - [ ] MessagePersistenceStore.swift
+**`Privacy`**
 - [ ] ContentVisibilityservice.swift
 - [ ] PrivacyService.swift
 - [ ] PrivacyServiceExtension.swift
+**`Security`**
 - [ ] MomentsAppCheckProviderFactory.swift
+**`Social`**
 - [ ] AffinityTracker.swift
 - [ ] BestFriendsService.swift
 - [ ] EchoService.swift
 - [ ] StoryChainLimitsService.swift
 - [ ] StoryRingCacheService.swift
+**`Storage`**
 - [ ] MediaUploadService.swift
 - [ ] StoragePathBuilder.swift
 - [ ] StorageService.swift
 - [ ] UIImage+StorageUpload.swift
 - [ ] VideoCompressionService.swift
+**`Video`**
 - [ ] ReelPrebufferService.swift
 - [ ] SharedVideoPlayerPool.swift
 - [ ] VideoAdaptivePlayback.swift

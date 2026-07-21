@@ -174,4 +174,7 @@
     <string name="time_hour">h</string>
     <string name="time_day">j</string>
     <string name="time_week">sem</string>
+    <string name="user_activity_time_spent_limit_reached_title">Moments</string>
+    <string name="user_activity_time_spent_limit_reached_body">Vous avez atteint votre limite quotidienne de temps sur Moments.</string>
+    <string name="user_activity_time_spent_limit_reached_in_app_title">Limite quotidienne atteinte</string>
 </resources>

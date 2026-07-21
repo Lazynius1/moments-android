@@ -174,4 +174,7 @@
     <string name="time_hour">h</string>
     <string name="time_day">g</string>
     <string name="time_week">sett</string>
+    <string name="user_activity_time_spent_limit_reached_title">Moments</string>
+    <string name="user_activity_time_spent_limit_reached_body">Hai raggiunto il tuo limite giornaliero di tempo su Moments.</string>
+    <string name="user_activity_time_spent_limit_reached_in_app_title">Limite giornaliero raggiunto</string>
 </resources>
