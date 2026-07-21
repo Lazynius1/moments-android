@@ -168,3 +168,30 @@ data class AppUser(
         }
     }
 }
+
+// MARK: - Serialización a Firestore (encode de AppUser; sin badges/Plus)
+fun AppUser.toMap(): Map<String, Any> = buildMap {
+    put("id", id); put("username", username); put("email", email); put("interests", interests)
+    profileImagePath?.let { put("profileImagePath", it) }
+    bio?.let { put("bio", it) }
+    put("blockedUsers", blockedUsers)
+    put("isPrivate", isPrivate); put("showMutuals", showMutuals)
+    put("showFollowing", showFollowing); put("showFollowers", showFollowers)
+    activeHoursStart?.let { put("activeHoursStart", it) }
+    activeHoursEnd?.let { put("activeHoursEnd", it) }
+    notificationPreferences?.let { put("notificationPreferences", it) }
+    put("bestFriends", bestFriends)
+    websiteUrl?.let { put("websiteUrl", it) }
+    profileNote?.let { put("profileNote", it) }
+    put("followersCount", followersCount); put("followingCount", followingCount); put("momentsCount", momentsCount)
+    put("isActive", isActive)
+    deactivatedAt?.let { put("deactivatedAt", com.google.firebase.Timestamp(it)) }
+    deactivatedBy?.let { put("deactivatedBy", it) }
+    selectedProfileTheme?.let { put("selectedProfileTheme", it) }
+    put("isVerified", isVerified)
+    put("onlineStatus", onlineStatus.raw)
+    lastSeen?.let { put("lastSeen", com.google.firebase.Timestamp(it)) }
+    put("isOnline", isOnline); put("showReadReceipts", showReadReceipts)
+    put("messageRequestPolicy", messageRequestPolicy.raw)
+    lastUsernameChange?.let { put("lastUsernameChange", com.google.firebase.Timestamp(it)) }
+}

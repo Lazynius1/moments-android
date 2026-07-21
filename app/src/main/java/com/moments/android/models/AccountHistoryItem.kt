@@ -36,3 +36,11 @@ data class AccountHistoryItem(
         }
     }
 }
+
+fun AccountHistoryItem.toMap(): Map<String, Any> = buildMap {
+    id?.let { put("id", it) }
+    put("type", type.raw)
+    oldValue?.let { put("oldValue", it) }
+    newValue?.let { put("newValue", it) }
+    put("timestamp", com.google.firebase.Timestamp(timestamp))
+}

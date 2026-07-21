@@ -1,5 +1,6 @@
 package com.moments.android.models
 
+import com.google.firebase.Timestamp
 import java.util.Date
 
 // MARK: - Estados
@@ -152,4 +153,33 @@ data class Echo(
             )
         }
     }
+}
+
+// MARK: - Serialización a Firestore (equivalente a encode(to:) de iOS)
+
+fun EchoParticipant.toMap(): Map<String, Any> = buildMap {
+    put("userId", userId); put("username", username); put("status", status.raw)
+    profileImagePath?.let { put("profileImagePath", it) }
+}
+
+fun EchoMomentRef.toMap(): Map<String, Any> = buildMap {
+    put("momentId", momentId); put("authorId", authorId); put("username", username)
+    put("timestamp", Timestamp(timestamp)); put("mediaType", mediaType); put("mediaUrl", mediaUrl)
+    aspectRatio?.let { put("aspectRatio", it) }
+    thumbnailUrl?.let { put("thumbnailUrl", it) }
+    audience?.let { put("audience", it) }
+    customListId?.let { put("customListId", it) }
+}
+
+fun Echo.toMap(): Map<String, Any> = buildMap {
+    // id NO se serializa (@DocumentID en iOS).
+    put("hostId", hostId)
+    put("participants", participants.map { it.toMap() })
+    put("location", location.toMap())
+    locationName?.let { put("locationName", it) }
+    put("createdAt", Timestamp(createdAt)); put("expiresAt", Timestamp(expiresAt))
+    put("status", status.raw)
+    put("moments", moments.map { it.toMap() })
+    vibeSummary?.let { put("vibeSummary", it) }
+    put("participantIds", participantIds)
 }
