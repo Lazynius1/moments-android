@@ -1,6 +1,7 @@
 package com.moments.android.models
 
 import com.google.firebase.Timestamp
+import java.util.Calendar
 import java.util.Date
 import java.util.UUID
 
@@ -419,4 +420,154 @@ data class Comment(
             mentions = (data["mentions"] as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(CommentMentionEntity::from) } ?: emptyList(),
         )
     }
+}
+
+// MARK: - Hidden Layers (capas ocultas en un momento)
+enum class HiddenLayerTextStyle(val raw: String) {
+    CLEAN("clean"), SERIF("serif"), HANDWRITTEN("handwritten"), MONO("mono"), BUBBLE("bubble"), EDITORIAL("editorial");
+    companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } }
+}
+
+enum class HiddenLayerPresentationStyle(val raw: String) {
+    GLASS_CARD("glassCard"), CAPTION_PILL("captionPill"), PAPER_NOTE("paperNote"),
+    MARKER_LABEL("markerLabel"), FLOATING_QUOTE("floatingQuote"), MINIMAL_TEXT("minimalText");
+    companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: GLASS_CARD }
+}
+
+enum class HiddenLayerImageFrameStyle(val raw: String) {
+    CLASSIC("classic"), CLEAN("clean"), VINTAGE("vintage");
+    companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } }
+}
+
+data class MomentHiddenLayer(
+    val id: String = UUID.randomUUID().toString(),
+    val type: LayerType,
+    val anchorX: Double,
+    val anchorY: Double,
+    val width: Double,
+    val height: Double,
+    val shape: LayerShape = LayerShape.ROUNDED_RECT,
+    val zIndex: Int = 0,
+    val text: String? = null,
+    val mediaURL: String? = null,
+    val thumbnailURL: String? = null,
+    val duration: Double? = null,
+    val caption: String? = null,
+    val imageOffsetX: Double? = null,
+    val imageOffsetY: Double? = null,
+    val imageScale: Double? = null,
+    val imageFrameStyle: HiddenLayerImageFrameStyle? = null,
+    val textStyle: HiddenLayerTextStyle? = null,
+    val presentationStyle: HiddenLayerPresentationStyle = HiddenLayerPresentationStyle.GLASS_CARD,
+    val unlockMode: UnlockMode = UnlockMode.IMMEDIATE,
+    val unlockAt: Date? = null,
+    val authorTimezoneIdentifier: String? = null,
+    val discoverCount: Int? = null,
+    val uniqueDiscovererCount: Int? = null,
+    val lastDiscoveredAt: Date? = null,
+    val moderationState: ModerationState? = ModerationState.VISIBLE,
+    val moderationReason: String? = null,
+    val moderationCategory: String? = null,
+    val moderatedAt: Date? = null,
+    val createdAt: Date = Date(),
+) {
+    enum class LayerType(val raw: String) {
+        TEXT("text"), AUDIO("audio"), IMAGE("image");
+        companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: TEXT }
+    }
+
+    enum class LayerShape(val raw: String) {
+        CIRCLE("circle"), ROUNDED_RECT("roundedRect");
+        companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: ROUNDED_RECT }
+    }
+
+    enum class ModerationState(val raw: String) {
+        VISIBLE("visible"), HIDDEN("hidden"), PENDING("pending");
+        companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } }
+    }
+
+    enum class UnlockMode(val raw: String) {
+        IMMEDIATE("immediate"), SCHEDULED("scheduled");
+        companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: IMMEDIATE }
+    }
+
+    val isHiddenByModeration: Boolean get() = moderationState == ModerationState.HIDDEN
+
+    val isVisibleInViewer: Boolean
+        get() = when (moderationState ?: ModerationState.VISIBLE) {
+            ModerationState.VISIBLE -> true
+            ModerationState.HIDDEN, ModerationState.PENDING -> false
+        }
+
+    fun isUnlocked(at: Date = Date()): Boolean = when (unlockMode) {
+        UnlockMode.IMMEDIATE -> true
+        UnlockMode.SCHEDULED -> unlockAt?.let { !it.after(at) } ?: true
+    }
+
+    companion object {
+        fun from(data: Map<String, Any?>): MomentHiddenLayer = MomentHiddenLayer(
+            id = data["id"] as? String ?: UUID.randomUUID().toString(),
+            type = LayerType.from(data["type"] as? String),
+            anchorX = (data["anchorX"] as? Number)?.toDouble() ?: 0.0,
+            anchorY = (data["anchorY"] as? Number)?.toDouble() ?: 0.0,
+            width = (data["width"] as? Number)?.toDouble() ?: 0.0,
+            height = (data["height"] as? Number)?.toDouble() ?: 0.0,
+            shape = LayerShape.from(data["shape"] as? String),
+            zIndex = (data["zIndex"] as? Number)?.toInt() ?: 0,
+            text = data["text"] as? String,
+            mediaURL = data["mediaURL"] as? String,
+            thumbnailURL = data["thumbnailURL"] as? String,
+            duration = (data["duration"] as? Number)?.toDouble(),
+            caption = data["caption"] as? String,
+            imageOffsetX = (data["imageOffsetX"] as? Number)?.toDouble(),
+            imageOffsetY = (data["imageOffsetY"] as? Number)?.toDouble(),
+            imageScale = (data["imageScale"] as? Number)?.toDouble(),
+            imageFrameStyle = HiddenLayerImageFrameStyle.from(data["imageFrameStyle"] as? String),
+            textStyle = HiddenLayerTextStyle.from(data["textStyle"] as? String),
+            presentationStyle = HiddenLayerPresentationStyle.from(data["presentationStyle"] as? String),
+            unlockMode = UnlockMode.from(data["unlockMode"] as? String),
+            unlockAt = MediaItem.anyToDate(data["unlockAt"]),
+            authorTimezoneIdentifier = data["authorTimezoneIdentifier"] as? String,
+            discoverCount = (data["discoverCount"] as? Number)?.toInt(),
+            uniqueDiscovererCount = (data["uniqueDiscovererCount"] as? Number)?.toInt(),
+            lastDiscoveredAt = MediaItem.anyToDate(data["lastDiscoveredAt"]),
+            moderationState = ModerationState.from(data["moderationState"] as? String) ?: ModerationState.VISIBLE,
+            moderationReason = data["moderationReason"] as? String,
+            moderationCategory = data["moderationCategory"] as? String,
+            moderatedAt = MediaItem.anyToDate(data["moderatedAt"]),
+            createdAt = MediaItem.anyToDate(data["createdAt"]) ?: Date(),
+        )
+    }
+}
+
+data class HiddenLayerDiscovery(
+    val viewerId: String,
+    val username: String? = null,
+    val profileImagePath: String? = null,
+    val discoveredAt: Date,
+) {
+    val id: String get() = viewerId
+
+    companion object {
+        fun from(data: Map<String, Any?>): HiddenLayerDiscovery = HiddenLayerDiscovery(
+            viewerId = data["viewerId"] as? String ?: "",
+            username = data["username"] as? String,
+            profileImagePath = data["profileImagePath"] as? String,
+            discoveredAt = MediaItem.anyToDate(data["discoveredAt"]) ?: Date(),
+        )
+    }
+}
+
+data class HiddenLayerMetricsSnapshot(
+    val layers: List<MomentHiddenLayer>,
+    val uniquePeopleCount: Int,
+    val recentDiscoveriesByLayer: Map<String, List<HiddenLayerDiscovery>>,
+) {
+    val totalDiscoveries: Int get() = layers.sumOf { maxOf(0, it.discoverCount ?: 0) }
+    val discoveredLayerCount: Int get() = layers.count { (it.discoverCount ?: 0) > 0 }
+    val totalLayerCount: Int get() = layers.size
+    val coverageRatio: Double get() = if (totalLayerCount > 0) discoveredLayerCount.toDouble() / totalLayerCount else 0.0
+    val topLayer: MomentHiddenLayer?
+        get() = layers.maxWithOrNull(compareBy<MomentHiddenLayer> { it.discoverCount ?: 0 }
+            .thenBy { it.lastDiscoveredAt?.time ?: Long.MIN_VALUE })
 }
