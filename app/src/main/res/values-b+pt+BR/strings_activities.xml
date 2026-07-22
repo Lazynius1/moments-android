@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<!-- Activities upload progress (ActivityKit → Android notification) -->
+    <string name="upload_progress_moment_title">Enviando moment</string>
+    <string name="upload_progress_story_title">Enviando story</string>
+    <string name="upload_progress_status_uploading">Enviando… %d%%</string>
+    <string name="upload_progress_status_processing">Processando…</string>
+    <string name="upload_progress_status_completed">Envio concluído</string>
+    <string name="upload_progress_status_failed">Falha no envio</string>
+</resources>

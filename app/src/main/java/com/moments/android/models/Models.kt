@@ -1267,3 +1267,84 @@ fun QuestionData.toMap(): Map<String, Any> = mapOf(
     "responseCount" to responseCount,
     "createdAt" to Timestamp(createdAt),
 )
+
+// MARK: - CustomAudienceList (AudienceModels.swift)
+data class CustomAudienceList(
+    val id: String? = null,
+    val name: String,
+    val description: String? = null,
+    val members: List<String> = emptyList(),
+    val createdAt: Date = Date(),
+    val updatedAt: Date = Date(),
+    val color: String? = null,
+    val icon: String? = null,
+) {
+    companion object {
+        fun from(id: String?, data: Map<String, Any?>): CustomAudienceList? {
+            val name = data["name"] as? String ?: return null
+            return CustomAudienceList(
+                id = id ?: data["id"] as? String,
+                name = name,
+                description = data["description"] as? String,
+                members = (data["members"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                createdAt = MediaItem.anyToDate(data["createdAt"]) ?: Date(),
+                updatedAt = MediaItem.anyToDate(data["updatedAt"]) ?: Date(),
+                color = data["color"] as? String,
+                icon = data["icon"] as? String,
+            )
+        }
+    }
+
+    fun toMap(): Map<String, Any?> = mapOf(
+        "name" to name,
+        "description" to description,
+        "members" to members,
+        "createdAt" to Timestamp(createdAt),
+        "updatedAt" to Timestamp(updatedAt),
+        "color" to color,
+        "icon" to icon,
+    )
+}
+
+// MARK: - MomentGridPreviewSettings (MomentGridPreview.swift)
+data class MomentGridPreviewSettings(
+    val scale: Double = 1.0,
+    val offsetX: Double = 0.0,
+    val offsetY: Double = 0.0,
+    val fitMode: FitMode = FitMode.FILL,
+    val background: Background = Background.BLUR,
+) {
+    enum class FitMode(val raw: String) {
+        FILL("fill"), FIT("fit");
+    }
+
+    enum class Background(val raw: String) {
+        BLUR("blur"), SOLID("solid"), GRADIENT("gradient");
+    }
+
+    val isDefault: Boolean
+        get() = scale == 1.0 && offsetX == 0.0 && offsetY == 0.0 &&
+            fitMode == FitMode.FILL && background == Background.BLUR
+}
+
+// MARK: - MapVisibilityPolicy (MapDiscoverSupport.swift)
+object MapVisibilityPolicy {
+    fun resolvedVisibility(hasLocation: Boolean, audience: String?): String {
+        if (!hasLocation) return "hidden"
+        return if (audience == "onlyMe") "hidden" else "public"
+    }
+
+    data class StoryMapLocation(
+        val name: String,
+        val latitude: Double,
+        val longitude: Double,
+    )
+
+    fun storyMapLocation(stickers: List<StickerData>?): StoryMapLocation? =
+        stickers?.firstNotNullOfOrNull { sticker ->
+            if (sticker.type != "location") return@firstNotNullOfOrNull null
+            val latitude = sticker.latitude ?: return@firstNotNullOfOrNull null
+            val longitude = sticker.longitude ?: return@firstNotNullOfOrNull null
+            StoryMapLocation(sticker.location?.trim().orEmpty(), latitude, longitude)
+        }
+}

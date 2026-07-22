@@ -1,9 +1,15 @@
 package com.moments.android.models
 
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.Date
 
 // MARK: - Payloads de la cola offline (Outbox)
-// Nota: MessagePayload (depende de EnhancedMessage) se añadirá al portar Messaging.
+
+data class MessagePayload(
+    val message: EnhancedMessage,
+    val useServerTimestamp: Boolean = true,
+)
 
 data class ReactionPayload(
     val momentId: String,
@@ -101,3 +107,64 @@ data class ProfileUpdatePayload(
     val profileImageLocalPath: String? = null,
     val isImageUpdate: Boolean = false,
 )
+
+// MARK: - JSON encoding (paridad con JSONEncoder en iOS)
+
+fun MediaMessagePayload.encode(): ByteArray = JSONObject().apply {
+    put("conversationId", conversationId)
+    put("senderId", senderId)
+    put("messageId", messageId)
+    put("typeRaw", typeRaw)
+    put("fileExtension", fileExtension)
+    fileName?.let { put("fileName", it) }
+    duration?.let { put("duration", it) }
+    audioWaveform?.let { list ->
+        put("audioWaveform", JSONArray().apply { list.forEach { put(it.toDouble()) } })
+    }
+    mediaBatchId?.let { put("mediaBatchId", it) }
+    if (isVanishModeMessage) put("isVanishModeMessage", true)
+    vanishExpiresAt?.let { put("vanishExpiresAt", it.time) }
+    replyTo?.let { put("replyTo", it) }
+}.toString().toByteArray()
+
+fun ReactionPayload.encode(): ByteArray = JSONObject().apply {
+    put("momentId", momentId)
+    put("reaction", reaction)
+    put("authorId", authorId)
+    put("userId", userId)
+}.toString().toByteArray()
+
+fun SavePayload.encode(): ByteArray = JSONObject().apply {
+    put("userId", userId)
+    put("momentId", momentId)
+}.toString().toByteArray()
+
+fun CommentPayload.encode(): ByteArray = JSONObject().apply {
+    put("momentId", momentId)
+    put("authorId", authorId)
+    put("senderId", senderId)
+    put("content", content)
+    parentCommentId?.let { put("parentCommentId", it) }
+    commentId?.let { put("commentId", it) }
+    mentions?.let { list ->
+        put("mentions", JSONArray().apply {
+            list.forEach { mention ->
+                put(JSONObject(mention.toMap()))
+            }
+        })
+    }
+}.toString().toByteArray()
+
+fun DeleteCommentPayload.encode(): ByteArray = JSONObject().apply {
+    put("momentId", momentId)
+    put("commentId", commentId)
+    put("userId", userId)
+    put("authorId", authorId)
+}.toString().toByteArray()
+
+fun FollowActionPayload.encode(): ByteArray = JSONObject().apply {
+    put("followerId", followerId)
+    put("followedId", followedId)
+    put("followedUsername", followedUsername)
+    put("isFollow", isFollow)
+}.toString().toByteArray()
