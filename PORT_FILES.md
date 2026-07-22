@@ -2,7 +2,15 @@
 
 Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalente en Android. Generado desde `../Moments/Moments`. Complementa a [PORT_CHECKLIST.md](PORT_CHECKLIST.md) (vista por carpeta).
 
-**Progreso: 13 / 574 archivos** (2%). Marcado `[x]` = portado o N/A. La lógica no-UI (Services/Models/…) se ha portado en parte inline.
+**Mapa actual: ~165 / 574 archivos con contraparte nombrada** (conteo aproximado; actualizar al cerrar cada lote). Esto no es una certificación de paridad:
+
+| Marca | Significado |
+|---|---|
+| `[ ]` | Sin contraparte Kotlin |
+| `[x]` | Contraparte existe y el flujo principal está cableado (aún puede faltar pulido e2e) |
+| `[~]` | Contraparte existe pero **a medias**: stubs, placeholders, o divergencia confirmada |
+
+Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y UI/UX con su Swift. **Regla de trabajo:** al cerrar un lote de port, actualizar este archivo en el mismo turno.
 
 ## Views  (12/421)
 
@@ -34,12 +42,12 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 **`Creator/AudienceSelector`**
 - [ ] AudienceModels.swift
 - [ ] AudienceSelectionRows.swift
-- [ ] AudienceSelectionView.swift
+- [~] AudienceSelectionView.swift → `views/creator/audienceselector/AudienceSelectionView.kt` (predefinidas + listas; custom people pending)
 - [ ] CustomAudienceManagementViews.swift
 - [ ] CustomListSelectorView.swift
 **`Creator`**
-- [ ] BackgroundMomentUploadService.swift
-- [ ] BackgroundStoryUploadService.swift
+- [x] BackgroundMomentUploadService.swift → `views/creator/BackgroundMomentUploadService.kt`
+- [x] BackgroundStoryUploadService.swift → `views/creator/BackgroundStoryUploadService.kt` (+ `StoryStickerRebuild.kt`)
 **`Creator/CameraKit`**
 - [ ] CameraKitSpike.swift
 - [ ] LensReel.swift
@@ -47,7 +55,7 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] ChainConfigurationView.swift
 - [ ] ChainContinuationSelectorView.swift
 **`Creator/Components`**
-- [ ] CaptureButton.swift
+- [~] CaptureButton.swift → `views/creator/creatorscreens/CaptureButton.kt`
 - [ ] EditableImageView.swift
 - [ ] StickerDetailPalette.swift
 - [ ] StickerGiphyViews.swift
@@ -60,35 +68,35 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] StoryBackgroundPresets.swift
 - [ ] StoryColorPickerView.swift
 - [ ] StoryDominantColorsExtractor.swift
-- [ ] StoryDrawingEditorOverlay.swift
+- [~] StoryDrawingEditorOverlay.swift → `StoryDrawingEditorOverlay.kt` (pinceles/undo/redo/export PNG; ColorPicker sistema deferred)
 - [ ] StoryEditingControls.swift
-- [ ] StoryEditorTextTypes.swift
-- [ ] StoryFilterSelectorView.swift
-- [ ] StoryFontRegistry.swift
+- [~] StoryEditorTextTypes.swift → `StoryEditorTextTypes.kt` (estilos Aa + swatches; motion/effects pending)
+- [~] StoryFilterSelectorView.swift → `StoryFilterSelectorView.kt` (+ intensidad; cableado en StoryEditing)
+- [~] StoryFontRegistry.swift → `StoryFontRegistry.kt` + assets/fonts/*.ttf
 - [ ] StoryTextAttributesBuilder.swift
 - [ ] StoryTextEditorChrome.swift
 - [ ] StoryTextGradientSettings.swift
 - [ ] StoryTextMotionEngine.swift
-- [ ] StoryTextOverlayLabel.swift
-- [ ] StoryTextOverlayMetadata.swift
+- [~] StoryTextOverlayMetadata.swift → draft en `StoryTextOverlayDraft.kt` + model `Models.kt`; encode en payload
+- [~] StoryTextEditor.swift → `views/creator/creatorscreens/StoryTextEditor.kt` (fonts + color swatches; HSB/eyedropper/motion pending)
 - [ ] StoryTextVisualRenderer.swift
 - [ ] StoryVideoPlayerView.swift
 **`Creator/CreatorScreens`**
 - [ ] AlbumPickerView.swift
-- [ ] CaptionAndDetailsView.swift
-- [ ] ContentTypeSelectionView.swift
-- [ ] FilterOption.swift
-- [ ] LocationPickerView.swift
-- [ ] MediaEditingView.swift
-- [ ] MediaGridCell.swift
-- [ ] MediaSelectionView.swift
+- [~] CaptionAndDetailsView.swift → `views/creator/creatorscreens/CaptionAndDetailsView.kt` (share + Location/Audience/PhotoTag/HiddenLayers texto; schedule pending)
+- [~] ContentTypeSelectionView.swift → `views/creator/creatorscreens/ContentTypeSelectionView.kt`
+- [~] FilterOption.swift → `views/creator/creatorscreens/FilterOption.kt` (cableado en MediaEditing filter mode)
+- [~] LocationPickerView.swift → `views/creator/creatorscreens/LocationPickerView.kt` (search + GPS; sin MapKit)
+- [~] MediaEditingView.swift → `views/creator/creatorscreens/MediaEditingView.kt` (preview + crop + filtros; OK)
+- [~] MediaGridCell.swift → `views/creator/creatorscreens/MediaGridCell.kt`
+- [~] MediaSelectionView.swift → `views/creator/creatorscreens/MediaSelectionView.kt` (galería + álbumes MediaStore; CameraCapture pendiente)
 - [ ] StickerOverlayView.swift
-- [ ] StoryCameraView.swift
-- [ ] StoryOverlaysView.swift
-- [ ] StoryTextEditor.swift
+- [~] StoryCameraView.swift → `views/creator/creatorscreens/StoryCameraView.kt` (CameraX foto+vídeo long-press/flip/galería/Aa; lenses pending)
+- [~] StoryOverlaysView.swift
+- [~] StoryTextEditor.swift → ver `creatorscreens/StoryTextEditor.kt` (fonts/colors chunk3)
 - [ ] UserSearchView.swift
 **`Creator`**
-- [ ] CreatorSharedModels.swift
+- [~] CreatorSharedModels.swift → parcial en `CreatorView.kt` (`CreatorMedia` / `CreatorAlbumInfo` / flows)
 **`Creator/CreatorUIKit`**
 - [ ] BackgroundCameraView.swift
 - [ ] CameraCapture.swift
@@ -96,108 +104,108 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] CreatorCaptureGeometry.swift
 - [ ] CreatorControls.swift
 - [ ] CreatorUIImageExtensions.swift
-- [ ] CropViewWrapper.swift
+- [~] CropViewWrapper.swift → `views/creator/creatorscreens/CropViewWrapper.kt` (Compose crop; TOCropViewController paridad funcional)
 - [ ] DrawingView.swift
 - [ ] StoryGalleryPicker.swift
 - [ ] StoryMediaPicker.swift
 **`Creator`**
-- [ ] CreatorView.swift
-- [ ] HiddenLayersEditorView.swift
-- [ ] PhotoTagSelectionView.swift
+- [~] CreatorView.swift → `views/creator/CreatorView.kt` (shell + type/media/edit/caption/story camera+editor chunk1)
+- [~] HiddenLayersEditorView.swift → `views/creator/creatorscreens/HiddenLayersEditorView.kt` (texto máx 3; image/audio/schedule pending)
+- [~] PhotoTagSelectionView.swift → `views/creator/creatorscreens/PhotoTagSelectionView.kt`
 - [ ] StickerEmojiPalettePicker.swift
 - [ ] StoryVideoProcessingService.swift
 - [ ] StoryVideoTrimEditorView.swift
 - [ ] VideoEditor.swift
 - [ ] stickerview.swift
-- [ ] storyeditor.swift
+- [~] storyeditor.swift → `views/creator/creatorscreens/StoryEditingView.kt` (+ texto/fonts/colors + dibujo + filtros chunk5; stickers/motion pending)
 **`Echoes`**
-- [ ] EchoHistoryView.swift
-- [ ] EchoInvitationView.swift
+- [x] EchoHistoryView.swift → `views/echoes/EchoHistoryView.kt` (cableado en FeedPresentationModifier)
+- [x] EchoInvitationView.swift → `views/echoes/EchoInvitationView.kt` (cableado en FeedOverlaysSection)
 - [ ] EchoViewerUI.swift
 **`Explore`**
-- [ ] ExploreGridLayout.swift
-- [ ] ExploreMomentDetailView.swift
+- [~] ExploreGridLayout.swift → `views/explore/ExploreGridLayout.kt` (grid 3 cols; bento exacto = pulido)
+- [~] ExploreMomentDetailView.swift → `views/explore/ExploreMomentDetailView.kt` (reusa SingleMomentDetail; scroll multi = pulido)
 **`Explore/ExploreSections`**
-- [ ] ExploreResultsSection.swift
-- [ ] ExploreSuggestionsSection.swift
+- [~] ExploreResultsSection.swift → `views/explore/sections/ExploreResultsSection.kt`
+- [~] ExploreSuggestionsSection.swift → `views/explore/sections/ExploreSuggestionsSection.kt`
 **`Explore`**
-- [ ] ExploreView.swift
-- [ ] ExploreViewModel.swift
-- [ ] ModernExploreDetailHeader.swift
-- [ ] MomentDetailView.swift
-- [ ] SuggestedUsersView.swift
+- [~] ExploreView.swift → `views/explore/ExploreView.kt` (tab + sheet feed/hashtag cableados; Profile sheet stub)
+- [~] ExploreViewModel.swift → `views/explore/ExploreViewModel.kt`
+- [ ] ModernExploreDetailHeader.swift — no en MVP (chrome vía SingleMomentDetail)
+- [ ] MomentDetailView.swift — N/A legacy iOS (cero call sites)
+- [~] SuggestedUsersView.swift → `views/explore/SuggestedUsersView.kt` (lista + follow; sin paginación infinita)
 **`Feed/Controls`**
-- [ ] FeedTypeSelector.swift
-- [ ] feedchange.swift
+- [x] FeedTypeSelector.swift → `views/feed/controls/FeedTypeSelector.kt`
+- [x] feedchange.swift → `views/feed/controls/FeedChange.kt`
 **`Feed/Core`**
-- [ ] FeedNotificationRoutingModifier.swift
-- [ ] FeedPresentationModifier.swift
-- [ ] FeedRoutes.swift
-- [ ] FeedView.swift
-- [ ] FeedViewModel.swift
-- [ ] ModernEmptyFeedView.swift
+- [~] FeedNotificationRoutingModifier.swift → `views/feed/core/FeedNotificationRoutingModifier.kt`
+- [~] FeedPresentationModifier.swift → `views/feed/core/FeedPresentationModifier.kt` (Explore/Stories/Messaging/Profile/Edit/Comments/EchoHistory cableados; sin placeholders del contrato Feed)
+- [x] FeedRoutes.swift → `views/feed/core/FeedRoutes.kt`
+- [~] FeedView.swift → `views/feed/core/FeedView.kt` (feed usable; pulido visual card vs iOS)
+- [~] FeedViewModel.swift → `views/feed/core/FeedViewModel.kt`
+- [x] ModernEmptyFeedView.swift → `views/feed/core/ModernEmptyFeedView.kt`
 **`Feed/Core/Sections`**
-- [ ] FeedHeaderSection.swift
-- [ ] FeedListSection.swift
-- [ ] FeedMomentComponents.swift
-- [ ] FeedMomentDetailRoute.swift
-- [ ] FeedOverlaysSection.swift
-- [ ] FeedPostSkeletonView.swift
-- [ ] FeedStoryRingComponents.swift
+- [~] FeedHeaderSection.swift → `views/feed/core/sections/FeedHeaderSection.kt`
+- [~] FeedListSection.swift → `views/feed/core/sections/FeedListSection.kt`
+- [~] FeedMomentComponents.swift → `views/feed/core/sections/FeedMomentComponents.kt` (`ModernPostCardView`)
+- [x] FeedMomentDetailRoute.swift → `views/feed/core/sections/FeedMomentDetailRoute.kt` → `MomentDetailContainerView(Single)`
+- [~] FeedOverlaysSection.swift → `views/feed/core/sections/FeedOverlaysSection.kt` (EchoInvitation + ContextMenu cableados; resto parcial)
+- [x] FeedPostSkeletonView.swift → `views/feed/core/sections/FeedPostSkeletonView.kt`
+- [~] FeedStoryRingComponents.swift → `views/feed/core/sections/FeedStoryRingComponents.kt`
 **`Feed/Moments`**
-- [ ] ClickableHashtagsView.swift
-- [ ] HiddenLayersOverlayView.swift
-- [ ] MomentCarouselLayoutRules.swift
+- [x] ClickableHashtagsView.swift → `views/feed/moments/ClickableHashtagsView.kt`
+- [x] HiddenLayersOverlayView.swift → `views/feed/moments/HiddenLayersOverlayView.kt`
+- [x] MomentCarouselLayoutRules.swift → `views/feed/moments/MomentCarouselLayoutRules.kt` (+ `MomentMediaCarousel.kt`)
 **`Feed/Reactions`**
-- [ ] MomentReactionButton.swift
-- [ ] reacciones.swift
+- [x] MomentReactionButton.swift → `views/feed/reactions/MomentReactionButton.kt`
+- [x] reacciones.swift → `views/feed/reactions/Reacciones.kt`
 **`Feed/Sharing`**
-- [ ] ShareMomentSticker.swift
-- [ ] StoryShare.swift
-- [ ] share.swift
+- [x] ShareMomentSticker.swift → `views/feed/sharing/ShareMomentSticker.kt`
+- [x] StoryShare.swift → `views/feed/sharing/StoryShare.kt`
+- [x] share.swift → `views/feed/sharing/Share.kt`
 **`Feed/Stories`**
-- [ ] FeedStoryRingCoordinator.swift
-- [ ] StoryRingTraySkeleton.swift
+- [~] FeedStoryRingCoordinator.swift → `views/feed/stories/FeedStoryRingCoordinator.kt` (anillo en feed; viewer = stub hasta lote Stories)
+- [x] StoryRingTraySkeleton.swift → `views/feed/stories/StoryRingTraySkeleton.kt` (+ `StoryRingLayout.kt`)
 **`Feed/Uploads`**
-- [ ] FeedUploadProgressRow.swift
-- [ ] FloatingMomentUploadOverlay.swift
-- [ ] StoryUploadProgressManager.swift
+- [x] FeedUploadProgressRow.swift → `views/feed/uploads/FeedUploadProgressRow.kt`
+- [x] FloatingMomentUploadOverlay.swift → `views/feed/uploads/FloatingMomentUploadOverlay.kt`
+- [x] StoryUploadProgressManager.swift → `views/feed/uploads/StoryUploadProgressManager.kt`
 **`Feed/Video`**
-- [ ] LiveVideoTimeLabel.swift
-- [ ] Reels.swift
-- [ ] VideoFeedProgressBar.swift
-- [ ] VideoPlaybackChromeStyle.swift
-- [ ] VideoPlayer.swift
-- [ ] VideoPosterOverlay.swift
+- [~] LiveVideoTimeLabel.swift → `views/feed/video/LiveVideoTimeLabel.kt`
+- [~] Reels.swift → `views/feed/video/Reels.kt`
+- [~] VideoFeedProgressBar.swift → `views/feed/video/VideoFeedProgressBar.kt`
+- [~] VideoPlaybackChromeStyle.swift → `views/feed/video/VideoPlaybackChromeStyle.kt`
+- [~] VideoPlayer.swift → `views/feed/video/VideoPlayer.kt` (existe; paridad global vs iOS aún abierta)
+- [~] VideoPosterOverlay.swift → `views/feed/video/VideoPosterOverlay.kt`
 **`Feed/maps`**
-- [ ] DiscoverMapView.swift
-- [ ] LocationMomentDetailView.swift
-- [ ] MapAnnotationModels.swift
-- [ ] MapDiscoverSupport.swift
-- [ ] MapLocationServices.swift
-- [ ] MapPlaceBottomSheet.swift
-- [ ] MapPlaceClusterEngine.swift
-- [ ] MapPlaceStoryDeck.swift
-- [ ] MapWeatherEffects.swift
-- [ ] Maps.swift
+- [~] DiscoverMapView.swift → `views/feed/maps/DiscoverMapView.kt`
+- [~] LocationMomentDetailView.swift → `views/feed/maps/LocationMomentDetailView.kt` (lista + cards; sin swipe-dismiss/prefetch completo vs iOS)
+- [x] MapAnnotationModels.swift → `views/feed/maps/MapAnnotationModels.kt`
+- [~] MapDiscoverSupport.swift → `views/feed/maps/MapDiscoverSupport.kt`
+- [~] MapLocationServices.swift → `views/feed/maps/MapLocationServices.kt`
+- [~] MapPlaceBottomSheet.swift → `views/feed/maps/MapPlaceBottomSheet.kt`
+- [~] MapPlaceClusterEngine.swift → `views/feed/maps/MapPlaceClusterEngine.kt`
+- [~] MapPlaceStoryDeck.swift → `views/feed/maps/MapPlaceStoryDeck.kt`
+- [~] MapWeatherEffects.swift → `views/feed/maps/MapWeatherEffects.kt`
+- [~] Maps.swift → `views/feed/maps/LocationMapView.kt` / `Maps.kt` (+ secciones; parcial)
 **`Feed/maps/MapsSections`**
-- [ ] MapBottomSheetSection.swift
-- [ ] MapCanvasSection.swift
+- [~] MapBottomSheetSection.swift → `views/feed/maps/mapsections/MapBottomSheetSection.kt`
+- [~] MapCanvasSection.swift → `views/feed/maps/mapsections/MapCanvasSection.kt` (+ `MapHeaderSection.kt`)
 **`Feed/maps`**
-- [ ] WeatherService.swift
+- [~] WeatherService.swift → `views/feed/maps/WeatherService.kt`
 **`Login`**
-- [x] AuthUIComponents.swift → `ui/login/AuthComponents.kt`
-- [x] CreatingProfileView.swift → `ui/login/CreatingProfileScreen.kt`
-- [x] DeactivatedAccountView.swift → `ui/login/AccountStateScreens.kt`
+- [x] AuthUIComponents.swift → `views/login/AuthComponents.kt`
+- [x] CreatingProfileView.swift → `views/login/CreatingProfileScreen.kt`
+- [x] DeactivatedAccountView.swift → `views/login/AccountStateScreens.kt`
 - [x] Interestview.swift — N/A (archivo vacío)
-- [x] LiquidGlassComponents.swift → `ui/login/AuthComponents.kt + AuthTheme.kt`
-- [x] LoginView.swift → `ui/login/LoginScreen.kt`
-- [x] PrivacyPolicyView.swift → `ui/login/PrivacyPolicyScreen.kt`
-- [x] ProfileOnboardingView.swift → `ui/login/OnboardingScreen.kt`
+- [x] LiquidGlassComponents.swift → `views/login/AuthComponents.kt + AuthTheme.kt`
+- [x] LoginView.swift → `views/login/LoginScreen.kt`
+- [x] PrivacyPolicyView.swift → `views/login/PrivacyPolicyScreen.kt`
+- [x] ProfileOnboardingView.swift → `views/login/OnboardingScreen.kt`
 - [x] RegisterView.swift → `→ OnboardingScreen.kt`
 - [x] SocialProfileCompletionView.swift — N/A (era Apple; Google crea perfil directo)
-- [x] SplashScreen.swift → `ui/login/SplashScreen.kt`
-- [x] SuspendedAccount.swift → `ui/login/AccountStateScreens.kt`
+- [x] SplashScreen.swift → `views/login/SplashScreen.kt`
+- [x] SuspendedAccount.swift → `views/login/AccountStateScreens.kt`
 **`Messaging/Attachments`**
 - [ ] ChatGiphyPickerSheet.swift
 - [ ] ChatLocationSheet.swift
@@ -237,7 +245,7 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] ChatViewModel.swift
 - [ ] MessageItem.swift
 - [ ] MessageModel.swift
-- [ ] MessagingViewModel.swift
+- [~] MessagingViewModel.swift → `views/messaging/core/MessagingViewModel.kt` (inbox + targetId + chat texto)
 **`Messaging/Media`**
 - [ ] CameraPickerView.swift
 - [ ] ChatCameraView.swift
@@ -264,33 +272,33 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 **`Messaging/Screens`**
 - [ ] ConversationSettingsView.swift
 - [ ] MessageRequestsView.swift
-- [ ] MessagingView.swift
+- [~] MessagingView.swift → `views/messaging/screens/MessagingView.kt` (inbox + thread texto; glass/media = abiertos)
 **`Messaging/Services`**
-- [ ] ChatAccessCoordinator.swift
+- [x] ChatAccessCoordinator.swift → `views/messaging/services/ChatAccessCoordinator.kt`
 - [ ] ChatBuzzProcessedStore.swift
 - [ ] ChatDraftStore.swift
 - [ ] ChatGiphyService.swift
 - [ ] ChatKeyboardScrollCoordinator.swift
-- [ ] ChatNavigationIntentStore.swift
+- [x] ChatNavigationIntentStore.swift → `views/messaging/services/ChatNavigationIntentStore.kt`
 - [ ] ChatRowHeightEstimator.swift
 - [ ] ChatScrollDebug.swift
 - [ ] ChatScrollStateStore.swift
 - [ ] ChatService+Buzz.swift
 - [ ] ChatService+ChunkedVideoUpload.swift
-- [ ] ChatService+EncryptedMediaResolver.swift
+- [x] ChatService+EncryptedMediaResolver.swift → `views/messaging/services/ChatEncryptedMediaResolver.kt`
 - [ ] ChatService+EphemeralCleanup.swift
 - [ ] ChatService+LocalFirstSnapshot.swift
-- [ ] ChatService+MediaPipeline.swift
+- [x] ChatService+MediaPipeline.swift → `views/messaging/services/ChatServiceMediaPipeline.kt`
 - [ ] ChatService+MessageActions.swift
 - [ ] ChatService+MessageHydration.swift
 - [ ] ChatService+MessageReactions.swift
 - [ ] ChatService+Search.swift
 - [ ] ChatService+SharingAndViewOnce.swift
 - [ ] ChatService+VanishMode.swift
-- [ ] ChatService.swift
-- [ ] ChatSessionEngine.swift
+- [x] ChatService.swift → `views/messaging/services/ChatService.kt` (+ `ChatMessageMapper.kt`)
+- [x] ChatSessionEngine.swift → `views/messaging/services/ChatSessionEngine.kt`
 - [ ] ChatVideoPosterGenerator.swift
-- [ ] LiveLocationSharingService.swift
+- [x] LiveLocationSharingService.swift → `views/messaging/services/LiveLocationSharingService.kt` (teardown logout)
 - [ ] ViewOnceConsumptionService.swift
 **`Misc`**
 - [ ] WhatsNewView.swift
@@ -402,8 +410,8 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] IncognitoGlobalOverlay.swift
 - [ ] IncognitoModeSheet.swift
 **`Profile/MomentsView`**
-- [ ] ContextMenu.swift
-- [ ] EditMomentView.swift
+- [x] ContextMenu.swift → `views/profile/momentsview/ContextMenu.kt` (`ModernContextMenuOverlay`; cableado en FeedOverlays)
+- [~] EditMomentView.swift → `views/profile/momentsview/EditMomentView.kt` (cableado desde Feed + SingleMomentDetail; AudienceSelector/LocationPicker/PhotoTag = pickers simples / stubs honestos)
 - [ ] ModernMomentDetailView.swift
 **`Profile/Theme`**
 - [ ] EnhancedProfileBackground.swift
@@ -420,8 +428,8 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] UserProfileSharedViews.swift
 - [ ] UserProfileStateViews.swift
 **`Profile/UserProfile`**
-- [ ] UserProfileView.swift
-- [ ] UserProfileViewModel.swift
+- [~] UserProfileView.swift → `views/profile/userprofile/UserProfileView.kt` (sheet Feed + tab propio MVP)
+- [~] UserProfileViewModel.swift → `views/profile/userprofile/UserProfileViewModel.kt`
 **`Settings`**
 - [ ] AccountHistoryActivityView.swift
 - [ ] AccountManagement.swift
@@ -467,35 +475,35 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] AppErrorBanner.swift
 - [ ] BlurView.swift
 **`Shared/MomentDetail`**
-- [ ] MomentDetailContainerView.swift
-- [ ] MomentDetailContext.swift
-- [ ] SingleMomentDetailView.swift
+- [x] MomentDetailContainerView.swift → `views/shared/momentdetail/MomentDetailContainerView.kt` (ProfileCarousel cae a Single hasta portar ModernMomentDetailView)
+- [x] MomentDetailContext.swift → `views/shared/momentdetail/MomentDetailContext.kt`
+- [~] SingleMomentDetailView.swift → `views/shared/momentdetail/SingleMomentDetailView.kt` (card/chrome/menu/peek/mapa/delete + ModernComments; Edit/Explore = placeholders)
 **`Shared`**
 - [ ] MomentsVideoPlaybackTimeline.swift
 - [ ] MomentsVideoPlayer.swift
 - [ ] OfflineBannerModifier.swift
 - [ ] PhotoTagOverlayView.swift
-- [ ] ScreenshotProtectedView.swift
+- [x] ScreenshotProtectedView.swift → `views/shared/ScreenshotProtectedView.kt`
 **`comments`**
-- [ ] CommentMentionSearchOverlay.swift
-- [ ] CommentsView.swift
-- [ ] ModernCommentsView.swift
+- [x] CommentMentionSearchOverlay.swift → `views/comments/CommentMentionSearchOverlay.kt`
+- [ ] CommentsView.swift (legacy iOS; el feed usa ModernCommentsView)
+- [x] ModernCommentsView.swift → `views/comments/ModernCommentsView.kt` (+ `CommentMuteFilters.kt`, `CommentMentionDraft.kt`, `EnhancedModernCommentRow.kt`) — listener, mute filters, menciones, skeletons, StoryRing, like/reply/edit/delete, moderación; cableado en FeedPresentation + SingleMomentDetail
 **`story`**
 - [ ] QuestionResponsesView.swift
-- [ ] StoriesView.swift
+- [~] StoriesView.swift → `views/story/StoriesView.kt` (MVP ring + viewer; ads/chains omitidos)
 - [ ] StoryChainView.swift
 - [ ] StoryDeckGestureGate.swift
 - [ ] StoryInteractiveStickers.swift
-- [ ] StoryModels.swift
-- [ ] StoryPlaybackCoordinator.swift
-- [ ] StoryRepository.swift
-- [ ] StoryRingAvatarView.swift
+- [ ] StoryModels.swift — modelo `Story` ya en `models/Models.kt`
+- [ ] StoryPlaybackCoordinator.swift — timer inline en StoryViewerScreen MVP
+- [ ] StoryRepository.swift — usa `FirestoreStoriesRepository.fetchActiveStoriesForUsers`
+- [x] StoryRingAvatarView.swift → `views/story/StoryRingAvatarView.kt`
 - [ ] StorySegmentedRing.swift
 **`story/StoryStickers`**
 - [ ] StoryStickerEffects.swift
 - [ ] StoryStickerViews.swift
 **`story`**
-- [ ] StoryViewModel.swift
+- [~] StoryViewModel.swift → `views/story/StoryViewModel.kt` (carga + privacy + markSeen)
 **`story/StoryViewer`**
 - [ ] StoryDeckInteractionLayout.swift
 - [ ] StoryGestureCoordinator.swift
@@ -503,37 +511,37 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] StoryMediaOverlayRendererView.swift
 - [ ] StoryQuickActionsMenu.swift
 - [ ] StoryReplyViews.swift
-- [ ] StoryUserDeckPager.swift
+- [ ] StoryUserDeckPager.swift — swipe usuarios simplificado en StoriesView
 - [ ] StoryViewerBottomComponents.swift
 - [ ] StoryViewerLayers.swift
 - [ ] StoryViewerLayoutHelpers.swift
-- [ ] StoryViewerMedia.swift
-- [ ] StoryViewerOverlay.swift
-- [ ] StoryViewerScreen.swift
+- [~] StoryViewerMedia.swift → `views/story/storyviewer/StoryViewerScreen.kt` (`StoryViewerMedia`)
+- [~] StoryViewerOverlay.swift — progress + header mínimos en StoryViewerScreen
+- [~] StoryViewerScreen.swift → `views/story/storyviewer/StoryViewerScreen.kt` (MVP gestos/timer)
 **`story`**
 - [ ] archived stories.swift
 
-## Activities  (0/3)
+## Activities  (3/3)
 
-- [ ] LiveActivityThumbnailStore.swift
-- [ ] MomentUploadActivityAttributes.swift
-- [ ] StoryUploadActivityAttributes.swift
+- [x] LiveActivityThumbnailStore.swift → `activities/LiveActivityThumbnailStore.kt` (cache interno; N/A App Group iOS)
+- [x] MomentUploadActivityAttributes.swift → `activities/MomentUploadActivityAttributes.kt` + `UploadProgressNotificationHelper.kt`
+- [x] StoryUploadActivityAttributes.swift → `activities/StoryUploadActivityAttributes.kt` + `UploadProgressNotificationHelper.kt`
 
-## Coordinators  (0/5)
+## Coordinators  (5/5)
 
-- [ ] AppRouter.swift
-- [ ] LegacyNavigationBridge.swift
-- [ ] MainViewModel.swift
-- [ ] SharedComponents.swift
-- [ ] TabBarView.swift
+- [x] AppRouter.swift → `coordinators/AppRouter.kt`
+- [x] LegacyNavigationBridge.swift → `coordinators/LegacyNavigationBridge.kt`
+- [x] MainViewModel.swift → `coordinators/MainViewModel.kt`
+- [x] SharedComponents.swift → `coordinators/SharedComponents.kt`
+- [x] TabBarView.swift → `coordinators/TabBarScreen.kt`
 
-## Extensions  (0/5)
+## Extensions  (5/5)
 
-- [ ] AVAssetImageGenerator+Thumbnail.swift
-- [ ] Color+Hex.swift
-- [ ] Date+Extensions.swift
-- [ ] InterestEmojiHelper.swift
-- [ ] View+LiquidGlass.swift
+- [x] AVAssetImageGenerator+Thumbnail.swift → `extensions/AvAssetThumbnail.kt`
+- [x] Color+Hex.swift → `extensions/ColorHex.kt`
+- [x] Date+Extensions.swift → `extensions/DateExtensions.kt`
+- [x] InterestEmojiHelper.swift → `extensions/InterestEmojiHelper.kt`
+- [x] View+LiquidGlass.swift → `extensions/LiquidGlass.kt`
 
 ## Models  (0/21)
 
@@ -559,163 +567,164 @@ Checklist **archivo por archivo** de los `.swift` del target iOS y su equivalent
 - [ ] UserBadge.swift
 - [ ] VisitsView.swift
 
-## Moderation  (0/2)
+## Moderation  (2/2)
 
-- [ ] CommentsModerationService.swift
-- [ ] MediaModerationService.swift
+- [x] CommentsModerationService.swift → `moderation/CommentsModerationService.kt`
+- [x] MediaModerationService.swift → `moderation/MediaModerationService.kt`
 
-## MomentsApp.swift  (0/1)
+## MomentsApp.swift  (1/1)
 
-- [ ] MomentsApp.swift
+- [x] MomentsApp.swift → `MomentsApp.kt` (raíz `com.moments.android`, como iOS)
 
-## Notifications  (0/24)
+## Notifications  (24/24)
 
-- [ ] NotificationGroupedFollowersOverlay.swift
-- [ ] NotificationRowComponents.swift
-- [ ] NotificationSharedViews.swift
-- [ ] NotificationGroup.swift
-- [ ] NotificationRowSupport.swift
-- [ ] NotificationsViewModel.swift
-- [ ] EnhancedNotificationRow+Follow.swift
-- [ ] EnhancedNotificationRow+Messages.swift
-- [ ] EnhancedNotificationRow+Previews.swift
-- [ ] EnhancedNotificationRow+Trailing.swift
-- [ ] EnhancedNotificationRow.swift
-- [ ] NotificationSummaryPopup.swift
-- [ ] NotificationsView.swift
-- [ ] AppDelegate.swift
-- [ ] FCMTokenService.swift
-- [ ] InAppNotificationPreviewResolver.swift
-- [ ] InAppNotificationService.swift
-- [ ] NotificationBadgeService.swift
-- [ ] NotificationCopyResolver.swift
-- [ ] NotificationExtensions.swift
-- [ ] NotificationNavigationService.swift
-- [ ] NotificationOpenIntentStore.swift
-- [~] NotificationPresentationCoordinator.swift → `notifications/NotificationPresentationCoordinator.kt` (stub mínimo para banners; port completo pendiente)
-- [ ] Notificationservice.swift
+- [x] NotificationGroupedFollowersOverlay.swift → `notifications/components/NotificationGroupedFollowersOverlay.kt`
+- [x] NotificationRowComponents.swift → `notifications/components/NotificationRowComponents.kt`
+- [x] NotificationSharedViews.swift → `notifications/components/NotificationSharedViews.kt`
+- [x] NotificationGroup.swift → `notifications/core/NotificationGroup.kt`
+- [x] NotificationRowSupport.swift → `notifications/core/NotificationRowSupport.kt`
+- [x] NotificationsViewModel.swift → `notifications/core/NotificationsViewModel.kt`
+- [x] EnhancedNotificationRow+Follow.swift → `notifications/row/EnhancedNotificationRowFollow.kt`
+- [x] EnhancedNotificationRow+Messages.swift → `notifications/row/EnhancedNotificationRowMessages.kt`
+- [x] EnhancedNotificationRow+Previews.swift → `notifications/row/EnhancedNotificationRowPreviews.kt`
+- [x] EnhancedNotificationRow+Trailing.swift → `notifications/row/EnhancedNotificationRowTrailing.kt`
+- [x] EnhancedNotificationRow.swift → `notifications/row/EnhancedNotificationRow.kt`
+- [x] NotificationSummaryPopup.swift → `notifications/screens/NotificationSummaryPopup.kt`
+- [x] NotificationsView.swift → `notifications/screens/NotificationsScreen.kt`
+- [x] AppDelegate.swift (push) → `notifications/services/MomentsFirebaseMessagingService.kt` + `MainActivity` / `MomentsApplication`
+- [x] FCMTokenService.swift → `notifications/services/FCMTokenService.kt`
+- [x] InAppNotificationPreviewResolver.swift → `notifications/services/InAppNotificationPreviewResolver.kt`
+- [x] InAppNotificationService.swift → `notifications/services/InAppNotificationService.kt`
+- [x] NotificationBadgeService.swift → `notifications/services/NotificationBadgeService.kt`
+- [x] NotificationCopyResolver.swift → `notifications/services/NotificationCopyResolver.kt`
+- [x] NotificationExtensions.swift → `notifications/services/NotificationExtensions.kt`
+- [x] NotificationNavigationService.swift → `notifications/services/NotificationNavigationService.kt`
+- [x] NotificationOpenIntentStore.swift → `notifications/services/NotificationOpenIntentStore.kt`
+- [x] NotificationPresentationCoordinator.swift → `notifications/services/NotificationPresentationCoordinator.kt`
+- [x] Notificationservice.swift → `notifications/services/NotificationService.kt` (re-export deprecated en `services/notifications/`)
 
-## Reportes  (0/7)
+## Reportes  (7/7)
 
-- [ ] AppealFormView.swift
-- [ ] AppealService.swift
-- [ ] AppealStatus.swift
-- [ ] ModerationReviewStatusView.swift
-- [ ] ModernReportContent.swift
-- [ ] ReportBottomSheet.swift
-- [ ] UserReportContent.swift
+- [x] AppealFormView.swift → `reportes/AppealFormView.kt` (+ ModerationReviewRequestSheet)
+- [x] AppealService.swift → `reportes/AppealService.kt` + `AppealModels.kt` + `AppealError.kt`
+- [x] AppealStatus.swift → `reportes/AppealStatusView.kt`
+- [x] ModerationReviewStatusView.swift → `reportes/ModerationReviewStatusView.kt`
+- [x] ModernReportContent.swift → `reportes/ModernReportContent.kt`
+- [x] ReportBottomSheet.swift → `reportes/ReportBottomSheet.kt` + `ReportModels.kt`
+- [x] UserReportContent.swift → `reportes/UserReportContent.kt`
 
-## Services  (1/69)
+## Services  (69 named mappings; 0 parity-certified)
 
 **`Activity`**
 - [x] TimeSpentManager.swift → `services/activity/TimeSpentManager.kt`
 **`Auth`**
-- [ ] AuthService.swift
-- [ ] LoginActivityService.swift
-- [ ] OnboardingDraftStore.swift
-- [ ] PasskeyService.swift
+- [x] AuthService.swift → `services/auth/AuthService.kt` (email+Google; Apple/Passkey N/A)
+- [x] LoginActivityService.swift → `services/auth/LoginActivityService.kt`
+- [x] OnboardingDraftStore.swift → `services/auth/OnboardingDraftStore.kt`
+- [x] PasskeyService.swift — N/A (Android: solo Google + email)
 **`Cache`**
-- [ ] CacheManager.swift
-- [ ] ImagePrefetchManager.swift
-- [ ] PersistentAudioCache.swift
-- [ ] PersistentVideoCache.swift
-- [ ] UserCacheService.swift
-- [ ] VideoPreloader.swift
-- [ ] VideoThumbnailCache.swift
+- [x] CacheManager.swift → `services/cache/CacheManager.kt`
+- [x] ImagePrefetchManager.swift → `services/cache/ImagePrefetchManager.kt`
+- [x] PersistentAudioCache.swift → `services/cache/PersistentAudioCache.kt`
+- [x] PersistentVideoCache.swift → `services/cache/PersistentVideoCache.kt`
+- [x] UserCacheService.swift → `services/cache/UserCacheService.kt`
+- [x] VideoPreloader.swift → `services/cache/VideoPreloader.kt`
+- [x] VideoThumbnailCache.swift → `services/cache/VideoThumbnailCache.kt`
 **`Camera`**
-- [ ] SnapCameraKitConfiguration.swift
+- [x] SnapCameraKitConfiguration.swift → `services/camera/SnapCameraKitConfiguration.kt` (feature off)
 **`Content`**
-- [ ] BackendFeedService.swift
-- [ ] FilterService.swift
-- [ ] ForYouDiscoveryService.swift
-- [ ] ProfileVisitsService.swift
+- [x] BackendFeedService.swift → `services/content/BackendFeedService.kt`
+- [x] FilterService.swift → `services/content/FilterService.kt`
+- [x] ForYouDiscoveryService.swift → `services/content/ForYouDiscoveryService.kt`
+- [x] ProfileVisitsService.swift → `services/content/ProfileVisitsService.kt`
 **`Firestore`**
-- [ ] FirestoreActivityRepository.swift
-- [ ] FirestoreAudienceRepository.swift
-- [ ] FirestoreCommentsRepository.swift
-- [ ] FirestoreCore.swift
-- [ ] FirestoreHiddenLayersRepository.swift
-- [ ] FirestoreMomentsRepository.swift
-- [ ] FirestoreProfilesRepository.swift
-- [ ] FirestoreSearchRepository.swift
-- [ ] FirestoreService.swift
-- [ ] FirestoreStoriesRepository.swift
+- [x] FirestoreActivityRepository.swift → `services/firestore/FirestoreActivityRepository.kt`
+- [x] FirestoreAudienceRepository.swift → `services/firestore/FirestoreAudienceRepository.kt`
+- [~] FirestoreCommentsRepository.swift → `services/firestore/FirestoreCommentsRepository.kt` (reply/mention notification and raw-mention handling differ from iOS)
+- [x] FirestoreCore.swift → `services/firestore/FirestoreCore.kt`
+- [x] FirestoreHiddenLayersRepository.swift → `services/firestore/FirestoreHiddenLayersRepository.kt`
+- [~] FirestoreMomentsRepository.swift → `services/firestore/FirestoreMomentsRepository.kt` (corregido localmente el ID único de audiencia personalizada; falta validar en Firebase/emulador)
+- [~] FirestoreProfilesRepository.swift → `services/firestore/FirestoreProfilesRepository.kt` (operaciones principales alineadas; falta recuperación de e-mail/Auth y decodificación legacy de iOS)
+- [~] FirestoreSearchRepository.swift → `services/firestore/FirestoreSearchRepository.kt` (API consolidada; degradación de sugerencias alineada y compilada)
+- [x] FirestoreService.swift → `services/firestore/FirestoreService.kt`
+- [~] FirestoreStoriesRepository.swift → `services/firestore/FirestoreStoriesRepository.kt` (corregido localmente `mapLocation` y los valores de `mapVisibility`; falta validar escritura/lectura con Firebase)
 **`Incognito`**
-- [ ] IncognitoModeService.swift
+- [x] IncognitoModeService.swift → `services/incognito/IncognitoModeService.kt` (sin Live Activity/Widget iOS)
 **`Messaging`**
-- [ ] ChatCacheStore.swift
-- [ ] ChatCommunicationNotificationService.swift
-- [ ] ChatMediaChunkedCipher.swift
-- [ ] ChatMediaDownloadPolicy.swift
-- [ ] ChatMediaPrefetcher.swift
-- [ ] ChatRecoveryCrypto.swift
-- [ ] ChatSendMessageIntentHandler.swift
-- [ ] EncryptionService.swift
-- [ ] LocalFirstMessagingSettings.swift
-- [ ] MessageCatchUpService.swift
-- [ ] MessageIngestService.swift
-- [ ] MessageRequestService.swift
-- [ ] OnlineStatusService.swift
-- [ ] VanishMessageTimer.swift
+- [x] ChatCacheStore.swift → `services/messaging/ChatCacheStore.kt`
+- [x] ChatCommunicationNotificationService.swift → `services/messaging/ChatCommunicationNotificationService.kt` (shortcuts + Person; MessagingStyle en notificaciones)
+- [x] ChatMediaChunkedCipher.swift → `services/messaging/ChatMediaChunkedCipher.kt`
+- [x] ChatMediaDownloadPolicy.swift → `services/messaging/ChatMediaDownloadPolicy.kt`
+- [x] ChatMediaPrefetcher.swift → `services/messaging/ChatMediaPrefetcher.kt`
+- [x] ChatRecoveryCrypto.swift → `services/messaging/ChatRecoveryCrypto.kt`
+- [x] ChatSendMessageIntentHandler.swift — N/A (Intents iOS; Android RemoteInput)
+- [~] EncryptionService.swift → `services/messaging/EncryptionService.kt` (E2E identity/recovery correction is local; cross-device verification pending)
+- [x] LocalFirstMessagingSettings.swift → `services/messaging/LocalFirstMessagingSettings.kt`
+- [x] MessageCatchUpService.swift → `services/messaging/MessageCatchUpService.kt`
+- [x] MessageIngestService.swift → `services/messaging/MessageIngestService.kt`
+- [x] MessageRequestService.swift → `services/messaging/MessageRequestService.kt`
+- [x] OnlineStatusService.swift → `services/messaging/OnlineStatusService.kt`
+- [x] VanishMessageTimer.swift → `services/messaging/VanishMessageTimer.kt`
 **`Network`**
-- [ ] NetworkMonitor.swift
-- [ ] OfflineSyncService.swift
+- [x] NetworkMonitor.swift → `services/network/NetworkMonitor.kt`
+- [x] OfflineSyncService.swift → `services/network/OfflineSyncService.kt`
 **`Nova`**
-- [ ] NovaEmbeddingService.swift
+- [x] NovaEmbeddingService.swift → `services/nova/NovaEmbeddingService.kt`
 **`Performance`**
-- [ ] FeedVisibilityCoordinator.swift
-- [ ] MotionPolicy.swift
-- [ ] PerformanceSignposts.swift
-- [ ] VideoMomentsIndex.swift
+- [x] FeedVisibilityCoordinator.swift → `services/performance/FeedVisibilityCoordinator.kt`
+- [x] MotionPolicy.swift → `services/performance/MotionPolicy.kt`
+- [x] PerformanceSignposts.swift → `services/performance/PerformanceSignposts.kt`
+- [x] VideoMomentsIndex.swift → `services/performance/VideoMomentsIndex.kt`
 **`Persistence`**
-- [ ] LocalPersistenceService.swift
-- [ ] MessagePersistenceStore.swift
+- [x] LocalPersistenceService.swift → `services/persistence/LocalPersistenceService.kt` (JSON/filesDir; StorySeen en archivo aparte)
+- [x] MessagePersistenceStore.swift → `services/persistence/MessagePersistenceStore.kt`
+- [x] StorySeenStateService (en LocalPersistence iOS) → `services/persistence/StorySeenStateService.kt`
 **`Privacy`**
-- [ ] ContentVisibilityservice.swift
-- [ ] PrivacyService.swift
-- [ ] PrivacyServiceExtension.swift
+- [x] ContentVisibilityservice.swift → `services/privacy/ContentVisibilityService.kt`
+- [~] PrivacyService.swift → `services/privacy/PrivacyService.kt` + `services/privacy/PrivacyServiceExtension.kt` (port dividido: la extensión Kotlin contiene también las rutas avanzadas que Swift conserva en el archivo principal; auditoría de ramas/errores pendiente)
+- [x] PrivacyServiceExtension.swift → `services/privacy/PrivacyServiceExtension.kt` (filtrado de contenido y `canViewMoment`)
 **`Security`**
-- [ ] MomentsAppCheckProviderFactory.swift
+- [x] MomentsAppCheckProviderFactory.swift → `services/security/MomentsAppCheckProviderFactory.kt`
 **`Social`**
-- [ ] AffinityTracker.swift
-- [ ] BestFriendsService.swift
-- [ ] EchoService.swift
-- [ ] StoryChainLimitsService.swift
-- [ ] StoryRingCacheService.swift
+- [x] AffinityTracker.swift → `services/social/AffinityTracker.kt`
+- [x] BestFriendsService.swift → `services/social/BestFriendsService.kt`
+- [x] EchoService.swift → `services/social/EchoService.kt`
+- [x] StoryChainLimitsService.swift → `services/social/StoryChainLimitsService.kt`
+- [x] StoryRingCacheService.swift → `services/social/StoryRingCacheService.kt`
 **`Storage`**
-- [ ] MediaUploadService.swift
-- [ ] StoragePathBuilder.swift
-- [ ] StorageService.swift
-- [ ] UIImage+StorageUpload.swift
-- [ ] VideoCompressionService.swift
+- [x] MediaUploadService.swift → `services/storage/MediaUploadService.kt`
+- [x] StoragePathBuilder.swift → `services/storage/StoragePathBuilder.kt`
+- [x] StorageService.swift → `services/storage/StorageService.kt`
+- [x] UIImage+StorageUpload.swift → `services/storage/BitmapStorageUpload.kt`
+- [x] VideoCompressionService.swift → `services/storage/VideoCompressionService.kt`
 **`Video`**
-- [ ] ReelPrebufferService.swift
-- [ ] SharedVideoPlayerPool.swift
-- [ ] VideoAdaptivePlayback.swift
-- [ ] VideoPlaybackSelector.swift
+- [x] ReelPrebufferService.swift → `services/video/ReelPrebufferService.kt`
+- [x] SharedVideoPlayerPool.swift → `services/video/SharedVideoPlayerPool.kt`
+- [x] VideoAdaptivePlayback.swift → `services/video/VideoAdaptivePlayback.kt`
+- [x] VideoPlaybackSelector.swift → `services/video/VideoPlaybackSelector.kt`
 
-## Utilities  (0/11)
+## Utilities  (11/11)
 
-- [ ] ActiveWindowMetrics.swift
-- [ ] AppLog.swift
-- [ ] EmojiUsageTracker.swift
-- [ ] HapticManager.swift
-- [ ] LegacyTypographyScale.swift
-- [ ] MentionParsing.swift
-- [ ] MomentsAppearModifiers.swift
-- [ ] MomentsAudioSession.swift
-- [ ] MomentsFormat.swift
-- [ ] MomentsPressButtonStyle.swift
-- [ ] OrientationManager.swift
+- [x] ActiveWindowMetrics.swift → `utilities/ActiveWindowMetrics.kt`
+- [x] AppLog.swift → `utilities/AppLog.kt`
+- [x] EmojiUsageTracker.swift → `utilities/EmojiUsageTracker.kt`
+- [x] HapticManager.swift → `utilities/HapticManager.kt`
+- [x] LegacyTypographyScale.swift → `utilities/LegacyTypographyScale.kt`
+- [x] MentionParsing.swift → `utilities/MentionParsing.kt`
+- [x] MomentsAppearModifiers.swift → `utilities/MomentsAppearModifiers.kt`
+- [x] MomentsAudioSession.swift → `utilities/MomentsAudioSession.kt`
+- [x] MomentsFormat.swift → `utilities/MomentsFormat.kt`
+- [x] MomentsPressButtonStyle.swift → `utilities/MomentsPressButtonStyle.kt`
+- [x] OrientationManager.swift → `utilities/OrientationManager.kt`
 
-## ViewModels  (0/1)
 
-- [ ] EchoViewModel.swift
+## ViewModels  (1/1)
 
-## ad  (0/4)
+- [x] EchoViewModel.swift → `viewmodels/EchoViewModel.kt` (StateFlow)
 
-- [ ] AdAspectRatioContext.swift
-- [ ] AdMob Configuration.swift
-- [ ] FeedNativeAd.swift
-- [ ] StoryNativeAd.swift
+## ad  (4/4)
 
+- [x] AdAspectRatioContext.swift → `ad/AdAspectRatioContext.kt`
+- [x] AdMob Configuration.swift → `ad/AdMobConfiguration.kt` (+ NativeAdManager, PlusAdManager)
+- [x] FeedNativeAd.swift → `ad/FeedNativeAd.kt` (Compose)
+- [x] StoryNativeAd.swift → `ad/StoryNativeAd.kt` (Compose)

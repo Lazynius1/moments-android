@@ -14,8 +14,8 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import com.moments.android.R
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
-import com.moments.android.notifications.NotificationPresentationCoordinator
-import com.moments.android.notifications.NotificationPresentationSource
+import com.moments.android.notifications.services.NotificationPresentationCoordinator
+import com.moments.android.notifications.services.NotificationPresentationSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -130,7 +130,7 @@ class TimeSpentManager private constructor(
         val body = app.getString(R.string.user_activity_time_spent_limit_reached_body)
         val manager = app.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notification = NotificationCompat.Builder(app, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_stat_moments)
             .setContentTitle(title)
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
