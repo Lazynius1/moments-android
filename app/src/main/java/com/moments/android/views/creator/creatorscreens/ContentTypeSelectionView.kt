@@ -1,5 +1,4 @@
 package com.moments.android.views.creator.creatorscreens
-
 import android.Manifest
 import android.content.ContentUris
 import android.content.pm.PackageManager
@@ -45,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -67,11 +67,12 @@ import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.CreatorContentType
 import com.moments.android.views.creator.CreatorFlow
+import com.moments.android.views.creator.creatoruikit.BackgroundCameraView
 import kotlin.math.roundToInt
 
 /**
  * Port de `ContentTypeSelectionView.swift` (chunk UI principal).
- * BackgroundCameraView / PermissionPrimerGate fotos: pendientes de sus archivos iOS.
+ * PermissionPrimerGate fotos: pendiente de su archivo iOS.
  */
 @Composable
 fun ContentTypeSelectionView(
@@ -87,6 +88,8 @@ fun ContentTypeSelectionView(
     var shutterScale by remember { mutableFloatStateOf(1f) }
     var dialTransientOffset by remember { mutableFloatStateOf(0f) }
     val context = LocalContext.current
+    val hasCameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+        PackageManager.PERMISSION_GRANTED
     val density = LocalDensity.current
 
     val dialControlWidth = 170.dp
@@ -143,16 +146,20 @@ fun ContentTypeSelectionView(
                     Box(Modifier.fillMaxSize().background(Color.Gray.copy(0.1f)))
                 }
             } else {
-                // BackgroundCameraView.swift aún no portado — fallback iOS sin permiso
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Black, Color(0xFF4A148C).copy(0.2f), Color(0xFFE91E63).copy(0.1f)),
+                if (hasCameraPermission) {
+                    BackgroundCameraView(modifier = Modifier.fillMaxSize().blur(10.dp))
+                    Box(Modifier.fillMaxSize().background(Color.Black.copy(.1f)))
+                } else {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color.Black, Color(0xFF4A148C).copy(0.2f), Color(0xFFE91E63).copy(0.1f)),
+                                ),
                             ),
-                        ),
-                )
+                    )
+                }
             }
         }
 

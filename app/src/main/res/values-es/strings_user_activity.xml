@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Port de Settings/UserActivity* (iOS Localizable.strings). -->
+<resources>
+    <string name="user_activity_not_authenticated">Usuario no autenticado.</string>
+    <string name="user_activity_event_follow_subtitle">Te siguió el %s</string>
+    <string name="user_activity_event_visit_subtitle">Visitó tu perfil el %s</string>
+    <string name="user_activity_event_action_view_profile">Ver perfil</string>
+    <string name="user_activity_stickers_actor_fallback">Usuario</string>
+    <string name="user_activity_stickers_poll_option_fallback">Opción %d</string>
+    <string name="user_activity_stickers_poll_subtitle_fallback">Votaste en una encuesta</string>
+    <string name="user_activity_stickers_poll_subtitle">Votaste: %s</string>
+    <string name="user_activity_stickers_poll_action">ha votado</string>
+    <string name="user_activity_stickers_poll_context">Votación de %s</string>
+    <string name="user_activity_stickers_question_subtitle_fallback">Respondiste una pregunta</string>
+    <string name="user_activity_stickers_question_action">ha respondido</string>
+    <string name="user_activity_stickers_question_context">Pregunta de %s</string>
+    <string name="user_activity_echo_unknown_location">Ubicación desconocida</string>
+    <string name="user_activity_status_unknown">Desconocido</string>
+    <string name="user_activity_empty_stickers">No hay respuestas a sticker recientes</string>
+</resources>

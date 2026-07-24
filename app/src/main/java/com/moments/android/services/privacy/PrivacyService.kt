@@ -106,21 +106,8 @@ object FollowStateStore {
     }
 }
 
-// MARK: - Content audience (para getContentViewers)
-
-enum class ContentAudience(val raw: String) {
-    EVERYONE("everyone"),
-    MUTUALS("mutuals"),
-    BEST_FRIENDS("bestFriends"),
-    CUSTOM("custom"),
-    CUSTOM_LIST("customList"),
-    ONLY_ME("onlyMe");
-
-    companion object {
-        fun from(raw: String?): ContentAudience =
-            entries.firstOrNull { it.raw == raw } ?: EVERYONE
-    }
-}
+// Compatibilidad para los consumidores que aún importan el enum histórico.
+typealias ContentAudience = com.moments.android.views.creator.audienceselector.ContentAudience
 
 /**
  * Port de PrivacyService.swift (clase principal + helpers privados + tipos auxiliares).

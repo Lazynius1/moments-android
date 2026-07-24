@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UserActivityDetailView (iOS Localizable.strings). -->
+<resources>
+    <string name="user_activity_loading">Aktivität wird geladen...</string>
+    <string name="user_activity_retry">Erneut versuchen</string>
+    <string name="user_activity_error_offline_title">Keine Verbindung</string>
+    <string name="user_activity_error_offline_subtitle">Prüfe deine Internetverbindung und versuche es erneut.</string>
+    <string name="user_activity_error_generic_title">Etwas ist schiefgelaufen</string>
+    <string name="user_activity_error_generic_subtitle">Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.</string>
+    <string name="user_activity_filters_sort">Sortieren</string>
+    <string name="user_activity_filters_date">Daten</string>
+    <string name="user_activity_filters_author">Autor</string>
+    <string name="user_activity_filters_from">Von</string>
+    <string name="user_activity_filters_to">Bis</string>
+    <string name="user_activity_select">Auswählen</string>
+    <string name="user_activity_cancel">Abbrechen</string>
+    <string name="user_activity_common_cancel">Abbrechen</string>
+    <string name="user_activity_reactions_selected_count">%d ausgewählt</string>
+    <string name="user_activity_reactions_delete_single">Reaktion löschen</string>
+    <string name="user_activity_reactions_delete_multiple">Reaktionen löschen</string>
+    <string name="user_activity_reactions_confirm_delete_title">Reaktionen löschen</string>
+    <string name="user_activity_reactions_confirm_delete_message">Möchtest du die ausgewählten Reaktionen löschen?</string>
+    <string name="user_activity_reactions_success_delete">Reaktionen gelöscht</string>
+    <string name="user_activity_tags_selected_count">%d ausgewählt</string>
+    <string name="user_activity_tags_remove_single">Markierung entfernen</string>
+    <string name="user_activity_tags_remove_multiple">Markierungen entfernen</string>
+    <string name="user_activity_tags_confirm_remove_title">Markierungen entfernen</string>
+    <string name="user_activity_tags_confirm_remove_message">Möchtest du die ausgewählten Markierungen entfernen?</string>
+    <string name="user_activity_tags_success_remove">Markierungen entfernt</string>
+    <string name="user_activity_comments_selected_count">%d ausgewählt</string>
+    <string name="user_activity_comments_delete_single">Kommentar löschen</string>
+    <string name="user_activity_comments_delete_multiple">Kommentare löschen</string>
+    <string name="user_activity_comments_confirm_delete_title">Kommentare löschen</string>
+    <string name="user_activity_comments_confirm_delete_message">Möchtest du die ausgewählten Kommentare löschen?</string>
+    <string name="user_activity_comments_success_delete">Kommentare gelöscht</string>
+    <string name="user_activity_stickers_selected_count">%d selected</string>
+    <string name="user_activity_stickers_delete_single">Antwort löschen</string>
+    <string name="user_activity_stickers_delete_multiple">Antworten löschen</string>
+    <string name="user_activity_stickers_confirm_delete_title">Antworten löschen</string>
+    <string name="user_activity_stickers_confirm_delete_message">Möchtest du die ausgewählten Antworten löschen?</string>
+    <string name="user_activity_stickers_success_delete">Antworten gelöscht</string>
+    <string name="user_activity_recently_deleted_restore_single">Wiederherstellen</string>
+    <string name="user_activity_recently_deleted_delete_single">Dauerhaft löschen</string>
+    <string name="user_activity_recently_deleted_confirm_restore_title">Inhalt wiederherstellen</string>
+    <string name="user_activity_recently_deleted_confirm_restore_message">Möchtest du den ausgewählten Inhalt wiederherstellen?</string>
+    <string name="user_activity_recently_deleted_confirm_delete_title">Dauerhaft löschen</string>
+    <string name="user_activity_recently_deleted_confirm_delete_message">Dadurch wird der ausgewählte Inhalt dauerhaft gelöscht.</string>
+    <string name="user_activity_recently_deleted_success_restore">Inhalt wiederhergestellt</string>
+    <string name="user_activity_recently_deleted_success_delete">Inhalt dauerhaft gelöscht</string>
+    <string name="user_activity_recently_deleted_processing_restore">Inhalt wird wiederhergestellt…</string>
+    <string name="user_activity_recently_deleted_processing_delete">Dauerhaftes Löschen…</string>
+    <string name="user_activity_recently_deleted_processing_subtitle">Das kann ein paar Sekunden dauern</string>
+    <string name="user_activity_archived_action_restore">Wiederherstellen</string>
+    <string name="user_activity_archived_confirm_restore_title">Archivierte Inhalte wiederherstellen</string>
+    <string name="user_activity_archived_confirm_restore_message">Möchtest du die ausgewählten archivierten Inhalte wiederherstellen?</string>
+    <string name="user_activity_archived_success_restore">Archivierte Inhalte wiederhergestellt</string>
+</resources>

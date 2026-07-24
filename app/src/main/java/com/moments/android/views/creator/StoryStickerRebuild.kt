@@ -1,5 +1,4 @@
 package com.moments.android.views.creator
-
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
@@ -93,6 +92,7 @@ internal object StoryStickerRebuild {
         }
         cached.interactionData?.let { data ->
             when (cached.type) {
+                "emoji" -> return data.caption?.takeIf { it.isNotBlank() } ?: "😀"
                 "mention" -> return "@${data.username.orEmpty()}"
                 "hashtag" -> return "#${data.hashtag.orEmpty()}"
                 "location" -> return data.location.orEmpty()

@@ -767,7 +767,7 @@ private fun SlowConnectionBanner(isOffline: Boolean, modifier: Modifier = Modifi
 }
 
 @Composable
-private fun AppErrorBanner(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+internal fun AppErrorBanner(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier
             .fillMaxWidth()

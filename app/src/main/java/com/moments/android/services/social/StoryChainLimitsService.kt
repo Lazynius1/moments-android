@@ -1,7 +1,9 @@
 package com.moments.android.services.social
 
+import android.content.Context
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.moments.android.R
 import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 import java.util.Date
@@ -134,12 +136,12 @@ object StoryChainLimitsService {
     }
 }
 
-fun Double.formattedRemainingTime(): String {
+fun Double.formattedRemainingTime(context: Context): String {
     val hours = toInt() / 3600
     val minutes = (toInt() % 3600) / 60
     return when {
-        hours > 0 -> "${hours}h ${minutes}m restantes"
-        minutes > 0 -> "${minutes}m restantes"
-        else -> "storyChains.time.expired"
+        hours > 0 -> context.getString(R.string.story_chains_time_remaining_hm, hours, minutes)
+        minutes > 0 -> context.getString(R.string.story_chains_time_remaining_m, minutes)
+        else -> context.getString(R.string.story_chains_time_expired)
     }
 }

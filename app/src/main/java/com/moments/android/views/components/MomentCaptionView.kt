@@ -2,12 +2,15 @@ package com.moments.android.views.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
@@ -77,6 +80,11 @@ fun MomentCaptionView(
 
     val secondary = if (isDark) Color.White.copy(alpha = 0.68f) else Color.Black.copy(alpha = 0.58f)
 
+    if (style == MomentCaptionPresentationStyle.Reels) {
+        ReelsCaptionBody(trimmed, onHashtagTap, modifier)
+        return
+    }
+
     Column(
         modifier
             .fillMaxWidth()
@@ -139,6 +147,30 @@ fun MomentCaptionView(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+        }
+    }
+}
+
+/** Bloque Reels de `MomentCaptionView.swift`: preview corto y expansión con scroll limitado. */
+@Composable
+private fun ReelsCaptionBody(content: String, onHashtagTap: (String) -> Unit, modifier: Modifier) {
+    var expanded by remember(content) { mutableStateOf(false) }
+    val lines = content.lines().filter { it.isNotBlank() }
+    val needsMore = lines.size >= 2 || content.length > 72
+    val collapsed = when {
+        !needsMore -> content
+        lines.size >= 2 -> (lines.take(2).joinToString("\n")).take(75).trimEnd()
+        else -> content.take(75).trimEnd()
+    }
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (expanded) {
+            Column(Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState())) {
+                ClickableHashtagsView(content, onHashtagTap, Modifier.fillMaxWidth())
+            }
+            Text(stringResource(R.string.feed_see_less), color = if (isSystemInDarkTheme()) Color.White else Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { expanded = false })
+        } else {
+            ClickableHashtagsView(collapsed, onHashtagTap, Modifier.fillMaxWidth().clickable(enabled = needsMore) { expanded = true })
+            if (needsMore) Text(stringResource(R.string.feed_see_more), color = if (isSystemInDarkTheme()) Color.White else Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { expanded = true })
         }
     }
 }

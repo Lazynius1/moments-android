@@ -3,7 +3,7 @@ package com.moments.android.notifications.services
 import com.moments.android.models.MessageType
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
-import com.moments.android.shared.ChatPreviewPrivacy
+import com.moments.android.views.shared.ChatPreviewPrivacy
 import com.moments.android.services.messaging.EncryptionService
 import kotlinx.coroutines.tasks.await
 import com.google.firebase.firestore.FirebaseFirestore

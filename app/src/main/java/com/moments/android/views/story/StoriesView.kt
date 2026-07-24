@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
+import com.moments.android.models.Story
 import com.moments.android.views.story.storyviewer.StoryViewerScreen
 
 /**
@@ -41,18 +42,32 @@ fun StoriesView(
     ringNavigationUserIds: List<String> = emptyList(),
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    explicitStories: List<Story>? = null,
+    startAtIndex: Int = 0,
+    highlightTitle: String? = null,
 ) {
     val viewModel = remember { StoryViewModel() }
     var userIndex by remember { mutableIntStateOf(0) }
     var storyIndex by remember { mutableIntStateOf(0) }
     var dragAccum by remember { mutableFloatStateOf(0f) }
+    val deckGestureGate = remember { StoryDeckGestureGate() }
 
-    LaunchedEffect(startAtUserId, ringNavigationUserIds) {
-        viewModel.load(ringNavigationUserIds, startAtUserId)
+    LaunchedEffect(startAtUserId, ringNavigationUserIds, explicitStories) {
+        // Modo lista explícita (destacados / cadenas), como el init `chainStories:` de iOS.
+        if (explicitStories != null) {
+            viewModel.loadExplicitStories(explicitStories)
+        } else {
+            viewModel.load(ringNavigationUserIds, startAtUserId)
+        }
     }
 
     LaunchedEffect(viewModel.userIds, startAtUserId, viewModel.isLoading) {
         if (viewModel.isLoading || viewModel.userIds.isEmpty()) return@LaunchedEffect
+        if (explicitStories != null) {
+            userIndex = 0
+            storyIndex = startAtIndex.coerceIn(0, (explicitStories.size - 1).coerceAtLeast(0))
+            return@LaunchedEffect
+        }
         val start = startAtUserId?.takeIf { it.isNotBlank() }
         val idx = if (start != null) {
             viewModel.userIds.indexOf(start).takeIf { it >= 0 } ?: 0
@@ -101,13 +116,19 @@ fun StoriesView(
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragEnd = {
+                        if (deckGestureGate.suppressDeckNavigation) {
+                            dragAccum = 0f
+                            return@detectHorizontalDragGestures
+                        }
                         when {
                             dragAccum < -80f -> goNextState.value()
                             dragAccum > 80f -> goPreviousState.value()
                         }
                         dragAccum = 0f
                     },
-                    onHorizontalDrag = { _, dx -> dragAccum += dx },
+                    onHorizontalDrag = { _, dx ->
+                        if (!deckGestureGate.suppressDeckNavigation) dragAccum += dx
+                    },
                 )
             },
     ) {
@@ -139,6 +160,9 @@ fun StoriesView(
                     onNext = { goNextState.value() },
                     onPrevious = { goPreviousState.value() },
                     onDismiss = onDismiss,
+                    gestureGate = deckGestureGate,
+                    viewers = viewModel.storyViewers[currentStory.id.orEmpty()].orEmpty(),
+                    reactions = viewModel.storyReactions[currentStory.id.orEmpty()].orEmpty(),
                     modifier = Modifier.fillMaxSize(),
                 )
             }

@@ -1,5 +1,6 @@
 package com.moments.android.views.creator.creatorscreens
 
+import com.moments.android.views.creator.creatoruikit.CropViewWrapper
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri

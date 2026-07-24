@@ -1,5 +1,4 @@
 package com.moments.android.views.creator.creatorscreens
-
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri

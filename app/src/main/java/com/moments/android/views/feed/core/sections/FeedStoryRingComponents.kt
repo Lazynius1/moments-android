@@ -53,12 +53,11 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.views.feed.FeedInk
-import com.moments.android.views.feed.StoryRingColors
-import com.moments.android.views.feed.StoryRingViewed
 import com.moments.android.views.feed.uploads.StoryUploadProgressManager
 import com.moments.android.views.feed.uploads.UploadKind
 import com.moments.android.views.feed.uploads.UploadStatus
 import com.moments.android.views.story.StoryRingLayout
+import com.moments.android.views.story.StorySegmentedRing
 import kotlin.math.min
 
 data class FeedStoryUserState(
@@ -225,12 +224,11 @@ fun FeedStoryRingAvatar(
                 storyCount = storyCount,
                 hasStory = hasStory,
                 hasUnseenStory = hasUnseenStory,
-                viewedStatuses = viewedStatuses,
+                storyViewedStatus = viewedStatuses,
                 storyAudiences = storyAudiences,
                 isOwnStory = isOwnStory,
-                avatarSize = avatarSize,
+                ringSize = StoryRingLayout.ringStrokeDiameter(avatarSize, resolvedLineWidth),
                 lineWidth = resolvedLineWidth,
-                modifier = Modifier.fillMaxSize(),
             )
         }
 
@@ -306,137 +304,6 @@ private fun StoryRingItem(
             textAlign = TextAlign.Center,
             modifier = Modifier.width(64.dp),
         )
-    }
-}
-
-@Composable
-private fun StorySegmentedRing(
-    storyCount: Int,
-    hasStory: Boolean,
-    hasUnseenStory: Boolean,
-    viewedStatuses: List<Boolean>,
-    storyAudiences: List<String?>,
-    isOwnStory: Boolean,
-    avatarSize: Dp,
-    lineWidth: Dp,
-    modifier: Modifier = Modifier,
-) {
-    val isDark = isSystemInDarkTheme()
-    val outerSize = StoryRingLayout.outerFrameSize(avatarSize, lineWidth)
-    val gapAngle = 15.0
-    val ringPadding = lineWidth / 2 + 1.dp
-
-    // iOS StorySegmentedRing: blue→purple→pink (StoryRingColors)
-    val unseenBrush = remember { Brush.linearGradient(StoryRingColors) }
-    // iOS viewedGrayGradient
-    val viewedBrush = remember(isDark) {
-        if (isDark) {
-            Brush.linearGradient(
-                listOf(Color.Gray.copy(alpha = 0.58f), Color.Gray.copy(alpha = 0.82f)),
-            )
-        } else {
-            Brush.linearGradient(
-                listOf(Color.Gray.copy(alpha = 0.76f), Color.Gray.copy(alpha = 0.94f)),
-            )
-        }
-    }
-    val bestFriendsBrush = remember {
-        Brush.linearGradient(listOf(Color(0xFF24C26A), Color(0xFF5BE584)))
-    }
-    val mutualsBrush = remember {
-        Brush.linearGradient(listOf(Color(0xFF00B4D8), Color(0xFF4CC9F0)))
-    }
-
-    fun normalizedAudience(raw: String?): String =
-        raw?.trim()?.lowercase()
-            ?.replace("_", "")
-            ?.replace("-", "")
-            .orEmpty()
-
-    fun audienceBrush(index: Int): Brush? {
-        if (index !in storyAudiences.indices) return null
-        return when (normalizedAudience(storyAudiences[index])) {
-            "bestfriends", "bestfriend" -> bestFriendsBrush
-            "mutuals", "mutual" -> mutualsBrush
-            else -> null
-        }
-    }
-
-    // iOS segmentGradient(for:)
-    fun segmentBrush(index: Int): Brush {
-        val wasViewed = index < viewedStatuses.size && viewedStatuses[index]
-        // externos vistos → gris siempre (incluye bestfriends/mutuals)
-        if (!isOwnStory && wasViewed) return viewedBrush
-        audienceBrush(index)?.let { return it }
-        return if (isOwnStory) {
-            unseenBrush
-        } else if (wasViewed) {
-            viewedBrush
-        } else {
-            unseenBrush
-        }
-    }
-
-    // iOS storyRingGradient (1 historia)
-    fun singleBrush(): Brush {
-        val wasViewed = !hasUnseenStory
-        if (!isOwnStory && wasViewed) return viewedBrush
-        audienceBrush(0)?.let { return it }
-        return when {
-            isOwnStory -> unseenBrush
-            hasUnseenStory -> unseenBrush
-            hasStory -> viewedBrush
-            else -> Brush.linearGradient(StoryRingViewed)
-        }
-    }
-
-    Canvas(
-        modifier
-            .size(outerSize)
-            .padding(ringPadding),
-    ) {
-        if (!hasStory || storyCount <= 0) return@Canvas
-
-        val strokePx = lineWidth.toPx()
-        val diameter = size.minDimension
-        val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
-        val arcSize = Size(diameter, diameter)
-        val stroke = Stroke(width = strokePx, cap = StrokeCap.Round)
-
-        if (storyCount == 1) {
-            drawArc(
-                brush = singleBrush(),
-                startAngle = 0f,
-                sweepAngle = 360f,
-                useCenter = false,
-                topLeft = topLeft,
-                size = arcSize,
-                style = stroke,
-            )
-        } else {
-            val segmentAngleTotal = 360.0 / storyCount
-            val segmentAngleUseful = segmentAngleTotal - gapAngle
-            val segmentFraction = segmentAngleUseful / 360.0
-
-            repeat(storyCount) { index ->
-                val startFraction = index * segmentAngleTotal / 360.0
-                val endFraction = min(startFraction + segmentFraction, 1.0)
-                // iOS rotationEffect -90 en el ZStack; aquí compensamos en startAngle
-                val startAngle = (startFraction * 360.0 - 90.0).toFloat()
-                val sweepAngle = ((endFraction - startFraction) * 360.0).toFloat()
-                if (sweepAngle <= 0f) return@repeat
-
-                drawArc(
-                    brush = segmentBrush(index),
-                    startAngle = startAngle,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = stroke,
-                )
-            }
-        }
     }
 }
 

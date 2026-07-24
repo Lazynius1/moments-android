@@ -21,7 +21,7 @@ import com.moments.android.models.Moment
 import com.moments.android.models.ReactionPayload
 import com.moments.android.models.cache.CachedAction
 import com.moments.android.models.encode
-import com.moments.android.services.notifications.NotificationService
+import com.moments.android.notifications.services.NotificationService
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.models.NotificationType
@@ -700,10 +700,17 @@ class FirestoreService(
     ): List<Moment> {
         val normalized = userIds.distinct().filter { it.isNotEmpty() }
         if (normalized.isEmpty()) return emptyList()
+        // Como en iOS: cada tanda que falla se salta; solo se propaga el error si no queda nada.
+        var capturedError: Throwable? = null
         val allMoments = normalized.chunked(10).flatMap { batch ->
-            runCatching { fetchMomentsFromUsersBatch(batch, perUserLimit) }
-                .getOrElse { fetchMomentsFromUsersLegacy(batch, perUserLimit) }
+            runCatching { fetchMomentsFromUsersBatch(batch, perUserLimit.coerceAtLeast(1)) }
+                .recoverCatching { fetchMomentsFromUsersLegacy(batch, perUserLimit.coerceAtLeast(1)) }
+                .getOrElse { error ->
+                    capturedError = capturedError ?: error
+                    emptyList()
+                }
         }
+        if (allMoments.isEmpty()) capturedError?.let { throw it }
         return allMoments.sortedByDescending { it.timestamp }.take(totalLimit.coerceAtLeast(1))
     }
 
@@ -729,21 +736,31 @@ class FirestoreService(
         }
     }
 
+    // Como en iOS: un usuario sin permiso de lectura no invalida el resto; solo se propaga
+    // el error si no se pudo recuperar ningún momento.
     private suspend fun fetchMomentsFromUsersLegacy(userIds: List<String>, perUserLimit: Int): List<Moment> =
         coroutineScope {
-            userIds.map { userId ->
+            val results = userIds.map { userId ->
                 async {
-                    val snap = db.collection("users").document(userId).collection("moments")
-                        .orderBy("timestamp", Query.Direction.DESCENDING)
-                        .limit(perUserLimit.toLong())
-                        .get()
-                        .await()
-                    snap.documents.mapNotNull { doc ->
-                        @Suppress("UNCHECKED_CAST")
-                        runCatching { Moment.from(doc.id, doc.data as Map<String, Any?>) }.getOrNull()
+                    runCatching {
+                        val snap = db.collection("users").document(userId).collection("moments")
+                            .orderBy("timestamp", Query.Direction.DESCENDING)
+                            .limit(perUserLimit.toLong())
+                            .get()
+                            .await()
+                        snap.documents.mapNotNull { doc ->
+                            @Suppress("UNCHECKED_CAST")
+                            runCatching { Moment.from(doc.id, doc.data as Map<String, Any?>) }.getOrNull()
+                        }
                     }
                 }
-            }.awaitAll().flatten()
+            }.awaitAll()
+
+            val moments = results.mapNotNull { it.getOrNull() }.flatten()
+            if (moments.isEmpty()) {
+                results.firstNotNullOfOrNull { it.exceptionOrNull() }?.let { throw it }
+            }
+            moments.sortedByDescending { it.timestamp }
         }
 
     internal fun filterScheduledMomentsForCurrentViewer(moments: List<Moment>): List<Moment> {

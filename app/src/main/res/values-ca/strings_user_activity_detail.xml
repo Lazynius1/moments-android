@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UserActivityDetailView (iOS Localizable.strings). -->
+<resources>
+    <string name="user_activity_loading">Carregant activitat...</string>
+    <string name="user_activity_retry">Tornar a provar</string>
+    <string name="user_activity_error_offline_title">Sense connexió</string>
+    <string name="user_activity_error_offline_subtitle">Comprova la teva connexió a internet i torna-ho a provar.</string>
+    <string name="user_activity_error_generic_title">Alguna cosa ha anat malament</string>
+    <string name="user_activity_error_generic_subtitle">S\'ha produït un error inesperat. Torna-ho a provar.</string>
+    <string name="user_activity_filters_sort">Ordenar</string>
+    <string name="user_activity_filters_date">Dates</string>
+    <string name="user_activity_filters_author">Autor</string>
+    <string name="user_activity_filters_from">Des de</string>
+    <string name="user_activity_filters_to">Fins a</string>
+    <string name="user_activity_select">Seleccionar</string>
+    <string name="user_activity_cancel">Cancel·lar</string>
+    <string name="user_activity_common_cancel">Cancel·lar</string>
+    <string name="user_activity_reactions_selected_count">%d seleccionats</string>
+    <string name="user_activity_reactions_delete_single">Eliminar reacció</string>
+    <string name="user_activity_reactions_delete_multiple">Eliminar reaccions</string>
+    <string name="user_activity_reactions_confirm_delete_title">Eliminar reaccions</string>
+    <string name="user_activity_reactions_confirm_delete_message">Vols eliminar les reaccions seleccionades?</string>
+    <string name="user_activity_reactions_success_delete">Reaccions eliminades</string>
+    <string name="user_activity_tags_selected_count">%d seleccionats</string>
+    <string name="user_activity_tags_remove_single">Treure etiqueta</string>
+    <string name="user_activity_tags_remove_multiple">Treure etiquetes</string>
+    <string name="user_activity_tags_confirm_remove_title">Treure etiquetes</string>
+    <string name="user_activity_tags_confirm_remove_message">Vols treure les etiquetes seleccionades?</string>
+    <string name="user_activity_tags_success_remove">Etiquetes eliminades</string>
+    <string name="user_activity_comments_selected_count">%d seleccionats</string>
+    <string name="user_activity_comments_delete_single">Eliminar comentari</string>
+    <string name="user_activity_comments_delete_multiple">Eliminar comentaris</string>
+    <string name="user_activity_comments_confirm_delete_title">Eliminar comentaris</string>
+    <string name="user_activity_comments_confirm_delete_message">Vols eliminar els comentaris seleccionats?</string>
+    <string name="user_activity_comments_success_delete">Comentaris eliminats</string>
+    <string name="user_activity_stickers_selected_count">%d seleccionats</string>
+    <string name="user_activity_stickers_delete_single">Eliminar resposta</string>
+    <string name="user_activity_stickers_delete_multiple">Eliminar respostes</string>
+    <string name="user_activity_stickers_confirm_delete_title">Eliminar respostes</string>
+    <string name="user_activity_stickers_confirm_delete_message">Vols eliminar les respostes seleccionades?</string>
+    <string name="user_activity_stickers_success_delete">Respostes eliminades</string>
+    <string name="user_activity_recently_deleted_restore_single">Restaurar</string>
+    <string name="user_activity_recently_deleted_delete_single">Eliminar permanentment</string>
+    <string name="user_activity_recently_deleted_confirm_restore_title">Restaurar contingut</string>
+    <string name="user_activity_recently_deleted_confirm_restore_message">Vols restaurar el contingut seleccionat?</string>
+    <string name="user_activity_recently_deleted_confirm_delete_title">Eliminar permanentment</string>
+    <string name="user_activity_recently_deleted_confirm_delete_message">Això esborrarà el contingut seleccionat de manera permanent.</string>
+    <string name="user_activity_recently_deleted_success_restore">Contingut restaurat</string>
+    <string name="user_activity_recently_deleted_success_delete">Contingut eliminat permanentment</string>
+    <string name="user_activity_recently_deleted_processing_restore">Restaurant contingut…</string>
+    <string name="user_activity_recently_deleted_processing_delete">Eliminant permanentment…</string>
+    <string name="user_activity_recently_deleted_processing_subtitle">Això pot trigar uns segons</string>
+    <string name="user_activity_archived_action_restore">Restaurar</string>
+    <string name="user_activity_archived_confirm_restore_title">Restaurar arxivats</string>
+    <string name="user_activity_archived_confirm_restore_message">Vols restaurar el contingut arxivat seleccionat?</string>
+    <string name="user_activity_archived_success_restore">Contingut arxivat restaurat</string>
+</resources>

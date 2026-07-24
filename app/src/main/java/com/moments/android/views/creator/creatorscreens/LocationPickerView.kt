@@ -1,5 +1,4 @@
 package com.moments.android.views.creator.creatorscreens
-
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Geocoder

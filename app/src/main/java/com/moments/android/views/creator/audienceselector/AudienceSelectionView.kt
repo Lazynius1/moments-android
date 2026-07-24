@@ -1,5 +1,4 @@
 package com.moments.android.views.creator.audienceselector
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -173,28 +172,18 @@ fun AudienceSelectionView(
                 modifier = Modifier.padding(bottom = 10.dp),
             )
 
-            val predefined = listOf(
-                Triple(ContentAudience.EVERYONE, Icons.Filled.Public, R.string.audience_type_everyone),
-                Triple(ContentAudience.MUTUALS, Icons.Filled.People, R.string.audience_type_mutuals),
-                Triple(ContentAudience.BEST_FRIENDS, Icons.Filled.Star, R.string.audience_type_best_friends),
-                Triple(ContentAudience.ONLY_ME, Icons.Filled.Lock, R.string.audience_type_only_me),
-            )
-            predefined.chunked(2).forEach { row ->
-                Row(
-                    Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    row.forEach { (audience, icon, titleRes) ->
-                        AudienceGridCard(
-                            title = stringResource(titleRes),
-                            icon = icon,
-                            selected = selectedAudience == audience && selectedListId == null,
-                            modifier = Modifier.weight(1f),
-                            onClick = { selectPredefined(audience) },
-                        )
-                    }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
-                }
+            listOf(
+                ContentAudience.EVERYONE,
+                ContentAudience.MUTUALS,
+                ContentAudience.BEST_FRIENDS,
+                ContentAudience.ONLY_ME,
+            ).forEach { audience ->
+                AudienceGridCard(
+                    audience = audience,
+                    isSelected = selectedAudience == audience && selectedListId == null,
+                    onTap = { selectPredefined(audience) },
+                    modifier = Modifier.padding(bottom = 2.dp),
+                )
             }
 
             Spacer(Modifier.height(18.dp))
@@ -229,40 +218,17 @@ fun AudienceSelectionView(
                 ) {
                     items(customLists, key = { it.id ?: it.name }) { list ->
                         val selected = selectedAudience == ContentAudience.CUSTOM_LIST && selectedListId == list.id
-                        Box(
-                            Modifier
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (selected) Color(0xFF007AFF).copy(0.18f) else content.copy(0.06f))
-                                .border(
-                                    1.dp,
-                                    if (selected) Color(0xFF007AFF) else content.copy(0.1f),
-                                    RoundedCornerShape(14.dp),
-                                )
-                                .clickable {
-                                    onSelectedAudienceChange(ContentAudience.CUSTOM_LIST)
-                                    onSelectedListIdChange(list.id)
-                                    onSelectedListNameChange(list.name)
-                                    onCustomSelectedUsersChange(emptyList())
-                                    showSaved = true
-                                }
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                        ) {
-                            Column {
-                                Icon(Icons.Filled.Group, null, tint = if (selected) Color(0xFF007AFF) else content)
-                                Text(
-                                    list.name,
-                                    color = content,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.padding(top = 6.dp),
-                                )
-                                Text(
-                                    stringResource(R.string.audience_people_count, list.members.size),
-                                    color = secondary,
-                                    fontSize = 11.sp,
-                                )
-                            }
-                        }
+                        CustomListCard(
+                            list = list,
+                            isSelected = selected,
+                            onTap = {
+                                onSelectedAudienceChange(ContentAudience.CUSTOM_LIST)
+                                onSelectedListIdChange(list.id)
+                                onSelectedListNameChange(list.name)
+                                onCustomSelectedUsersChange(emptyList())
+                                showSaved = true
+                            },
+                        )
                     }
                 }
             }
@@ -312,47 +278,6 @@ fun AudienceSelectionView(
             // Keep selectedListName visible for compile unused suppress via usage above
             @Suppress("UNUSED_VARIABLE")
             val keep = selectedListName
-        }
-    }
-}
-
-@Composable
-private fun AudienceGridCard(
-    title: String,
-    icon: ImageVector,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val isDark = isSystemInDarkTheme()
-    val content = if (isDark) Color.White else Color.Black
-    Box(
-        modifier
-            .height(88.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) Color(0xFF007AFF).copy(0.18f) else content.copy(0.06f))
-            .border(
-                1.dp,
-                if (selected) Color(0xFF007AFF) else content.copy(0.1f),
-                RoundedCornerShape(14.dp),
-            )
-            .clickable(onClick = onClick)
-            .padding(14.dp),
-    ) {
-        Column {
-            Icon(icon, null, tint = if (selected) Color(0xFF007AFF) else content)
-            Spacer(Modifier.weight(1f))
-            Text(title, color = content, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-        }
-        if (selected) {
-            Icon(
-                Icons.Filled.Check,
-                null,
-                tint = Color(0xFF007AFF),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(16.dp),
-            )
         }
     }
 }

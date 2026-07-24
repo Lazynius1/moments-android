@@ -1,8 +1,19 @@
 package com.moments.android.views.creator
-
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -10,7 +21,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.moments.android.models.StickerData
 import com.moments.android.views.creator.creatorscreens.CaptionAndDetailsView
 import com.moments.android.views.creator.creatorscreens.ContentTypeSelectionView
@@ -18,7 +33,8 @@ import com.moments.android.views.creator.creatorscreens.CreatorFlowPendingScreen
 import com.moments.android.views.creator.creatorscreens.MediaEditingView
 import com.moments.android.views.creator.creatorscreens.MediaSelectionView
 import com.moments.android.views.creator.creatorscreens.StoryCameraView
-import com.moments.android.views.creator.creatorscreens.StoryEditingView
+import com.moments.android.views.creator.StoryEditingView
+import com.moments.android.views.story.RevealSurfaceView
 
 /**
  * Port de `CreatorView.swift` — orquestador de flujos.
@@ -62,12 +78,22 @@ enum class CreatorAspectRatio(val displayName: String, val ratio: Float) {
     }
 }
 
+/** Espejo de `CreatorMedia.StoryVideoMode` (CreatorSharedModels.swift). */
+enum class StoryVideoMode {
+    NORMAL,
+    TRIMMED,
+    AUTO_SPLIT,
+}
+
 /** Espejo de `CreatorMedia` (CreatorSharedModels.swift) para el flujo. */
 data class CreatorMedia(
     val id: String = java.util.UUID.randomUUID().toString(),
     val uri: Uri,
     val isVideo: Boolean = false,
     val durationSeconds: Double? = null,
+    /** `CreatorMedia.thumbnailURL` — custom video cover when the editor chooses one. */
+    val thumbnailUri: Uri? = null,
+    val storyVideoMode: StoryVideoMode = StoryVideoMode.NORMAL,
     val aspectRatio: CreatorAspectRatio = CreatorAspectRatio.SQUARE,
     val recommendedAspectRatio: CreatorAspectRatio? = null,
     val hasEdits: Boolean = false,
@@ -167,9 +193,10 @@ fun CreatorView(
                 onCurrentFlowChange = { currentFlow = it },
                 onDismiss = { onShowCreatorViewChange(false) },
             )
-            CreatorFlow.VIDEO_EDITING -> CreatorFlowPendingScreen(
-                iosSource = "VideoEditor.swift / SocialVideoEditorView",
-                onBack = { currentFlow = CreatorFlow.MEDIA_SELECTION },
+            CreatorFlow.VIDEO_EDITING -> SocialVideoEditorView(
+                selectedMediaItems = selectedMediaItems,
+                onSelectedMediaItemsChange = { selectedMediaItems = it },
+                onCurrentFlowChange = { currentFlow = it },
                 onDismiss = { onShowCreatorViewChange(false) },
             )
             CreatorFlow.CAPTION_AND_DETAILS -> CaptionAndDetailsView(
@@ -205,4 +232,55 @@ fun CreatorView(
     // Suppress unused until sticker/chain entry consume them (paridad iOS state).
     @Suppress("UNUSED_VARIABLE")
     val keep = Pair(initialSticker, isCreatingStory)
+}
+
+/** Primer bloque de `RevealStickerEditorView` de CreatorView.swift. */
+@Composable
+fun RevealStickerEditorView(
+    stickers: List<StoryStickerDraft>,
+    editingId: String?,
+    onEditingIdChange: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val sticker = stickers.firstOrNull { it.id == editingId }
+    Box(modifier.fillMaxSize().clip(androidx.compose.foundation.shape.RoundedCornerShape(28.dp))) {
+        if (sticker != null) {
+            RevealSurfaceView(
+                type = sticker.revealType,
+                pattern = sticker.revealPattern,
+                primaryColor = sticker.revealPrimaryColor,
+                secondaryColor = sticker.revealSecondaryColor,
+                effectColor = sticker.revealEffectColor,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .background(Color.Black.copy(.35f), CircleShape)
+                    .clickable { onEditingIdChange(null) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Close, null, tint = Color.White)
+            }
+            Spacer(Modifier.weight(1f))
+            Text("Customize Reveal", color = Color.White, fontSize = 17.sp)
+            Spacer(Modifier.weight(1f))
+            Text(
+                "Done",
+                color = Color.White,
+                fontSize = 15.sp,
+                modifier = Modifier
+                    .background(Color.Black.copy(.35f), CircleShape)
+                    .clickable { onEditingIdChange(null) }
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+            )
+        }
+    }
 }

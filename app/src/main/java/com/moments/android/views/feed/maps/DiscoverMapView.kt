@@ -17,10 +17,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.moments.android.R
-import com.moments.android.views.feed.maps.mapsections.MapCanvasSection
-import com.moments.android.views.feed.maps.mapsections.MapFilterChipsSection
-import com.moments.android.views.feed.maps.mapsections.MapHeaderCloseStyle
-import com.moments.android.views.feed.maps.mapsections.MapHeaderSection
+import com.moments.android.views.feed.maps.mapssections.MapCanvasSection
+import com.moments.android.views.feed.maps.mapssections.MapFilterChipsSection
+import com.moments.android.views.feed.maps.mapssections.MapHeaderCloseStyle
+import com.moments.android.views.feed.maps.mapssections.MapHeaderSection
 
 /** Port de `DiscoverMapView.swift` — scaffold hasta tener Google Maps API key. */
 @Composable

@@ -116,6 +116,24 @@ object EncryptionService {
             CryptoHelpers.aesGcmOpen(encryptedData, blobKey, aad)
         }
 
+    /** Text counterpart of iOS `encryptNovaData`: AES-GCM combined bytes, Base64 encoded. */
+    suspend fun encryptNovaData(text: String, userId: String): String = withContext(Dispatchers.Default) {
+        if (!isEncryptionEnabled) return@withContext text
+        runCatching {
+            val encrypted = CryptoHelpers.aesGcmSeal(text.toByteArray(Charsets.UTF_8), getUserKey(userId))
+            Base64.encodeToString(encrypted, Base64.NO_WRAP)
+        }.getOrDefault(text)
+    }
+
+    /** Text counterpart of iOS `decryptNovaData`, retaining plaintext legacy fallback on failure. */
+    suspend fun decryptNovaData(encryptedText: String, userId: String): String = withContext(Dispatchers.Default) {
+        if (!isEncryptionEnabled) return@withContext encryptedText
+        runCatching {
+            val bytes = Base64.decode(encryptedText, Base64.DEFAULT)
+            CryptoHelpers.aesGcmOpen(bytes, getUserKey(userId)).toString(Charsets.UTF_8)
+        }.getOrDefault(encryptedText)
+    }
+
     // MARK: - Conversation keys
 
     suspend fun preloadConversationKeys(conversationIds: List<String>) {

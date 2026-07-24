@@ -425,7 +425,75 @@ object UploadPayloadDecoder {
                 JSONArray().apply { list.forEach { put(encodeOverlay(it)) } },
             )
         }
-        // stickers: chunks siguientes
+        payload.stickers?.takeIf { it.isNotEmpty() }?.let { list ->
+            json.put(
+                "stickers",
+                JSONArray().apply {
+                    list.forEach { sticker ->
+                        put(
+                            JSONObject().apply {
+                                put("id", sticker.id)
+                                sticker.localImageName?.let { put("localImageName", it) }
+                                put(
+                                    "position",
+                                    JSONObject().apply {
+                                        put("x", sticker.position.x)
+                                        put("y", sticker.position.y)
+                                    },
+                                )
+                                put("scale", sticker.scale)
+                                put("rotationRadians", sticker.rotationRadians)
+                                sticker.gifURL?.let { put("gifURL", it) }
+                                sticker.videoURL?.let { put("videoURL", it) }
+                                put("isAnimated", sticker.isAnimated)
+                                put("type", sticker.type)
+                                sticker.interactionData?.let { data ->
+                                    put(
+                                        "interactionData",
+                                        JSONObject().apply {
+                                            data.username?.let { put("username", it) }
+                                            data.userId?.let { put("userId", it) }
+                                            data.hashtag?.let { put("hashtag", it) }
+                                            data.location?.let { put("location", it) }
+                                            data.latitude?.let { put("latitude", it) }
+                                            data.longitude?.let { put("longitude", it) }
+                                            data.styleVariant?.let { put("styleVariant", it) }
+                                            data.pollData?.let { put("pollData", JSONArray(it)) }
+                                            data.questionText?.let { put("questionText", it) }
+                                            data.weatherSymbol?.let { put("weatherSymbol", it) }
+                                            data.linkURL?.let { put("linkURL", it) }
+                                            data.linkTitle?.let { put("linkTitle", it) }
+                                            data.countdownTitle?.let { put("countdownTitle", it) }
+                                            data.countdownTargetAtMs?.let { put("countdownTargetAtMs", it) }
+                                            data.sliderEmoji?.let { put("sliderEmoji", it) }
+                                            data.sliderPrompt?.let { put("sliderPrompt", it) }
+                                            data.caption?.let { put("caption", it) }
+                                            data.profileImagePath?.let { put("profileImagePath", it) }
+                                            data.momentId?.let { put("momentId", it) }
+                                            data.mediaCount?.let { put("mediaCount", it) }
+                                            data.quizQuestion?.let { put("quizQuestion", it) }
+                                            data.quizOptions?.let { put("quizOptions", JSONArray(it)) }
+                                            data.quizCorrectIndex?.let { put("quizCorrectIndex", it) }
+                                            data.revealType?.let { put("revealType", it) }
+                                            data.revealPattern?.let { put("revealPattern", it) }
+                                            data.revealPrimaryColor?.let { put("revealPrimaryColor", it) }
+                                            data.revealSecondaryColor?.let { put("revealSecondaryColor", it) }
+                                            data.revealEffectColor?.let { put("revealEffectColor", it) }
+                                            data.frameStyle?.let { put("frameStyle", it) }
+                                            data.contentScale?.let { put("contentScale", it) }
+                                            data.contentOffsetX?.let { put("contentOffsetX", it) }
+                                            data.contentOffsetY?.let { put("contentOffsetY", it) }
+                                            data.audioURL?.let { put("audioURL", it) }
+                                            data.audioDuration?.let { put("audioDuration", it) }
+                                        },
+                                    )
+                                }
+                            },
+                        )
+                    }
+                },
+            )
+        }
         return json.toString().toByteArray(Charsets.UTF_8)
     }
 

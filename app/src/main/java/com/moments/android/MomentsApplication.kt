@@ -56,6 +56,7 @@ class MomentsApplication : Application() {
         NetworkMonitor.initialize(this)
         TimeSpentManager.initialize(this)
         VideoCompressionService.initialize(this)
+        com.moments.android.views.creator.StoryVideoProcessingService.initialize(this)
         LocalPersistenceService.initialize(this)
         StorySeenStateService.initialize(this)
         com.moments.android.services.persistence.MessagePersistenceStore.initialize(this)
