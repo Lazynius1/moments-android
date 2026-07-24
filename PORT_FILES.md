@@ -429,7 +429,7 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [ ] UserProfileStateViews.swift
 **`Profile/UserProfile`**
 - [~] UserProfileView.swift → `views/profile/userprofile/UserProfileView.kt` (sheet Feed + tab propio MVP)
-- [~] UserProfileViewModel.swift → `views/profile/userprofile/UserProfileViewModel.kt`
+- [~] UserProfileViewModel.swift → `views/profile/userprofile/UserProfileViewModel.kt` (**port completo del VM 1071→~490 líneas**: fetchProfile con caché local+visibilidad, refresh, conexiones categorizadas por privacidad, tagged, sugeridas por intereses, común, follow/unfollow/cancel/request, block/unblock, best friend, mute, custom lists, visitas+afinidad. DispatchGroup→coroutines. Puentes: sin observer NotificationCenter, hápticas a la UI, checkIfBestFriend vía bestFriends del viewer)
 **`Settings`**
 - [~] AccountHistoryActivityView.swift → `views/settings/AccountHistoryActivityView.kt`
 - [~] AccountManagement.swift → `views/settings/AccountManagement.kt`

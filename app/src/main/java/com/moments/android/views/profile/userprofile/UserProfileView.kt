@@ -50,7 +50,6 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.models.Moment
-import com.moments.android.services.firestore.PublicProfileAvailability
 import com.moments.android.views.explore.toExploreFeedMoment
 import com.moments.android.views.feed.core.sections.ModernFollowButton
 import com.moments.android.views.feed.rememberAdaptiveColors
@@ -69,11 +68,15 @@ fun UserProfileView(
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
-    val viewModel = remember { UserProfileViewModel() }
+    val viewModel = remember(userId) { UserProfileViewModel(userId) }
     var detailMoment by remember { mutableStateOf<Moment?>(null) }
     var showStories by remember { mutableStateOf(false) }
 
-    LaunchedEffect(userId) { viewModel.load(userId) }
+    LaunchedEffect(userId) {
+        viewModel.fetchProfile()
+        viewModel.checkFollowButtonState()
+        viewModel.registerVisit()
+    }
 
     Box(
         modifier
@@ -86,14 +89,14 @@ fun UserProfileView(
                     CircularProgressIndicator()
                 }
             }
-            viewModel.errorMessage != null && viewModel.user == null -> {
+            viewModel.isOffline && viewModel.userProfile == null -> {
                 Column(
                     Modifier.fillMaxSize().padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Text(viewModel.errorMessage.orEmpty(), color = colors.secondary)
-                    TextButton(onClick = { viewModel.load(userId) }) {
+                    Text(stringResource(R.string.explore_error_title), color = colors.secondary)
+                    TextButton(onClick = { viewModel.fetchProfile() }) {
                         Text(stringResource(R.string.explore_error_retry))
                     }
                     TextButton(onClick = onDismiss) {
@@ -101,7 +104,7 @@ fun UserProfileView(
                     }
                 }
             }
-            viewModel.availability != PublicProfileAvailability.AVAILABLE -> {
+            viewModel.isProfileUnavailable -> {
                 ProfileShell(
                     title = stringResource(R.string.user_profile_unavailable_title),
                     subtitle = stringResource(R.string.user_profile_unavailable_message),
@@ -109,7 +112,7 @@ fun UserProfileView(
                 )
             }
             else -> {
-                val user = viewModel.user
+                val user = viewModel.userProfile
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier.fillMaxSize(),
@@ -177,7 +180,7 @@ fun UserProfileView(
                                 Spacer(Modifier.height(14.dp))
                                 if (!viewModel.isOwnProfile) {
                                     ModernFollowButton(
-                                        state = viewModel.followState,
+                                        state = viewModel.followButtonState,
                                         isLoading = false,
                                         onClick = { viewModel.toggleFollow() },
                                     )
