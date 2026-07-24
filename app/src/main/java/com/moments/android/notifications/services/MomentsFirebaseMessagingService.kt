@@ -14,7 +14,7 @@ import com.google.firebase.messaging.RemoteMessage
 import com.moments.android.MainActivity
 import com.moments.android.R
 import com.moments.android.services.messaging.EncryptionService
-import com.moments.android.shared.ChatPreviewPrivacy
+import com.moments.android.views.shared.ChatPreviewPrivacy
 import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.services.messaging.ChatCommunicationNotificationService
 import com.moments.android.services.messaging.MessageIngestService

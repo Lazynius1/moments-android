@@ -1,9 +1,10 @@
 package com.moments.android.views.creator
-
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.moments.android.models.CachedSticker
 import com.moments.android.models.CachedUploadMediaItem
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Point
@@ -17,14 +18,19 @@ import com.moments.android.services.firestore.createStoryWithVisibility
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.services.storage.FeedMediaUploadContext
+import com.moments.android.services.storage.MediaUploadPayload
+import com.moments.android.services.storage.MediaUploadService
 import com.moments.android.services.storage.StoragePathBuilder
+import com.moments.android.services.storage.StorageUploadDomain
 import com.moments.android.services.storage.StorageService
 import com.moments.android.services.storage.UploadMediaItem
 import com.moments.android.services.storage.UploadMediaKind
+import com.moments.android.views.creator.components.sendMentionNotificationsForStory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Collections
@@ -57,7 +63,7 @@ object BackgroundStoryUploadService {
      * para chunk-1 del editor (sin bake de overlays/vídeo).
      * @return actionId si se encoló; null si no hay sesión / media.
      */
-    fun uploadStory(
+        fun uploadStory(
         media: CreatorMedia,
         storyText: String? = null,
         textPosition: Point? = null,
@@ -65,6 +71,7 @@ object BackgroundStoryUploadService {
         textOverlayMetadata: StoryTextOverlayMetadata? = null,
         textOverlays: List<StoryTextOverlayMetadata>? = null,
         drawingData: ByteArray? = null,
+        stickers: List<CachedSticker>? = null,
         audienceSetting: String = ContentAudience.EVERYONE.raw,
         customViewers: List<String>? = null,
         customListId: String? = null,
@@ -93,9 +100,25 @@ object BackgroundStoryUploadService {
                 }
             }
             if (!copied) return@runCatching null
+            val thumbnailFileName = media.thumbnailUri?.let { thumbnailUri ->
+                val thumbnailName = "story_thumbnail_${UUID.randomUUID()}.jpg"
+                val thumbnailOut = File(dir, thumbnailName)
+                val copiedThumbnail = when (thumbnailUri.scheme) {
+                    "file" -> thumbnailUri.path?.let(::File)?.takeIf(File::exists)?.inputStream()?.use { input ->
+                        FileOutputStream(thumbnailOut).use { output -> input.copyTo(output) }
+                        true
+                    } ?: false
+                    else -> ctx.contentResolver.openInputStream(thumbnailUri)?.use { input ->
+                        FileOutputStream(thumbnailOut).use { output -> input.copyTo(output) }
+                        true
+                    } ?: false
+                }
+                thumbnailName.takeIf { copiedThumbnail }
+            }
             CachedUploadMediaItem(
                 type = if (media.isVideo) "video" else "image",
                 localFileName = name,
+                thumbnailFileName = thumbnailFileName,
                 aspectRatio = media.aspectRatio.displayName,
                 videoDuration = media.durationSeconds,
             )
@@ -126,6 +149,7 @@ object BackgroundStoryUploadService {
             selectedListName = selectedListName,
             expirationHours = expirationHours,
             drawingFileName = drawingFileName,
+            stickers = stickers?.takeIf { it.isNotEmpty() },
         )
         val action = CachedAction(
             id = actionId,
@@ -262,6 +286,14 @@ object BackgroundStoryUploadService {
                     storyId = storyId,
                 )
             }
+            processInteractiveStickers(
+                storyId = storyId,
+                storyAuthorId = userId,
+                audience = audience,
+                customViewers = payload.customViewers,
+                customListId = payload.customListId,
+                stickers = stickers.orEmpty(),
+            )
             LocalPersistenceService.updateActionStatus(action.id, CachedAction.ActionStatus.COMPLETED)
             // iOS: NotificationCenter.post("StoryUploaded")
             com.moments.android.coordinators.NavigationEventBus.emit(
@@ -275,6 +307,49 @@ object BackgroundStoryUploadService {
             )
         } finally {
             inFlightActionIds.remove(action.id)
+        }
+    }
+
+    /** Port de `setupAudioStickers`: reemplaza la ruta temporal por download URL tras crear la Story. */
+    /** Port parcial de `processInteractiveStickers`: menciones + audio ya soportado. */
+    private suspend fun processInteractiveStickers(
+        storyId: String,
+        storyAuthorId: String,
+        audience: ContentAudience,
+        customViewers: List<String>?,
+        customListId: String?,
+        stickers: List<com.moments.android.models.StickerData>,
+    ) {
+        if (stickers.any { it.type == "mention" }) {
+            sendMentionNotificationsForStory(
+                storyId = storyId,
+                storyAuthorId = storyAuthorId,
+                audience = audience,
+                customViewers = customViewers,
+                customListId = customListId,
+                stickers = stickers,
+            )
+        }
+        setupAudioStickers(storyId, stickers)
+    }
+
+    private suspend fun setupAudioStickers(storyId: String, stickers: List<com.moments.android.models.StickerData>) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        stickers.filter { it.type == "audio" }.forEach { sticker ->
+            val stickerId = sticker.stickerId ?: return@forEach
+            val local = sticker.audioURL?.let(::File)?.takeIf { it.exists() } ?: return@forEach
+            runCatching {
+                val target = StoragePathBuilder.build(userId, StorageUploadDomain.StoryStickerAudio(storyId, stickerId))
+                val remoteUrl = MediaUploadService.upload(target, MediaUploadPayload.File(Uri.fromFile(local)))
+                val reference = FirebaseFirestore.getInstance().collection("users").document(userId).collection("stories").document(storyId)
+                val document = reference.get().await()
+                val serialized = (document.get("stickers") as? List<*>)?.mapNotNull { it as? Map<String, Any?> } ?: return@runCatching
+                val updated = serialized.map { entry ->
+                    if (entry["stickerId"] == stickerId) entry + ("audioURL" to remoteUrl) else entry
+                }
+                reference.update("stickers", updated).await()
+                local.delete()
+            }
         }
     }
 }

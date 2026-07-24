@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UserActivityDetailView (iOS Localizable.strings). -->
+<resources>
+    <string name="user_activity_loading">Caricamento attività...</string>
+    <string name="user_activity_retry">Riprova</string>
+    <string name="user_activity_error_offline_title">Nessuna connessione</string>
+    <string name="user_activity_error_offline_subtitle">Controlla la tua connessione internet e riprova.</string>
+    <string name="user_activity_error_generic_title">Qualcosa è andato storto</string>
+    <string name="user_activity_error_generic_subtitle">Si è verificato un errore imprevisto. Riprova.</string>
+    <string name="user_activity_filters_sort">Ordina</string>
+    <string name="user_activity_filters_date">Date</string>
+    <string name="user_activity_filters_author">Autore</string>
+    <string name="user_activity_filters_from">Da</string>
+    <string name="user_activity_filters_to">A</string>
+    <string name="user_activity_select">Seleziona</string>
+    <string name="user_activity_cancel">Annulla</string>
+    <string name="user_activity_common_cancel">Annulla</string>
+    <string name="user_activity_reactions_selected_count">%d selezionati</string>
+    <string name="user_activity_reactions_delete_single">Elimina reazione</string>
+    <string name="user_activity_reactions_delete_multiple">Elimina reazioni</string>
+    <string name="user_activity_reactions_confirm_delete_title">Elimina reazioni</string>
+    <string name="user_activity_reactions_confirm_delete_message">Vuoi eliminare le reazioni selezionate?</string>
+    <string name="user_activity_reactions_success_delete">Reazioni eliminate</string>
+    <string name="user_activity_tags_selected_count">%d selezionati</string>
+    <string name="user_activity_tags_remove_single">Rimuovi tag</string>
+    <string name="user_activity_tags_remove_multiple">Rimuovi tag</string>
+    <string name="user_activity_tags_confirm_remove_title">Rimuovi tag</string>
+    <string name="user_activity_tags_confirm_remove_message">Vuoi rimuovere i tag selezionati?</string>
+    <string name="user_activity_tags_success_remove">Tag rimossi</string>
+    <string name="user_activity_comments_selected_count">%d selezionati</string>
+    <string name="user_activity_comments_delete_single">Elimina commento</string>
+    <string name="user_activity_comments_delete_multiple">Elimina commenti</string>
+    <string name="user_activity_comments_confirm_delete_title">Elimina commenti</string>
+    <string name="user_activity_comments_confirm_delete_message">Vuoi eliminare i commenti selezionati?</string>
+    <string name="user_activity_comments_success_delete">Commenti eliminati</string>
+    <string name="user_activity_stickers_selected_count">%d selezionati</string>
+    <string name="user_activity_stickers_delete_single">Elimina risposta</string>
+    <string name="user_activity_stickers_delete_multiple">Elimina risposte</string>
+    <string name="user_activity_stickers_confirm_delete_title">Elimina risposte</string>
+    <string name="user_activity_stickers_confirm_delete_message">Vuoi eliminare le risposte selezionate?</string>
+    <string name="user_activity_stickers_success_delete">Risposte eliminate</string>
+    <string name="user_activity_recently_deleted_restore_single">Ripristina</string>
+    <string name="user_activity_recently_deleted_delete_single">Elimina definitivamente</string>
+    <string name="user_activity_recently_deleted_confirm_restore_title">Ripristina contenuto</string>
+    <string name="user_activity_recently_deleted_confirm_restore_message">Vuoi ripristinare il contenuto selezionato?</string>
+    <string name="user_activity_recently_deleted_confirm_delete_title">Elimina definitivamente</string>
+    <string name="user_activity_recently_deleted_confirm_delete_message">Questo eliminerà definitivamente il contenuto selezionato.</string>
+    <string name="user_activity_recently_deleted_success_restore">Contenuto ripristinato</string>
+    <string name="user_activity_recently_deleted_success_delete">Contenuto eliminato definitivamente</string>
+    <string name="user_activity_recently_deleted_processing_restore">Ripristino del contenuto…</string>
+    <string name="user_activity_recently_deleted_processing_delete">Eliminazione definitiva…</string>
+    <string name="user_activity_recently_deleted_processing_subtitle">Potrebbero volerci alcuni secondi</string>
+    <string name="user_activity_archived_action_restore">Ripristina</string>
+    <string name="user_activity_archived_confirm_restore_title">Ripristina contenuti archiviati</string>
+    <string name="user_activity_archived_confirm_restore_message">Vuoi ripristinare i contenuti archiviati selezionati?</string>
+    <string name="user_activity_archived_success_restore">Contenuti archiviati ripristinati</string>
+</resources>

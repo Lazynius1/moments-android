@@ -1,17 +1,10 @@
 package com.moments.android.services.nova
 
+import com.moments.android.views.nova.memory.NovaFact
 import java.util.Locale
 import kotlin.math.sqrt
 
 /** Hecho de memoria Nova (mínimo para embeddings; modelo completo en Views/Nova). */
-data class NovaFact(
-    val content: String,
-    val embedding: List<Double>? = null,
-) {
-    val normalizedContent: String
-        get() = content.lowercase(Locale.getDefault()).trim()
-}
-
 /**
  * Port de NovaEmbeddingService.swift.
  *

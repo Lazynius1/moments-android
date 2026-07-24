@@ -1,0 +1,36 @@
+package com.moments.android.views.creator.creatoruikit
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import com.moments.android.utilities.HapticManager
+
+/** Equivalente Compose de `ToolIconButton` de CreatorControls.swift. */
+@Composable
+fun ToolIconButton(
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier
+            .size(44.dp)
+            .background(Color.White.copy(.12f), CircleShape)
+            .clickable {
+                HapticManager.shared.lightImpact()
+                onClick()
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = null, tint = Color.White)
+    }
+}

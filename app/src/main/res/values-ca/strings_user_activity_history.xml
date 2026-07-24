@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AccountHistoryActivityView (iOS Localizable.strings). -->
+<resources>
+    <string name="user_activity_account_history_screen_title">Informació sobre l\'historial del compte</string>
+    <string name="user_activity_account_history_description">Revisa els canvis que has fet al teu compte des que el vas crear.</string>
+    <string name="user_activity_account_history_no_changes">No s\'han trobat canvis.</string>
+    <string name="user_activity_account_history_filter_newest">Més recents</string>
+    <string name="user_activity_account_history_filter_oldest">Més antics</string>
+    <string name="user_activity_account_history_filter_all">Tots</string>
+    <string name="user_activity_filters_type">Tipus</string>
+    <string name="user_activity_account_history_type_join">Creació del compte</string>
+    <string name="user_activity_account_history_type_username">Nom d\'usuari</string>
+    <string name="user_activity_account_history_type_bio">Biografia</string>
+    <string name="user_activity_account_history_type_website">Lloc web</string>
+    <string name="user_activity_account_history_type_privacy">Privacitat</string>
+    <string name="user_activity_account_history_change_from">De:</string>
+    <string name="user_activity_account_history_change_to">A:</string>
+</resources>

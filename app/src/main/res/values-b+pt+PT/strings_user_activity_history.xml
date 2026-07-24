@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AccountHistoryActivityView (iOS Localizable.strings). -->
+<resources>
+    <string name="user_activity_account_history_screen_title">Informações do histórico da conta</string>
+    <string name="user_activity_account_history_description">Vê as alterações que fizeste na tua conta desde que a criaste.</string>
+    <string name="user_activity_account_history_no_changes">Nenhuma alteração encontrada.</string>
+    <string name="user_activity_account_history_filter_newest">Mais recentes primeiro</string>
+    <string name="user_activity_account_history_filter_oldest">Mais antigos primeiro</string>
+    <string name="user_activity_account_history_filter_all">Todos</string>
+    <string name="user_activity_filters_type">Tipo</string>
+    <string name="user_activity_account_history_type_join">Entrou no Moments</string>
+    <string name="user_activity_account_history_type_username">Nome de usuário</string>
+    <string name="user_activity_account_history_type_bio">Biografia</string>
+    <string name="user_activity_account_history_type_website">Site</string>
+    <string name="user_activity_account_history_type_privacy">Privacidade</string>
+    <string name="user_activity_account_history_change_from">De:</string>
+    <string name="user_activity_account_history_change_to">Para:</string>
+</resources>

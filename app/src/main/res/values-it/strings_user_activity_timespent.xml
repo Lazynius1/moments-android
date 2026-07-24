@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TimeSpentDetailsView / TimeSpentCardView (iOS Localizable.strings). -->
+<resources>
+    <string name="user_activity_time_spent_details_title">Tempo su Moments</string>
+    <string name="user_activity_time_spent_details_subtitle">Scopri quanto tempo passi ogni giorno su Moments. Usiamo questi dati per aiutarti a gestire il tuo tempo.</string>
+    <string name="user_activity_time_spent_daily_limit_title">Limite giornaliero</string>
+    <string name="user_activity_time_spent_daily_limit_subtitle">Aggiungi un limite al tempo che trascorri ogni giorno.</string>
+    <string name="user_activity_time_spent_rest_mode_title">Modalità riposo</string>
+    <string name="user_activity_time_spent_rest_mode_subtitle">Scegli le ore del giorno in cui vuoi silenziare le notifiche push.</string>
+    <string name="user_activity_time_spent_nav_title">Tempo trascorso</string>
+    <string name="user_activity_time_spent_card_title">Tempo su Moments</string>
+    <string name="user_activity_time_spent_average">Media giornaliera</string>
+</resources>

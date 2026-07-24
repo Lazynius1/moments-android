@@ -1,5 +1,4 @@
 package com.moments.android.views.creator.creatorscreens
-
 import android.Manifest
 import android.content.ContentUris
 import android.content.Intent
@@ -76,6 +75,7 @@ import com.moments.android.views.creator.CreatorAlbumInfo
 import com.moments.android.views.creator.CreatorAspectRatio
 import com.moments.android.views.creator.CreatorFlow
 import com.moments.android.views.creator.CreatorMedia
+import com.moments.android.views.creator.creatoruikit.CameraCapture
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -160,10 +160,21 @@ fun MediaSelectionView(
     }
 
     if (showingCameraPending) {
-        CreatorFlowPendingScreen(
-            iosSource = "CameraCapture.swift",
-            onBack = { showingCameraPending = false },
-            onDismiss = onDismiss,
+        CameraCapture(
+            onCapture = { media ->
+                showingCameraPending = false
+                if (
+                    media.isVideo &&
+                    (media.durationSeconds ?: 0.0) > CreatorMedia.MAX_MOMENT_VIDEO_DURATION_SECONDS
+                ) {
+                    rejectedVideoDuration = media.durationSeconds ?: 0.0
+                    showingVideoTooLongAlert = true
+                } else {
+                    onSelectedMediaItemsChange(selectedMediaItems + media)
+                    onCurrentFlowChange(CreatorFlow.MEDIA_EDITING)
+                }
+            },
+            onDismiss = { showingCameraPending = false },
             modifier = modifier,
         )
         return
@@ -546,44 +557,6 @@ fun MediaSelectionView(
     // selectedMediaItems param reserved for restore; suppress unused until editors round-trip.
     @Suppress("UNUSED_VARIABLE")
     val keep = selectedMediaItems
-}
-
-@Composable
-private fun AlbumPickerView(
-    albums: List<CreatorAlbumInfo>,
-    selectedAlbum: CreatorAlbumInfo?,
-    onAlbumSelected: (CreatorAlbumInfo) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val isDark = isSystemInDarkTheme()
-    val contentColor = if (isDark) Color.White else Color.Black
-    Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
-        Text(
-            stringResource(R.string.creator_album_select),
-            color = contentColor,
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-        )
-        albums.forEach { album ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onAlbumSelected(album) }
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(album.title, color = contentColor, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                Text("${album.assetCount}", color = Color.Gray, fontSize = 13.sp)
-                if (selectedAlbum?.id == album.id) {
-                    Text(" ✓", color = Color(0xFFE91E63))
-                }
-            }
-        }
-        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Text(stringResource(R.string.login_close), color = contentColor)
-        }
-    }
 }
 
 private data class GalleryAsset(

@@ -59,6 +59,14 @@ data class AdaptiveColors(
             listOf(Color(0xFF007AFF), Color.Black.copy(alpha = 0.7f))
         }
 
+    /** iOS: ChatAdaptiveColors.chatBackground — 3x 0B1215 (dark) / 3x FAF9F6 (light). */
+    val chatBackground: List<Color>
+        get() = if (isDark) {
+            listOf(Color(0xFF0B1215), Color(0xFF0B1215), Color(0xFF0B1215))
+        } else {
+            listOf(Color(0xFFFAF9F6), Color(0xFFFAF9F6), Color(0xFFFAF9F6))
+        }
+
     val shadowColor: Color
         get() = if (isDark) Color.Black.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.15f)
 

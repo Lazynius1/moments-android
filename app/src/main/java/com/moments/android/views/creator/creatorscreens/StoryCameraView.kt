@@ -1,16 +1,15 @@
 package com.moments.android.views.creator.creatorscreens
 
+import com.moments.android.views.creator.components.CaptureButton
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
 import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.Camera
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -26,6 +25,7 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,15 +69,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
-import com.moments.android.views.creator.CreatorAspectRatio
 import com.moments.android.views.creator.CreatorFlow
 import com.moments.android.views.creator.CreatorMedia
+import com.moments.android.views.creator.camerakit.LensReel
+import com.moments.android.views.creator.creatoruikit.StoryGalleryPicker
+import com.moments.android.views.creator.creatoruikit.storyMediaFromUri
 import kotlinx.coroutines.delay
 import java.io.File
 import java.util.UUID
@@ -146,8 +149,11 @@ fun StoryCameraView(
     var isRecording by remember { mutableStateOf(false) }
     var recordingDuration by remember { mutableDoubleStateOf(0.0) }
     var lastGalleryThumb by remember { mutableStateOf<Uri?>(null) }
+    var isGalleryPickerPresented by remember { mutableStateOf(false) }
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
     var activeRecording by remember { mutableStateOf<Recording?>(null) }
+    var boundCamera by remember { mutableStateOf<Camera?>(null) }
+    var zoomLevel by remember { mutableStateOf(1f) }
 
     val imageCapture = remember {
         ImageCapture.Builder()
@@ -191,13 +197,14 @@ fun StoryCameraView(
             .build()
         runCatching {
             provider.unbindAll()
-            provider.bindToLifecycle(
+            boundCamera = provider.bindToLifecycle(
                 lifecycleOwner,
                 selector,
                 preview,
                 imageCapture,
                 videoCapture,
             )
+            boundCamera?.cameraControl?.setZoomRatio(zoomLevel)
         }
     }
 
@@ -214,16 +221,6 @@ fun StoryCameraView(
                 break
             }
         }
-    }
-
-    val galleryLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia(),
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val media = mediaFromUri(context, uri) ?: return@rememberLauncherForActivityResult
-        onStoryStartsInTextModeChange(false)
-        onSelectedMediaItemsChange(listOf(media))
-        onCurrentFlowChange(CreatorFlow.STORY_EDITING)
     }
 
     fun goTextMode() {
@@ -254,7 +251,7 @@ fun StoryCameraView(
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                     val uri = outputFileResults.savedUri ?: Uri.fromFile(photoFile)
-                    val media = mediaFromUri(context, uri)
+                    val media = storyMediaFromUri(context, uri)
                     mainExecutor.execute {
                         isCapturing = false
                         if (media != null) openCaptured(media) else HapticManager.shared.warning()
@@ -296,7 +293,7 @@ fun StoryCameraView(
                         if (!event.hasError()) {
                             val uri = event.outputResults.outputUri.takeIf { it != Uri.EMPTY }
                                 ?: Uri.fromFile(videoFile)
-                            val media = mediaFromUri(context, uri)
+                            val media = storyMediaFromUri(context, uri)
                             if (media != null) openCaptured(media) else HapticManager.shared.warning()
                         } else {
                             HapticManager.shared.warning()
@@ -370,7 +367,20 @@ fun StoryCameraView(
                             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
                         }.also { previewView = it }
                     },
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Equivalente del MagnifyGesture de StoryCameraView.swift. CameraX informa
+                        // del máximo real por dispositivo, manteniendo el tope visual de 5× de iOS.
+                        .pointerInput(boundCamera) {
+                            detectTransformGestures { _, _, zoom, _ ->
+                                val maxZoom = minOf(
+                                    5f,
+                                    boundCamera?.cameraInfo?.zoomState?.value?.maxZoomRatio ?: 5f,
+                                )
+                                zoomLevel = (zoomLevel * zoom).coerceIn(1f, maxZoom)
+                                boundCamera?.cameraControl?.setZoomRatio(zoomLevel)
+                            }
+                        },
                 )
 
                 Row(
@@ -470,9 +480,7 @@ fun StoryCameraView(
                         .momentsChromeGlass(CircleShape, interactive = true)
                         .border(1.dp, Color.White.copy(0.18f), CircleShape)
                         .clickable(enabled = !isRecording) {
-                            galleryLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-                            )
+                            isGalleryPickerPresented = true
                         },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -488,11 +496,16 @@ fun StoryCameraView(
                     }
                 }
 
-                CaptureButton(
+                // LensReel se mantiene aunque Camera Kit esté deshabilitado: Swift también
+                // conserva el carrusel con la única celda passthrough y el disparador centrado.
+                LensReel(
+                    lenses = emptyList(),
                     isRecording = isRecording,
-                    onTap = { takePhoto() },
-                    onLongPressStart = { startRecording() },
-                    onLongPressEnd = { stopRecording() },
+                    onSelect = { /* Camera Kit Android permanece apagado hasta enlazar su SDK. */ },
+                    onCapturePhoto = { takePhoto() },
+                    onStartVideo = { startRecording() },
+                    onStopVideo = { stopRecording() },
+                    modifier = Modifier.weight(1f),
                 )
 
                 Box(
@@ -506,6 +519,10 @@ fun StoryCameraView(
                             } else {
                                 CameraSelector.LENS_FACING_BACK
                             }
+                            // Swift restablece el zoom al invertir cámara para no pedir una ratio
+                            // inválida al sensor que acaba de activarse.
+                            zoomLevel = 1f
+                            boundCamera?.cameraControl?.setZoomRatio(1f)
                         },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -520,6 +537,19 @@ fun StoryCameraView(
                 modifier = Modifier.clickable(enabled = !isRecording, onClick = onDismiss),
             )
             Spacer(Modifier.height(8.dp))
+        }
+
+        if (isGalleryPickerPresented) {
+            StoryGalleryPicker(
+                isPresented = true,
+                onSelect = { media ->
+                    isGalleryPickerPresented = false
+                    onStoryStartsInTextModeChange(false)
+                    onSelectedMediaItemsChange(listOf(media))
+                    onCurrentFlowChange(CreatorFlow.STORY_EDITING)
+                },
+                onDismiss = { isGalleryPickerPresented = false },
+            )
         }
     }
 }
@@ -565,50 +595,4 @@ private fun latestGalleryImageUri(context: android.content.Context): Uri? {
         }
     }
     return null
-}
-
-private fun mediaFromUri(context: android.content.Context, uri: Uri): CreatorMedia? {
-    val type = context.contentResolver.getType(uri).orEmpty()
-    val isVideo = type.startsWith("video") || uri.toString().endsWith(".mp4", ignoreCase = true)
-    return if (isVideo) {
-        val retriever = MediaMetadataRetriever()
-        try {
-            retriever.setDataSource(context, uri)
-            val duration = (retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L) / 1000.0
-            val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toFloatOrNull()
-            val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toFloatOrNull()?.coerceAtLeast(1f)
-            val ratio = if (w != null && h != null) CreatorAspectRatio.fromRatio(w / h) else CreatorAspectRatio.NINE_BY_SIXTEEN
-            CreatorMedia(
-                uri = uri,
-                isVideo = true,
-                durationSeconds = duration,
-                aspectRatio = ratio,
-                recommendedAspectRatio = ratio,
-            )
-        } catch (_: Exception) {
-            CreatorMedia(uri = uri, isVideo = true, aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN)
-        } finally {
-            runCatching { retriever.release() }
-        }
-    } else {
-        val ratio = runCatching {
-            val stream = when (uri.scheme) {
-                "file" -> uri.path?.let { java.io.FileInputStream(File(it)) }
-                else -> context.contentResolver.openInputStream(uri)
-            }
-            stream?.use { input ->
-                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeStream(input, null, opts)
-                val w = opts.outWidth.toFloat()
-                val h = opts.outHeight.toFloat().coerceAtLeast(1f)
-                if (w <= 0f) CreatorAspectRatio.NINE_BY_SIXTEEN else CreatorAspectRatio.fromRatio(w / h)
-            } ?: CreatorAspectRatio.NINE_BY_SIXTEEN
-        }.getOrDefault(CreatorAspectRatio.NINE_BY_SIXTEEN)
-        CreatorMedia(
-            uri = uri,
-            isVideo = false,
-            aspectRatio = ratio,
-            recommendedAspectRatio = ratio,
-        )
-    }
 }

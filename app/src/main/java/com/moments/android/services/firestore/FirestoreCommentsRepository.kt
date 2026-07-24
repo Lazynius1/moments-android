@@ -13,7 +13,7 @@ import com.moments.android.models.NotificationType
 import com.moments.android.models.cache.CachedAction
 import com.moments.android.models.encode
 import com.moments.android.models.toMap
-import com.moments.android.services.notifications.NotificationService
+import com.moments.android.notifications.services.NotificationService
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.services.privacy.ContentVisibilityService
@@ -235,11 +235,11 @@ private suspend fun FirestoreService.sendCommentReactionNotification(
     val sender = runCatching { fetchUser(senderId) }.getOrNull() ?: return
     NotificationService.sendInteractionNotification(
         type = NotificationType.LIKE,
-        senderId = senderId,
-        recipientId = recipientId,
+        targetUserId = recipientId,
         momentId = momentId,
         commentId = commentId,
-        content = reaction,
+        reaction = reaction,
+        senderUsername = sender.username,
     )
 }
 

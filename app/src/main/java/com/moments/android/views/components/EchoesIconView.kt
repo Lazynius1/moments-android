@@ -2,6 +2,7 @@ package com.moments.android.views.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -45,16 +46,12 @@ object EchoesIconGradients {
 fun EchoesIconView(
     size: Dp,
     modifier: Modifier = Modifier,
-    tintColor: Color = Color.Unspecified,
+    tintColor: Color? = null,
     gradient: Brush? = null,
 ) {
     val painter = painterResource(R.drawable.echoes_icon)
     val brush = gradient
-        ?: if (tintColor != Color.Unspecified) {
-            Brush.linearGradient(listOf(tintColor, tintColor))
-        } else {
-            EchoesIconGradients.brandHorizontal
-        }
+        ?: Brush.linearGradient(listOf(tintColor ?: LocalContentColor.current, tintColor ?: LocalContentColor.current))
 
     Box(
         modifier

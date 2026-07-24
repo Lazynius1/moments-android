@@ -24,6 +24,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Date
@@ -31,6 +34,10 @@ import java.util.UUID
 
 import com.moments.android.services.messaging.EncryptionService
 import com.moments.android.services.messaging.ChatCacheStore
+import com.moments.android.services.messaging.VanishMessageTimer
+import com.moments.android.views.messaging.media.ChatMediaOverlayPayload
+import com.moments.android.views.messaging.models.LiveLocationDuration
+import org.json.JSONObject
 
 /**
  * Port core de ChatService.swift para ingest, offline sync y logout.
@@ -43,9 +50,15 @@ object ChatService {
     const val SEND_ACK_TIMEOUT_MS = 15_000L
 
     private val db get() = FirebaseFirestore.getInstance()
+    internal val firestore get() = db
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val encryptedMediaResolver = ChatEncryptedMediaResolver
+    private val messageListeners = mutableMapOf<String, com.google.firebase.firestore.ListenerRegistration>()
+    private val typingListeners = mutableMapOf<String, com.google.firebase.firestore.ListenerRegistration>()
+    private val preferenceListeners = mutableMapOf<String, com.google.firebase.firestore.ListenerRegistration>()
+    private val _typingUsers = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+    val typingUsers: StateFlow<Map<String, Set<String>>> = _typingUsers.asStateFlow()
 
     data class LiveLocationStatus(
         val exists: Boolean,
@@ -100,12 +113,133 @@ object ChatService {
         }.filter { MessageSyncCursor(it.timestamp, it.id) > after }
     }
 
+    suspend fun fetchMessagesBefore(
+        conversationId: String,
+        before: MessageSyncCursor,
+        limit: Int,
+    ): Result<List<EnhancedMessage>> = runCatching {
+        preloadEncryption(conversationId)
+        val collection = db.collection("conversations").document(conversationId).collection("messages")
+        val snapshot = collection.orderBy("timestamp", Query.Direction.ASCENDING)
+            .orderBy(FieldPath.documentId(), Query.Direction.ASCENDING)
+            .endBefore(Timestamp(before.timestamp), before.messageId)
+            .limitToLast(limit.toLong())
+            .get().await()
+        snapshot.documents.mapNotNull { ChatMessageMapper.buildFromSnapshot(it, conversationId) }
+            .filter { MessageSyncCursor(it.timestamp, it.id) < before }
+    }
+
     suspend fun fetchMessage(conversationId: String, messageId: String): Result<EnhancedMessage> = runCatching {
         preloadEncryption(conversationId)
         val doc = db.collection("conversations").document(conversationId)
             .collection("messages").document(messageId).get().await()
         ChatMessageMapper.buildFromSnapshot(doc, conversationId)
             ?: error("Message not found")
+    }
+
+    suspend fun materializeConversation(otherUserId: String, currentUserId: String): Result<String> = runCatching {
+        require(otherUserId.isNotBlank() && currentUserId.isNotBlank())
+        val existing = db.collection("conversations").whereArrayContains("participants", currentUserId).get().await()
+            .documents.firstOrNull { document ->
+                @Suppress("UNCHECKED_CAST")
+                (document.data?.get("participants") as? List<*>)?.filterIsInstance<String>()?.contains(otherUserId) == true
+            }
+        if (existing != null) return@runCatching existing.id
+        val conversation = db.collection("conversations").document()
+        conversation.set(
+            mapOf(
+                "participants" to listOf(currentUserId, otherUserId).sorted(),
+                "timestamp" to FieldValue.serverTimestamp(),
+                "readStatus" to mapOf(currentUserId to true, otherUserId to false),
+            ),
+        ).await()
+        conversation.id
+    }
+
+    suspend fun decryptMessageContent(content: String, conversationId: String): String =
+        EncryptionService.decryptChatMessage(content, conversationId) ?: content
+
+    suspend fun sendBuzz(conversationId: String, senderId: String): Result<Unit> = runCatching {
+        val now = Date()
+        db.collection("conversations").document(conversationId).collection("buzzEvents").document()
+            .set(
+                mapOf(
+                    "senderId" to senderId,
+                    "type" to "buzz",
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "expiresAt" to Timestamp(Date(now.time + 5L * 60L * 1000L)),
+                    "intensity" to "normal",
+                    "clientNonce" to UUID.randomUUID().toString(),
+                ),
+            )
+            .await()
+    }
+
+    fun listenToMessages(
+        conversationId: String,
+        replaceExisting: Boolean = false,
+        onUpdate: (Result<List<EnhancedMessage>>) -> Unit,
+    ) {
+        if (conversationId.isBlank()) return
+        if (replaceExisting) messageListeners.remove(conversationId)?.remove()
+        if (conversationId in messageListeners) return
+        messageListeners[conversationId] = db.collection("conversations").document(conversationId)
+            .collection("messages")
+            .orderBy("timestamp", Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, error ->
+                scope.launch(Dispatchers.Main) {
+                    if (error != null) onUpdate(Result.failure(error))
+                    else onUpdate(Result.success(buildMessagesFromSnapshotUsingLocalCache(snapshot?.toList().orEmpty(), conversationId, cutoffDate = null)))
+                }
+            }
+    }
+
+    fun removeMessagesListener(conversationId: String) {
+        messageListeners.remove(conversationId)?.remove()
+    }
+
+    fun listenToTypingIndicators(conversationId: String) {
+        if (conversationId.isBlank() || conversationId in typingListeners) return
+        typingListeners[conversationId] = db.collection("conversations").document(conversationId)
+            .collection("typing")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                val users = snapshot?.documents.orEmpty().map { it.id }.toSet()
+                _typingUsers.value = _typingUsers.value + (conversationId to users)
+            }
+    }
+
+    fun removeTypingListener(conversationId: String) {
+        typingListeners.remove(conversationId)?.remove()
+        _typingUsers.value = _typingUsers.value - conversationId
+    }
+
+    fun listenToConversationPreferences(
+        conversationId: String,
+        onUpdate: (
+            forwarding: Map<String, Boolean>,
+            buzz: Map<String, Boolean>,
+            vanishActive: Boolean,
+            vanishTimer: VanishMessageTimer,
+        ) -> Unit,
+    ) {
+        if (conversationId.isBlank() || conversationId in preferenceListeners) return
+        preferenceListeners[conversationId] = db.collection("conversations").document(conversationId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                val data = snapshot?.data.orEmpty()
+                @Suppress("UNCHECKED_CAST")
+                val forwarding = (data["forwardingPreferences"] as? Map<String, Boolean>).orEmpty()
+                @Suppress("UNCHECKED_CAST")
+                val buzz = (data["buzzPreferences"] as? Map<String, Boolean>).orEmpty()
+                val active = data["vanishModeActive"] as? Boolean ?: false
+                val timer = VanishMessageTimer.fromStored(data["vanishMessageTimer"] as? String)
+                scope.launch(Dispatchers.Main) { onUpdate(forwarding, buzz, active, timer) }
+            }
+    }
+
+    fun removeConversationPreferencesListener(conversationId: String) {
+        preferenceListeners.remove(conversationId)?.remove()
     }
 
     suspend fun sendTextMessage(
@@ -268,6 +402,18 @@ object ChatService {
         ).await()
     }
 
+    suspend fun markConversationAsUnread(conversationId: String, userId: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).update("readStatus.$userId", false).await()
+    }
+
+    suspend fun archiveConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).update("archivedByUserIds", FieldValue.arrayUnion(userId)).await()
+    }
+
+    suspend fun unarchiveConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).update("archivedByUserIds", FieldValue.arrayRemove(userId)).await()
+    }
+
     fun updateLocalMessageStatus(conversationId: String, messageId: String, status: MessageStatus) {
         // Event bus cuando ChatViewModel esté portado; persistencia local ya actualizada en sendMessage timeout.
     }
@@ -412,6 +558,150 @@ object ChatService {
         sendMessage(message, useServerTimestamp = true).getOrThrow()
     }
 
+    suspend fun sendViewOnceMessage(
+        conversationId: String,
+        senderId: String,
+        mediaData: ByteArray,
+        isImage: Boolean,
+        messageId: String,
+        isVanishModeMessage: Boolean,
+        allowReplay: Boolean,
+        replyTo: String?,
+        overlayPayload: ChatMediaOverlayPayload?,
+    ): Result<EnhancedMessage> = runCatching {
+        val type = if (isImage) MessageType.VIEW_ONCE_IMAGE else MessageType.VIEW_ONCE_VIDEO
+        val upload = ChatServiceMediaPipeline.uploadMedia(mediaData, type, conversationId, messageId).getOrThrow()
+        val message = EnhancedMessage(
+            id = messageId,
+            conversationId = conversationId,
+            senderId = senderId,
+            type = type,
+            mediaUrl = upload.mediaUrl,
+            thumbnailUrl = upload.thumbnailUrl,
+            mediaObjectPath = upload.mediaObjectPath,
+            thumbnailObjectPath = upload.thumbnailObjectPath,
+            mediaEncryption = upload.mediaEncryption,
+            thumbnailEncryption = upload.thumbnailEncryption,
+            fileSize = mediaData.size.toLong(),
+            timestamp = Date(),
+            status = MessageStatus.SENDING,
+            replyTo = replyTo,
+            isViewed = false,
+            textOverlayLive = overlayPayload?.textOverlayLive,
+            textOverlays = overlayPayload?.textOverlays,
+            stickers = overlayPayload?.stickers,
+            drawingData = overlayPayload?.drawingData,
+            allowReplay = allowReplay.takeIf { it },
+            viewedBy = emptyList(),
+            replayedBy = if (allowReplay) emptyList() else null,
+            isVanishModeMessage = isVanishModeMessage,
+        )
+        sendMessage(message, useServerTimestamp = true).getOrThrow()
+    }
+
+    suspend fun sendGiphyReferenceMessage(
+        conversationId: String,
+        senderId: String,
+        type: MessageType,
+        giphyId: String,
+        mediaUrl: String,
+        width: Int,
+        height: Int,
+        messageId: String,
+        isVanishModeMessage: Boolean,
+        replyTo: String?,
+    ): Result<EnhancedMessage> = sendMessage(
+        EnhancedMessage(
+            id = messageId,
+            conversationId = conversationId,
+            senderId = senderId,
+            type = type,
+            mediaUrl = mediaUrl,
+            fileName = "giphy_$giphyId",
+            mediaWidth = width.takeIf { it > 0 },
+            mediaHeight = height.takeIf { it > 0 },
+            timestamp = Date(),
+            status = MessageStatus.SENDING,
+            replyTo = replyTo,
+            isVanishModeMessage = isVanishModeMessage,
+        ),
+        useServerTimestamp = true,
+    )
+
+    suspend fun sendStaticLocationMessage(
+        conversationId: String,
+        senderId: String,
+        latitude: Double,
+        longitude: Double,
+        name: String?,
+        address: String?,
+        messageId: String,
+        isVanishModeMessage: Boolean,
+    ): Result<EnhancedMessage> = sendLocationMessage(
+        conversationId, senderId, latitude, longitude, name, address, false, null, null, null, messageId, isVanishModeMessage,
+    )
+
+    suspend fun sendLiveLocationMessage(
+        conversationId: String,
+        senderId: String,
+        latitude: Double,
+        longitude: Double,
+        name: String?,
+        address: String?,
+        duration: LiveLocationDuration,
+        sessionId: String,
+        expiresAt: Date,
+        messageId: String,
+        isVanishModeMessage: Boolean,
+    ): Result<EnhancedMessage> = sendLocationMessage(
+        conversationId, senderId, latitude, longitude, name, address, true, duration.firestoreValue, sessionId, expiresAt, messageId, isVanishModeMessage,
+    )
+
+    private suspend fun sendLocationMessage(
+        conversationId: String,
+        senderId: String,
+        latitude: Double,
+        longitude: Double,
+        name: String?,
+        address: String?,
+        isLive: Boolean,
+        duration: String?,
+        sessionId: String?,
+        expiresAt: Date?,
+        messageId: String,
+        isVanishModeMessage: Boolean,
+    ): Result<EnhancedMessage> = runCatching {
+        val payload = JSONObject().apply {
+            put("lat", latitude)
+            put("lng", longitude)
+            put("name", name)
+            put("address", address)
+        }.toString()
+        val encrypted = EncryptionService.encryptChatMessage(payload, conversationId)
+        sendMessage(
+            EnhancedMessage(
+                id = messageId,
+                conversationId = conversationId,
+                senderId = senderId,
+                type = MessageType.LOCATION,
+                content = encrypted,
+                latitude = latitude,
+                longitude = longitude,
+                locationName = name,
+                locationAddress = address,
+                isLiveLocation = isLive,
+                liveLocationDuration = duration,
+                liveLocationSessionId = sessionId,
+                liveLocationExpiresAt = expiresAt,
+                locationUpdatedAt = Date(),
+                timestamp = Date(),
+                status = MessageStatus.SENDING,
+                isVanishModeMessage = isVanishModeMessage,
+            ),
+            useServerTimestamp = true,
+        ).getOrThrow()
+    }
+
     private fun queueOfflineMediaMessage(
         conversationId: String,
         senderId: String,
@@ -472,6 +762,168 @@ object ChatService {
             vanishExpiresAt = vanishExpiresAt,
             replyTo = replyTo,
         )
+    }
+
+    /** Operaciones usadas por `ChatViewModel`; las extensiones Swift equivalentes siguen siendo
+     * la referencia para las políticas de cada acción. */
+    fun startTyping(conversationId: String, userId: String) {
+        if (conversationId.isBlank() || userId.isBlank()) return
+        scope.launch {
+            runCatching {
+                db.collection("conversations").document(conversationId)
+                    .collection("typing").document(userId)
+                    .set(mapOf("updatedAt" to FieldValue.serverTimestamp()))
+                    .await()
+            }
+        }
+    }
+
+    fun stopTyping(conversationId: String, userId: String) {
+        if (conversationId.isBlank() || userId.isBlank()) return
+        scope.launch {
+            runCatching {
+                db.collection("conversations").document(conversationId)
+                    .collection("typing").document(userId).delete().await()
+            }
+        }
+    }
+
+    suspend fun editMessage(
+        conversationId: String,
+        messageId: String,
+        newContent: String,
+    ): Result<Unit> = runCatching {
+        val encrypted = EncryptionService.encryptChatMessage(newContent, conversationId)
+        db.collection("conversations").document(conversationId).collection("messages").document(messageId)
+            .update(mapOf("content" to encrypted, "editedAt" to FieldValue.serverTimestamp()))
+            .await()
+    }
+
+    suspend fun setMessageReaction(
+        conversationId: String,
+        messageId: String,
+        emoji: String,
+        userId: String,
+        isActive: Boolean,
+    ): Result<Unit> = runCatching {
+        val reference = db.collection("conversations").document(conversationId).collection("messages").document(messageId)
+        db.runTransaction { transaction ->
+            @Suppress("UNCHECKED_CAST")
+            val raw = transaction.get(reference).get("reactions") as? Map<String, List<String>> ?: emptyMap()
+            val reactions = raw.mapValues { (_, users) -> users.filterNot { it == userId }.toMutableList() }.toMutableMap()
+            reactions.entries.removeAll { it.value.isEmpty() }
+            if (isActive) reactions[emoji] = (reactions[emoji].orEmpty() + userId).distinct().toMutableList()
+            transaction.update(reference, "reactions", reactions)
+        }.await()
+    }
+
+    suspend fun deleteMessageForEveryone(conversationId: String, messageId: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).collection("messages").document(messageId)
+            .update(
+                mapOf(
+                    "isDeleted" to true,
+                    "deletedAt" to FieldValue.serverTimestamp(),
+                    "mediaUrl" to FieldValue.delete(),
+                    "thumbnailUrl" to FieldValue.delete(),
+                ),
+            )
+            .await()
+        LocalPersistenceService.markMessageDeletedForEveryone(conversationId, messageId)
+    }
+
+    suspend fun deleteMessageForMe(conversationId: String, messageId: String, userId: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).collection("messages").document(messageId)
+            .update("deletedFor", FieldValue.arrayUnion(userId))
+            .await()
+    }
+
+    suspend fun deleteConversationsBetweenUsers(user1Id: String, user2Id: String): Result<Unit> = runCatching {
+        val conversations = db.collection("conversations")
+            .whereArrayContains("participants", user1Id)
+            .get()
+            .await()
+            .documents
+            .filter { document -> (document.get("participants") as? List<*>)?.filterIsInstance<String>()?.contains(user2Id) == true }
+        if (conversations.isEmpty()) return@runCatching
+        val batch = db.batch()
+        conversations.forEach { document ->
+            batch.update(
+                document.reference,
+                mapOf(
+                    "deletedFor" to FieldValue.arrayUnion(user1Id),
+                    "lastDeletedAt.$user1Id" to FieldValue.serverTimestamp(),
+                ),
+            )
+        }
+        batch.commit().await()
+    }
+
+    suspend fun setVanishMode(
+        conversationId: String,
+        active: Boolean,
+        timer: VanishMessageTimer?,
+    ): Result<Unit> = runCatching {
+        val values = mutableMapOf<String, Any>("vanishModeActive" to active)
+        if (timer != null) values["vanishMessageTimer"] = timer.raw
+        db.collection("conversations").document(conversationId).update(values).await()
+    }
+
+    suspend fun setVanishMessageTimer(conversationId: String, timer: VanishMessageTimer): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId)
+            .update("vanishMessageTimer", timer.raw).await()
+    }
+
+    suspend fun markVanishMessagesVanishedForMe(
+        conversationId: String,
+        messageIds: Collection<String>,
+        userId: String,
+    ): Result<Unit> = runCatching {
+        if (messageIds.isEmpty()) return@runCatching
+        val batch = db.batch()
+        val messages = db.collection("conversations").document(conversationId).collection("messages")
+        messageIds.distinct().forEach { batch.update(messages.document(it), "vanishedFor", FieldValue.arrayUnion(userId)) }
+        batch.commit().await()
+    }
+
+    suspend fun stampVanishExpiry(conversationId: String, messageId: String, expiresAt: Date): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).collection("messages").document(messageId)
+            .update("vanishExpiresAt", Timestamp(expiresAt)).await()
+        LocalPersistenceService.updateMessageVanishExpiresAt(conversationId, messageId, expiresAt)
+    }
+
+    fun purgeVanishMessagesLocally(conversationId: String, messageIds: Collection<String>) {
+        messageIds.forEach { messageId ->
+            LocalPersistenceService.removeCachedMessage(conversationId, messageId)
+            ChatCacheStore.deleteMessageFiles(conversationId, messageId)
+        }
+    }
+
+    suspend fun sendChatNotice(
+        conversationId: String,
+        senderId: String,
+        noticeToken: String,
+    ): Result<EnhancedMessage> = sendMessage(
+        EnhancedMessage(
+            id = UUID.randomUUID().toString(),
+            conversationId = conversationId,
+            senderId = senderId,
+            type = MessageType.CHAT_NOTICE,
+            content = noticeToken,
+            timestamp = Date(),
+            status = MessageStatus.SENDING,
+        ),
+    )
+
+    suspend fun updateChatNotice(conversationId: String, messageId: String, noticeToken: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).collection("messages").document(messageId)
+            .update("content", noticeToken).await()
+        LocalPersistenceService.updateMessageNoticeContent(conversationId, messageId, noticeToken)
+    }
+
+    suspend fun reportVanishCapture(conversationId: String, reporterId: String, noticeToken: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).collection("vanishEvents").document()
+            .set(mapOf("reporterId" to reporterId, "kind" to noticeToken, "createdAt" to FieldValue.serverTimestamp()))
+            .await()
     }
 
     private var conversationsListener: com.google.firebase.firestore.ListenerRegistration? = null

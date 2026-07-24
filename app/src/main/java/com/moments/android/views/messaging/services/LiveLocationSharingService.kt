@@ -2,6 +2,10 @@ package com.moments.android.views.messaging.services
 
 import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 /**
@@ -9,6 +13,8 @@ import org.json.JSONObject
  * Tracking GPS / restoreIfNeeded requieren Messaging UI + permisos Always.
  */
 object LiveLocationSharingService {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private const val PREFS = "live_location_sharing"
     private const val KEY_ACTIVE_SESSION = "activeSession"
@@ -31,6 +37,35 @@ object LiveLocationSharingService {
     }
 
     val hasActiveSession: Boolean get() = activeSession != null
+
+    fun startSession(
+        conversationId: String,
+        messageId: String,
+        sessionId: String,
+        duration: com.moments.android.views.messaging.models.LiveLocationDuration,
+        expiresAt: java.util.Date,
+    ) {
+        val ownerUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        ActiveSession(
+            ownerUserId = ownerUserId,
+            conversationId = conversationId,
+            messageId = messageId,
+            sessionId = sessionId,
+            durationRaw = duration.firestoreValue,
+            expiresAtMs = expiresAt.time,
+        ).also {
+            activeSession = it
+            persist(it)
+        }
+    }
+
+    fun stopSharing(messageId: String, conversationId: String) {
+        val session = activeSession
+        if (session != null && session.messageId == messageId && session.conversationId == conversationId) {
+            stopLocal(markStopped = false)
+        }
+        scope.launch { runCatching { ChatService.stopLiveLocationMessage(conversationId, messageId) } }
+    }
 
     /** Marca sesión activa como detenida en servidor antes de signOut (paridad iOS). */
     suspend fun endActiveSessionForSignOut() {

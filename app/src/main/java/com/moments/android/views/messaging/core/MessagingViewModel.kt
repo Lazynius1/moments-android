@@ -21,6 +21,8 @@ class MessagingViewModel : ViewModel() {
 
     var conversations by mutableStateOf<List<Conversation>>(emptyList())
         private set
+    var archivedConversations by mutableStateOf<List<Conversation>>(emptyList())
+        private set
     var isLoading by mutableStateOf(true)
         private set
     var errorMessage by mutableStateOf<String?>(null)
@@ -43,13 +45,13 @@ class MessagingViewModel : ViewModel() {
         }
         val cached = LocalPersistenceService.loadConversations()
         if (cached.isNotEmpty()) {
-            conversations = cached
+            applyConversationLists(cached, userId)
             isLoading = false
             maybeSelectTarget(targetConversationId)
         }
         ChatService.fetchConversations(userId) { result ->
             result.onSuccess { list ->
-                conversations = list
+                applyConversationLists(list, userId)
                 isLoading = false
                 errorMessage = null
                 maybeSelectTarget(targetConversationId)
@@ -74,6 +76,18 @@ class MessagingViewModel : ViewModel() {
     fun closeChat() {
         selectedConversation = null
         chatMessages = emptyList()
+    }
+
+    fun archiveConversation(conversation: Conversation) = updateArchiveState(conversation, true)
+    fun unarchiveConversation(conversation: Conversation) = updateArchiveState(conversation, false)
+
+    fun markConversationAsUnread(conversation: Conversation) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val id = conversation.id ?: return
+        val updated = conversation.copy(readStatus = conversation.readStatus + (userId to false))
+        conversations = conversations.map { if (it.id == id) updated else it }
+        archivedConversations = archivedConversations.map { if (it.id == id) updated else it }
+        viewModelScope.launch { ChatService.markConversationAsUnread(id, userId).onFailure { errorMessage = it.message } }
     }
 
     fun sendText(text: String) {
@@ -101,7 +115,7 @@ class MessagingViewModel : ViewModel() {
 
     private fun maybeSelectTarget(targetId: String?) {
         val id = targetId?.takeIf { it.isNotBlank() } ?: return
-        val found = conversations.firstOrNull { it.id == id }
+        val found = (conversations + archivedConversations).firstOrNull { it.id == id }
         if (found != null) {
             openConversation(found)
             return
@@ -109,8 +123,23 @@ class MessagingViewModel : ViewModel() {
         targetWaitJob?.cancel()
         targetWaitJob = viewModelScope.launch {
             delay(3000)
-            conversations.firstOrNull { it.id == id }?.let { openConversation(it) }
+            (conversations + archivedConversations).firstOrNull { it.id == id }?.let { openConversation(it) }
         }
+    }
+
+    private fun applyConversationLists(list: List<Conversation>, userId: String) {
+        conversations = list.filterNot { it.isArchived(userId) }.sortedByDescending { it.timestamp }
+        archivedConversations = list.filter { it.isArchived(userId) }.sortedByDescending { it.timestamp }
+    }
+
+    private fun updateArchiveState(conversation: Conversation, archived: Boolean) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val id = conversation.id ?: return
+        val ids = conversation.archivedByUserIds.orEmpty().toMutableList().apply { if (archived && userId !in this) add(userId); if (!archived) remove(userId) }
+        val updated = conversation.copy(archivedByUserIds = ids.takeIf { it.isNotEmpty() })
+        if (archived) { conversations = conversations.filterNot { it.id == id }; archivedConversations = (archivedConversations.filterNot { it.id == id } + updated).sortedByDescending { it.timestamp } }
+        else { archivedConversations = archivedConversations.filterNot { it.id == id }; conversations = (conversations.filterNot { it.id == id } + updated).sortedByDescending { it.timestamp } }
+        viewModelScope.launch { (if (archived) ChatService.archiveConversation(id, userId) else ChatService.unarchiveConversation(id, userId)).onFailure { errorMessage = it.message } }
     }
 
     private fun loadChat(conversationId: String) {

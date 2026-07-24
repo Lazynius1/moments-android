@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TimeSpentDetailsView / TimeSpentCardView (iOS Localizable.strings). -->
+<resources>
+    <string name="user_activity_time_spent_details_title">Temps a Moments</string>
+    <string name="user_activity_time_spent_details_subtitle">Consulta quant temps passes a Moments cada dia. Fem servir aquestes dades per ajudar-te a gestionar el teu temps.</string>
+    <string name="user_activity_time_spent_daily_limit_title">Límit diari</string>
+    <string name="user_activity_time_spent_daily_limit_subtitle">Afegeix un límit per al temps que passes cada dia.</string>
+    <string name="user_activity_time_spent_rest_mode_title">Mode Descans</string>
+    <string name="user_activity_time_spent_rest_mode_subtitle">Tria les hores del dia a les què vols silenciar les notificacions push.</string>
+    <string name="user_activity_time_spent_nav_title">Temps invertit</string>
+    <string name="user_activity_time_spent_card_title">Temps a Moments</string>
+    <string name="user_activity_time_spent_average">Mitjana diària</string>
+</resources>

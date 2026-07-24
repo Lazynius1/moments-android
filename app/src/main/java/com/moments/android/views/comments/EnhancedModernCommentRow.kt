@@ -417,24 +417,3 @@ private fun CommentMentionText(
         },
     )
 }
-
-@Composable
-fun CommentRowSkeletonList(rows: Int = 4, modifier: Modifier = Modifier) {
-    val isDark = isSystemInDarkTheme()
-    val shimmer = if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.06f)
-    Column(modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        repeat(rows) {
-            Row {
-                Box(Modifier.size(42.dp).background(shimmer, RoundedCornerShape(50)))
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Box(Modifier.fillMaxWidth(0.35f).height(12.dp).background(shimmer, RoundedCornerShape(4.dp)))
-                    Spacer(Modifier.height(8.dp))
-                    Box(Modifier.fillMaxWidth(0.9f).height(12.dp).background(shimmer, RoundedCornerShape(4.dp)))
-                    Spacer(Modifier.height(6.dp))
-                    Box(Modifier.fillMaxWidth(0.55f).height(12.dp).background(shimmer, RoundedCornerShape(4.dp)))
-                }
-            }
-        }
-    }
-}

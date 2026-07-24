@@ -48,8 +48,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.moments.android.R
 import com.moments.android.models.Moment
 import com.moments.android.models.cache.CachedSearch
-import com.moments.android.views.explore.sections.ExploreResultsSection
-import com.moments.android.views.explore.sections.ExploreSuggestionsSection
+import com.moments.android.views.explore.exploresections.ExploreResultsSection
+import com.moments.android.views.explore.exploresections.ExploreSuggestionsSection
 import com.moments.android.views.feed.maps.DiscoverMapView
 import com.moments.android.views.feed.rememberAdaptiveColors
 import kotlinx.coroutines.launch
@@ -245,12 +245,8 @@ fun ExploreView(
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
             SuggestedUsersView(
-                users = viewModel.suggestedUsers,
-                userButtonStates = viewModel.userButtonStates,
-                onFollowUser = viewModel::followUser,
-                onUserTap = { showSuggestedUsers = false },
-                onDismiss = { showSuggestedUsers = false },
-                onAppearUser = viewModel::checkUserButtonState,
+                onNavigateBack = { showSuggestedUsers = false },
+                onSelectUser = { showSuggestedUsers = false },
             )
         }
     }
@@ -272,9 +268,12 @@ fun ExploreView(
             onDismissRequest = { detailMoment = null },
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
+            val gridMoments = if (searchText.isBlank()) viewModel.moments else viewModel.filteredMoments
+            val moments = gridMoments.ifEmpty { listOf(moment) }
             ExploreMomentDetailView(
-                moment = moment,
-                onDismiss = { detailMoment = null },
+                moments = moments,
+                initialIndex = moments.indexOfFirst { it.id == moment.id }.coerceAtLeast(0),
+                onNavigateBack = { detailMoment = null },
             )
         }
     }

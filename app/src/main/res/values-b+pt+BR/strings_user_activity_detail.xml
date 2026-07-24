@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- UserActivityDetailView (iOS Localizable.strings). -->
+<resources>
+    <string name="user_activity_loading">Carregando atividade...</string>
+    <string name="user_activity_retry">Tentar novamente</string>
+    <string name="user_activity_error_offline_title">Sem conexão</string>
+    <string name="user_activity_error_offline_subtitle">Verifique sua conexão com a internet e tente novamente.</string>
+    <string name="user_activity_error_generic_title">Algo deu errado</string>
+    <string name="user_activity_error_generic_subtitle">Ocorreu um erro inesperado. Tente novamente.</string>
+    <string name="user_activity_filters_sort">Ordenar</string>
+    <string name="user_activity_filters_date">Datas</string>
+    <string name="user_activity_filters_author">Autor</string>
+    <string name="user_activity_filters_from">De</string>
+    <string name="user_activity_filters_to">Até</string>
+    <string name="user_activity_select">Selecionar</string>
+    <string name="user_activity_cancel">Cancelar</string>
+    <string name="user_activity_common_cancel">Cancelar</string>
+    <string name="user_activity_reactions_selected_count">%d selecionados</string>
+    <string name="user_activity_reactions_delete_single">Excluir reação</string>
+    <string name="user_activity_reactions_delete_multiple">Excluir reações</string>
+    <string name="user_activity_reactions_confirm_delete_title">Excluir reações</string>
+    <string name="user_activity_reactions_confirm_delete_message">Deseja excluir as reações selecionadas?</string>
+    <string name="user_activity_reactions_success_delete">Reações excluídas</string>
+    <string name="user_activity_tags_selected_count">%d selecionados</string>
+    <string name="user_activity_tags_remove_single">Remover marcação</string>
+    <string name="user_activity_tags_remove_multiple">Remover marcações</string>
+    <string name="user_activity_tags_confirm_remove_title">Remover marcações</string>
+    <string name="user_activity_tags_confirm_remove_message">Deseja remover as marcações selecionadas?</string>
+    <string name="user_activity_tags_success_remove">Marcações removidas</string>
+    <string name="user_activity_comments_selected_count">%d selecionados</string>
+    <string name="user_activity_comments_delete_single">Excluir comentário</string>
+    <string name="user_activity_comments_delete_multiple">Excluir comentários</string>
+    <string name="user_activity_comments_confirm_delete_title">Excluir comentários</string>
+    <string name="user_activity_comments_confirm_delete_message">Deseja excluir os comentários selecionados?</string>
+    <string name="user_activity_comments_success_delete">Comentários excluídos</string>
+    <string name="user_activity_stickers_selected_count">%d selecionados</string>
+    <string name="user_activity_stickers_delete_single">Excluir resposta</string>
+    <string name="user_activity_stickers_delete_multiple">Excluir respostas</string>
+    <string name="user_activity_stickers_confirm_delete_title">Excluir respostas</string>
+    <string name="user_activity_stickers_confirm_delete_message">Deseja excluir as respostas selecionadas?</string>
+    <string name="user_activity_stickers_success_delete">Respostas excluídas</string>
+    <string name="user_activity_recently_deleted_restore_single">Restaurar</string>
+    <string name="user_activity_recently_deleted_delete_single">Excluir permanentemente</string>
+    <string name="user_activity_recently_deleted_confirm_restore_title">Restaurar conteúdo</string>
+    <string name="user_activity_recently_deleted_confirm_restore_message">Deseja restaurar o conteúdo selecionado?</string>
+    <string name="user_activity_recently_deleted_confirm_delete_title">Excluir permanentemente</string>
+    <string name="user_activity_recently_deleted_confirm_delete_message">Isso excluirá permanentemente o conteúdo selecionado.</string>
+    <string name="user_activity_recently_deleted_success_restore">Conteúdo restaurado</string>
+    <string name="user_activity_recently_deleted_success_delete">Conteúdo excluído permanentemente</string>
+    <string name="user_activity_recently_deleted_processing_restore">Restaurando conteúdo…</string>
+    <string name="user_activity_recently_deleted_processing_delete">Excluindo permanentemente…</string>
+    <string name="user_activity_recently_deleted_processing_subtitle">Isso pode levar alguns segundos</string>
+    <string name="user_activity_archived_action_restore">Restaurar</string>
+    <string name="user_activity_archived_confirm_restore_title">Restaurar conteúdo arquivado</string>
+    <string name="user_activity_archived_confirm_restore_message">Deseja restaurar o conteúdo arquivado selecionado?</string>
+    <string name="user_activity_archived_success_restore">Conteúdo arquivado restaurado</string>
+</resources>

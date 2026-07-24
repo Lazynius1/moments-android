@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TimeSpentDetailsView / TimeSpentCardView (iOS Localizable.strings). -->
+<resources>
+    <string name="user_activity_time_spent_details_title">Time on Moments</string>
+    <string name="user_activity_time_spent_details_subtitle">See how much time you spend on Moments each day. We use this data to help you manage your time.</string>
+    <string name="user_activity_time_spent_daily_limit_title">Daily limit</string>
+    <string name="user_activity_time_spent_daily_limit_subtitle">Add a limit for the time you spend each day.</string>
+    <string name="user_activity_time_spent_rest_mode_title">Rest Mode</string>
+    <string name="user_activity_time_spent_rest_mode_subtitle">Choose the hours of the day you want to mute push notifications.</string>
+    <string name="user_activity_time_spent_nav_title">Time Spent</string>
+    <string name="user_activity_time_spent_card_title">Time on Moments</string>
+    <string name="user_activity_time_spent_average">Daily average</string>
+</resources>
