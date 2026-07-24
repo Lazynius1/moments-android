@@ -506,7 +506,7 @@ private fun ensurePlacesClient(context: Context): com.google.android.libraries.p
     return Places.createClient(context.applicationContext)
 }
 
-private fun placeFields() = listOf(Place.Field.ID, Place.Field.NAME, Place.Field.ADDRESS, Place.Field.LAT_LNG)
+private fun placeFields() = listOf(Place.Field.ID, Place.Field.DISPLAY_NAME, Place.Field.FORMATTED_ADDRESS, Place.Field.LOCATION)
 
 private suspend fun searchNearbyPlaces(context: Context, latitude: Double, longitude: Double): List<ChatLocationPlace> {
     val client = ensurePlacesClient(context) ?: return emptyList()
@@ -531,12 +531,12 @@ private suspend fun searchPlaces(
 }
 
 private fun toChatLocationPlace(place: Place): ChatLocationPlace? {
-    val coordinate = place.latLng ?: return null
-    val name = place.name?.takeIf { it.isNotBlank() } ?: return null
+    val coordinate = place.location ?: return null
+    val name = place.displayName?.takeIf { it.isNotBlank() } ?: return null
     return ChatLocationPlace(
         id = place.id ?: "${coordinate.latitude}:${coordinate.longitude}:$name",
         name = name,
-        address = place.address?.takeIf { it.isNotBlank() },
+        address = place.formattedAddress?.takeIf { it.isNotBlank() },
         latitude = coordinate.latitude,
         longitude = coordinate.longitude,
     )
