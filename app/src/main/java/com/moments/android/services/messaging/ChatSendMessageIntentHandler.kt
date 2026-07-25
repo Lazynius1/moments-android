@@ -8,7 +8,9 @@ package com.moments.android.services.messaging
  *
  * Android: las respuestas inline se implementan con:
  * - `NotificationCompat.Action` + `RemoteInput` en el handler de FCM/local notifications
- * - `FirebaseMessagingService` o `BroadcastReceiver` que llame a `ChatService` (cuando esté portado)
+ * - `ChatNotificationReplyReceiver` (declarado en el manifest) que llama a `ChatService.sendTextMessage`
+ *
+ * Es decir: la funcionalidad SÍ existe en Android, sólo que no vía Intents framework.
  *
  * No hay Intents framework equivalente; este archivo existe solo como ancla de documentación.
  */

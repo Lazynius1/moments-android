@@ -65,7 +65,7 @@ import java.util.Locale
 fun SharedActivityView(
     currentUser: AppUser?,
     otherUser: AppUser,
-    viewModel: ProfileViewModel,
+    viewModel: UserListViewModel,
     onDismiss: () -> Unit,
     onOpenProfile: (String) -> Unit,
     onOpenChat: (AppUser) -> Unit,

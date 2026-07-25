@@ -36,6 +36,7 @@ import com.moments.android.services.messaging.EncryptionService
 import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.messaging.VanishMessageTimer
 import com.moments.android.views.messaging.media.ChatMediaOverlayPayload
+import com.moments.android.views.messaging.models.ChatLocationPayload
 import com.moments.android.views.messaging.models.LiveLocationDuration
 import org.json.JSONObject
 
@@ -296,6 +297,172 @@ object ChatService {
         message.copy(status = MessageStatus.SENT)
     }
 
+    /**
+     * Port de `removeListener(for:)`: suelta TODOS los listeners de una conversación (mensajes,
+     * escritura, preferencias, reacciones y zumbidos) de una sola vez.
+     */
+    fun removeListener(conversationId: String) {
+        if (conversationId.isBlank()) return
+        removeMessagesListener(conversationId)
+        removeTypingListener(conversationId)
+        removeConversationPreferencesListener(conversationId)
+        removeMessageReactionsListener(conversationId)
+        removeBuzzListener(conversationId)
+    }
+
+    /** Port de `removeAllListeners()`: limpieza total (logout, cambio de usuario). */
+    fun removeAllListeners() {
+        messageListeners.keys.toList().forEach { removeMessagesListener(it) }
+        typingListeners.keys.toList().forEach { removeTypingListener(it) }
+        preferenceListeners.keys.toList().forEach { removeConversationPreferencesListener(it) }
+        stopConversationsListener()
+    }
+
+    /**
+     * Port de `updateUserDataInAllConversations`: al cambiar nombre o avatar hay que refrescar la
+     * copia desnormalizada que cada conversación guarda del participante.
+     */
+    suspend fun updateUserDataInAllConversations(userId: String, username: String, profileImagePath: String?): Result<Unit> = runCatching {
+        val snapshot = db.collection("conversations").whereArrayContains("participants", userId).get().await()
+        if (snapshot.documents.isEmpty()) return@runCatching
+        val batch = db.batch()
+        snapshot.documents.forEach { doc ->
+            batch.update(
+                doc.reference,
+                mapOf(
+                    "participantData.$userId.username" to username,
+                    "participantData.$userId.profileImagePath" to profileImagePath.orEmpty(),
+                    "participantData.$userId.lastUpdated" to FieldValue.serverTimestamp(),
+                ),
+            )
+        }
+        batch.commit().await()
+    }
+
+    /**
+     * Port de `createBidirectionalConversation`: crea el documento con los datos de ambos
+     * participantes ya desnormalizados. `getOrCreateConversation` cubre el camino normal; esta
+     * existe para crearla explícitamente sin mensaje inicial.
+     */
+    suspend fun createBidirectionalConversation(user1Id: String, user2Id: String): Result<String> = runCatching {
+        val participants = listOf(user1Id, user2Id).sorted()
+        val conversationRef = db.collection("conversations").document()
+        conversationRef.set(
+            mapOf(
+                "participants" to participants,
+                "lastMessage" to "",
+                "timestamp" to FieldValue.serverTimestamp(),
+                "readStatus" to mapOf(user1Id to true, user2Id to false),
+            ),
+        ).await()
+        conversationRef.id
+    }
+
+    /**
+     * Port de `sendStoryReplyMessage`: responder a una historia desde el chat. El contenido va
+     * cifrado como cualquier mensaje y `storyReplyData` viaja en claro (metadatos de la historia).
+     */
+    suspend fun sendStoryReplyMessage(
+        conversationId: String,
+        senderId: String,
+        content: String,
+        storyReplyData: Map<String, String>,
+        isVanishModeMessage: Boolean = false,
+    ): Result<EnhancedMessage> = runCatching {
+        val encrypted = EncryptionService.encryptChatMessage(content, conversationId)
+        val message = EnhancedMessage(
+            id = UUID.randomUUID().toString(),
+            conversationId = conversationId,
+            senderId = senderId,
+            type = MessageType.TEXT,
+            content = encrypted,
+            timestamp = Date(),
+            status = MessageStatus.SENDING,
+            isVanishModeMessage = isVanishModeMessage,
+            storyReplyData = storyReplyData,
+        )
+        sendMessage(message, useServerTimestamp = true).getOrThrow()
+    }
+
+    /**
+     * Port de `updateLiveLocationMessage`: refresca las coordenadas de una ubicación en directo.
+     * El payload se recifra en cada actualización, como en iOS.
+     */
+    suspend fun updateLiveLocationMessage(
+        conversationId: String,
+        messageId: String,
+        latitude: Double,
+        longitude: Double,
+    ): Result<Unit> = runCatching {
+        val payload = ChatLocationPayload(lat = latitude, lng = longitude).encodedJSON().orEmpty()
+        val encrypted = EncryptionService.encryptChatMessage(payload, conversationId)
+        db.collection("conversations").document(conversationId)
+            .collection("messages").document(messageId)
+            .update(
+                mapOf(
+                    "content" to encrypted,
+                    "locationUpdatedAt" to FieldValue.serverTimestamp(),
+                ),
+            ).await()
+    }
+
+    /** Port de `restoreConversation`: deshace el borrado local de la conversación. */
+    suspend fun restoreConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId)
+            .update("deletedFor", FieldValue.arrayRemove(userId)).await()
+    }
+
+    /** Port de `setLastMessageReaction`: reacción mostrada en la vista previa de la bandeja. */
+    suspend fun setLastMessageReaction(
+        conversationId: String,
+        messageId: String,
+        emoji: String,
+        byUserId: String,
+    ): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).update(
+            mapOf(
+                "lastMessageReaction" to mapOf(
+                    "messageId" to messageId,
+                    "emoji" to emoji,
+                    "byUserId" to byUserId,
+                ),
+            ),
+        ).await()
+    }
+
+    /** Port de `clearLastMessageReaction`. */
+    suspend fun clearLastMessageReaction(conversationId: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId)
+            .update("lastMessageReaction", FieldValue.delete()).await()
+    }
+
+    /** Port de `isConversationArchived`. */
+    suspend fun isConversationArchived(conversationId: String, userId: String): Result<Boolean> = runCatching {
+        val snapshot = db.collection("conversations").document(conversationId).get().await()
+        val archived = snapshot.data?.get("archivedByUserIds") as? List<*>
+        archived?.filterIsInstance<String>()?.contains(userId) == true
+    }
+
+    /**
+     * Port de `markAllPendingMessagesAsDelivered`: al abrir la app se marcan como entregados los
+     * mensajes recibidos que aún constaban como enviados.
+     */
+    suspend fun markAllPendingMessagesAsDelivered(conversationId: String, currentUserId: String): Result<Unit> = runCatching {
+        val snapshot = db.collection("conversations").document(conversationId)
+            .collection("messages")
+            .whereEqualTo("status", MessageStatus.SENT.raw)
+            .get()
+            .await()
+        val batch = db.batch()
+        var pending = 0
+        snapshot.documents.forEach { doc ->
+            if ((doc.data?.get("senderId") as? String) == currentUserId) return@forEach
+            batch.update(doc.reference, "status", MessageStatus.DELIVERED.raw)
+            pending++
+        }
+        if (pending > 0) batch.commit().await()
+    }
+
     suspend fun stopLiveLocationMessage(conversationId: String, messageId: String) {
         db.collection("conversations").document(conversationId)
             .collection("messages").document(messageId)
@@ -412,6 +579,46 @@ object ChatService {
 
     suspend fun unarchiveConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
         db.collection("conversations").document(conversationId).update("archivedByUserIds", FieldValue.arrayRemove(userId)).await()
+    }
+
+    // Fijar y silenciar conversaciones: mismo contrato Firestore que iOS (array de ids + mapa de
+    // marcas de tiempo por usuario). El modelo, el orden de la bandeja y el menú ya existían;
+    // faltaban estas escrituras, así que la acción no se podía completar.
+
+    suspend fun pinConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).update(
+            mapOf(
+                "pinnedByUserIds" to FieldValue.arrayUnion(userId),
+                "pinnedByTimestamps.$userId" to FieldValue.serverTimestamp(),
+            ),
+        ).await()
+    }
+
+    suspend fun unpinConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).update(
+            mapOf(
+                "pinnedByUserIds" to FieldValue.arrayRemove(userId),
+                "pinnedByTimestamps.$userId" to FieldValue.delete(),
+            ),
+        ).await()
+    }
+
+    suspend fun muteConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).update(
+            mapOf(
+                "mutedByUserIds" to FieldValue.arrayUnion(userId),
+                "mutedByTimestamps.$userId" to FieldValue.serverTimestamp(),
+            ),
+        ).await()
+    }
+
+    suspend fun unmuteConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
+        db.collection("conversations").document(conversationId).update(
+            mapOf(
+                "mutedByUserIds" to FieldValue.arrayRemove(userId),
+                "mutedByTimestamps.$userId" to FieldValue.delete(),
+            ),
+        ).await()
     }
 
     fun updateLocalMessageStatus(conversationId: String, messageId: String, status: MessageStatus) {

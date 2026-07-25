@@ -53,6 +53,15 @@ internal object EncryptionKeyStore {
         prefs().edit().remove(tag).apply()
     }
 
+    /** Borra todas las claves guardadas (equivale al `SecItemDelete` por servicio de iOS). */
+    fun deleteAll() {
+        prefs().edit().clear().apply()
+    }
+
+    /** Tags almacenados que empiezan por el prefijo dado (equivale al escaneo de keychain de iOS). */
+    fun tagsWithPrefix(prefix: String): List<String> =
+        prefs().all.keys.filter { it.startsWith(prefix) }
+
     fun contains(tag: String): Boolean = prefs().contains(tag)
 
     /** Round-trip test for health checks (paridad keychain accessibility iOS). */

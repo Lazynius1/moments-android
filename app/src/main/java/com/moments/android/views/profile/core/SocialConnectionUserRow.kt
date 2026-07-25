@@ -65,7 +65,7 @@ object SocialConnectionAvatarTapRouting { fun route(userId: String, hasStory: Bo
 fun SocialConnectionUserRow(
     user: AppUser,
     subtitle: String?,
-    viewModel: ProfileViewModel,
+    viewModel: UserListViewModel,
     onUserTap: ((AppUser) -> Unit)?,
     configuration: SocialConnectionRowConfiguration = SocialConnectionRowConfiguration(),
     newContentCount: Int? = null,

@@ -8,7 +8,7 @@ import javax.crypto.spec.PBEKeySpec
 /**
  * Port de ChatRecoveryCrypto.swift.
  * Deriva claves PBKDF2-HMAC-SHA256 (equivalente a CCKeyDerivationPBKDF en iOS).
- * La clave simétrica real para AES-GCM se obtiene en EncryptionService cuando el port E2E esté completo.
+ * La clave derivada se usa tal cual como clave AES-GCM en EncryptionService (bundle de recuperación).
  */
 object ChatRecoveryCrypto {
     fun randomSalt(length: Int = 32): ByteArray {

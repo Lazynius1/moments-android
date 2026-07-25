@@ -41,9 +41,7 @@ import kotlinx.coroutines.delay
 fun NovaView() {
     val context = LocalContext.current
     val agent = remember(context) { NovaAgent(context) }
-    val access by ChatAccessCoordinator.accessState.collectAsState()
-    LaunchedEffect(Unit) { ChatAccessCoordinator.ensureAccess() }
-    ChatRecoveryGateView(access) { NovaSecureContent(agent) }
+    ChatRecoveryGateView { NovaSecureContent(agent) }
 }
 
 @Composable

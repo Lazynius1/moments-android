@@ -5,6 +5,8 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.moments.android.MomentsApplication
+import com.moments.android.R
 import com.moments.android.models.AcceptMessageRequestResult
 import com.moments.android.models.MessageRequest
 import com.moments.android.models.MessageRequestPolicy
@@ -131,24 +133,35 @@ class MessageRequestService(
     ) {
         val currentUser = FirebaseAuth.getInstance().currentUser
         if (currentUser == null) {
-            onComplete(Result.failure(IllegalStateException("Usuario no autenticado")))
+            onComplete(Result.failure(IllegalStateException(localized(R.string.messaging_error_not_authenticated))))
             return
         }
         _isLoading.value = true
         scope.launch {
             runCatching {
                 val allowed = verifyReceiverAcceptsRequests(currentUser.uid, receiverId)
-                if (!allowed) error("El usuario no acepta solicitudes de mensaje")
+                if (!allowed) error(localized(R.string.chat_request_error_not_allowed))
                 val existing = checkExistingRequest(currentUser.uid, receiverId)
-                if (existing != null) error("Ya existe una solicitud pendiente")
-                createNewRequest(
-                    senderId = currentUser.uid,
-                    receiverId = receiverId,
-                    message = message,
-                    messageType = messageType,
-                    mediaUrl = mediaUrl,
-                    thumbnailUrl = thumbnailUrl,
-                )
+                if (existing != null) {
+                    // Paridad iOS (`updateExistingRequest`): si ya hay solicitud pendiente se
+                    // actualiza con el mensaje nuevo, NO se falla ni se duplica.
+                    updateExistingRequest(
+                        existingRequest = existing,
+                        newMessage = message,
+                        messageType = messageType,
+                        mediaUrl = mediaUrl,
+                        thumbnailUrl = thumbnailUrl,
+                    )
+                } else {
+                    createNewRequest(
+                        senderId = currentUser.uid,
+                        receiverId = receiverId,
+                        message = message,
+                        messageType = messageType,
+                        mediaUrl = mediaUrl,
+                        thumbnailUrl = thumbnailUrl,
+                    )
+                }
             }.onSuccess {
                 _isLoading.value = false
                 onComplete(Result.success(Unit))
@@ -162,12 +175,12 @@ class MessageRequestService(
     fun acceptRequest(request: MessageRequest, onComplete: (Result<AcceptMessageRequestResult>) -> Unit) {
         val requestId = request.id
         if (requestId.isNullOrEmpty()) {
-            onComplete(Result.failure(IllegalStateException("Solicitud no disponible")))
+            onComplete(Result.failure(IllegalStateException(localized(R.string.message_requests_accept_error_not_available))))
             return
         }
         val currentUser = FirebaseAuth.getInstance().currentUser
         if (currentUser == null) {
-            onComplete(Result.failure(IllegalStateException("Usuario no autenticado")))
+            onComplete(Result.failure(IllegalStateException(localized(R.string.messaging_error_not_authenticated))))
             return
         }
         if (currentUser.uid != request.receiverId) {
@@ -297,16 +310,40 @@ class MessageRequestService(
         db.collection("messageRequests").add(request.encode()).await()
     }
 
+    /** Port de `updateExistingRequest`: refresca la solicitud pendiente con el mensaje más reciente. */
+    private suspend fun updateExistingRequest(
+        existingRequest: MessageRequest,
+        newMessage: String,
+        messageType: MessageType,
+        mediaUrl: String?,
+        thumbnailUrl: String?,
+    ) {
+        val requestId = existingRequest.id ?: error("Invalid request id")
+        val updates = mutableMapOf<String, Any?>(
+            "message" to newMessage,
+            "messageType" to messageType.raw,
+            "mediaUrl" to mediaUrl,
+            "thumbnailUrl" to thumbnailUrl,
+            "timestamp" to com.google.firebase.Timestamp(Date()),
+        )
+        db.collection("messageRequests").document(requestId).update(updates).await()
+    }
+
+    /** Textos localizados como en iOS (`messageRequests.acceptError.*`), nunca hardcodeados. */
+    private fun localized(resId: Int): String =
+        MomentsApplication.instance?.getString(resId).orEmpty()
+
     private fun localizedAcceptRequestError(code: AcceptRequestServerErrorCode?, statusCode: Int): String =
         when (code) {
             AcceptRequestServerErrorCode.REQUEST_FORBIDDEN,
-            AcceptRequestServerErrorCode.REQUEST_UNTRUSTED -> "No puedes aceptar esta solicitud"
+            AcceptRequestServerErrorCode.REQUEST_UNTRUSTED -> localized(R.string.message_requests_accept_error_forbidden)
             AcceptRequestServerErrorCode.REQUEST_NOT_FOUND,
             AcceptRequestServerErrorCode.REQUEST_NOT_PENDING,
             AcceptRequestServerErrorCode.USER_NOT_FOUND,
             AcceptRequestServerErrorCode.INACTIVE_USER,
-            AcceptRequestServerErrorCode.BLOCKED_RELATIONSHIP -> "La solicitud ya no está disponible"
-            AcceptRequestServerErrorCode.REQUEST_ACCEPT_FAILED -> "Error al aceptar la solicitud"
-            null -> if (statusCode == 401) "No autenticado" else "Error del servidor"
+            AcceptRequestServerErrorCode.BLOCKED_RELATIONSHIP -> localized(R.string.message_requests_accept_error_not_available)
+            AcceptRequestServerErrorCode.REQUEST_ACCEPT_FAILED -> localized(R.string.message_requests_accept_error_server)
+            null -> if (statusCode == 401) localized(R.string.messaging_error_not_authenticated)
+                    else localized(R.string.message_requests_accept_error_server)
         }
 }

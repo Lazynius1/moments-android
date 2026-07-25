@@ -229,7 +229,7 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] ChatMessageListView.swift → views/messaging/components/ChatMessageListView.kt (LazyColumn, transacciones, ancla prepend, scroll serializado, navegación, top/prefetch y estado viewport)
 - [~] ChatMessageOptionsMenu.swift → views/messaging/components/ChatMessageOptionsMenu.kt (selección, chrome, reacciones y menú de acciones condicionado)
 - [~] ChatMessageSupportViews.swift → views/messaging/components/ChatMessageSupportViews.kt (reply bars/previews, quotes, reaction chips, star y status)
-- [~] ChatRecoveryViews.swift → views/messaging/components/ChatRecoveryViews.kt (gate, PIN setup/restore, settings, estado y validación)
+- [~] ChatRecoveryViews.swift → `views/messaging/components/ChatRecoveryViews.kt` (**REESCRITO desde el Swift 2026-07-25**: gate real conectado a `ChatAccessCoordinator`, alta de PIN con confirmación y salto de foco, restauración con intentos + bloqueo con cuenta atrás, ajustes con forzar-restauración, celdas de dígitos, paleta y backdrop. **Antes estaba roto**: todos los botones —enviar PIN, cancelar, cerrar, forzar— mostraban el texto "Reply", y NO llamaba a la cripto, así que el PIN no restauraba nada. Ahora el gate envuelve el chat desde `MessagingView`)
 - [~] ChatSearchNavigationBar.swift → views/messaging/components/ChatSearchNavigationBar.kt
 - [~] ChatSpeechBubbleViews.swift → views/messaging/components/ChatSpeechBubbleViews.kt (grupos, forma, spoilers, reply y avatar gutter)
 - [~] ChatStickerMessageBubble.swift → views/messaging/components/ChatStickerMessageBubble.kt (sticker inline, resolución cifrada y progreso)
@@ -242,10 +242,10 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] VoiceNotes.swift → views/messaging/components/VoiceNotes.kt (grabación, composición, trim, waveform y reproducción)
 - [~] VoiceRecordingGestureViews.swift → views/messaging/components/VoiceRecordingGestureViews.kt (hold, lock, cancel y aura reactiva)
 **`Messaging/Core`**
-- [~] ChatViewModel.swift → `views/messaging/core/ChatViewModel.kt` (estado/cache/realtime, paginación, media, envío/acciones, lectura, vanish, búsqueda y borrador; revisión de paridad pendiente)
+- [~] ChatViewModel.swift → `views/messaging/core/ChatViewModel.kt` (estado/cache/realtime, paginación, media, envío/acciones, lectura, vanish, búsqueda y borrador. **Añadido 2026-07-25**: estado y listener de **zumbidos** (`buzzEvents`/`latestBuzzEvent`) — `listenToBuzzEvents` existía en el servicio pero **no lo llamaba nadie**, así que los zumbidos recibidos nunca llegaban; ahora con corte por `lastDeletedAt`, respeto a la preferencia del receptor y liberación del listener al pausar. **Falta**: `isLoadingOlderHistory` declarado pero sin consumir)
 - [~] MessageItem.swift → `views/messaging/core/MessageItem.kt` (item/cluster, filas sintéticas y secciones; revisión de paridad pendiente)
 - [~] MessageModel.swift → `models/ChatModels.kt` (conversation, requests/contexto, enhanced media/view-once, política/reacciones, persistencia y mapper; revisión de paridad pendiente)
-- [~] MessagingViewModel.swift → `views/messaging/core/MessagingViewModel.kt` (inbox + targetId + chat texto)
+- [~] MessagingViewModel.swift → `views/messaging/core/MessagingViewModel.kt` (**REESCRITO desde el Swift 2026-07-25**, 154→~550 líneas: `startConversation` completo con su rama de **solicitud requerida** cuando no hay follow mutuo —lo que antes bloqueaba escribir a según quién—, borrador local sin crear documento hasta el primer mensaje, `searchUsers` + sugerencias con debounce 250 ms, búsqueda global de mensajes sobre caché local, lectura optimista reconciliada, orden de bandeja por fijados/borradores/fecha, archivar/desarchivar, borrar, marcar no leído, vanish. **Falta**: `createBidirectionalConversation` (no existe en Kotlin; solo lo usaba `createOrFindConversation`, fuera del camino principal) y `refreshUserData`/`refreshVisibleUsers` (refresco de avatares vía UserCacheService))
 **`Messaging/Media`**
 - [~] CameraPickerView.swift → `views/messaging/media/CameraPickerView.kt` (CameraX, galería, preview/retake/send y modo efímero; revisión de paridad pendiente)
 - [~] ChatCameraView.swift → `views/messaging/media/ChatCameraView.kt` (captura/foto-vídeo, zoom, flash, galería y entrada al editor; revisión de paridad pendiente)
@@ -257,7 +257,7 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 **`Messaging/Screens`**
 - [~] ArchivedConversationsView.swift → `views/messaging/screens/ArchivedConversationsView.kt` (lista, vacío, acciones y menú contextual; revisión de paridad pendiente)
 **`Messaging/Screens/Chat`**
-- [~] GlassmorphicChatView+Clustering.swift → `views/messaging/screens/chat/GlassmorphicChatViewClustering.kt` (cluster, navegación, highlight y replay buzz; revisión de paridad pendiente)
+- [~] GlassmorphicChatView+Clustering.swift → `views/messaging/screens/chat/GlassmorphicChatViewClustering.kt` ⚠️ **CLASE HUÉRFANA: nadie la instancia.** Sus funciones están duplicadas y sí vivas en otros sitios — `clusterMessages` en `MomentsChatViewModel.syncMessagePresentation` (vía `ClusterMessageGrouper`), y salto/resaltado en `GlassmorphicChatViewScroll`. Lo único suyo que faltaba de verdad, el **replay de zumbido al abrir desde el banner**, se cableó el 2026-07-25 dentro de `GlassmorphicChatView.kt` consumiendo `ChatNavigationIntentStore` (que encolaba intenciones que nadie leía). Pendiente decidir en el repaso: borrar esta clase o hacer que los demás la usen)
 - [~] GlassmorphicChatView+ComposerAndChrome.swift → `views/messaging/screens/chat/GlassmorphicChatViewComposerAndChrome.kt` (composer, requests, chrome de input, media compartida, render de filas y ciclo de pantalla; revisión de paridad pendiente)
 - [~] GlassmorphicChatView+Lifecycle.swift → `views/messaging/screens/chat/GlassmorphicChatViewLifecycle.kt` (cámara/view-once, presencia, disponibilidad, bloqueo y agrupación visual; revisión de paridad pendiente)
 - [~] GlassmorphicChatView+MessageList.swift → `views/messaging/screens/chat/GlassmorphicChatViewMessageList.kt` (política de filas, transacción, prefetch, aviso de historial y renderizado de filas; revisión de paridad pendiente)
@@ -419,16 +419,16 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [ ] ProfileThemeDemo.swift
 - [ ] ProfileThemeSelector.swift
 **`Profile/UserProfile/Sections`**
-- [ ] UserProfileAvatarBadges.swift
-- [ ] UserProfileHeaderSection.swift
-- [ ] UserProfileMomentsSection.swift
-- [ ] UserProfileOverviewSection.swift
-- [ ] UserProfilePublicProfileView.swift
-- [ ] UserProfileRelationshipViews.swift
-- [ ] UserProfileSharedViews.swift
-- [ ] UserProfileStateViews.swift
+- [~] UserProfileAvatarBadges.swift → `sections/UserProfileAvatarBadges.kt` (anillo de historia + long-press a foto completa; badges/Plus NO portados a propósito: sistemas descartados)
+- [~] UserProfileHeaderSection.swift → `sections/UserProfileHeaderSection.kt` (chrome fijado con back/username+verificado/menú mute-block-report-share-QR, y cabecera: avatar+nota, username en gradiente, bio expandible, web, botones seguir/mensaje. **Falta**: `UserProfileBadgesView` (descartado), ShareLink real (el item Share abre el mismo QR), y el flujo `startConversation` queda en el host vía `onOpenMessage`)
+- [~] UserProfileMomentsSection.swift → `sections/UserProfileMomentsSection.kt` (`UserModernMomentThumbnail` delega en `ModernMomentThumbnail` ya portado —misma maquinaria media/crop/chrome/gestos— fijando estilo visitante; + `calculateBentoGridHeight`/`calculateTaggedGridHeight` con parámetro `availableWidth` extra)
+- [~] UserProfileOverviewSection.swift → `sections/UserProfileOverviewSection.kt` (stats posts/seguidores/seguidos con gating de privacidad, intereses desplegables, `UserExpandableBioView`, `UserModernAvatar`, `UserModernInterestsView`. **Falta**: resaltado de intereses compartidos no se autocarga —`sharedInterests` es parámetro, iOS lo leía de Firestore en `onAppear`)
+- [~] UserProfilePublicProfileView.swift → `sections/UserProfilePublicProfileView.kt` (composición: chrome+cabecera+overview+destacadas+pills tabs+grids bento de momentos y etiquetados con ScreenshotProtectedView y zoom sourceID. **Falta**: pull-to-refresh (queda en el host, solo se pinta el indicador), sticky chrome con blur real, tab bar flotante fijada, y las rutas sheet de QR/report/conexiones salen por callback)
+- [~] UserProfileRelationshipViews.swift → `sections/UserProfileRelationshipViews.kt` (chip + hoja completa de gestión: mejor amigo, silenciar, listas personalizadas con navegación interna y diálogo de confirmación de borrado, dejar de seguir. `confirmationDialog`→`AlertDialog`)
+- [~] UserProfileSharedViews.swift → `sections/UserProfileSharedViews.kt` (StatItem, fondo desenfocado, preview de moment, contenido expandible, visor de foto, indicador de refresh)
+- [~] UserProfileStateViews.swift → `sections/UserProfileStateViews.kt` (sin momentos, bloqueado, privado con stats "--", no disponible, sin conexión, bloqueado-por-mí. **Falta**: gesto de arrastre para cerrar en `UserModernBlockedView`, y mensajería vía callback `onOpenMessage`)
 **`Profile/UserProfile`**
-- [~] UserProfileView.swift → `views/profile/userprofile/UserProfileView.kt` (sheet Feed + tab propio MVP)
+- [~] UserProfileView.swift → `views/profile/userprofile/UserProfileView.kt` (**port completo de la raíz**: `UserProfileColors`, `UserProfileTabType` con icono+título, `UserProfilePillTabs` con pulgar deslizante y arrastre —umbral 28% del segmento y tap directo como iOS—, `UserProfileFloatingTabBar`, y el enrutado de estados cargando/bloqueado-por-mí/no-disponible/sin-conexión/privado/público + hojas: gestión de relación, confirmación de unfollow con mensaje distinto si el perfil es privado, visor de foto, historias, QR, reporte, y zoom de moment vía `MomentZoomOpener`. `handleFollowAction` y la visita diferida 1s portados. **Puentes documentados**: (1) `onOpenMessage` sin destino — no existe `startConversation` en el `MessagingViewModel` de Kotlin; (2) ruta de conexiones sociales pendiente — `SocialConnectionsScreen` exige `ProfileViewModel`, no `UserProfileViewModel`, y cablearla obliga a tocar ese archivo; (3) fondo con `UserModernBackgroundView` en vez de `EnhancedProfileBackground` porque los temas de perfil están descartados; (4) sin `ProfileGridHeroTransitionCoordinator` — se usa el zoom ya portado, que es la infraestructura equivalente)
 - [~] UserProfileViewModel.swift → `views/profile/userprofile/UserProfileViewModel.kt` (**port completo del VM 1071→~490 líneas**: fetchProfile con caché local+visibilidad, refresh, conexiones categorizadas por privacidad, tagged, sugeridas por intereses, común, follow/unfollow/cancel/request, block/unblock, best friend, mute, custom lists, visitas+afinidad. DispatchGroup→coroutines. Puentes: sin observer NotificationCenter, hápticas a la UI, checkIfBestFriend vía bestFriends del viewer)
 **`Settings`**
 - [~] AccountHistoryActivityView.swift → `views/settings/AccountHistoryActivityView.kt`
@@ -654,14 +654,14 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] ChatCommunicationNotificationService.swift → `services/messaging/ChatCommunicationNotificationService.kt` (shortcuts + Person; MessagingStyle en notificaciones)
 - [~] ChatMediaChunkedCipher.swift → `services/messaging/ChatMediaChunkedCipher.kt`
 - [~] ChatMediaDownloadPolicy.swift → `services/messaging/ChatMediaDownloadPolicy.kt`
-- [~] ChatMediaPrefetcher.swift → `services/messaging/ChatMediaPrefetcher.kt`
+- [~] ChatMediaPrefetcher.swift → `services/messaging/ChatMediaPrefetcher.kt` (**BUG ARREGLADO 2026-07-25**: descargaba en serie y `finish()` se llamaba recursivamente, así que `prefetchIfNeeded` no retornaba hasta vaciar la cola entera —bloqueando `ingestBatch`, o sea cada push y catch-up— con una recursión por mensaje. Reescrito con workers concurrentes reales (tope 3) y sin bloquear al llamante, como el `Task {}` de iOS)
 - [~] ChatRecoveryCrypto.swift → `services/messaging/ChatRecoveryCrypto.kt`
 - [~] ChatSendMessageIntentHandler.swift — N/A (Intents iOS; Android RemoteInput)
-- [~] EncryptionService.swift → `services/messaging/EncryptionService.kt` (E2E identity/recovery correction is local; cross-device verification pending)
+- [~] EncryptionService.swift → `services/messaging/EncryptionService.kt` (**auditado a fondo 2026-07-25 leyendo cuerpos, no nombres**: `chatAccessState` es port línea por línea de iOS, bundle de recuperación PBKDF2 real, restauración con intentos/bloqueo, AES-GCM + HKDF en media y Nova, X25519 para wrapped keys. La diferencia 3050 vs ~1100 líneas es ~700 de métricas/estadísticas de iOS + verbosidad de Swift, NO lógica ausente. **Añadidas**: `deleteUserKeys`, `deleteAllKeys`, `verifyRecoveryPIN`, `removeLocalChatIdentity`. Ojo: iOS tampoco llama nunca a deleteAllKeys/deleteUserKeys. **Falta**: `encryptUserData`/`decryptUserData`, `encryptChatMessagesBatch`, escaneo/limpieza de keychain y subida de métricas a Firestore)
 - [~] LocalFirstMessagingSettings.swift → `services/messaging/LocalFirstMessagingSettings.kt`
-- [~] MessageCatchUpService.swift → `services/messaging/MessageCatchUpService.kt`
+- [~] MessageCatchUpService.swift → `services/messaging/MessageCatchUpService.kt` (**BUG ARREGLADO 2026-07-25**: iOS corta la paginación con `break`; el port usaba `return@repeat`, que en Kotlin es `continue`, así que seguía paginando en vacío — hasta 10 lecturas inútiles a Firestore por conversación × 20 conversaciones por sync. Ahora es un `for` que rompe de verdad)
 - [~] MessageIngestService.swift → `services/messaging/MessageIngestService.kt`
-- [~] MessageRequestService.swift → `services/messaging/MessageRequestService.kt`
+- [~] MessageRequestService.swift → `services/messaging/MessageRequestService.kt` (**ARREGLADO 2026-07-25**: al reenviar a alguien con solicitud pendiente fallaba con error; iOS hace `updateExistingRequest` y actualiza el mensaje — portado. Además los textos de error estaban hardcodeados en español dentro del servicio y llegaban a la UI: ahora salen de `strings.xml` con las 7 claves reales de iOS en los 8 idiomas)
 - [~] OnlineStatusService.swift → `services/messaging/OnlineStatusService.kt`
 - [~] VanishMessageTimer.swift → `services/messaging/VanishMessageTimer.kt`
 **`Network`**
