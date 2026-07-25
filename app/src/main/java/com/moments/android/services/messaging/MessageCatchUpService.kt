@@ -75,16 +75,19 @@ object MessageCatchUpService {
             var ingestedCount = 0
             val maxPages = MAX_CATCH_UP_MESSAGES_PER_SYNC / CATCH_UP_PAGE_SIZE
 
-            repeat(maxPages) {
-                if (ingestedCount >= MAX_CATCH_UP_MESSAGES_PER_SYNC) return@repeat
+            // OJO: en iOS estos cortes son `break`. Con `repeat { ... return@repeat }` serían
+            // `continue` y el bucle seguiría paginando en vacío (10 lecturas inútiles por
+            // conversación en cada sync), así que aquí hace falta un bucle que pueda romperse.
+            for (page in 0 until maxPages) {
+                if (ingestedCount >= MAX_CATCH_UP_MESSAGES_PER_SYNC) break
                 val cursor = resolveCatchUpCursor(conversationId)
                 val pageLimit = minOf(CATCH_UP_PAGE_SIZE, MAX_CATCH_UP_MESSAGES_PER_SYNC - ingestedCount)
                 val messages = fetchCatchUpPage(conversationId, cursor, pageLimit)
-                if (messages.isEmpty()) return@repeat
+                if (messages.isEmpty()) break
 
                 MessageIngestService.ingestBatch(messages, conversationId, MessageIngestSource.CATCH_UP)
                 ingestedCount += messages.size
-                if (messages.size < pageLimit) return@repeat
+                if (messages.size < pageLimit) break
             }
         } finally {
             mutex.withLock { inFlightConversationIds.remove(conversationId) }

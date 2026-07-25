@@ -33,6 +33,7 @@ import com.moments.android.services.privacy.checkMutualConnection
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.social.BestFriendsService
+import com.moments.android.views.profile.core.UserListViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -51,7 +52,7 @@ class UserProfileViewModel(
     val userId: String,
     private val firestoreService: FirestoreService = FirestoreService(),
     private val bestFriendsService: BestFriendsService = BestFriendsService(),
-) : ViewModel() {
+) : ViewModel(), UserListViewModel {
 
     var userProfile by mutableStateOf<AppUser?>(null); private set
     var viewerProfile by mutableStateOf<AppUser?>(null); private set
@@ -478,7 +479,7 @@ class UserProfileViewModel(
 
     // MARK: - Follow / Unfollow / Request
 
-    fun followUser(targetId: String) {
+    override fun followUser(targetId: String) {
         val current = currentUserId ?: return
         recentUnfollows.remove(targetId)
         viewModelScope.launch {
@@ -540,7 +541,7 @@ class UserProfileViewModel(
         }
     }
 
-    fun cancelFollowRequest(targetId: String) {
+    override fun cancelFollowRequest(targetId: String) {
         val current = currentUserId ?: return
         viewModelScope.launch {
             if (runCatching { firestoreService.cancelFollowRequest(current, targetId) }.isSuccess) {
@@ -550,7 +551,7 @@ class UserProfileViewModel(
         }
     }
 
-    fun unfollowUser(targetId: String) {
+    override fun unfollowUser(targetId: String) {
         val current = currentUserId ?: return
         recentUnfollows.add(targetId)
         viewModelScope.launch {
@@ -577,7 +578,7 @@ class UserProfileViewModel(
         }
     }
 
-    fun relationshipStateSync(targetId: String): FollowButtonState {
+    override fun relationshipState(targetId: String): FollowButtonState {
         // Versión no-suspend para pintar: usa lo conocido (following/mutuals) sin ir a red.
         val current = currentUserId
         if (current == targetId) return FollowButtonState.OWN_PROFILE
@@ -588,7 +589,7 @@ class UserProfileViewModel(
         return if (known?.isPrivate == true) FollowButtonState.CAN_REQUEST_FOLLOW else FollowButtonState.CAN_FOLLOW
     }
 
-    fun prefetchRelationshipState(targetId: String) {
+    override fun prefetchRelationshipState(targetId: String) {
         val current = currentUserId ?: return
         if (current == targetId) return
         viewModelScope.launch {

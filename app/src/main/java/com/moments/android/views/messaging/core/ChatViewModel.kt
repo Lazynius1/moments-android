@@ -17,6 +17,9 @@ import com.moments.android.views.messaging.services.forwardTextMessage
 import com.moments.android.views.messaging.services.toggleMessageStar
 import com.moments.android.views.messaging.services.listenToMessageReactions
 import com.moments.android.views.messaging.services.removeMessageReactionsListener
+import com.moments.android.views.messaging.services.ChatBuzzEvent
+import com.moments.android.views.messaging.services.listenToBuzzEvents
+import com.moments.android.views.messaging.services.removeBuzzListener
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.messaging.VanishMessageTimer
 import kotlinx.coroutines.CoroutineScope
@@ -70,6 +73,10 @@ open class EnhancedChatViewModel(
     private val _vanishModeActive = MutableStateFlow(false); val vanishModeActive = _vanishModeActive.asStateFlow()
     private val _vanishMessageTimer = MutableStateFlow(VanishMessageTimer.DEFAULT); val vanishMessageTimer = _vanishMessageTimer.asStateFlow()
     private val _liveReactionOverlays = MutableStateFlow<Map<String, Map<String, List<String>>>>(emptyMap()); val reactionOverlays = _liveReactionOverlays.asStateFlow()
+    private val _buzzEvents = MutableStateFlow<List<ChatBuzzEvent>>(emptyList()); val buzzEvents = _buzzEvents.asStateFlow()
+    private val _latestBuzzEvent = MutableStateFlow<ChatBuzzEvent?>(null); val latestBuzzEvent = _latestBuzzEvent.asStateFlow()
+    private val _isLoadingOlderHistory = MutableStateFlow(false); val isLoadingOlderHistory = _isLoadingOlderHistory.asStateFlow()
+    private val seenBuzzEventIds = mutableSetOf<String>()
     private val localMessageStates = mutableMapOf<String, MessageStatus>()
     private val outgoingTempMessages = mutableMapOf<String, EnhancedMessage>()
     private val hydratingMediaIds = mutableSetOf<String>()
@@ -249,6 +256,26 @@ open class EnhancedChatViewModel(
             result.onSuccess { update -> _liveReactionOverlays.value = update.reactionsByMessage }
                 .onFailure { _error.value = it.message }
         }
+        // Zumbidos: sin este listener la infraestructura de buzz (fila en timeline + shake) queda
+        // muerta, porque nadie alimenta `buzzEvents`.
+        chatService.listenToBuzzEvents(
+            conversationId = conversationId,
+            cutoffDate = effectiveDeletedAtCutoff(),
+            replaceExisting = false,
+        ) { event, isInitialSnapshot ->
+            // Como iOS: respetar la preferencia del receptor también dentro de la app, no solo
+            // en el push — si desactivó zumbidos, ni shake ni fila en el timeline.
+            val isIncoming = event.senderId != currentUserId
+            if (isIncoming && _buzzPreferences.value[currentUserId] == false) {
+                seenBuzzEventIds.add(event.id)
+                return@listenToBuzzEvents
+            }
+            if (!seenBuzzEventIds.add(event.id)) return@listenToBuzzEvents
+            _buzzEvents.value = (_buzzEvents.value + event).sortedBy { it.createdAt }
+            rebuildMessagesList()
+            if (!isInitialSnapshot) _latestBuzzEvent.value = event
+        }
+
         if (_typingIndicatorEnabled.value) {
             chatService.listenToTypingIndicators(conversationId)
             typingUsersJob?.cancel()
@@ -260,6 +287,35 @@ open class EnhancedChatViewModel(
         }
     }
 
+    /**
+     * Port de `mergeConversationReadMetadata(from:)`.
+     *
+     * La sesión se cachea en [ChatSessionEngine]: al reutilizarla hay que traer el `lastReadAt`
+     * fresco de la lista, o el saneado de leídos trabajaría con datos viejos.
+     */
+    fun mergeConversationReadMetadata(fresh: Conversation) {
+        if (fresh.id.isNullOrEmpty() || fresh.id != conversation.id) return
+        fresh.lastReadAt?.let { if (it != conversation.lastReadAt) conversation.lastReadAt = it }
+        if (fresh.lastMessageSenderId != conversation.lastMessageSenderId) {
+            conversation.lastMessageSenderId = fresh.lastMessageSenderId
+        }
+        if (fresh.lastMessageSeenAt != conversation.lastMessageSeenAt) {
+            conversation.lastMessageSeenAt = fresh.lastMessageSeenAt
+        }
+        if (fresh.lastMessageReaction != conversation.lastMessageReaction) {
+            conversation.lastMessageReaction = fresh.lastMessageReaction
+        }
+    }
+
+    /** Port de `effectiveDeletedAtCutoff()`: los eventos previos al borrado del usuario no cuentan. */
+    private fun effectiveDeletedAtCutoff(): java.util.Date? =
+        conversation.lastDeletedAt?.get(currentUserId)
+
+    /** Consumido por la UI tras reproducir el shake, para no repetirlo. */
+    fun clearLatestBuzzEvent() {
+        _latestBuzzEvent.value = null
+    }
+
     fun pauseChatListenersImmediately() {
         if (!sessionListenersAttached) return
         sessionListenersAttached = false
@@ -267,6 +323,7 @@ open class EnhancedChatViewModel(
         chatService.removeTypingListener(conversationId)
         chatService.removeConversationPreferencesListener(conversationId)
         chatService.removeMessageReactionsListener(conversationId)
+        chatService.removeBuzzListener(conversationId)
         _liveReactionOverlays.value = emptyMap()
         typingUsersJob?.cancel(); typingUsersJob = null
         _typingUsers.value = emptySet()

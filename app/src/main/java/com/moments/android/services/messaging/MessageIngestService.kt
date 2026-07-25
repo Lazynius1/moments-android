@@ -23,6 +23,22 @@ object MessageIngestService {
         LocalPersistenceService.clearAllChatCache()
     }
 
+    /**
+     * Purga el caché local tras restaurar la identidad de chat.
+     *
+     * Necesario porque el descifrado ocurre al ingerir (`ChatMessageMapper`) y, cuando falla, el
+     * contenido se guarda tal cual en cifrado (`decrypted ?: ciphertext`, igual que iOS). Los
+     * mensajes recibidos mientras la identidad era la equivocada quedaron persistidos ilegibles:
+     * sin tirar el caché seguirían mostrándose así para siempre aunque ya haya clave buena.
+     * Al vaciarlo se vuelven a bajar de Firestore y se descifran con la identidad restaurada.
+     */
+    fun resetAfterIdentityRestore() {
+        inFlightKeys.clear()
+        recentlyIngestedKeys.clear()
+        MessageSyncCursorStore.clearAll()
+        LocalPersistenceService.clearAllChatCache()
+    }
+
     suspend fun drainPendingQueue() {
         if (!LocalFirstMessagingSettings.isEnabled) return
         if (FirebaseAuth.getInstance().currentUser == null) return

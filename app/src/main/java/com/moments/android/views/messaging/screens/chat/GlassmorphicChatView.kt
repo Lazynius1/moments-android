@@ -14,6 +14,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.moments.android.utilities.HapticManager
+import com.moments.android.views.messaging.services.ChatBuzzProcessedStore
+import com.moments.android.views.messaging.services.ChatNavigationIntentStore
+import com.moments.android.views.messaging.services.ChatSessionEngine
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -47,6 +51,7 @@ import com.moments.android.views.messaging.core.MessageItem
 import com.moments.android.views.messaging.services.ChatDraftStore
 import com.moments.android.views.messaging.services.ChatScrollTarget
 import com.moments.android.views.messaging.services.ViewOnceReplaySessionStore
+import java.util.Date
 import java.util.UUID
 
 /** Port de `Views/Messaging/Screens/Chat/GlassmorphicChatView.swift`. */
@@ -55,8 +60,10 @@ data class ChatStoryRoute(val userId: String)
 @Composable
 fun GlassmorphicChatView(
     conversation: Conversation,
+    // Como iOS (`ChatSessionEngine.shared.session(for:)`): la sesión sale del caché, así que
+    // reabrir la conversación reutiliza mensajes, listeners y scroll en vez de reconstruirlos.
     session: MomentsChatViewModel = remember(conversation.id) {
-        MomentsChatViewModel(conversation, FirebaseAuth.getInstance().currentUser?.uid.orEmpty())
+        ChatSessionEngine.session(conversation)
     },
     pendingChatContext: PendingChatContext? = null,
     onBack: () -> Unit,
@@ -200,11 +207,48 @@ fun GlassmorphicChatView(
         onTurnOnVanish = { session.toggleVanishMode() },
     )
 
+    // Port de `handleIncomingBuzzToastIfNeeded()`: al llegar un zumbido ajeno se muestra el aviso
+    // 1,9 s y se marca como procesado para no repetirlo al reabrir el chat.
+    val latestBuzzEvent by session.latestBuzzEvent.collectAsState()
+    val buzzEvents by session.buzzEvents.collectAsState()
+    var buzzToastText by remember { mutableStateOf<String?>(null) }
+
+    // Abrir desde el banner/push de un zumbido: `ChatNavigationIntentStore.enqueueBuzz` deja la
+    // intención pendiente y aquí se consume, reproduciéndolo una vez (port de
+    // `resolvePendingBuzzEventForReplay`). Sin esto la intención se encolaba y no la leía nadie.
+    LaunchedEffect(session.conversationId, buzzEvents.size) {
+        val conversationId = session.conversationId.ifBlank { return@LaunchedEffect }
+        val intent = ChatNavigationIntentStore.peek(conversationId) ?: return@LaunchedEffect
+        if (!intent.playBuzzOnOpen) return@LaunchedEffect
+        val replayWindowStart = Date(System.currentTimeMillis() - ChatBuzzProcessedStore.replayWindowMillis)
+        val event = intent.buzzEventId?.let { id -> buzzEvents.firstOrNull { it.id == id } }
+            ?: buzzEvents.filter { it.senderId != session.currentUserId && it.createdAt >= replayWindowStart }
+                .maxByOrNull { it.createdAt }
+            ?: return@LaunchedEffect
+        ChatNavigationIntentStore.clearBuzz(conversationId)
+        buzzToastText = context.getString(R.string.chat_buzz_received, displayName)
+        ChatBuzzProcessedStore.markProcessed(context, event.id, conversationId)
+        HapticManager.shared.mediumImpact()
+        kotlinx.coroutines.delay(1_900)
+        buzzToastText = null
+    }
+    LaunchedEffect(latestBuzzEvent?.id) {
+        val event = latestBuzzEvent ?: return@LaunchedEffect
+        if (event.senderId == session.currentUserId) return@LaunchedEffect
+        if (ChatBuzzProcessedStore.isProcessed(context, event.id, session.conversationId)) return@LaunchedEffect
+        buzzToastText = context.getString(R.string.chat_buzz_received, displayName)
+        ChatBuzzProcessedStore.markProcessed(context, event.id, session.conversationId)
+        HapticManager.shared.mediumImpact()
+        kotlinx.coroutines.delay(1_900)
+        buzzToastText = null
+        session.clearLatestBuzzEvent()
+    }
+
     GlassmorphicChatRootContent(
         adaptiveColors = colors,
         viewModel = session,
         messagePresentation = messagePresentation,
-        buzzToastText = null,
+        buzzToastText = buzzToastText,
         isSearchVisible = search.isSearchVisible,
         composerHeight = scroll.lastComposerHeight ?: 68.dp,
         callbacks = ChatMessageRenderingCallbacks(

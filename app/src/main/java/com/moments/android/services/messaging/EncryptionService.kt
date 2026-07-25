@@ -392,6 +392,12 @@ object EncryptionService {
             restoreChatIdentityFromBundle(normalizedPin, bundle, userId)
             identityPrefs().edit().putBoolean(CHAT_RECOVERY_MARKER_PREFIX + userId, true).apply()
             clearRecoveryAttemptState(userId)
+            // Al cambiar de identidad, TODA clave de conversación derivada con la anterior es
+            // inservible. Si no se tiran, `getConversationKey` seguiría devolviendo la cacheada
+            // y los mensajes se seguirían viendo cifrados aun con la identidad correcta.
+            // (iOS no lo necesita porque su puerta de acceso impide llegar al chat sin identidad
+            // válida; en Android este estado sí es alcanzable al restaurar en un móvil ya usado.)
+            purgeConversationKeys()
         } catch (error: EncryptionError.RecoveryLocked) {
             throw error
         } catch (_: Exception) {
@@ -405,6 +411,77 @@ object EncryptionService {
     fun hasLocalChatIdentity(userId: String? = FirebaseAuth.getInstance().currentUser?.uid): Boolean {
         if (userId.isNullOrEmpty()) return false
         return EncryptionKeyStore.contains(CHAT_IDENTITY_KEY_PREFIX + userId)
+    }
+
+    /**
+     * Tira todas las claves de conversación (memoria + keystore) para que se vuelvan a desenvolver
+     * desde `wrappedKeys` con la identidad vigente. Se usa tras restaurar identidad.
+     */
+    fun purgeConversationKeys() {
+        conversationKeyCache.clear()
+        EncryptionKeyStore.tagsWithPrefix(CONVERSATION_KEYS_PREFIX).forEach(EncryptionKeyStore::delete)
+    }
+
+    // MARK: - Limpieza de claves (paridad `LEGACY SUPPORT & CLEANUP` de iOS)
+
+    /** Port de `deleteUserKeys(for:)`. */
+    suspend fun deleteUserKeys(userId: String) = withContext(Dispatchers.IO) {
+        userKeyCache.remove(userId)
+        EncryptionKeyStore.delete(USER_KEYS_PREFIX + userId)
+    }
+
+    /**
+     * Port de `deleteAllKeys()` — reset total del material criptográfico de este dispositivo.
+     * Necesario al cerrar sesión: si no, las claves del usuario anterior se quedan en el aparato.
+     */
+    suspend fun deleteAllKeys() = withContext(Dispatchers.IO) {
+        userKeyCache.clear()
+        conversationKeyCache.clear()
+        EncryptionKeyStore.deleteAll()
+    }
+
+    /**
+     * Port de `verifyRecoveryPIN(_:)` — comprueba si el PIN abre el bundle remoto SIN restaurar
+     * la identidad ni consumir intentos.
+     */
+    suspend fun verifyRecoveryPIN(pin: String): Boolean = withContext(Dispatchers.IO) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return@withContext false
+        val trimmed = pin.trim()
+        if (trimmed.length != 6 || !trimmed.all(Char::isDigit)) return@withContext false
+        runCatching {
+            val snapshot = db.collection(ChatIdentityContract.usersCollection)
+                .document(userId)
+                .collection(ChatIdentityContract.recoveryCollection)
+                .document(ChatIdentityContract.recoveryDocumentId)
+                .get()
+                .await()
+            val bundle = snapshot.data?.let { ChatRecoveryBundle.from(it) } ?: return@runCatching false
+            val salt = Base64.decode(bundle.salt, Base64.DEFAULT)
+            val encryptedPrivateKey = Base64.decode(bundle.encryptedPrivateKey, Base64.DEFAULT)
+            val pinKey = ChatRecoveryCrypto.derivePINKey(
+                pin = trimmed,
+                salt = salt,
+                iterations = bundle.kdfParams.iterations,
+                keyLength = bundle.kdfParams.keyLength,
+            )
+            CryptoHelpers.aesGcmOpen(encryptedPrivateKey, pinKey)
+            true
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Port de `removeLocalChatIdentity()` — borra la identidad de chat de ESTE dispositivo para
+     * forzar la restauración con PIN (opción "forzar restauración" de los ajustes de recuperación).
+     * No toca el bundle remoto: sin él la restauración sería imposible.
+     */
+    suspend fun removeLocalChatIdentity() = withContext(Dispatchers.IO) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: throw EncryptionError.KeyNotFound
+        EncryptionKeyStore.delete(CHAT_IDENTITY_KEY_PREFIX + userId)
+        identityPrefs().edit()
+            .remove(CHAT_IDENTITY_KEY_ID_PREFIX + userId)
+            .remove(CHAT_RECOVERY_MARKER_PREFIX + userId)
+            .apply()
+        clearRecoveryAttemptState(userId)
     }
 
     // MARK: - Text encrypt/decrypt (REAL con clave de conversación)
@@ -422,6 +499,14 @@ object EncryptionService {
             requireInitialized()
             val key = getConversationKey(conversationId)
             decryptText(encryptedText, key)
+        }.onFailure {
+            // Diagnóstico temporal (sin loguear texto ni claves): distingue "sin clave" de
+            // "clave equivocada" (AEADBadTagException) para localizar el bug de mensajes cifrados
+            // tras restaurar identidad. Quitar cuando esté confirmado y arreglado.
+            android.util.Log.w(
+                "EncryptionService",
+                "decryptChatMessage failed conv=$conversationId cause=${it::class.simpleName}: ${it.message}",
+            )
         }.getOrDefault(encryptedText)
     }
 
@@ -481,7 +566,17 @@ object EncryptionService {
             if (wrappedKeyMap != null) {
                 val wrapped = WrappedConversationKey.from(wrappedKeyMap)
                     ?: throw EncryptionError.DecryptionFailed
-                return@withContext unwrapConversationKey(wrapped, currentUserId)
+                return@withContext runCatching { unwrapConversationKey(wrapped, currentUserId) }
+                    .onFailure {
+                        // Diagnóstico temporal: si esto falla con AEADBadTagException, la clave
+                        // de conversación fue envuelta contra una clave pública distinta a la
+                        // identidad local vigente (p. ej. Firestore corrompido con la identidad
+                        // equivocada antes de restaurar). Quitar cuando esté confirmado/arreglado.
+                        android.util.Log.w(
+                            "EncryptionService",
+                            "unwrapConversationKey failed conv=$conversationId wrappedBy=${wrapped.wrappedBy} cause=${it::class.simpleName}: ${it.message}",
+                        )
+                    }.getOrThrow()
             }
 
             (data["sharedEncryptionKey"] as? String)?.let { keyB64 ->

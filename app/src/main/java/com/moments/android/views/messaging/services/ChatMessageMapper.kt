@@ -132,7 +132,12 @@ internal object ChatMessageMapper {
             mediaEncryption = mediaEncryption,
             thumbnailEncryption = thumbnailEncryption,
             duration = (data["duration"] as? Number)?.toDouble(),
-            audioWaveform = (data["audioWaveform"] as? List<*>)?.mapNotNull { (it as? Number)?.toFloat() },
+            // Como `decodeAudioWaveform` en iOS: tope de 64 muestras y clamp a 0..1 (un valor
+            // fuera de rango dibujaría la onda rota).
+            audioWaveform = (data["audioWaveform"] as? List<*>)
+                ?.take(64)
+                ?.mapNotNull { (it as? Number)?.toFloat()?.coerceIn(0f, 1f) }
+                ?.takeIf { it.isNotEmpty() },
             fileName = data["fileName"] as? String,
             fileSize = (data["fileSize"] as? Number)?.toLong(),
             mediaWidth = (data["mediaWidth"] as? Number)?.toInt(),
@@ -200,7 +205,6 @@ internal object ChatMessageMapper {
         }
         message.duration?.let { data["duration"] = it }
         message.audioWaveform?.takeIf { it.isNotEmpty() }?.let { data["audioWaveform"] = it.take(64).map(Float::toDouble) }
-        message.audioWaveform?.takeIf { it.isNotEmpty() }?.let { data["audioWaveform"] = it.take(64).map { v -> v.toDouble() } }
         message.fileName?.let { data["fileName"] = it }
         message.fileSize?.let { data["fileSize"] = it }
         message.mediaWidth?.let { data["mediaWidth"] = it }

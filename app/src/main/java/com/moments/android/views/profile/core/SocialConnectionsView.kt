@@ -68,7 +68,7 @@ fun SocialConnectionsScreen(
     mutuals: List<AppUser>,
     suggestedUsers: List<AppUser>,
     visitTimestamps: Map<String, List<java.util.Date>>,
-    listViewModel: ProfileViewModel,
+    listViewModel: UserListViewModel,
     connectionVisibility: VisibleConnectionTypes? = null,
     onDismiss: () -> Unit,
     onOpenProfile: (String) -> Unit,
@@ -88,11 +88,16 @@ fun SocialConnectionsScreen(
     val primary = sharedPrimary(); val secondary = sharedSecondary()
 
     sharedUser?.let { other -> SharedActivityView(currentUser, other, listViewModel, { sharedUser = null }, onOpenProfile, onOpenChat, onOpenMoment, modifier); return }
-    fun refresh() { if (tab == SocialConnectionTab.VISITS) listViewModel.refreshVisits() else listViewModel.refreshProfile() }
+    // Como iOS: el refresco depende del VM concreto; visitas solo existen en el perfil propio.
+    fun refresh() {
+        val own = listViewModel as? ProfileViewModel
+        if (own != null) { if (tab == SocialConnectionTab.VISITS) own.refreshVisits() else own.refreshProfile() }
+        else (listViewModel as? com.moments.android.views.profile.userprofile.UserProfileViewModel)?.refreshProfile()
+    }
     fun loadTimestamps() { val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return; scope.launch { val values = if (tab == SocialConnectionTab.FOLLOWING) FirestoreService().fetchFollowingWithTimestamps(userId) else FirestoreService().fetchFollowersWithTimestamps(userId); timestamps = values.associate { it.first.id to it.second } } }
-    val baseUsers = when (tab) { SocialConnectionTab.VISITS -> listViewModel.groupedVisits.map { it.user }; SocialConnectionTab.IN_COMMON -> inCommonUsers; SocialConnectionTab.FOLLOWERS -> if (connectionVisibility?.canViewFollowers == false) emptyList() else followers; SocialConnectionTab.FOLLOWING -> if (connectionVisibility?.canViewFollowing == false) emptyList() else following; SocialConnectionTab.MUTUALS -> mutuals; null -> emptyList() }
+    val baseUsers = when (tab) { SocialConnectionTab.VISITS -> (listViewModel as? ProfileViewModel)?.groupedVisits.orEmpty().map { it.user }; SocialConnectionTab.IN_COMMON -> inCommonUsers; SocialConnectionTab.FOLLOWERS -> if (connectionVisibility?.canViewFollowers == false) emptyList() else followers; SocialConnectionTab.FOLLOWING -> if (connectionVisibility?.canViewFollowing == false) emptyList() else following; SocialConnectionTab.MUTUALS -> mutuals; null -> emptyList() }
     val ordered = SocialConnectionsSorting.sortUsers(baseUsers, sortMode, timestamps).filter { it.username.contains(search, ignoreCase = true) }
-    val items = availableTabs.map { item -> SocialConnectionTabItem(item, when (item) { SocialConnectionTab.VISITS -> listViewModel.groupedVisits.size; SocialConnectionTab.IN_COMMON -> inCommonUsers.size; SocialConnectionTab.FOLLOWERS -> followers.size; SocialConnectionTab.FOLLOWING -> following.size; SocialConnectionTab.MUTUALS -> mutuals.size }) }
+    val items = availableTabs.map { item -> SocialConnectionTabItem(item, when (item) { SocialConnectionTab.VISITS -> (listViewModel as? ProfileViewModel)?.groupedVisits?.size ?: 0; SocialConnectionTab.IN_COMMON -> inCommonUsers.size; SocialConnectionTab.FOLLOWERS -> followers.size; SocialConnectionTab.FOLLOWING -> following.size; SocialConnectionTab.MUTUALS -> mutuals.size }) }
 
     Column(modifier.fillMaxSize().background(sharedCanvas())) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Filled.ArrowBack, stringResource(R.string.common_back), tint = primary, modifier = Modifier.size(28.dp).clickable(onClick = onDismiss)); Text(username, color = primary, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 12.dp).weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -102,12 +107,12 @@ fun SocialConnectionsScreen(
             Box { Icon(Icons.Filled.Sort, stringResource(R.string.social_connections_sort), tint = primary, modifier = Modifier.size(36.dp).clickable { sortExpanded = true }.padding(7.dp)); DropdownMenu(sortExpanded, { sortExpanded = false }) { SocialConnectionsSortMode.entries.forEach { mode -> DropdownMenuItem(text = { Text(stringResource(sortLabel(mode))) }, onClick = { sortExpanded = false; sortMode = mode; if (mode == SocialConnectionsSortMode.NEWEST || mode == SocialConnectionsSortMode.OLDEST) loadTimestamps() }) } } }
         }
         when {
-            tab == SocialConnectionTab.VISITS && listViewModel.isLoadingVisits -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            tab == SocialConnectionTab.VISITS && (listViewModel as? ProfileViewModel)?.isLoadingVisits == true -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             tab == null -> Box(Modifier.fillMaxSize())
             ordered.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.social_connections_empty), color = secondary) }
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 if (tab == SocialConnectionTab.IN_COMMON && suggestedUsers.isNotEmpty()) item { Text(stringResource(R.string.social_connections_suggested), color = primary, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp)) }
-                items(ordered, key = { it.id }) { user -> SocialConnectionUserRow(user, if (tab == SocialConnectionTab.VISITS) visitTimestamps[user.id]?.maxOrNull()?.timeAgoDisplay() else null, listViewModel, { onOpenProfile(it.id) }, configuration = socialRowConfiguration(tab, isOwnProfile), newContentCount = null, onViewSharedActivity = if (isOwnProfile && tab in setOf(SocialConnectionTab.FOLLOWING, SocialConnectionTab.MUTUALS)) { { sharedUser = it } } else null, onRemoveFollower = if (isOwnProfile && tab == SocialConnectionTab.FOLLOWERS) { { listViewModel.removeFollower(it.id) } } else null, onAvatarTap = { id, hasStory -> SocialConnectionAvatarTapRouting.route(id, hasStory, onOpenProfile, onOpenStories) }, isMutual = user.id in mutuals.map { it.id }.toSet()) }
+                items(ordered, key = { it.id }) { user -> SocialConnectionUserRow(user, if (tab == SocialConnectionTab.VISITS) visitTimestamps[user.id]?.maxOrNull()?.timeAgoDisplay() else null, listViewModel, { onOpenProfile(it.id) }, configuration = socialRowConfiguration(tab, isOwnProfile), newContentCount = null, onViewSharedActivity = if (isOwnProfile && tab in setOf(SocialConnectionTab.FOLLOWING, SocialConnectionTab.MUTUALS)) { { sharedUser = it } } else null, onRemoveFollower = if (isOwnProfile && tab == SocialConnectionTab.FOLLOWERS) { { (listViewModel as? ProfileViewModel)?.removeFollower(it.id) } } else null, onAvatarTap = { id, hasStory -> SocialConnectionAvatarTapRouting.route(id, hasStory, onOpenProfile, onOpenStories) }, isMutual = user.id in mutuals.map { it.id }.toSet()) }
                 if (tab == SocialConnectionTab.IN_COMMON) items(suggestedUsers, key = { "suggested-${it.id}" }) { user -> SocialConnectionUserRow(user, null, listViewModel, { onOpenProfile(it.id) }, onAvatarTap = { id, hasStory -> SocialConnectionAvatarTapRouting.route(id, hasStory, onOpenProfile, onOpenStories) }) }
             }
         }
