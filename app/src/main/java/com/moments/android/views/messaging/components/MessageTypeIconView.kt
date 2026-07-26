@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.sp
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.MessageType
 
 /** Port de `Views/Messaging/Components/MessageTypeIconView.swift`. */
 @Composable

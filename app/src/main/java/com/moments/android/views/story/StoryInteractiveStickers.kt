@@ -64,6 +64,7 @@ import com.moments.android.extensions.fromHex
 import com.moments.android.extensions.revealContrastingEffectColor
 import com.moments.android.models.StickerData
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.components.StickerDitherPattern
 import com.moments.android.views.components.StickerPolaroidFrameView
 import com.moments.android.views.components.StoryPolaroidFrameStyle
 import com.moments.android.views.story.storyviewer.StoryGestureSuppressionScope
@@ -492,7 +493,8 @@ fun RevealSurfaceView(
         else -> primary.revealContrastingEffectColor()
     }
     val resolvedPattern = pattern?.takeIf { it != "none" }
-        ?: if (type == null || type == "scratch" || type == "none") "dots" else null
+    val showLegacyDither = (pattern.isNullOrBlank() || pattern == "none") &&
+        (type == null || type == "scratch" || type == "none")
     val patternPhase = rememberInfiniteTransition(label = "revealPattern").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -500,26 +502,20 @@ fun RevealSurfaceView(
         label = "revealPatternPhase",
     ).value
 
-    Canvas(modifier) {
-        if (type == "gradient") {
-            drawRect(Brush.linearGradient(listOf(primary, secondary)))
-        } else {
-            drawRect(primary)
-        }
-        when (resolvedPattern) {
-            "dots" -> {
-                val spacing = 12.dp.toPx()
-                for (x in 0..(size.width / spacing).toInt()) {
-                    for (y in 0..(size.height / spacing).toInt()) {
-                        drawCircle(effect.copy(alpha = 0.7f), radius = 1.2.dp.toPx(), center = Offset(x * spacing, y * spacing))
-                    }
+    Box(modifier) {
+        Canvas(Modifier.fillMaxSize()) {
+            if (type == "gradient") {
+                drawRect(Brush.linearGradient(listOf(primary, secondary)))
+            } else {
+                drawRect(primary)
+            }
+            when (resolvedPattern) {
+                "dots" -> Unit // StickerDitherPattern overlay (paridad iOS)
+                "grid" -> {
+                    val spacing = 30.dp.toPx()
+                    for (x in 0..(size.width / spacing).toInt()) drawLine(effect.copy(alpha = 0.3f), Offset(x * spacing, 0f), Offset(x * spacing, size.height), 0.5.dp.toPx())
+                    for (y in 0..(size.height / spacing).toInt()) drawLine(effect.copy(alpha = 0.3f), Offset(0f, y * spacing), Offset(size.width, y * spacing), 0.5.dp.toPx())
                 }
-            }
-            "grid" -> {
-                val spacing = 30.dp.toPx()
-                for (x in 0..(size.width / spacing).toInt()) drawLine(effect.copy(alpha = 0.3f), Offset(x * spacing, 0f), Offset(x * spacing, size.height), 0.5.dp.toPx())
-                for (y in 0..(size.height / spacing).toInt()) drawLine(effect.copy(alpha = 0.3f), Offset(0f, y * spacing), Offset(size.width, y * spacing), 0.5.dp.toPx())
-            }
             "lines" -> {
                 val spacing = 15.dp.toPx()
                 for (x in -size.height.toInt()..size.width.toInt() step spacing.toInt().coerceAtLeast(1)) {
@@ -585,13 +581,20 @@ fun RevealSurfaceView(
                 }
             }
         }
-    }
-    if (resolvedPattern == "holographic") {
-        RevealHolographicPattern(
-            color = effect,
-            accentColor = secondary,
-            modifier = modifier,
-        )
+        }
+        if (resolvedPattern == "dots" || showLegacyDither) {
+            StickerDitherPattern(
+                color = if (showLegacyDither) Color.White.copy(alpha = 0.7f) else effect,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        if (resolvedPattern == "holographic") {
+            RevealHolographicPattern(
+                color = effect,
+                accentColor = secondary,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 

@@ -1,20 +1,30 @@
 package com.moments.android.models
 
+import androidx.annotation.StringRes
+import com.moments.android.R
+import com.google.firebase.Timestamp
 import java.util.Date
 
-// MARK: - AccountHistoryEventType
-enum class AccountHistoryEventType(val raw: String) {
-    JOIN("join"),
-    USERNAME("username"),
-    BIO("bio"),
-    WEBSITE("website"),
-    PRIVACY("privacy");
+/**
+ * Port de `Models/AccountHistoryItem.swift`.
+ */
+enum class AccountHistoryEventType(
+    val raw: String,
+    @StringRes val labelRes: Int,
+    /** ≡ SF Symbol name; UI mapea a Material. */
+    val iconName: String,
+) {
+    JOIN("join", R.string.user_activity_account_history_type_join, "person.badge.plus"),
+    USERNAME("username", R.string.user_activity_account_history_type_username, "person.text.rectangle"),
+    BIO("bio", R.string.user_activity_account_history_type_bio, "text.alignleft"),
+    WEBSITE("website", R.string.user_activity_account_history_type_website, "link"),
+    PRIVACY("privacy", R.string.user_activity_account_history_type_privacy, "lock");
 
-    companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } }
-    // localizedName / icon (localizado + SF Symbols) → capa de UI.
+    companion object {
+        fun from(raw: String?) = entries.firstOrNull { it.raw == raw }
+    }
 }
 
-// MARK: - AccountHistoryItem (evento del historial de la cuenta)
 data class AccountHistoryItem(
     val id: String? = null,
     val type: AccountHistoryEventType,
@@ -42,5 +52,5 @@ fun AccountHistoryItem.toMap(): Map<String, Any> = buildMap {
     put("type", type.raw)
     oldValue?.let { put("oldValue", it) }
     newValue?.let { put("newValue", it) }
-    put("timestamp", com.google.firebase.Timestamp(timestamp))
+    put("timestamp", Timestamp(timestamp))
 }

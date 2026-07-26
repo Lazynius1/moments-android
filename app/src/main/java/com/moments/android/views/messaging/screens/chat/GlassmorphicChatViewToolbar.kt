@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
-import com.moments.android.models.PresenceDisplay
+import com.moments.android.views.messaging.core.PresenceDisplay
 import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.messaging.components.ChatSearchNavigationBar
 

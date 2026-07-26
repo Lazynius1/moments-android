@@ -1,6 +1,6 @@
 package com.moments.android.views.messaging.screens.chat
 
-import com.moments.android.models.EnhancedMessage
+import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageItem
 import com.moments.android.views.messaging.components.ClusterMessageGrouper
 import com.moments.android.views.messaging.components.ClusterMessageItem

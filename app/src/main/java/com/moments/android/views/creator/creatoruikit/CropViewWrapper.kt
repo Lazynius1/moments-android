@@ -1,8 +1,11 @@
 package com.moments.android.views.creator.creatoruikit
+
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.net.Uri
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,11 +16,12 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -30,23 +34,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.views.creator.CreatorAspectRatio
@@ -57,33 +68,50 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * Port de `CropViewWrapper.swift` (TOCropViewController).
- * Presets de aspect ratio, rotate/reset, free crop → ratio detectado al guardar.
+ *
+ * - Default `allowFreeCrop=false` (como iOS); MediaEditing pasa `true`
+ * - Free → ciclar preset al tocar el label (≡ lock off + ratio picker)
+ * - Rotate/Reset; toolbar negro 0.8; crop mapea guía → bitmap (Fit + pan/zoom)
  */
 @Composable
 fun CropViewWrapper(
     imageUri: Uri,
     aspectRatio: CreatorAspectRatio,
-    allowFreeCrop: Boolean = true,
+    allowFreeCrop: Boolean = false,
     onComplete: (Uri, CreatorAspectRatio) -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+
+    var workingBitmap by remember(imageUri) { mutableStateOf<Bitmap?>(null) }
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
-    var rotationQuarterTurns by remember { mutableIntStateOf(0) }
+    var guideAspect by remember(aspectRatio) { mutableFloatStateOf(aspectRatio.ratio) }
+    var containerSize by remember { mutableStateOf(Size.Zero) }
     var isSaving by remember { mutableStateOf(false) }
 
     LaunchedEffect(imageUri) {
         scale = 1f
         offsetX = 0f
         offsetY = 0f
-        rotationQuarterTurns = 0
+        guideAspect = aspectRatio.ratio
+        workingBitmap = withContext(Dispatchers.IO) { loadNormalizedBitmap(context, imageUri) }
+    }
+
+    fun resetTransforms() {
+        scale = 1f
+        offsetX = 0f
+        offsetY = 0f
+        guideAspect = aspectRatio.ratio
     }
 
     Column(modifier.fillMaxSize().background(Color.Black)) {
@@ -114,19 +142,22 @@ fun CropViewWrapper(
                 Modifier
                     .size(40.dp)
                     .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(enabled = !isSaving) {
+                    .clickable(enabled = !isSaving && workingBitmap != null) {
+                        val bmp = workingBitmap ?: return@clickable
+                        val size = containerSize
                         isSaving = true
                         scope.launch {
                             val result = withContext(Dispatchers.IO) {
                                 cropAndSave(
                                     context = context,
-                                    imageUri = imageUri,
-                                    aspectRatio = aspectRatio,
-                                    allowFreeCrop = allowFreeCrop,
+                                    bitmap = bmp,
+                                    containerWidthPx = size.width,
+                                    containerHeightPx = size.height,
+                                    guideAspect = guideAspect,
                                     scale = scale,
                                     offsetX = offsetX,
                                     offsetY = offsetY,
-                                    rotationQuarterTurns = rotationQuarterTurns,
+                                    lockedAspect = if (allowFreeCrop) null else aspectRatio,
                                 )
                             }
                             isSaving = false
@@ -135,7 +166,7 @@ fun CropViewWrapper(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Check, null, tint = Color(0xFFE91E63), modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(18.dp))
             }
         }
 
@@ -143,6 +174,9 @@ fun CropViewWrapper(
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .onSizeChanged { size: IntSize ->
+                    containerSize = Size(size.width.toFloat(), size.height.toFloat())
+                }
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
                         scale = (scale * zoom).coerceIn(1f, 5f)
@@ -152,31 +186,44 @@ fun CropViewWrapper(
                 },
             contentAlignment = Alignment.Center,
         ) {
-            AsyncImage(
-                model = imageUri,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
+            val containerW = constraints.maxWidth.toFloat()
+            val containerH = constraints.maxHeight.toFloat()
+            val guide = cropGuideRect(containerW, containerH, guideAspect)
+
+            workingBitmap?.let { bmp ->
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = offsetX
+                            translationY = offsetY
+                        },
+                )
+            }
+
+            Canvas(
+                Modifier
                     .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                        translationX = offsetX
-                        translationY = offsetY
-                        rotationZ = rotationQuarterTurns * 90f
-                    },
-            )
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
+            ) {
+                drawRect(Color.Black.copy(alpha = 0.35f))
+                drawRect(
+                    color = Color.Transparent,
+                    topLeft = Offset(guide.left, guide.top),
+                    size = Size(guide.width, guide.height),
+                    blendMode = BlendMode.Clear,
+                )
+            }
+
             Box(
                 Modifier
-                    .fillMaxWidth(0.86f)
-                    .aspectRatio(aspectRatio.ratio)
-                    .border(2.dp, Color.White),
-            )
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(0.35f)))
-            Box(
-                Modifier
-                    .fillMaxWidth(0.86f)
-                    .aspectRatio(aspectRatio.ratio)
+                    .width(with(density) { guide.width.toDp() })
+                    .height(with(density) { guide.height.toDp() })
                     .border(2.dp, Color.White),
             )
         }
@@ -184,83 +231,146 @@ fun CropViewWrapper(
         Row(
             Modifier
                 .fillMaxWidth()
-                .background(Color.Black.copy(0.8f))
+                .background(Color.Black.copy(alpha = 0.8f))
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable {
-                scale = 1f
-                offsetX = 0f
-                offsetY = 0f
-                rotationQuarterTurns = 0
-            }) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickable { resetTransforms() },
+            ) {
                 Icon(Icons.Filled.Refresh, null, tint = Color.White, modifier = Modifier.size(22.dp))
                 Text(stringResource(R.string.creator_crop_reset), color = Color.White.copy(0.7f), fontSize = 11.sp)
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable {
-                rotationQuarterTurns = (rotationQuarterTurns + 1) % 4
-            }) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickable {
+                    workingBitmap = workingBitmap?.let { rotateBitmap90(it) }
+                    scale = 1f
+                    offsetX = 0f
+                    offsetY = 0f
+                },
+            ) {
                 Icon(Icons.Filled.RotateRight, null, tint = Color.White, modifier = Modifier.size(22.dp))
                 Text(stringResource(R.string.creator_crop_rotate), color = Color.White.copy(0.7f), fontSize = 11.sp)
             }
             Text(
-                aspectRatio.displayName,
+                text = if (allowFreeCrop) {
+                    CreatorAspectRatio.fromRatio(guideAspect).displayName
+                } else {
+                    aspectRatio.displayName
+                },
                 color = Color.White.copy(0.7f),
                 fontSize = 12.sp,
+                modifier = if (allowFreeCrop) {
+                    Modifier.clickable {
+                        val order = CreatorAspectRatio.entries
+                        val current = CreatorAspectRatio.fromRatio(guideAspect)
+                        val next = order[(order.indexOf(current) + 1) % order.size]
+                        guideAspect = next.ratio
+                    }
+                } else {
+                    Modifier
+                },
             )
         }
     }
 }
 
+private fun cropGuideRect(containerW: Float, containerH: Float, guideAspect: Float): Rect {
+    val aspect = guideAspect.coerceAtLeast(0.01f)
+    var guideWidth = containerW * 0.86f
+    var guideHeight = guideWidth / aspect
+    if (guideHeight > containerH * 0.86f) {
+        guideHeight = containerH * 0.86f
+        guideWidth = guideHeight * aspect
+    }
+    val left = (containerW - guideWidth) / 2f
+    val top = (containerH - guideHeight) / 2f
+    return Rect(left, top, left + guideWidth, top + guideHeight)
+}
+
+private fun loadNormalizedBitmap(context: Context, uri: Uri): Bitmap? {
+    val raw = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+        ?: return null
+    return raw.creatorNormalizedUp(context, uri)
+}
+
+private fun rotateBitmap90(source: Bitmap): Bitmap {
+    val matrix = android.graphics.Matrix().apply { postRotate(90f) }
+    return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+}
+
 private fun cropAndSave(
-    context: android.content.Context,
-    imageUri: Uri,
-    aspectRatio: CreatorAspectRatio,
-    allowFreeCrop: Boolean,
+    context: Context,
+    bitmap: Bitmap,
+    containerWidthPx: Float,
+    containerHeightPx: Float,
+    guideAspect: Float,
     scale: Float,
     offsetX: Float,
     offsetY: Float,
-    rotationQuarterTurns: Int,
+    lockedAspect: CreatorAspectRatio?,
 ): Pair<Uri, CreatorAspectRatio>? {
-    val source = context.contentResolver.openInputStream(imageUri)?.use { BitmapFactory.decodeStream(it) }
-        ?: return null
-    val rotated = rotateBitmap(source, rotationQuarterTurns * 90f)
-    val targetRatio = aspectRatio.ratio
-    val srcRatio = rotated.width.toFloat() / rotated.height.toFloat()
-    val biasX = (offsetX / max(scale, 0.01f)).toInt()
-    val biasY = (offsetY / max(scale, 0.01f)).toInt()
-    val cropRect = if (srcRatio > targetRatio) {
-        val h = rotated.height
-        val w = (h * targetRatio).toInt().coerceAtLeast(1)
-        val left = ((rotated.width - w) / 2 + biasX).coerceIn(0, rotated.width - w)
-        android.graphics.Rect(left, 0, left + w, h)
-    } else {
-        val w = rotated.width
-        val h = (w / targetRatio).toInt().coerceAtLeast(1)
-        val top = ((rotated.height - h) / 2 + biasY).coerceIn(0, rotated.height - h)
-        android.graphics.Rect(0, top, w, top + h)
+    if (containerWidthPx <= 0f || containerHeightPx <= 0f) return null
+
+    val guide = cropGuideRect(containerWidthPx, containerHeightPx, guideAspect)
+    val imgW = bitmap.width.toFloat()
+    val imgH = bitmap.height.toFloat()
+    val fitScale = min(containerWidthPx / imgW, containerHeightPx / imgH)
+    val drawnW = imgW * fitScale
+    val drawnH = imgH * fitScale
+    val drawnLeft = (containerWidthPx - drawnW) / 2f
+    val drawnTop = (containerHeightPx - drawnH) / 2f
+    val s = max(scale, 0.01f)
+
+    fun mapToBitmap(px: Float, py: Float): Pair<Float, Float> {
+        val localX = (px - containerWidthPx / 2f - offsetX) / s + containerWidthPx / 2f
+        val localY = (py - containerHeightPx / 2f - offsetY) / s + containerHeightPx / 2f
+        return (localX - drawnLeft) / fitScale to (localY - drawnTop) / fitScale
     }
+
+    val (x0, y0) = mapToBitmap(guide.left, guide.top)
+    val (x1, y1) = mapToBitmap(guide.right, guide.bottom)
+
+    var left = min(x0, x1).roundToInt().coerceIn(0, bitmap.width - 1)
+    var top = min(y0, y1).roundToInt().coerceIn(0, bitmap.height - 1)
+    var right = max(x0, x1).roundToInt().coerceIn(left + 1, bitmap.width)
+    var bottom = max(y0, y1).roundToInt().coerceIn(top + 1, bitmap.height)
+
+    lockedAspect?.let { locked ->
+        val target = locked.ratio
+        val selW = (right - left).toFloat()
+        val selH = (bottom - top).toFloat().coerceAtLeast(1f)
+        val selRatio = selW / selH
+        if (selRatio > target) {
+            val newW = (selH * target).roundToInt().coerceAtLeast(1)
+            val cx = (left + right) / 2
+            left = (cx - newW / 2).coerceIn(0, bitmap.width - newW)
+            right = left + newW
+        } else {
+            val newH = (selW / target).roundToInt().coerceAtLeast(1)
+            val cy = (top + bottom) / 2
+            top = (cy - newH / 2).coerceIn(0, bitmap.height - newH)
+            bottom = top + newH
+        }
+    }
+
     val cropped = Bitmap.createBitmap(
-        rotated,
-        cropRect.left,
-        cropRect.top,
-        cropRect.width().coerceAtLeast(1),
-        cropRect.height().coerceAtLeast(1),
+        bitmap,
+        left,
+        top,
+        (right - left).coerceAtLeast(1),
+        (bottom - top).coerceAtLeast(1),
     )
-    val finalRatio = if (allowFreeCrop) {
-        CreatorAspectRatio.fromRatio(cropped.width.toFloat() / cropped.height.toFloat().coerceAtLeast(1f))
-    } else {
-        aspectRatio
-    }
+    val finalRatio = lockedAspect
+        ?: CreatorAspectRatio.fromRatio(
+            cropped.width.toFloat() / cropped.height.toFloat().coerceAtLeast(1f),
+        )
+
     val dir = File(context.cacheDir, "creator_crops").also { it.mkdirs() }
     val out = File(dir, "crop_${UUID.randomUUID()}.jpg")
     FileOutputStream(out).use { cropped.compress(Bitmap.CompressFormat.JPEG, 92, it) }
     return Uri.fromFile(out) to finalRatio
-}
-
-private fun rotateBitmap(source: Bitmap, degrees: Float): Bitmap {
-    if (degrees % 360f == 0f) return source
-    val matrix = Matrix().apply { postRotate(degrees) }
-    return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
 }

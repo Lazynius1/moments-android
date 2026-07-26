@@ -1,8 +1,8 @@
 package com.moments.android.views.messaging.core
 
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.PendingChatContext
-import com.moments.android.models.PendingChatTimelineMessage
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.PendingChatContext
+import com.moments.android.views.messaging.core.PendingChatTimelineMessage
 import com.moments.android.views.messaging.services.ChatBuzzEvent
 import java.util.Date
 
@@ -37,7 +37,8 @@ sealed interface ChatRenderRow {
     }
 
     data class Header(val date: Date) : ChatRenderRow {
-        override val id: String get() = "row:header:${date.time}"
+        // ≡ iOS `date.timeIntervalSince1970` (segundos, no ms).
+        override val id: String get() = "row:header:${date.time / 1000.0}"
     }
 
     data class Message(val item: MessageItem) : ChatRenderRow {
@@ -61,5 +62,6 @@ data class ChatTimelineSection(
     val date: Date,
     val rows: List<ChatRenderRow>,
 ) {
-    val id: String get() = "section-${date.time}"
+    // ≡ iOS `section-\(date.timeIntervalSince1970)`
+    val id: String get() = "section-${date.time / 1000.0}"
 }

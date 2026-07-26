@@ -52,6 +52,8 @@ import com.moments.android.notifications.screens.NotificationSummaryService
 import com.moments.android.notifications.services.NotificationBadgeService
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.firestore.deleteMoment
+import com.moments.android.services.firestore.loadSavedMoments
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.network.OfflineSyncService
 import com.moments.android.services.social.EchoService
@@ -516,9 +518,8 @@ fun FeedView(
         updateMoment = { moment, payload -> updateMoment(moment, payload) },
         deleteMoment = { deleteMoment(it) },
     ) {
-        // MARK: - body ZStack
+        // Scaffold/tab: laterales + bottom (tab bar docked) + laterales.
         // iOS: fondo under status bar; header con padding.top -8 (sin doble inset).
-        // Scaffold ya mete top inset → solo aplicamos bottom (tab bar) + laterales.
         val layoutDir = LocalLayoutDirection.current
         Box(
             Modifier

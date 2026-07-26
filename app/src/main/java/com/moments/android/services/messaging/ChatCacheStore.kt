@@ -2,13 +2,14 @@ package com.moments.android.services.messaging
 
 import android.content.Context
 import android.net.Uri
-import com.moments.android.models.ChatMediaPurpose
-import com.moments.android.models.EnhancedMessage
+import com.moments.android.views.messaging.core.ChatMediaPurpose
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.services.persistence.LocalPersistenceService
 import java.io.File
 import java.util.Calendar
 import java.util.Date
-
+import java.util.UUID
 data class ChatStorageBreakdown(
     val messageCount: Int,
     val decryptedMediaBytes: Long,
@@ -86,7 +87,19 @@ object ChatCacheStore {
     ): File {
         ensureDirectories()
         val file = decryptedMediaFile(conversationId, messageId, purpose, fileExtension)
-        file.writeBytes(data)
+        // iOS: Data.write(options: .atomic)
+        val temp = File(file.parentFile, ".${UUID.randomUUID()}.tmp")
+        try {
+            temp.writeBytes(data)
+            if (file.exists()) file.delete()
+            if (!temp.renameTo(file)) {
+                temp.copyTo(file, overwrite = true)
+                temp.delete()
+            }
+        } catch (e: Exception) {
+            temp.delete()
+            throw e
+        }
         return file
     }
 
@@ -99,10 +112,21 @@ object ChatCacheStore {
     ): File {
         ensureDirectories()
         val destination = decryptedMediaFile(conversationId, messageId, purpose, fileExtension)
-        val temp = File(destination.parentFile, ".${System.currentTimeMillis()}.tmp")
-        sourceFile.copyTo(temp, overwrite = true)
-        if (destination.exists()) destination.delete()
-        temp.renameTo(destination)
+        val temp = File(destination.parentFile, ".${UUID.randomUUID()}.tmp")
+        try {
+            sourceFile.copyTo(temp, overwrite = true)
+            if (destination.exists()) {
+                // replace atómico aproximado: borrar destino y mover temp
+                destination.delete()
+            }
+            if (!temp.renameTo(destination)) {
+                temp.copyTo(destination, overwrite = true)
+                temp.delete()
+            }
+        } catch (e: Exception) {
+            temp.delete()
+            throw e
+        }
         return destination
     }
 
@@ -132,6 +156,12 @@ object ChatCacheStore {
                 thumbnailUrl = Uri.fromFile(cacheFile).toString()
                 touchAccessDate(cacheFile)
             }
+        }
+
+        // iOS: fallback a poster de vídeo vía ChatVideoPosterGenerator.cachedPosterURL
+        if ((thumbnailUrl == null || localFileMissing(thumbnailUrl)) && message.type == MessageType.VIDEO) {
+            val poster = posterFile(message.id)
+            if (poster.isFile) thumbnailUrl = Uri.fromFile(poster).toString()
         }
 
         return mediaUrl to thumbnailUrl
@@ -248,10 +278,17 @@ object ChatCacheStore {
     private fun migrateFromLegacyCachesIfNeeded() {
         val prefs = context().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (prefs.getBoolean(DID_MIGRATE_KEY, false)) return
-        ensureDirectoriesWithoutMigrationFlag()
-        val legacyRoot = File(context().cacheDir, LEGACY_DECRYPTED).parentFile ?: context().cacheDir
-        migrateDirectory(File(legacyRoot, LEGACY_DECRYPTED), decryptedDirectory())
-        migrateDirectory(File(legacyRoot, LEGACY_POSTERS), postersDirectory())
+        try {
+            ensureDirectoriesWithoutMigrationFlag()
+        } catch (_: Exception) {
+            // iOS: si falla crear dirs, marca migrado para no reintentar en bucle.
+            prefs.edit().putBoolean(DID_MIGRATE_KEY, true).apply()
+            return
+        }
+        // iOS: FileManager.cachesDirectory / chat_media_decrypted|chat_video_posters
+        val legacyCaches = context().cacheDir
+        migrateDirectory(File(legacyCaches, LEGACY_DECRYPTED), decryptedDirectory())
+        migrateDirectory(File(legacyCaches, LEGACY_POSTERS), postersDirectory())
         prefs.edit().putBoolean(DID_MIGRATE_KEY, true).apply()
     }
 
@@ -270,7 +307,7 @@ object ChatCacheStore {
     }
 
     private fun filesIn(directory: File): List<File> =
-        directory.listFiles()?.filter { it.isFile } ?: emptyList()
+        directory.listFiles()?.filter { it.isFile && !it.name.startsWith(".") } ?: emptyList()
 
     private fun directoryBytes(directory: File): Long =
         filesIn(directory).sumOf { it.length() }

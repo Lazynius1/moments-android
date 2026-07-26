@@ -203,11 +203,13 @@ private fun InvitationCard(
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            EchoesIconView(
-                size = EchoesIconMetrics.invitation,
-                gradient = EchoesIconGradients.brandHorizontal,
-            )
-            Spacer(Modifier.width(10.dp))
+            Box(Modifier.size(40.dp), contentAlignment = Alignment.CenterStart) {
+                EchoesIconView(
+                    size = EchoesIconMetrics.invitation,
+                    gradient = EchoesIconGradients.brandHorizontal,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     stringResource(R.string.echo_invitation_spark_detected),
@@ -232,22 +234,33 @@ private fun InvitationCard(
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            Modifier.padding(top = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Text(
-                stringResource(R.string.echo_invitation_participants),
+                stringResource(R.string.echo_invitation_participants).uppercase(),
                 color = secondary,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                participants.forEachIndexed { index, participant ->
-                    AsyncProfileImageView(
-                        userId = participant.userId,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .offset(x = (-10 * index).dp)
-                            .clip(CircleShape),
-                    )
+                // ≡ HStack(spacing: -10) — pitch 34dp
+                Box(
+                    Modifier.width(
+                        if (participants.isEmpty()) 0.dp
+                        else (44 + (participants.size - 1) * 34).dp,
+                    ).height(44.dp),
+                ) {
+                    participants.forEachIndexed { index, participant ->
+                        AsyncProfileImageView(
+                            userId = participant.userId,
+                            modifier = Modifier
+                                .offset(x = (34 * index).dp)
+                                .size(44.dp)
+                                .clip(CircleShape),
+                        )
+                    }
                 }
                 if (participants.size > 1) {
                     val count = participants.size

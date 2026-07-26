@@ -9,15 +9,20 @@ import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -43,18 +48,23 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Story
+import com.moments.android.views.creator.creatoruikit.storyViewerCaptureRect
+import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
 import com.moments.android.views.story.StoryDeckGestureGate
 import com.moments.android.views.story.StoryPlaybackCoordinator
 import com.moments.android.views.story.StoryRevealStickerOverlay
@@ -62,6 +72,7 @@ import com.moments.android.views.story.StoryReaction
 import com.moments.android.views.story.StoryViewer
 import com.moments.android.views.story.StoryRepository
 import com.moments.android.views.story.StoryChainView
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -171,28 +182,54 @@ fun StoryViewerScreen(
             .graphicsLayer(scaleX = zoomScale, scaleY = zoomScale)
             .transformable(zoomGesture),
     ) {
-        StoryViewerMedia(
-            story = story,
-            isPaused = playbackCoordinator.isPaused,
-            onVideoProgress = { playbackCoordinator.updateVideoProgress(it, story) },
-            onVideoComplete = {
-                if (playbackCoordinator.canAdvanceAfterVideoComplete()) onNextState.value()
-            },
-            modifier = Modifier.fillMaxSize(),
-        )
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val density = LocalDensity.current
+            val topInset = WindowInsets.statusBars.getTop(density).toFloat()
+            val bottomInset = WindowInsets.navigationBars.getBottom(density).toFloat()
+            val captureRect = storyViewerCaptureRect(
+                inSize = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()),
+                safeAreaTopPx = topInset,
+                safeAreaBottomPx = bottomInset,
+                density = density,
+            )
+            val corner = storyViewerCanvasCornerRadius
 
-        StoryMediaOverlayRendererView(
-            textOverlays = story.textOverlays.orEmpty(),
-            stickers = story.stickers.orEmpty(),
-            drawingData = story.drawingData,
-            storyId = story.id.orEmpty(),
-            userId = story.authorId,
-            replayToken = segmentIndex,
-            gestureGate = gestureGate,
-            onPauseStory = ::pauseStoryPlayback,
-            onResumeStory = ::resumeStoryPlayback,
-            modifier = Modifier.fillMaxSize(),
-        )
+            Box(
+                Modifier
+                    .offset {
+                        IntOffset(captureRect.left.roundToInt(), captureRect.top.roundToInt())
+                    }
+                    .size(
+                        width = with(density) { captureRect.width.toDp() },
+                        height = with(density) { captureRect.height.toDp() },
+                    )
+                    .clip(RoundedCornerShape(corner))
+                    .background(Color.Black),
+            ) {
+                StoryViewerMedia(
+                    story = story,
+                    isPaused = playbackCoordinator.isPaused,
+                    onVideoProgress = { playbackCoordinator.updateVideoProgress(it, story) },
+                    onVideoComplete = {
+                        if (playbackCoordinator.canAdvanceAfterVideoComplete()) onNextState.value()
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                StoryMediaOverlayRendererView(
+                    textOverlays = story.textOverlays.orEmpty(),
+                    stickers = story.stickers.orEmpty(),
+                    drawingData = story.drawingData,
+                    storyId = story.id.orEmpty(),
+                    userId = story.authorId,
+                    replayToken = segmentIndex,
+                    gestureGate = gestureGate,
+                    onPauseStory = ::pauseStoryPlayback,
+                    onResumeStory = ::resumeStoryPlayback,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
 
         // Gradient top for readability
         Box(

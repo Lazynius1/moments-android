@@ -2,6 +2,7 @@ package com.moments.android
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -34,6 +35,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // ≡ iOS INFOPLIST_KEY_UISupportedInterfaceOrientations = Portrait only
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestNotificationPermissionIfNeeded()
@@ -86,7 +89,7 @@ class MainActivity : ComponentActivity() {
         } ?: return
         NotificationNavigationService.handleNotificationData(userInfo)
         val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
-        val notificationId = userInfo["notificationId"] as? String ?: userInfo["gcm.message_id"] as? String
+        val notificationId = userInfo["notificationId"] as? String
         if (userId != null && !notificationId.isNullOrBlank()) {
             com.google.firebase.firestore.FirebaseFirestore.getInstance()
                 .collection("users").document(userId)

@@ -30,7 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
-import com.moments.android.models.EnhancedMessage
+import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.messaging.components.ChatBottomWallpaperEdgeFade
 import com.moments.android.views.messaging.components.ChatBuzzTimelineEventRow
@@ -166,11 +166,11 @@ fun GlassmorphicChatRootContent(
     }
 }
 
-private fun requestDisclaimerForRendering(context: com.moments.android.models.PendingChatContext?): Int = when (context?.status) {
-    com.moments.android.models.PendingChatContext.Status.INCOMING_REQUEST_PENDING -> R.string.chat_request_disclaimer_incoming
-    com.moments.android.models.PendingChatContext.Status.OUTGOING_REQUEST_SENT -> R.string.chat_request_disclaimer_sent
-    com.moments.android.models.PendingChatContext.Status.OUTGOING_REQUEST_DRAFT,
-    com.moments.android.models.PendingChatContext.Status.OUTGOING_REQUEST_BLOCKED -> R.string.chat_request_disclaimer_outgoing
-    com.moments.android.models.PendingChatContext.Status.NORMAL_CONVERSATION,
+private fun requestDisclaimerForRendering(context: com.moments.android.views.messaging.core.PendingChatContext?): Int = when (context?.status) {
+    com.moments.android.views.messaging.core.PendingChatContext.Status.INCOMING_REQUEST_PENDING -> R.string.chat_request_disclaimer_incoming
+    com.moments.android.views.messaging.core.PendingChatContext.Status.OUTGOING_REQUEST_SENT -> R.string.chat_request_disclaimer_sent
+    com.moments.android.views.messaging.core.PendingChatContext.Status.OUTGOING_REQUEST_DRAFT,
+    com.moments.android.views.messaging.core.PendingChatContext.Status.OUTGOING_REQUEST_BLOCKED -> R.string.chat_request_disclaimer_outgoing
+    com.moments.android.views.messaging.core.PendingChatContext.Status.NORMAL_CONVERSATION,
     null -> R.string.chat_intro_disclaimer_normal
 }

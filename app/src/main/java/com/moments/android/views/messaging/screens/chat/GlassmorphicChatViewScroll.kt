@@ -139,7 +139,10 @@ class GlassmorphicChatScrollController(
         pendingInitialScrollRoute = false
         isPinnedToBottom = pinsToBottom
         listIsAtBottom = pinsToBottom
-        if (pinsToBottom) frozenInitialScrollTarget = ChatScrollTarget.Bottom(viewModel.messages.value.lastOrNull()?.id)
+        if (pinsToBottom) {
+            frozenInitialScrollTarget = viewModel.messages.value.lastOrNull()?.id
+                ?.let { ChatScrollTarget.Bottom(it) }
+        }
         callbacks.onPrefetchMedia()
         callbacks.onPendingReactionHighlights()
         callbacks.onPendingBuzz()

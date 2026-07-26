@@ -13,7 +13,27 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
+import android.net.Uri
 import com.moments.android.utilities.MomentMentionParser
+
+/** Port de `MomentHashtagLink` (scheme hashtag, host open, query value). */
+object MomentHashtagLink {
+    fun url(forHashtag: String): String =
+        Uri.Builder()
+            .scheme("hashtag")
+            .authority("open")
+            .appendQueryParameter("value", forHashtag)
+            .build()
+            .toString()
+
+    fun hashtag(from: String): String? {
+        val uri = Uri.parse(from)
+        if (uri.scheme != "hashtag") return null
+        val value = uri.getQueryParameter("value")
+        if (!value.isNullOrEmpty()) return value
+        return uri.host?.takeIf { it.isNotEmpty() }
+    }
+}
 
 /** Parser Unicode equivalente a `MomentHashtagParser`. */
 object MomentHashtagParser {

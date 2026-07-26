@@ -114,7 +114,8 @@ object NotificationService {
     fun loadMore() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val lastDoc = lastDocument ?: return
-        if (!_canLoadMore.value || _isLoadingMore.value) return
+        // ≡ canLoadMore && !isLoading (iOS); also block while isLoadingMore
+        if (!_canLoadMore.value || _isLoading.value || _isLoadingMore.value) return
 
         scope.launch {
             _isLoadingMore.value = true
@@ -188,7 +189,7 @@ object NotificationService {
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val username = senderUsername
             ?: LocalPersistenceService.loadCurrentUser()?.username
-            ?: "Someone"
+            ?: "Alguien" // ≡ UserDefaults current_username fallback en iOS
 
         val notification = MomentsNotification(
             id = notificationId,
@@ -460,7 +461,10 @@ object NotificationService {
 
     private fun visibleNotifications(fetched: List<MomentsNotification>): List<MomentsNotification> {
         if (hiddenPendingDeletionIds.isEmpty()) return fetched
-        return fetched.filter { it.id !in hiddenPendingDeletionIds }
+        return fetched.filter { notification ->
+            val id = notification.id ?: return@filter true
+            id !in hiddenPendingDeletionIds
+        }
     }
 
     private fun removeFromLocalState(notificationsToDelete: List<MomentsNotification>) {

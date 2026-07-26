@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -63,34 +64,44 @@ fun FilterOption(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val shape = RoundedCornerShape(12.dp)
+        val thumbModifier = Modifier
+            .size(80.dp, 100.dp)
+            .then(
+                if (isSelected) {
+                    Modifier.shadow(
+                        elevation = 8.dp,
+                        shape = shape,
+                        ambientColor = Color.Magenta.copy(alpha = 0.3f),
+                        spotColor = Color.Magenta.copy(alpha = 0.3f),
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .clip(shape)
+            .then(
+                if (isSelected) {
+                    Modifier.border(
+                        2.dp,
+                        Brush.linearGradient(
+                            listOf(Color(0xFF9C27B0), Color(0xFFE91E63), Color(0xFFFF9800)),
+                        ),
+                        shape,
+                    )
+                } else {
+                    Modifier
+                },
+            )
         if (preview != null) {
             Image(
                 bitmap = preview!!.asImageBitmap(),
                 contentDescription = filter.raw,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(80.dp, 100.dp)
-                    .clip(shape)
-                    .then(
-                        if (isSelected) {
-                            Modifier.border(
-                                2.dp,
-                                Brush.linearGradient(
-                                    listOf(Color(0xFF9C27B0), Color(0xFFE91E63), Color(0xFFFF9800)),
-                                ),
-                                shape,
-                            )
-                        } else {
-                            Modifier
-                        },
-                    ),
+                modifier = thumbModifier,
             )
         } else {
             Spacer(
-                Modifier
-                    .size(80.dp, 100.dp)
-                    .clip(shape)
-                    .background(Color.Gray.copy(0.2f)),
+                thumbModifier.background(Color.Gray.copy(0.2f)),
             )
         }
         Spacer(Modifier.height(8.dp))

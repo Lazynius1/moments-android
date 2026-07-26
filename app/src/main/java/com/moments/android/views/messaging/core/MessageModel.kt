@@ -1,12 +1,25 @@
-package com.moments.android.models
+package com.moments.android.views.messaging.core
 
+import android.content.Context
+import android.text.format.Formatter
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.moments.android.R
+import com.moments.android.models.AppUser
+import com.moments.android.models.MessageRequestPolicy
+import com.moments.android.models.StickerData
+import com.moments.android.models.StoryTextOverlayMetadata
+import com.moments.android.models.OnlineStatus
+import com.moments.android.models.WrappedConversationKey
+import com.moments.android.models.toMap
 import com.moments.android.models.cache.CachedMessage
 import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.content.BackendFeedService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.messaging.ChatCacheStore
+import com.moments.android.services.messaging.ChatMediaDownloadPolicy
+import com.moments.android.services.messaging.VanishMessageTimer
+import com.moments.android.utilities.MomentsFormat
 import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
 import org.json.JSONObject
@@ -25,21 +38,110 @@ enum class MessageType(val raw: String) {
     val isViewOnce: Boolean get() = this == VIEW_ONCE_IMAGE || this == VIEW_ONCE_VIDEO
     val isChatNotice: Boolean get() = this == CHAT_NOTICE
 
+    /** ≡ `MessageType.iconName` (SF Symbol names; UI mapea a Material). */
+    val iconName: String
+        get() = when (this) {
+            TEXT -> "text.bubble"
+            IMAGE -> "photo"
+            VIDEO -> "video"
+            AUDIO -> "mic"
+            GIF -> "photo.on.rectangle.angled"
+            STICKER -> "face.smiling"
+            LOCATION -> "location"
+            FILE -> "doc"
+            EPHEMERAL -> "timer"
+            SHARED_MOMENT -> "square.and.arrow.up"
+            SHARED_STORY -> "paperplane.fill"
+            VIEW_ONCE_IMAGE -> "camera.circle"
+            VIEW_ONCE_VIDEO -> "video.circle"
+            CHAT_NOTICE -> "timer"
+        }
+
+    fun displayName(context: Context): String = when (this) {
+        TEXT -> context.getString(R.string.message_type_text)
+        IMAGE -> context.getString(R.string.message_type_photo)
+        VIDEO -> context.getString(R.string.message_type_video)
+        AUDIO -> context.getString(R.string.message_type_audio)
+        GIF -> "GIF"
+        STICKER -> "Sticker"
+        LOCATION -> context.getString(R.string.message_type_location)
+        FILE -> context.getString(R.string.message_type_file)
+        EPHEMERAL -> context.getString(R.string.chat_view_once_label)
+        SHARED_MOMENT -> context.getString(R.string.chat_preview_shared_moment)
+        SHARED_STORY -> context.getString(R.string.chat_preview_shared_story)
+        VIEW_ONCE_IMAGE -> context.getString(R.string.chat_view_once_photo) +
+            " (" + context.getString(R.string.chat_view_once_label) + ")"
+        VIEW_ONCE_VIDEO -> context.getString(R.string.chat_view_once_video) +
+            " (" + context.getString(R.string.chat_view_once_label) + ")"
+        CHAT_NOTICE -> ""
+    }
+
     companion object {
         fun from(raw: String?): MessageType = entries.firstOrNull { it.raw == raw } ?: TEXT
     }
 }
 
+/** Port de `MessageType.conversationPreview` (MessageModel.swift). */
+fun MessageType.conversationPreview(context: android.content.Context): String = when (this) {
+    MessageType.TEXT -> context.getString(com.moments.android.R.string.chat_preview_text)
+    MessageType.IMAGE, MessageType.VIEW_ONCE_IMAGE -> context.getString(com.moments.android.R.string.chat_preview_photo)
+    MessageType.VIDEO, MessageType.VIEW_ONCE_VIDEO -> context.getString(com.moments.android.R.string.chat_preview_video)
+    MessageType.AUDIO -> context.getString(com.moments.android.R.string.chat_preview_audio)
+    MessageType.GIF -> context.getString(com.moments.android.R.string.chat_preview_gif)
+    MessageType.STICKER -> context.getString(com.moments.android.R.string.chat_preview_sticker)
+    MessageType.LOCATION -> context.getString(com.moments.android.R.string.chat_preview_location)
+    MessageType.FILE -> context.getString(com.moments.android.R.string.chat_preview_file)
+    MessageType.EPHEMERAL -> context.getString(com.moments.android.R.string.chat_preview_ephemeral)
+    MessageType.SHARED_MOMENT -> context.getString(com.moments.android.R.string.chat_preview_shared_moment)
+    MessageType.SHARED_STORY -> context.getString(com.moments.android.R.string.chat_preview_shared_story)
+    MessageType.CHAT_NOTICE -> ""
+}
+
 private val neutralConversationPreviewPrefixes = listOf("💬", "📷", "🎥", "🎵", "🎞", "😊", "📍", "📎", "📸", "⏱")
+
+/** ≡ `sanitizedConversationPreview(_:encryptionVersion:)` — usa preview neutro de texto. */
+fun sanitizedConversationPreview(
+    context: Context,
+    rawPreview: String?,
+    encryptionVersion: String?,
+): String = sanitizedConversationPreview(
+    rawPreview,
+    encryptionVersion,
+    neutralTextPreview = context.getString(R.string.chat_preview_text),
+)
+
 fun sanitizedConversationPreview(rawPreview: String?, encryptionVersion: String?, neutralTextPreview: String): String {
     val preview = rawPreview?.trim().orEmpty()
     if (encryptionVersion?.startsWith("3") != true) return preview
-    return if (preview.isEmpty() || neutralConversationPreviewPrefixes.none(preview::startsWith)) neutralTextPreview else preview
+    if (preview.isEmpty()) return neutralTextPreview
+    return if (neutralConversationPreviewPrefixes.any(preview::startsWith)) preview else neutralTextPreview
 }
 
 enum class MessageStatus(val raw: String) {
     PENDING("pending"), SENDING("sending"), SENT("sent"), DELIVERED("delivered"),
     READ("read"), FAILED("failed");
+
+    /** ≡ `MessageStatus.displayName`. */
+    fun displayName(context: Context): String = context.getString(
+        when (this) {
+            PENDING -> R.string.chat_status_pending
+            SENDING -> R.string.chat_status_sending
+            SENT -> R.string.chat_status_sent
+            DELIVERED -> R.string.chat_status_delivered
+            READ -> R.string.chat_status_read
+            FAILED -> R.string.chat_status_failed
+        },
+    )
+
+    /** ≡ `MessageStatus.iconName` (SF Symbol; UI mapea a Material). */
+    val iconName: String
+        get() = when (this) {
+            PENDING, SENDING -> "clock"
+            SENT -> "checkmark"
+            DELIVERED -> "checkmark.circle"
+            READ -> "checkmark.circle.fill"
+            FAILED -> "exclamationmark.triangle"
+        }
 
     companion object {
         fun from(raw: String?): MessageStatus = entries.firstOrNull { it.raw == raw } ?: PENDING
@@ -146,6 +248,9 @@ data class EnhancedMessage(
     var isVanishModeMessage: Boolean = false,
     var vanishedFor: List<String> = emptyList(),
     var vanishExpiresAt: Date? = null,
+    /** Session-only (no Firestore) — ≡ iOS `@Published` en EnhancedMessage. */
+    var replayAvailableInCurrentChatSession: Boolean = false,
+    var replayConsumedInCurrentChatSession: Boolean = false,
 ) : MessageProtocol {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -208,99 +313,239 @@ data class EnhancedMessage(
         vanishExpiresAt?.let { put("vanishExpiresAt", it.time) }
     }
 
-    fun toCachedMessage(): CachedMessage = CachedMessage(
-        id = id,
-        conversationId = conversationId,
-        senderId = senderId,
-        typeString = type.raw,
-        content = content,
-        mediaUrl = mediaUrl,
-        thumbnailUrl = thumbnailUrl,
-        mediaObjectPath = mediaObjectPath,
-        thumbnailObjectPath = thumbnailObjectPath,
-        mediaEncryptionData = mediaEncryption?.toJson()?.toString()?.toByteArray(),
-        thumbnailEncryptionData = thumbnailEncryption?.toJson()?.toString()?.toByteArray(),
-        mediaBatchId = mediaBatchId,
-        duration = duration,
-        audioWaveformData = audioWaveform?.let { JSONArray(it).toString().toByteArray() },
-        fileName = fileName,
-        fileSize = fileSize,
-        mediaWidth = mediaWidth,
-        mediaHeight = mediaHeight,
-        latitude = latitude,
-        longitude = longitude,
-        timestamp = timestamp,
-        statusString = status.raw,
-        isRead = isRead,
-        isDeleted = isDeleted,
-        deletedAt = deletedAt,
-        editedAt = editedAt,
-        reactionsData = reactions?.let { JSONObject(it.mapValues { (_, v) -> JSONArray(v) }).toString().toByteArray() },
-        replyTo = replyTo,
-        storyReplyDataEncoded = storyReplyData?.let { JSONObject(it).toString().toByteArray() },
-        expirationDate = expirationDate,
-        isViewed = isViewed,
-        isVanishModeMessage = isVanishModeMessage,
-        vanishedFor = vanishedFor,
-        vanishExpiresAt = vanishExpiresAt,
-    )
+    fun toCachedMessage(): CachedMessage = CachedMessage.from(this)
 
     fun isVanished(userId: String): Boolean = userId in vanishedFor
     fun isStarred(userId: String): Boolean = userId in starredBy.orEmpty()
     fun replacingContent(newContent: String?): EnhancedMessage = copy(content = newContent)
     val isExpired: Boolean get() = expirationDate?.before(Date()) == true
     val isLiveLocationMessage: Boolean get() = type == MessageType.LOCATION && isLiveLocation == true
-    val isLiveLocationActive: Boolean get() = isLiveLocationMessage && liveLocationStoppedAt == null && (liveLocationExpiresAt == null || Date().before(liveLocationExpiresAt))
+    val isLiveLocationActive: Boolean
+        get() {
+            if (!isLiveLocationMessage) return false
+            if (liveLocationStoppedAt != null) return false
+            val expiresAt = liveLocationExpiresAt
+            if (expiresAt != null && !Date().before(expiresAt)) return false
+            return true
+        }
     val isViewOnce: Boolean get() = type.isViewOnce
     fun hasBeenViewedBy(userId: String): Boolean = isViewOnce && userId in viewedBy.orEmpty()
     fun hasBeenReplayedBy(userId: String): Boolean = isViewOnce && userId in replayedBy.orEmpty()
-    fun canReplayViewOnce(userId: String): Boolean = isViewOnce && allowReplay == true && senderId != userId && hasBeenViewedBy(userId) && !hasBeenReplayedBy(userId)
-    fun shouldShowViewOnceContent(userId: String): Boolean = !isViewOnce || senderId == userId || !hasBeenViewedBy(userId)
+    fun canReplayViewOnce(userId: String): Boolean =
+        isViewOnce && allowReplay == true && senderId != userId && hasBeenViewedBy(userId) && !hasBeenReplayedBy(userId)
+
+    /** ≡ `viewOnceStatus(for:)`. */
+    fun viewOnceStatus(context: Context, currentUserId: String): String {
+        if (!isViewOnce) return ""
+        return if (senderId == currentUserId) {
+            if (isViewed) context.getString(R.string.chat_view_once_viewed)
+            else context.getString(R.string.chat_view_once_sent)
+        } else {
+            if (hasBeenViewedBy(currentUserId)) context.getString(R.string.chat_view_once_viewed)
+            else context.getString(R.string.chat_view_once_tap_to_view)
+        }
+    }
+
+    fun shouldShowViewOnceContent(userId: String): Boolean =
+        !isViewOnce || senderId == userId || !hasBeenViewedBy(userId)
+
+    val typeIcon: String get() = type.iconName
     val canBeAutoDeleted: Boolean get() = isViewOnce && isViewed && !isDeleted
+
+    /** ≡ `EnhancedMessage.preview`. */
+    fun preview(context: Context): String {
+        if (isVanishModeMessage && type != MessageType.CHAT_NOTICE) {
+            return type.conversationPreview(context)
+        }
+        return when (type) {
+            MessageType.TEXT -> content.orEmpty()
+            MessageType.IMAGE -> context.getString(R.string.chat_preview_image)
+            MessageType.VIDEO -> context.getString(R.string.chat_preview_video)
+            MessageType.AUDIO -> context.getString(R.string.chat_preview_audio)
+            MessageType.GIF -> context.getString(R.string.chat_preview_gif)
+            MessageType.STICKER -> context.getString(R.string.chat_preview_sticker)
+            MessageType.LOCATION -> context.getString(R.string.chat_preview_location)
+            MessageType.FILE -> "📎 ${fileName ?: context.getString(R.string.message_type_file)}"
+            MessageType.EPHEMERAL -> context.getString(R.string.chat_preview_ephemeral_long)
+            MessageType.SHARED_MOMENT -> context.getString(R.string.chat_preview_shared_moment)
+            MessageType.SHARED_STORY -> context.getString(R.string.chat_preview_shared_story)
+            MessageType.VIEW_ONCE_IMAGE -> context.getString(R.string.chat_preview_photo)
+            MessageType.VIEW_ONCE_VIDEO -> context.getString(R.string.chat_preview_video)
+            MessageType.CHAT_NOTICE -> chatNoticePreviewText(context, content.orEmpty())
+        }
+    }
+
+    /** Preview truncado para lista de conversaciones. */
+    fun conversationPreview(context: Context): String {
+        if (type == MessageType.TEXT) {
+            val text = content ?: return type.conversationPreview(context)
+            return if (text.length > 50) text.take(47) + "..." else text
+        }
+        return type.conversationPreview(context)
+    }
+
     val analyticsData: Map<String, Any> get() = buildMap {
         put("messageType", type.raw); put("hasMedia", mediaUrl != null); put("isViewOnce", isViewOnce); put("messageLength", content?.length ?: 0)
         if (isViewOnce) { put("viewOnceType", type.raw); put("hasBeenViewed", isViewed); put("viewerCount", viewedBy.orEmpty().size) }
         duration?.let { put("mediaDuration", it) }; fileSize?.let { put("fileSize", it) }
     }
     val analyticsEvent: String get() = if (isViewOnce) if (isViewed) "view_once_message_viewed" else "view_once_message_sent" else "message_sent"
+
+    val relativeTimeString: String get() = MomentsFormat.relativeTime(from = timestamp)
+    val absoluteTimeString: String get() = MomentsFormat.smartDate(from = timestamp, context = MomentsFormat.DateContext.MESSAGE_ABSOLUTE)
+    val formattedFileSize: String?
+        get() = fileSize?.let { Formatter.formatFileSize(MomentsFormat.requireContext(), it) }
+    val formattedDuration: String?
+        get() {
+            val d = duration ?: return null
+            val minutes = d.toInt() / 60
+            val seconds = d.toInt() % 60
+            return if (minutes > 0) "%d:%02d".format(minutes, seconds) else "0:%02d".format(seconds)
+        }
+
     private fun missingLocalFile(url: String?): Boolean = runCatching {
+        if (url == null) return false
         val uri = android.net.Uri.parse(url)
         uri.scheme == "file" && (uri.path == null || !java.io.File(uri.path!!).isFile)
     }.getOrDefault(false)
+
     val hasMissingLocalMedia: Boolean get() = missingLocalFile(mediaUrl)
     val hasMissingLocalThumbnail: Boolean get() = missingLocalFile(thumbnailUrl)
+
     fun localMediaFileIsReachable(url: String): Boolean = runCatching {
         val uri = android.net.Uri.parse(url)
         uri.scheme != "file" || (uri.path != null && java.io.File(uri.path!!).isFile)
     }.getOrDefault(false)
-    val needsVideoThumbnailForDisplay: Boolean get() = type == MessageType.VIDEO && (thumbnailUrl == null || !localMediaFileIsReachable(thumbnailUrl))
-    val isMediaPendingResolution: Boolean get() {
-        if (isDeleted || status == MessageStatus.SENDING) return false
-        val canResolveMedia = mediaObjectPath != null && mediaEncryption != null
-        val (cachedMedia, cachedThumbnail) = ChatCacheStore.localURLsIfPresent(this)
-        val mediaReady = (cachedMedia ?: mediaUrl)?.let(::localMediaFileIsReachable) == true
-        val thumbnailReady = (cachedThumbnail ?: thumbnailUrl)?.let(::localMediaFileIsReachable) == true
-        return when (type) {
-            MessageType.IMAGE, MessageType.EPHEMERAL -> !mediaReady && canResolveMedia
-            MessageType.VIDEO -> !mediaReady && !thumbnailReady && (canResolveMedia || (thumbnailObjectPath != null && thumbnailEncryption != null))
-            MessageType.GIF, MessageType.STICKER -> !mediaReady && canResolveMedia
+
+    val needsVideoThumbnailForDisplay: Boolean
+        get() {
+            if (type != MessageType.VIDEO) return false
+            val url = thumbnailUrl ?: return true
+            return !localMediaFileIsReachable(url)
+        }
+
+    /** ≡ iOS `isMediaPendingResolution` (cache disco + file:// ausente). */
+    val isMediaPendingResolution: Boolean
+        get() {
+            if (isDeleted || status == MessageStatus.SENDING) return false
+            val canResolve = mediaObjectPath != null && mediaEncryption != null
+            fun diskMediaReachable(): Boolean {
+                if (mediaUrl != null && !missingLocalFile(mediaUrl)) return true
+                val disk = ChatCacheStore.localURLsIfPresent(this)
+                val candidate = disk.first ?: mediaUrl
+                return candidate?.let(::localMediaFileIsReachable) == true
+            }
+            fun diskThumbReachable(): Boolean {
+                if (thumbnailUrl != null && !missingLocalFile(thumbnailUrl)) return true
+                val disk = ChatCacheStore.localURLsIfPresent(this)
+                val candidate = disk.second ?: thumbnailUrl
+                return candidate?.let(::localMediaFileIsReachable) == true
+            }
+            return when (type) {
+                MessageType.IMAGE, MessageType.EPHEMERAL -> {
+                    if (diskMediaReachable()) false
+                    else if (mediaUrl == null) canResolve
+                    else missingLocalFile(mediaUrl) && canResolve
+                }
+                MessageType.VIDEO -> {
+                    if (diskThumbReachable() || diskMediaReachable()) false
+                    else {
+                        val canResolveThumb = thumbnailObjectPath != null && thumbnailEncryption != null
+                        canResolve || canResolveThumb
+                    }
+                }
+                MessageType.GIF, MessageType.STICKER -> when {
+                    mediaUrl == null -> canResolve
+                    missingLocalFile(mediaUrl) -> canResolve
+                    else -> false
+                }
+                else -> false
+            }
+        }
+
+    val hasLocalVideoFileReady: Boolean
+        get() = type == MessageType.VIDEO && mediaUrl?.let(::localMediaFileIsReachable) == true
+
+    val hasLocalMediaReadyForViewer: Boolean
+        get() = when (type) {
+            MessageType.IMAGE, MessageType.EPHEMERAL -> mediaUrl?.let(::localMediaFileIsReachable) == true
+            MessageType.VIDEO -> hasLocalVideoFileReady
             else -> false
         }
-    }
-    val hasLocalVideoFileReady: Boolean get() = type == MessageType.VIDEO && mediaUrl?.let(::localMediaFileIsReachable) == true
-    val hasLocalMediaReadyForViewer: Boolean get() = when (type) {
-        MessageType.IMAGE, MessageType.EPHEMERAL -> mediaUrl?.let(::localMediaFileIsReachable) == true
-        MessageType.VIDEO -> hasLocalVideoFileReady
-        else -> false
-    }
-    val needsDownloadForPlayback: Boolean get() = !isDeleted && status != MessageStatus.SENDING && when (type) {
-        MessageType.IMAGE, MessageType.EPHEMERAL, MessageType.VIDEO -> !hasLocalMediaReadyForViewer && mediaObjectPath != null && mediaEncryption != null
-        MessageType.GIF, MessageType.STICKER -> isMediaPendingResolution
-        else -> false
-    }
-    val estimatedDownloadByteCount: Long? get() = fileSize?.takeIf { it > 0 } ?: mediaEncryption?.plaintextSize?.takeIf { it > 0 }?.let { main -> if (type == MessageType.VIDEO) main + (thumbnailEncryption?.plaintextSize ?: 0) else main }
+
+    val needsDownloadForPlayback: Boolean
+        get() {
+            if (isDeleted || status == MessageStatus.SENDING) return false
+            return when (type) {
+                MessageType.IMAGE, MessageType.EPHEMERAL, MessageType.VIDEO -> {
+                    if (hasLocalMediaReadyForViewer) return false
+                    if (mediaUrl == null || missingLocalFile(mediaUrl)) {
+                        val disk = ChatCacheStore.localURLsIfPresent(this).first
+                        if (disk != null && localMediaFileIsReachable(disk)) return false
+                    }
+                    mediaObjectPath != null && mediaEncryption != null
+                }
+                MessageType.GIF, MessageType.STICKER -> {
+                    val url = mediaUrl
+                    if (url != null) {
+                        val uri = android.net.Uri.parse(url)
+                        if (uri.scheme != "file") return false
+                    }
+                    isMediaPendingResolution
+                }
+                else -> false
+            }
+        }
+
+    val isMediaAwaitingManualDownload: Boolean
+        get() {
+            if (ChatMediaDownloadPolicy.shouldDownloadAutomatically()) return false
+            return if (type == MessageType.VIDEO) needsDownloadForPlayback else isMediaPendingResolution
+        }
+
+    val estimatedDownloadByteCount: Long?
+        get() {
+            fileSize?.takeIf { it > 0 }?.let { return it }
+            val main = mediaEncryption?.plaintextSize?.takeIf { it > 0 } ?: return null
+            return if (type == MessageType.VIDEO) {
+                val thumb = thumbnailEncryption?.plaintextSize?.takeIf { it > 0 } ?: 0L
+                main + thumb
+            } else main
+        }
+
+    val formattedDownloadSize: String?
+        get() = estimatedDownloadByteCount?.let { Formatter.formatFileSize(MomentsFormat.requireContext(), it) }
+
+    val previewThumbnailURLForDisplay: String?
+        get() {
+            val url = thumbnailUrl ?: return null
+            return url.takeIf { localMediaFileIsReachable(it) }
+        }
 
     companion object {
+        /** ≡ `EnhancedMessage.chatNoticePreviewText(for:)`. */
+        fun chatNoticePreviewText(context: Context, token: String): String {
+            if (VanishMessageTimer.parseEnabledNotice(token) != null || token == "chat.vanish.enabled") {
+                return context.getString(R.string.chat_vanish_notice_preview_enabled)
+            }
+            if (token == VanishMessageTimer.DISABLED_NOTICE_TOKEN || token == "chat.vanish.disabled") {
+                return context.getString(R.string.chat_vanish_notice_preview_disabled)
+            }
+            if (token == VanishMessageTimer.SCREENSHOT_NOTICE_TOKEN) {
+                return context.getString(R.string.chat_vanish_screenshot)
+            }
+            if (token == VanishMessageTimer.SCREEN_RECORDING_NOTICE_TOKEN) {
+                return context.getString(R.string.chat_vanish_screen_recording)
+            }
+            if (token.isEmpty()) return ""
+            val resId = context.resources.getIdentifier(token.replace('.', '_'), "string", context.packageName)
+            if (resId != 0) {
+                val localized = context.getString(resId)
+                if (localized != token) return localized
+            }
+            return ""
+        }
+
         fun createViewOnceImage(conversationId: String, senderId: String, mediaUrl: String, fileSize: Long? = null): EnhancedMessage =
             EnhancedMessage(UUID.randomUUID().toString(), conversationId, senderId, MessageType.VIEW_ONCE_IMAGE, mediaUrl = mediaUrl, fileSize = fileSize, viewedBy = emptyList())
         fun createViewOnceVideo(conversationId: String, senderId: String, mediaUrl: String, thumbnailUrl: String? = null, duration: Double? = null, fileSize: Long? = null): EnhancedMessage =
@@ -341,6 +586,12 @@ data class EnhancedMessage(
             isDeleted = obj.optBoolean("isDeleted"),
             deletedAt = obj.optLong("deletedAt").takeIf { obj.has("deletedAt") }?.let { Date(it) },
             editedAt = obj.optLong("editedAt").takeIf { obj.has("editedAt") }?.let { Date(it) },
+            reactions = obj.optJSONObject("reactions")?.let { payload ->
+                payload.keys().asSequence().associateWith { key ->
+                    val arr = payload.optJSONArray(key) ?: return@associateWith emptyList()
+                    (0 until arr.length()).map(arr::getString)
+                }
+            },
             replyTo = obj.optString("replyTo").takeIf { obj.has("replyTo") && !obj.isNull("replyTo") },
             storyReplyData = obj.optJSONObject("storyReplyData")?.let { payload ->
                 payload.keys().asSequence().associateWith { key -> payload.optString(key) }
@@ -367,43 +618,7 @@ data class EnhancedMessage(
             vanishExpiresAt = obj.optLong("vanishExpiresAt").takeIf { obj.has("vanishExpiresAt") }?.let { Date(it) },
         )
 
-        fun fromCached(cached: CachedMessage): EnhancedMessage = EnhancedMessage(
-            id = cached.id,
-            conversationId = cached.conversationId,
-            senderId = cached.senderId,
-            type = MessageType.from(cached.typeString),
-            content = cached.content,
-            mediaUrl = cached.mediaUrl,
-            thumbnailUrl = cached.thumbnailUrl,
-            mediaObjectPath = cached.mediaObjectPath,
-            thumbnailObjectPath = cached.thumbnailObjectPath,
-            mediaEncryption = cached.mediaEncryptionData?.let {
-                runCatching { EncryptedChatMediaMetadata.fromJson(JSONObject(String(it))) }.getOrNull()
-            },
-            thumbnailEncryption = cached.thumbnailEncryptionData?.let {
-                runCatching { EncryptedChatMediaMetadata.fromJson(JSONObject(String(it))) }.getOrNull()
-            },
-            duration = cached.duration,
-            fileName = cached.fileName,
-            fileSize = cached.fileSize,
-            mediaWidth = cached.mediaWidth,
-            mediaHeight = cached.mediaHeight,
-            latitude = cached.latitude,
-            longitude = cached.longitude,
-            timestamp = cached.timestamp,
-            status = MessageStatus.from(cached.statusString),
-            isRead = cached.isRead,
-            isDeleted = cached.isDeleted,
-            deletedAt = cached.deletedAt,
-            editedAt = cached.editedAt,
-            replyTo = cached.replyTo,
-            expirationDate = cached.expirationDate,
-            isViewed = cached.isViewed,
-            mediaBatchId = cached.mediaBatchId,
-            isVanishModeMessage = cached.isVanishModeMessage,
-            vanishedFor = cached.vanishedFor,
-            vanishExpiresAt = cached.vanishExpiresAt,
-        )
+        fun fromCached(cached: CachedMessage): EnhancedMessage = cached.toEnhancedMessage()
     }
 }
 
@@ -444,6 +659,7 @@ data class Conversation(
     val archivedByUserIds: List<String>? = null,
     val encryptionVersion: String? = null,
     val conversationKeyVersion: Int? = null,
+    val wrappedKeys: Map<String, WrappedConversationKey>? = null,
     var readReceiptPreferences: Map<String, Boolean>? = emptyMap(),
     var buzzPreferences: Map<String, Boolean>? = emptyMap(),
     var forwardingPreferences: Map<String, Boolean>? = emptyMap(),
@@ -482,10 +698,35 @@ data class Conversation(
         val count = com.moments.android.services.persistence.LocalPersistenceService.unreadMessageCount(conversationId, currentUserId, lastReadAt?.get(currentUserId))
         return count.takeIf { it > 0 } ?: 1
     }
+    /** Stub iOS: siempre true (bloqueos no filtrados aquí). */
+    val isActive: Boolean get() = true
     fun isOwnLastMessage(currentUserId: String): Boolean =
         lastMessageSenderId == currentUserId || lastMessageSeenAt?.get(otherParticipantId) != null || lastMessageReaction?.byUserId == otherParticipantId
     fun showsViewOnceInboxPlayButton(currentUserId: String): Boolean =
         lastMessageViewOncePending && lastMessageType?.isViewOnce == true && !isOwnLastMessage(currentUserId)
+
+    /** ≡ `Conversation.messagePreview`. */
+    fun messagePreview(context: Context): String {
+        val last = lastMessage
+        if (last != null) {
+            if (last.startsWith("📎")) return last
+            if (last.length > 50) return last.take(47) + "..."
+            return last
+        }
+        return context.getString(R.string.chat_preview_new_conversation)
+    }
+
+    /** ≡ `inboxMessagePreview(for:)` — view-once entrante → Foto/Video genérico. */
+    fun inboxMessagePreview(context: Context, currentUserId: String): String {
+        val type = lastMessageType
+        if (type != null && type.isViewOnce && !isOwnLastMessage(currentUserId)) {
+            return when (type) {
+                MessageType.VIEW_ONCE_VIDEO -> context.getString(R.string.chat_preview_video)
+                else -> context.getString(R.string.chat_preview_photo)
+            }
+        }
+        return messagePreview(context)
+    }
 }
 
 /** Compatibilidad con el modelo `Message` previo a `EnhancedMessage`. */
@@ -515,7 +756,11 @@ data class MessageNotification(
     val messagePreview: String,
     val timestamp: Date = Date(),
     val isViewOnce: Boolean = false,
-)
+) {
+    val title: String get() = senderName
+    fun body(context: Context): String =
+        if (isViewOnce) context.getString(R.string.chat_notification_view_once_prompt) else messagePreview
+}
 
 data class ViewOnceMetadata(
     val messageId: String,
@@ -530,13 +775,41 @@ data class ViewOnceMetadata(
 }
 
 object ViewOnceStateManager {
-    fun shouldDelete(message: EnhancedMessage, userId: String): Boolean = message.isViewOnce && message.senderId != userId && message.hasBeenViewedBy(userId)
+    fun shouldDelete(message: EnhancedMessage, userId: String): Boolean =
+        message.isViewOnce && message.senderId != userId && message.hasBeenViewedBy(userId)
+
+    fun getViewOnceStatusText(context: Context, message: EnhancedMessage, userId: String): String {
+        if (!message.isViewOnce) return ""
+        if (message.isDeleted) return context.getString(R.string.messaging_message_deleted)
+        return if (message.senderId == userId) {
+            if (message.isViewed) context.getString(R.string.chat_view_once_viewed)
+            else context.getString(R.string.chat_view_once_sent)
+        } else {
+            if (message.hasBeenViewedBy(userId)) context.getString(R.string.chat_view_once_viewed)
+            else context.getString(R.string.chat_view_once_tap_to_view)
+        }
+    }
+
+    /** Tokens de color lógicos ≡ iOS (`primary`/`secondary`/`success`/`warning`). */
+    fun getViewOnceStatusColor(message: EnhancedMessage, userId: String): String {
+        if (!message.isViewOnce) return "primary"
+        if (message.isDeleted) return "secondary"
+        return if (message.senderId == userId) {
+            if (message.isViewed) "success" else "warning"
+        } else {
+            if (message.hasBeenViewedBy(userId)) "secondary" else "primary"
+        }
+    }
 }
 
 enum class ViewOnceMediaType {
     IMAGE, VIDEO;
     val messageType: MessageType get() = if (this == IMAGE) MessageType.VIEW_ONCE_IMAGE else MessageType.VIEW_ONCE_VIDEO
     val iconName: String get() = if (this == IMAGE) "camera.circle" else "video.circle"
+    fun preview(context: Context): String = when (this) {
+        IMAGE -> context.getString(R.string.chat_preview_view_once_photo)
+        VIDEO -> context.getString(R.string.chat_preview_view_once_video)
+    }
     companion object { fun fromMessageType(type: MessageType): ViewOnceMediaType? = when (type) { MessageType.VIEW_ONCE_IMAGE -> IMAGE; MessageType.VIEW_ONCE_VIDEO -> VIDEO; else -> null } }
 }
 
@@ -551,9 +824,48 @@ object ViewOnceConstants {
     const val MAX_FILE_SIZE_BYTES = 50L * 1024L * 1024L
     val supportedImageTypes = setOf("image/jpeg", "image/png", "image/heic")
     val supportedVideoTypes = setOf("video/mp4", "video/mov", "video/quicktime")
+
+    object Analytics {
+        const val VIEW_ONCE_CREATED = "view_once_created"
+        const val VIEW_ONCE_OPENED = "view_once_opened"
+        const val VIEW_ONCE_CLOSED = "view_once_closed"
+        const val VIEW_ONCE_DELETED = "view_once_deleted"
+        const val VIEW_ONCE_EXPIRED = "view_once_expired"
+    }
+
+    object Notifications {
+        const val VIEW_ONCE_VIEWED = "ViewOnceMessageViewed"
+        const val VIEW_ONCE_DELETED = "ViewOnceMessageDeleted"
+        const val VIEW_ONCE_RECEIVED = "ViewOnceMessageReceived"
+        const val VIEW_ONCE_CLOSED = "ViewOnceMessageClosed"
+    }
+
+    object MomentsStyle {
+        const val DELETE_ON_VIEW_CLOSE = true
+        const val ALLOW_SCREENSHOTS = false
+        const val SHOW_CLOSE_WARNING = true
+        const val ENABLE_HAPTIC_FEEDBACK = true
+    }
 }
 
-enum class ViewOnceError { MESSAGE_NOT_FOUND, ALREADY_VIEWED, NOT_VIEW_ONCE_MESSAGE, DELETION_FAILED, UPLOAD_FAILED, INVALID_MEDIA_TYPE, FILE_TOO_LARGE, NETWORK_ERROR }
+enum class ViewOnceError {
+    MESSAGE_NOT_FOUND, ALREADY_VIEWED, NOT_VIEW_ONCE_MESSAGE, DELETION_FAILED,
+    UPLOAD_FAILED, INVALID_MEDIA_TYPE, FILE_TOO_LARGE, NETWORK_ERROR;
+
+    /** ≡ `ViewOnceError.errorDescription`. */
+    fun errorDescription(context: Context): String = context.getString(
+        when (this) {
+            MESSAGE_NOT_FOUND -> R.string.messaging_message_not_found
+            ALREADY_VIEWED -> R.string.messaging_message_already_viewed
+            NOT_VIEW_ONCE_MESSAGE -> R.string.messaging_message_not_view_once
+            DELETION_FAILED -> R.string.messaging_message_delete_failed
+            UPLOAD_FAILED -> R.string.messaging_message_upload_failed
+            INVALID_MEDIA_TYPE -> R.string.messaging_message_unsupported_file
+            FILE_TOO_LARGE -> R.string.messaging_message_file_too_large
+            NETWORK_ERROR -> R.string.messaging_message_connection_error
+        },
+    )
+}
 
 /** Una sola reacción activa por usuario: repetir emoji la elimina. */
 object MessageReactionMutation {
@@ -602,6 +914,26 @@ data class MessageRequest(
 ) {
     enum class RequestStatus(val raw: String) {
         PENDING("pending"), ACCEPTED("accepted"), REJECTED("rejected"), BLOCKED("blocked");
+
+        /** ≡ `RequestStatus.displayName`. */
+        fun displayName(context: Context): String = context.getString(
+            when (this) {
+                PENDING -> R.string.messaging_request_status_pending
+                ACCEPTED -> R.string.messaging_request_status_accepted
+                REJECTED -> R.string.messaging_request_status_rejected
+                BLOCKED -> R.string.messaging_request_status_blocked
+            },
+        )
+
+        /** ≡ `RequestStatus.color` (hex sin `#`). */
+        val color: String
+            get() = when (this) {
+                PENDING -> "FF9500"
+                ACCEPTED -> "34C759"
+                REJECTED -> "FF3B30"
+                BLOCKED -> "8E8E93"
+            }
+
         companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: PENDING }
     }
 

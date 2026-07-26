@@ -1,37 +1,44 @@
 package com.moments.android.views.creator.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.models.StickerData
 import com.moments.android.notifications.services.NotificationService
-import com.moments.android.services.firestore.FirestoreService
-import com.moments.android.services.firestore.fetchCustomListDetails
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.services.privacy.ContentVisibilityService
 import com.moments.android.services.privacy.ContentVisibilityType
 import com.moments.android.utilities.momentsPress
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
-/** Port de `glow(color:radius:)` de SwiftUI. */
+/** Port de `glow(color:radius:)` de SwiftUI (triple shadow). */
 fun Modifier.glow(color: Color, radius: Dp): Modifier =
-    shadow(radius / 3, spotColor = color)
-        .shadow(radius / 3, spotColor = color)
-        .shadow(radius / 3, spotColor = color)
+    shadow(elevation = radius / 3, ambientColor = color, spotColor = color)
+        .shadow(elevation = radius / 3, ambientColor = color, spotColor = color)
+        .shadow(elevation = radius / 3, ambientColor = color, spotColor = color)
 
-/** Port de `pressAnimation()`; delega al estilo compartido del proyecto. */
+/** Port de `pressAnimation()` → `.momentsPress`. */
 fun Modifier.pressAnimation(): Modifier = momentsPress()
 
-/** Conserva el alias con la errata que existe en el fuente Swift. */
-fun Modifier.pressAnimatioon(): Modifier = pressAnimation()
+/**
+ * Port del typo Swift `pressAnimatioon()` — stub (`scaleEffect(1)` + tap vacío).
+ * No aplica press real.
+ */
+fun Modifier.pressAnimatioon(): Modifier = this
 
-/** Fallback Android de `MeshGradient` para los consumidores de este archivo. */
+/** Fallback Android de `MeshGradient` (iOS < 18 → LinearGradient first/last). */
 @Composable
 fun MeshGradient(
     width: Int,
@@ -44,24 +51,33 @@ fun MeshGradient(
     val ignoredMeshGeometry = Triple(width, height, points)
     val start = colors.firstOrNull() ?: Color.Black
     val end = colors.lastOrNull() ?: Color.Black
-    androidx.compose.foundation.layout.Box(
-        modifier.background(Brush.linearGradient(listOf(start, end))),
+    Box(
+        modifier.background(
+            Brush.linearGradient(
+                colors = listOf(start, end),
+                start = Offset.Zero,
+                end = Offset.Infinite,
+            ),
+        ),
     )
 }
 
-/** Resultado equivalente a `StoryMentionNotificationResult`. */
+/** ≡ `StoryMentionNotificationResult`. */
 data class StoryMentionNotificationResult(
     val sentUserIds: List<String>,
     val skippedOutsideAudienceUserIds: List<String>,
 )
 
-/** Equivalente de `sendMentionNotificationsForStory(storyId:stickers:)`. */
+/**
+ * ≡ `StickerPickerView.sendMentionNotificationsForStory(storyId:stickers:)`
+ * (audience = everyone, author = current user).
+ */
 fun sendMentionNotificationsForStory(
     storyId: String,
     stickers: List<StickerData>,
 ) {
     val authorId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+    CoroutineScope(Dispatchers.IO).launch {
         sendMentionNotificationsForStory(
             storyId = storyId,
             storyAuthorId = authorId,
@@ -74,8 +90,8 @@ fun sendMentionNotificationsForStory(
 }
 
 /**
- * Port de la sobrecarga Swift que sólo entrega notificaciones si la persona
- * mencionada puede ver la historia bajo su audiencia efectiva.
+ * ≡ sobrecarga async con audiencia.
+ * Solo notifica si el mencionado puede ver la historia.
  */
 suspend fun sendMentionNotificationsForStory(
     storyId: String,
@@ -91,53 +107,111 @@ suspend fun sendMentionNotificationsForStory(
         .filter { it != storyAuthorId }
         .distinct()
         .toList()
+
     val sent = mutableListOf<String>()
     val skipped = mutableListOf<String>()
 
-    mentionedUserIds.forEach { userId ->
-        if (!canNotifyStoryMention(userId, storyAuthorId, audience, customViewers, customListId)) {
+    for (userId in mentionedUserIds) {
+        val canNotify = canNotifyStoryMention(
+            mentionedUserId = userId,
+            storyAuthorId = storyAuthorId,
+            audience = audience,
+            customViewers = customViewers,
+            customListId = customListId,
+        )
+        if (!canNotify) {
             skipped += userId
-            return@forEach
+            continue
         }
-        NotificationService.sendStoryMentionNotification(userId, storyId, storyAuthorId)
+        withContext(Dispatchers.Main) {
+            NotificationService.sendStoryMentionNotification(userId, storyId, storyAuthorId)
+        }
         sent += userId
     }
-    return StoryMentionNotificationResult(sent, skipped)
+
+    return StoryMentionNotificationResult(
+        sentUserIds = sent,
+        skippedOutsideAudienceUserIds = skipped,
+    )
 }
 
+/** ≡ `canNotifyStoryMention` — switch audiencia 1:1 con Swift. */
 private suspend fun canNotifyStoryMention(
     mentionedUserId: String,
     storyAuthorId: String,
     audience: ContentAudience,
     customViewers: List<String>?,
     customListId: String?,
-): Boolean {
-    val visibility = when (audience) {
-        ContentAudience.EVERYONE -> ContentVisibilityType.EVERYONE
-        ContentAudience.MUTUALS -> ContentVisibilityType.MUTUALS
-        ContentAudience.BEST_FRIENDS -> ContentVisibilityType.BEST_FRIENDS
-        ContentAudience.ONLY_ME -> return false
-        ContentAudience.CUSTOM, ContentAudience.CUSTOM_LIST -> ContentVisibilityType.CUSTOM
-    }
-    val allowedUsers = when (audience) {
-        ContentAudience.CUSTOM -> customViewers.orEmpty()
-        ContentAudience.CUSTOM_LIST -> customViewers.orEmpty().ifEmpty {
-            val id = customListId?.takeIf(String::isNotBlank) ?: return false
-            runCatching {
-                FirestoreService().fetchCustomListDetails(id, storyAuthorId).members
-            }.getOrDefault(emptyList())
+): Boolean = when (audience) {
+    ContentAudience.ONLY_ME -> false
+    ContentAudience.CUSTOM, ContentAudience.CUSTOM_LIST -> {
+        if (!customViewers.isNullOrEmpty()) {
+            canUserSeeContent(
+                ownerId = storyAuthorId,
+                viewerId = mentionedUserId,
+                visibility = ContentVisibilityType.CUSTOM,
+                customViewers = customViewers,
+            )
+        } else if (audience == ContentAudience.CUSTOM_LIST && !customListId.isNullOrBlank()) {
+            val members = fetchCustomListMembers(listId = customListId, ownerId = storyAuthorId)
+            canUserSeeContent(
+                ownerId = storyAuthorId,
+                viewerId = mentionedUserId,
+                visibility = ContentVisibilityType.CUSTOM,
+                customViewers = members,
+            )
+        } else {
+            false
         }
-        else -> null
     }
-    if (visibility == ContentVisibilityType.CUSTOM && allowedUsers.isNullOrEmpty()) return false
-    return ContentVisibilityService.canUserSeeContent(
-        contentOwnerId = storyAuthorId,
+    ContentAudience.EVERYONE -> canUserSeeContent(
+        ownerId = storyAuthorId,
         viewerId = mentionedUserId,
-        contentType = visibility,
-        customViewers = allowedUsers,
+        visibility = ContentVisibilityType.EVERYONE,
+    )
+    ContentAudience.MUTUALS -> canUserSeeContent(
+        ownerId = storyAuthorId,
+        viewerId = mentionedUserId,
+        visibility = ContentVisibilityType.MUTUALS,
+    )
+    ContentAudience.BEST_FRIENDS -> canUserSeeContent(
+        ownerId = storyAuthorId,
+        viewerId = mentionedUserId,
+        visibility = ContentVisibilityType.BEST_FRIENDS,
     )
 }
 
-/** Equivalente de `extractUserIdFromMentionSticker`. */
+private suspend fun canUserSeeContent(
+    ownerId: String,
+    viewerId: String,
+    visibility: ContentVisibilityType,
+    customViewers: List<String>? = null,
+): Boolean = ContentVisibilityService.canUserSeeContent(
+    contentOwnerId = ownerId,
+    viewerId = viewerId,
+    contentType = visibility,
+    customViewers = customViewers,
+)
+
+/**
+ * ≡ `fetchCustomListMembers` —
+ * `users/{ownerId}/customAudienceLists/{listId}.members`
+ */
+private suspend fun fetchCustomListMembers(listId: String, ownerId: String): List<String> {
+    val snap = FirebaseFirestore.getInstance()
+        .collection("users")
+        .document(ownerId)
+        .collection("customAudienceLists")
+        .document(listId)
+        .get()
+        .await()
+    @Suppress("UNCHECKED_CAST")
+    return (snap.data?.get("members") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+}
+
+/**
+ * ≡ `extractUserIdFromMentionSticker` —
+ * `interactionData?.userId` (en Android el userId vive en [StickerData]).
+ */
 fun extractUserIdFromMentionSticker(sticker: StickerData): String? =
-    sticker.userId?.takeIf { sticker.type == "mention" && it.isNotBlank() }
+    sticker.userId?.takeIf { it.isNotBlank() }

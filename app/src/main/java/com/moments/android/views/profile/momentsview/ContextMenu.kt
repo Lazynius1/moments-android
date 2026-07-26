@@ -73,7 +73,6 @@ import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchHiddenLayerDiscoveriesPage
 import com.moments.android.services.firestore.fetchHiddenLayerMetrics
 import com.moments.android.services.privacy.PrivacyService
-import com.moments.android.services.privacy.canShareMoment
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.feed.sharing.buildMomentShareUrl
 import kotlinx.coroutines.launch

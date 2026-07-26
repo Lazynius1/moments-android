@@ -39,9 +39,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.border
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -49,7 +51,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem as ExoMediaItem
-import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -162,7 +163,6 @@ fun CustomVideoPlayer(
     val exoPlayer = remember(url) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(ExoMediaItem.fromUri(Uri.parse(url)))
-            repeatMode = Player.REPEAT_MODE_ONE
             prepare()
             playWhenReady = true
         }
@@ -229,7 +229,8 @@ fun AsyncProfileImageView(
     Box(
         modifier
             .clip(CircleShape)
-            .background(Color.Gray.copy(alpha = 0.1f)),
+            .background(Color.Gray.copy(alpha = 0.1f))
+            .border(0.5.dp, Color.White.copy(alpha = 0.2f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         when {
@@ -268,12 +269,6 @@ fun AsyncProfileImageView(
                 )
             }
         }
-        Box(
-            Modifier
-                .matchParentSize()
-                .clip(CircleShape)
-                .background(Color.Transparent)
-        )
     }
 }
 
@@ -340,10 +335,17 @@ fun ActionSubCardView(
         }.getOrDefault(false)
     }
 
+    val cardShape = RoundedCornerShape(20.dp)
     Row(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .shadow(
+                elevation = 12.dp,
+                shape = cardShape,
+                ambientColor = Color.Black.copy(alpha = 0.4f),
+                spotColor = Color.Black.copy(alpha = 0.4f),
+            )
+            .clip(cardShape)
             .background(
                 Brush.linearGradient(
                     if (isDark) {
@@ -353,6 +355,7 @@ fun ActionSubCardView(
                     },
                 ),
             )
+            .border(1.dp, Color.White.copy(alpha = 0.15f), cardShape)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(20.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -416,7 +419,7 @@ fun ActionSubCardView(
             Icon(
                 if (isSaved) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
                 contentDescription = null,
-                tint = if (isSaved) Color(0xFFFFB800) else Color.White,
+                tint = if (isSaved) Color(0xFFFFA500) else Color.White,
                 modifier = Modifier.size(18.dp),
             )
         }

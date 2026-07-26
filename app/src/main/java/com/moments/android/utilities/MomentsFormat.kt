@@ -26,6 +26,9 @@ object MomentsFormat {
     private fun ctx(): Context =
         appContext ?: error("MomentsFormat.initialize(context) required")
 
+    /** Para formatters (p. ej. tamaño de fichero) en modelos sin Context de UI. */
+    fun requireContext(): Context = ctx()
+
     enum class RelativeTimeStyle {
         /** Compact feed style: `5 min ago` / `hace 5 min`. */
         COMPACT,

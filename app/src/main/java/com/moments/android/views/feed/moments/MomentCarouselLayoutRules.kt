@@ -2,6 +2,7 @@ package com.moments.android.views.feed.moments
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 /** Port de `MomentCarouselLayoutRules.swift`. */
 enum class MomentCarouselPresentationMode {
@@ -90,6 +91,9 @@ object FeedMomentCardLayout {
     val mediaCornerRadius = MomentCarouselLayoutRules.mediaCornerRadius
     val storyCanvasCornerRadius = mediaCornerRadius
     val peekCornerRadius = mediaCornerRadius
+
+    /** iOS `FeedMomentCardLayout.continuousRoundedRect` (style .continuous ≈ default Compose). */
+    val continuousRoundedRectShape = RoundedCornerShape(mediaCornerRadius)
 
     /** iOS `mediaContentWidth` = screenWidth - listHorizontalPadding * 2. */
     fun mediaContentWidth(screenWidthDp: Float): Float =

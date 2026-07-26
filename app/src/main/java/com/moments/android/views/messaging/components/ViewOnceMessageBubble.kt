@@ -31,9 +31,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageStatus
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageStatus
+import com.moments.android.views.messaging.core.MessageType
 
 /** Port de `Views/Messaging/Components/ViewOnceMessageBubble.swift`. */
 data class ViewOnceMessageState(

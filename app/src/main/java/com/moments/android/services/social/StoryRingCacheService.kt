@@ -6,7 +6,6 @@ import com.google.firebase.firestore.Query
 import com.moments.android.models.Story
 import com.moments.android.services.persistence.StorySeenStateService
 import com.moments.android.services.privacy.PrivacyService
-import com.moments.android.services.privacy.canUserViewStoryEnhanced
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -109,15 +108,15 @@ object StoryRingResolverService {
         db: FirebaseFirestore,
     ): StoryRingSnapshot {
         val documents = try {
+            // iOS: expirationDate > now, order by timestamp ascending.
             db.collection("users").document(authorId).collection("stories")
                 .whereGreaterThan("expirationDate", Timestamp.now())
-                .orderBy("expirationDate")
                 .orderBy("timestamp", Query.Direction.ASCENDING)
                 .get()
                 .await()
                 .documents
         } catch (_: Exception) {
-            // Fallback sin índice compuesto: filtrar en cliente.
+            // Fallback sin índice: filtrar/ordenar en cliente.
             db.collection("users").document(authorId).collection("stories")
                 .whereGreaterThan("expirationDate", Timestamp.now())
                 .get()

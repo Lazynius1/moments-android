@@ -12,7 +12,20 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import com.moments.android.views.creator.components.StoryDrawingEditorOverlay
 
-/** Fachada de `DrawingView.swift` sobre el editor Compose compartido de trazos. */
+/**
+ * Port de `DrawingView` / `DrawingViewController` (`DrawingView.swift`).
+ *
+ * iOS: PencilKit + toolbars propias (pen/neon/marker/arrow/eraser, slider 2…26,
+ * 8 colores). En Android el motor/UI de trazos vive en [StoryDrawingEditorOverlay]
+ * (mismo rango de ancho, brushes equivalentes PEN/GLOW/MARKER/ARROW/ERASER).
+ *
+ * - Fondo: `scaleAspectFill` ≡ [ContentScale.Crop] + dim 0.10; sin imagen → negro
+ * - [initialDrawing] ≡ dibujo previo en el canvas (no el fondo)
+ * - Done → bitmap de trazos (+ base si hay); luego dismiss (como iOS `onComplete` + `onDismiss`)
+ *
+ * Nota: en el árbol Swift actual no hay call sites de `DrawingView`; Story usa
+ * `StoryDrawingEditorOverlay` directamente (igual que `storyeditor.kt`).
+ */
 @Composable
 fun DrawingView(
     backgroundImage: Bitmap?,
@@ -22,19 +35,23 @@ fun DrawingView(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize().background(Color.Black)) {
-        backgroundImage?.let {
+        if (backgroundImage != null) {
             Image(
-                bitmap = it.asImageBitmap(),
+                bitmap = backgroundImage.asImageBitmap(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(.1f)))
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.10f)))
         }
+
         StoryDrawingEditorOverlay(
             baseDrawing = initialDrawing,
             onCancel = onDismiss,
-            onDone = onComplete,
+            onDone = { result ->
+                onComplete(result)
+                onDismiss()
+            },
             modifier = Modifier.fillMaxSize(),
         )
     }

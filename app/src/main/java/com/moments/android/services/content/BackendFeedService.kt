@@ -52,6 +52,8 @@ data class FeedMoment(
     val reactionCount: Int,
     val hideLikeCounts: Boolean,
     val disableComments: Boolean,
+    /** Paridad iOS `Moment.allowSharing` — oculta bookmark si false. */
+    val allowSharing: Boolean = true,
     val hasHiddenLayers: Boolean = false,
     val hiddenLayerCount: Int = 0,
     /** Paridad iOS `Moment.audience` — != "everyone" → ScreenshotProtected. */
@@ -582,6 +584,7 @@ private fun JSONObject.toFeedMoment(): FeedMoment {
         } ?: 0,
         hideLikeCounts = optBoolean("hideLikeCounts"),
         disableComments = optBoolean("disableComments"),
+        allowSharing = optBoolean("allowSharing", true),
         hasHiddenLayers = optBoolean("hasHiddenLayers"),
         hiddenLayerCount = optInt("hiddenLayerCount"),
         audience = stringOrNull("audience"),

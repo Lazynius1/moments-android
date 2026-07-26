@@ -1,6 +1,7 @@
 package com.moments.android.services.messaging
 
 import android.content.Context
+import com.moments.android.views.messaging.core.MessageSyncCursor
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -8,7 +9,10 @@ import java.util.Date
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-/** Equivalente a Moments/Shared/MessageIngestQueue.swift + MessageSyncCursorStore. */
+/**
+ * Port de `Moments/Shared/MessageIngestQueue.swift` + `MessageSyncCursorStore`.
+ * App Group iOS → `filesDir/moments_shared` + SharedPreferences (misma app UID).
+ */
 data class PendingMessageIngest(
     val conversationId: String,
     val messageId: String,
@@ -16,7 +20,6 @@ data class PendingMessageIngest(
 )
 
 object MessageIngestQueue {
-    /** iOS usa App Group; en Android usamos filesDir compartido de la app. */
     const val SHARED_DIR_NAME = "moments_shared"
     private const val FILE_NAME = "pending_message_ingest.json"
     private val lock = ReentrantLock()
@@ -76,6 +79,7 @@ object MessageIngestQueue {
         }.getOrDefault(emptyList())
     }
 
+    /** Escritura atómica ≡ iOS `data.write(to:options: .atomic)`. */
     private fun writePendingUnsafe(pending: List<PendingMessageIngest>) {
         val file = queueFile ?: return
         val arr = JSONArray().apply {
@@ -87,7 +91,16 @@ object MessageIngestQueue {
                 })
             }
         }
-        file.writeText(arr.toString())
+        val tmp = File(file.parentFile, "${file.name}.tmp")
+        runCatching {
+            tmp.writeText(arr.toString())
+            if (!tmp.renameTo(file)) {
+                tmp.copyTo(file, overwrite = true)
+                tmp.delete()
+            }
+        }.onFailure {
+            tmp.delete()
+        }
     }
 }
 
@@ -109,30 +122,34 @@ object MessageSyncCursorStore {
 
     private fun prefs() = prefsProvider?.invoke() ?: error("MessageSyncCursorStore.initialize required")
 
-    fun cursor(conversationId: String): com.moments.android.models.MessageSyncCursor? {
+    fun cursor(conversationId: String): MessageSyncCursor? {
         val p = prefs()
         val tsKey = TIMESTAMP_PREFIX + conversationId
         val idKey = MESSAGE_ID_PREFIX + conversationId
         val storedTs = p.getLong(tsKey, 0L)
         if (storedTs > 0L) {
-            return com.moments.android.models.MessageSyncCursor(
+            return MessageSyncCursor(
                 timestamp = Date(storedTs),
                 messageId = p.getString(idKey, "") ?: "",
             )
         }
         val legacyTs = p.getLong(LEGACY_PREFIX + conversationId, 0L)
         if (legacyTs > 0L) {
-            return com.moments.android.models.MessageSyncCursor(Date(legacyTs), "")
+            return MessageSyncCursor(Date(legacyTs), "")
         }
         return null
     }
 
-    fun updateCursor(conversationId: String, cursor: com.moments.android.models.MessageSyncCursor) {
-        val p = prefs().edit()
-        p.putLong(TIMESTAMP_PREFIX + conversationId, cursor.timestamp.time)
-        p.putString(MESSAGE_ID_PREFIX + conversationId, cursor.messageId)
-        p.remove(LEGACY_PREFIX + conversationId)
-        p.apply()
+    fun updateCursor(conversationId: String, timestamp: Date, messageId: String) {
+        updateCursor(conversationId, MessageSyncCursor(timestamp, messageId))
+    }
+
+    fun updateCursor(conversationId: String, cursor: MessageSyncCursor) {
+        prefs().edit()
+            .putLong(TIMESTAMP_PREFIX + conversationId, cursor.timestamp.time)
+            .putString(MESSAGE_ID_PREFIX + conversationId, cursor.messageId)
+            .remove(LEGACY_PREFIX + conversationId)
+            .apply()
     }
 
     fun clearAll() {

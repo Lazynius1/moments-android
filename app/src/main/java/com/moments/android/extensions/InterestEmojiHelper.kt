@@ -4,8 +4,10 @@ import androidx.annotation.StringRes
 import com.moments.android.R
 
 /**
- * Port de `InterestEmojiHelper.swift`.
- * El valor [firestoreRaw] (español) es el que persiste en Firestore, igual que iOS.
+ * Port de `Extensions/InterestEmojiHelper.swift`.
+ *
+ * [firestoreRaw] en español = valor persistido en Firestore (igual que iOS).
+ * [labelRes] = UI localizada (≡ NSLocalizedString interest.*).
  */
 object InterestEmojiHelper {
 
@@ -15,7 +17,7 @@ object InterestEmojiHelper {
         val emoji: String,
     )
 
-    /** Retorna el emoji correspondiente o ✨ como fallback. */
+    /** ≡ emoji(for:) — fallback ✨ */
     fun emoji(interest: String): String = emojiFor(interest)
 
     fun emojiFor(interest: String): String {
@@ -26,30 +28,30 @@ object InterestEmojiHelper {
             "libros", "books", "lectura", "reading" -> "📚"
             "teatro", "theater" -> "🎭"
             "arte", "art" -> "🎨"
-            "diseño", "design", "diseno" -> "🎨"
+            "diseño", "design" -> "🎨"
             "baile", "dance" -> "💃"
 
             // Bienestar & Salud
-            "meditación", "meditation", "meditacion" -> "🕯️"
+            "meditación", "meditation" -> "🕯️"
             "yoga" -> "🧘"
             "fitness" -> "💪"
             "deportes", "sports" -> "⚽"
 
             // Naturaleza & Vida
             "naturaleza", "nature" -> "🌿"
-            "fotografía", "photography", "fotografia" -> "📸"
-            "mascotas", "pets", "animales", "animals" -> "🐾"
-            "astronomía", "astronomy", "astronomia" -> "⭐"
+            "fotografía", "photography" -> "📸"
+            "mascotas", "pets" -> "🐾"
+            "astronomía", "astronomy" -> "⭐"
 
             // Estilo & Lifestyle
             "moda", "fashion" -> "👗"
-            "café", "coffee", "cafe" -> "☕"
+            "café", "coffee" -> "☕"
             "cocina", "cooking" -> "👨‍🍳"
-            "viajar", "travel", "viajes" -> "✈️"
+            "viajar", "travel" -> "✈️"
 
             // Tecnología & Entretenimiento
             "gaming", "gamer" -> "🎮"
-            "tecnología", "technology", "tecnologia" -> "💻"
+            "tecnología", "technology" -> "💻"
             "programación", "programming", "programacion" -> "💻"
             "podcasts" -> "🎧"
             "kpop", "k-pop" -> "🎤"
@@ -58,24 +60,13 @@ object InterestEmojiHelper {
             "emprendimiento", "entrepreneurship" -> "🚀"
 
             // Música
-            "música", "music", "musica" -> "🎵"
-
-            // Registro extendido (InterestOption)
-            "comida", "food" -> "🍽️"
-            "ciencia", "science" -> "🔬"
-            "historia", "history" -> "📜"
-            "política", "politics", "politica" -> "🏛️"
-            "negocios", "business" -> "💼"
-            "salud", "health" -> "❤️‍🩹"
-            "estilo", "style" -> "✨"
-            "diy" -> "🛠️"
-            "coches", "cars" -> "🚗"
+            "música", "music" -> "🎵"
 
             else -> "✨"
         }
     }
 
-    /** Lista completa de intereses soportados con sus emojis (espejo de iOS `supportedInterests`). */
+    /** ≡ supportedInterests — orden y emojis 1:1 con iOS */
     val supportedInterests: List<SupportedInterest> = listOf(
         SupportedInterest("Escritura", R.string.interest_writing, "✍️"),
         SupportedInterest("Cine", R.string.interest_movies, "🎬"),
@@ -105,6 +96,8 @@ object InterestEmojiHelper {
         SupportedInterest("Kpop", R.string.interest_kpop, "🎤"),
     )
 
+    /** ≡ randomInterest() */
     fun randomInterest(): SupportedInterest =
-        supportedInterests.randomOrNull() ?: SupportedInterest("Interés", R.string.interest_writing, "✨")
+        supportedInterests.randomOrNull()
+            ?: SupportedInterest("Interés", R.string.interest_writing, "✨")
 }

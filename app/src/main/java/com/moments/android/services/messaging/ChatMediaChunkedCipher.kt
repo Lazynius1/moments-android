@@ -10,7 +10,6 @@ import javax.crypto.spec.GCMParameterSpec
 
 /**
  * Port de ChatMediaChunkedCipher.swift — formato MCHAT02 con AES-GCM por bloque.
- * Requiere la clave simétrica de conversación (proporcionada por EncryptionService cuando E2E esté portado).
  */
 object ChatMediaChunkedCipher {
     const val METADATA_VERSION = "2.0"
@@ -21,6 +20,7 @@ object ChatMediaChunkedCipher {
     private const val MAXIMUM_CHUNK_SIZE = 4_194_304
     private const val SEALED_OVERHEAD = 28 // nonce (12) + tag (16)
     private const val GCM_TAG_BITS = 128
+    private const val UINT32_MAX = 0xFFFF_FFFFL
 
     class CipherFormatException(message: String) : Exception(message)
 
@@ -37,27 +37,35 @@ object ChatMediaChunkedCipher {
         val plaintextSize = inputFile.length()
         prepareOutputFile(outputFile)
 
-        FileInputStream(inputFile).use { input ->
-            FileOutputStream(outputFile).use { output ->
-                output.write(MAGIC)
-                output.write(encodedUInt32(chunkSize))
-                output.write(encodedUInt64(plaintextSize))
+        try {
+            FileInputStream(inputFile).use { input ->
+                FileOutputStream(outputFile).use { output ->
+                    output.write(MAGIC)
+                    output.write(encodedUInt32(chunkSize))
+                    output.write(encodedUInt64(plaintextSize))
 
-                var chunkIndex = 0L
-                val buffer = ByteArray(chunkSize)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read <= 0) break
-                    val chunk = if (read == buffer.size) buffer else buffer.copyOf(read)
-                    val sealed = sealChunk(chunk, key, chunkAuthenticatedData(authenticatedData, chunkIndex))
-                    output.write(encodedUInt32(sealed.size))
-                    output.write(sealed)
-                    chunkIndex++
+                    var chunkIndex = 0L
+                    val buffer = ByteArray(chunkSize)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        val chunk = if (read == buffer.size) buffer else buffer.copyOf(read)
+                        val sealed = sealChunk(chunk, key, chunkAuthenticatedData(authenticatedData, chunkIndex))
+                        if (sealed.size.toLong() > UINT32_MAX) {
+                            throw CipherFormatException("Sealed chunk too large")
+                        }
+                        output.write(encodedUInt32(sealed.size))
+                        output.write(sealed)
+                        chunkIndex++
+                    }
+                    output.fd.sync()
                 }
-                output.fd.sync()
             }
+            return plaintextSize
+        } catch (e: Exception) {
+            outputFile.delete()
+            throw e
         }
-        return plaintextSize
     }
 
     fun decryptFile(
@@ -70,44 +78,52 @@ object ChatMediaChunkedCipher {
         require(key.size in listOf(16, 24, 32)) { "Invalid AES key length" }
         prepareOutputFile(outputFile)
 
-        FileInputStream(inputFile).use { input ->
-            FileOutputStream(outputFile).use { output ->
-                val magic = readExactly(input, MAGIC.size)
-                if (!magic.contentEquals(MAGIC)) throw CipherFormatException("Bad magic")
+        try {
+            FileInputStream(inputFile).use { input ->
+                FileOutputStream(outputFile).use { output ->
+                    val magic = readExactly(input, MAGIC.size)
+                    if (!magic.contentEquals(MAGIC)) throw CipherFormatException("Bad magic")
 
-                val chunkSize = decodeUInt32(readExactly(input, 4))
-                val declaredSize = decodeUInt64(readExactly(input, 8)).toLong()
-                if (chunkSize !in (64 * 1024)..MAXIMUM_CHUNK_SIZE || declaredSize < 0 || declaredSize != expectedPlaintextSize) {
-                    throw CipherFormatException("Header mismatch")
-                }
-
-                var written = 0L
-                var chunkIndex = 0L
-                while (true) {
-                    val lengthData = readUpTo(input, 4)
-                    if (lengthData.isEmpty()) break
-                    if (lengthData.size != 4) throw CipherFormatException("Truncated length")
-
-                    val sealedLength = decodeUInt32(lengthData)
-                    if (sealedLength < SEALED_OVERHEAD || sealedLength > chunkSize + SEALED_OVERHEAD) {
-                        throw CipherFormatException("Invalid sealed length")
+                    val chunkSize = decodeUInt32(readExactly(input, 4))
+                    val declaredSize = decodeUInt64(readExactly(input, 8))
+                    if (chunkSize !in (64 * 1024)..MAXIMUM_CHUNK_SIZE ||
+                        declaredSize < 0 ||
+                        declaredSize != expectedPlaintextSize
+                    ) {
+                        throw CipherFormatException("Header mismatch")
                     }
 
-                    val sealedData = readExactly(input, sealedLength)
-                    val plaintext = openChunk(
-                        sealedData,
-                        key,
-                        chunkAuthenticatedData(authenticatedData, chunkIndex),
-                    )
-                    written += plaintext.size
-                    if (written > expectedPlaintextSize) throw CipherFormatException("Overflow")
-                    output.write(plaintext)
-                    chunkIndex++
-                }
+                    var written = 0L
+                    var chunkIndex = 0L
+                    while (true) {
+                        val lengthData = readUpTo(input, 4)
+                        if (lengthData.isEmpty()) break
+                        if (lengthData.size != 4) throw CipherFormatException("Truncated length")
 
-                if (written != expectedPlaintextSize) throw CipherFormatException("Size mismatch")
-                output.fd.sync()
+                        val sealedLength = decodeUInt32(lengthData)
+                        if (sealedLength < SEALED_OVERHEAD || sealedLength > chunkSize + SEALED_OVERHEAD) {
+                            throw CipherFormatException("Invalid sealed length")
+                        }
+
+                        val sealedData = readExactly(input, sealedLength)
+                        val plaintext = openChunk(
+                            sealedData,
+                            key,
+                            chunkAuthenticatedData(authenticatedData, chunkIndex),
+                        )
+                        written += plaintext.size
+                        if (written > expectedPlaintextSize) throw CipherFormatException("Overflow")
+                        output.write(plaintext)
+                        chunkIndex++
+                    }
+
+                    if (written != expectedPlaintextSize) throw CipherFormatException("Size mismatch")
+                    output.fd.sync()
+                }
             }
+        } catch (e: Exception) {
+            outputFile.delete()
+            throw e
         }
     }
 

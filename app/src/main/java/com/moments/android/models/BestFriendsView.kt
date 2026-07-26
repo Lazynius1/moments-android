@@ -49,7 +49,7 @@ import com.moments.android.R
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchMutuals
 import com.moments.android.services.firestore.fetchUser
-import com.moments.android.services.firestore.searchUsers
+import com.moments.android.services.firestore.searchUsersUncapped
 import com.moments.android.services.social.BestFriendsService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -135,7 +135,7 @@ fun BestFriendsView(
         }
         delay(350)
         state = state.copy(
-            remoteResults = runCatching { firestore.searchUsers(query) }.getOrDefault(emptyList()),
+            remoteResults = runCatching { firestore.searchUsersUncapped(query) }.getOrDefault(emptyList()),
         )
     }
 

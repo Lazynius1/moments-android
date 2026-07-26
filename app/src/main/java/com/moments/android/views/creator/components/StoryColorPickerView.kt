@@ -3,7 +3,9 @@ package com.moments.android.views.creator.components
 import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,9 +35,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.gestures.detectDragGestures
+import com.moments.android.utilities.HapticManager
 import kotlin.math.PI
 import kotlin.math.atan2
 
@@ -59,12 +63,16 @@ fun StoryColorPickerPanel(
         saturation = hsb[1]
         brightness = hsb[2]
     }
+
     fun applyHsb() {
         onSelectedColorChange(
             Color(AndroidColor.HSVToColor(floatArrayOf(hue * 360f, saturation, brightness))),
         )
     }
+
     LaunchedEffect(selectedColor) { syncFromSelected() }
+
+    val hsbPreview = Color(AndroidColor.HSVToColor(floatArrayOf(hue * 360f, saturation, brightness)))
 
     Column(
         modifier
@@ -96,16 +104,26 @@ fun StoryColorPickerPanel(
                 contentAlignment = Alignment.Center,
             ) {
                 Canvas(Modifier.matchParentSize()) {
-                    drawCircle(Brush.sweepGradient(listOf(
-                        Color.Red, Color.Yellow, Color.Green, Color.Cyan,
-                        Color.Blue, Color.Magenta, Color.Red,
-                    )))
+                    drawCircle(
+                        Brush.sweepGradient(
+                            listOf(
+                                Color.Red,
+                                Color.Yellow,
+                                Color.Green,
+                                Color.Cyan,
+                                Color.Blue,
+                                Color(0xFF9C27B0), // SwiftUI .purple
+                                Color.Red,
+                            ),
+                        ),
+                    )
                 }
                 Box(
                     Modifier
                         .size(28.dp)
-                        .background(selectedColor, CircleShape)
-                        .clip(CircleShape),
+                        .clip(CircleShape)
+                        .background(hsbPreview)
+                        .border(2.dp, Color.White, CircleShape),
                 )
             }
             Column(
@@ -124,9 +142,19 @@ fun StoryColorPickerPanel(
         }
 
         if (suggestedColors.isNotEmpty()) {
-            StoryColorSuggestedRow(title = "Suggested", colors = suggestedColors, selectedColor, onSelectedColorChange)
+            StoryColorSuggestedRow(
+                title = "Suggested",
+                colors = suggestedColors,
+                selectedColor = selectedColor,
+                onSelectedColorChange = onSelectedColorChange,
+            )
         }
-        StoryColorSuggestedRow(title = null, colors = swatchColors, selectedColor, onSelectedColorChange)
+        StoryColorSuggestedRow(
+            title = null,
+            colors = swatchColors,
+            selectedColor = selectedColor,
+            onSelectedColorChange = onSelectedColorChange,
+        )
 
         onPickFromCanvas?.let { pick ->
             Text(
@@ -134,6 +162,7 @@ fun StoryColorPickerPanel(
                 color = Color.White,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(50))
@@ -147,13 +176,16 @@ fun StoryColorPickerPanel(
 
 @Composable
 private fun StoryColorSliderRow(label: String, value: Float, onValueChange: (Float) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Text(
             text = label,
             color = Color.White.copy(alpha = 0.7f),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(end = 8.dp),
+            modifier = Modifier.width(12.dp),
         )
         Slider(
             value = value,
@@ -173,7 +205,12 @@ private fun StoryColorSuggestedRow(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         title?.let {
-            Text(it, color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                it,
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
         Row(
             Modifier.horizontalScroll(rememberScrollState()),
@@ -181,15 +218,22 @@ private fun StoryColorSuggestedRow(
         ) {
             colors.forEach { color ->
                 val selected = color.toArgb() == selectedColor.toArgb()
+                // Visual de `ColorOption` (definido en StoryTextEditor.swift; usado aquí).
+                val strokeColor = when {
+                    selected -> Color.White
+                    color.toArgb() == Color.White.toArgb() -> Color.Gray.copy(alpha = 0.9f)
+                    else -> Color.White.copy(alpha = 0.92f)
+                }
                 Box(
                     Modifier
-                        .size(28.dp)
+                        .size(24.dp)
                         .clip(CircleShape)
                         .background(color)
-                        .clickable { onSelectedColorChange(color) }
-                        .then(
-                            if (selected) Modifier.background(Color.White.copy(alpha = 0.25f), CircleShape) else Modifier,
-                        ),
+                        .border(if (selected) 2.dp else 1.dp, strokeColor, CircleShape)
+                        .clickable {
+                            onSelectedColorChange(color)
+                            HapticManager.shared.lightImpact()
+                        },
                 )
             }
         }

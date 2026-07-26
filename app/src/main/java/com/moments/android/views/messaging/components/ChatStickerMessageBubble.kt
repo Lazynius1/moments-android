@@ -8,11 +8,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageStatus
 import com.moments.android.views.creator.components.AnimatedGIFView
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageStatus
 import java.io.File
 
 /** Port de `Views/Messaging/Components/ChatStickerMessageBubble.swift`. */
@@ -25,17 +28,24 @@ fun ChatStickerMessageBubble(
     message: EnhancedMessage,
     progress: Double?,
     modifier: Modifier = Modifier,
+    isSending: Boolean = message.status == MessageStatus.SENDING,
 ) {
     val isDark = isSystemInDarkTheme()
-    val isSending = message.status == MessageStatus.SENDING
-    val pendingResolution = message.isStickerMediaPendingResolution()
+    val pendingResolution = message.isMediaPendingResolution
     val stickerUrl = message.mediaUrl.takeIf { !it.isNullOrBlank() && it.isReachableStickerUrl() }
 
-    Box(modifier.size(ChatStickerMessageLayout.stickerSize), contentAlignment = Alignment.Center) {
+    Box(
+        modifier
+            .size(ChatStickerMessageLayout.stickerSize)
+            .alpha(if (isSending) 0.7f else 1f),
+        contentAlignment = Alignment.Center,
+    ) {
         when {
             stickerUrl != null && !pendingResolution -> AnimatedGIFView(
                 url = stickerUrl,
-                modifier = Modifier.size(ChatStickerMessageLayout.stickerSize),
+                modifier = Modifier
+                    .size(ChatStickerMessageLayout.stickerSize)
+                    .clip(RectangleShape),
             )
             pendingResolution -> CircularProgressIndicator(
                 color = if (isDark) Color.White.copy(alpha = .6f) else Color.Black.copy(alpha = .4f),
@@ -48,13 +58,6 @@ fun ChatStickerMessageBubble(
             )
         }
     }
-}
-
-private fun EnhancedMessage.isStickerMediaPendingResolution(): Boolean {
-    if (isDeleted || status == MessageStatus.SENDING) return false
-    val canResolve = !mediaObjectPath.isNullOrBlank() && mediaEncryption != null
-    val url = mediaUrl
-    return canResolve && (url.isNullOrBlank() || !url.isReachableStickerUrl())
 }
 
 private fun String.isReachableStickerUrl(): Boolean {

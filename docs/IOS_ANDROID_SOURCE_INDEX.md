@@ -22,7 +22,7 @@ un adaptador de plataforma, queda junto al archivo equivalente y se anota aquí.
 | `Services/Messaging/EncryptionService.swift` | `services/messaging/EncryptionService.kt` | Identidad X25519, recovery, claves envueltas y cifrado. |
 | `Models/ChatSecurityModels.swift` | `models/ChatSecurityModels.kt` | Shapes de Firestore idénticos. |
 | `Views/Messaging/Services/ChatService.swift` | `views/messaging/services/ChatService.kt` | Envío, estados, recibos y privacidad. |
-| `Views/Messaging/Services/ChatService.swift` | `views/messaging/services/ChatMessageMapper.kt` | Adaptador de `DocumentSnapshot` separado sólo por la API Android; comparte carpeta y responsabilidad. |
+| `Views/Messaging/Services/ChatService.swift` | `views/messaging/services/ChatService.kt` | Core messaging service. |
 | `MomentsNotificationService/NotificationService.swift` | `notifications/services/MomentsFirebaseMessagingService.kt` | Entry point de push Android y preview E2E local. |
 | `Shared/ChatPreviewPrivacy.swift` | `shared/ChatPreviewPrivacy.kt` | Preferencia por conversación y bloqueo de vanish. |
 

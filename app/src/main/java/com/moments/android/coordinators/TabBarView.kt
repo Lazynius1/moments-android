@@ -20,8 +20,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import com.moments.android.views.feed.rememberAdaptiveColors
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -62,11 +67,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.extensions.MomentsGlassButtonTint
 import com.moments.android.notifications.services.FCMTokenService
 import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.notifications.screens.NotificationsScreen
@@ -323,6 +328,7 @@ fun TabBarScreen(
         }
 
         if (showCreatorView) {
+            val creatorSurface = rememberAdaptiveColors().surfaceBackground
             Dialog(
                 onDismissRequest = {
                     showCreatorView = false
@@ -334,13 +340,16 @@ fun TabBarScreen(
                     decorFitsSystemWindows = false,
                 ),
             ) {
-                // Fondo edge-to-edge; el contenido respeta safe drawing (status + nav).
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(Color.Black),
-                ) {
-                    Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                // Fondo AdaptiveColors edge-to-edge (también bajo status bar).
+                // El safe drawing va solo en el contenido — no recorta el color de fondo.
+                Box(Modifier.fillMaxSize().background(creatorSurface)) {
+                    // Barras de sistema sí; IME no — el teclado se superpone (como iOS ignoresSafeArea(.keyboard)).
+                    // Si incluimos IME en el padding, el canvas creatorMomentsCaptureRect se encoge.
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars)),
+                    ) {
                         CreatorView(
                             showCreatorView = true,
                             onShowCreatorViewChange = {
@@ -425,6 +434,10 @@ private fun TabContent(
     }
 }
 
+/**
+ * Tab bar docked estilo IG (full-width, sin labels).
+ * TODO(paridad TabBarView.swift): auditar show/hide 1:1 al cerrar Coordinators/TabBarView.
+ */
 @Composable
 private fun MomentsCustomTabBar(
     selectedTab: Int,
@@ -434,63 +447,74 @@ private fun MomentsCustomTabBar(
     showProfileBadge: Boolean,
 ) {
     val isDark = isSystemInDarkTheme()
-    val activeColor = if (isDark) Color.White else Color(0xFF0B1215)
-    val inactiveColor = activeColor.copy(alpha = 0.62f)
-    val chromeTint = if (isDark) Color(0xFF1C1C1E).copy(alpha = 0.92f) else Color.White.copy(alpha = 0.92f)
+    val activeColor = if (isDark) Color.White else MomentsGlassButtonTint.dark
+    val inactiveColor = activeColor.copy(alpha = 0.55f)
+    val chromeFill = MomentsGlassButtonTint.canvas(isDark)
+    val hairline = Color.Black.copy(alpha = if (isDark) 0.28f else 0.10f)
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = chromeTint,
-        shadowElevation = 8.dp,
+        color = chromeFill,
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TabBarItem(
-                icon = if (selectedTab == 0) Icons.Filled.Home else Icons.Outlined.Home,
-                title = stringResource(R.string.tab_bar_home),
-                isSelected = selectedTab == 0,
-                activeColor = activeColor,
-                inactiveColor = inactiveColor,
-                showBadge = showFeedBadge,
-                onClick = { onSelectTab(0) },
+        Column(Modifier.fillMaxWidth()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(0.5.dp)
+                    .background(hairline),
             )
-            TabBarItem(
-                icon = null,
-                title = stringResource(R.string.tab_bar_nova),
-                isSelected = selectedTab == 1,
-                activeColor = activeColor,
-                inactiveColor = inactiveColor,
-                isNova = true,
-                onClick = { onSelectTab(1) },
-            )
-            CreateTabButton(
-                isSelected = selectedTab == 2,
-                isDark = isDark,
-                onClick = onOpenCreator,
-            )
-            TabBarItem(
-                icon = if (selectedTab == 3) Icons.Filled.Search else Icons.Outlined.Search,
-                title = stringResource(R.string.tab_bar_explore),
-                isSelected = selectedTab == 3,
-                activeColor = activeColor,
-                inactiveColor = inactiveColor,
-                onClick = { onSelectTab(3) },
-            )
-            TabBarItem(
-                icon = if (selectedTab == 4) Icons.Filled.Person else Icons.Outlined.Person,
-                title = stringResource(R.string.tab_bar_profile),
-                isSelected = selectedTab == 4,
-                activeColor = activeColor,
-                inactiveColor = inactiveColor,
-                showBadge = showProfileBadge,
-                onClick = { onSelectTab(4) },
-            )
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .height(49.dp)
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TabBarItem(
+                    icon = if (selectedTab == 0) Icons.Filled.Home else Icons.Outlined.Home,
+                    title = stringResource(R.string.tab_bar_home),
+                    isSelected = selectedTab == 0,
+                    activeColor = activeColor,
+                    inactiveColor = inactiveColor,
+                    showBadge = showFeedBadge,
+                    onClick = { onSelectTab(0) },
+                )
+                TabBarItem(
+                    icon = null,
+                    title = stringResource(R.string.tab_bar_nova),
+                    isSelected = selectedTab == 1,
+                    activeColor = activeColor,
+                    inactiveColor = inactiveColor,
+                    isNova = true,
+                    onClick = { onSelectTab(1) },
+                )
+                CreateTabButton(
+                    isSelected = selectedTab == 2,
+                    isDark = isDark,
+                    onClick = onOpenCreator,
+                )
+                TabBarItem(
+                    icon = if (selectedTab == 3) Icons.Filled.Search else Icons.Outlined.Search,
+                    title = stringResource(R.string.tab_bar_explore),
+                    isSelected = selectedTab == 3,
+                    activeColor = activeColor,
+                    inactiveColor = inactiveColor,
+                    onClick = { onSelectTab(3) },
+                )
+                TabBarItem(
+                    icon = if (selectedTab == 4) Icons.Filled.Person else Icons.Outlined.Person,
+                    title = stringResource(R.string.tab_bar_profile),
+                    isSelected = selectedTab == 4,
+                    activeColor = activeColor,
+                    inactiveColor = inactiveColor,
+                    showBadge = showProfileBadge,
+                    onClick = { onSelectTab(4) },
+                )
+            }
         }
     }
 }
@@ -506,22 +530,22 @@ private fun RowScope.TabBarItem(
     showBadge: Boolean = false,
     onClick: () -> Unit,
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .weight(1f)
+            .fillMaxSize()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
             )
             .semantics { contentDescription = title },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Box {
             if (isNova) {
                 NovaTabGlyph(
-                    size = 22.dp,
+                    size = 26.dp,
                     color = if (isSelected) activeColor else inactiveColor,
                 )
             } else if (icon != null) {
@@ -529,7 +553,7 @@ private fun RowScope.TabBarItem(
                     icon,
                     contentDescription = null,
                     tint = if (isSelected) activeColor else inactiveColor,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(26.dp),
                 )
             }
             if (showBadge) {
@@ -543,12 +567,6 @@ private fun RowScope.TabBarItem(
                 )
             }
         }
-        Text(
-            text = title,
-            fontSize = 10.sp,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (isSelected) activeColor else inactiveColor,
-        )
     }
 }
 

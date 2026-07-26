@@ -3,18 +3,35 @@ package com.moments.android.models
 import com.google.firebase.Timestamp
 import java.util.Date
 
-// MARK: - Estados
+/**
+ * Port de `Models/EchoModels.swift`.
+ */
+
+// MARK: - Echo Status
+
 enum class EchoStatus(val raw: String) {
-    PENDING("pending"), ACTIVE("active"), EXPIRED("expired"), COMPLETED("completed");
-    companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: PENDING }
+    PENDING("pending"),
+    ACTIVE("active"),
+    EXPIRED("expired"),
+    COMPLETED("completed");
+
+    companion object {
+        fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: PENDING
+    }
 }
 
 enum class EchoParticipantStatus(val raw: String) {
-    PENDING("pending"), ACCEPTED("accepted"), DECLINED("declined");
-    companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: PENDING }
+    PENDING("pending"),
+    ACCEPTED("accepted"),
+    DECLINED("declined");
+
+    companion object {
+        fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: PENDING
+    }
 }
 
-// MARK: - Participante
+// MARK: - Echo Participant
+
 data class EchoParticipant(
     val userId: String,
     val username: String,
@@ -33,7 +50,8 @@ data class EchoParticipant(
     }
 }
 
-// MARK: - Referencia a un momento del Echo
+// MARK: - Echo Moment Reference
+
 data class EchoMomentRef(
     val momentId: String,
     val authorId: String,
@@ -60,6 +78,7 @@ data class EchoMomentRef(
             customListId = moment.customListId,
         )
 
+        /** ≡ iOS `init(from mediaItem:author:)`. */
         fun fromMediaItem(mediaItem: MediaItem, author: Moment): EchoMomentRef = EchoMomentRef(
             momentId = author.id ?: "",
             authorId = author.authorId,
@@ -89,6 +108,7 @@ data class EchoMomentRef(
 }
 
 // MARK: - Echo
+
 data class Echo(
     val id: String? = null,
     val hostId: String,
@@ -102,18 +122,24 @@ data class Echo(
     val vibeSummary: String? = null,
     val participantIds: List<String> = emptyList(),
 ) {
-    /** Momentos visibles: de participantes que han aceptado. */
+    /** Momentos de participantes aceptados (el VM filtra además la perspectiva propia). */
     val visibleMoments: List<EchoMomentRef>
         get() {
-            val accepted = participants.filter { it.status == EchoParticipantStatus.ACCEPTED }.map { it.userId }.toSet()
-            return moments.filter { accepted.contains(it.authorId) }
+            val accepted = participants
+                .filter { it.status == EchoParticipantStatus.ACCEPTED }
+                .map { it.userId }
+                .toSet()
+            return moments.filter { it.authorId in accepted }
         }
 
-    val momentParticipantIds: List<String> get() = moments.map { it.authorId }.toSet().sorted()
+    val momentParticipantIds: List<String>
+        get() = moments.map { it.authorId }.toSet().sorted()
 
-    val hasMinimumMomentParticipants: Boolean get() = momentParticipantIds.size >= 2
+    val hasMinimumMomentParticipants: Boolean
+        get() = momentParticipantIds.size >= 2
 
     companion object {
+        /** ≡ iOS `init` — ventana 24h. */
         fun create(
             hostId: String,
             participants: List<EchoParticipant>,
@@ -129,7 +155,7 @@ data class Echo(
                 location = location,
                 locationName = locationName,
                 createdAt = now,
-                expiresAt = Date(now.time + 86_400_000L), // 24h
+                expiresAt = Date(now.time + 86_400_000L),
                 status = EchoStatus.PENDING,
                 moments = moments,
                 participantIds = participants.map { it.userId },
@@ -141,13 +167,17 @@ data class Echo(
             return Echo(
                 id = id ?: data["id"] as? String,
                 hostId = data["hostId"] as? String ?: "",
-                participants = (data["participants"] as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(EchoParticipant::from) } ?: emptyList(),
+                participants = (data["participants"] as? List<*>)
+                    ?.mapNotNull { (it as? Map<String, Any?>)?.let(EchoParticipant::from) }
+                    ?: emptyList(),
                 location = location,
                 locationName = data["locationName"] as? String,
                 createdAt = MediaItem.anyToDate(data["createdAt"]) ?: Date(),
                 expiresAt = MediaItem.anyToDate(data["expiresAt"]) ?: Date(),
                 status = EchoStatus.from(data["status"] as? String),
-                moments = (data["moments"] as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(EchoMomentRef::from) } ?: emptyList(),
+                moments = (data["moments"] as? List<*>)
+                    ?.mapNotNull { (it as? Map<String, Any?>)?.let(EchoMomentRef::from) }
+                    ?: emptyList(),
                 vibeSummary = data["vibeSummary"] as? String,
                 participantIds = (data["participantIds"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
             )
@@ -155,16 +185,22 @@ data class Echo(
     }
 }
 
-// MARK: - Serialización a Firestore (equivalente a encode(to:) de iOS)
+// MARK: - Firestore maps (≡ encode(to:); id no se serializa)
 
 fun EchoParticipant.toMap(): Map<String, Any> = buildMap {
-    put("userId", userId); put("username", username); put("status", status.raw)
+    put("userId", userId)
+    put("username", username)
+    put("status", status.raw)
     profileImagePath?.let { put("profileImagePath", it) }
 }
 
 fun EchoMomentRef.toMap(): Map<String, Any> = buildMap {
-    put("momentId", momentId); put("authorId", authorId); put("username", username)
-    put("timestamp", Timestamp(timestamp)); put("mediaType", mediaType); put("mediaUrl", mediaUrl)
+    put("momentId", momentId)
+    put("authorId", authorId)
+    put("username", username)
+    put("timestamp", Timestamp(timestamp))
+    put("mediaType", mediaType)
+    put("mediaUrl", mediaUrl)
     aspectRatio?.let { put("aspectRatio", it) }
     thumbnailUrl?.let { put("thumbnailUrl", it) }
     audience?.let { put("audience", it) }
@@ -172,12 +208,12 @@ fun EchoMomentRef.toMap(): Map<String, Any> = buildMap {
 }
 
 fun Echo.toMap(): Map<String, Any> = buildMap {
-    // id NO se serializa (@DocumentID en iOS).
     put("hostId", hostId)
     put("participants", participants.map { it.toMap() })
     put("location", location.toMap())
     locationName?.let { put("locationName", it) }
-    put("createdAt", Timestamp(createdAt)); put("expiresAt", Timestamp(expiresAt))
+    put("createdAt", Timestamp(createdAt))
+    put("expiresAt", Timestamp(expiresAt))
     put("status", status.raw)
     put("moments", moments.map { it.toMap() })
     vibeSummary?.let { put("vibeSummary", it) }

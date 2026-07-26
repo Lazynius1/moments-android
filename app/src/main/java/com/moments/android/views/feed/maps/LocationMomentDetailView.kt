@@ -172,6 +172,7 @@ private fun Moment.toFeedMomentForMap(): FeedMoment {
         reactionCount = reactionTotal,
         hideLikeCounts = hideLikeCounts,
         disableComments = disableComments,
+        allowSharing = allowSharing,
         hasHiddenLayers = hasHiddenLayers,
         hiddenLayerCount = hiddenLayerCount,
         audience = audience,

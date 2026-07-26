@@ -38,14 +38,31 @@ object StoryUploadProgressManager {
         activeUploads = emptyList()
     }
 
-    fun trackStoryUpload(id: String = java.util.UUID.randomUUID().toString(), initialProgress: Double = 0.0) {
+    fun trackStoryUpload(
+        id: String = java.util.UUID.randomUUID().toString(),
+        initialProgress: Double = 0.0,
+        status: UploadStatus = UploadStatus.Uploading,
+    ) {
         startUpload()
         activeUploads = activeUploads + UploadProgressItem(
             id = id,
             kind = UploadKind.Story,
             progress = initialProgress,
-            status = UploadStatus.Uploading,
+            status = status,
         )
+    }
+
+    fun updateStatus(id: String, status: UploadStatus, progress: Double? = null) {
+        activeUploads = activeUploads.map {
+            if (it.id != id) it
+            else it.copy(
+                status = status,
+                progress = progress ?: it.progress,
+            )
+        }
+        if (status == UploadStatus.Uploading || status == UploadStatus.Initializing) {
+            isUploading = true
+        }
     }
 
     fun complete(id: String) {

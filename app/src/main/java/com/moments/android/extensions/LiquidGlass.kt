@@ -16,9 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -33,7 +31,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,8 +38,12 @@ import com.moments.android.R
 import com.moments.android.utilities.MomentsPressDefaults
 import com.moments.android.utilities.momentsPress
 
-// MARK: - Liquid Glass variants
-
+/**
+ * Port de `Extensions/View+LiquidGlass.swift`.
+ *
+ * API/métricas 1:1. Render Android = fill opaco + borde (sin Liquid Glass /
+ * ultraThinMaterial — se ve mal sin el glass del sistema iOS).
+ */
 enum class LiquidGlassVariant {
     CLEAR,
     IDENTITY,
@@ -117,8 +118,8 @@ object ProfileChromeGlassMetrics {
 /**
  * Tint de chrome alineado al canvas de la app.
  *
- * Android: fills **opacos** (sin glass/transparencia). El blur/material de iOS
- * se ve mal aquí; usamos el mismo color de superficie sólido en todos los estilos.
+ * Android: fills **opacos** (sin Liquid Glass / material). Métricas y API
+ * 1:1 con iOS; el render es sólido porque la transparencia sin glass se ve mal.
  */
 object MomentsGlassButtonTint {
     val dark = Color.fromHex("0B1215")
@@ -128,19 +129,23 @@ object MomentsGlassButtonTint {
 }
 
 object MomentsChromeGlass {
-    /** Histórico iOS; en Android el tint es siempre opaco (alpha 1). */
-    const val defaultTintOpacity = 1f
-    const val defaultDarkTintOpacity = 1f
-    const val nativeTintedOpacityScale = 1f
+    /** ≡ iOS; en Android [canvasTint] fuerza alpha 1 (chrome sólido). */
+    const val defaultTintOpacity = 0.60f
+    const val defaultDarkTintOpacity = 0.82f
+    const val nativeTintedOpacityScale = 0.45f
 
     fun canvasTint(isDark: Boolean, opacity: Float = defaultTintOpacity): Color {
-        // Ignora opacity: Android chrome = sólido.
+        // Platform: ignore opacity — opaque canvas fill.
+        @Suppress("UNUSED_PARAMETER")
+        val ignored = opacity
         return MomentsGlassButtonTint.canvas(isDark).copy(alpha = 1f)
     }
 
     fun contentColor(isDark: Boolean): Color =
         if (isDark) Color.White else MomentsGlassButtonTint.dark
 
+    /** ≡ underlayOpacity; Android siempre opaco. */
+    @Suppress("UNUSED_PARAMETER")
     fun underlayOpacity(tintOpacity: Float): Float = 1f
 }
 
@@ -314,8 +319,9 @@ fun ProfileGlassPillThumb(
                 ambientColor = Color.Black.copy(alpha = if (isDark) 0.2f else 0.07f),
                 spotColor = Color.Black.copy(alpha = if (isDark) 0.2f else 0.07f),
             )
+            // iOS: fill + momentsChromeGlass; Android: thumb sólido invertido (legible sin glass)
             .clip(CapsuleShape)
-            .background(ProfilePillTabPalette.selectedThumbTint(isDark)),
+            .background(ProfilePillTabPalette.selectedThumbTint(isDark), CapsuleShape),
     )
 }
 
@@ -347,23 +353,8 @@ fun MomentsTabBarChromeBackground(modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-fun ProfilePillTabLabel(
-    text: String,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val isDark = isSystemInDarkTheme()
-    val color = if (selected) {
-        ProfilePillTabPalette.selectedLabelColor(isDark)
-    } else {
-        ProfilePillTabPalette.unselectedLabelColor(isDark)
-    }
-    Text(
-        text = text,
-        fontSize = ProfileChromeGlassMetrics.pillLabelSize,
-        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-        color = color,
-        modifier = modifier,
-    )
-}
+// ≡ iOS typealiases (Compose no typealiasa @Composable):
+// MomentsGlassCluster → ProfileChromeControlsCluster
+// MomentsGlassIconButton → ProfileChromeIconButton
+// MomentsGlassPillBar → ProfileGlassPillTrack
+

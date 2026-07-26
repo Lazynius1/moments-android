@@ -137,6 +137,18 @@ class FirestoreService(
         return result
     }
 
+    /** True si `otherUserId` está en `users/{userId}/mutuals` (mantenida al follow mutuo). */
+    suspend fun isMutualConnection(userId: String, otherUserId: String): Boolean {
+        if (userId.isEmpty() || otherUserId.isEmpty() || userId == otherUserId) return false
+        return runCatching {
+            db.collection("users").document(userId)
+                .collection("mutuals").document(otherUserId)
+                .get()
+                .await()
+                .exists()
+        }.getOrDefault(false)
+    }
+
     suspend fun isFollowingCached(currentUserId: String, targetUserId: String): Boolean {
         refreshFollowingCacheIfStale()
         val cacheKey = "${currentUserId}_$targetUserId"
@@ -188,6 +200,8 @@ class FirestoreService(
     suspend fun blockUser(currentUserId: String, targetUserId: String) {
         db.collection("users").document(currentUserId)
             .update("blockedUsers", FieldValue.arrayUnion(targetUserId)).await()
+        invalidateFollowingCache(currentUserId, targetUserId)
+        invalidateFollowingCache(targetUserId, currentUserId)
         runCatching { unfollowUser(currentUserId, targetUserId) }
         runCatching { unfollowUser(targetUserId, currentUserId) }
         runCatching { deleteNotificationsBetweenUsers(currentUserId, targetUserId) }
@@ -215,6 +229,8 @@ class FirestoreService(
     }
 
     suspend fun unblockUser(currentUserId: String, targetUserId: String) {
+        invalidateFollowingCache(currentUserId, targetUserId)
+        invalidateFollowingCache(targetUserId, currentUserId)
         db.collection("users").document(currentUserId)
             .update("blockedUsers", FieldValue.arrayRemove(targetUserId)).await()
     }
@@ -412,7 +428,13 @@ class FirestoreService(
     suspend fun acceptFollowRequest(notificationId: String, recipientId: String, senderId: String) {
         val request = getFollowRequestByUsers(senderId, recipientId) ?: error("Request not found")
         require(request.status == FollowRequestStatus.PENDING) { "Already processed" }
-        request.expirationDate?.let { if (Date().after(it)) error("Expired") }
+        request.expirationDate?.let { expiration ->
+            if (Date().after(expiration)) {
+                // iOS: limpia la solicitud expirada vía reject y luego falla.
+                runCatching { rejectFollowRequest(notificationId, recipientId, senderId) }
+                error("Expired")
+            }
+        }
         performFollow(senderId, recipientId, sendNotification = false, acceptedFollowRequestId = request.id)
         db.runBatch { batch ->
             batch.delete(db.collection("users").document(senderId)
@@ -576,17 +598,21 @@ class FirestoreService(
     }
 
     suspend fun fetchMomentAuthorId(momentId: String, preferredUserId: String? = null): String? {
-        preferredUserId?.let { userId ->
+        val candidates = buildList {
+            preferredUserId?.takeIf { it.isNotEmpty() }?.let { add(it) }
+            FirebaseAuth.getInstance().currentUser?.uid?.takeIf { it.isNotEmpty() }?.let { add(it) }
+        }.distinct()
+        for (userId in candidates) {
             val snap = db.collection("users").document(userId)
                 .collection("moments").document(momentId).get().await()
-            if (snap.exists()) return userId
+            if (!snap.exists()) continue
+            @Suppress("UNCHECKED_CAST")
+            val data = snap.data as? Map<String, Any?> ?: continue
+            val moment = runCatching { Moment.from(snap.id, data) }.getOrNull() ?: continue
+            return moment.authorId
         }
-        val groupSnap = db.collectionGroup("moments")
-            .whereEqualTo(FieldPath.documentId(), momentId)
-            .limit(5)
-            .get()
-            .await()
-        return groupSnap.documents.firstOrNull()?.reference?.parent?.parent?.id
+        // iOS no hace collectionGroup aquí: si los candidatos fallan → null.
+        return null
     }
 
     suspend fun isUserPlus(userId: String): Boolean {
@@ -679,11 +705,12 @@ class FirestoreService(
 
     suspend fun fetchRecentMomentCounts(authorIds: List<String>, since: Date): Map<String, Int> =
         coroutineScope {
-            authorIds.distinct().map { authorId ->
+            authorIds.distinct().take(60).map { authorId ->
                 async {
                     runCatching {
                         val count = db.collection("users").document(authorId).collection("moments")
                             .whereGreaterThan("timestamp", Timestamp(since))
+                            .limit(10)
                             .get()
                             .await()
                             .size()
@@ -805,11 +832,27 @@ class FirestoreService(
     }
 
     suspend fun checkActiveHours(user: AppUser): Boolean {
-        val start = user.activeHoursStart ?: return true
-        val end = user.activeHoursEnd ?: return true
-        val format = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US)
-        val now = format.format(Date())
-        return if (start <= end) now in start..end else now >= start || now <= end
+        val start = user.activeHoursStart?.takeIf { it.isNotEmpty() } ?: return true
+        val end = user.activeHoursEnd?.takeIf { it.isNotEmpty() } ?: return true
+        val format = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).apply {
+            timeZone = java.util.TimeZone.getDefault()
+        }
+        val startDate = runCatching { format.parse(start) }.getOrNull() ?: return true
+        val endDate = runCatching { format.parse(end) }.getOrNull() ?: return true
+        val calendar = Calendar.getInstance()
+        val now = calendar.time
+        fun minutesOf(date: Date): Int {
+            calendar.time = date
+            return calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+        }
+        val currentMinutes = minutesOf(now)
+        val startMinutes = minutesOf(startDate)
+        val endMinutes = minutesOf(endDate)
+        return if (startMinutes <= endMinutes) {
+            currentMinutes in startMinutes..endMinutes
+        } else {
+            currentMinutes >= startMinutes || currentMinutes <= endMinutes
+        }
     }
 
     internal suspend fun scheduleStorySummaryRebuildIfNeeded(userId: String) {
@@ -827,18 +870,7 @@ class FirestoreService(
         storySummaryRebuildInFlight.remove(userId)
     }
 
-    /** Prefetch saved moments for feed cards (iOS `loadSavedMoments`). */
-    suspend fun loadSavedMoments(userId: String) {
-        if (userId.isEmpty()) return
-        runCatching {
-            db.collection("users").document(userId).collection("savedMoments").get().await()
-        }
-    }
-
-    suspend fun deleteMoment(userId: String, momentId: String) {
-        db.collection("users").document(userId)
-            .collection("moments").document(momentId)
-            .delete()
-            .await()
-    }
+    // loadSavedMoments / deleteMoment: viven en FirestoreMomentsRepository.kt
+    // (soft-delete → recentlyDeleted + estado savedMomentIds). NO duplicar aquí:
+    // un método miembro eclipsaría las extensiones y rompería la paridad iOS.
 }

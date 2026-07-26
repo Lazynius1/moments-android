@@ -10,8 +10,6 @@ import com.moments.android.models.Moment
 import com.moments.android.services.cache.ImagePrefetchManager
 import com.moments.android.services.cache.VideoPreloader
 import com.moments.android.services.privacy.PrivacyService
-import com.moments.android.services.privacy.canUserViewMomentEnhanced
-import com.moments.android.services.privacy.checkIfBestFriend
 import com.moments.android.services.social.EchoService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -151,6 +149,7 @@ class EchoViewModel(
     fun switchPerspective(index: Int) {
         val perspectives = _groupedPerspectives.value
         if (index !in perspectives.indices) return
+        // ≡ switchPerspective(to:) — apagar video, delay 0.03s, reset vertical
         _isVideoPlaying.value = false
         scope.launch {
             kotlinx.coroutines.delay(30)
@@ -159,7 +158,7 @@ class EchoViewModel(
             _ripplePhase.value = 0.0
             val firstMoment = perspectives[index].moments.firstOrNull()
             _isVideoPlaying.value = firstMoment?.mediaType == "video"
-            kotlinx.coroutines.delay(320)
+            kotlinx.coroutines.delay(350)
             _ripplePhase.value = 0.0
         }
     }
@@ -170,6 +169,7 @@ class EchoViewModel(
         if (perspectiveIndex >= perspectives.size) return
         val moments = perspectives[perspectiveIndex].moments
         if (index !in moments.indices) return
+        // ≡ switchVerticalIndex(to:)
         _isVideoPlaying.value = false
         scope.launch {
             kotlinx.coroutines.delay(30)
@@ -225,10 +225,12 @@ class EchoViewModel(
         if (_currentPerspectiveIndex.value >= perspectives.size) {
             _currentPerspectiveIndex.value = maxOf(0, perspectives.size - 1)
         }
-        val visibleMoments = perspectives.getOrNull(_currentPerspectiveIndex.value)?.moments.orEmpty()
-        if (_currentVerticalIndex.value >= visibleMoments.size) {
-            _currentVerticalIndex.value = maxOf(0, visibleMoments.size - 1)
-        } else if (perspectives.isEmpty()) {
+        if (_currentPerspectiveIndex.value < perspectives.size) {
+            val visibleMoments = perspectives[_currentPerspectiveIndex.value].moments
+            if (_currentVerticalIndex.value >= visibleMoments.size) {
+                _currentVerticalIndex.value = maxOf(0, visibleMoments.size - 1)
+            }
+        } else {
             _currentVerticalIndex.value = 0
         }
     }
@@ -261,30 +263,32 @@ class EchoViewModel(
 
     private fun validateSingleMoment(momentRef: EchoMomentRef, viewerId: String, privacyService: PrivacyService) {
         scope.launch(Dispatchers.IO) {
+            fun setAvailable(value: Boolean) {
+                _momentAvailability.value = _momentAvailability.value + (momentRef.momentId to value)
+            }
             try {
                 val snapshot = db.collection("users").document(momentRef.authorId)
                     .collection("moments").document(momentRef.momentId).get().await()
                 if (!snapshot.exists()) {
-                    _momentAvailability.value = _momentAvailability.value + (momentRef.momentId to false)
+                    setAvailable(false)
                     return@launch
                 }
                 @Suppress("UNCHECKED_CAST")
                 val data = snapshot.data as Map<String, Any?>? ?: emptyMap()
                 val moment = Moment.from(snapshot.id, data)
                 if (moment.isArchived == true) {
-                    _momentAvailability.value = _momentAvailability.value + (momentRef.momentId to false)
+                    setAvailable(false)
                     return@launch
                 }
                 val audience = momentRef.audience ?: "everyone"
-                val available = when (audience) {
-                    "everyone", "mutuals" -> true
-                    "bestFriends" -> privacyService.checkIfBestFriend(momentRef.authorId, viewerId)
-                    "custom", "customList" -> privacyService.canUserViewMomentEnhanced(moment, viewerId)
-                    else -> false
+                when (audience) {
+                    "everyone", "mutuals" -> setAvailable(true)
+                    "bestFriends" -> setAvailable(privacyService.checkIfBestFriend(momentRef.authorId, viewerId))
+                    "custom", "customList" -> setAvailable(privacyService.canUserViewMomentEnhanced(moment, viewerId))
+                    // iOS: ramas desconocidas no escriben availability
                 }
-                _momentAvailability.value = _momentAvailability.value + (momentRef.momentId to available)
             } catch (_: Exception) {
-                _momentAvailability.value = _momentAvailability.value + (momentRef.momentId to false)
+                setAvailable(false)
             }
         }
     }

@@ -2,9 +2,9 @@ package com.moments.android.views.messaging.screens.chat
 
 import android.content.Context
 import android.location.LocationManager
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageStatus
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageStatus
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.media.CameraPickerMediaType
 import com.moments.android.views.messaging.media.ChatMediaOverlayPayload
 import com.moments.android.views.messaging.models.ChatGiphyAsset
@@ -13,6 +13,7 @@ import com.moments.android.views.messaging.models.ChatStickerAsset
 import com.moments.android.views.messaging.models.LiveLocationDuration
 import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.messaging.services.LiveLocationSharingService
+import com.moments.android.views.messaging.services.sendViewOnceMessage
 import java.util.Date
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope

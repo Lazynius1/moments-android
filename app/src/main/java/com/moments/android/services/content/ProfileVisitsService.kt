@@ -1,28 +1,24 @@
 package com.moments.android.services.content
 
 import com.google.firebase.FirebaseApp
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.moments.android.models.AppUser
 import com.moments.android.models.GroupedVisit
 import com.moments.android.models.Visit
 import com.moments.android.models.VisitGrouping
 import com.moments.android.services.firestore.FirestoreService
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
+import com.moments.android.services.firestore.fetchVisits
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Date
-import com.moments.android.services.firestore.fetchUser
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
-/** Port de ProfileVisitsService.swift. */
+/**
+ * Port de `ProfileVisitsService.swift`.
+ * CF `getProfileVisitsPage` → fallback Firestore `users/{id}/visits`.
+ */
 object ProfileVisitsService {
     private val firestoreService = FirestoreService()
 
@@ -57,10 +53,12 @@ object ProfileVisitsService {
                     val arr = g.getJSONArray("visits")
                     for (j in 0 until arr.length()) {
                         val v = arr.getJSONObject(j)
+                        // iOS: Date(timeIntervalSince1970: timestamp / 1000) — epoch millis.
+                        val epochMs = v.getDouble("timestamp")
                         visits += Visit(
                             id = v.optString("id").takeIf { it.isNotEmpty() },
                             visitorId = visitorId,
-                            timestamp = Date(v.getDouble("timestamp").toLong()),
+                            timestamp = Date(epochMs.toLong()),
                         )
                     }
                 }
@@ -73,33 +71,15 @@ object ProfileVisitsService {
 
     private suspend fun fetchFromFirestore(userId: String): List<GroupedVisit> {
         return runCatching {
-            val visits = fetchVisits(userId)
+            val visits = firestoreService.fetchVisits(userId)
             buildGroupedVisits(visits)
         }.getOrDefault(emptyList())
     }
 
-    private suspend fun buildGroupedVisits(visits: List<Visit>): List<GroupedVisit> = coroutineScope {
+    private suspend fun buildGroupedVisits(visits: List<Visit>): List<GroupedVisit> {
         val ids = VisitGrouping.uniqueVisitorIds(visits)
-        if (ids.isEmpty()) return@coroutineScope emptyList()
-        val users = ids.map { id ->
-            async { runCatching { firestoreService.fetchUser(id) }.getOrNull() }
-        }.awaitAll().filterNotNull()
-        VisitGrouping.build(visits, users)
-    }
-
-    private suspend fun fetchVisits(userId: String): List<Visit> {
-        val snap = FirebaseFirestore.getInstance()
-            .collection("users").document(userId)
-            .collection("visits")
-            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-            .limit(1000)
-            .get()
-            .await()
-        return snap.documents.mapNotNull { doc ->
-            val data = doc.data ?: return@mapNotNull null
-            val visitorId = data["visitorId"] as? String ?: return@mapNotNull null
-            val ts = (data["timestamp"] as? Timestamp)?.toDate() ?: Date()
-            Visit(id = doc.id, visitorId = visitorId, timestamp = ts)
-        }
+        if (ids.isEmpty()) return emptyList()
+        val users = firestoreService.fetchUsersAsync(ids)
+        return VisitGrouping.build(visits, users)
     }
 }

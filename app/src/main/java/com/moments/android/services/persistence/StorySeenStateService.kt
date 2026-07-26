@@ -8,6 +8,7 @@ import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
@@ -15,6 +16,7 @@ import kotlin.coroutines.resume
 /**
  * Port de StorySeenStateService (final de LocalPersistenceService.swift).
  * Cache local del último timestamp de story vista por autor y viewer.
+ * Colección Firestore: users/{viewerId}/storySeen/{authorId}.
  */
 object StorySeenStateService {
 
@@ -38,25 +40,23 @@ object StorySeenStateService {
 
     private fun ensureLoaded() {
         if (loaded) return
-        val stored = prefs?.all ?: emptyMap()
-        for ((key, value) in stored) {
-            when (value) {
-                is Number -> lastSeenMap[key] = value.toDouble()
-                is String -> value.toDoubleOrNull()?.let { lastSeenMap[key] = it }
+        // ≡ iOS UserDefaults dictionary(forKey:) — un JSON bajo STORAGE_KEY (no float prefs).
+        val raw = prefs?.getString(STORAGE_KEY, null)
+        if (!raw.isNullOrEmpty()) {
+            runCatching {
+                val json = JSONObject(raw)
+                for (key in json.keys()) {
+                    lastSeenMap[key] = json.getDouble(key)
+                }
             }
         }
-        // Prefer dedicated map under STORAGE_KEY if present as encoded pairs — iOS uses dictionary forKey.
-        // Android SharedPreferences stores flat; we use prefs file as the dictionary itself.
         loaded = true
     }
 
     private fun persistLocked() {
-        val editor = prefs?.edit() ?: return
-        editor.clear()
-        for ((k, v) in lastSeenMap) {
-            editor.putFloat(k, v.toFloat())
-        }
-        editor.apply()
+        val json = JSONObject()
+        for ((k, v) in lastSeenMap) json.put(k, v)
+        prefs?.edit()?.putString(STORAGE_KEY, json.toString())?.apply()
     }
 
     private fun localLastSeenDateLocked(viewerId: String, authorId: String): Date? {

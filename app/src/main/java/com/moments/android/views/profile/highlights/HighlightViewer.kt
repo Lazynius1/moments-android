@@ -33,7 +33,6 @@ import com.moments.android.models.Story
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchStoriesByIds
 import com.moments.android.services.privacy.PrivacyService
-import com.moments.android.services.privacy.canUserViewStoryEnhanced
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.profile.core.ProfileColors
 import com.moments.android.views.story.StoriesView

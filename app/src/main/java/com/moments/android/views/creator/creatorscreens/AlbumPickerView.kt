@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -35,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -42,20 +42,24 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.views.creator.CreatorAlbumInfo
+import com.moments.android.views.feed.rememberAdaptiveColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
  * Port de AlbumPickerView.swift.
  *
- * MediaStore no entrega una portada de álbum como Photos; se consulta
- * perezosamente el asset más reciente del bucket, equivalente al thumbnail que
- * Swift pide al PHImageManager al aparecer cada fila.
+ * iOS: `.ultraThinMaterial` + stroke gradient. Android: canvas sólido
+ * AdaptiveColors (`#0B1215` / `#FAF9F6`) — sin blur (decisión de plataforma).
+ *
+ * MediaStore no entrega portada de álbum; se consulta perezosamente el asset
+ * más reciente del bucket ≡ PHImageManager al aparecer cada fila.
  */
 @Composable
 fun AlbumPickerView(
@@ -66,37 +70,48 @@ fun AlbumPickerView(
     modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
+    val canvas = rememberAdaptiveColors().surfaceBackground
     val contentColor = if (isDark) Color.White else Color.Black
-    val surface = if (isDark) Color(0xFF182124).copy(alpha = .96f) else Color(0xFFF7F7F5)
     val selectedColor = Color(0xFF00A896)
 
     Column(
         modifier
             .fillMaxWidth()
             .heightIn(max = 620.dp)
+            .shadow(
+                elevation = 20.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = Color.Black.copy(alpha = if (isDark) 0.30f else 0.10f),
+                spotColor = Color.Black.copy(alpha = if (isDark) 0.30f else 0.10f),
+            )
             .clip(RoundedCornerShape(20.dp))
-            .background(surface)
+            .background(canvas)
             .border(
                 1.dp,
-                Brush.linearGradient(listOf(Color.White.copy(alpha = .30f), Color(0xFFFF6B8A).copy(alpha = .40f))),
+                Brush.linearGradient(
+                    listOf(Color.White.copy(alpha = 0.30f), Color(0xFFFF6B8A).copy(alpha = 0.40f)),
+                ),
                 RoundedCornerShape(20.dp),
-            )
-            .padding(bottom = 20.dp),
+            ),
     ) {
+        // ≡ headerView — drag indicator + título
         Box(
             Modifier
                 .align(Alignment.CenterHorizontally)
                 .padding(top = 8.dp, bottom = 16.dp)
                 .size(width = 36.dp, height = 5.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(Color.White.copy(alpha = .60f)),
+                .clip(RoundedCornerShape(2.5.dp))
+                .background(Color.White.copy(alpha = 0.60f)),
         )
         Text(
             text = stringResource(R.string.creator_album_select),
             color = contentColor,
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 0.dp),
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp),
         )
         LazyColumn(
             modifier = Modifier
@@ -119,13 +134,15 @@ fun AlbumPickerView(
             color = contentColor,
             fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
                 .padding(horizontal = 20.dp)
+                .padding(bottom = 30.dp)
+                .height(50.dp)
                 .clip(RoundedCornerShape(25.dp))
-                .background(Color.White.copy(alpha = .10f))
-                .border(1.dp, Color.White.copy(alpha = .20f), RoundedCornerShape(25.dp))
+                .background(Color.White.copy(alpha = 0.10f))
+                .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(25.dp))
                 .clickable(onClick = onDismiss)
                 .padding(vertical = 14.dp),
         )
@@ -152,7 +169,7 @@ private fun AlbumPickerRow(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) selectedColor.copy(alpha = .10f) else Color.Transparent)
+            .background(if (selected) selectedColor.copy(alpha = 0.10f) else Color.Transparent)
             .clickable(onClick = onTap)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -162,7 +179,7 @@ private fun AlbumPickerRow(
             Modifier
                 .size(60.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color.Gray.copy(alpha = .30f)),
+                .background(Color.Gray.copy(alpha = 0.30f)),
             contentAlignment = Alignment.Center,
         ) {
             if (thumbnailUri != null) {
@@ -180,14 +197,14 @@ private fun AlbumPickerRow(
             Text(album.title, color = contentColor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Text(
                 pluralStringResource(R.plurals.creator_album_elements, album.assetCount, album.assetCount),
-                color = Color.Gray.copy(alpha = .80f),
+                color = Color.Gray.copy(alpha = 0.80f),
                 fontSize = 14.sp,
             )
         }
         Icon(
             if (selected) Icons.Filled.CheckCircle else Icons.Filled.Circle,
             contentDescription = null,
-            tint = if (selected) selectedColor else Color.Gray.copy(alpha = .50f),
+            tint = if (selected) selectedColor else Color.Gray.copy(alpha = 0.50f),
             modifier = Modifier.size(20.dp),
         )
     }

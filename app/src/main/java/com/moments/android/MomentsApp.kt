@@ -1,14 +1,21 @@
 package com.moments.android
 
+import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -16,31 +23,84 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.coordinators.TabBarScreen
+import com.moments.android.notifications.services.NotificationBadgeService
+import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.firestore.updateLastAppOpenAt
+import com.moments.android.services.incognito.IncognitoModeService
+import com.moments.android.services.messaging.ChatCacheStore
+import com.moments.android.services.messaging.MessageCatchUpService
+import com.moments.android.services.messaging.MessageIngestService
+import com.moments.android.services.network.OfflineSyncService
+import com.moments.android.services.persistence.LocalPersistenceService
+import com.moments.android.services.social.AffinityTracker
+import com.moments.android.views.creator.BackgroundMomentUploadService
 import com.moments.android.views.login.AccountState
 import com.moments.android.views.login.DeactivatedScreen
 import com.moments.android.views.login.LoginScreen
 import com.moments.android.views.login.SplashScreen
 import com.moments.android.views.login.SuspendedScreen
 import com.moments.android.views.login.resolveAccountState
+import com.moments.android.views.messaging.services.ChatService
+import com.moments.android.views.messaging.services.LiveLocationSharingService
+import com.moments.android.views.misc.WhatsNewView
+import com.moments.android.views.profile.incognito.IncognitoGlobalOverlay
 import com.moments.android.views.shared.MomentsTheme
 import com.moments.android.views.shared.Surface
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/**
+ * Port de `MomentsApp.swift` (cuerpo Compose / Scene).
+ *
+ * Init Firebase/AppCheck/caches → [MomentsApplication] (≡ `MomentsApp.init` + partes AppDelegate).
+ * Auth gate (Login/cuenta) es capa Android; iOS monta TabBar siempre.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MomentsApp(
     deepLinkUri: Uri? = null,
     onDeepLinkHandled: () -> Unit = {},
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val prefs = remember {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
     var showSplash by remember { mutableStateOf(true) }
+    var showWhatsNew by remember { mutableStateOf(false) }
+    var didPostLaunchInit by remember { mutableStateOf(false) }
     var signedIn by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser != null) }
     var accountState by remember { mutableStateOf<AccountState>(AccountState.Loading) }
 
+    val incognitoActive by IncognitoModeService.isActive.collectAsState()
+
+    // ≡ Auth.auth().addStateDidChangeListener
     DisposableEffect(Unit) {
-        val listener = FirebaseAuth.AuthStateListener { signedIn = it.currentUser != null }
+        val listener = FirebaseAuth.AuthStateListener { auth ->
+            val user = auth.currentUser
+            signedIn = user != null
+            if (user != null) {
+                NotificationBadgeService.setupListeners()
+                syncLastAppOpenIfNeeded(prefs, force = true, scope = scope)
+                IncognitoModeService.loadState()
+                scope.launch { MessageIngestService.drainPendingQueue() }
+            } else {
+                NotificationBadgeService.cleanup()
+                IncognitoModeService.resetForSignedOutUser()
+                LiveLocationSharingService.handleUserSignedOut()
+            }
+        }
         FirebaseAuth.getInstance().addAuthStateListener(listener)
         onDispose { FirebaseAuth.getInstance().removeAuthStateListener(listener) }
     }
@@ -53,18 +113,130 @@ fun MomentsApp(
         }
     }
 
-    when {
-        showSplash -> SplashScreen(onComplete = { showSplash = false })
-        !signedIn -> LoginScreen(onAuthenticated = { signedIn = true })
-        accountState is AccountState.Loading -> AccountLoading()
-        accountState is AccountState.Deactivated -> DeactivatedScreen(accountState as AccountState.Deactivated) {
+    // ≡ onAppear: post-launch init (una vez) + restore live location
+    LaunchedEffect(Unit) {
+        if (!didPostLaunchInit) {
+            didPostLaunchInit = true
+            delay(200)
+            OfflineSyncService.enableAutomaticSync()
+            BackgroundMomentUploadService.cleanupStaleUploadActivities()
+            // BackgroundStoryUploadService.cleanupStaleUploadActivities — Live Activity N/A
+            LocalPersistenceService.cleanupOldData()
+            ChatCacheStore.runMaintenance()
+            if (FirebaseAuth.getInstance().currentUser != null) {
+                MessageIngestService.drainPendingQueue()
+                MessageCatchUpService.syncRecent(LocalPersistenceService.loadConversations())
+            }
+            AffinityTracker.applyTimeDecayIfNeeded()
+            AffinityTracker.cleanupVeryLowAffinities()
+        }
+        LiveLocationSharingService.restoreIfNeeded()
+    }
+
+    // ≡ UIApplication.didBecomeActiveNotification
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
+            scope.launch { ChatService.markAllPendingMessagesAsDelivered() }
+            NotificationBadgeService.refreshAllCounts()
+            LiveLocationSharingService.restoreIfNeeded()
+            syncLastAppOpenIfNeeded(prefs, force = false, scope = scope)
+            IncognitoModeService.refresh()
+            IncognitoModeService.handlePendingAppGroupActionIfNeeded()
             scope.launch {
-                val uid = FirebaseAuth.getInstance().currentUser?.uid
-                accountState = if (uid != null) resolveAccountState(uid) else AccountState.Active
+                ChatCacheStore.runMaintenance()
+                MessageIngestService.drainPendingQueue()
+                MessageCatchUpService.syncRecent(LocalPersistenceService.loadConversations())
             }
         }
-        accountState is AccountState.Suspended -> SuspendedScreen(accountState as AccountState.Suspended)
-        else -> TabBarScreen(deepLinkUri = deepLinkUri, onDeepLinkHandled = onDeepLinkHandled)
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        // Contenido principal (bajo el splash, como iOS ZStack)
+        when {
+            !signedIn -> LoginScreen(onAuthenticated = { signedIn = true })
+            accountState is AccountState.Loading -> AccountLoading()
+            accountState is AccountState.Deactivated -> DeactivatedScreen(accountState as AccountState.Deactivated) {
+                scope.launch {
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid
+                    accountState = if (uid != null) resolveAccountState(uid) else AccountState.Active
+                }
+            }
+            accountState is AccountState.Suspended -> SuspendedScreen(accountState as AccountState.Suspended)
+            else -> TabBarScreen(deepLinkUri = deepLinkUri, onDeepLinkHandled = onDeepLinkHandled)
+        }
+
+        if (incognitoActive && signedIn) {
+            IncognitoGlobalOverlay(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(1600f),
+            )
+        }
+
+        if (showSplash) {
+            SplashScreen(
+                onComplete = {
+                    showSplash = false
+                    checkVersion(context, prefs, scope) { showWhatsNew = true }
+                },
+            )
+        }
+
+        if (showWhatsNew) {
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+            ModalBottomSheet(
+                onDismissRequest = { showWhatsNew = false },
+                sheetState = sheetState,
+            ) {
+                WhatsNewView(onDismiss = { showWhatsNew = false })
+            }
+        }
+    }
+}
+
+/** ≡ checkVersion() */
+private fun checkVersion(
+    context: Context,
+    prefs: android.content.SharedPreferences,
+    scope: CoroutineScope,
+    onShowWhatsNew: () -> Unit,
+) {
+    val currentVersion = runCatching {
+        val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.getPackageInfo(context.packageName, 0)
+        }
+        info.versionName
+    }.getOrNull() ?: "2.9.0"
+
+    val lastPrompted = prefs.getString(KEY_LAST_VERSION_PROMPTED, "1.0.0") ?: "1.0.0"
+    if (lastPrompted == currentVersion) return
+    scope.launch {
+        delay(1_500)
+        prefs.edit().putString(KEY_LAST_VERSION_PROMPTED, currentVersion).apply()
+        onShowWhatsNew()
+    }
+}
+
+/** ≡ syncLastAppOpenIfNeeded(force:) — mínimo 15 min */
+private fun syncLastAppOpenIfNeeded(
+    prefs: android.content.SharedPreferences,
+    force: Boolean,
+    scope: CoroutineScope,
+) {
+    if (FirebaseAuth.getInstance().currentUser == null) return
+    val nowSec = System.currentTimeMillis() / 1000.0
+    val last = Double.fromBits(prefs.getLong(KEY_LAST_APP_OPEN_SYNC_AT, 0L))
+    val minimumInterval = 15 * 60.0
+    if (!force && (nowSec - last) < minimumInterval) return
+    prefs.edit().putLong(KEY_LAST_APP_OPEN_SYNC_AT, nowSec.toBits()).apply()
+    scope.launch {
+        runCatching { FirestoreService().updateLastAppOpenAt() }
     }
 }
 
@@ -74,6 +246,10 @@ private fun AccountLoading() {
         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
     }
 }
+
+private const val PREFS_NAME = "moments_app"
+private const val KEY_LAST_VERSION_PROMPTED = "lastVersionPrompted"
+private const val KEY_LAST_APP_OPEN_SYNC_AT = "lastAppOpenSyncAt"
 
 @Preview(showBackground = true)
 @Composable

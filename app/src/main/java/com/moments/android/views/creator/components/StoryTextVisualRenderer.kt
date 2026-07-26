@@ -1,6 +1,13 @@
 package com.moments.android.views.creator.components
 
-/** Port de `StoryTextVisualTreatment` de `StoryTextVisualRenderer.swift`. */
+import android.content.Context
+import androidx.annotation.StringRes
+import com.moments.android.R
+
+/**
+ * Port de `StoryTextVisualRenderer.swift`.
+ * Android persiste efectos como raw string (≡ `StoryEditingView.TextEffect.rawValue`).
+ */
 enum class StoryTextVisualTreatment(val raw: String) {
     PLAIN("plain"),
     SPARKLE_PULSE("sparklePulse"),
@@ -30,27 +37,70 @@ enum class StoryTextVisualTreatment(val raw: String) {
     }
 }
 
-/** Equivalente de `TextEffect.visualTreatment`; Android persiste el raw string. */
-fun storyTextVisualTreatmentForEffect(effect: String?): StoryTextVisualTreatment = when (effect?.lowercase()) {
-    "sparkle" -> StoryTextVisualTreatment.SPARKLE_PULSE
-    "neon" -> StoryTextVisualTreatment.NEON_GLOW
-    "glow" -> StoryTextVisualTreatment.SOFT_GLOW
-    "pulse" -> StoryTextVisualTreatment.PULSE_HALO
-    "marker" -> StoryTextVisualTreatment.MARKER_HIGHLIGHT
-    "chalk" -> StoryTextVisualTreatment.CHALK_DUST
-    "pixel" -> StoryTextVisualTreatment.PIXEL_BITMAP
-    "outline" -> StoryTextVisualTreatment.OUTLINE_POP
-    "sticker" -> StoryTextVisualTreatment.STICKER_CUTOUT
-    "gradient" -> StoryTextVisualTreatment.GRADIENT_FILL
-    "glass" -> StoryTextVisualTreatment.GLASS_TEXT
-    "holographic" -> StoryTextVisualTreatment.HOLOGRAPHIC_FILL
-    "tape" -> StoryTextVisualTreatment.TAPE_LABEL
-    "textshimmer", "shimmer" -> StoryTextVisualTreatment.TEXT_SHIMMER
-    "echo" -> StoryTextVisualTreatment.ECHO_STACK
-    "depth" -> StoryTextVisualTreatment.LONG_SHADOW
-    "glitch" -> StoryTextVisualTreatment.GLITCH_SPLIT
-    else -> StoryTextVisualTreatment.PLAIN
+/** ≡ `TextEffect.momentsVisualToolbar` — orden visual de la toolbar. */
+val storyTextVisualToolbarEffects: List<String> =
+    StoryTextEffect.momentsVisualToolbar.map { it.raw }
+
+/** Equivalente de `TextEffect.visualTreatment`. */
+fun storyTextVisualTreatmentForEffect(effect: String?): StoryTextVisualTreatment =
+    when (StoryTextEffect.fromStoredRaw(effect)) {
+        StoryTextEffect.SPARKLE -> StoryTextVisualTreatment.SPARKLE_PULSE
+        StoryTextEffect.NEON -> StoryTextVisualTreatment.NEON_GLOW
+        StoryTextEffect.GLOW -> StoryTextVisualTreatment.SOFT_GLOW
+        StoryTextEffect.PULSE -> StoryTextVisualTreatment.PULSE_HALO
+        StoryTextEffect.MARKER -> StoryTextVisualTreatment.MARKER_HIGHLIGHT
+        StoryTextEffect.CHALK -> StoryTextVisualTreatment.CHALK_DUST
+        StoryTextEffect.PIXEL -> StoryTextVisualTreatment.PIXEL_BITMAP
+        StoryTextEffect.OUTLINE -> StoryTextVisualTreatment.OUTLINE_POP
+        StoryTextEffect.STICKER -> StoryTextVisualTreatment.STICKER_CUTOUT
+        StoryTextEffect.GRADIENT -> StoryTextVisualTreatment.GRADIENT_FILL
+        StoryTextEffect.GLASS -> StoryTextVisualTreatment.GLASS_TEXT
+        StoryTextEffect.HOLOGRAPHIC -> StoryTextVisualTreatment.HOLOGRAPHIC_FILL
+        StoryTextEffect.TAPE -> StoryTextVisualTreatment.TAPE_LABEL
+        StoryTextEffect.TEXT_SHIMMER, StoryTextEffect.SHIMMER -> StoryTextVisualTreatment.TEXT_SHIMMER
+        StoryTextEffect.ECHO -> StoryTextVisualTreatment.ECHO_STACK
+        StoryTextEffect.DEPTH -> StoryTextVisualTreatment.LONG_SHADOW
+        StoryTextEffect.GLITCH -> StoryTextVisualTreatment.GLITCH_SPLIT
+        StoryTextEffect.NONE -> StoryTextVisualTreatment.PLAIN
+    }
+
+/**
+ * ≡ `TextEffect.momentsToolbarLabel` → `storyTextEffect.*` Localizable.
+ */
+@StringRes
+fun storyTextEffectMomentsToolbarLabelRes(effect: String?): Int = when (effect?.lowercase()) {
+    "none", null -> R.string.story_text_effect_none
+    "sticker" -> R.string.story_text_effect_sticker
+    "outline" -> R.string.story_text_effect_outline
+    "gradient" -> R.string.story_text_effect_gradient
+    "neon" -> R.string.story_text_effect_neon
+    "glow" -> R.string.story_text_effect_glow
+    "glass" -> R.string.story_text_effect_glass
+    "sparkle" -> R.string.story_text_effect_sparkle
+    "pixel" -> R.string.story_text_effect_pixel
+    "holographic" -> R.string.story_text_effect_holographic
+    "tape" -> R.string.story_text_effect_tape
+    "pulse" -> R.string.story_text_effect_pulse
+    "marker" -> R.string.story_text_effect_marker
+    "chalk" -> R.string.story_text_effect_chalk
+    "textshimmer", "shimmer" -> R.string.story_text_effect_text_shimmer
+    "echo" -> R.string.story_text_effect_echo
+    "depth" -> R.string.story_text_effect_depth
+    "glitch" -> R.string.story_text_effect_glitch
+    else -> R.string.story_text_effect_none
 }
+
+/** ≡ `TextEffect.momentsToolbarLabel` con Context. */
+fun storyTextEffectMomentsToolbarLabel(effect: String?, context: Context): String =
+    context.getString(storyTextEffectMomentsToolbarLabelRes(effect))
+
+/** ≡ `TextEffect.usesGradientEditor`. */
+fun storyTextEffectUsesGradientEditor(effect: String?): Boolean =
+    StoryTextEffect.fromRaw(effect).usesGradientEditor
+
+/** ≡ `TextEffect.opensColorContextOnSelect`. */
+fun storyTextEffectOpensColorContextOnSelect(effect: String?): Boolean =
+    StoryTextEffect.fromRaw(effect).opensColorContextOnSelect
 
 /** Equivalente de `TextStyle.styleAccentTreatment`. */
 fun StoryTextStyle.styleAccentTreatment(): StoryTextVisualTreatment = when (this) {
@@ -58,9 +108,3 @@ fun StoryTextStyle.styleAccentTreatment(): StoryTextVisualTreatment = when (this
     StoryTextStyle.MEME -> StoryTextVisualTreatment.MEME_STRONG
     else -> StoryTextVisualTreatment.PLAIN
 }
-
-/** Lista de la toolbar Swift en su orden visual. */
-val storyTextVisualToolbarEffects = listOf(
-    "none", "sticker", "outline", "gradient", "neon", "glitch", "echo", "depth",
-    "glow", "glass", "sparkle", "pixel", "holographic", "tape", "pulse",
-)

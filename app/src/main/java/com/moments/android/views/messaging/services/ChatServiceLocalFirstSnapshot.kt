@@ -2,10 +2,11 @@ package com.moments.android.views.messaging.services
 
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.Blob
 import com.google.firebase.firestore.QueryDocumentSnapshot
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageStatus
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageStatus
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.models.StickerData
 import com.moments.android.models.StoryTextOverlayMetadata
 import com.moments.android.services.persistence.LocalPersistenceService
@@ -14,12 +15,21 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import java.util.Date
 
-/** Port de `ChatService+LocalFirstSnapshot.swift`. */
+/**
+ * Port de `ChatService+LocalFirstSnapshot.swift`.
+ * Local-first: reutiliza Room/cache y solo hidrata docs nuevos o con cambio material.
+ */
+
+/** ≡ `ChatService.resolvedIncomingIsRead(from:senderId:)` (static iOS). */
 fun resolvedIncomingIsRead(data: Map<String, Any?>, senderId: String): Boolean {
     val readBy = (data["readBy"] as? List<*>)?.filterIsInstance<String>().orEmpty()
-    val documentIsRead = data["isRead"] as? Boolean ?: false
-    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-    return if (currentUserId != null && senderId != currentUserId) documentIsRead || currentUserId in readBy else documentIsRead
+    val docIsRead = data["isRead"] as? Boolean ?: false
+    val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+    return if (currentUid != null && senderId != currentUid) {
+        docIsRead || currentUid in readBy
+    } else {
+        docIsRead
+    }
 }
 
 suspend fun ChatService.buildMessagesFromSnapshotUsingLocalCache(
@@ -27,44 +37,73 @@ suspend fun ChatService.buildMessagesFromSnapshotUsingLocalCache(
     conversationId: String,
     cutoffDate: Date?,
 ): List<EnhancedMessage> {
-    val cachedById = LocalPersistenceService.loadMessagesFast(conversationId).associateBy(EnhancedMessage::id)
+    val cached = LocalPersistenceService.loadMessagesFast(conversationId)
+    val cachedById = cached.associateBy(EnhancedMessage::id)
+    val hasLocalCache = cached.isNotEmpty()
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+
     val indexedMessages = mutableMapOf<Int, EnhancedMessage>()
-    val needingHydration = mutableListOf<Triple<Int, QueryDocumentSnapshot, Map<String, Any?>>>()
+    val indicesNeedingHydration =
+        mutableListOf<Triple<Int, QueryDocumentSnapshot, Map<String, Any?>>>()
     val orderedIndices = mutableListOf<Int>()
 
-    documents.forEachIndexed { index, document ->
-        val data = document.data
+    documents.forEachIndexed { index, doc ->
+        val data = doc.data
+
         val deletedFor = (data["deletedFor"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+        if (currentUserId != null && currentUserId in deletedFor) return@forEachIndexed
+
         val vanishedFor = (data["vanishedFor"] as? List<*>)?.filterIsInstance<String>().orEmpty()
-        val timestamp = (data["timestamp"] as? Timestamp)?.toDate()
-        if (currentUserId != null && (currentUserId in deletedFor || currentUserId in vanishedFor)) return@forEachIndexed
-        if (cutoffDate != null && timestamp != null && timestamp <= cutoffDate) return@forEachIndexed
+        if (currentUserId != null && currentUserId in vanishedFor) return@forEachIndexed
+
+        val msgTimestamp = (data["timestamp"] as? Timestamp)?.toDate()
+        if (cutoffDate != null && msgTimestamp != null && !msgTimestamp.after(cutoffDate)) {
+            return@forEachIndexed
+        }
 
         orderedIndices += index
-        val messageId = data["id"] as? String ?: document.id
-        val cached = cachedById[messageId]
-        if (cached != null && !snapshotNeedsFullHydrate(data, cached)) {
-            indexedMessages[index] = applySnapshotMetadata(cached, data)
-        } else {
-            needingHydration += Triple(index, document, data)
+        val messageId = data["id"] as? String ?: doc.id
+
+        if (hasLocalCache) {
+            val existing = cachedById[messageId]
+            if (existing != null && !snapshotNeedsFullHydrate(data, existing)) {
+                indexedMessages[index] = applySnapshotMetadata(existing, data)
+                return@forEachIndexed
+            }
+        }
+        indicesNeedingHydration += Triple(index, doc, data)
+    }
+
+    if (indicesNeedingHydration.isNotEmpty()) {
+        coroutineScope {
+            // ≡ withTaskGroup hydrate paralelo
+            indicesNeedingHydration.map { (index, doc, data) ->
+                async {
+                    index to buildEnhancedMessage(data, doc.id, conversationId)
+                }
+            }.awaitAll().forEach { (index, message) ->
+                indexedMessages[index] = message
+            }
         }
     }
 
-    coroutineScope {
-        needingHydration.map { (index, document, data) ->
-            async { index to ChatMessageMapper.buildFromMap(data, document.id, conversationId) }
-        }.awaitAll().forEach { (index, message) -> indexedMessages[index] = message }
-    }
-    return orderedIndices.mapNotNull(indexedMessages::get)
+    return orderedIndices.mapNotNull { indexedMessages[it] }
 }
 
 private fun snapshotNeedsFullHydrate(data: Map<String, Any?>, cached: EnhancedMessage): Boolean {
-    val type = data["type"] as? String ?: MessageType.TEXT.raw
-    if (type != cached.type.raw) return true
-    if ((data["editedAt"] as? Timestamp)?.toDate() != cached.editedAt) return true
-    if ((data["isDeleted"] as? Boolean ?: false) != cached.isDeleted) return true
-    if (type == MessageType.CHAT_NOTICE.raw && (data["content"] as? String) != cached.content) return true
+    val typeString = data["type"] as? String ?: MessageType.TEXT.raw
+    if (typeString != cached.type.raw) return true
+
+    val remoteEditedAt = (data["editedAt"] as? Timestamp)?.toDate()
+    if (remoteEditedAt != cached.editedAt) return true
+
+    val remoteDeleted = data["isDeleted"] as? Boolean ?: false
+    if (remoteDeleted != cached.isDeleted) return true
+
+    if (typeString == MessageType.CHAT_NOTICE.raw) {
+        if ((data["content"] as? String) != cached.content) return true
+    }
+
     if ((data["mediaObjectPath"] as? String) != cached.mediaObjectPath) return true
     if ((data["thumbnailObjectPath"] as? String) != cached.thumbnailObjectPath) return true
 
@@ -76,16 +115,19 @@ private fun snapshotNeedsFullHydrate(data: Map<String, Any?>, cached: EnhancedMe
     } else if ((remoteEncryption != null) != (cachedEncryption != null)) {
         return true
     }
-    return data["content"] != null && data["editedAt"] != null
+
+    if (data["content"] != null && remoteEditedAt != null) return true
+    return false
 }
 
 private fun applySnapshotMetadata(message: EnhancedMessage, data: Map<String, Any?>): EnhancedMessage {
-    fun stringList(key: String): List<String>? = (data[key] as? List<*>)?.filterIsInstance<String>()
-    val isDeleted = data["isDeleted"] as? Boolean ?: message.isDeleted
-    val updated = message.copy(
+    fun stringList(key: String): List<String>? =
+        (data[key] as? List<*>)?.filterIsInstance<String>()
+
+    var updated = message.copy(
         isRead = resolvedIncomingIsRead(data, message.senderId),
         status = (data["status"] as? String)?.let(MessageStatus::from) ?: message.status,
-        isDeleted = isDeleted,
+        isDeleted = data["isDeleted"] as? Boolean ?: message.isDeleted,
         deletedAt = (data["deletedAt"] as? Timestamp)?.toDate() ?: message.deletedAt,
         isViewed = data["isViewed"] as? Boolean ?: message.isViewed,
         viewedBy = stringList("viewedBy") ?: message.viewedBy,
@@ -99,20 +141,42 @@ private fun applySnapshotMetadata(message: EnhancedMessage, data: Map<String, An
         textOverlayLive = data["textOverlayLive"] as? Boolean,
         textOverlays = decodeTextOverlays(data["textOverlays"]),
         stickers = decodeStickers(data["stickers"]),
-        drawingData = data["drawingData"] as? ByteArray,
+        drawingData = decodeDrawingData(data["drawingData"]),
     )
-    return if (updated.isDeleted) updated.copy(
-        mediaUrl = null,
-        thumbnailUrl = null,
-        textOverlayLive = null,
-        textOverlays = null,
-        stickers = null,
-        drawingData = null,
-    ) else updated
+
+    updated = ViewOnceReplaySessionStore.apply(
+        updated,
+        FirebaseAuth.getInstance().currentUser?.uid,
+    )
+
+    return if (updated.isDeleted) {
+        updated.copy(
+            mediaUrl = null,
+            thumbnailUrl = null,
+            textOverlayLive = null,
+            textOverlays = null,
+            stickers = null,
+            drawingData = null,
+        )
+    } else {
+        updated
+    }
 }
 
 private fun decodeTextOverlays(value: Any?): List<StoryTextOverlayMetadata>? =
-    (value as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(StoryTextOverlayMetadata::from) }
+    (value as? List<*>)?.mapNotNull { (it as? Map<*, *>)?.let { map ->
+        @Suppress("UNCHECKED_CAST")
+        StoryTextOverlayMetadata.from(map as Map<String, Any?>)
+    } }
 
 private fun decodeStickers(value: Any?): List<StickerData>? =
-    (value as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(StickerData::from) }
+    (value as? List<*>)?.mapNotNull { (it as? Map<*, *>)?.let { map ->
+        @Suppress("UNCHECKED_CAST")
+        StickerData.from(map as Map<String, Any?>)
+    } }
+
+private fun decodeDrawingData(value: Any?): ByteArray? = when (value) {
+    is ByteArray -> value
+    is Blob -> value.toBytes()
+    else -> null
+}

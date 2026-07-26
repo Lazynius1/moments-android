@@ -2,6 +2,7 @@ package com.moments.android.services.cache
 
 import androidx.media3.common.MediaItem as ExoMediaItem
 import com.moments.android.models.Moment
+import com.moments.android.services.performance.PerformanceSignposts
 import com.moments.android.services.video.VideoPlaybackSelector
 import com.moments.android.services.video.VideoPlaybackSource
 import java.net.URL
@@ -11,7 +12,7 @@ import java.util.concurrent.Executors
 
 /**
  * Port de VideoPreloader.swift.
- * AVPlayerItem → Media3 ExoMediaItem + [VideoPlaybackSelector] tier preheat URLs.
+ * AVPlayerItem → Media3 ExoMediaItem; disco vía PersistentVideoCache.
  */
 object VideoPreloader {
 
@@ -57,6 +58,7 @@ object VideoPreloader {
     }
 
     fun preloadAssets(urls: List<String>) {
+        PerformanceSignposts.event("VideoPreloadBatch")
         queue.execute {
             for (urlString in urls.take(MAX_CACHE_SIZE)) {
                 if (cachedAsset(urlString) != null) continue
@@ -66,6 +68,7 @@ object VideoPreloader {
                 } else {
                     val remote = runCatching { URL(urlString) }.getOrNull() ?: continue
                     setCachedAsset(ExoMediaItem.fromUri(urlString), urlString)
+                    // Descargar para futuras sesiones
                     PersistentVideoCache.downloadAndCache(remote)
                 }
             }

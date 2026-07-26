@@ -34,9 +34,13 @@ object PersistentAudioCache {
     fun saveToCache(temporaryFile: File, forRemote: String) {
         val destination = File(dir(), filename(forRemote))
         if (destination.exists()) return
+        // iOS: move; si falla, remove destino + copy.
         if (!temporaryFile.renameTo(destination)) {
-            temporaryFile.copyTo(destination, overwrite = true)
-            temporaryFile.delete()
+            runCatching {
+                if (destination.exists()) destination.delete()
+                temporaryFile.copyTo(destination, overwrite = true)
+                temporaryFile.delete()
+            }
         }
     }
 

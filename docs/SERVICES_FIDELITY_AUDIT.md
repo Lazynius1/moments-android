@@ -71,7 +71,7 @@
 | `NovaEmbeddingService.kt` | Documented Android limitation (no NLEmbedding; same null fallback as iOS without model) |
 | `BackgroundMomentUploadService.kt` | Real `resumeUpload`: decode payload, Storage upload, `createMomentWithVisibility` / custom list |
 | `BackgroundStoryUploadService.kt` | Real `resumeUpload`: media + thumbnail upload, `createStoryWithVisibility` / custom list |
-| `ChatService.kt` + `ChatMessageMapper.kt` | Core fetch/send/delivery/offline queue; `stopLiveLocationMessage` for logout |
+| `ChatService.kt` | Core fetch/send/delivery/offline queue; `stopLiveLocationMessage` for logout |
 | `ChatSessionEngine.kt` | Fallback IDs from cached conversations, `invalidateSession`, UID reconcile |
 | `LiveLocationSharingService.kt` | **New** — `endActiveSessionForSignOut` wired from `AuthService.logout` |
 | `AuthService.kt` | Calls `LiveLocationSharingService.endActiveSessionForSignOut` before sign-out |

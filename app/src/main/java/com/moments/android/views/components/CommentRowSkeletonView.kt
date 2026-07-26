@@ -1,21 +1,13 @@
 package com.moments.android.views.components
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -23,57 +15,71 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 
-/** Port de `CommentRowSkeletonView.swift`: avatar, autor y una o dos líneas de comentario. */
+/**
+ * Port de `CommentRowSkeletonView.swift`.
+ * Imita `InlineCommentRow`/`EnhancedModernCommentRow`: avatar + línea de usuario + 1-2 líneas.
+ */
 @Composable
 fun CommentRowSkeletonView(
     textLineCount: Int = 2,
     modifier: Modifier = Modifier,
 ) {
-    val base = if (isSystemInDarkTheme()) Color.White.copy(.08f) else Color.Black.copy(.06f)
-    val shimmer = rememberCommentSkeletonBrush(base)
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        Box(Modifier.size(32.dp).background(shimmer, CircleShape))
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.width(84.dp).height(11.dp).background(shimmer, RoundedCornerShape(4.dp)))
+    val surfaceColor = if (isSystemInDarkTheme()) {
+        Color.White.copy(alpha = 0.08f)
+    } else {
+        Color.Black.copy(alpha = 0.06f)
+    }
+    Row(
+        modifier = modifier
+            .shimmer(isAnimating = true)
+            .clearAndSetSemantics { }, // iOS: accessibilityHidden(true)
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(32.dp).background(surfaceColor, CircleShape))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(
+                Modifier
+                    .width(84.dp)
+                    .height(11.dp)
+                    .background(surfaceColor, RoundedCornerShape(4.dp)),
+            )
             repeat(textLineCount.coerceAtLeast(0)) { index ->
-                val line = Modifier.height(12.dp).background(shimmer, RoundedCornerShape(4.dp))
-                Box(if (index == textLineCount - 1) line.width(140.dp) else line.fillMaxWidth())
+                val lineMod = Modifier
+                    .height(12.dp)
+                    .background(surfaceColor, RoundedCornerShape(4.dp))
+                Box(
+                    if (index == textLineCount - 1) {
+                        lineMod.width(140.dp)
+                    } else {
+                        lineMod.fillMaxWidth()
+                    },
+                )
             }
         }
     }
 }
 
-/** Lista vertical de filas de comentario en carga, equivalente a `CommentRowSkeletonList`. */
+/**
+ * Lista vertical de N filas de comentario en estado de carga.
+ * Port de `CommentRowSkeletonList` — sin padding propio (iOS lo aplica en el call site).
+ */
 @Composable
 fun CommentRowSkeletonList(
     rows: Int = 3,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(20.dp),
+        horizontalAlignment = Alignment.Start,
     ) {
-        repeat(rows.coerceAtLeast(0)) { CommentRowSkeletonView() }
+        repeat(rows.coerceAtLeast(0)) {
+            CommentRowSkeletonView()
+        }
     }
-}
-
-@Composable
-private fun rememberCommentSkeletonBrush(base: Color): Brush {
-    val transition = rememberInfiniteTransition(label = "commentSkeletonShimmer")
-    val phase = transition.animateFloat(
-        initialValue = -1f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1_150, easing = LinearEasing), RepeatMode.Restart),
-        label = "commentSkeletonPhase",
-    ).value
-    return Brush.linearGradient(
-        colors = listOf(base.copy(alpha = base.alpha * .72f), base.copy(alpha = (base.alpha * 1.45f).coerceAtMost(1f)), base.copy(alpha = base.alpha * .72f)),
-        start = androidx.compose.ui.geometry.Offset(phase * 500f, 0f),
-        end = androidx.compose.ui.geometry.Offset((phase + 1f) * 500f, 500f),
-    )
 }

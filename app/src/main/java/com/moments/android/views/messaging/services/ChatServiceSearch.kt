@@ -2,8 +2,8 @@ package com.moments.android.views.messaging.services
 
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Query
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageType
 import kotlinx.coroutines.tasks.await
 import java.text.Normalizer
 
@@ -39,7 +39,12 @@ suspend fun ChatService.searchMessages(
             val encryptedContent = data["content"] as? String ?: continue
             val plainText = decryptMessageContent(encryptedContent, conversationId)
             if (!normalizeSearchText(plainText).contains(normalizedQuery)) continue
-            matches += ChatMessageMapper.buildFromMap(data, document.id, conversationId)
+            matches += buildEnhancedMessage(
+                data = data,
+                docId = document.id,
+                conversationId = conversationId,
+                decryptedContentOverride = plainText,
+            )
             if (matches.size >= limit) break
         }
     }

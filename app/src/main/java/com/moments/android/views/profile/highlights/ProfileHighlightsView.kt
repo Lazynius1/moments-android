@@ -58,7 +58,6 @@ import com.moments.android.services.firestore.deleteHighlight
 import com.moments.android.services.firestore.fetchHighlights
 import com.moments.android.services.firestore.fetchStoriesByIds
 import com.moments.android.services.privacy.PrivacyService
-import com.moments.android.services.privacy.canUserViewStoryEnhanced
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.profile.core.ProfileColors
 import com.moments.android.views.shared.AppErrorBanner

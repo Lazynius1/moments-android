@@ -4,22 +4,19 @@ import com.moments.android.views.nova.memory.NovaFact
 import java.util.Locale
 import kotlin.math.sqrt
 
-/** Hecho de memoria Nova (mínimo para embeddings; modelo completo en Views/Nova). */
 /**
- * Port de NovaEmbeddingService.swift.
+ * Port de `NovaEmbeddingService.swift`.
  *
- * **Limitación Android documentada:** iOS usa `NLEmbedding.sentenceEmbedding` on-device (NaturalLanguage).
- * No hay equivalente empaquetado en Android ni fallback Cloud Function en iOS cuando falta el modelo;
- * ambas plataformas devuelven `null` sin modelo. Semantic dedup / búsqueda vectorial de hechos Nova
- * requiere integrar TFLite/MediaPipe o un endpoint backend compartido — fuera de scope Services hasta
- * que Nova Views defina el contrato server-side.
+ * iOS: `NLEmbedding.sentenceEmbedding` on-device. Sin modelo → `null` / listas vacías.
+ * Android: sin NLEmbedding ni TFLite cableado → mismo fallo graceful (dedup exacto por
+ * `normalizedContent` sigue vivo en [isNearDuplicate]).
  */
 object NovaEmbeddingService {
 
     fun generateEmbedding(forText: String): List<Double>? {
-        val clean = forText.lowercase(Locale.getDefault()).trim()
-        if (clean.isEmpty()) return null
-        // Sin NLEmbedding / TFLite cableado aún → null (comportamiento "sin modelo").
+        val cleanText = forText.lowercase(Locale.getDefault()).trim()
+        if (cleanText.isEmpty()) return null
+        // Sin modelo on-device (equivalente iOS cuando NLEmbedding no carga).
         return null
     }
 
@@ -36,6 +33,7 @@ object NovaEmbeddingService {
             .map { it.first }
     }
 
+    /** True when candidate is semantically redundant with any existing fact. */
     fun isNearDuplicate(
         candidate: NovaFact,
         existing: List<NovaFact>,
@@ -43,6 +41,7 @@ object NovaEmbeddingService {
     ): Boolean {
         val candidateKey = candidate.normalizedContent
         if (existing.any { it.normalizedContent == candidateKey }) return true
+
         val candidateVector = candidate.embedding ?: generateEmbedding(candidate.content) ?: return false
         for (fact in existing) {
             val factVector = fact.embedding ?: generateEmbedding(fact.content) ?: continue
@@ -53,15 +52,16 @@ object NovaEmbeddingService {
 
     fun cosineSimilarity(v1: List<Double>, v2: List<Double>): Double {
         if (v1.size != v2.size) return 0.0
-        var dot = 0.0
+
+        var dotProduct = 0.0
         var normA = 0.0
         var normB = 0.0
         for (i in v1.indices) {
-            dot += v1[i] * v2[i]
+            dotProduct += v1[i] * v2[i]
             normA += v1[i] * v1[i]
             normB += v2[i] * v2[i]
         }
         if (normA == 0.0 || normB == 0.0) return 0.0
-        return dot / (sqrt(normA) * sqrt(normB))
+        return dotProduct / (sqrt(normA) * sqrt(normB))
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.services.network.NetworkMonitor
+import com.moments.android.utilities.HapticManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -171,7 +172,19 @@ object IncognitoModeService {
             val token = user.getIdToken(false).await().token ?: throw IllegalStateException("No token")
             val response = callBackend(action, token)
             apply(response.state)
-            _lastErrorState.value = if (response.reason == "exhausted") LastErrorState.EXHAUSTED else null
+
+            if (response.reason == "exhausted") {
+                _lastErrorState.value = LastErrorState.EXHAUSTED
+                HapticManager.shared.notification(HapticManager.NotificationType.WARNING)
+            } else {
+                _lastErrorState.value = null
+            }
+
+            when (action) {
+                Action.ACTIVATE, Action.RESUME -> HapticManager.shared.mediumImpact()
+                Action.PAUSE -> HapticManager.shared.selection()
+                Action.GET -> Unit
+            }
         } catch (e: java.net.UnknownHostException) {
             _lastErrorState.value = LastErrorState.OFFLINE
         } catch (e: java.net.SocketTimeoutException) {

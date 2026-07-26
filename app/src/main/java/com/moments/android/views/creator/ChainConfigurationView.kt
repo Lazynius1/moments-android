@@ -1,8 +1,19 @@
 package com.moments.android.views.creator
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,10 +42,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
@@ -51,9 +65,19 @@ enum class ChainContinuationSetting(val raw: String, val contentAudience: Conten
     val title: String get() = contentAudience.title
     val description: String get() = contentAudience.description
     val icon: String get() = contentAudience.assetName
+
+    companion object {
+        fun from(raw: String?): ChainContinuationSetting =
+            entries.firstOrNull { it.raw.equals(raw, ignoreCase = true) } ?: EVERYONE
+    }
 }
 
-/** Port Compose de `ChainConfigurationView`. */
+private enum class ChainConfigFlow {
+    Main,
+    ContinuationAudience,
+}
+
+/** Port Compose de `ChainConfigurationView.swift`. */
 @Composable
 fun ChainConfigurationView(
     allowOthersToContinue: Boolean,
@@ -72,84 +96,304 @@ fun ChainConfigurationView(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    val dark = isSystemInDarkTheme()
     val content = if (dark) Color.White else Color.Black
-    var selectingAudience by remember { mutableStateOf(false) }
+    var flow by remember { mutableStateOf(ChainConfigFlow.Main) }
+    var navigatingForward by remember { mutableStateOf(true) }
     var titleValidation by remember { mutableStateOf(false) }
 
     if (titleValidation) {
         AlertDialog(
             onDismissRequest = { titleValidation = false },
-            title = { Text("Title required") },
-            text = { Text("Add a title before sharing this chain.") },
-            confirmButton = { TextButton(onClick = { titleValidation = false }) { Text("OK") } },
+            title = { Text(stringResource(R.string.story_chains_title_required_title)) },
+            text = { Text(stringResource(R.string.story_chains_title_required_message)) },
+            confirmButton = {
+                TextButton(onClick = { titleValidation = false }) {
+                    Text(stringResource(R.string.story_chains_ok))
+                }
+            },
         )
-    }
-    if (selectingAudience) {
-        ChainContinuationSelectorView(
-            selectedAudience = continuationAudience,
-            onSelectedAudienceChange = onContinuationAudienceChange,
-            selectedListId = selectedListId,
-            onSelectedListIdChange = onSelectedListIdChange,
-            selectedListName = selectedListName,
-            onSelectedListNameChange = onSelectedListNameChange,
-            customSelectedUsers = customSelectedUsers,
-            onCustomSelectedUsersChange = onCustomSelectedUsersChange,
-            embeddedInFlow = true,
-            onBack = { selectingAudience = false },
-            onComplete = { selectingAudience = false },
-            modifier = modifier,
-        )
-        return
     }
 
-    Column(modifier.fillMaxSize().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Filled.Link, null, tint = Color(0xFF007AFF), modifier = Modifier.padding(top = 20.dp).size(48.dp))
-        Text("Chain configuration", color = content, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 16.dp))
-        Text(
-            if (isContinuing) "The original author defined these chain settings and they cannot be changed." else "Choose who may continue this chain.",
-            color = content.copy(.65f), fontSize = 16.sp, modifier = Modifier.padding(top = 12.dp),
-        )
-        chainTitleSummary?.trim()?.takeIf { it.isNotEmpty() }?.let { title ->
-            Column(Modifier.fillMaxWidth().padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Chain title", color = content.copy(.6f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Text(title, color = content, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+    fun navigate(to: ChainConfigFlow, forward: Boolean = true) {
+        navigatingForward = forward
+        flow = to
+    }
+
+    AnimatedContent(
+        targetState = flow,
+        transitionSpec = {
+            val springSpec = spring<Float>(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)
+            if (navigatingForward) {
+                (slideInHorizontally(springSpec) { it } + fadeIn(springSpec)) togetherWith
+                    (slideOutHorizontally(springSpec) { -it / 3 } + fadeOut(springSpec))
+            } else {
+                (slideInHorizontally(springSpec) { -it } + fadeIn(springSpec)) togetherWith
+                    (slideOutHorizontally(springSpec) { it / 3 } + fadeOut(springSpec))
             }
-        }
-        if (!isContinuing) {
-            Row(Modifier.fillMaxWidth().padding(top = 28.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Allow others to continue", color = content, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                    Text("Let selected people add to this chain.", color = content.copy(.6f), fontSize = 14.sp)
-                }
-                Switch(checked = allowOthersToContinue, onCheckedChange = onAllowOthersToContinueChange)
-            }
-        }
-        if (allowOthersToContinue) {
-            Text("Continuation audience", color = content, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.fillMaxWidth().padding(top = 24.dp))
-            val display = if (continuationAudience == ChainContinuationSetting.CUSTOM && selectedListId != null) ContentAudience.CUSTOM_LIST else continuationAudience.contentAudience
-            Row(
-                Modifier.fillMaxWidth().padding(top = 12.dp).clip(RoundedCornerShape(14.dp)).background(content.copy(.06f)).clickable(enabled = !isContinuing) { selectingAudience = true }.padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AudienceIconView(display, AudienceIconMetrics.creatorRow, if (isContinuing) content.copy(.55f) else null)
-                Text(
-                    when {
-                        continuationAudience == ChainContinuationSetting.CUSTOM && selectedListName != null -> selectedListName
-                        continuationAudience == ChainContinuationSetting.CUSTOM -> "${customSelectedUsers.size} people"
-                        else -> continuationAudience.title
-                    },
-                    color = if (isContinuing) content.copy(.55f) else content, fontSize = 16.sp, modifier = Modifier.padding(start = 12.dp).weight(1f),
+        },
+        label = "chainConfigFlow",
+        modifier = modifier,
+    ) { destination ->
+        when (destination) {
+            ChainConfigFlow.ContinuationAudience -> {
+                ChainContinuationSelectorView(
+                    selectedAudience = continuationAudience,
+                    onSelectedAudienceChange = onContinuationAudienceChange,
+                    selectedListId = selectedListId,
+                    onSelectedListIdChange = onSelectedListIdChange,
+                    selectedListName = selectedListName,
+                    onSelectedListNameChange = onSelectedListNameChange,
+                    customSelectedUsers = customSelectedUsers,
+                    onCustomSelectedUsersChange = onCustomSelectedUsersChange,
+                    embeddedInFlow = true,
+                    onBack = { navigate(ChainConfigFlow.Main, forward = false) },
+                    onComplete = { navigate(ChainConfigFlow.Main, forward = false) },
+                    modifier = Modifier.fillMaxSize(),
                 )
-                if (!isContinuing) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = content, modifier = Modifier.size(18.dp).momentsChromeGlass(CircleShape, true))
+            }
+            ChainConfigFlow.Main -> {
+                ChainConfigurationMainContent(
+                    allowOthersToContinue = allowOthersToContinue,
+                    onAllowOthersToContinueChange = onAllowOthersToContinueChange,
+                    continuationAudience = continuationAudience,
+                    selectedListId = selectedListId,
+                    selectedListName = selectedListName,
+                    customSelectedUsers = customSelectedUsers,
+                    chainTitleSummary = chainTitleSummary,
+                    isContinuing = isContinuing,
+                    content = content,
+                    onOpenAudience = { navigate(ChainConfigFlow.ContinuationAudience) },
+                    onShare = {
+                        if (!isContinuing && chainTitleSummary.isNullOrBlank()) {
+                            titleValidation = true
+                        } else {
+                            onDismiss()
+                            onConfirm?.invoke()
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
-        if (isContinuing) Text("As a collaborator, the chain rules set by its author apply.", color = content.copy(.6f), fontSize = 13.sp, fontStyle = FontStyle.Italic, modifier = Modifier.padding(top = 20.dp))
+    }
+}
+
+@Composable
+private fun ChainConfigurationMainContent(
+    allowOthersToContinue: Boolean,
+    onAllowOthersToContinueChange: (Boolean) -> Unit,
+    continuationAudience: ChainContinuationSetting,
+    selectedListId: String?,
+    selectedListName: String?,
+    customSelectedUsers: List<String>,
+    chainTitleSummary: String?,
+    isContinuing: Boolean,
+    content: Color,
+    onOpenAudience: () -> Unit,
+    onShare: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(top = 20.dp),
+        ) {
+            Icon(
+                Icons.Filled.Link,
+                contentDescription = null,
+                tint = Color(0xFF007AFF),
+                modifier = Modifier.size(48.dp),
+            )
+            Text(
+                stringResource(R.string.story_chains_configuration_title),
+                color = content,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                stringResource(
+                    if (isContinuing) R.string.story_chains_inherited_settings_info
+                    else R.string.story_chains_visibility_info,
+                ),
+                color = content.copy(alpha = 0.65f),
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+        }
+
+        chainTitleSummary?.trim()?.takeIf { it.isNotEmpty() }?.let { title ->
+            Column(
+                Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    stringResource(R.string.story_chains_chain_title),
+                    color = content.copy(alpha = 0.6f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    title,
+                    color = content,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                )
+            }
+        }
+
+        Column(
+            Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            if (!isContinuing) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.story_chains_allow_others_toggle),
+                            color = content,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Switch(
+                            checked = allowOthersToContinue,
+                            onCheckedChange = onAllowOthersToContinueChange,
+                        )
+                    }
+                    Text(
+                        stringResource(R.string.story_chains_allow_others_description),
+                        color = content.copy(alpha = 0.6f),
+                        fontSize = 14.sp,
+                    )
+                }
+            }
+
+            if (allowOthersToContinue) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        stringResource(R.string.story_chains_continuation_audience),
+                        color = content,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    val displayAudience =
+                        if (continuationAudience == ChainContinuationSetting.CUSTOM && selectedListId != null) {
+                            ContentAudience.CUSTOM_LIST
+                        } else {
+                            continuationAudience.contentAudience
+                        }
+                    val audienceLabel = when {
+                        continuationAudience == ChainContinuationSetting.CUSTOM &&
+                            !selectedListName.isNullOrBlank() -> selectedListName
+                        continuationAudience == ChainContinuationSetting.CUSTOM -> {
+                            val count = customSelectedUsers.size
+                            if (count == 1) {
+                                stringResource(R.string.story_editor_custom_audience_single, count)
+                            } else {
+                                stringResource(R.string.story_editor_custom_audience_multiple, count)
+                            }
+                        }
+                        continuationAudience == ChainContinuationSetting.EVERYONE ->
+                            stringResource(R.string.audience_type_everyone)
+                        continuationAudience == ChainContinuationSetting.MUTUALS ->
+                            stringResource(R.string.audience_type_mutuals)
+                        continuationAudience == ChainContinuationSetting.BEST_FRIENDS ->
+                            stringResource(R.string.audience_type_best_friends)
+                        continuationAudience == ChainContinuationSetting.CUSTOM_LIST ->
+                            stringResource(R.string.audience_type_custom_list)
+                        else -> continuationAudience.title
+                    }
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isContinuing, onClick = onOpenAudience)
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+                            AudienceIconView(
+                                audience = displayAudience,
+                                size = AudienceIconMetrics.creatorRow,
+                                tintColor = if (isContinuing) content.copy(alpha = 0.55f) else null,
+                            )
+                        }
+                        Text(
+                            audienceLabel,
+                            color = if (isContinuing) content.copy(alpha = 0.55f) else content,
+                            fontSize = 16.sp,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .weight(1f),
+                        )
+                        if (!isContinuing) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = content,
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .momentsChromeGlass(CircleShape, interactive = true)
+                                    .padding(5.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (isContinuing) {
+                Text(
+                    stringResource(R.string.story_chains_collaborator_notice),
+                    color = content.copy(alpha = 0.6f),
+                    fontSize = 13.sp,
+                    fontStyle = FontStyle.Italic,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        }
+
         Spacer(Modifier.weight(1f))
+
         Row(
-            Modifier.fillMaxWidth().padding(bottom = 20.dp).clip(RoundedCornerShape(25.dp)).background(Brush.horizontalGradient(listOf(Color(0xFF007AFF), Color(0xFFAF52DE), Color(0xFFFF2D55)))).clickable {
-                if (!isContinuing && chainTitleSummary.isNullOrBlank()) titleValidation = true else { onDismiss(); onConfirm?.invoke() }
-            }.padding(vertical = 14.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-        ) { Icon(Icons.Filled.Send, null, tint = Color.White, modifier = Modifier.size(16.dp)); Text("Share chain", color = Color.White, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 8.dp)) }
+            Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp)
+                .clip(RoundedCornerShape(25.dp))
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(Color(0xFF007AFF), Color(0xFFAF52DE), Color(0xFFFF2D55)),
+                    ),
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.1f)),
+                    ),
+                    shape = RoundedCornerShape(25.dp),
+                )
+                .clickable(onClick = onShare)
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Filled.Send, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+            Text(
+                stringResource(R.string.story_chains_share_chain),
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
     }
 }

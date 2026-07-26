@@ -8,7 +8,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.models.Moment
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.privacy.PrivacyService
-import com.moments.android.services.privacy.canUserViewMomentEnhanced
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

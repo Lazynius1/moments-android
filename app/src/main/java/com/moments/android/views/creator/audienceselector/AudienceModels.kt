@@ -81,6 +81,25 @@ enum class ContentAudience(val raw: String) {
         }
 
     companion object {
+        /**
+         * Port de `ContentAudience.fromCaptionAudienceSetting(_:hasCustomList:)`.
+         * [CaptionAudienceSetting] ≡ `CaptionAndDetailsView.AudienceSetting` (iOS).
+         */
+        fun fromCaptionAudienceSetting(
+            setting: CaptionAudienceSetting,
+            hasCustomList: Boolean,
+        ): ContentAudience {
+            if (setting == CaptionAudienceSetting.CUSTOM && hasCustomList) return CUSTOM_LIST
+            return when (setting) {
+                CaptionAudienceSetting.EVERYONE -> EVERYONE
+                CaptionAudienceSetting.MUTUALS -> MUTUALS
+                CaptionAudienceSetting.BEST_FRIENDS -> BEST_FRIENDS
+                CaptionAudienceSetting.CUSTOM -> CUSTOM
+                CaptionAudienceSetting.ONLY_ME -> ONLY_ME
+            }
+        }
+
+        /** Overload cuando el caller ya usa [ContentAudience] (CaptionAndDetails Android). */
         fun fromCaptionAudienceSetting(setting: ContentAudience, hasCustomList: Boolean): ContentAudience =
             if (setting == CUSTOM && hasCustomList) CUSTOM_LIST else setting
 
@@ -98,6 +117,18 @@ enum class ContentAudience(val raw: String) {
         /** Alias de compatibilidad con los consumidores Android previos. */
         fun from(raw: String?): ContentAudience = fromAudienceValue(raw)
     }
+}
+
+/**
+ * Port de `CaptionAndDetailsView.AudienceSetting` (sin `customList`;
+ * ese se deriva con `hasCustomList` en [ContentAudience.fromCaptionAudienceSetting]).
+ */
+enum class CaptionAudienceSetting {
+    EVERYONE,
+    MUTUALS,
+    BEST_FRIENDS,
+    CUSTOM,
+    ONLY_ME,
 }
 
 /** Modelo Firestore de una lista de audiencia; igualdad por id como en Swift. */

@@ -146,7 +146,6 @@ fun FeedOverlaysSection(
                 unreadMessages = unreadMessages,
                 isDark = isDark,
                 onDismiss = onDismissNotificationSummary,
-                onNavigate = onDismissNotificationSummary,
             )
         }
 

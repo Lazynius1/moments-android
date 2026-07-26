@@ -1,10 +1,17 @@
 package com.moments.android.models
 
 import com.google.firebase.Timestamp
-import java.util.Calendar
+import com.moments.android.utilities.MomentsFormat
 import java.util.Date
 
-// MARK: - Estado en línea (equivalente a OnlineStatus de iOS)
+/**
+ * Port de `Models/User.swift`.
+ * Sin UserBadge / PlusSubscription / ProfileTheme (🚫 fuera de alcance Android).
+ * Sí se porta el flag Firestore [isPlusSubscriber] (ads), no el subsistema de chapas.
+ */
+
+// MARK: - OnlineStatus
+
 enum class OnlineStatus(val raw: String) {
     ONLINE("online"),
     AWAY("away"),
@@ -12,35 +19,81 @@ enum class OnlineStatus(val raw: String) {
     OFFLINE("offline"),
     INVISIBLE("invisible");
 
+    /** ≡ iOS `OnlineStatus.icon` (SF Symbol; UI mapea a Material). */
+    val iconName: String
+        get() = when (this) {
+            ONLINE -> "circle.fill"
+            AWAY -> "moon.fill"
+            BUSY -> "exclamationmark.circle.fill"
+            OFFLINE -> "circle"
+            INVISIBLE -> "eye.slash.fill"
+        }
+
+    /** ≡ iOS `OnlineStatus.color` (ARGB; UI aplica a Compose/View). */
+    val colorArgb: Int
+        get() = when (this) {
+            ONLINE -> 0xFF4CAF50.toInt()
+            AWAY -> 0xFFFF9800.toInt()
+            BUSY -> 0xFFF44336.toInt()
+            OFFLINE, INVISIBLE -> 0xFF9E9E9E.toInt()
+        }
+
     companion object {
         fun from(raw: String?): OnlineStatus = entries.firstOrNull { it.raw == raw } ?: OFFLINE
     }
 }
 
-// MARK: - Política de solicitudes de mensaje (equivalente a MessageRequestPolicy de iOS)
+// MARK: - MessageRequestPolicy
+
 enum class MessageRequestPolicy(val raw: String) {
     EVERYONE("everyone"),
     FOLLOWING("following"),
     NOBODY("nobody");
 
     companion object {
-        fun from(raw: String?): MessageRequestPolicy = entries.firstOrNull { it.raw == raw } ?: EVERYONE
+        fun from(raw: String?): MessageRequestPolicy =
+            entries.firstOrNull { it.raw == raw } ?: EVERYONE
     }
 }
 
-// MARK: - Nivel de privacidad (equivalente a PrivacyLevel de iOS)
-enum class PrivacyLevel { PUBLIC, RESTRICTED, PRIVATE, DEACTIVATED }
+// MARK: - PrivacyLevel
+
+enum class PrivacyLevel {
+    PUBLIC,
+    RESTRICTED,
+    PRIVATE,
+    DEACTIVATED;
+
+    /** ≡ iOS `PrivacyLevel.displayName` (textos fijos del Swift). */
+    val displayName: String
+        get() = when (this) {
+            PUBLIC -> "Público"
+            RESTRICTED -> "Restringido"
+            PRIVATE -> "Privado"
+            DEACTIVATED -> "Desactivado"
+        }
+
+    /** ≡ iOS `PrivacyLevel.description`. */
+    val description: String
+        get() = when (this) {
+            PUBLIC -> "Cualquiera puede ver tu perfil y contenido"
+            RESTRICTED -> "Tu perfil es público pero algunas opciones están restringidas"
+            PRIVATE -> "Solo tus seguidores pueden ver tu contenido"
+            DEACTIVATED -> "La cuenta está temporalmente desactivada"
+        }
+}
 
 /**
- * Usuario de la app — equivalente a AppUser de iOS.
- * Sin el subsistema de badges/Plus/temas (no se usa en el proyecto).
- * La igualdad es por `id`, como en iOS.
+ * Usuario de la app — ≡ [AppUser] de iOS.
+ * Igualdad por `id`.
  */
 data class AppUser(
     val id: String,
     val username: String = "Usuario Desconocido",
     val email: String = "",
     val interests: List<String> = emptyList(),
+    /** Flag Firestore; no implica portar PlusSubscription / badges 🚫. */
+    val isPlusSubscriber: Boolean = false,
     val profileImagePath: String? = null,
     val bio: String? = null,
     val blockedUsers: List<String> = emptyList(),
@@ -69,26 +122,32 @@ data class AppUser(
     val messageRequestPolicy: MessageRequestPolicy = MessageRequestPolicy.EVERYONE,
     val lastUsernameChange: Date? = null,
 ) {
-    // Igualdad por id (como AppUser: Equatable/Hashable de iOS).
     override fun equals(other: Any?): Boolean = other is AppUser && other.id == id
     override fun hashCode(): Int = id.hashCode()
 
-    // MARK: - Sistema de seguimiento / privacidad (extensiones de AppUser en iOS)
+    // MARK: - Seguimiento / privacidad (extensiones AppUser en iOS)
 
     val isPrivateAccount: Boolean get() = isPrivate
 
-    /** Si la cuenta puede iniciar sesión (está activa). */
     val canLogin: Boolean get() = isActive
+
+    /** ≡ iOS `deactivationInfo`. */
+    fun deactivationInfo(): String? {
+        if (isActive) return null
+        val at = deactivatedAt ?: return null
+        val formatted = MomentsFormat.smartDate(from = at, context = MomentsFormat.DateContext.MEDIUM_DATE_TIME)
+        return "Cuenta desactivada el $formatted"
+    }
 
     val daysSinceDeactivation: Int?
         get() = deactivatedAt?.let {
             ((System.currentTimeMillis() - it.time) / (24L * 3600 * 1000)).toInt()
         }
 
-    /** Placeholder: se resolverá con el servicio de conexiones. */
+    /** Placeholder ≡ iOS (siempre false hasta cablear historias). */
     val hasActiveStory: Boolean get() = false
 
-    fun hasMutualConnection(userId: String): Boolean = false // placeholder (como iOS)
+    fun hasMutualConnection(userId: String): Boolean = false
 
     fun canReceiveDirectMessages(from: String): Boolean {
         if (!isActive) return false
@@ -119,16 +178,19 @@ data class AppUser(
             else -> PrivacyLevel.PUBLIC
         }
 
-    /** Requiere aprobación para seguir (privada y activa). */
     val requiresFollowApproval: Boolean get() = isPrivate && isActive
 
+    /** ≡ iOS `shouldHideAds` (flag básico; sin PlusSubscription 🚫). */
+    val shouldHideAds: Boolean get() = isPlusSubscriber
+
     companion object {
-        /** Deserializa desde un documento Firestore (equivalente al init(from decoder:) de iOS). */
+        /** ≡ iOS `init(from decoder:)` / mapa Firestore. */
         fun from(id: String, data: Map<String, Any?>): AppUser = AppUser(
             id = id,
             username = data["username"] as? String ?: "Usuario Desconocido",
             email = data["email"] as? String ?: "",
             interests = (data["interests"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+            isPlusSubscriber = data["isPlusSubscriber"] as? Boolean ?: false,
             profileImagePath = data["profileImagePath"] as? String,
             bio = data["bio"] as? String,
             blockedUsers = (data["blockedUsers"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
@@ -159,7 +221,7 @@ data class AppUser(
             lastUsernameChange = anyToDate(data["lastUsernameChange"]),
         )
 
-        /** Firestore puede entregar fechas como Timestamp o como Double (epoch s) — como en iOS. */
+        /** Timestamp | Date | Double epoch s (como Codable iOS en deactivatedAt). */
         private fun anyToDate(value: Any?): Date? = when (value) {
             is Timestamp -> value.toDate()
             is Date -> value
@@ -169,29 +231,39 @@ data class AppUser(
     }
 }
 
-// MARK: - Serialización a Firestore (encode de AppUser; sin badges/Plus)
+// MARK: - Serialización Firestore (sin ownedBadges / plusSubscription 🚫)
+
 fun AppUser.toMap(): Map<String, Any> = buildMap {
-    put("id", id); put("username", username); put("email", email); put("interests", interests)
+    put("id", id)
+    put("username", username)
+    put("email", email)
+    put("interests", interests)
+    put("isPlusSubscriber", isPlusSubscriber)
     profileImagePath?.let { put("profileImagePath", it) }
     bio?.let { put("bio", it) }
     put("blockedUsers", blockedUsers)
-    put("isPrivate", isPrivate); put("showMutuals", showMutuals)
-    put("showFollowing", showFollowing); put("showFollowers", showFollowers)
+    put("isPrivate", isPrivate)
+    put("showMutuals", showMutuals)
+    put("showFollowing", showFollowing)
+    put("showFollowers", showFollowers)
     activeHoursStart?.let { put("activeHoursStart", it) }
     activeHoursEnd?.let { put("activeHoursEnd", it) }
     notificationPreferences?.let { put("notificationPreferences", it) }
     put("bestFriends", bestFriends)
     websiteUrl?.let { put("websiteUrl", it) }
     profileNote?.let { put("profileNote", it) }
-    put("followersCount", followersCount); put("followingCount", followingCount); put("momentsCount", momentsCount)
+    put("followersCount", followersCount)
+    put("followingCount", followingCount)
+    put("momentsCount", momentsCount)
     put("isActive", isActive)
-    deactivatedAt?.let { put("deactivatedAt", com.google.firebase.Timestamp(it)) }
+    deactivatedAt?.let { put("deactivatedAt", Timestamp(it)) }
     deactivatedBy?.let { put("deactivatedBy", it) }
     selectedProfileTheme?.let { put("selectedProfileTheme", it) }
     put("isVerified", isVerified)
     put("onlineStatus", onlineStatus.raw)
-    lastSeen?.let { put("lastSeen", com.google.firebase.Timestamp(it)) }
-    put("isOnline", isOnline); put("showReadReceipts", showReadReceipts)
+    lastSeen?.let { put("lastSeen", Timestamp(it)) }
+    put("isOnline", isOnline)
+    put("showReadReceipts", showReadReceipts)
     put("messageRequestPolicy", messageRequestPolicy.raw)
-    lastUsernameChange?.let { put("lastUsernameChange", com.google.firebase.Timestamp(it)) }
+    lastUsernameChange?.let { put("lastUsernameChange", Timestamp(it)) }
 }

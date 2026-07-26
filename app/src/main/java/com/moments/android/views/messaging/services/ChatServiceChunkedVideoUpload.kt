@@ -1,16 +1,14 @@
 package com.moments.android.views.messaging.services
 
-import android.graphics.Bitmap
 import android.net.Uri
-import com.moments.android.extensions.extractVideoThumbnailFromFile
-import com.moments.android.models.ChatMediaPurpose
-import com.moments.android.models.EncryptedChatMediaMetadata
+import com.moments.android.views.messaging.core.ChatMediaPurpose
+import com.moments.android.views.messaging.core.EncryptedChatMediaMetadata
 import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.messaging.EncryptionService
 import com.moments.android.services.storage.MediaUploadService
 import com.moments.android.services.storage.StoragePathBuilder
 import com.moments.android.services.storage.StorageUploadDomain
-import java.io.ByteArrayOutputStream
+import com.moments.android.utilities.AppLog
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -19,7 +17,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 data class ChatMediaUploadProgress(val messageId: String, val progress: Double)
 
-/** Equivalente Android de las notificaciones `MediaUploadProgress` de iOS. */
+/** ≡ NotificationCenter `MediaUploadProgress` (userInfo: messageId, progress). */
 object ChatMediaUploadProgressEvents {
     private val mutableEvents = MutableSharedFlow<ChatMediaUploadProgress>(extraBufferCapacity = 64)
     val events: SharedFlow<ChatMediaUploadProgress> = mutableEvents.asSharedFlow()
@@ -29,8 +27,11 @@ object ChatMediaUploadProgressEvents {
     }
 }
 
-/** Port de `ChatService+ChunkedVideoUpload.swift`. */
-internal suspend fun ChatService.uploadChunkedEncryptedVideo(
+/**
+ * Port de `ChatService+ChunkedVideoUpload.swift`.
+ * Pipeline de vídeo cifrado sin copias completas en memoria.
+ */
+suspend fun ChatService.uploadChunkedEncryptedVideo(
     preparedFile: File,
     senderId: String,
     conversationId: String,
@@ -69,77 +70,80 @@ internal suspend fun ChatService.uploadChunkedEncryptedVideo(
             messageId,
         )
         encryptedMediaResolver.markUploadStarted(messageId)
+        // ≡ defer markUploadFinished — cubre upload principal + thumbnail + stage final.
         try {
             MediaUploadService.uploadEncryptedFile(
                 target = encryptedMainTarget,
                 fileUri = Uri.fromFile(encryptedMain.ciphertextFile),
                 progress = { ChatMediaUploadProgressEvents.emit(messageId, it) },
             )
+
+            var thumbnailObjectPath: String? = null
+            var thumbnailEncryption: EncryptedChatMediaMetadata? = null
+            var localThumbnailUrl: String? = null
+
+            val thumbnailData = ChatServiceMediaPipeline.generateVideoThumbnailData(preparedFile)
+            if (thumbnailData != null) {
+                try {
+                    val thumbId = UUID.randomUUID().toString()
+                    val thumbBase = StoragePathBuilder.build(
+                        senderId,
+                        StorageUploadDomain.ChatThumbnail(
+                            conversationId = conversationId,
+                            messageId = messageId,
+                            thumbId = thumbId,
+                        ),
+                    )
+                    val encryptedThumb = EncryptionService.encryptChatMedia(
+                        data = thumbnailData,
+                        conversationId = conversationId,
+                        messageId = messageId,
+                        purpose = ChatMediaPurpose.THUMBNAIL,
+                        contentType = "image/jpeg",
+                        fileExtension = "jpg",
+                    )
+                    val encryptedThumbTarget = ChatServiceMediaPipeline.chatEncryptedStorageTarget(
+                        userId = senderId,
+                        conversationId = conversationId,
+                        messageId = messageId,
+                        fileId = thumbId,
+                        originalContentType = "image/jpeg",
+                        objectPath = thumbBase.objectPath.replace(".jpg", ".enc"),
+                    )
+                    MediaUploadService.uploadEncryptedBlob(encryptedThumbTarget, encryptedThumb.ciphertext)
+                    thumbnailObjectPath = encryptedThumbTarget.objectPath
+                    thumbnailEncryption = encryptedThumb.metadata
+                    val cachedThumb = ChatCacheStore.writeDecryptedMedia(
+                        thumbnailData,
+                        conversationId,
+                        messageId,
+                        encryptedThumb.metadata.purpose,
+                        encryptedThumb.metadata.fileExtension,
+                    )
+                    localThumbnailUrl = Uri.fromFile(cachedThumb).toString()
+                } catch (error: Exception) {
+                    AppLog.error("Encrypted video thumbnail upload failed: ${error.message}")
+                }
+            }
+
+            val preview = CachedResolvedMedia(
+                mediaUrl = localPreviewUrl,
+                thumbnailUrl = localThumbnailUrl,
+            )
+            encryptedMediaResolver.stageOutgoingPreview(preview, messageId)
+            encryptedMediaResolver.cacheResolvedPreview(preview, messageId)
+
+            return ChatMediaUploadResult(
+                mediaUrl = localPreviewUrl,
+                thumbnailUrl = localThumbnailUrl,
+                mediaObjectPath = encryptedMainTarget.objectPath,
+                thumbnailObjectPath = thumbnailObjectPath,
+                mediaEncryption = encryptedMain.metadata,
+                thumbnailEncryption = thumbnailEncryption,
+            )
         } finally {
             encryptedMediaResolver.markUploadFinished(messageId)
         }
-
-        var thumbnailObjectPath: String? = null
-        var thumbnailEncryption: EncryptedChatMediaMetadata? = null
-        var localThumbnailUrl: String? = null
-        val thumbnailData = extractVideoThumbnailFromFile(preparedFile)?.let { bitmap ->
-            ByteArrayOutputStream().use { stream ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 78, stream)
-                stream.toByteArray()
-            }
-        }
-        if (thumbnailData != null) {
-            runCatching {
-                val thumbId = UUID.randomUUID().toString()
-                val thumbBase = StoragePathBuilder.build(
-                    senderId,
-                    StorageUploadDomain.ChatThumbnail(
-                        conversationId = conversationId,
-                        messageId = messageId,
-                        thumbId = thumbId,
-                    ),
-                )
-                val encryptedThumb = EncryptionService.encryptChatMedia(
-                    data = thumbnailData,
-                    conversationId = conversationId,
-                    messageId = messageId,
-                    purpose = ChatMediaPurpose.THUMBNAIL,
-                    contentType = "image/jpeg",
-                    fileExtension = "jpg",
-                )
-                val encryptedThumbTarget = ChatServiceMediaPipeline.chatEncryptedStorageTarget(
-                    userId = senderId,
-                    conversationId = conversationId,
-                    messageId = messageId,
-                    fileId = thumbId,
-                    originalContentType = "image/jpeg",
-                    objectPath = thumbBase.objectPath.replace(".jpg", ".enc"),
-                )
-                MediaUploadService.uploadEncryptedBlob(encryptedThumbTarget, encryptedThumb.ciphertext)
-                thumbnailObjectPath = encryptedThumbTarget.objectPath
-                thumbnailEncryption = encryptedThumb.metadata
-                val cachedThumb = ChatCacheStore.writeDecryptedMedia(
-                    thumbnailData,
-                    conversationId,
-                    messageId,
-                    encryptedThumb.metadata.purpose,
-                    encryptedThumb.metadata.fileExtension,
-                )
-                localThumbnailUrl = Uri.fromFile(cachedThumb).toString()
-            }
-        }
-
-        val preview = CachedResolvedMedia(localPreviewUrl, localThumbnailUrl)
-        encryptedMediaResolver.stageOutgoingPreview(preview, messageId)
-        encryptedMediaResolver.cacheResolvedPreview(preview, messageId)
-        return ChatMediaUploadResult(
-            mediaUrl = localPreviewUrl,
-            thumbnailUrl = localThumbnailUrl,
-            mediaObjectPath = encryptedMainTarget.objectPath,
-            thumbnailObjectPath = thumbnailObjectPath,
-            mediaEncryption = encryptedMain.metadata,
-            thumbnailEncryption = thumbnailEncryption,
-        )
     } finally {
         encryptedMain.ciphertextFile.delete()
     }

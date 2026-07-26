@@ -54,8 +54,8 @@ import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.models.AppUser
-import com.moments.android.models.Conversation
-import com.moments.android.models.EnhancedMessage
+import com.moments.android.views.messaging.core.Conversation
+import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.components.ChatRecoveryGateView
@@ -227,8 +227,8 @@ fun MessagingView(
 /**
  * Envío de solicitud de mensaje cuando no hay follow mutuo. En iOS este caso abre el chat con un
  * `PendingChatContext` cuyo composer manda la solicitud; aquí se resuelve con un diálogo directo
- * sobre `MessageRequestService`, que ya aplica las reglas del backend (y actualiza la solicitud
- * existente en vez de duplicarla).
+ * sobre `MessageRequestService`, que ya aplica las reglas del backend (falla si ya hay
+ * solicitud pendiente, igual que iOS — no duplica ni actualiza).
  */
 @Composable
 private fun SendMessageRequestDialog(

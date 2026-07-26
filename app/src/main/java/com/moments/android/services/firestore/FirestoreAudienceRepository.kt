@@ -3,7 +3,6 @@ package com.moments.android.services.firestore
 import com.google.firebase.firestore.FieldValue
 import com.moments.android.models.CustomAudienceList
 import kotlinx.coroutines.tasks.await
-import java.util.Date
 
 /** Port de FirestoreAudienceRepository.swift. */
 suspend fun FirestoreService.saveCustomAudienceForContent(
@@ -59,6 +58,58 @@ suspend fun FirestoreService.fetchCustomLists(userId: String): List<CustomAudien
         @Suppress("UNCHECKED_CAST")
         CustomAudienceList.from(doc.id, doc.data as Map<String, Any?>)
     }
+}
+
+/** Port de `CreateListViewModel.createList` — `users/{uid}/customAudienceLists`. */
+suspend fun FirestoreService.createCustomAudienceList(
+    userId: String,
+    name: String,
+    description: String,
+    members: List<String>,
+    color: String,
+    icon: String,
+): String {
+    val ref = db.collection("users").document(userId).collection("customAudienceLists").document()
+    val data = mutableMapOf<String, Any>(
+        "name" to name,
+        "members" to members,
+        "color" to color,
+        "icon" to icon,
+        "createdAt" to FieldValue.serverTimestamp(),
+        "updatedAt" to FieldValue.serverTimestamp(),
+    )
+    if (description.isNotBlank()) data["description"] = description
+    ref.set(data).await()
+    return ref.id
+}
+
+/** Port de `EditListViewModel.updateList`. */
+suspend fun FirestoreService.updateCustomAudienceList(
+    userId: String,
+    listId: String,
+    name: String,
+    description: String,
+    members: List<String>,
+    color: String,
+    icon: String,
+) {
+    val update = mutableMapOf<String, Any>(
+        "name" to name,
+        "members" to members,
+        "color" to color,
+        "icon" to icon,
+        "updatedAt" to FieldValue.serverTimestamp(),
+    )
+    // iOS: description vacía → FieldValue.delete()
+    if (description.isBlank()) {
+        update["description"] = FieldValue.delete()
+    } else {
+        update["description"] = description
+    }
+    db.collection("users").document(userId)
+        .collection("customAudienceLists").document(listId)
+        .update(update)
+        .await()
 }
 
 suspend fun FirestoreService.fetchCustomListDetails(listId: String, ownerId: String): CustomAudienceList {

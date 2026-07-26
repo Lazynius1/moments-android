@@ -10,6 +10,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.ConcurrentHashMap
+import com.moments.android.models.Story
+import com.moments.android.services.firestore.fetchMutuals
 
 // MARK: - Privacy settings
 
@@ -136,7 +138,7 @@ object PrivacyService {
         return runCatching {
             val settings = fetchPrivacySettings(moment.authorId)
             if (settings.isPrivate) {
-                firestoreService.isFollowing(moment.authorId, viewerId)
+                firestoreService.isMutualConnection(viewerId, moment.authorId)
             } else {
                 true
             }
@@ -401,10 +403,330 @@ object PrivacyService {
                 if (now - updatedAt <= MUTED_USERS_CACHE_TTL_MS) return ids
             }
         }
-        val mutedIds = firestoreService.fetchMutedUserIds(viewerId)
+        // iOS: error en mute → set vacío (no muteado).
+        val mutedIds = runCatching { firestoreService.fetchMutedUserIds(viewerId) }.getOrDefault(emptySet())
         mutedUsersCacheMutex.withLock {
             mutedUsersCache[viewerId] = mutedIds to now
         }
         return mutedIds
     }
+
+    // MARK: - Conexión mutua y mejores amigos
+
+    suspend fun checkMutualConnection(user1: String, user2: String): Boolean =
+        firestore.isMutualConnection(user1, user2)
+
+    suspend fun checkIfBestFriend(userId: String, friendId: String): Boolean =
+        dedupeInFlightBestFriend("$userId|$friendId") {
+            runCatching {
+                val snap = database.collection("users").document(userId).get().await()
+                @Suppress("UNCHECKED_CAST")
+                val bestFriends = (snap.data as? Map<String, Any?>)?.get("bestFriends") as? List<*>
+                bestFriends?.filterIsInstance<String>()?.contains(friendId) == true
+            }.getOrDefault(false)
+        }
+
+    // MARK: - Audiencias personalizadas
+
+    suspend fun checkCustomAudience(
+        contentType: String,
+        contentId: String,
+        authorId: String,
+        viewerId: String,
+    ): Boolean = runCatching {
+        val snap = database.collection("users").document(authorId)
+            .collection("customAudiences")
+            .document("${contentType}_$contentId")
+            .get()
+            .await()
+        @Suppress("UNCHECKED_CAST")
+        val allowedUsers = (snap.data as? Map<String, Any?>)?.get("allowedUsers") as? List<*>
+        allowedUsers?.filterIsInstance<String>()?.contains(viewerId) == true
+    }.getOrDefault(false)
+
+    private suspend fun checkStoryVisibilitySettings(
+        authorId: String,
+        viewerId: String,
+    ): Boolean {
+        val snap = database.collection("users").document(authorId).get().await()
+        @Suppress("UNCHECKED_CAST")
+        val data = snap.data as? Map<String, Any?> ?: return canViewUserContent(viewerId, authorId)
+        @Suppress("UNCHECKED_CAST")
+        val settings = data["contentVisibilitySettings"] as? Map<String, Any?> ?: run {
+            return canViewUserContent(viewerId, authorId)
+        }
+        return when (settings["storyVisibility"] as? String) {
+            "everyone" -> canViewUserContent(viewerId, authorId)
+            "mutuals" -> checkMutualConnection(viewerId, authorId)
+            "bestFriends" -> checkIfBestFriend(authorId, viewerId)
+            "custom" -> {
+                @Suppress("UNCHECKED_CAST")
+                val customViewers = settings["customStoryViewers"] as? List<*>
+                customViewers?.filterIsInstance<String>()?.contains(viewerId) == true
+            }
+            else -> false
+        }
+    }
+
+    suspend fun saveCustomAudience(
+        contentType: String,
+        contentId: String,
+        authorId: String,
+        allowedUsers: List<String>,
+    ) {
+        val data = mapOf(
+            "contentType" to contentType,
+            "contentId" to contentId,
+            "allowedUsers" to allowedUsers,
+            "createdAt" to FieldValue.serverTimestamp(),
+        )
+        database.collection("users").document(authorId)
+            .collection("customAudiences")
+            .document("${contentType}_$contentId")
+            .set(data)
+            .await()
+    }
+
+    // MARK: - Content viewers
+
+    suspend fun getContentViewers(moment: Moment): List<String> {
+        val audience = ContentAudience.from(moment.audience)
+        return when (audience) {
+            ContentAudience.EVERYONE -> fetchPotentialViewers(moment.authorId)
+            ContentAudience.MUTUALS -> fetchMutualsUserIds(moment.authorId)
+            ContentAudience.BEST_FRIENDS -> fetchBestFriendsUserIds(moment.authorId)
+            ContentAudience.CUSTOM -> fetchCustomAudienceUserIds(
+                contentType = "moment",
+                contentId = moment.id.orEmpty(),
+                authorId = moment.authorId,
+            )
+            ContentAudience.CUSTOM_LIST -> fetchCustomListViewersForMoment(moment)
+            ContentAudience.ONLY_ME -> listOf(moment.authorId)
+        }
+    }
+
+    private suspend fun fetchCustomListViewersForMoment(moment: Moment): List<String> {
+        val momentId = moment.id ?: return emptyList()
+        val snap = database.collection("users").document(moment.authorId)
+            .collection("moments").document(momentId)
+            .get()
+            .await()
+        @Suppress("UNCHECKED_CAST")
+        val customListId = (snap.data as? Map<String, Any?>)?.get("customListId") as? String
+            ?: return emptyList()
+        return getCustomListViewers(customListId, moment.authorId)
+    }
+
+    suspend fun checkCustomList(
+        contentType: String,
+        contentId: String,
+        authorId: String,
+        viewerId: String,
+    ): Boolean = runCatching {
+        val contentCollection = if (contentType == "story") "stories" else "moments"
+        val snap = database.collection("users").document(authorId)
+            .collection(contentCollection).document(contentId)
+            .get()
+            .await()
+        @Suppress("UNCHECKED_CAST")
+        val customListId = (snap.data as? Map<String, Any?>)?.get("customListId") as? String
+            ?: return@runCatching false
+        checkUserInList(viewerId, customListId, authorId)
+    }.getOrDefault(false)
+
+    private suspend fun fetchPotentialViewers(userId: String): List<String> =
+        runCatching {
+            fetchPrivacySettings(userId)
+            firestore.fetchFollowers(userId).map { it.id }
+        }.getOrDefault(emptyList())
+
+    private suspend fun fetchMutualsUserIds(userId: String): List<String> =
+        runCatching {
+            firestore.fetchMutuals(userId).map { it.id }
+        }.getOrDefault(emptyList())
+
+    private suspend fun fetchBestFriendsUserIds(userId: String): List<String> {
+        val snap = database.collection("users").document(userId).get().await()
+        @Suppress("UNCHECKED_CAST")
+        val bestFriends = (snap.data as? Map<String, Any?>)?.get("bestFriends") as? List<*>
+        return bestFriends?.filterIsInstance<String>() ?: emptyList()
+    }
+
+    private suspend fun fetchCustomAudienceUserIds(
+        contentType: String,
+        contentId: String,
+        authorId: String,
+    ): List<String> {
+        val snap = database.collection("users").document(authorId)
+            .collection("customAudiences")
+            .document("${contentType}_$contentId")
+            .get()
+            .await()
+        @Suppress("UNCHECKED_CAST")
+        val allowedUsers = (snap.data as? Map<String, Any?>)?.get("allowedUsers") as? List<*>
+        return allowedUsers?.filterIsInstance<String>() ?: emptyList()
+    }
+
+    // MARK: - Listas personalizadas reutilizables
+
+    suspend fun canUserViewContentWithCustomList(
+        content: CustomListContent,
+        viewerId: String,
+    ): Boolean {
+        if (content.authorId == viewerId) return true
+        if (checkMutualBlocks(viewerId, content.authorId)) return false
+        val listId = content.customListId?.takeIf { it.isNotEmpty() } ?: return false
+        return checkUserInList(viewerId, listId, content.authorId)
+    }
+
+    private suspend fun checkCustomListMembership(story: Story, viewerId: String): Boolean {
+        val customListId = story.customListId?.takeIf { it.isNotEmpty() } ?: return false
+        return checkUserInList(viewerId, customListId, story.authorId)
+    }
+
+    private suspend fun checkCustomListMembership(moment: Moment, viewerId: String): Boolean {
+        val customListId = moment.customListId?.takeIf { it.isNotEmpty() } ?: return false
+        return checkUserInList(viewerId, customListId, moment.authorId)
+    }
+
+    private suspend fun checkUserInList(
+        userId: String,
+        listId: String,
+        listOwnerId: String,
+    ): Boolean = runCatching {
+        val snap = database.collection("users").document(listOwnerId)
+            .collection("customAudienceLists").document(listId)
+            .get()
+            .await()
+        @Suppress("UNCHECKED_CAST")
+        val members = (snap.data as? Map<String, Any?>)?.get("members") as? List<*>
+        members?.filterIsInstance<String>()?.contains(userId) == true
+    }.getOrDefault(false)
+
+    suspend fun getCustomListViewers(listId: String, ownerId: String): List<String> {
+        val snap = database.collection("users").document(ownerId)
+            .collection("customAudienceLists").document(listId)
+            .get()
+            .await()
+        @Suppress("UNCHECKED_CAST")
+        val members = (snap.data as? Map<String, Any?>)?.get("members") as? List<*>
+        return members?.filterIsInstance<String>() ?: emptyList()
+    }
+
+    // MARK: - Visibilidad mejorada de momentos e historias
+
+    suspend fun canUserViewMomentEnhanced(moment: Moment, viewerId: String): Boolean {
+        val momentId = moment.id?.takeIf { it.isNotEmpty() } ?: return false
+        if (moment.authorId == viewerId) return true
+        if (isAuthorMutedForViewer(viewerId, moment.authorId)) return false
+        if (checkMutualBlocks(viewerId, moment.authorId)) return false
+        if (isViewerHiddenFromAuthorContent(moment.authorId, viewerId)) return false
+
+        return when (moment.audience ?: "everyone") {
+            "everyone" -> canViewUserContentAfterBlockCheck(viewerId, moment.authorId)
+            "mutuals" -> checkMutualConnection(viewerId, moment.authorId)
+            "bestFriends" -> checkIfBestFriend(moment.authorId, viewerId)
+            "custom" -> checkCustomAudience("moment", momentId, moment.authorId, viewerId)
+            "customList" -> checkCustomListMembership(moment, viewerId)
+            else -> false
+        }
+    }
+
+    suspend fun canUserViewStoryEnhanced(story: Story, viewerId: String): Boolean {
+        if (story.authorId == viewerId) return true
+        if (isAuthorMutedForViewer(viewerId, story.authorId)) return false
+        if (checkMutualBlocks(viewerId, story.authorId)) return false
+        if (isViewerHiddenFromAuthorContent(story.authorId, viewerId)) return false
+
+        return when (story.audience ?: "everyone") {
+            "everyone" -> canViewUserContentAfterBlockCheck(viewerId, story.authorId)
+            "mutuals" -> checkMutualConnection(viewerId, story.authorId)
+            "bestFriends" -> checkIfBestFriend(story.authorId, viewerId)
+            "custom" -> checkCustomAudience(
+                contentType = "story",
+                contentId = story.id.orEmpty(),
+                authorId = story.authorId,
+                viewerId = viewerId,
+            )
+            "customList" -> checkCustomListMembership(story, viewerId)
+            "onlyMe" -> false
+            else -> false
+        }
+    }
+
+    // MARK: - Hidden / muted checks
+
+    private suspend fun isViewerHiddenFromAuthorContent(
+        authorId: String,
+        viewerId: String,
+    ): Boolean = dedupeInFlightHidden("$authorId|$viewerId") {
+        runCatching {
+            val snap = database.collection("users").document(authorId).get().await()
+            @Suppress("UNCHECKED_CAST")
+            val data = snap.data as? Map<String, Any?> ?: return@runCatching false
+            @Suppress("UNCHECKED_CAST")
+            val settings = data["contentVisibilitySettings"] as? Map<String, Any?> ?: return@runCatching false
+            @Suppress("UNCHECKED_CAST")
+            val hiddenFromUsers = settings["hiddenFromUsers"] as? List<*>
+            hiddenFromUsers?.filterIsInstance<String>()?.contains(viewerId) == true
+        }.getOrDefault(false)
+    }
+
+    private suspend fun isAuthorMutedForViewer(
+        viewerId: String,
+        authorId: String,
+    ): Boolean {
+        if (viewerId.isEmpty() || authorId.isEmpty()) return false
+        if (viewerId == authorId) return false
+        val mutedIds = fetchMutedUsersCached(viewerId)
+        return authorId in mutedIds
+    }
+
+    // MARK: - Explore (más permisivo)
+
+    suspend fun canUserViewMomentInExplore(moment: Moment, viewerId: String): Boolean {
+        if (moment.authorId == viewerId) return true
+        if (isAuthorMutedForViewer(viewerId, moment.authorId)) return false
+        if (checkMutualBlocks(viewerId, moment.authorId)) return false
+        if (isViewerHiddenFromAuthorContent(moment.authorId, viewerId)) return false
+
+        return when (moment.audience ?: "everyone") {
+            "everyone" -> canViewUserContentForExplore(viewerId, moment.authorId)
+            "mutuals" -> checkMutualConnection(viewerId, moment.authorId)
+            "bestFriends" -> checkIfBestFriend(moment.authorId, viewerId)
+            "custom" -> checkCustomAudience(
+                contentType = "moment",
+                contentId = moment.id.orEmpty(),
+                authorId = moment.authorId,
+                viewerId = viewerId,
+            )
+            "customList" -> checkCustomListMembership(moment, viewerId)
+            "onlyMe" -> false
+            else -> false
+        }
+    }
+
+    suspend fun canViewUserContentForExplore(
+        viewerId: String,
+        targetUserId: String,
+    ): Boolean {
+        if (viewerId == targetUserId) return true
+        return runCatching {
+            val settings = fetchPrivacySettings(targetUserId)
+            if (!settings.isPrivate) true else firestore.isFollowing(viewerId, targetUserId)
+        }.getOrDefault(false)
+    }
+
+    fun canShareMoment(moment: Moment): Boolean {
+        val audience = moment.audience ?: "everyone"
+        return audience == "everyone"
+    }
+
+}
+
+// MARK: - Protocolo para contenido con lista personalizada (CustomListContent.swift section)
+
+interface CustomListContent {
+    val authorId: String
+    val customListId: String?
 }

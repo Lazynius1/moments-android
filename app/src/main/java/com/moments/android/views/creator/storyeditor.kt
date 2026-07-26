@@ -1,6 +1,14 @@
 package com.moments.android.views.creator
 
 import com.moments.android.views.creator.components.ActiveEditorMode
+import com.moments.android.services.social.StoryChainLimitError
+import com.moments.android.services.social.StoryChainLimitsService
+import com.moments.android.views.creator.components.StoryBackgroundPreset
+import com.moments.android.views.creator.components.StoryMediaBackgroundView
+import com.moments.android.views.creator.components.EditableImageView
+import com.moments.android.views.creator.components.StoryEditableMediaContainer
+import com.moments.android.views.creator.components.storyShouldShowGeneratedBackground
+import com.moments.android.views.creator.components.storyDominantBackgroundColors
 import com.moments.android.views.creator.components.StoryDrawingEditorOverlay
 import com.moments.android.views.creator.components.StoryFilterSelectorView
 import com.moments.android.views.creator.components.StoryTextOverlayDraft
@@ -8,28 +16,45 @@ import com.moments.android.views.creator.components.StoryTextStyle
 import com.moments.android.views.creator.components.StoryTextGradientSettings
 import com.moments.android.views.creator.components.StoryVideoGravity
 import com.moments.android.views.creator.components.StoryVideoPlayerView
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.layout.requiredSize
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
+import android.media.MediaMetadataRetriever
 import com.moments.android.views.components.AnimatedStickerView
 import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
+import com.moments.android.views.components.InteractiveAudioStickerView
+import com.moments.android.views.components.StickerHashtagCardView
+import com.moments.android.views.components.StickerLinkCardView
+import com.moments.android.views.components.StickerLocationCardView
+import com.moments.android.views.components.StickerMentionCardView
 import com.moments.android.views.components.StickerPolaroidFrameView
+import com.moments.android.views.components.StickerTimeCardView
 import com.moments.android.views.components.StoryPolaroidFrameStyle
-import com.moments.android.views.creator.components.parseStoryColorHex
-import com.moments.android.views.creator.components.rememberStoryFontFamily
+import com.moments.android.views.story.QuestionResponseStoryStickerCardView
+import com.moments.android.views.creator.components.StoryTextOverlayLabel
 import com.moments.android.views.creator.creatorscreens.CreatorFlowPendingScreen
 import com.moments.android.views.creator.creatorscreens.SelfieStickerLiveCameraView
+import com.moments.android.views.creator.creatorscreens.StoryDrawingCanvasOverlay
 import com.moments.android.views.creator.creatorscreens.StoryOverlayDragState
 import com.moments.android.views.creator.creatorscreens.StoryOverlayTrashZone
 import com.moments.android.views.creator.creatorscreens.StoryOverlayToast
 import com.moments.android.views.creator.creatorscreens.StoryOverlayToastHost
+import com.moments.android.views.creator.creatorscreens.StoryPolaroidCaptionField
+import com.moments.android.views.creator.creatorscreens.StoryRevealStatusBadge
 import com.moments.android.views.creator.creatorscreens.StickerOverlayView
 import com.moments.android.views.creator.creatorscreens.StoryTextEditor
 import com.moments.android.views.creator.creatorscreens.StoryTextOverlayItem
-import com.moments.android.views.creator.creatorscreens.isPointOverStoryOverlayTrash
-import android.Manifest
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.content.ContentValues
+import android.os.Build
+import android.provider.MediaStore
+import android.widget.Toast
 import android.net.Uri
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -43,19 +68,31 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import com.moments.android.views.creator.creatoruikit.creatorMomentsCaptureRect
+import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
+import kotlin.math.roundToInt
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -65,22 +102,32 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.EmojiEmotions
-import androidx.compose.material.icons.filled.Filter
+import androidx.compose.material.icons.filled.PhotoFilter
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,6 +138,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
@@ -98,6 +146,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -106,24 +155,46 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.coordinators.CoordinatorNavigationEvent
+import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.CachedSticker
 import com.moments.android.models.CachedStickerInteractionData
 import com.moments.android.models.Point
+import com.moments.android.models.StickerData
 import com.moments.android.services.content.FilterService
+import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.firestore.searchUsers
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.utilities.HapticManager
+import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.views.creator.BackgroundStoryUploadService
 import com.moments.android.views.creator.CreatorAspectRatio
 import com.moments.android.views.creator.CreatorFlow
 import com.moments.android.views.creator.CreatorMedia
 import com.moments.android.views.creator.audienceselector.AudienceSelectionView
+import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.feed.maps.LocationMapView
+import com.moments.android.views.permission.shared.PermissionPrimerGate
+import com.moments.android.views.permission.shared.PermissionPrimerGateHost
+import com.moments.android.views.creator.EmojiPickerView
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.moments.android.views.messaging.media.CameraPickerMediaType
+import com.moments.android.views.messaging.media.ChatMediaOverlayPayload
+import com.moments.android.views.messaging.media.ChatMediaSendMode
+import com.moments.android.views.messaging.media.ChatMediaSendModeIcon
+import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.creator.stickerHostLabel
 import kotlinx.coroutines.Dispatchers
 import android.app.DatePickerDialog
@@ -144,7 +215,6 @@ import java.io.FileOutputStream
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import android.graphics.Color as AndroidColor
 
 /** Equivalente local de la edición inline que `StickerOverlayView.swift` habilita por tipo. */
 private fun stickerSupportsInlineEdit(sticker: StoryStickerDraft): Boolean = when (sticker.type) {
@@ -172,6 +242,7 @@ private fun formatCountdownRemaining(targetAtMs: Double): String {
  * Chunk 6: stickers emoji (StickerPickerView + overlay + upload).
  * Stickers interactivos / GIF / motion: chunks siguientes.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun StoryEditingView(
     selectedMediaItems: List<CreatorMedia>,
@@ -180,6 +251,15 @@ fun StoryEditingView(
     startInTextMode: Boolean,
     onStartInTextModeChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
+    /** iOS `initialSticker` / response sticker. */
+    initialSticker: StickerData? = null,
+    initialChainId: String? = null,
+    initialChainTitle: String? = null,
+    initialChainPosition: Int? = null,
+    /** ≡ iOS `chatRecipientUserId` — avatar en barra de envío chat. */
+    chatRecipientUserId: String? = null,
+    /** ≡ iOS `onChatSend` — si no es null, editor en modo chat (sin publicar historia). */
+    onChatSend: ((ByteArray, CameraPickerMediaType, ChatMediaSendMode, ChatMediaOverlayPayload?) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -220,6 +300,9 @@ fun StoryEditingView(
     var deleteArmedId by remember { mutableStateOf<String?>(null) }
     var overlayDragState by remember { mutableStateOf(StoryOverlayDragState()) }
     var drawingImage by remember { mutableStateOf<Bitmap?>(null) }
+    var drawingOffsetX by remember { mutableFloatStateOf(0f) }
+    var drawingOffsetY by remember { mutableFloatStateOf(0f) }
+    var drawingScale by remember { mutableFloatStateOf(1f) }
     var selectedFilter by remember { mutableStateOf(FilterService.FilterType.NORMAL) }
     var filterIntensity by remember { mutableDoubleStateOf(1.0) }
     var filteredImage by remember { mutableStateOf<Bitmap?>(null) }
@@ -229,6 +312,141 @@ fun StoryEditingView(
     var stickers by remember { mutableStateOf<List<StoryStickerDraft>>(emptyList()) }
     var showingStickerPicker by remember { mutableStateOf(false) }
     var nextStickerZ by remember { mutableIntStateOf(0) }
+    // ≡ iOS chain context (storyeditor.swift)
+    var chainId by remember { mutableStateOf<String?>(null) }
+    var chainTitle by remember { mutableStateOf("") }
+    var chainPosition by remember { mutableStateOf<Int?>(null) }
+    var originalChainTitle by remember { mutableStateOf("") }
+    var isContinuingChain by remember { mutableStateOf(false) }
+    // ≡ iOS selectedBackgroundPresetIndex / discard / gallery alert
+    var selectedBackgroundPresetIndex by remember { mutableIntStateOf(0) }
+    var showDiscardChangesAlert by remember { mutableStateOf(false) }
+    // ≡ iOS isCreatingChain / allowOthersToContinue / continuationAudience / showingChainConfiguration
+    var isCreatingChain by remember { mutableStateOf(false) }
+    var allowOthersToContinue by remember { mutableStateOf(true) }
+    var continuationAudience by remember { mutableStateOf(ChainContinuationSetting.EVERYONE) }
+    var showingChainConfiguration by remember { mutableStateOf(false) }
+    // ≡ iOS chat send mode
+    var chatSendMode by remember { mutableStateOf(ChatMediaSendMode.VIEW_ONCE) }
+    var mediaCanvasWidthPx by remember { mutableFloatStateOf(1080f) }
+    var mediaCanvasHeightPx by remember { mutableFloatStateOf(1920f) }
+    // Rect del capture en coords de pantalla completa (para drawing overlay fuera del clip).
+    var mediaCaptureRect by remember { mutableStateOf(Rect.Zero) }
+    val isChatSendMode = onChatSend != null
+    // ≡ iOS imageScale / imageOffset / imageRotation + EditableImageView
+    var imageScale by remember { mutableFloatStateOf(1f) }
+    var imageOffset by remember { mutableStateOf(Offset.Zero) }
+    var imageRotationRadians by remember { mutableFloatStateOf(0f) }
+    var sourceBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var isLoadingUserSettings by remember { mutableStateOf(true) }
+    // ≡ iOS autoBackgroundPalette / autoBackgroundPaletteMediaId
+    var autoBackgroundPalette by remember {
+        mutableStateOf(
+            listOf(Color(0xFF0B1215), Color(0xFFFAF9F6)),
+        )
+    }
+    var autoBackgroundPaletteMediaId by remember { mutableStateOf<String?>(null) }
+    // ≡ iOS showingLocationMap / selectedLocationName / selectedCoordinate
+    var showingLocationMap by remember { mutableStateOf(false) }
+    var selectedLocationName by remember { mutableStateOf("") }
+    var selectedLocationLat by remember { mutableStateOf<Double?>(null) }
+    var selectedLocationLng by remember { mutableStateOf<Double?>(null) }
+    var showingExpirationInfoOverlay by remember { mutableStateOf(false) }
+    var showingEmojiPicker by remember { mutableStateOf(false) }
+    val emojiUsageTracker = remember { com.moments.android.utilities.EmojiUsageTracker() }
+    val photosSaveGate = remember { PermissionPrimerGate(PermissionPrimerGate.Kind.PHOTOS_SAVE) }
+
+    val selectedBackgroundPreset =
+        StoryBackgroundPreset.presets[selectedBackgroundPresetIndex % StoryBackgroundPreset.presets.size]
+
+    val showsStoryExpirationSelector = !isChatSendMode && !isCreatingChain && !isContinuingChain
+    val showsGeneratedBackground = storyShouldShowGeneratedBackground(
+        imageScale,
+        imageOffset,
+        imageRotationRadians,
+    )
+
+    fun resolvedStoryBackgroundPalette(): List<Color> {
+        return if (selectedBackgroundPreset.usesAutoPalette) {
+            autoBackgroundPalette.ifEmpty {
+                listOf(Color(0xFF0B1215), Color(0xFF203A43), Color(0xFFFAF9F6))
+            }
+        } else {
+            selectedBackgroundPreset.colors.ifEmpty {
+                listOf(Color(0xFF0B1215), Color(0xFF203A43), Color(0xFFFAF9F6))
+            }
+        }
+    }
+
+    fun setChainContext(id: String, title: String, position: Int) {
+        chainId = id
+        chainTitle = title
+        chainPosition = position
+        isContinuingChain = true
+        originalChainTitle = title
+    }
+
+    fun stickerDataToDraft(data: StickerData): StoryStickerDraft = StoryStickerDraft(
+        id = data.stickerId ?: UUID.randomUUID().toString(),
+        type = data.type,
+        content = data.content,
+        normalizedX = data.position.x,
+        normalizedY = data.position.y,
+        scale = data.scale,
+        rotationRadians = data.rotation,
+        zIndex = data.zIndex ?: nextStickerZ++,
+        gifURL = data.gifURL,
+        videoURL = data.videoURL,
+        isAnimated = data.isAnimated,
+        hashtag = data.hashtag,
+        weatherSymbol = data.weatherSymbol,
+        username = data.username,
+        userId = data.userId,
+        profileImagePath = data.profileImagePath,
+        questionText = data.questionText,
+        caption = data.caption,
+        pollOptions = data.pollOptions,
+        linkURL = data.linkURL,
+        linkTitle = data.linkTitle,
+        location = data.location,
+        latitude = data.latitude,
+        longitude = data.longitude,
+        countdownTitle = data.countdownTitle,
+        countdownTargetAtMs = data.countdownTargetAtMs,
+        quizQuestion = data.quizQuestion,
+        quizOptions = data.quizOptions,
+        quizCorrectIndex = data.quizCorrectIndex,
+        sliderEmoji = data.sliderEmoji,
+        sliderPrompt = data.sliderPrompt,
+        frameStyle = data.frameStyle,
+        contentScale = data.contentScale,
+        contentOffsetX = data.contentOffsetX,
+        contentOffsetY = data.contentOffsetY,
+        styleVariant = data.styleVariant,
+        revealType = data.revealType,
+        revealPattern = data.revealPattern,
+        revealPrimaryColor = data.revealPrimaryColor,
+        revealSecondaryColor = data.revealSecondaryColor,
+        revealEffectColor = data.revealEffectColor,
+        audioURL = data.audioURL,
+        audioDuration = data.audioDuration,
+    )
+
+    // ≡ onAppear: initialSticker + initialChain* + SetChainContext listener
+    LaunchedEffect(Unit) {
+        initialSticker?.let { stickers = stickers + stickerDataToDraft(it) }
+        val cid = initialChainId
+        val ctitle = initialChainTitle
+        val cpos = initialChainPosition
+        if (cid != null && ctitle != null && cpos != null) {
+            setChainContext(cid, ctitle, cpos)
+        }
+        NavigationEventBus.events.collect { event ->
+            if (event is CoordinatorNavigationEvent.SetChainContext) {
+                setChainContext(event.chainId, event.chainTitle, event.chainPosition)
+            }
+        }
+    }
     var activeEditingStickerId by remember { mutableStateOf<String?>(null) }
     var deleteArmedStickerId by remember { mutableStateOf<String?>(null) }
     var focusedInlineStickerOriginal by remember { mutableStateOf<StoryStickerDraft?>(null) }
@@ -237,7 +455,138 @@ fun StoryEditingView(
     var polaroidCaptionBuffer by remember { mutableStateOf("") }
     var polaroidSwipeOffsetX by remember { mutableStateOf(0f) }
     var editingRevealId by remember { mutableStateOf<String?>(null) }
+    val isEditingStickerChrome = activeEditingStickerId != null || editingPolaroidId != null
     var storyOverlayToast by remember { mutableStateOf<StoryOverlayToast?>(null) }
+    var draggingStickerId by remember { mutableStateOf<String?>(null) }
+    var selectedStickerId by remember { mutableStateOf<String?>(null) }
+
+    fun cycleStickerStyle(stickerId: String) {
+        stickers = stickers.map { item ->
+            if (item.id != stickerId) return@map item
+            val count = if (item.type == "questionResponse") 6 else 4
+            val next = ((item.styleVariant ?: 0) + 1) % count
+            item.copy(styleVariant = next)
+        }
+        HapticManager.shared.lightImpact()
+    }
+
+    /** iOS `cycleSelectedStickerColor` — poll/question/quiz/countdown/emojiSlider → styleVariant % 6. */
+    fun cycleSelectedStickerColor() {
+        val selectedId = activeEditingStickerId ?: selectedStickerId ?: return
+        stickers = stickers.map { item ->
+            if (item.id != selectedId) return@map item
+            val next = ((item.styleVariant ?: 0) + 1) % 6
+            item.copy(styleVariant = next)
+        }
+        HapticManager.shared.lightImpact()
+    }
+
+    fun cycleBackgroundPreset() {
+        selectedBackgroundPresetIndex =
+            (selectedBackgroundPresetIndex + 1) % StoryBackgroundPreset.presets.size
+        HapticManager.shared.lightImpact()
+    }
+
+    fun stickerPalettePreviewColors(): List<Color> = listOf(
+        Color(0xFFFF5F6D),
+        Color(0xFF9D4EDD),
+        Color(0xFF4A00E0),
+    )
+
+    fun backgroundPalettePreviewColors(): List<Color> =
+        resolvedStoryBackgroundPalette().take(3)
+
+    fun showsStickerPaletteButton(): Boolean {
+        val active = stickers.firstOrNull { it.id == activeEditingStickerId } ?: return false
+        return active.type in setOf("poll", "question", "quiz", "countdown", "emojiSlider")
+    }
+
+    /** Sin transforms aún: solo text-only (media vacío), ≡ iOS `selectedMediaItems.isEmpty`. */
+    fun showsBackgroundPaletteButton(): Boolean =
+        activeEditorMode == ActiveEditorMode.IDLE &&
+            editingRevealId == null &&
+            activeEditingStickerId == null &&
+            (selectedMediaItems.isEmpty() || showsGeneratedBackground)
+
+    fun updateActiveSliderEmoji(emoji: String) {
+        val activeId = activeEditingStickerId ?: return
+        emojiUsageTracker.increment(emoji)
+        stickers = stickers.map { item ->
+            if (item.id != activeId) item
+            else item.copy(sliderEmoji = emoji, content = emoji)
+        }
+        HapticManager.shared.lightImpact()
+    }
+
+    fun saveToGalleryAuthorized() {
+        val current = selectedMediaItems.firstOrNull()
+        val palette = resolvedStoryBackgroundPalette()
+        val canvasW = mediaCanvasWidthPx
+        val canvasH = mediaCanvasHeightPx
+        val scale = imageScale
+        val offset = imageOffset
+        val rotation = imageRotationRadians
+        val drawing = drawingImage
+        val drawingS = drawingScale
+        val drawingOx = drawingOffsetX
+        val drawingOy = drawingOffsetY
+        val filterBmp = filteredImage
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    if (current != null && current.isVideo) {
+                        // iOS: vídeo fuente sin bake; overlays van en metadata al publicar.
+                        saveUriToGallery(context, current.uri, isVideo = true)
+                    } else {
+                        val mediaBmp = when {
+                            current == null -> null
+                            filterBmp != null &&
+                                selectedFilter != FilterService.FilterType.NORMAL &&
+                                !filterBmp.isRecycled -> filterBmp
+                            else ->
+                                context.contentResolver.openInputStream(current.uri)
+                                    ?.use(BitmapFactory::decodeStream)
+                        }
+                        val composed = renderStoryWithOverlays(
+                            mediaImage = mediaBmp,
+                            backgroundPalette = palette,
+                            drawing = drawing,
+                            drawingScale = drawingS,
+                            drawingOffsetX = drawingOx,
+                            drawingOffsetY = drawingOy,
+                            imageScale = scale,
+                            imageOffsetX = offset.x,
+                            imageOffsetY = offset.y,
+                            imageRotationRadians = rotation,
+                            editorCanvasWidth = canvasW,
+                            editorCanvasHeight = canvasH,
+                        )
+                        saveBitmapToGallery(context, composed).also {
+                            composed.recycle()
+                            if (mediaBmp != null && mediaBmp !== filterBmp && !mediaBmp.isRecycled) {
+                                mediaBmp.recycle()
+                            }
+                        }
+                    }
+                }.getOrDefault(false)
+            }
+            Toast.makeText(
+                context,
+                context.getString(R.string.story_editor_saved_to_gallery),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    fun saveToGallery() {
+        photosSaveGate.requestAccess(context) {
+            saveToGalleryAuthorized()
+        }
+    }
+
+    fun tapCyclesStickerStyle(type: String): Boolean =
+        type == "location" || type == "mention" || type == "link" ||
+            type == "hashtag" || type == "time" || type == "questionResponse"
 
     fun restoreFocusedInlineSticker() {
         val original = focusedInlineStickerOriginal ?: return
@@ -287,6 +636,78 @@ fun StoryEditingView(
         }
         deleteArmedStickerId = null
         HapticManager.shared.mediumImpact()
+    }
+
+    fun handleProfileNavigation(userId: String) {
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+        if (currentUid != null && currentUid == userId) return
+        HapticManager.shared.mediumImpact()
+        NavigationEventBus.emit(CoordinatorNavigationEvent.NavigateToProfile(userId))
+        onDismiss()
+    }
+
+    fun handleLocationNavigation(locationName: String, latitude: Double?, longitude: Double?) {
+        HapticManager.shared.mediumImpact()
+        selectedLocationName = locationName
+        selectedLocationLat = latitude
+        selectedLocationLng = longitude
+        showingLocationMap = true
+    }
+
+    /**
+     * ≡ `handleStickerTap` de `StoryOverlaysView.swift`.
+     * En el editor, mention/location/hashtag/link/time/questionResponse suelen ciclar estilo
+     * antes de llegar aquí; poll/question suelen ir a edición inline.
+     */
+    fun handleStickerTap(sticker: StoryStickerDraft) {
+        selectedStickerId = sticker.id
+        activeEditingStickerId = null
+        when (sticker.type) {
+            "frame" -> beginPolaroidEditing(sticker)
+            "poll" -> storyOverlayToast = StoryOverlayToast.Poll
+            "question" -> storyOverlayToast = StoryOverlayToast.Question
+            "questionResponse" -> storyOverlayToast = StoryOverlayToast.QuestionResponse
+            "hashtag" -> {
+                val tag = sticker.hashtag?.takeIf { it.isNotBlank() }
+                    ?: sticker.content.removePrefix("#").takeIf { it.isNotBlank() }
+                if (tag != null) storyOverlayToast = StoryOverlayToast.Hashtag(tag)
+            }
+            "mention" -> {
+                val knownId = sticker.userId?.takeIf { it.isNotBlank() }
+                if (knownId != null) {
+                    handleProfileNavigation(knownId)
+                    return
+                }
+                val username = sticker.username?.takeIf { it.isNotBlank() }
+                    ?: sticker.content.removePrefix("@").takeIf { it.isNotBlank() }
+                    ?: return
+                // ≡ findUserIdByUsername + onNavigateToProfile / userNotFound toast
+                scope.launch {
+                    val users = runCatching {
+                        FirestoreService().searchUsers(username, limit = 10)
+                    }.getOrDefault(emptyList())
+                    val match = users.firstOrNull {
+                        it.username.equals(username, ignoreCase = true)
+                    }
+                    if (match == null) {
+                        storyOverlayToast = StoryOverlayToast.UserNotFound(username)
+                    } else {
+                        handleProfileNavigation(match.id)
+                    }
+                }
+            }
+            "location" -> {
+                val loc = sticker.location?.takeIf { it.isNotBlank() }
+                    ?: sticker.content.takeIf { it.isNotBlank() }
+                if (loc != null) {
+                    handleLocationNavigation(loc, sticker.latitude, sticker.longitude)
+                }
+            }
+            else -> {
+                // Android: segundo tap armado para borrar (iOS usa trash zone).
+                deleteArmedStickerId = sticker.id
+            }
+        }
     }
 
     fun savePolaroidEditing() {
@@ -470,6 +891,17 @@ fun StoryEditingView(
         deleteArmedId = null
     }
 
+    // ≡ iOS applyRandomBackgroundPresetIfNeeded (solo text-only)
+    LaunchedEffect(selectedMediaItems.isEmpty()) {
+        if (selectedMediaItems.isEmpty()) {
+            selectedBackgroundPresetIndex =
+                (0 until StoryBackgroundPreset.presets.size).random()
+        } else {
+            // ≡ resetBaseMediaTransform → preset index 0 al tener media
+            selectedBackgroundPresetIndex = 0
+        }
+    }
+
     LaunchedEffect(startInTextMode) {
         if (startInTextMode) {
             beginCreatingTextOverlay()
@@ -477,27 +909,108 @@ fun StoryEditingView(
         }
     }
 
+    // ≡ iOS loadUserDefaultAudienceSettings
+    LaunchedEffect(Unit) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid == null) {
+            isLoadingUserSettings = false
+            return@LaunchedEffect
+        }
+        runCatching {
+            val snap = FirebaseFirestore.getInstance().collection("users").document(uid).get().await()
+            val visibility = snap.get("contentVisibilitySettings") as? Map<*, *> ?: return@runCatching
+            val raw = visibility["storyAudience"] as? String ?: return@runCatching
+            val content = ContentAudience.entries.firstOrNull { it.raw == raw } ?: return@runCatching
+            when (content) {
+                ContentAudience.CUSTOM -> {
+                    audience = ContentAudience.CUSTOM
+                    customSelectedUsers =
+                        (visibility["storyCustomUsers"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+                }
+                ContentAudience.CUSTOM_LIST -> {
+                    audience = ContentAudience.CUSTOM_LIST
+                    selectedListId = visibility["storyCustomListId"] as? String
+                    selectedListName = visibility["storyCustomListName"] as? String
+                }
+                else -> audience = content
+            }
+        }
+        isLoadingUserSettings = false
+    }
+
     val media = selectedMediaItems.firstOrNull()
+
+    // Bitmap fuente para EditableImageView / paleta vídeo
+    LaunchedEffect(media?.id, media?.uri, media?.isVideo) {
+        val current = media
+        if (current == null) {
+            sourceBitmap = null
+            imageScale = 1f
+            imageOffset = Offset.Zero
+            imageRotationRadians = 0f
+            autoBackgroundPaletteMediaId = null
+            return@LaunchedEffect
+        }
+        imageScale = 1f
+        imageOffset = Offset.Zero
+        imageRotationRadians = 0f
+        sourceBitmap = withContext(Dispatchers.IO) {
+            if (current.isVideo) {
+                current.thumbnailUri?.let { thumb ->
+                    context.contentResolver.openInputStream(thumb)?.use(BitmapFactory::decodeStream)
+                } ?: runCatching {
+                    val retriever = MediaMetadataRetriever()
+                    try {
+                        retriever.setDataSource(context, current.uri)
+                        retriever.getFrameAtTime(100_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    } finally {
+                        runCatching { retriever.release() }
+                    }
+                }.getOrNull()
+            } else {
+                context.contentResolver.openInputStream(current.uri)?.use(BitmapFactory::decodeStream)
+            }
+        }
+    }
+
+    // ≡ iOS resolveAutoBackgroundPaletteIfNeeded
+    LaunchedEffect(sourceBitmap, media?.id) {
+        val bmp = sourceBitmap ?: return@LaunchedEffect
+        val id = media?.id ?: return@LaunchedEffect
+        if (autoBackgroundPaletteMediaId == id) return@LaunchedEffect
+        autoBackgroundPalette = withContext(Dispatchers.Default) {
+            storyDominantBackgroundColors(bmp)
+        }
+        autoBackgroundPaletteMediaId = id
+    }
+
     val hasTextOverlays = textOverlays.any { it.isReady } ||
         (activeEditorMode == ActiveEditorMode.TEXT && editorBuffer.trim().isNotEmpty())
     val hasDrawing = drawingImage != null
     val hasStickers = stickers.isNotEmpty()
     val hasContent = media != null || hasTextOverlays || hasDrawing || hasStickers
 
-    if (showingAudience) {
-        AudienceSelectionView(
-            selectedAudience = audience,
-            selectedListId = selectedListId,
-            selectedListName = selectedListName,
-            customSelectedUsers = customSelectedUsers,
-            onSelectedAudienceChange = { audience = it },
-            onSelectedListIdChange = { selectedListId = it },
-            onSelectedListNameChange = { selectedListName = it },
-            onCustomSelectedUsersChange = { customSelectedUsers = it },
-            onDismiss = { showingAudience = false },
-            modifier = modifier,
+    if (showDiscardChangesAlert) {
+        AlertDialog(
+            onDismissRequest = { showDiscardChangesAlert = false },
+            title = { Text(stringResource(R.string.story_editor_discard_title)) },
+            text = { Text(stringResource(R.string.story_editor_discard_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDiscardChangesAlert = false
+                        onCurrentFlowChange(CreatorFlow.STORY_CAMERA)
+                    },
+                ) {
+                    Text(stringResource(R.string.story_editor_discard_confirm), color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardChangesAlert = false }) {
+                    Text(stringResource(R.string.story_editor_discard_cancel))
+                }
+            },
         )
-        return
     }
 
     if (pendingTool != null) {
@@ -510,57 +1023,253 @@ fun StoryEditingView(
         return
     }
 
+    fun handleChainLimitError(error: Throwable) {
+        HapticManager.shared.warning()
+        val msg = when (error) {
+            is StoryChainLimitError.InvalidChainData -> context.getString(R.string.story_chains_error_invalid_title)
+            is StoryChainLimitError.MaxPartsReached -> context.getString(R.string.story_chains_error_max_parts)
+            is StoryChainLimitError.ChainExpired -> context.getString(R.string.story_chains_error_expired)
+            is StoryChainLimitError.TooSoonBetweenParts -> context.getString(R.string.story_chains_error_too_soon)
+            is StoryChainLimitError.ChainNotFound -> context.getString(R.string.story_chains_error_not_found)
+            is StoryChainLimitError.UserNotAuthorized -> context.getString(R.string.story_chains_error_user_not_authorized)
+            else -> context.getString(R.string.story_chains_error_validation, error.message.orEmpty())
+        }
+        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+        if (isContinuingChain) {
+            isContinuingChain = false
+            chainId = null
+            chainPosition = null
+            originalChainTitle = ""
+        }
+        isPublishing = false
+    }
+
+    fun chatOverlayPayload(): ChatMediaOverlayPayload? {
+        val prepared = textOverlays.filter { it.isReady }
+            .sortedBy { it.layerOrder }
+            .mapNotNull { it.toMetadata() }
+        val stickerPayload = stickers.sortedBy { it.zIndex }.mapIndexed { index, draft ->
+            draft.toChatStickerData(index)
+        }
+        val payload = ChatMediaOverlayPayload(
+            textOverlayLive = if (prepared.isEmpty()) null else true,
+            textOverlays = prepared.takeIf { it.isNotEmpty() },
+            stickers = stickerPayload.takeIf { it.isNotEmpty() },
+            drawingData = null,
+        )
+        return if (payload.isEmpty) null else payload
+    }
+
+    fun chatSend() {
+        val send = onChatSend ?: return
+        if (isPublishing) return
+        finishTextEditing()
+        isPublishing = true
+        val overlayPayload = chatOverlayPayload()
+        val current = selectedMediaItems.firstOrNull()
+        scope.launch {
+            try {
+                if (current != null && current.isVideo) {
+                    val (tw, th) = storyRenderTargetSize()
+                    val overlay = renderStoryOverlayImage(
+                        drawing = drawingImage,
+                        drawingScale = drawingScale,
+                        drawingOffsetX = drawingOffsetX,
+                        drawingOffsetY = drawingOffsetY,
+                        targetWidth = tw,
+                        targetHeight = th,
+                        screenWidth = mediaCanvasWidthPx,
+                        screenHeight = mediaCanvasHeightPx,
+                    )
+                    val shouldBake = shouldBakeCurrentOverlaysIntoVideo(
+                        media = current,
+                        drawingImage = drawingImage,
+                        hasAnyTextOverlays = textOverlays.any { it.isReady },
+                        imageScale = imageScale,
+                        imageOffsetX = imageOffset.x,
+                        imageOffsetY = imageOffset.y,
+                        imageRotationRadians = imageRotationRadians,
+                    )
+                    val prepared = withContext(Dispatchers.IO) {
+                        prepareMediaForStoryUpload(
+                            context = context,
+                            media = current,
+                            shouldBake = shouldBake,
+                            overlay = overlay,
+                            backgroundPalette = resolvedStoryBackgroundPalette(),
+                            targetWidth = tw,
+                            targetHeight = th,
+                            imageScale = imageScale,
+                            imageOffsetX = imageOffset.x,
+                            imageOffsetY = imageOffset.y,
+                            imageRotationRadians = imageRotationRadians,
+                            editorCanvasWidth = mediaCanvasWidthPx,
+                            editorCanvasHeight = mediaCanvasHeightPx,
+                        )
+                    }
+                    overlay?.recycle()
+                    val data = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(prepared.uri)?.use { it.readBytes() }
+                            ?: error("Missing video bytes")
+                    }
+                    isPublishing = false
+                    HapticManager.shared.mediumImpact()
+                    send(data, CameraPickerMediaType.VIDEO, chatSendMode, overlayPayload)
+                } else {
+                    val data = withContext(Dispatchers.IO) {
+                        renderChatImageJpeg(
+                            context = context,
+                            media = current,
+                            filteredImage = filteredImage,
+                            drawingImage = drawingImage,
+                            drawingScale = drawingScale,
+                            drawingOffsetX = drawingOffsetX,
+                            drawingOffsetY = drawingOffsetY,
+                            backgroundPalette = resolvedStoryBackgroundPalette(),
+                            imageScale = imageScale,
+                            imageOffsetX = imageOffset.x,
+                            imageOffsetY = imageOffset.y,
+                            imageRotationRadians = imageRotationRadians,
+                            editorCanvasWidth = mediaCanvasWidthPx,
+                            editorCanvasHeight = mediaCanvasHeightPx,
+                        )
+                    }
+                    isPublishing = false
+                    if (data == null) return@launch
+                    HapticManager.shared.mediumImpact()
+                    send(data, CameraPickerMediaType.IMAGE, chatSendMode, overlayPayload)
+                }
+            } catch (_: Throwable) {
+                isPublishing = false
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.story_editor_error_publish_start),
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+    }
+
+    fun resetStoryForm() {
+        // ≡ iOS resetStoryForm
+        textOverlays = emptyList()
+        stickers = emptyList()
+        drawingImage?.recycle()
+        drawingImage = null
+        drawingOffsetX = 0f
+        drawingOffsetY = 0f
+        drawingScale = 1f
+        expirationHours = 24
+        selectedFilter = FilterService.FilterType.NORMAL
+        filterIntensity = 1.0
+        filteredImage = null
+        imageScale = 1f
+        imageOffset = Offset.Zero
+        imageRotationRadians = 0f
+        isCreatingChain = false
+        chainTitle = ""
+        activeEditorMode = ActiveEditorMode.IDLE
+        activeTextOverlayId = null
+        activeEditingStickerId = null
+        selectedStickerId = null
+        editorBuffer = ""
+        editorStyle = StoryTextStyle.MODERN
+        editorColorHex = StoryTextStyle.MODERN.defaultColorHex
+        editorTextAlignmentRaw = "center"
+        editorTextBackgroundFillRaw = "none"
+        editorTextFontSize = 30f
+        editorTextStrokeRaw = "none"
+        editorTextMotionRaw = "none"
+        editorVisualEffectRaw = "none"
+        editorGradientStops = emptyList()
+        editorGradientAngle = 0
+        editorSelectedGradientStopIndex = 0
+        editorForcesAllCaps = false
+    }
+
     fun publishStory() {
-        if (isPublishing || FirebaseAuth.getInstance().currentUser == null || !hasContent) return
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (isPublishing || userId == null || !hasContent) return
         finishTextEditing()
         val prepared = textOverlays.filter { it.isReady }
             .sortedBy { it.layerOrder }
-            .map { it.toMetadata() }
+            .mapNotNull { it.toMetadata() }
         if (media == null && prepared.isEmpty() && drawingImage == null && stickers.isEmpty()) return
         isPublishing = true
         scope.launch {
-            val publishMedia = when {
-                filteredImage != null &&
-                    selectedFilter != FilterService.FilterType.NORMAL &&
-                    media != null && !media.isVideo -> {
-                    val bmp = filteredImage!!
-                    val dir = File(context.cacheDir, "story_filters").also { it.mkdirs() }
-                    val file = File(dir, "filter_${UUID.randomUUID()}.jpg")
-                    withContext(Dispatchers.IO) {
-                        FileOutputStream(file).use { out ->
-                            bmp.compress(Bitmap.CompressFormat.JPEG, 92, out)
-                        }
-                    }
-                    media.copy(uri = Uri.fromFile(file), hasEdits = true)
+            try {
+                if (isCreatingChain) {
+                    StoryChainLimitsService.validateChainTitle(chainTitle)
+                } else if (isContinuingChain) {
+                    val existing = chainId ?: throw StoryChainLimitError.ChainNotFound
+                    StoryChainLimitsService.canContinueChain(existing, userId)
                 }
-                media != null -> media
-                else -> {
-                    val bitmap = Bitmap.createBitmap(1080, 1920, Bitmap.Config.ARGB_8888)
-                    bitmap.eraseColor(if (isDark) AndroidColor.parseColor("#0B1215") else AndroidColor.parseColor("#FAF9F6"))
-                    val dir = File(context.cacheDir, "story_text_only").also { it.mkdirs() }
-                    val file = File(dir, "text_${System.currentTimeMillis()}.jpg")
-                    FileOutputStream(file).use { out ->
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
-                    }
-                    bitmap.recycle()
-                    CreatorMedia(
-                        uri = Uri.fromFile(file),
-                        isVideo = false,
-                        aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
-                        recommendedAspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
-                    )
-                }
+            } catch (e: Throwable) {
+                handleChainLimitError(e)
+                return@launch
             }
+
+            // Capturar estado en Main antes de dismiss (≡ iOS publishStoryAfterValidation)
+            val baseMedia = media
+            val capturedFilter = selectedFilter
+            val capturedFilterBmp = filteredImage?.let { src ->
+                if (src.isRecycled) null else src.copy(Bitmap.Config.ARGB_8888, false)
+            }
+            val capturedSourceBmp = sourceBitmap?.let { src ->
+                if (src.isRecycled) null else src.copy(Bitmap.Config.ARGB_8888, false)
+            }
+            val capturedDrawing = drawingImage?.let { src ->
+                if (src.isRecycled) null else src.copy(Bitmap.Config.ARGB_8888, false)
+            }
+            val capturedDrawingScale = drawingScale
+            val capturedDrawingOffsetX = drawingOffsetX
+            val capturedDrawingOffsetY = drawingOffsetY
+            val capturedScale = imageScale
+            val capturedOffset = imageOffset
+            val capturedRotation = imageRotationRadians
+            val capturedCanvasW = mediaCanvasWidthPx
+            val capturedCanvasH = mediaCanvasHeightPx
+            val capturedPalette = resolvedStoryBackgroundPalette()
+            val capturedStickers = stickers.toList()
             val primary = prepared.firstOrNull()
-            val drawingBytes = drawingImage?.let { bmp ->
+            val drawingBytes = capturedDrawing?.let { bmp ->
                 ByteArrayOutputStream().use { out ->
                     bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
                     out.toByteArray()
                 }
             }
-            val pendingDir = File(context.filesDir, "pending_uploads").also { it.mkdirs() }
+            val publishChainId: String?
+            val publishChainTitle: String?
+            val publishChainPosition: Int?
+            when {
+                isCreatingChain && chainTitle.isNotBlank() -> {
+                    publishChainId = UUID.randomUUID().toString()
+                    publishChainTitle = chainTitle.trim()
+                    publishChainPosition = 1
+                }
+                isContinuingChain -> {
+                    publishChainId = chainId
+                    publishChainTitle = originalChainTitle
+                    publishChainPosition = (chainPosition ?: 0) + 1
+                }
+                else -> {
+                    publishChainId = null
+                    publishChainTitle = null
+                    publishChainPosition = null
+                }
+            }
+            val chainActive = isCreatingChain || isContinuingChain
+            val publishAudience = if (chainActive) ContentAudience.EVERYONE else audience
+            val resolvedExpiration = if (chainActive) 48 else expirationHours
+            val capturedCustomUsers = customSelectedUsers.toList()
+            val capturedListId = selectedListId
+            val capturedListName = selectedListName
+            val capturedAllow = allowOthersToContinue
+            val capturedContinuation = continuationAudience.raw
+            val appCtx = context.applicationContext
+            val pendingDir = File(appCtx.filesDir, "pending_uploads").also { it.mkdirs() }
             val cachedStickers = withContext(Dispatchers.Default) {
-                stickers.sortedBy { it.zIndex }.map { draft ->
+                capturedStickers.sortedBy { it.zIndex }.map { draft ->
                     val stickerBitmap = when {
                         draft.type == "emoji" && draft.content.isNotBlank() -> renderEmojiStickerBitmap(draft.content)
                         draft.type == "selfie" || draft.type == "frame" -> draft.image
@@ -589,6 +1298,7 @@ fun StoryEditingView(
                         interactionData = CachedStickerInteractionData(
                             username = draft.username,
                             userId = draft.userId,
+                            profileImagePath = draft.profileImagePath,
                             hashtag = draft.hashtag,
                             weatherSymbol = draft.weatherSymbol,
                             questionText = draft.questionText,
@@ -621,8 +1331,109 @@ fun StoryEditingView(
                     )
                 }
             }
-            val actionId = BackgroundStoryUploadService.uploadStory(
-                media = publishMedia,
+
+            val actionId = BackgroundStoryUploadService.uploadStoryWithPreparation(
+                prepareMedia = {
+                    var publishMedia = baseMedia
+                        ?: CreatorMedia(
+                            uri = Uri.EMPTY,
+                            isVideo = false,
+                            aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
+                            recommendedAspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
+                        )
+                    if (publishMedia.isVideo && baseMedia != null) {
+                        val (tw, th) = storyRenderTargetSize()
+                        val overlay = renderStoryOverlayImage(
+                            drawing = capturedDrawing,
+                            drawingScale = capturedDrawingScale,
+                            drawingOffsetX = capturedDrawingOffsetX,
+                            drawingOffsetY = capturedDrawingOffsetY,
+                            targetWidth = tw,
+                            targetHeight = th,
+                            screenWidth = capturedCanvasW,
+                            screenHeight = capturedCanvasH,
+                        )
+                        val shouldBake = shouldBakeCurrentOverlaysIntoVideo(
+                            media = publishMedia,
+                            drawingImage = capturedDrawing,
+                            hasAnyTextOverlays = prepared.isNotEmpty(),
+                            imageScale = capturedScale,
+                            imageOffsetX = capturedOffset.x,
+                            imageOffsetY = capturedOffset.y,
+                            imageRotationRadians = capturedRotation,
+                        )
+                        try {
+                            publishMedia = prepareMediaForStoryUpload(
+                                context = appCtx,
+                                media = publishMedia,
+                                shouldBake = shouldBake,
+                                overlay = overlay,
+                                backgroundPalette = capturedPalette,
+                                targetWidth = tw,
+                                targetHeight = th,
+                                imageScale = capturedScale,
+                                imageOffsetX = capturedOffset.x,
+                                imageOffsetY = capturedOffset.y,
+                                imageRotationRadians = capturedRotation,
+                                editorCanvasWidth = capturedCanvasW,
+                                editorCanvasHeight = capturedCanvasH,
+                            )
+                        } finally {
+                            overlay?.recycle()
+                            capturedDrawing?.recycle()
+                            capturedFilterBmp?.recycle()
+                            capturedSourceBmp?.recycle()
+                        }
+                    } else {
+                        // ≡ iOS finalRenderedImage = renderStoryWithOverlays()
+                        val mediaBmp = when {
+                            capturedFilterBmp != null &&
+                                capturedFilter != FilterService.FilterType.NORMAL -> capturedFilterBmp
+                            capturedSourceBmp != null -> capturedSourceBmp
+                            baseMedia != null ->
+                                appCtx.contentResolver.openInputStream(baseMedia.uri)
+                                    ?.use(BitmapFactory::decodeStream)
+                            else -> null
+                        }
+                        val finalBmp = renderStoryWithOverlays(
+                            mediaImage = mediaBmp,
+                            backgroundPalette = capturedPalette,
+                            drawing = capturedDrawing,
+                            drawingScale = capturedDrawingScale,
+                            drawingOffsetX = capturedDrawingOffsetX,
+                            drawingOffsetY = capturedDrawingOffsetY,
+                            imageScale = capturedScale,
+                            imageOffsetX = capturedOffset.x,
+                            imageOffsetY = capturedOffset.y,
+                            imageRotationRadians = capturedRotation,
+                            editorCanvasWidth = capturedCanvasW,
+                            editorCanvasHeight = capturedCanvasH,
+                        )
+                        val dir = File(appCtx.cacheDir, "story_rendered").also { it.mkdirs() }
+                        val file = File(dir, "story_${UUID.randomUUID()}.jpg")
+                        FileOutputStream(file).use { out ->
+                            finalBmp.compress(Bitmap.CompressFormat.JPEG, 92, out)
+                        }
+                        finalBmp.recycle()
+                        if (mediaBmp != null &&
+                            mediaBmp !== capturedFilterBmp &&
+                            mediaBmp !== capturedSourceBmp
+                        ) {
+                            mediaBmp.recycle()
+                        }
+                        capturedDrawing?.recycle()
+                        capturedFilterBmp?.recycle()
+                        capturedSourceBmp?.recycle()
+                        publishMedia = CreatorMedia(
+                            uri = Uri.fromFile(file),
+                            isVideo = false,
+                            aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
+                            recommendedAspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
+                            hasEdits = true,
+                        )
+                    }
+                    publishMedia
+                },
                 storyText = primary?.text,
                 textPosition = primary?.normalizedPosition,
                 selectedTextStyle = primary?.styleRaw,
@@ -630,80 +1441,100 @@ fun StoryEditingView(
                 textOverlays = prepared.takeIf { it.isNotEmpty() },
                 drawingData = drawingBytes,
                 stickers = cachedStickers.takeIf { it.isNotEmpty() },
-                audienceSetting = audience.raw,
-                customViewers = customSelectedUsers.takeIf { it.isNotEmpty() },
-                customListId = selectedListId,
-                selectedListName = selectedListName,
-                expirationHours = expirationHours,
+                audienceSetting = publishAudience.raw,
+                customViewers = capturedCustomUsers.takeIf { it.isNotEmpty() && !chainActive },
+                customListId = capturedListId.takeUnless { chainActive },
+                selectedListName = capturedListName.takeUnless { chainActive },
+                expirationHours = resolvedExpiration,
+                chainId = publishChainId,
+                chainPosition = publishChainPosition,
+                chainTitle = publishChainTitle,
+                allowOthersToContinue = if (chainActive) capturedAllow else null,
+                continuationAudience = if (chainActive) capturedContinuation else null,
+                continuationCustomViewers = if (chainActive) capturedCustomUsers.takeIf { it.isNotEmpty() } else null,
+                continuationCustomListId = if (chainActive) capturedListId else null,
+                continuationCustomListName = if (chainActive) capturedListName else null,
+                onPrepareFailed = {
+                    // Toast desde main — el editor ya puede estar cerrado
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        Toast.makeText(
+                            appCtx,
+                            appCtx.getString(R.string.story_editor_error_publish_start),
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                },
             )
+
             if (actionId != null) {
                 HapticManager.shared.success()
                 onSelectedMediaItemsChange(emptyList())
-                textOverlays = emptyList()
-                stickers = emptyList()
-                drawingImage?.recycle()
-                drawingImage = null
-                delay(400)
+                resetStoryForm()
                 onDismiss()
             } else {
                 HapticManager.shared.warning()
                 isPublishing = false
+                capturedDrawing?.recycle()
+                capturedFilterBmp?.recycle()
+                capturedSourceBmp?.recycle()
             }
         }
     }
 
     Box(modifier.fillMaxSize().background(canvas)) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ChromeTool(
-                    onClick = {
-                        when (activeEditorMode) {
-                            ActiveEditorMode.TEXT -> finishTextEditing()
-                            ActiveEditorMode.DRAWING -> activeEditorMode = ActiveEditorMode.IDLE
-                            ActiveEditorMode.FILTERS -> activeEditorMode = ActiveEditorMode.IDLE
-                            else -> onCurrentFlowChange(CreatorFlow.STORY_CAMERA)
-                        }
-                    },
-                    stroke = controlStroke,
-                ) {
-                    Icon(Icons.Filled.Close, null, tint = controlFg, modifier = Modifier.size(18.dp))
-                }
-                ChromeTool(
-                    onClick = { pendingTool = "StoryEditingView.saveToGallery (pending)" },
-                    stroke = controlStroke,
-                ) {
-                    Icon(Icons.Filled.Download, null, tint = controlFg, modifier = Modifier.size(18.dp))
-                }
-            }
+        // ≡ iOS GeometryReader + creatorMomentsCaptureRect (inset 4 / top 8 / radius 12)
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val density = LocalDensity.current
+            val navBottomPx = WindowInsets.navigationBars.getBottom(density).toFloat()
+            // ≡ iOS: solo safe-area bottom (no restar chrome publish/filtros)
+            val captureRect = creatorMomentsCaptureRect(
+                inSize = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()),
+                topInsetPx = 0f,
+                bottomInsetPx = navBottomPx,
+                density = density,
+            )
+            val corner = storyViewerCanvasCornerRadius
+            val boxW = captureRect.width.coerceAtLeast(1f)
+            val boxH = captureRect.height.coerceAtLeast(1f)
+            mediaCanvasWidthPx = boxW
+            mediaCanvasHeightPx = boxH
+            mediaCaptureRect = captureRect
 
-            BoxWithConstraints(
+            Box(
                 Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clip(RoundedCornerShape(28.dp))
+                    .offset {
+                        IntOffset(captureRect.left.roundToInt(), captureRect.top.roundToInt())
+                    }
+                    .size(
+                        width = with(density) { captureRect.width.toDp() },
+                        height = with(density) { captureRect.height.toDp() },
+                    )
+                    .clip(RoundedCornerShape(corner))
                     .background(Color.Black),
             ) {
-                val boxW = constraints.maxWidth.toFloat().coerceAtLeast(1f)
-                val boxH = constraints.maxHeight.toFloat().coerceAtLeast(1f)
 
                 when {
                     media != null && !media.isVideo -> {
-                        val preview = filteredImage
-                        if (preview != null && selectedFilter != FilterService.FilterType.NORMAL) {
-                            Image(
-                                bitmap = preview.asImageBitmap(),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
+                        val bmp = sourceBitmap
+                        if (bmp != null) {
+                            EditableImageView(
+                                image = bmp,
+                                scale = imageScale,
+                                onScaleChange = { imageScale = it },
+                                offset = imageOffset,
+                                onOffsetChange = { imageOffset = it },
+                                rotationRadians = imageRotationRadians,
+                                onRotationChange = { imageRotationRadians = it },
+                                filteredImage = filteredImage.takeIf {
+                                    selectedFilter != FilterService.FilterType.NORMAL
+                                },
+                                canvasSize = Size(boxW, boxH),
+                                paletteIdentity = media.id,
+                                paletteOverride = resolvedStoryBackgroundPalette(),
+                                isInteractionEnabled = activeEditorMode == ActiveEditorMode.IDLE &&
+                                    activeEditingStickerId == null &&
+                                    editingPolaroidId == null &&
+                                    editingRevealId == null,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         } else {
@@ -716,48 +1547,127 @@ fun StoryEditingView(
                         }
                     }
                     media != null && media.isVideo -> {
+                        val paletteBmp = sourceBitmap
+                        val mediaSize = paletteBmp?.let {
+                            Size(it.width.toFloat().coerceAtLeast(1f), it.height.toFloat().coerceAtLeast(1f))
+                        } ?: Size(boxW, boxH)
                         Box(Modifier.fillMaxSize()) {
-                            StoryVideoPlayerView(
-                                videoUri = media.uri,
-                                videoGravity = StoryVideoGravity.RESIZE_ASPECT_FILL,
-                                isMuted = isVideoPreviewMuted,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                            Box(
-                                Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(12.dp)
-                                    .size(42.dp)
-                                    .momentsChromeGlass(CircleShape, interactive = true)
-                                    .clickable { isVideoPreviewMuted = !isVideoPreviewMuted },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    if (isVideoPreviewMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp),
+                            if (paletteBmp != null) {
+                                StoryEditableMediaContainer(
+                                    mediaSize = mediaSize,
+                                    scale = imageScale,
+                                    onScaleChange = { imageScale = it },
+                                    offset = imageOffset,
+                                    onOffsetChange = { imageOffset = it },
+                                    rotationRadians = imageRotationRadians,
+                                    onRotationChange = { imageRotationRadians = it },
+                                    canvasSize = Size(boxW, boxH),
+                                    paletteIdentity = "${media.id}-video",
+                                    paletteSourceImage = paletteBmp,
+                                    paletteOverride = resolvedStoryBackgroundPalette(),
+                                    isInteractionEnabled = activeEditorMode == ActiveEditorMode.IDLE &&
+                                        activeEditingStickerId == null &&
+                                        editingPolaroidId == null &&
+                                        editingRevealId == null,
+                                    modifier = Modifier.fillMaxSize(),
+                                ) { _ ->
+                                    StoryVideoPlayerView(
+                                        videoUri = media.uri,
+                                        videoGravity = StoryVideoGravity.RESIZE_ASPECT_FILL,
+                                        isMuted = isVideoPreviewMuted,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                }
+                            } else {
+                                StoryVideoPlayerView(
+                                    videoUri = media.uri,
+                                    videoGravity = StoryVideoGravity.RESIZE_ASPECT_FILL,
+                                    isMuted = isVideoPreviewMuted,
+                                    modifier = Modifier.fillMaxSize(),
                                 )
                             }
+                            // Mute va en sideToolbar (≡ iOS editingToolButtons), no sobre el canvas.
                         }
                     }
                     else -> {
-                        Box(
-                            Modifier
-                                .fillMaxSize()
-                                .background(if (isDark) Color(0xFF1A2226) else Color(0xFFE8E4DC)),
+                        val palette = resolvedStoryBackgroundPalette()
+                        StoryMediaBackgroundView(
+                            palette = palette,
+                            modifier = Modifier.fillMaxSize(),
                         )
                     }
                 }
 
-                // Drawing layer under text overlays
+                // ≡ iOS canvasAutoSplitNotice — sobre el media, bottom del canvas
+                if (
+                    activeEditorMode == ActiveEditorMode.IDLE &&
+                    media != null &&
+                    media.isVideo &&
+                    media.storyVideoMode == StoryVideoMode.AUTO_SPLIT
+                ) {
+                    val duration = media.durationSeconds ?: 0.0
+                    val partCount = maxOf(
+                        2,
+                        kotlin.math.ceil(duration / StoryVideoProcessingService.maxStorySegmentDuration).toInt(),
+                    )
+                    Row(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 14.dp)
+                            .momentsChromeGlass(RoundedCornerShape(14.dp), interactive = false)
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(
+                            Icons.Filled.Layers,
+                            contentDescription = null,
+                            tint = controlFg.copy(0.86f),
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(
+                            stringResource(R.string.story_video_editor_auto_split_notice, partCount),
+                            color = controlFg.copy(0.86f),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 12.sp,
+                            maxLines = 2,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+
+                // Drawing layer under text overlays — ≡ StoryOverlaysView drawing + trash
                 if (activeEditorMode != ActiveEditorMode.DRAWING) {
                     drawingImage?.let { bmp ->
-                        Image(
-                            bitmap = bmp.asImageBitmap(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize(),
+                        StoryDrawingCanvasOverlay(
+                            bitmap = bmp,
+                            offsetX = drawingOffsetX,
+                            offsetY = drawingOffsetY,
+                            scale = drawingScale,
+                            canvasWidthPx = boxW,
+                            canvasHeightPx = boxH,
+                            hasTextOverlays = textOverlays.any { it.isReady },
+                            onOffsetChange = { x, y ->
+                                drawingOffsetX = x
+                                drawingOffsetY = y
+                            },
+                            onScaleChange = { drawingScale = it },
+                            onClear = {
+                                drawingImage?.recycle()
+                                drawingImage = null
+                                drawingOffsetX = 0f
+                                drawingOffsetY = 0f
+                                drawingScale = 1f
+                                HapticManager.shared.warning()
+                            },
+                            onDragStateChange = { state ->
+                                if (!overlayDragState.isOverTrash && state.isOverTrash) {
+                                    HapticManager.shared.mediumImpact()
+                                }
+                                overlayDragState = state
+                            },
+                            onBackgroundTap = { selectedStickerId = null },
                         )
                     }
                 }
@@ -768,6 +1678,7 @@ fun StoryEditingView(
                     Box(
                         Modifier
                             .fillMaxSize()
+                            .zIndex(1500f)
                             .background(
                                 Color.Black.copy(alpha = if (editingPolaroidId != null) .82f else .65f),
                             )
@@ -807,13 +1718,21 @@ fun StoryEditingView(
                         if (sticker.type == "reveal") return@forEach
                         val armed = deleteArmedStickerId == sticker.id
                         val editing = activeEditingStickerId == sticker.id
+                        val polaroidEditing = editingPolaroidId == sticker.id
+                        val selected = selectedStickerId == sticker.id || armed || editing
+                        val effectiveZ = when {
+                            editing -> 3000f
+                            polaroidEditing -> 2000f
+                            selected -> 500f
+                            else -> sticker.zIndex.toFloat()
+                        }
                         StickerOverlayView(
                             sticker = sticker,
                             canvasWidthPx = boxW.roundToInt(),
                             canvasHeightPx = boxH.roundToInt(),
-                            isSelected = armed || editing,
-                            isDragging = false,
-                            isContentEditing = false,
+                            isSelected = selected,
+                            isDragging = draggingStickerId == sticker.id,
+                            isContentEditing = polaroidEditing,
                             isEditingInline = editing,
                             onUpdate = { updated ->
                                 stickers = stickers.map { if (it.id == updated.id) updated else it }
@@ -822,15 +1741,12 @@ fun StoryEditingView(
                                 stickers = stickers.filterNot { it.id == sticker.id }
                                 deleteArmedStickerId = null
                                 activeEditingStickerId = null
+                                selectedStickerId = null
                                 HapticManager.shared.warning()
                             },
-                            onDragChanged = { updated ->
-                                val overTrash = isPointOverStoryOverlayTrash(
-                                    x = updated.normalizedX.toFloat() * boxW,
-                                    y = updated.normalizedY.toFloat() * boxH,
-                                    canvasWidthPx = boxW,
-                                    canvasHeightPx = boxH,
-                                )
+                            onDragChanged = { updated, overTrash ->
+                                draggingStickerId = updated.id
+                                selectedStickerId = updated.id
                                 if (!overlayDragState.isOverTrash && overTrash) {
                                     HapticManager.shared.mediumImpact()
                                 }
@@ -838,10 +1754,12 @@ fun StoryEditingView(
                                 deleteArmedStickerId = null
                                 stickers = stickers.map { if (it.id == updated.id) updated else it }
                             },
-                            onDragEnded = { updated ->
-                                if (overlayDragState.isOverTrash) {
+                            onDragEnded = { updated, overTrash ->
+                                draggingStickerId = null
+                                if (overTrash) {
                                     stickers = stickers.filterNot { it.id == updated.id }
                                     activeEditingStickerId = null
+                                    selectedStickerId = null
                                     HapticManager.shared.warning()
                                 } else {
                                     stickers = stickers.map { if (it.id == updated.id) updated else it }
@@ -854,9 +1772,11 @@ fun StoryEditingView(
                                         stickers = stickers.filterNot { item -> item.id == sticker.id }
                                         deleteArmedStickerId = null
                                         activeEditingStickerId = null
+                                        selectedStickerId = null
                                         restoreFocusedInlineSticker()
                                         HapticManager.shared.warning()
                                     }
+                                    // ≡ isInlineEditableSticker → focusInlineEditableSticker
                                     stickerSupportsInlineEdit(sticker) -> {
                                         if (editing) {
                                             activeEditingStickerId = null
@@ -865,13 +1785,17 @@ fun StoryEditingView(
                                             focusInlineSticker(sticker)
                                         }
                                     }
-                                    sticker.type == "frame" -> beginPolaroidEditing(sticker)
-                                    else -> {
-                                        activeEditingStickerId = null
-                                        deleteArmedStickerId = sticker.id
+                                    // ≡ tapCyclesStickerStyle → cycle on second tap
+                                    tapCyclesStickerStyle(sticker.type) -> {
+                                        val wasSelected = selectedStickerId == sticker.id
+                                        selectedStickerId = sticker.id
+                                        if (wasSelected) cycleStickerStyle(sticker.id)
                                     }
+                                    // ≡ handleStickerTap (frame / toasts / select)
+                                    else -> handleStickerTap(sticker)
                                 }
                             },
+                            modifier = Modifier.zIndex(effectiveZ),
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 StoryStickerChip(
@@ -940,40 +1864,26 @@ fun StoryEditingView(
                     }
 
                     if (stickers.any { it.type == "reveal" } && editingRevealId == null) {
-                        Row(
-                            Modifier
+                        StoryRevealStatusBadge(
+                            onCustomize = {
+                                editingRevealId = stickers.firstOrNull { it.type == "reveal" }?.id
+                                HapticManager.shared.mediumImpact()
+                            },
+                            onRemove = {
+                                stickers = stickers.filterNot { it.type == "reveal" }
+                                editingRevealId = null
+                            },
+                            modifier = Modifier
                                 .align(Alignment.TopCenter)
-                                .padding(top = 100.dp)
-                                .momentsChromeGlass(RoundedCornerShape(24.dp), interactive = true)
-                                .clickable {
-                                    editingRevealId = stickers.firstOrNull { it.type == "reveal" }?.id
-                                    HapticManager.shared.mediumImpact()
-                                }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Filled.VisibilityOff, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                            Text("Reveal active", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(start = 6.dp))
-                            Icon(
-                                Icons.Filled.Close,
-                                null,
-                                tint = Color.White.copy(.65f),
-                                modifier = Modifier
-                                    .padding(start = 8.dp)
-                                    .size(16.dp)
-                                    .clickable {
-                                        stickers = stickers.filterNot { it.type == "reveal" }
-                                        editingRevealId = null
-                                    },
-                            )
-                        }
+                                .padding(top = 100.dp),
+                        )
                     }
 
                     StoryOverlayTrashZone(overlayDragState)
 
                     // Pie de foto vivo del frame, sobre el fondo de foco y bajo el sticker hero.
                     if (editingPolaroidId != null) {
-                        BasicTextField(
+                        StoryPolaroidCaptionField(
                             value = polaroidCaptionBuffer,
                             onValueChange = { caption ->
                                 polaroidCaptionBuffer = caption
@@ -984,33 +1894,9 @@ fun StoryEditingView(
                                     }
                                 }
                             },
-                            singleLine = false,
-                            textStyle = TextStyle(
-                                color = Color.Black,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Medium,
-                                textAlign = TextAlign.Center,
-                            ),
-                            cursorBrush = SolidColor(Color.Black),
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(bottom = 24.dp)
-                                .widthIn(max = 320.dp)
-                                .momentsChromeGlass(CircleShape, interactive = true)
-                                .padding(horizontal = 25.dp, vertical = 12.dp),
-                            decorationBox = { inner ->
-                                Box(contentAlignment = Alignment.Center) {
-                                    if (polaroidCaptionBuffer.isBlank()) {
-                                        Text(
-                                            "Add a note",
-                                            color = Color.Black.copy(.42f),
-                                            fontSize = 24.sp,
-                                            textAlign = TextAlign.Center,
-                                        )
-                                    }
-                                    inner()
-                                }
-                            },
+                                .padding(bottom = 24.dp),
                         )
                     }
                 }
@@ -1029,39 +1915,252 @@ fun StoryEditingView(
                     onDismiss = { storyOverlayToast = null },
                     modifier = Modifier.fillMaxSize(),
                 )
+            }
 
-                // Side toolbar
-                if (activeEditorMode == ActiveEditorMode.IDLE && activeEditingStickerId == null && editingPolaroidId == null && editingRevealId == null) {
-                    Column(
-                        Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+            // ≡ iOS topBarView overlay (oculto en reveal; en sticker edit → Done + palette)
+            if (
+                activeEditorMode != ActiveEditorMode.TEXT &&
+                activeEditorMode != ActiveEditorMode.DRAWING &&
+                editingRevealId == null
+            ) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                ) {
+                    if (isEditingStickerChrome) {
+                        // ≡ iOS topBarView when activeEditingStickerId != nil
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Spacer(Modifier.size(44.dp))
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                stringResource(R.string.story_text_editor_done),
+                                color = controlFg,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                modifier = Modifier
+                                    .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                                    .clickable {
+                                        activeEditingStickerId = null
+                                        editingPolaroidId = null
+                                        HapticManager.shared.lightImpact()
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
+                        }
+                        if (showsStickerPaletteButton()) {
+                            val paletteOffsetY = if (isChatSendMode) 56.dp else 0.dp
+                            StoryEditorPaletteChip(
+                                iconTint = controlFg,
+                                previewColors = stickerPalettePreviewColors(),
+                                onClick = { cycleSelectedStickerColor() },
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .padding(top = paletteOffsetY),
+                            )
+                        }
+                    } else {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        SideTool(Icons.Filled.TextFields, controlFg, controlStroke) {
-                            beginCreatingTextOverlay()
+                        ChromeTool(
+                            onClick = {
+                                when (activeEditorMode) {
+                                    ActiveEditorMode.FILTERS -> activeEditorMode = ActiveEditorMode.IDLE
+                                    else -> showDiscardChangesAlert = true
+                                }
+                            },
+                            stroke = controlStroke,
+                        ) {
+                            Icon(
+                                if (activeEditorMode == ActiveEditorMode.FILTERS) {
+                                    Icons.AutoMirrored.Filled.ArrowBack
+                                } else {
+                                    Icons.Filled.Close
+                                },
+                                null,
+                                tint = controlFg,
+                                modifier = Modifier.size(18.dp),
+                            )
                         }
-                        SideTool(Icons.Filled.EmojiEmotions, controlFg, controlStroke) {
-                            showingStickerPicker = true
-                        }
-                        SideTool(Icons.Filled.Brush, controlFg, controlStroke) {
-                            activeEditorMode = ActiveEditorMode.DRAWING
-                        }
-                        SideTool(Icons.Filled.Filter, controlFg, controlStroke) {
-                            if (media != null && !media.isVideo) {
-                                activeEditorMode = ActiveEditorMode.FILTERS
-                                showingIntensitySlider = selectedFilter != FilterService.FilterType.NORMAL
-                                applySelectedFilter()
-                            } else {
-                                pendingTool = "StoryFilterSelectorView.swift (image only)"
+                        if (activeEditorMode == ActiveEditorMode.FILTERS) {
+                            // Done handled by back → idle on left button style; keep save hidden like iOS filters
+                            Text(
+                                stringResource(R.string.common_done),
+                                color = controlFg,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp,
+                                modifier = Modifier
+                                    .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                                    .clickable { activeEditorMode = ActiveEditorMode.IDLE }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                            )
+                        } else {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                // ≡ iOS chatTopToolbarView
+                                if (isChatSendMode && activeEditorMode == ActiveEditorMode.IDLE && editingRevealId == null) {
+                                    SideTool(Icons.Filled.TextFields, controlFg, controlStroke) {
+                                        beginCreatingTextOverlay()
+                                    }
+                                    SideTool(
+                                        iconRes = R.drawable.moments_sticker_tool,
+                                        tint = controlFg,
+                                        stroke = controlStroke,
+                                    ) {
+                                        showingStickerPicker = true
+                                    }
+                                    SideTool(Icons.Filled.Brush, controlFg, controlStroke) {
+                                        activeEditorMode = ActiveEditorMode.DRAWING
+                                    }
+                                    SideTool(Icons.Filled.PhotoFilter, controlFg, controlStroke) {
+                                        activeEditorMode = ActiveEditorMode.FILTERS
+                                        if (media != null && !media.isVideo) {
+                                            showingIntensitySlider = selectedFilter != FilterService.FilterType.NORMAL
+                                            applySelectedFilter()
+                                        }
+                                    }
+                                    if (media != null && media.isVideo) {
+                                        SideTool(
+                                            if (isVideoPreviewMuted) Icons.AutoMirrored.Filled.VolumeOff
+                                            else Icons.AutoMirrored.Filled.VolumeUp,
+                                            controlFg,
+                                            controlStroke,
+                                        ) {
+                                            isVideoPreviewMuted = !isVideoPreviewMuted
+                                        }
+                                    }
+                                }
+                                ChromeTool(
+                                    onClick = { saveToGallery() },
+                                    stroke = controlStroke,
+                                ) {
+                                    Icon(Icons.Filled.Download, null, tint = controlFg, modifier = Modifier.size(18.dp))
+                                }
                             }
                         }
+                    }
+                    // iOS center swatch: sticker palette > background palette
+                    // chatPaletteTopOffset ≡ tool row height + gap when chat mode
+                    val paletteOffsetY = if (isChatSendMode) 56.dp else 0.dp
+                    when {
+                        showsStickerPaletteButton() -> {
+                            StoryEditorPaletteChip(
+                                iconTint = controlFg,
+                                previewColors = stickerPalettePreviewColors(),
+                                onClick = { cycleSelectedStickerColor() },
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .padding(top = paletteOffsetY),
+                            )
+                        }
+                        showsBackgroundPaletteButton() -> {
+                            StoryEditorPaletteChip(
+                                iconTint = controlFg,
+                                previewColors = backgroundPalettePreviewColors(),
+                                onClick = { cycleBackgroundPreset() },
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .padding(top = paletteOffsetY),
+                            )
+                        }
+                    }
+                    } // end else normal top bar
+                }
+            }
+
+            // ≡ iOS sideToolbarView: debajo del topBar, trailing (fuera del captureRect).
+            if (
+                !isChatSendMode &&
+                activeEditorMode == ActiveEditorMode.IDLE &&
+                activeEditingStickerId == null &&
+                editingPolaroidId == null &&
+                editingRevealId == null
+            ) {
+                Column(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .statusBarsPadding()
+                        .padding(top = 62.dp, end = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    SideTool(Icons.Filled.TextFields, controlFg, controlStroke) {
+                        beginCreatingTextOverlay()
+                    }
+                    SideTool(
+                        iconRes = R.drawable.moments_sticker_tool,
+                        tint = controlFg,
+                        stroke = controlStroke,
+                    ) {
+                        showingStickerPicker = true
+                    }
+                    SideTool(Icons.Filled.Brush, controlFg, controlStroke) {
+                        activeEditorMode = ActiveEditorMode.DRAWING
+                    }
+                    SideTool(Icons.Filled.PhotoFilter, controlFg, controlStroke) {
+                        activeEditorMode = ActiveEditorMode.FILTERS
+                        if (media != null && !media.isVideo) {
+                            showingIntensitySlider = selectedFilter != FilterService.FilterType.NORMAL
+                            applySelectedFilter()
+                        }
+                    }
+                    if (media != null && media.isVideo) {
+                        SideTool(
+                            if (isVideoPreviewMuted) Icons.AutoMirrored.Filled.VolumeOff
+                            else Icons.AutoMirrored.Filled.VolumeUp,
+                            controlFg,
+                            controlStroke,
+                        ) {
+                            isVideoPreviewMuted = !isVideoPreviewMuted
+                        }
+                    }
+                    if (!isContinuingChain) {
+                        Box(
+                            Modifier
+                                .size(44.dp)
+                                .momentsChromeGlass(CircleShape, interactive = true)
+                                .border(
+                                    1.dp,
+                                    if (isCreatingChain) Color(0xFF007AFF) else controlStroke,
+                                    CircleShape,
+                                )
+                                .clickable {
+                                    isCreatingChain = !isCreatingChain
+                                    HapticManager.shared.selection()
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Filled.Link,
+                                null,
+                                tint = if (isCreatingChain) Color(0xFF007AFF) else controlFg,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                    if (showsStoryExpirationSelector) {
                         Box(
                             Modifier
                                 .size(44.dp)
                                 .momentsChromeGlass(CircleShape, interactive = true)
                                 .border(1.dp, controlStroke, CircleShape)
-                                .clickable { expirationHours = if (expirationHours == 24) 48 else 24 },
+                                .combinedClickable(
+                                    onClick = { expirationHours = if (expirationHours == 24) 48 else 24 },
+                                    onLongClick = {
+                                        showingExpirationInfoOverlay = true
+                                        HapticManager.shared.lightImpact()
+                                    },
+                                ),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
@@ -1073,78 +2172,18 @@ fun StoryEditingView(
                         }
                     }
                 }
-
-                if (activeEditorMode == ActiveEditorMode.TEXT) {
-                    StoryTextEditor(
-                        text = editorBuffer,
-                        onTextChange = { editorBuffer = it },
-                        selectedStyle = editorStyle,
-                        onStyleChange = { editorStyle = it },
-                        colorHex = editorColorHex,
-                        onColorHexChange = { editorColorHex = it },
-                        textAlignmentRaw = editorTextAlignmentRaw,
-                        onTextAlignmentRawChange = { editorTextAlignmentRaw = it },
-                        textBackgroundFillRaw = editorTextBackgroundFillRaw,
-                        onTextBackgroundFillRawChange = { editorTextBackgroundFillRaw = it },
-                        textFontSize = editorTextFontSize,
-                        onTextFontSizeChange = { editorTextFontSize = it },
-                        textStrokeRaw = editorTextStrokeRaw,
-                        onTextStrokeRawChange = { editorTextStrokeRaw = it },
-                        textMotionRaw = editorTextMotionRaw,
-                        onTextMotionRawChange = { editorTextMotionRaw = it },
-                        visualEffectRaw = editorVisualEffectRaw,
-                        onVisualEffectRawChange = { editorVisualEffectRaw = it },
-                        gradientStops = editorGradientStops,
-                        onGradientStopsChange = { editorGradientStops = it },
-                        gradientAngle = editorGradientAngle,
-                        onGradientAngleChange = { editorGradientAngle = it },
-                        selectedGradientStopIndex = editorSelectedGradientStopIndex,
-                        onSelectedGradientStopIndexChange = { editorSelectedGradientStopIndex = it },
-                        forcesAllCaps = editorForcesAllCaps,
-                        onForcesAllCapsChange = { editorForcesAllCaps = it },
-                        mediaSampleImage = filteredImage,
-                        onDone = { finishTextEditing() },
-                        onCancel = {
-                            val id = activeTextOverlayId
-                            activeTextOverlayId = null
-                            editorBuffer = ""
-                            editorStyle = StoryTextStyle.MODERN
-                            editorColorHex = StoryTextStyle.MODERN.defaultColorHex
-                            editorTextAlignmentRaw = "center"
-                            editorTextBackgroundFillRaw = "none"
-                            editorTextFontSize = 30f
-                            editorTextStrokeRaw = "none"
-                            editorTextMotionRaw = "none"
-                            editorVisualEffectRaw = "none"
-                            editorGradientStops = emptyList()
-                            editorGradientAngle = 0
-                            editorSelectedGradientStopIndex = 0
-                            editorForcesAllCaps = false
-                            if (id != null) {
-                                textOverlays = textOverlays.filterNot { it.id == id && it.text.isBlank() }
-                            }
-                            activeEditorMode = ActiveEditorMode.IDLE
-                        },
-                    )
-                }
-
-                if (activeEditorMode == ActiveEditorMode.DRAWING) {
-                    StoryDrawingEditorOverlay(
-                        baseDrawing = drawingImage,
-                        onCancel = { activeEditorMode = ActiveEditorMode.IDLE },
-                        onDone = { result ->
-                            val previous = drawingImage
-                            drawingImage = result
-                            if (previous != null && previous !== result && !previous.isRecycled) {
-                                previous.recycle()
-                            }
-                            activeEditorMode = ActiveEditorMode.IDLE
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
             }
 
+            // ≡ iOS bottomPublishingInset + filter chrome bajo el canvas
+            Column(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
             if (activeEditorMode == ActiveEditorMode.FILTERS && media != null && !media.isVideo) {
                 Spacer(Modifier.height(10.dp))
                 Column(
@@ -1193,56 +2232,85 @@ fun StoryEditingView(
                 Spacer(Modifier.height(8.dp))
             }
 
-            if (activeEditorMode == ActiveEditorMode.IDLE && activeEditingStickerId == null && editingPolaroidId == null && editingRevealId == null) {
-                Spacer(Modifier.height(14.dp))
+            if (editingRevealId != null) {
+                RevealStickerBottomControlsInset(
+                    stickers = stickers,
+                    onStickersChange = { stickers = it },
+                    editingId = editingRevealId,
+                    onEditingIdChange = { editingRevealId = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 8.dp),
+                )
+            } else if (isChatSendMode && activeEditorMode == ActiveEditorMode.IDLE && activeEditingStickerId == null && editingPolaroidId == null) {
+                // ≡ iOS chatSendBottomBar
+                val isEditingSticker = activeEditingStickerId != null
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
+                        .padding(horizontal = 0.dp)
+                        .padding(bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Row(
                         Modifier
-                            .weight(1f)
                             .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
-                            .clickable { showingAudience = true }
-                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                            .clickable(enabled = !isPublishing) {
+                                chatSendMode = chatSendMode.next()
+                                HapticManager.shared.selection()
+                            }
+                            .padding(start = 10.dp, end = 16.dp, top = 9.dp, bottom = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        AudienceIconView(audience, AudienceIconMetrics.storyCapsule, tintColor = controlFg.copy(0.72f))
+                        Box(
+                            Modifier
+                                .size(30.dp)
+                                .border(
+                                    width = 1.6.dp,
+                                    color = controlFg,
+                                    shape = CircleShape,
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            when (chatSendMode.innerIcon) {
+                                ChatMediaSendModeIcon.PLAY ->
+                                    Icon(Icons.Filled.PlayArrow, null, tint = controlFg, modifier = Modifier.size(14.dp))
+                                ChatMediaSendModeIcon.SAVE ->
+                                    Icon(Icons.Filled.Download, null, tint = controlFg, modifier = Modifier.size(14.dp))
+                                null ->
+                                    Text("1", color = controlFg, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
+                        }
                         Text(
-                            when {
-                                audience == ContentAudience.CUSTOM_LIST && !selectedListName.isNullOrBlank() ->
-                                    selectedListName!!
-                                else -> audienceLabel(audience)
-                            },
+                            stringResource(chatSendMode.labelRes),
                             color = controlFg,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 15.sp,
-                            maxLines = 1,
                         )
                     }
-
+                    Spacer(Modifier.weight(1f))
                     Row(
                         Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(shareBg.copy(if (hasContent && !isPublishing) 1f else 0.55f))
-                            .clickable(enabled = hasContent && !isPublishing) { publishStory() }
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                            .background(shareBg.copy(if (!isPublishing && !isEditingSticker) 1f else 0.55f))
+                            .clickable(enabled = !isPublishing && !isEditingSticker) { chatSend() }
+                            .padding(start = 9.dp, end = 18.dp, top = 9.dp, bottom = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        if (isPublishing) {
-                            CircularProgressIndicator(
-                                color = shareFg,
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(16.dp),
+                        if (chatRecipientUserId != null) {
+                            AsyncProfileImageView(
+                                userId = chatRecipientUserId,
+                                modifier = Modifier.size(30.dp).clip(CircleShape),
                             )
+                        }
+                        if (isPublishing) {
+                            CircularProgressIndicator(color = shareFg, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                         } else {
                             Text(
-                                stringResource(R.string.story_editor_share),
+                                stringResource(R.string.camera_preview_send),
                                 color = shareFg,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 16.sp,
@@ -1251,14 +2319,276 @@ fun StoryEditingView(
                                 Icons.AutoMirrored.Filled.ArrowForward,
                                 null,
                                 tint = shareFg,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(14.dp),
                             )
+                        }
+                    }
+                }
+            } else if (activeEditorMode == ActiveEditorMode.IDLE && activeEditingStickerId == null && editingPolaroidId == null) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    when {
+                        // iOS: chain title input while creating
+                        isCreatingChain -> {
+                            val keyboardController = LocalSoftwareKeyboardController.current
+                            var chainTitleFocused by remember { mutableStateOf(false) }
+                            Row(
+                                Modifier
+                                    .weight(1f)
+                                    .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Icon(Icons.Filled.Link, null, tint = controlFg.copy(0.72f), modifier = Modifier.size(15.dp))
+                                BasicTextField(
+                                    value = chainTitle,
+                                    onValueChange = { chainTitle = it.take(50) },
+                                    singleLine = true,
+                                    textStyle = androidx.compose.ui.text.TextStyle(
+                                        color = controlFg,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 15.sp,
+                                    ),
+                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(controlFg),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .onFocusChanged { chainTitleFocused = it.isFocused },
+                                    decorationBox = { inner ->
+                                        if (chainTitle.isBlank()) {
+                                            Text(
+                                                stringResource(R.string.story_chains_title_placeholder),
+                                                color = controlFg.copy(0.45f),
+                                                fontSize = 15.sp,
+                                            )
+                                        }
+                                        inner()
+                                    },
+                                )
+                                if (chainTitleFocused) {
+                                    Icon(
+                                        Icons.Filled.KeyboardArrowDown,
+                                        contentDescription = null,
+                                        tint = controlFg.copy(0.72f),
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clickable {
+                                                keyboardController?.hide()
+                                                chainTitleFocused = false
+                                            },
+                                    )
+                                }
+                            }
+                        }
+                        // iOS: continuing capsule
+                        isContinuingChain -> {
+                            Row(
+                                Modifier
+                                    .weight(1f)
+                                    .momentsChromeGlass(RoundedCornerShape(50), interactive = false)
+                                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Icon(Icons.Filled.Link, null, tint = controlFg, modifier = Modifier.size(15.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        stringResource(R.string.story_chains_continuing, originalChainTitle),
+                                        color = controlFg,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 15.sp,
+                                        maxLines = 1,
+                                    )
+                                    Text(
+                                        stringResource(R.string.story_chains_part_short, (chainPosition ?: 0) + 1),
+                                        color = controlFg.copy(0.72f),
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+                        else -> {
+                            Row(
+                                Modifier
+                                    .weight(1f)
+                                    .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                                    .clickable { showingAudience = true }
+                                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                AudienceIconView(audience, AudienceIconMetrics.storyCapsule, tintColor = controlFg.copy(0.72f))
+                                Text(
+                                    when {
+                                        audience == ContentAudience.CUSTOM_LIST && !selectedListName.isNullOrBlank() ->
+                                            selectedListName!!
+                                        else -> audienceLabel(audience)
+                                    },
+                                    color = controlFg,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+
+                    // ≡ principalActionButton
+                    when {
+                        isContinuingChain -> {
+                            Box(
+                                Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(shareBg.copy(if (hasContent && !isPublishing && !isLoadingUserSettings) 1f else 0.55f))
+                                    .clickable(enabled = hasContent && !isPublishing && !isLoadingUserSettings) { publishStory() }
+                                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (isPublishing) {
+                                    CircularProgressIndicator(color = shareFg, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                                } else {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = shareFg, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
+                        isCreatingChain -> {
+                            Box(
+                                Modifier
+                                    .size(width = 54.dp, height = 48.dp)
+                                    .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                                    .clickable(enabled = hasContent && !isPublishing && !isLoadingUserSettings) {
+                                        showingChainConfiguration = true
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Filled.Settings, null, tint = controlFg, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        else -> {
+                            Row(
+                                Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(shareBg.copy(if (hasContent && !isPublishing && !isLoadingUserSettings) 1f else 0.55f))
+                                    .clickable(enabled = hasContent && !isPublishing && !isLoadingUserSettings) { publishStory() }
+                                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                if (isPublishing) {
+                                    CircularProgressIndicator(
+                                        color = shareFg,
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                } else {
+                                    Text(
+                                        stringResource(R.string.story_editor_share),
+                                        color = shareFg,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 16.sp,
+                                    )
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ArrowForward,
+                                        null,
+                                        tint = shareFg,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
             }
+            } // bottom chrome Column
+        } // BoxWithConstraints capture geometry
+
+        // ≡ StoryTextEditor / StoryDrawingEditorOverlay a pantalla completa (fuera del
+        // captureRect clip), mismo contenedor que el ZStack iOS.
+        if (activeEditorMode == ActiveEditorMode.DRAWING) {
+            StoryDrawingEditorOverlay(
+                baseDrawing = drawingImage,
+                canvasRect = mediaCaptureRect.takeIf { it.width > 1f && it.height > 1f },
+                onCancel = { activeEditorMode = ActiveEditorMode.IDLE },
+                onDone = { result ->
+                    val previous = drawingImage
+                    drawingImage = result
+                    drawingOffsetX = 0f
+                    drawingOffsetY = 0f
+                    drawingScale = 1f
+                    if (previous != null && previous !== result && !previous.isRecycled) {
+                        previous.recycle()
+                    }
+                    activeEditorMode = ActiveEditorMode.IDLE
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(45f),
+            )
         }
+
+        if (activeEditorMode == ActiveEditorMode.TEXT) {
+            StoryTextEditor(
+                text = editorBuffer,
+                onTextChange = { editorBuffer = it },
+                selectedStyle = editorStyle,
+                onStyleChange = { editorStyle = it },
+                colorHex = editorColorHex,
+                onColorHexChange = { editorColorHex = it },
+                textAlignmentRaw = editorTextAlignmentRaw,
+                onTextAlignmentRawChange = { editorTextAlignmentRaw = it },
+                textBackgroundFillRaw = editorTextBackgroundFillRaw,
+                onTextBackgroundFillRawChange = { editorTextBackgroundFillRaw = it },
+                textFontSize = editorTextFontSize,
+                onTextFontSizeChange = { editorTextFontSize = it },
+                textStrokeRaw = editorTextStrokeRaw,
+                onTextStrokeRawChange = { editorTextStrokeRaw = it },
+                textMotionRaw = editorTextMotionRaw,
+                onTextMotionRawChange = { editorTextMotionRaw = it },
+                visualEffectRaw = editorVisualEffectRaw,
+                onVisualEffectRawChange = { editorVisualEffectRaw = it },
+                gradientStops = editorGradientStops,
+                onGradientStopsChange = { editorGradientStops = it },
+                gradientAngle = editorGradientAngle,
+                onGradientAngleChange = { editorGradientAngle = it },
+                selectedGradientStopIndex = editorSelectedGradientStopIndex,
+                onSelectedGradientStopIndexChange = { editorSelectedGradientStopIndex = it },
+                forcesAllCaps = editorForcesAllCaps,
+                onForcesAllCapsChange = { editorForcesAllCaps = it },
+                mediaSampleImage = filteredImage,
+                onDone = { finishTextEditing() },
+                onCancel = {
+                    val id = activeTextOverlayId
+                    activeTextOverlayId = null
+                    editorBuffer = ""
+                    editorStyle = StoryTextStyle.MODERN
+                    editorColorHex = StoryTextStyle.MODERN.defaultColorHex
+                    editorTextAlignmentRaw = "center"
+                    editorTextBackgroundFillRaw = "none"
+                    editorTextFontSize = 30f
+                    editorTextStrokeRaw = "none"
+                    editorTextMotionRaw = "none"
+                    editorVisualEffectRaw = "none"
+                    editorGradientStops = emptyList()
+                    editorGradientAngle = 0
+                    editorSelectedGradientStopIndex = 0
+                    editorForcesAllCaps = false
+                    if (id != null) {
+                        textOverlays = textOverlays.filterNot { it.id == id && it.text.isBlank() }
+                    }
+                    activeEditorMode = ActiveEditorMode.IDLE
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(5000f),
+            )
+        }
+
 
         val editingSlider = stickers.firstOrNull {
             it.id == activeEditingStickerId && it.type == "emojiSlider"
@@ -1266,13 +2596,12 @@ fun StoryEditingView(
         if (editingSlider != null) {
             EmojiSliderPresetBar(
                 selectedEmoji = editingSlider.sliderEmoji ?: "😍",
-                onSelect = { emoji ->
-                    stickers = stickers.map { item ->
-                        if (item.id != editingSlider.id) item
-                        else item.copy(sliderEmoji = emoji, content = emoji)
-                    }
+                onSelect = { emoji -> updateActiveSliderEmoji(emoji) },
+                onMore = {
+                    showingEmojiPicker = true
                     HapticManager.shared.lightImpact()
                 },
+                emojiUsageTracker = emojiUsageTracker,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 88.dp),
@@ -1291,8 +2620,154 @@ fun StoryEditingView(
                 },
                 onSelfieRequested = ::requestSelfieSticker,
                 hasRevealSticker = stickers.any { it.type == "reveal" },
+                isVideo = media?.isVideo == true,
+                hasAudioSticker = stickers.any { it.type == "audio" },
                 onDismiss = { showingStickerPicker = false },
             )
+        }
+
+        // ≡ iOS `.sheet` LocationMapView
+        if (showingLocationMap) {
+            Dialog(
+                onDismissRequest = { showingLocationMap = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false),
+            ) {
+                LocationMapView(
+                    locationName = selectedLocationName,
+                    latitude = selectedLocationLat,
+                    longitude = selectedLocationLng,
+                    onDismiss = { showingLocationMap = false },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        // ≡ iOS showingEmojiPicker → EmojiPickerView
+        if (showingEmojiPicker) {
+            MomentsModalSheet(
+                onDismissRequest = { showingEmojiPicker = false },
+                largeOnly = false,
+                containerColor = rememberAdaptiveColors().surfaceBackground,
+            ) {
+                EmojiPickerView(
+                    onDismiss = { showingEmojiPicker = false },
+                    onSelect = { emoji ->
+                        updateActiveSliderEmoji(emoji)
+                        showingEmojiPicker = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        // ≡ iOS storyExpirationInfoOverlay
+        if (showingExpirationInfoOverlay) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Transparent)
+                    .clickable { showingExpirationInfoOverlay = false },
+            ) {
+                Column(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .statusBarsPadding()
+                        .padding(top = 84.dp, end = 68.dp)
+                        .widthIn(max = 260.dp)
+                        .momentsChromeGlass(RoundedCornerShape(22.dp), interactive = false)
+                        .clickable { /* consume */ }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.story_editor_expiration_info_title),
+                        color = controlFg,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.story_editor_expiration_info_message),
+                        color = controlFg.copy(0.78f),
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp,
+                    )
+                }
+            }
+        }
+
+        // ≡ iOS overlay storyEditor.sharing (chat bake / publish brief)
+        if (isPublishing && isChatSendMode) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(0.5f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = Color.White)
+                    Spacer(Modifier.height(20.dp))
+                    Text(
+                        stringResource(R.string.story_editor_sharing),
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+        }
+
+        PermissionPrimerGateHost(gate = photosSaveGate)
+
+        // ≡ iOS `.sheet` AudienceSelectionView (detents medium/large)
+        if (showingAudience) {
+            MomentsModalSheet(
+                onDismissRequest = { showingAudience = false },
+                largeOnly = false,
+                containerColor = rememberAdaptiveColors().surfaceBackground,
+            ) {
+                AudienceSelectionView(
+                    selectedAudience = audience,
+                    selectedListId = selectedListId,
+                    selectedListName = selectedListName,
+                    customSelectedUsers = customSelectedUsers,
+                    onSelectedAudienceChange = { audience = it },
+                    onSelectedListIdChange = { selectedListId = it },
+                    onSelectedListNameChange = { selectedListName = it },
+                    onCustomSelectedUsersChange = { customSelectedUsers = it },
+                    onDismiss = { showingAudience = false },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            }
+        }
+
+        // ≡ iOS `.sheet` ChainConfigurationView
+        if (showingChainConfiguration) {
+            MomentsModalSheet(
+                onDismissRequest = { showingChainConfiguration = false },
+                largeOnly = false,
+                containerColor = rememberAdaptiveColors().surfaceBackground,
+            ) {
+                ChainConfigurationView(
+                    allowOthersToContinue = allowOthersToContinue,
+                    onAllowOthersToContinueChange = { allowOthersToContinue = it },
+                    continuationAudience = continuationAudience,
+                    onContinuationAudienceChange = { continuationAudience = it },
+                    selectedListId = selectedListId,
+                    onSelectedListIdChange = { selectedListId = it },
+                    selectedListName = selectedListName,
+                    onSelectedListNameChange = { selectedListName = it },
+                    customSelectedUsers = customSelectedUsers,
+                    onCustomSelectedUsersChange = { customSelectedUsers = it },
+                    chainTitleSummary = if (isContinuingChain) originalChainTitle else chainTitle,
+                    isContinuing = isContinuingChain,
+                    onConfirm = { publishStory() },
+                    onDismiss = { showingChainConfiguration = false },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            }
         }
     }
 }
@@ -1375,8 +2850,17 @@ private fun StoryStickerChip(
     }
 
     if (sticker.type == "audio") {
-        Box(modifier.size(72.dp).background(Color.White.copy(alpha = 0.25f), CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Icons.Filled.Mic, null, tint = Color.White, modifier = Modifier.size(28.dp))
+        val url = sticker.audioURL
+        if (!url.isNullOrBlank()) {
+            InteractiveAudioStickerView(
+                audioURL = url,
+                duration = sticker.audioDuration ?: 0.0,
+                modifier = modifier,
+            )
+        } else {
+            Box(modifier.size(72.dp).background(Color.White.copy(alpha = 0.25f), CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Mic, null, tint = Color.White, modifier = Modifier.size(28.dp))
+            }
         }
         return
     }
@@ -1422,103 +2906,54 @@ private fun StoryStickerChip(
             )
         }
         "time" -> {
-            Column(
-                modifier
-                    .background(Color.White.copy(0.92f), RoundedCornerShape(22.dp))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            ) {
-                Text(
-                    sticker.questionText ?: sticker.content.substringBefore("·").trim(),
-                    color = Color.Black.copy(0.92f),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 17.sp,
-                )
-                Text(
-                    sticker.caption ?: sticker.content.substringAfter("·", "").trim(),
-                    color = Color.Black.copy(0.48f),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 11.sp,
-                )
-            }
+            val timeText = sticker.questionText
+                ?: sticker.content.substringBefore("·").trim().ifBlank { sticker.content }
+            val dateText = sticker.caption
+                ?: sticker.content.substringAfter("·", "").trim()
+            StickerTimeCardView(
+                timeText = timeText,
+                dateText = dateText,
+                styleVariant = sticker.styleVariant ?: 0,
+                modifier = modifier,
+            )
         }
         "hashtag" -> {
-            Row(
-                modifier
-                    .background(Color.White.copy(0.92f), RoundedCornerShape(22.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(
-                    Modifier
-                        .size(28.dp)
-                        .background(Color(0xFFF56694), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("#", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-                if (isEditingInline) {
-                    BasicTextField(
-                        value = sticker.hashtag.orEmpty(),
-                        onValueChange = { raw ->
-                            val cleaned = raw.removePrefix("#").filterNot { it.isWhitespace() }.take(24)
-                            onUpdate(
-                                sticker.copy(
-                                    hashtag = cleaned,
-                                    content = if (cleaned.isBlank()) "#" else "#$cleaned",
-                                ),
-                            )
-                        },
-                        singleLine = true,
-                        textStyle = TextStyle(
-                            color = Color.Black.copy(0.92f),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
-                        ),
-                        cursorBrush = SolidColor(Color.Black),
-                        modifier = Modifier
-                            .widthIn(min = 72.dp, max = 160.dp)
-                            .focusRequester(focusRequester),
-                        decorationBox = { inner ->
-                            if (sticker.hashtag.isNullOrBlank()) {
-                                Text("#", color = Color.Black.copy(0.35f), fontWeight = FontWeight.SemiBold)
-                            }
-                            inner()
-                        },
-                    )
+            StickerHashtagCardView(
+                hashtag = sticker.hashtag?.takeIf { it.isNotBlank() }
+                    ?: sticker.content.removePrefix("#"),
+                onHashtagChange = if (isEditingInline) {
+                    { raw ->
+                        val cleaned = raw.removePrefix("#").filterNot { it.isWhitespace() }.take(24)
+                        onUpdate(
+                            sticker.copy(
+                                hashtag = cleaned,
+                                content = if (cleaned.isBlank()) "#" else "#$cleaned",
+                            ),
+                        )
+                    }
                 } else {
-                    Text(
-                        sticker.hashtag?.takeIf { it.isNotBlank() } ?: sticker.content.removePrefix("#"),
-                        color = Color.Black.copy(0.92f),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
-                    )
-                }
-            }
+                    null
+                },
+                styleVariant = sticker.styleVariant ?: 0,
+                isEditingInline = isEditingInline,
+                modifier = modifier,
+            )
         }
         "mention" -> {
-            Row(
-                modifier
-                    .background(Color.White.copy(0.92f), RoundedCornerShape(22.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(
-                    Modifier
-                        .size(28.dp)
-                        .background(Color(0xFF2E7D32), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("@", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-                Text(
-                    sticker.username?.takeIf { it.isNotBlank() }?.let { "@$it" } ?: sticker.content,
-                    color = Color.Black.copy(0.92f),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
-                )
-            }
+            val username = sticker.username?.takeIf { it.isNotBlank() }
+                ?: sticker.content.removePrefix("@").trim()
+            StickerMentionCardView(
+                username = username.ifBlank { "user" },
+                styleVariant = sticker.styleVariant ?: 0,
+                modifier = modifier,
+            )
+        }
+        "questionResponse" -> {
+            QuestionResponseStoryStickerCardView(
+                questionText = sticker.questionText?.takeIf { it.isNotBlank() } ?: sticker.content,
+                styleVariant = sticker.styleVariant ?: 0,
+                modifier = modifier,
+            )
         }
         "poll" -> {
             val poll = (sticker.pollOptions ?: listOf("", "", "")).let {
@@ -1631,81 +3066,22 @@ private fun StoryStickerChip(
         }
         "link" -> {
             val title = sticker.linkTitle?.takeIf { it.isNotBlank() }
+                ?: sticker.linkURL?.let { stickerHostLabel(it) }
                 ?: sticker.content.takeIf { it.isNotBlank() }
                 ?: stringResource(R.string.sticker_link_fallback)
-            val host = sticker.linkURL?.let { stickerHostLabel(it) }.orEmpty()
-            Row(
-                modifier
-                    .background(Color.White.copy(0.94f), RoundedCornerShape(24.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Box(
-                    Modifier
-                        .size(40.dp)
-                        .background(Color(0xFF2EA8FA), RoundedCornerShape(20.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.Link,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                Column(Modifier.widthIn(max = 180.dp)) {
-                    Text(
-                        title,
-                        color = Color.Black.copy(0.92f),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
-                        maxLines = 1,
-                    )
-                    if (host.isNotBlank()) {
-                        Text(
-                            host,
-                            color = Color.Black.copy(0.48f),
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
+            StickerLinkCardView(
+                title = title,
+                styleVariant = sticker.styleVariant ?: 0,
+                modifier = modifier,
+            )
         }
         "location" -> {
-            val label = (sticker.location ?: sticker.content).let {
-                if (it.length > 22) it.take(22) + "…" else it
-            }
-            Row(
-                modifier
-                    .background(Color.White.copy(0.92f), RoundedCornerShape(22.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(
-                    Modifier
-                        .size(32.dp)
-                        .background(Color(0xFFFA6B42), RoundedCornerShape(16.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.LocationOn,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                Text(
-                    label,
-                    color = Color.Black.copy(0.90f),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
-                    maxLines = 1,
-                )
-            }
+            val label = (sticker.location ?: sticker.content).ifBlank { "Location" }
+            StickerLocationCardView(
+                locationName = label,
+                styleVariant = sticker.styleVariant ?: 0,
+                modifier = modifier,
+            )
         }
         "countdown" -> {
             val title = (sticker.countdownTitle ?: sticker.content).take(26)
@@ -2043,15 +3419,10 @@ private fun StoryCanvasTextLabel(
     overlay: StoryTextOverlayDraft,
     modifier: Modifier = Modifier,
 ) {
-    val style = StoryTextStyle.fromRaw(overlay.styleRaw)
-    val fontFamily = rememberStoryFontFamily(style)
-    Text(
-        style.displayText(overlay.text),
-        color = parseStoryColorHex(overlay.colorHex),
-        fontSize = overlay.fontSize.toFloat().sp,
-        fontWeight = FontWeight.SemiBold,
-        textAlign = TextAlign.Center,
-        fontFamily = fontFamily,
+    // ≡ StoryTextOverlayLabel — treatments + motion (no Text plano).
+    StoryTextOverlayLabel(
+        overlay = overlay,
+        maxWidth = 280.dp,
         modifier = modifier,
     )
 }
@@ -2060,10 +3431,16 @@ private fun StoryCanvasTextLabel(
 private fun EmojiSliderPresetBar(
     selectedEmoji: String,
     onSelect: (String) -> Unit,
+    onMore: () -> Unit,
     modifier: Modifier = Modifier,
+    emojiUsageTracker: com.moments.android.utilities.EmojiUsageTracker,
 ) {
-    // iOS ModernEmojiSliderInputView / emojiSliderPresetBar presets
-    val presets = listOf("😍", "🔥", "😂", "🥹", "🤩", "😮", "😢", "👏", "💯", "🤯")
+    // ≡ iOS resolvedEmojiSliderEmojis + emojiSliderPresetBar
+    val presets = emojiUsageTracker.orderedEmojis(
+        com.moments.android.utilities.EmojiReactionDefaults.emojiSlider,
+        limit = 8,
+    )
+    val controlFg = if (isSystemInDarkTheme()) Color.White else Color.Black.copy(0.82f)
     Row(
         modifier
             .fillMaxWidth()
@@ -2085,6 +3462,184 @@ private fun EmojiSliderPresetBar(
                     .clickable { onSelect(emoji) }
                     .padding(horizontal = 8.dp, vertical = 6.dp),
             )
+        }
+        Box(
+            Modifier
+                .padding(start = 4.dp)
+                .size(52.dp)
+                .clickable(onClick = onMore),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.EmojiEmotions, null, tint = controlFg, modifier = Modifier.size(24.dp))
+        }
+    }
+}
+
+
+/** ≡ iOS `StickerData.from` para chat — posiciones ya normalizadas en Android. */
+private fun StoryStickerDraft.toChatStickerData(zIndex: Int): StickerData = StickerData(
+    stickerId = id,
+    type = type,
+    content = content,
+    position = Point(normalizedX, normalizedY),
+    scale = scale,
+    rotation = rotationRadians,
+    zIndex = zIndex,
+    username = username,
+    userId = userId,
+    hashtag = hashtag,
+    location = location,
+    latitude = latitude,
+    longitude = longitude,
+    styleVariant = styleVariant,
+    questionText = questionText,
+    pollOptions = pollOptions,
+    weatherSymbol = weatherSymbol,
+    linkURL = linkURL,
+    linkTitle = linkTitle,
+    countdownTitle = countdownTitle,
+    countdownTargetAtMs = countdownTargetAtMs,
+    sliderEmoji = sliderEmoji,
+    sliderPrompt = sliderPrompt,
+    caption = caption,
+    profileImagePath = profileImagePath,
+    quizQuestion = quizQuestion,
+    quizOptions = quizOptions,
+    quizCorrectIndex = quizCorrectIndex,
+    revealType = revealType,
+    revealPattern = revealPattern,
+    revealPrimaryColor = revealPrimaryColor,
+    revealSecondaryColor = revealSecondaryColor,
+    revealEffectColor = revealEffectColor,
+    frameStyle = frameStyle,
+    contentScale = contentScale,
+    contentOffsetX = contentOffsetX,
+    contentOffsetY = contentOffsetY,
+    audioURL = audioURL,
+    audioDuration = audioDuration,
+    isAnimated = isAnimated,
+    gifURL = gifURL,
+    videoURL = videoURL,
+)
+
+/** ≡ iOS `renderStoryWithOverlays` JPEG path for chat image send. */
+private fun renderChatImageJpeg(
+    context: android.content.Context,
+    media: CreatorMedia?,
+    filteredImage: Bitmap?,
+    drawingImage: Bitmap?,
+    drawingScale: Float,
+    drawingOffsetX: Float,
+    drawingOffsetY: Float,
+    backgroundPalette: List<androidx.compose.ui.graphics.Color>,
+    imageScale: Float,
+    imageOffsetX: Float,
+    imageOffsetY: Float,
+    imageRotationRadians: Float,
+    editorCanvasWidth: Float,
+    editorCanvasHeight: Float,
+): ByteArray? {
+    val mediaBmp = when {
+        media == null -> null
+        filteredImage != null && !filteredImage.isRecycled -> filteredImage
+        else -> context.contentResolver.openInputStream(media.uri)?.use(BitmapFactory::decodeStream)
+            ?: return null
+    }
+    val composed = renderStoryWithOverlays(
+        mediaImage = mediaBmp,
+        backgroundPalette = backgroundPalette,
+        drawing = drawingImage,
+        drawingScale = drawingScale,
+        drawingOffsetX = drawingOffsetX,
+        drawingOffsetY = drawingOffsetY,
+        imageScale = imageScale,
+        imageOffsetX = imageOffsetX,
+        imageOffsetY = imageOffsetY,
+        imageRotationRadians = imageRotationRadians,
+        editorCanvasWidth = editorCanvasWidth,
+        editorCanvasHeight = editorCanvasHeight,
+    )
+    val bytes = ByteArrayOutputStream().use { out ->
+        composed.compress(Bitmap.CompressFormat.JPEG, 90, out)
+        out.toByteArray()
+    }
+    composed.recycle()
+    if (mediaBmp != null && mediaBmp !== filteredImage) mediaBmp.recycle()
+    return bytes
+}
+
+private fun saveBitmapToGallery(context: android.content.Context, bitmap: Bitmap): Boolean {
+    val resolver = context.contentResolver
+    val values = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, "Moment_${System.currentTimeMillis()}.jpg")
+        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/Moments")
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+    }
+    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+    return try {
+        resolver.openOutputStream(uri)?.use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
+        } ?: return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+        }
+        true
+    } catch (_: Exception) {
+        resolver.delete(uri, null, null)
+        false
+    }
+}
+
+private fun saveUriToGallery(context: android.content.Context, source: Uri, isVideo: Boolean): Boolean {
+    val resolver = context.contentResolver
+    val mime = if (isVideo) "video/mp4" else "image/jpeg"
+    val collection = if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+    val values = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, "Moment_${System.currentTimeMillis()}${if (isVideo) ".mp4" else ".jpg"}")
+        put(MediaStore.MediaColumns.MIME_TYPE, mime)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(MediaStore.MediaColumns.RELATIVE_PATH, if (isVideo) "Movies/Moments" else "Pictures/Moments")
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+    }
+    val target = resolver.insert(collection, values) ?: return false
+    return try {
+        resolver.openInputStream(source)?.use { input ->
+            resolver.openOutputStream(target)?.use { output -> input.copyTo(output) }
+        } ?: return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            resolver.update(target, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+        }
+        true
+    } catch (_: Exception) {
+        resolver.delete(target, null, null)
+        false
+    }
+}
+
+@Composable
+private fun StoryEditorPaletteChip(
+    iconTint: Color,
+    previewColors: List<Color>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(Icons.Filled.Palette, null, tint = iconTint, modifier = Modifier.size(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            previewColors.forEach { c ->
+                Box(Modifier.size(10.dp).background(c, CircleShape))
+            }
         }
     }
 }
@@ -2112,6 +3667,44 @@ private fun SideTool(
     stroke: Color,
     onClick: () -> Unit,
 ) {
+    SideToolContent(
+        tint = tint,
+        stroke = stroke,
+        icon = icon,
+        iconRes = null,
+        iconSizeDp = 20,
+        onClick = onClick,
+    )
+}
+
+/** ≡ iOS `EditingToolIcon` — `MomentsStickerTool` vía drawable (`iconRes`), resto Material. */
+@Composable
+private fun SideTool(
+    iconRes: Int,
+    tint: Color,
+    stroke: Color,
+    iconSizeDp: Int = 30,
+    onClick: () -> Unit,
+) {
+    SideToolContent(
+        tint = tint,
+        stroke = stroke,
+        icon = null,
+        iconRes = iconRes,
+        iconSizeDp = iconSizeDp,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun SideToolContent(
+    tint: Color,
+    stroke: Color,
+    icon: ImageVector?,
+    iconRes: Int?,
+    iconSizeDp: Int,
+    onClick: () -> Unit,
+) {
     Box(
         Modifier
             .size(44.dp)
@@ -2120,7 +3713,16 @@ private fun SideTool(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+        if (iconRes != null) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(iconSizeDp.dp),
+            )
+        } else if (icon != null) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(iconSizeDp.dp))
+        }
     }
 }
 

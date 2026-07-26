@@ -12,19 +12,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,102 +35,213 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.auth.FirebaseAuth
-import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.R
+import com.moments.android.models.CustomAudienceList
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchCustomLists
+import com.moments.android.utilities.legacyPoppinsSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Port de `CustomListSelectorView.swift`. */
+private val CanvasDark = Color(0xFF0B1215)
+private val CanvasLight = Color(0xFFFAF9F6)
+private val AccentBlue = Color(0xFF007AFF)
+
+/**
+ * Port de `CustomListSelectorView.swift`.
+ *
+ * Bindings iOS → callbacks. Sheet de creación → `CustomAudienceListsView`;
+ * al cerrar recarga. La carga usa `Auth.currentUser?.uid` como el Swift.
+ */
 @Composable
 fun CustomListSelectorView(
     selectedListId: String?,
-    onListSelected: (id: String?, name: String?) -> Unit,
+    selectedListName: String?,
+    onSelectedListIdChange: (String?) -> Unit,
+    onSelectedListNameChange: (String?) -> Unit,
     onDismiss: () -> Unit,
-    userId: String = FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
-    onCreateList: (() -> Unit)? = null,
+    @Suppress("UNUSED_PARAMETER") userId: String = FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
     modifier: Modifier = Modifier,
 ) {
     val dark = isSystemInDarkTheme()
-    val canvas = if (dark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+    val canvas = if (dark) CanvasDark else CanvasLight
     val content = if (dark) Color.White else Color.Black
-    var lists by remember(userId) { mutableStateOf<List<CustomAudienceList>>(emptyList()) }
-    var loading by remember(userId) { mutableStateOf(true) }
+    val secondary = content.copy(alpha = 0.55f)
+    val context = LocalContext.current
+    val density = LocalDensity.current
 
-    LaunchedEffect(userId) {
-        loading = true
-        lists = if (userId.isBlank()) emptyList() else withContext(Dispatchers.IO) {
-            runCatching { FirestoreService().fetchCustomLists(userId) }.getOrDefault(emptyList())
+    var customLists by remember { mutableStateOf<List<CustomAudienceList>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var showingCreateList by remember { mutableStateOf(false) }
+    var reloadToken by remember { mutableStateOf(0) }
+
+    @Suppress("UNUSED_VARIABLE")
+    val keepName = selectedListName
+
+    suspend fun loadCustomLists() {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        isLoading = true
+        customLists = if (uid == null) {
+            emptyList()
+        } else {
+            withContext(Dispatchers.IO) {
+                runCatching { FirestoreService().fetchCustomLists(uid) }.getOrDefault(emptyList())
+            }
         }
-        loading = false
+        isLoading = false
+    }
+
+    LaunchedEffect(reloadToken) {
+        loadCustomLists()
+    }
+
+    if (showingCreateList) {
+        Dialog(
+            onDismissRequest = {
+                showingCreateList = false
+                reloadToken++
+            },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            CustomAudienceListsView(
+                embeddedInFlow = false,
+                onDismiss = {
+                    showingCreateList = false
+                    reloadToken++
+                },
+                onListsChanged = { reloadToken++ },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(canvas),
+            )
+        }
     }
 
     Column(modifier.fillMaxSize().background(canvas)) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                Modifier.size(40.dp).momentsChromeGlass(CircleShape, interactive = true).clickable(onClick = onDismiss),
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = content, modifier = Modifier.size(18.dp)) }
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel), color = AccentBlue)
+            }
             Spacer(Modifier.weight(1f))
-            Text("Custom lists", color = content, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.audience_custom_lists),
+                color = content,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = with(density) { legacyPoppinsSize(context, 17).toSp() },
+            )
             Spacer(Modifier.weight(1f))
-            Box(
-                Modifier.size(40.dp).momentsChromeGlass(CircleShape, interactive = true).clickable { onCreateList?.invoke() },
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Filled.Add, null, tint = content, modifier = Modifier.size(18.dp)) }
+            TextButton(onClick = { showingCreateList = true }) {
+                Icon(Icons.Filled.Add, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(16.dp))
+            }
         }
 
         when {
-            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
+            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    CircularProgressIndicator(Modifier.size(36.dp), color = AccentBlue, strokeWidth = 2.dp)
+                    Text(
+                        stringResource(R.string.audience_loadingLists),
+                        color = secondary,
+                        fontSize = with(density) { legacyPoppinsSize(context, 14).toSp() },
+                    )
+                }
             }
-            lists.isEmpty() -> Column(
-                Modifier.fillMaxSize().padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(Icons.Filled.Group, null, tint = Color.Gray, modifier = Modifier.size(48.dp))
-                Text("No custom lists yet", color = content, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 20.dp))
-                Text("Create your first custom list", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
-                Text(
-                    "Create first list",
-                    color = Color.White,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .padding(top = 20.dp)
-                        .clip(RoundedCornerShape(25.dp))
-                        .background(Color(0xFF007AFF))
-                        .clickable { onCreateList?.invoke() }
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                )
+            customLists.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                    modifier = Modifier.padding(24.dp),
+                ) {
+                    Icon(Icons.Filled.List, null, tint = secondary, modifier = Modifier.size(48.dp))
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.audience_noCustomLists_title),
+                            color = content,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = with(density) { legacyPoppinsSize(context, 18).toSp() },
+                        )
+                        Text(
+                            stringResource(R.string.audience_noCustomLists_description),
+                            color = secondary,
+                            fontSize = with(density) { legacyPoppinsSize(context, 14).toSp() },
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    Row(
+                        Modifier
+                            .clip(RoundedCornerShape(25.dp))
+                            .background(AccentBlue)
+                            .clickable { showingCreateList = true }
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Icon(Icons.Filled.AddCircle, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Text(
+                            stringResource(R.string.audience_createFirstList),
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = with(density) { legacyPoppinsSize(context, 16).toSp() },
+                        )
+                    }
+                }
             }
             else -> LazyColumn(Modifier.fillMaxSize()) {
-                items(lists, key = { it.id ?: it.name }) { list ->
-                    val selected = list.id == selectedListId
+                items(customLists, key = { it.id ?: it.name }) { list ->
                     Row(
                         Modifier
                             .fillMaxWidth()
                             .clickable {
-                                onListSelected(list.id, list.name)
+                                onSelectedListIdChange(list.id)
+                                onSelectedListNameChange(list.name)
                                 onDismiss()
                             }
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(list.name, color = content, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                            Text("${list.members.size} people", color = content.copy(.6f), fontSize = 13.sp)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                list.name,
+                                color = content,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = with(density) { legacyPoppinsSize(context, 16).toSp() },
+                            )
+                            Text(
+                                stringResource(R.string.audience_people_count, list.members.size),
+                                color = secondary,
+                                fontSize = with(density) { legacyPoppinsSize(context, 13).toSp() },
+                            )
                         }
-                        if (selected) Icon(Icons.Filled.CheckCircle, null, tint = Color(0xFF007AFF), modifier = Modifier.size(20.dp))
+                        if (selectedListId == list.id) {
+                            Icon(
+                                Icons.Filled.CheckCircle,
+                                null,
+                                tint = AccentBlue,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
+                    HorizontalDivider(color = content.copy(alpha = 0.08f))
                 }
             }
         }

@@ -134,6 +134,7 @@ class TimeSpentManager private constructor(
             .setContentTitle(title)
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setDefaults(NotificationCompat.DEFAULT_SOUND)
             .setAutoCancel(true)
             .build()
         // POST_NOTIFICATIONS se pedirá desde UI/Permissions; aquí se intenta publicar.

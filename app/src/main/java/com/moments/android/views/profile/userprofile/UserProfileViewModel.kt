@@ -29,7 +29,6 @@ import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.services.privacy.VisibleConnectionTypes
-import com.moments.android.services.privacy.checkMutualConnection
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.social.BestFriendsService

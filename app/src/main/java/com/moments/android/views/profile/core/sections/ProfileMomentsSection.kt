@@ -3,7 +3,6 @@ package com.moments.android.views.profile.core.sections
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.text.format.DateUtils
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -43,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
@@ -206,7 +206,7 @@ private fun ProfileThumbnailTopChrome(moment: Moment, descriptor: ProfileGridTil
         if (descriptor.showsScheduledCue && moment.authorId == FirebaseAuth.getInstance().currentUser?.uid) {
             Row(Modifier.padding(start = 5.dp).clip(RoundedCornerShape(50)).background(Color.Black.copy(.52f)).padding(horizontal = 7.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Icon(Icons.Filled.Schedule, null, tint = Color.White, modifier = Modifier.size(8.dp))
-                Text(scheduledRemainingText(moment), color = Color.White, fontSize = 8.sp, maxLines = 1)
+                Text(moment.scheduledRemainingText(LocalContext.current), color = Color.White, fontSize = 8.sp, maxLines = 1)
             }
         }
         Spacer(Modifier.weight(1f))
@@ -230,8 +230,6 @@ private fun formatVideoDuration(duration: Double): String {
     val seconds = max(duration.toInt(), 0)
     return stringResource(R.string.profile_thumbnail_video_duration, seconds / 60, seconds % 60)
 }
-
-private fun scheduledRemainingText(moment: Moment): String = moment.scheduledDate?.let { DateUtils.getRelativeTimeSpanString(it.time, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE).toString() }.orEmpty()
 
 @Composable
 fun ProfileSectionEmptyState(icon: ProfileSectionEmptyIcon, title: Int, subtitle: Int, modifier: Modifier = Modifier) {

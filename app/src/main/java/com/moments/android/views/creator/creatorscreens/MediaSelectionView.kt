@@ -3,12 +3,12 @@ import android.Manifest
 import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,18 +35,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,7 +52,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -76,17 +71,21 @@ import com.moments.android.views.creator.CreatorAspectRatio
 import com.moments.android.views.creator.CreatorFlow
 import com.moments.android.views.creator.CreatorMedia
 import com.moments.android.views.creator.creatoruikit.CameraCapture
+import com.moments.android.views.messaging.components.AttachmentIcon
+import com.moments.android.views.messaging.components.AttachmentIconPreset
+import com.moments.android.views.messaging.components.AttachmentIconView
+import com.moments.android.views.permission.shared.PermissionPrimerGate
+import com.moments.android.views.permission.shared.PermissionPrimerGateHost
+import com.moments.android.views.permissions.CameraAccessBoundary
+import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import android.graphics.BitmapFactory
-import android.media.MediaMetadataRetriever
 
 /**
  * Port de `MediaSelectionView.swift`.
- * CameraCapture / PermissionPrimerGate: pendientes; cámara abre stub honesto.
+ * Fondo AdaptiveColors sólido; preview sin blur de imagen (decisión de plataforma).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MediaSelectionView(
     selectedMediaItems: List<CreatorMedia>,
@@ -100,6 +99,7 @@ fun MediaSelectionView(
     val canvas = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     val contentColor = if (isDark) Color.White else Color.Black
     val scope = rememberCoroutineScope()
+    val photosGate = remember { PermissionPrimerGate(PermissionPrimerGate.Kind.PHOTOS) }
 
     var mediaAssets by remember { mutableStateOf<List<GalleryAsset>>(emptyList()) }
     var selectedAssetIds by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -109,26 +109,20 @@ fun MediaSelectionView(
     var availableAlbums by remember { mutableStateOf<List<CreatorAlbumInfo>>(emptyList()) }
     var selectedAlbum by remember { mutableStateOf<CreatorAlbumInfo?>(null) }
     var showingAlbumPicker by remember { mutableStateOf(false) }
-    var showingCameraPending by remember { mutableStateOf(false) }
+    var showingCamera by remember { mutableStateOf(false) }
     var showingVideoTooLongAlert by remember { mutableStateOf(false) }
     var rejectedVideoDuration by remember { mutableStateOf(0.0) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { results ->
-        val granted = results.values.any { it }
-        permissionGranted = granted
-        permissionDenied = !granted
-        if (granted) {
-            scope.launch {
-                isLoadingLibrary = true
-                val albums = loadAlbums(context)
-                availableAlbums = albums
-                selectedAlbum = albums.firstOrNull()
-                mediaAssets = loadGalleryAssets(context, selectedAlbum?.bucketId)
-                isLoadingLibrary = false
-            }
-        } else {
+    fun loadLibrary(album: CreatorAlbumInfo? = selectedAlbum) {
+        scope.launch {
+            isLoadingLibrary = true
+            val albums = withContext(Dispatchers.IO) { loadAlbums(context) }
+            availableAlbums = albums
+            val chosen = album ?: albums.firstOrNull()
+            selectedAlbum = chosen
+            mediaAssets = withContext(Dispatchers.IO) { loadGalleryAssets(context, chosen?.bucketId) }
+            permissionGranted = true
+            permissionDenied = false
             isLoadingLibrary = false
         }
     }
@@ -137,54 +131,67 @@ fun MediaSelectionView(
         scope.launch {
             isLoadingLibrary = true
             selectedAssetIds = emptyList()
-            mediaAssets = loadGalleryAssets(context, album?.bucketId)
+            mediaAssets = withContext(Dispatchers.IO) { loadGalleryAssets(context, album?.bucketId) }
             isLoadingLibrary = false
         }
     }
 
+    // ≡ requestPhotoLibraryAccess + PermissionPrimerGate
     LaunchedEffect(Unit) {
         val perms = galleryPermissions()
         val allGranted = perms.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
         if (allGranted) {
-            permissionGranted = true
-            val albums = withContext(Dispatchers.IO) { loadAlbums(context) }
-            availableAlbums = albums
-            selectedAlbum = albums.firstOrNull()
-            mediaAssets = withContext(Dispatchers.IO) { loadGalleryAssets(context, selectedAlbum?.bucketId) }
-            isLoadingLibrary = false
+            loadLibrary()
         } else {
-            permissionLauncher.launch(perms)
+            photosGate.requestAccess(context) { loadLibrary() }
         }
     }
 
-    if (showingCameraPending) {
-        CameraCapture(
-            onCapture = { media ->
-                showingCameraPending = false
-                if (
-                    media.isVideo &&
-                    (media.durationSeconds ?: 0.0) > CreatorMedia.MAX_MOMENT_VIDEO_DURATION_SECONDS
-                ) {
-                    rejectedVideoDuration = media.durationSeconds ?: 0.0
-                    showingVideoTooLongAlert = true
-                } else {
-                    onSelectedMediaItemsChange(selectedMediaItems + media)
-                    onCurrentFlowChange(CreatorFlow.MEDIA_EDITING)
-                }
-            },
-            onDismiss = { showingCameraPending = false },
-            modifier = modifier,
-        )
+    var wasPhotosGatePresenting by remember { mutableStateOf(false) }
+    LaunchedEffect(photosGate.isPresenting) {
+        if (wasPhotosGatePresenting && !photosGate.isPresenting && !permissionGranted) {
+            val granted = galleryPermissions().any {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }
+            if (!granted) {
+                permissionDenied = true
+                isLoadingLibrary = false
+            }
+        }
+        wasPhotosGatePresenting = photosGate.isPresenting
+    }
+
+    // ≡ fullScreenCover CameraAccessBoundary + CameraCapture
+    if (showingCamera) {
+        CameraAccessBoundary(
+            requiresMicrophone = true,
+            onCancel = { showingCamera = false },
+        ) {
+            CameraCapture(
+                onCapture = { media ->
+                    showingCamera = false
+                    if (
+                        media.isVideo &&
+                        (media.durationSeconds ?: 0.0) > CreatorMedia.MAX_MOMENT_VIDEO_DURATION_SECONDS
+                    ) {
+                        rejectedVideoDuration = media.durationSeconds ?: 0.0
+                        showingVideoTooLongAlert = true
+                    } else {
+                        onSelectedMediaItemsChange(selectedMediaItems + media)
+                        onCurrentFlowChange(CreatorFlow.MEDIA_EDITING)
+                    }
+                },
+                onDismiss = { showingCamera = false },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         return
     }
 
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(canvas),
-    ) {
+    Box(modifier.fillMaxSize().background(canvas)) {
+        Column(Modifier.fillMaxSize()) {
         // iOS headerView: H 16 / top 10 / bottom 12; back 40; title centered
         Box(
             Modifier
@@ -277,15 +284,9 @@ fun MediaSelectionView(
                     Modifier
                         .fillMaxWidth()
                         .height(320.dp)
-                        .background(Color.Black),
+                        .background(Color.Black), // sólido — sin blur de imagen
                     contentAlignment = Alignment.Center,
                 ) {
-                    AsyncImage(
-                        model = preview.uri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().alpha(0.35f),
-                    )
                     AsyncImage(
                         model = preview.uri,
                         contentDescription = null,
@@ -314,13 +315,21 @@ fun MediaSelectionView(
                         )
                     }
                     if (preview.isVideo) {
-                        Box(
+                        Row(
                             Modifier
                                 .align(Alignment.BottomEnd)
                                 .padding(12.dp)
                                 .background(Color.Black.copy(0.5f), RoundedCornerShape(50))
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
+                            Icon(
+                                Icons.Filled.Videocam,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(12.dp),
+                            )
                             Text(
                                 formatMediaDuration(preview.durationSeconds ?: 0.0),
                                 color = Color.White,
@@ -394,12 +403,16 @@ fun MediaSelectionView(
                 Modifier
                     .clip(RoundedCornerShape(50))
                     .background(Brush.horizontalGradient(listOf(Color(0xFF9C27B0), Color(0xFFE91E63))))
-                    .clickable { showingCameraPending = true }
+                    .clickable { showingCamera = true }
                     .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                AttachmentIconView(
+                    icon = AttachmentIcon.CAMERA,
+                    preset = AttachmentIconPreset.CREATOR_CAMERA_CHIP,
+                    tintColor = Color.White,
+                )
                 Text(
                     stringResource(R.string.creator_camera),
                     color = Color.White,
@@ -430,7 +443,11 @@ fun MediaSelectionView(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Icon(Icons.Filled.PhotoLibrary, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(48.dp))
+                    AttachmentIconView(
+                        icon = AttachmentIcon.PHOTOS,
+                        preset = AttachmentIconPreset.PERMISSION_PROMPT_LARGE,
+                        tintColor = Color.Gray.copy(if (isDark) 1f else 0.6f),
+                    )
                     Spacer(Modifier.height(24.dp))
                     Text(
                         stringResource(R.string.creator_gallery_permission),
@@ -514,10 +531,8 @@ fun MediaSelectionView(
     }
 
     if (showingAlbumPicker) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
+        MomentsModalSheet(
             onDismissRequest = { showingAlbumPicker = false },
-            sheetState = sheetState,
             containerColor = canvas,
         ) {
             AlbumPickerView(
@@ -529,6 +544,7 @@ fun MediaSelectionView(
                     refreshLibrary(album)
                 },
                 onDismiss = { showingAlbumPicker = false },
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -554,9 +570,11 @@ fun MediaSelectionView(
         )
     }
 
-    // selectedMediaItems param reserved for restore; suppress unused until editors round-trip.
-    @Suppress("UNUSED_VARIABLE")
-    val keep = selectedMediaItems
+    PermissionPrimerGateHost(gate = photosGate)
+
+    @Suppress("UNUSED_PARAMETER")
+    val unusedDismiss = onDismiss
+    }
 }
 
 private data class GalleryAsset(

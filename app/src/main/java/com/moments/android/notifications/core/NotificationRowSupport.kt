@@ -1,6 +1,20 @@
 package com.moments.android.notifications.core
 
+import android.content.Context
+import android.net.Uri
+import androidx.annotation.StringRes
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.sp
+import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
+import com.moments.android.views.feed.reactions.ReactionType
+
+/** Port de NotificationRowSupport.swift */
 
 fun isPerActorSocialNotification(type: NotificationType): Boolean = when (type) {
     NotificationType.NEW_FOLLOWER,
@@ -38,28 +52,118 @@ fun uniqueSenderIds(group: NotificationGroup): List<String> {
     }
 }
 
+/** ≡ NotificationProfileLink — deep link `moments://notification-profile/{userId}` */
 object NotificationProfileLink {
+    private const val SCHEME = "moments"
     private const val HOST = "notification-profile"
+    const val ANNOTATION_TAG = "notification-profile"
 
-    fun path(userId: String): String? {
+    fun url(userId: String): Uri? {
         val trimmed = userId.trim()
         if (trimmed.isEmpty()) return null
-        return "moments://$HOST/${java.net.URLEncoder.encode(trimmed, Charsets.UTF_8.name())}"
+        return Uri.Builder()
+            .scheme(SCHEME)
+            .authority(HOST)
+            .appendPath(trimmed)
+            .build()
     }
 
-    fun userIdFromPath(path: String): String? {
-        val prefix = "moments://$HOST/"
-        if (!path.startsWith(prefix)) return null
-        val raw = path.removePrefix(prefix).trim('/')
-        if (raw.isEmpty()) return null
-        return java.net.URLDecoder.decode(raw, Charsets.UTF_8.name())
+    fun userId(from: Uri): String? {
+        if (from.scheme != SCHEME || from.host != HOST) return null
+        val raw = from.pathSegments.firstOrNull()?.takeIf { it.isNotEmpty() } ?: return null
+        return raw
+    }
+
+    /** Path string for AnnotatedString annotations (same as [url]). */
+    fun path(userId: String): String? = url(userId)?.toString()
+
+    fun userIdFromPath(path: String): String? = runCatching { userId(Uri.parse(path)) }.getOrNull()
+}
+
+/** ≡ styledNotificationMessage — nombres en semibold + link de perfil + emoji grande opcional. */
+fun styledNotificationMessage(
+    plain: String,
+    boldNames: List<String>,
+    nameToUserId: Map<String, String>,
+    baseColor: Color,
+    largeEmoji: String? = null,
+): AnnotatedString {
+    val uniqueBoldNames = boldNames
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+        .sortedByDescending { it.length }
+
+    return buildAnnotatedString {
+        withStyle(SpanStyle(color = baseColor, fontSize = 14.sp)) {
+            append(plain)
+        }
+
+        for (name in uniqueBoldNames) {
+            var start = 0
+            while (true) {
+                val index = plain.indexOf(name, startIndex = start)
+                if (index < 0) break
+                val end = index + name.length
+                addStyle(
+                    SpanStyle(color = baseColor, fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
+                    index,
+                    end,
+                )
+                nameToUserId[name]?.let { userId ->
+                    NotificationProfileLink.path(userId)?.let { link ->
+                        addStringAnnotation(NotificationProfileLink.ANNOTATION_TAG, link, index, end)
+                    }
+                }
+                start = end
+            }
+        }
+
+        if (!largeEmoji.isNullOrEmpty()) {
+            val index = plain.indexOf(largeEmoji)
+            if (index >= 0) {
+                addStyle(SpanStyle(fontSize = 18.sp), index, index + largeEmoji.length)
+            }
+        }
     }
 }
 
-fun normalizedCommentPreview(notification: com.moments.android.models.MomentsNotification): String? {
+/**
+ * ≡ notificationGroupedMessage(twoKey:threePlusKey:multipleKey:…).
+ * En Android las claves iOS (`notifications.message.*.two`) son `@StringRes`.
+ */
+fun notificationGroupedMessage(
+    context: Context,
+    @StringRes twoRes: Int,
+    @StringRes threePlusRes: Int,
+    @StringRes multipleRes: Int,
+    actors: NotificationGroupedActors,
+    nameToUserId: Map<String, String>,
+    baseColor: Color,
+): AnnotatedString {
+    val boldNames = buildList {
+        add(actors.primary)
+        actors.secondary?.let { add(it) }
+    }
+    val plain = when {
+        actors.hasExactlyTwo && actors.secondary != null ->
+            context.getString(twoRes, actors.primary, actors.secondary)
+        actors.secondary != null && actors.othersCount > 0 ->
+            context.getString(threePlusRes, actors.primary, actors.secondary, actors.othersCount)
+        else -> {
+            val moreCount = maxOf(actors.othersCount, 1)
+            context.getString(multipleRes, actors.primary, moreCount)
+        }
+    }
+    return styledNotificationMessage(plain, boldNames, nameToUserId, baseColor)
+}
+
+fun normalizedCommentPreview(notification: MomentsNotification): String? {
     for (raw in listOf(notification.reaction, notification.message)) {
         val text = raw?.trim().orEmpty()
         if (text.isEmpty()) continue
+        // ≡ if ReactionType(rawValue: text) != nil { continue }
+        if (ReactionType.fromRaw(text) != null) continue
         if (text.length > 140) return text.take(137) + "…"
         return text
     }

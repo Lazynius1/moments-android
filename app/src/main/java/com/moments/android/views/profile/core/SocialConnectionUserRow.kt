@@ -46,7 +46,7 @@ import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.components.VerifiedBadge
-import com.moments.android.views.feed.core.sections.ModernFollowButton
+import com.moments.android.views.components.ModernFollowButton
 import com.moments.android.views.story.StoryRingAvatarView
 import java.util.Date
 

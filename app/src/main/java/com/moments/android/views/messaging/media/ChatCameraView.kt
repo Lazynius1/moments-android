@@ -11,15 +11,19 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -45,12 +49,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
@@ -60,11 +67,16 @@ import com.moments.android.views.creator.CreatorMedia
 import com.moments.android.views.creator.StoryEditingView
 import com.moments.android.views.creator.components.CaptureButton
 import com.moments.android.views.creator.creatoruikit.CameraPreviewView
+import com.moments.android.views.creator.creatoruikit.creatorMomentsCaptureRect
+import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
+import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
-private const val CHAT_CAMERA_CAPTURE_RATIO = 9f / 16f
-
-/** Port Compose de `ChatCameraView`: captura vertical, galería y entrada al editor. */
+/**
+ * Port Compose de `ChatCameraView.swift`.
+ * Preview con `creatorMomentsCaptureRect` — misma geometría que StoryCamera / editor / viewer.
+ */
 @Composable
 fun ChatCameraView(
     otherUserId: String,
@@ -85,22 +97,36 @@ fun ChatCameraView(
     var startsInTextMode by remember { mutableStateOf(false) }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let {
-            mediaForEditor = CreatorMedia(uri = it, isVideo = isVideoUri(context, it), aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN, recommendedAspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN)
+            mediaForEditor = CreatorMedia(
+                uri = it,
+                isVideo = isVideoUri(context, it),
+                aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
+                recommendedAspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
+            )
             isEditorActive = true
         }
     }
-    val zoomState = rememberTransformableState { zoomChange, _, _ -> zoomLevel = (zoomLevel * zoomChange).coerceIn(1f, 5f) }
+    val zoomState = rememberTransformableState { zoomChange, _, _ ->
+        zoomLevel = (zoomLevel * zoomChange).coerceIn(1f, 5f)
+    }
 
     LaunchedEffect(isRecording) {
         recordingSeconds = 0
-        while (isRecording) { delay(1000); recordingSeconds++ }
+        while (isRecording) {
+            delay(1000)
+            recordingSeconds++
+        }
     }
 
     if (isEditorActive) {
         ChatCameraEditorHost(
-            media = mediaForEditor!!,
+            media = mediaForEditor,
             otherUserId = otherUserId,
-            onBack = { mediaForEditor = null; startsInTextMode = false; isEditorActive = false },
+            onBack = {
+                mediaForEditor = null
+                startsInTextMode = false
+                isEditorActive = false
+            },
             onSend = onSend,
             startsInTextMode = startsInTextMode,
             onStartsInTextModeChange = { startsInTextMode = it },
@@ -110,86 +136,246 @@ fun ChatCameraView(
         return
     }
 
-    BoxWithConstraints(modifier.fillMaxSize().background(Color(0xFF0B1215))) {
-        val captureWidth = minOf(maxWidth, maxHeight * CHAT_CAMERA_CAPTURE_RATIO)
-        val captureHeight = captureWidth / CHAT_CAMERA_CAPTURE_RATIO
-        val captureModifier = Modifier.width(captureWidth).height(captureHeight).align(Alignment.Center)
-        CameraPreviewView(
-            cameraPosition = if (frontCamera) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK,
-            flashMode = flashMode.toCameraXFlashMode(),
-            isRecording = isRecording,
-            zoomLevel = zoomLevel,
-            capturePhotoToken = photoToken,
-            captureAudio = true,
-            prefersMaximumCaptureQuality = false,
-            onRecordingStateChange = { isRecording = it },
-            onImageCaptured = { uri -> mediaForEditor = CreatorMedia(uri = uri, aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN, recommendedAspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN); isEditorActive = true },
-            onVideoCaptured = { uri -> mediaForEditor = CreatorMedia(uri = uri, isVideo = true, aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN, recommendedAspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN); isEditorActive = true },
-            modifier = captureModifier
-                .clip(RoundedCornerShape(28.dp))
-                .transformable(zoomState)
-                .pointerInput(frontCamera) { detectTapGestures(onDoubleTap = { frontCamera = !frontCamera; zoomLevel = 1f }) },
+    val canvasBg = if (isSystemInDarkTheme()) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+
+    BoxWithConstraints(modifier.fillMaxSize().background(canvasBg)) {
+        val density = LocalDensity.current
+        val bottomInsetPx = WindowInsets.navigationBars.getBottom(density).toFloat()
+        val captureRect = creatorMomentsCaptureRect(
+            inSize = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()),
+            topInsetPx = 0f,
+            bottomInsetPx = bottomInsetPx,
+            density = density,
         )
-        ChatCameraChrome(
-            otherUserId = otherUserId,
-            otherUsername = otherUsername,
-            flashMode = flashMode,
-            isRecording = isRecording,
-            recordingSeconds = recordingSeconds,
-            onDismiss = onDismiss,
-            onToggleFlash = { flashMode = flashMode.next() },
-            onOpenGallery = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
-            onSwitchCamera = { frontCamera = !frontCamera; zoomLevel = 1f },
-            onOpenTextMode = { startsInTextMode = true; mediaForEditor = null; isEditorActive = true },
-            onCapturePhoto = { photoToken++ },
-            onStartRecording = { isRecording = true },
-            onStopRecording = { isRecording = false },
-            modifier = captureModifier,
-        )
+        val corner = storyViewerCanvasCornerRadius
+        val shutterCenterInsetPx = with(density) { 10.dp.toPx() }
+        val recordingCenterInsetPx = with(density) { 108.dp.toPx() }
+        val textModeFromRightPx = with(density) { 26.dp.toPx() }
+        val textModeHalfPx = with(density) { 24.dp.toPx() }
+        val sideControlsExtraWidthPx = with(density) { 54.dp.toPx() }
+        val sideControlsScreenMarginPx = with(density) { 72.dp.toPx() }
+        val captureButtonYPx = captureRect.bottom - shutterCenterInsetPx
+        val bottomControlsWidthPx = min(
+            captureRect.width + sideControlsExtraWidthPx,
+            constraints.maxWidth - sideControlsScreenMarginPx,
+        ).coerceAtLeast(0f)
+        val bottomControlsYPx = constraints.maxHeight - bottomInsetPx - with(density) { 30.dp.toPx() }
+
+        // Preview ≡ iOS CameraPreviewRepresentable en captureRect
+        Box(
+            Modifier
+                .offset {
+                    IntOffset(captureRect.left.roundToInt(), captureRect.top.roundToInt())
+                }
+                .size(
+                    width = with(density) { captureRect.width.toDp() },
+                    height = with(density) { captureRect.height.toDp() },
+                )
+                .clip(RoundedCornerShape(corner))
+                .background(Color.Black),
+        ) {
+            CameraPreviewView(
+                cameraPosition = if (frontCamera) {
+                    CameraSelector.LENS_FACING_FRONT
+                } else {
+                    CameraSelector.LENS_FACING_BACK
+                },
+                flashMode = flashMode.toCameraXFlashMode(),
+                isRecording = isRecording,
+                zoomLevel = zoomLevel,
+                capturePhotoToken = photoToken,
+                captureAudio = true,
+                prefersMaximumCaptureQuality = false,
+                onRecordingStateChange = { isRecording = it },
+                onImageCaptured = { uri ->
+                    mediaForEditor = CreatorMedia(
+                        uri = uri,
+                        aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
+                        recommendedAspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
+                    )
+                    isEditorActive = true
+                },
+                onVideoCaptured = { uri ->
+                    mediaForEditor = CreatorMedia(
+                        uri = uri,
+                        isVideo = true,
+                        aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
+                        recommendedAspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
+                    )
+                    isEditorActive = true
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .transformable(zoomState)
+                    .pointerInput(frontCamera) {
+                        detectTapGestures(onDoubleTap = {
+                            frontCamera = !frontCamera
+                            zoomLevel = 1f
+                        })
+                    },
+            )
+
+            // Top chrome within canvas
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ChatCameraRoundButton(
+                    Icons.Filled.Close,
+                    stringResource(R.string.chat_camera_close),
+                    onDismiss,
+                )
+                ChatCameraHeader(otherUserId, otherUsername)
+                ChatCameraRoundButton(
+                    flashMode.icon(),
+                    stringResource(R.string.chat_camera_flash),
+                ) { flashMode = flashMode.next() }
+            }
+
+            if (isRecording) {
+                Text(
+                    stringResource(
+                        R.string.chat_camera_recording_time,
+                        recordingSeconds / 60,
+                        recordingSeconds % 60,
+                    ),
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = with(density) { recordingCenterInsetPx.toDp() }),
+                )
+            }
+        }
+
+        // Text mode button on canvas right edge (≡ textModeButton)
+        Box(
+            Modifier
+                .offset {
+                    IntOffset(
+                        (captureRect.right - textModeFromRightPx - textModeHalfPx).roundToInt(),
+                        (captureRect.center.y - textModeHalfPx).roundToInt(),
+                    )
+                }
+                .size(48.dp),
+        ) {
+            ChatCameraTextModeButton {
+                startsInTextMode = true
+                mediaForEditor = null
+                isEditorActive = true
+            }
+        }
+
+        // Shutter on canvas bottom edge
+        Box(
+            Modifier
+                .offset {
+                    IntOffset(
+                        (captureRect.center.x - with(density) { 44.dp.toPx() }).roundToInt(),
+                        (captureButtonYPx - with(density) { 44.dp.toPx() }).roundToInt(),
+                    )
+                },
+        ) {
+            CaptureButton(
+                isRecording = isRecording,
+                onTap = { photoToken++ },
+                onLongPressStart = { isRecording = true },
+                onLongPressEnd = { isRecording = false },
+            )
+        }
+
+        // Gallery / flip below canvas
+        Row(
+            Modifier
+                .offset {
+                    IntOffset(
+                        ((constraints.maxWidth - bottomControlsWidthPx) / 2f).roundToInt(),
+                        (bottomControlsYPx - with(density) { 24.dp.toPx() }).roundToInt(),
+                    )
+                }
+                .width(with(density) { bottomControlsWidthPx.toDp() }),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ChatCameraRoundButton(
+                Icons.Filled.Image,
+                stringResource(R.string.chat_camera_gallery),
+            ) {
+                gallery.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                )
+            }
+            ChatCameraRoundButton(
+                Icons.Filled.FlipCameraAndroid,
+                stringResource(R.string.chat_camera_switch),
+            ) {
+                frontCamera = !frontCamera
+                zoomLevel = 1f
+            }
+        }
     }
 }
 
 @Composable
-private fun ChatCameraChrome(
-    otherUserId: String, otherUsername: String, flashMode: CameraPickerFlashMode,
-    isRecording: Boolean, recordingSeconds: Int, onDismiss: () -> Unit, onToggleFlash: () -> Unit,
-    onOpenGallery: () -> Unit, onSwitchCamera: () -> Unit, onOpenTextMode: () -> Unit,
-    onCapturePhoto: () -> Unit, onStartRecording: () -> Unit, onStopRecording: () -> Unit, modifier: Modifier,
-) {
-    Column(modifier.padding(16.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            ChatCameraRoundButton(Icons.Filled.Close, stringResource(R.string.chat_camera_close), onDismiss)
-            ChatCameraHeader(otherUserId, otherUsername)
-            ChatCameraRoundButton(flashMode.icon(), stringResource(R.string.chat_camera_flash), onToggleFlash)
-        }
-        Spacer(Modifier.weight(1f))
-        if (isRecording) Text(stringResource(R.string.chat_camera_recording_time, recordingSeconds / 60, recordingSeconds % 60), color = Color.White, modifier = Modifier.align(Alignment.CenterHorizontally))
-        CaptureButton(isRecording, onCapturePhoto, onStartRecording, onStopRecording, Modifier.align(Alignment.CenterHorizontally).padding(bottom = 14.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            ChatCameraRoundButton(Icons.Filled.Image, stringResource(R.string.chat_camera_gallery), onOpenGallery)
-            ChatCameraTextModeButton(onOpenTextMode)
-            ChatCameraRoundButton(Icons.Filled.FlipCameraAndroid, stringResource(R.string.chat_camera_switch), onSwitchCamera)
-        }
-    }
-}
-
-@Composable private fun ChatCameraHeader(userId: String, username: String) =
-    Row(Modifier.clip(RoundedCornerShape(24.dp)).background(Color.Black.copy(.28f)).padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun ChatCameraHeader(userId: String, username: String) =
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color.Black.copy(.28f))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         AsyncProfileImageView(userId, Modifier.size(26.dp))
-        Column { Text(stringResource(R.string.chat_camera_header), color = Color.White.copy(.65f)); Text(username, color = Color.White) }
+        Column {
+            Text(stringResource(R.string.chat_camera_header), color = Color.White.copy(.65f))
+            Text(username, color = Color.White)
+        }
     }
 
-@Composable private fun ChatCameraRoundButton(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit) =
-    Box(Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(.15f)).clickable(onClick = onClick).semantics { contentDescription = description }, contentAlignment = Alignment.Center) { Icon(icon, null, tint = Color.White) }
+@Composable
+private fun ChatCameraRoundButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    onClick: () -> Unit,
+) =
+    Box(
+        Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(Color.White.copy(.15f))
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, null, tint = Color.White)
+    }
 
-@Composable private fun ChatCameraTextModeButton(onClick: () -> Unit) =
-    Box(Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(.15f)).clickable(onClick = onClick), contentAlignment = Alignment.Center) { Text(stringResource(R.string.chat_camera_text_mode), color = Color.White) }
+@Composable
+private fun ChatCameraTextModeButton(onClick: () -> Unit) =
+    Box(
+        Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(Color.White.copy(.15f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(stringResource(R.string.chat_camera_text_mode), color = Color.White)
+    }
 
 @Composable
 private fun ChatCameraEditorHost(
-    media: CreatorMedia?, otherUserId: String, onBack: () -> Unit,
+    media: CreatorMedia?,
+    otherUserId: String,
+    onBack: () -> Unit,
     onSend: (ByteArray, CameraPickerMediaType, ChatMediaSendMode, ChatMediaOverlayPayload?) -> Unit,
-    startsInTextMode: Boolean, onStartsInTextModeChange: (Boolean) -> Unit, onDismiss: () -> Unit, modifier: Modifier,
+    startsInTextMode: Boolean,
+    onStartsInTextModeChange: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier,
 ) {
     var mediaItems by remember(media) { mutableStateOf(listOfNotNull(media)) }
     var flow by remember { mutableStateOf(CreatorFlow.STORY_EDITING) }
@@ -200,12 +386,29 @@ private fun ChatCameraEditorHost(
         startInTextMode = startsInTextMode,
         onStartInTextModeChange = onStartsInTextModeChange,
         onDismiss = onDismiss,
+        chatRecipientUserId = otherUserId,
+        onChatSend = onSend,
         modifier = modifier,
     )
-    @Suppress("UNUSED_VARIABLE") val deferredChatSend = Pair(otherUserId, onSend)
 }
 
-private fun CameraPickerFlashMode.next(): CameraPickerFlashMode = when (this) { CameraPickerFlashMode.OFF -> CameraPickerFlashMode.ON; CameraPickerFlashMode.ON -> CameraPickerFlashMode.AUTO; CameraPickerFlashMode.AUTO -> CameraPickerFlashMode.OFF }
-private fun CameraPickerFlashMode.toCameraXFlashMode(): Int = when (this) { CameraPickerFlashMode.OFF -> ImageCapture.FLASH_MODE_OFF; CameraPickerFlashMode.ON -> ImageCapture.FLASH_MODE_ON; CameraPickerFlashMode.AUTO -> ImageCapture.FLASH_MODE_AUTO }
-private fun CameraPickerFlashMode.icon() = when (this) { CameraPickerFlashMode.OFF -> Icons.Filled.FlashOff; CameraPickerFlashMode.ON -> Icons.Filled.FlashOn; CameraPickerFlashMode.AUTO -> Icons.Filled.FlashAuto }
-private fun isVideoUri(context: android.content.Context, uri: Uri) = context.contentResolver.getType(uri)?.startsWith("video/") == true
+private fun CameraPickerFlashMode.next(): CameraPickerFlashMode = when (this) {
+    CameraPickerFlashMode.OFF -> CameraPickerFlashMode.ON
+    CameraPickerFlashMode.ON -> CameraPickerFlashMode.AUTO
+    CameraPickerFlashMode.AUTO -> CameraPickerFlashMode.OFF
+}
+
+private fun CameraPickerFlashMode.toCameraXFlashMode(): Int = when (this) {
+    CameraPickerFlashMode.OFF -> ImageCapture.FLASH_MODE_OFF
+    CameraPickerFlashMode.ON -> ImageCapture.FLASH_MODE_ON
+    CameraPickerFlashMode.AUTO -> ImageCapture.FLASH_MODE_AUTO
+}
+
+private fun CameraPickerFlashMode.icon() = when (this) {
+    CameraPickerFlashMode.OFF -> Icons.Filled.FlashOff
+    CameraPickerFlashMode.ON -> Icons.Filled.FlashOn
+    CameraPickerFlashMode.AUTO -> Icons.Filled.FlashAuto
+}
+
+private fun isVideoUri(context: android.content.Context, uri: Uri) =
+    context.contentResolver.getType(uri)?.startsWith("video/") == true

@@ -3,7 +3,7 @@ package com.moments.android.notifications.services
 import android.content.Context
 import com.moments.android.MomentsApplication
 import com.moments.android.R
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
 
@@ -88,10 +88,15 @@ object NotificationCopyResolver {
 
     private fun sanitizedPreviewLine(preview: String?, messageType: String?): String? {
         if (preview.isNullOrBlank()) return null
-        messageType?.let {
-            if (MessageType.from(it).isViewOnce) return null
+        // ≡ MessageType(rawValue:)?.isViewOnce — only when raw matches a known type
+        messageType?.let { raw ->
+            val type = MessageType.entries.firstOrNull { it.raw == raw }
+            if (type?.isViewOnce == true) return null
         }
         if (neutralPreviewPrefixes.any { preview.startsWith(it) }) return null
+        // ≡ preview == MessageType.text.conversationPreview
+        val textPreview = MomentsApplication.instance?.getString(R.string.chat_preview_text) ?: "New message"
+        if (preview == textPreview) return null
         if (looksLikeEncryptedPayload(preview)) return null
         return preview
     }

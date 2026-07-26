@@ -16,7 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moments.android.R
-import com.moments.android.models.PendingChatContext
+import com.moments.android.views.messaging.core.PendingChatContext
 import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.messaging.components.ChatHistoryLoadingIndicator
 import com.moments.android.views.messaging.components.ChatListRow
@@ -30,6 +30,7 @@ import com.moments.android.views.messaging.components.ChatRequestDisclaimerRow
 import com.moments.android.views.messaging.core.EnhancedChatViewModel
 import com.moments.android.views.messaging.core.ChatRenderRow
 import com.moments.android.views.messaging.core.MessageItem
+import com.moments.android.views.messaging.core.PendingChatTimelineMessage
 
 /** Port de `GlassmorphicChatView+MessageList.swift`.
  * El routing fino de scroll/búsqueda se recibe por callbacks y se completa en sus extensiones
@@ -73,7 +74,7 @@ fun chatListRows(
     baseRows: List<ChatRenderRow>,
     pendingChatContext: PendingChatContext?,
     conversationIntroContext: PendingChatContext?,
-    pendingTimelineMessage: com.moments.android.models.PendingChatTimelineMessage?,
+    pendingTimelineMessage: PendingChatTimelineMessage?,
     canLoadMore: Boolean,
     hasCompletedInitialScroll: Boolean,
     hasTypingUsers: Boolean,

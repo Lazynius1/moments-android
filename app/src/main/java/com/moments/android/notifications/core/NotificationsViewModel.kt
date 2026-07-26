@@ -99,6 +99,10 @@ class NotificationsViewModel(
 
     fun markAsRead(notification: MomentsNotification) = NotificationService.markAsRead(notification)
     fun markAllAsRead() = NotificationService.markAllAsRead()
+    fun dismissError() {
+        _showError.value = false
+        _errorMessage.value = ""
+    }
     fun deleteNotification(notification: MomentsNotification) = NotificationService.deleteNotification(notification)
     fun deleteNotificationGroup(group: NotificationGroup) = NotificationService.stageDeletion(group.notifications)
     fun undoPendingDeletion() = NotificationService.undoPendingDeletion()
@@ -159,8 +163,11 @@ class NotificationsViewModel(
     }
 
     fun getProfileImagePath(userId: String): String? = userProfileImageCache[userId]
+
     fun updateProfileImageCache(userId: String, imagePath: String?) {
+        // ≡ Swift Dictionary: nil elimina la clave
         if (imagePath != null) userProfileImageCache[userId] = imagePath
+        else userProfileImageCache.remove(userId)
     }
 
     private fun updatePendingCounts() {

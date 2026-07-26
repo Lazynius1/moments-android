@@ -2,6 +2,7 @@ package com.moments.android.views.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,14 +20,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 
 /** Port de `UserRowSkeletonView.swift`. */
 @Composable
 fun UserRowSkeletonView(avatarSize: Dp = 40.dp, modifier: Modifier = Modifier) {
     val surface = if (isSystemInDarkTheme()) Color.White.copy(.08f) else Color.Black.copy(.06f)
-    Row(modifier.fillMaxWidth().padding(vertical = 8.dp).shimmer(true), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier.fillMaxWidth().padding(vertical = 8.dp).shimmer(true).semantics { hideFromAccessibility() },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
         Box(Modifier.size(avatarSize).background(surface, CircleShape))
-        Spacer(Modifier.width(14.dp))
         Box(Modifier.width(120.dp).height(14.dp).background(surface, RoundedCornerShape(4.dp)))
         Spacer(Modifier.weight(1f))
         Box(Modifier.size(24.dp).background(surface, CircleShape))

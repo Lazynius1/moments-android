@@ -4,8 +4,9 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.IntSize
 import com.moments.android.models.MomentHiddenLayer
+import com.moments.android.views.creator.HiddenLayerDraft
 
-/** Port de `HiddenLayerLayout.swift`. */
+/** Port 1:1 de `HiddenLayerLayout.swift`. */
 object HiddenLayerLayout {
     const val imageAspectRatio = 1.26f
     const val textAspectRatio = 0.18f / 0.34f
@@ -17,31 +18,37 @@ object HiddenLayerLayout {
         imageHeight: Float,
         preferredAspectRatio: Float? = null,
     ): Float {
-        val source = preferredAspectRatio?.takeIf { it.isFinite() && it > 0f }
+        val sourceRatio = preferredAspectRatio?.takeIf { it.isFinite() && it > 0f }
             ?: (imageWidth / maxOf(imageHeight, 1f))
-        if (!source.isFinite() || source <= 0f) return 1f
-        return source.coerceIn(minimumPostAspectRatio, maximumPostAspectRatio)
+        if (!sourceRatio.isFinite() || sourceRatio <= 0f) return 1f
+        return sourceRatio.coerceIn(minimumPostAspectRatio, maximumPostAspectRatio)
     }
 
-    fun fixedAspectRect(aspectRatio: Float, container: Size): Rect {
-        if (aspectRatio <= 0f || container.width <= 0f || container.height <= 0f) {
-            return Rect(0f, 0f, container.width, container.height)
+    /** Equiv. iOS `displayedPostAspectRatio(for imageSize: CGSize, …)`. */
+    fun displayedPostAspectRatio(
+        imageSize: Size,
+        preferredAspectRatio: Float? = null,
+    ): Float = displayedPostAspectRatio(imageSize.width, imageSize.height, preferredAspectRatio)
+
+    fun fixedAspectRect(aspectRatio: Float, containerSize: Size): Rect {
+        if (aspectRatio <= 0f || containerSize.width <= 0f || containerSize.height <= 0f) {
+            return Rect(0f, 0f, containerSize.width, containerSize.height)
         }
-        val containerAspect = container.width / container.height
+        val containerAspectRatio = containerSize.width / containerSize.height
         val width: Float
         val height: Float
-        if (aspectRatio > containerAspect) {
-            width = container.width
+        if (aspectRatio > containerAspectRatio) {
+            width = containerSize.width
             height = width / aspectRatio
         } else {
-            height = container.height
+            height = containerSize.height
             width = height * aspectRatio
         }
         return Rect(
-            left = (container.width - width) / 2f,
-            top = (container.height - height) / 2f,
-            right = (container.width - width) / 2f + width,
-            bottom = (container.height - height) / 2f + height,
+            left = (containerSize.width - width) / 2f,
+            top = (containerSize.height - height) / 2f,
+            right = (containerSize.width - width) / 2f + width,
+            bottom = (containerSize.height - height) / 2f + height,
         )
     }
 
@@ -62,6 +69,25 @@ object HiddenLayerLayout {
         )
     }
 
+    /** Port de `frame(for draft: HiddenLayerDraft, in imageRect:)`. */
+    fun frame(draft: HiddenLayerDraft, imageRect: Rect): Rect {
+        val width = maxOf(44f, imageRect.width * draft.width.toFloat())
+        val height = if (draft.type == MomentHiddenLayer.LayerType.IMAGE) {
+            maxOf(44f, width * imageAspectRatio)
+        } else {
+            maxOf(44f, imageRect.height * draft.height.toFloat())
+        }
+        val centerX = imageRect.left + imageRect.width * draft.anchorX.toFloat()
+        val centerY = imageRect.top + imageRect.height * draft.anchorY.toFloat()
+        return Rect(
+            left = centerX - width / 2f,
+            top = centerY - height / 2f,
+            right = centerX + width / 2f,
+            bottom = centerY + height / 2f,
+        )
+    }
+
+    /** Helper Android: frame con tamaño de contenedor (equiv. imageRect origen cero). */
     fun frame(layer: MomentHiddenLayer, containerSize: IntSize): Rect =
         frame(layer, Rect(0f, 0f, containerSize.width.toFloat(), containerSize.height.toFloat()))
 }

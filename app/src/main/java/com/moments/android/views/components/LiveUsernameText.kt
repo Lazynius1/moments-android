@@ -8,11 +8,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import com.moments.android.services.cache.UserCacheService
 
-/** Port genérico de `LiveUsernameContent`: resuelve el nombre fresco sin ocultar el fallback. */
+/**
+ * Port de `LiveUsernameContent`.
+ * iOS hardcodea el fallback final como `"Usuario"` (sin Localizable en este archivo).
+ */
 @Composable
 fun LiveUsernameContent(
     userId: String,
@@ -20,30 +25,63 @@ fun LiveUsernameContent(
     content: @Composable (String) -> Unit,
 ) {
     var liveUsername by remember(userId) { mutableStateOf("") }
-    val resolved = liveUsername.trim().ifEmpty { fallbackUsername.trim().ifEmpty { "Usuario" } }
-    LaunchedEffect(userId, fallbackUsername) {
-        val requestedId = userId.trim()
-        if (requestedId.isEmpty()) {
+
+    fun resolvedUsername(): String {
+        val live = liveUsername.trim()
+        val fallback = fallbackUsername.trim()
+        if (live.isNotEmpty()) return live
+        return if (fallback.isEmpty()) "Usuario" else fallback
+    }
+
+    fun refreshUsername() {
+        val trimmedUserId = userId.trim()
+        if (trimmedUserId.isEmpty()) {
             liveUsername = ""
-        } else {
-            UserCacheService.refreshUser(requestedId) { user ->
-                if (userId.trim() == requestedId) liveUsername = user?.username?.trim().orEmpty()
+            return
+        }
+        UserCacheService.refreshUser(trimmedUserId) { user ->
+            val fetched = user?.username?.trim().orEmpty()
+            if (userId.trim() == trimmedUserId) {
+                liveUsername = fetched
             }
         }
     }
-    content(resolved)
+
+    // iOS: onAppear + onChange(userId)
+    LaunchedEffect(userId) {
+        refreshUsername()
+    }
+
+    // iOS: onChange(fallbackUsername) solo si live está vacío
+    LaunchedEffect(fallbackUsername) {
+        if (liveUsername.trim().isEmpty()) {
+            refreshUsername()
+        }
+    }
+
+    content(resolvedUsername())
 }
 
-/** Port de `LiveUsernameText.swift`. */
+/** Port de `LiveUsernameText`. [color]/[style],[modifier] = Environment/modifiers Compose. */
 @Composable
 fun LiveUsernameText(
     userId: String,
     fallbackUsername: String,
     prefix: String = "",
+    modifier: Modifier = Modifier,
     color: Color = LocalContentColor.current,
     style: TextStyle = TextStyle.Default,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
 ) {
-    LiveUsernameContent(userId, fallbackUsername) { username ->
-        Text(prefix + username, color = color, style = style)
+    LiveUsernameContent(userId = userId, fallbackUsername = fallbackUsername) { username ->
+        Text(
+            text = prefix + username,
+            modifier = modifier,
+            color = color,
+            style = style,
+            maxLines = maxLines,
+            overflow = overflow,
+        )
     }
 }

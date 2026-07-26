@@ -17,6 +17,7 @@ import com.moments.android.models.toMap
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.services.privacy.ContentVisibilityService
+import com.moments.android.services.privacy.ContentVisibilityType
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -233,6 +234,7 @@ suspend fun FirestoreService.toggleSaveMoment(userId: String, momentId: String) 
     }.await()
 }
 
+/** Paridad `createMoment` iOS: `addDocument` (ID auto) y **sin** `mapVisibility`. */
 suspend fun FirestoreService.createMoment(
     userId: String,
     content: String,
@@ -248,11 +250,40 @@ suspend fun FirestoreService.createMoment(
     allowSharing: Boolean = true,
     scheduledDate: Date? = null,
 ) {
-    createMomentDocument(
-        userId, content, mediaItems, taggedUsers, mentionedUsers, location,
-        locationCoordinate, audience, null, null, aspectRatio,
-        disableComments, hideLikeCounts, allowSharing, scheduledDate, null,
+    val user = fetchUser(userId)
+    val imagePath = mediaItems.firstOrNull { it.type == MediaItem.MediaType.IMAGE }?.url
+    val videoItem = mediaItems.firstOrNull { it.type == MediaItem.MediaType.VIDEO }
+    val moment = Moment(
+        authorId = userId,
+        username = user.username,
+        content = content,
+        imagePath = imagePath,
+        videoUrl = videoItem?.url,
+        timestamp = Date(),
+        profileImagePath = user.profileImagePath,
+        taggedUsers = taggedUsers,
+        mentionedUsers = mentionedUsers,
+        location = location,
+        locationCoordinate = locationCoordinate,
+        audience = audience,
+        mediaItems = mediaItems,
+        aspectRatio = aspectRatio ?: "1:1",
+        customListId = null,
+        thumbnailUrl = videoItem?.thumbnailUrl,
+        videoDuration = videoItem?.videoDuration,
+        videoFileSize = videoItem?.videoFileSize,
+        videoResolution = videoItem?.videoResolution,
+        disableComments = disableComments,
+        hideLikeCounts = hideLikeCounts,
+        allowSharing = allowSharing,
+        scheduledDate = scheduledDate,
     )
+    val momentData = moment.toMap().toMutableMap()
+    momentData["mediaItems"] = serializedMediaItems(mediaItems)
+    momentData["hasHiddenLayers"] = false
+    momentData["hiddenLayerCount"] = 0
+    db.collection("users").document(userId).collection("moments").add(momentData).await()
+    updateLastMomentCreatedAt(userId)
 }
 
 suspend fun FirestoreService.createMomentWithVisibility(
@@ -279,8 +310,9 @@ suspend fun FirestoreService.createMomentWithVisibility(
     }
     return createMomentDocument(
         userId, content, mediaItems, taggedUsers, mentionedUsers, location,
-        locationCoordinate, audience.raw, selectedListId, customViewers, aspectRatio,
+        locationCoordinate, audience.raw, selectedListId, aspectRatio,
         disableComments, hideLikeCounts, allowSharing, scheduledDate, resolvedMomentId,
+        includeMapVisibility = true,
     )
 }
 
@@ -301,10 +333,12 @@ suspend fun FirestoreService.createMomentWithCustomList(
     momentId: String? = null,
 ): String = createMomentDocument(
     userId, content, mediaItems, taggedUsers, mentionedUsers, location,
-    locationCoordinate, ContentAudience.CUSTOM_LIST.raw, customListId, null, aspectRatio,
+    locationCoordinate, ContentAudience.CUSTOM_LIST.raw, customListId, aspectRatio,
     disableComments, hideLikeCounts, allowSharing, scheduledDate, momentId,
+    includeMapVisibility = true,
 )
 
+/** createMomentWithVisibility / CustomList iOS: `setData` con ID + `mapVisibility`. */
 private suspend fun FirestoreService.createMomentDocument(
     userId: String,
     content: String,
@@ -315,13 +349,13 @@ private suspend fun FirestoreService.createMomentDocument(
     locationCoordinate: Moment.LocationCoordinate?,
     audience: String?,
     customListId: String?,
-    customViewers: List<String>?,
     aspectRatio: String?,
     disableComments: Boolean,
     hideLikeCounts: Boolean,
     allowSharing: Boolean,
     scheduledDate: Date?,
     momentId: String?,
+    includeMapVisibility: Boolean,
 ): String {
     val user = fetchUser(userId)
     val imagePath = mediaItems.firstOrNull { it.type == MediaItem.MediaType.IMAGE }?.url
@@ -355,10 +389,12 @@ private suspend fun FirestoreService.createMomentDocument(
     momentData["mediaItems"] = serializedMediaItems(mediaItems)
     momentData["hasHiddenLayers"] = false
     momentData["hiddenLayerCount"] = 0
-    momentData["mapVisibility"] = MapVisibilityPolicy.resolvedVisibility(
-        hasLocation = location != null || locationCoordinate != null,
-        audience = audience,
-    )
+    if (includeMapVisibility) {
+        momentData["mapVisibility"] = MapVisibilityPolicy.resolvedVisibility(
+            hasLocation = location != null || locationCoordinate != null,
+            audience = audience,
+        )
+    }
     val resolvedMomentId = momentId ?: UUID.randomUUID().toString()
     db.collection("users").document(userId).collection("moments")
         .document(resolvedMomentId).set(momentData).await()
@@ -398,7 +434,7 @@ suspend fun FirestoreService.fetchMomentsWithVisibility(userId: String, viewerId
 suspend fun FirestoreService.fetchInitialMoments(userId: String): MomentsPage {
     val following = fetchFollowing(userId)
     if (following.isEmpty()) return MomentsPage(emptyList(), null)
-    val allMoments = coroutineScope {
+    val snaps = coroutineScope {
         following.map { user ->
             async {
                 db.collection("users").document(user.id).collection("moments")
@@ -407,7 +443,11 @@ suspend fun FirestoreService.fetchInitialMoments(userId: String): MomentsPage {
                     .get().await()
             }
         }.awaitAll()
-    }.flatMap { snap ->
+    }
+    // iOS: lastDocument = último snapshot en carrera de DispatchGroup (mismo race).
+    var lastDocument: DocumentSnapshot? = null
+    val allMoments = snaps.flatMap { snap ->
+        snap.documents.lastOrNull()?.let { lastDocument = it }
         snap.documents.mapNotNull { doc ->
             @Suppress("UNCHECKED_CAST")
             runCatching { Moment.from(doc.id, doc.data as Map<String, Any?>) }.getOrNull()
@@ -418,7 +458,7 @@ suspend fun FirestoreService.fetchInitialMoments(userId: String): MomentsPage {
         if (moment.isArchived == true) return@filter false
         moment.scheduledDate?.let { !it.after(now) } ?: true
     }
-    return MomentsPage(filtered.take(10), null)
+    return MomentsPage(filtered.take(10), lastDocument)
 }
 
 suspend fun FirestoreService.fetchMoreMoments(
@@ -427,7 +467,7 @@ suspend fun FirestoreService.fetchMoreMoments(
 ): MomentsPage {
     val following = fetchFollowing(userId)
     if (following.isEmpty()) return MomentsPage(emptyList(), null)
-    val allMoments = coroutineScope {
+    val snaps = coroutineScope {
         following.map { user ->
             async {
                 db.collection("users").document(user.id).collection("moments")
@@ -437,7 +477,10 @@ suspend fun FirestoreService.fetchMoreMoments(
                     .get().await()
             }
         }.awaitAll()
-    }.flatMap { snap ->
+    }
+    var lastDocument: DocumentSnapshot? = null
+    val allMoments = snaps.flatMap { snap ->
+        snap.documents.lastOrNull()?.let { lastDocument = it }
         snap.documents.mapNotNull { doc ->
             @Suppress("UNCHECKED_CAST")
             runCatching { Moment.from(doc.id, doc.data as Map<String, Any?>) }.getOrNull()
@@ -448,9 +491,13 @@ suspend fun FirestoreService.fetchMoreMoments(
         if (moment.isArchived == true) return@filter false
         moment.scheduledDate?.let { !it.after(now) } ?: true
     }
-    return MomentsPage(filtered.take(10), null)
+    return MomentsPage(filtered.take(10), lastDocument)
 }
 
+/**
+ * Paridad iOS `Moment.visibilityType` + `customViewers`/`hiddenFrom` (siempre nil hoy).
+ * `customList` / `onlyMe` caen en EVERYONE como el switch Swift.
+ */
 private suspend fun FirestoreService.filterMomentsForVisibility(
     moments: List<Moment>,
     viewerId: String,
@@ -458,15 +505,17 @@ private suspend fun FirestoreService.filterMomentsForVisibility(
     val visibleIds = moments.map { moment ->
         async {
             val type = when (moment.audience) {
-                ContentAudience.MUTUALS.raw -> com.moments.android.services.privacy.ContentVisibilityType.MUTUALS
-                ContentAudience.BEST_FRIENDS.raw -> com.moments.android.services.privacy.ContentVisibilityType.BEST_FRIENDS
-                ContentAudience.CUSTOM.raw, ContentAudience.CUSTOM_LIST.raw ->
-                    com.moments.android.services.privacy.ContentVisibilityType.CUSTOM
-                ContentAudience.ONLY_ME.raw -> com.moments.android.services.privacy.ContentVisibilityType.ONLY_ME
-                else -> com.moments.android.services.privacy.ContentVisibilityType.EVERYONE
+                ContentAudience.MUTUALS.raw -> ContentVisibilityType.MUTUALS
+                ContentAudience.BEST_FRIENDS.raw -> ContentVisibilityType.BEST_FRIENDS
+                ContentAudience.CUSTOM.raw -> ContentVisibilityType.CUSTOM
+                else -> ContentVisibilityType.EVERYONE
             }
             val canSee = ContentVisibilityService.canUserSeeContent(
-                moment.authorId, viewerId, type, moment.customListId?.let { listOf(it) },
+                contentOwnerId = moment.authorId,
+                viewerId = viewerId,
+                contentType = type,
+                customViewers = null,
+                hiddenFrom = null,
             )
             if (canSee) moment.id else null
         }

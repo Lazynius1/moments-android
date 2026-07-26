@@ -10,21 +10,27 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.moments.android.views.components.emojiSliderMomentsGradientColors
 import kotlin.math.max
 import kotlin.math.sin
 
@@ -97,7 +103,10 @@ fun StickerPillFlowLayout(
     }
 }
 
-/** Port animado de `StickerEmojiSliderPillGlyph` de SwiftUI. */
+/**
+ * Port de `StickerEmojiSliderPillGlyph`.
+ * El emoji no debe ir en un `requiredSize` pequeño: en Android se recorta y desaparece.
+ */
 @Composable
 fun StickerEmojiSliderPillGlyph(modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "emojiSliderPill")
@@ -107,7 +116,9 @@ fun StickerEmojiSliderPillGlyph(modifier: Modifier = Modifier) {
         animationSpec = infiniteRepeatable(tween(3_490, easing = LinearEasing)),
         label = "emojiSliderPillPhase",
     )
-    val progress = 0.10f + (((sin(phase.toDouble() * 1.8).toFloat() + 1f) / 2f) * 0.80f)
+    // ≡ TimelineView: sin(t * 1.8); phase 0→2π en ~3.49s ⇒ phase ≈ t*1.8
+    val progress = 0.10f + (((sin(phase.toDouble()).toFloat() + 1f) / 2f) * 0.80f)
+    val density = LocalDensity.current
 
     BoxWithConstraints(modifier) {
         val trackHeight = 5.dp
@@ -118,38 +129,49 @@ fun StickerEmojiSliderPillGlyph(modifier: Modifier = Modifier) {
         val trackY = (maxHeight - trackHeight) / 2
         val emojiX = trackX + trackWidth * progress - emojiSize / 2
         val emojiY = (maxHeight - emojiSize) / 2
+        val emojiFontSp = with(density) { (15.dp + 5.dp * progress).toSp() }
 
         Canvas(Modifier.fillMaxSize()) {
             val trackTop = trackY.toPx()
             val trackLeft = trackX.toPx()
-            val height = trackHeight.toPx()
+            val heightPx = trackHeight.toPx()
             drawRoundRect(
                 color = Color.Black.copy(alpha = 0.10f),
-                topLeft = androidx.compose.ui.geometry.Offset(trackLeft, trackTop),
-                size = androidx.compose.ui.geometry.Size(trackWidth.toPx(), height),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(height / 2, height / 2),
+                topLeft = Offset(trackLeft, trackTop),
+                size = Size(trackWidth.toPx(), heightPx),
+                cornerRadius = CornerRadius(heightPx / 2, heightPx / 2),
             )
             drawRoundRect(
-                brush = Brush.horizontalGradient(
-                    listOf(Color(0xFFFFA62B), Color(0xFFFF5C93), Color(0xFF8D62FF)),
+                brush = Brush.horizontalGradient(emojiSliderMomentsGradientColors()),
+                topLeft = Offset(trackLeft, trackTop),
+                size = Size(
+                    (trackWidth.toPx() * progress).coerceAtLeast(heightPx),
+                    heightPx,
                 ),
-                topLeft = androidx.compose.ui.geometry.Offset(trackLeft, trackTop),
-                size = androidx.compose.ui.geometry.Size(
-                    (trackWidth.toPx() * progress).coerceAtLeast(height),
-                    height,
-                ),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(height / 2, height / 2),
+                cornerRadius = CornerRadius(heightPx / 2, heightPx / 2),
             )
         }
-        Text(
-            text = "😍",
-            fontSize = (15f + progress * 5f).sp,
-            fontWeight = FontWeight.Normal,
+
+        // Caja del thumb + Text sin clip (iOS frame + Text overflow visual del glyph)
+        Box(
             modifier = Modifier
-                .align(Alignment.TopStart)
-                .requiredSize(emojiSize)
-                .shadow(3.dp, spotColor = Color.Black.copy(alpha = 0.14f))
-                .offset(x = emojiX, y = emojiY),
-        )
+                .offset(x = emojiX, y = emojiY)
+                .size(emojiSize)
+                .shadow(
+                    elevation = 3.dp,
+                    ambientColor = Color.Black.copy(alpha = 0.14f),
+                    spotColor = Color.Black.copy(alpha = 0.14f),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "😍",
+                fontSize = emojiFontSp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.wrapContentSize(unbounded = true),
+            )
+        }
     }
 }
