@@ -1,6 +1,10 @@
 package com.moments.android.models
 
+import android.content.Context
 import com.google.firebase.Timestamp
+import com.moments.android.R
+import com.moments.android.services.privacy.ContentVisibilityType
+import java.util.Arrays
 import java.util.Calendar
 import java.util.Date
 import java.util.UUID
@@ -26,6 +30,16 @@ data class FilterSettings(val name: String, val intensity: Double)
 // MARK: - Seguimiento y solicitudes
 enum class FollowRequestStatus(val raw: String) {
     PENDING("pending"), ACCEPTED("accepted"), REJECTED("rejected"), CANCELLED("cancelled");
+
+    /** ≡ iOS `displayName` (textos fijos del Swift). */
+    val displayName: String
+        get() = when (this) {
+            PENDING -> "Pendiente"
+            ACCEPTED -> "Aceptada"
+            REJECTED -> "Rechazada"
+            CANCELLED -> "Cancelada"
+        }
+
     companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: PENDING }
 }
 
@@ -176,7 +190,15 @@ data class MediaItem(
                         if (r.isFinite() && r > 0) return r
                     }
                 }
-                // NOTA: el fallback canónico CreatorMedia.AspectRatio se añadirá con el módulo Creator.
+                // ≡ CreatorMedia.AspectRatio(from:).value (CreatorView.swift)
+                val canonical = when (normalized) {
+                    "1:1" -> 1f
+                    "4:5" -> 0.8f
+                    "16:9" -> 16f / 9f
+                    "9:16" -> 9f / 16f
+                    else -> 1f // default .square
+                }
+                if (canonical.isFinite() && canonical > 0) return canonical
             }
             videoResolution?.let { res ->
                 val idx = res.indexOf('x')
@@ -323,6 +345,42 @@ data class Moment(
             if (!shouldUseLegacyMediaFallback) return null
             return videoUrl?.trim()?.takeIf { it.isNotEmpty() }
         }
+
+    /** ≡ iOS `scheduledTimeFormatted()` (formato corto `Xh Ym` / `Ym`). */
+    fun scheduledTimeFormatted(context: Context): String {
+        val scheduled = scheduledDate ?: return ""
+        val diffSec = ((scheduled.time - System.currentTimeMillis()) / 1000L).toInt()
+        if (diffSec <= 0) return context.getString(R.string.moment_publishing)
+        val hours = diffSec / 3600
+        val minutes = (diffSec % 3600) / 60
+        return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+    }
+
+    /** ≡ iOS `Moment.scheduledRemainingText` (MARK Moment Helpers). */
+    fun scheduledRemainingText(context: Context): String {
+        val scheduled = scheduledDate ?: return ""
+        val now = Date()
+        if (!scheduled.after(now)) return ""
+        val millis = scheduled.time - now.time
+        val days = (millis / 86_400_000L).toInt()
+        val hours = ((millis % 86_400_000L) / 3_600_000L).toInt()
+        val minutes = ((millis % 3_600_000L) / 60_000L).toInt()
+        return when {
+            days > 0 -> context.getString(
+                if (days == 1) R.string.moment_scheduled_day else R.string.moment_scheduled_days,
+                days,
+            )
+            hours > 0 -> context.getString(
+                if (hours == 1) R.string.moment_scheduled_hour else R.string.moment_scheduled_hours,
+                hours,
+            )
+            minutes > 0 -> context.getString(
+                if (minutes == 1) R.string.moment_scheduled_minute else R.string.moment_scheduled_minutes,
+                minutes,
+            )
+            else -> context.getString(R.string.moment_scheduled_soon)
+        }
+    }
 
     companion object {
         fun from(id: String?, data: Map<String, Any?>): Moment = Moment(
@@ -586,7 +644,6 @@ data class HiddenLayerMetricsSnapshot(
 }
 
 // MARK: - StickerData (sticker interactivo de una historia/momento)
-// Nota: from(StickerItem)/extractContent (render a base64) son lógica del editor → módulo Creator.
 data class StickerData(
     val stickerId: String? = null,
     val type: String,
@@ -637,17 +694,33 @@ data class StickerData(
     val videoURL: String? = null,
 ) {
     companion object {
+        /** ≡ iOS `init(from:)` / mapa Firestore (incl. compat GIF antiguo). */
         fun from(data: Map<String, Any?>): StickerData {
-            // position: mapa {x,y} nuevo, o positionX/positionY antiguo (compat, como iOS).
             val position = Point.from(data["position"]) ?: Point(
                 (data["positionX"] as? Number)?.toDouble() ?: 0.0,
                 (data["positionY"] as? Number)?.toDouble() ?: 0.0,
             )
             fun strList(key: String) = (data[key] as? List<*>)?.filterIsInstance<String>()
+            val type = data["type"] as? String ?: ""
+            val content = data["content"] as? String ?: ""
+            val decodedIsAnimated = data["isAnimated"] as? Boolean ?: false
+            val decodedGifURL = data["gifURL"] as? String
+            val (isAnimated, gifURL, videoURL) = if (!decodedIsAnimated && decodedGifURL == null) {
+                val isGifFromContent = content.startsWith("http") &&
+                    (content.contains(".gif") || content.contains("giphy"))
+                val isGifFromType = type == "sticker" && content.startsWith("http")
+                Triple(
+                    isGifFromContent || isGifFromType,
+                    if (isGifFromContent) content else null,
+                    null as String?,
+                )
+            } else {
+                Triple(decodedIsAnimated, decodedGifURL, data["videoURL"] as? String)
+            }
             return StickerData(
                 stickerId = data["stickerId"] as? String,
-                type = data["type"] as? String ?: "",
-                content = data["content"] as? String ?: "",
+                type = type,
+                content = content,
                 position = position,
                 scale = (data["scale"] as? Number)?.toDouble() ?: 1.0,
                 rotation = (data["rotation"] as? Number)?.toDouble() ?: 0.0,
@@ -689,9 +762,125 @@ data class StickerData(
                 moderationCategory = data["moderationCategory"] as? String,
                 audioURL = data["audioURL"] as? String,
                 audioDuration = (data["audioDuration"] as? Number)?.toDouble(),
-                isAnimated = data["isAnimated"] as? Boolean ?: false,
-                gifURL = data["gifURL"] as? String,
-                videoURL = data["videoURL"] as? String,
+                isAnimated = isAnimated,
+                gifURL = gifURL,
+                videoURL = videoURL,
+            )
+        }
+
+        /** ≡ iOS `StickerData.from(_ stickerItem:)`. */
+        fun from(stickerItem: StickerItem): StickerData {
+            val interaction = stickerItem.interactionData
+            return StickerData(
+                stickerId = stickerItem.id,
+                type = stickerItem.type.raw,
+                content = extractContent(stickerItem),
+                position = stickerItem.position,
+                scale = stickerItem.scale,
+                rotation = stickerItem.rotationRadians,
+                zIndex = stickerItem.zIndex,
+                username = interaction?.username,
+                userId = interaction?.userId,
+                hashtag = interaction?.hashtag,
+                location = interaction?.location,
+                latitude = interaction?.locationCoordinate?.latitude,
+                longitude = interaction?.locationCoordinate?.longitude,
+                styleVariant = interaction?.styleVariant,
+                questionText = interaction?.questionText,
+                pollOptions = interaction?.pollData,
+                weatherSymbol = interaction?.weatherSymbol,
+                linkURL = interaction?.linkURL,
+                linkTitle = interaction?.linkTitle,
+                countdownTitle = interaction?.countdownTitle,
+                countdownTargetAtMs = interaction?.countdownTargetAtMs,
+                sliderEmoji = interaction?.sliderEmoji,
+                sliderPrompt = interaction?.sliderPrompt,
+                caption = interaction?.caption,
+                profileImagePath = interaction?.profileImagePath,
+                momentId = interaction?.momentId,
+                mediaCount = interaction?.mediaCount,
+                quizQuestion = interaction?.quizQuestion,
+                quizOptions = interaction?.quizOptions,
+                quizCorrectIndex = interaction?.quizCorrectIndex,
+                revealType = interaction?.revealType,
+                revealPattern = interaction?.revealPattern,
+                revealPrimaryColor = interaction?.revealPrimaryColor,
+                revealSecondaryColor = interaction?.revealSecondaryColor,
+                revealEffectColor = interaction?.revealEffectColor,
+                frameStyle = interaction?.frameStyle,
+                contentScale = interaction?.contentScale,
+                contentOffsetX = interaction?.contentOffsetX,
+                contentOffsetY = interaction?.contentOffsetY,
+                moderationState = null,
+                moderationReason = null,
+                moderationCategory = null,
+                audioURL = interaction?.audioURL,
+                audioDuration = interaction?.audioDuration,
+                isAnimated = stickerItem.isAnimated,
+                gifURL = stickerItem.gifURL,
+                videoURL = stickerItem.videoURL,
+            )
+        }
+
+        /** ≡ iOS `extractContent(from:)` (Bitmap → Base64 / metadatos). */
+        private fun extractContent(sticker: StickerItem): String {
+            if (sticker.type == StickerType.SELFIE) {
+                bitmapToBase64(sticker.image, android.graphics.Bitmap.CompressFormat.PNG, 100)?.let { return it }
+            }
+            if (sticker.type == StickerType.FRAME) {
+                val resized = resizeMaxDimension(sticker.image, 900)
+                bitmapToBase64(resized, android.graphics.Bitmap.CompressFormat.JPEG, 42)?.let { return it }
+            }
+            val jpegTypes = setOf(
+                StickerType.GENERIC, StickerType.STICKER, StickerType.EMOJI, StickerType.TIME,
+                StickerType.SELFIE, StickerType.QUESTION_RESPONSE, StickerType.SHARE_MOMENT,
+                StickerType.LINK, StickerType.COUNTDOWN, StickerType.EMOJI_SLIDER,
+                StickerType.FRAME, StickerType.QUIZ,
+            )
+            if (sticker.type in jpegTypes) {
+                bitmapToBase64(sticker.image, android.graphics.Bitmap.CompressFormat.JPEG, 60)?.let { return it }
+            }
+            sticker.interactionData?.let { data ->
+                when (sticker.type) {
+                    StickerType.MENTION -> return "@${data.username.orEmpty()}"
+                    StickerType.HASHTAG -> return "#${data.hashtag.orEmpty()}"
+                    StickerType.LOCATION -> return data.location.orEmpty()
+                    StickerType.QUESTION -> return data.questionText.orEmpty()
+                    StickerType.POLL -> return data.pollData?.joinToString("|").orEmpty()
+                    StickerType.WEATHER -> return data.weatherSymbol ?: "🌤️"
+                    StickerType.LINK -> return data.linkURL.orEmpty()
+                    StickerType.COUNTDOWN -> return data.countdownTitle.orEmpty()
+                    StickerType.EMOJI_SLIDER -> return data.sliderPrompt.orEmpty()
+                    else -> Unit
+                }
+            }
+            if (sticker.isAnimated) {
+                sticker.gifURL?.let { return it }
+            }
+            return "sticker_${sticker.type.raw}"
+        }
+
+        private fun bitmapToBase64(
+            bitmap: android.graphics.Bitmap,
+            format: android.graphics.Bitmap.CompressFormat,
+            quality: Int,
+        ): String? = runCatching {
+            val stream = java.io.ByteArrayOutputStream()
+            if (!bitmap.compress(format, quality, stream)) return null
+            android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.NO_WRAP)
+        }.getOrNull()
+
+        private fun resizeMaxDimension(bitmap: android.graphics.Bitmap, maxDim: Int): android.graphics.Bitmap {
+            val w = bitmap.width
+            val h = bitmap.height
+            val longest = maxOf(w, h)
+            if (longest <= maxDim) return bitmap
+            val scale = maxDim.toFloat() / longest
+            return android.graphics.Bitmap.createScaledBitmap(
+                bitmap,
+                (w * scale).toInt().coerceAtLeast(1),
+                (h * scale).toInt().coerceAtLeast(1),
+                true,
             )
         }
     }
@@ -800,6 +989,90 @@ data class Story(
     val chainPosition: Int? = null,
     val chainTitle: String? = null,
 ) {
+    /**
+     * `convertStickersToStickerItems` (UIImage/UIKit) → módulo Creator / viewer.
+     * Aquí solo persisten [StickerData]; no se inventa render Android en el modelo.
+     */
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is Story) return false
+        return id == other.id &&
+            authorId == other.authorId &&
+            duration == other.duration &&
+            expirationHours == other.expirationHours &&
+            expirationDate == other.expirationDate &&
+            mediaItem == other.mediaItem &&
+            profileImagePath == other.profileImagePath &&
+            timestamp == other.timestamp &&
+            username == other.username &&
+            audience == other.audience &&
+            customListId == other.customListId &&
+            text == other.text &&
+            textPosition == other.textPosition &&
+            textStyle == other.textStyle &&
+            textPositionNormX == other.textPositionNormX &&
+            textPositionNormY == other.textPositionNormY &&
+            textColorHex == other.textColorHex &&
+            textFontSize == other.textFontSize &&
+            textAlignment == other.textAlignment &&
+            textBackgroundFill == other.textBackgroundFill &&
+            textStroke == other.textStroke &&
+            textVisualEffect == other.textVisualEffect &&
+            textMotion == other.textMotion &&
+            forcesAllCaps == other.forcesAllCaps &&
+            textLayerOrder == other.textLayerOrder &&
+            textOverlayLive == other.textOverlayLive &&
+            textOverlays == other.textOverlays &&
+            stickers == other.stickers &&
+            Arrays.equals(drawingData, other.drawingData) &&
+            aspectRatio == other.aspectRatio &&
+            backgroundFrameURL == other.backgroundFrameURL &&
+            backgroundBlurredFrameURL == other.backgroundBlurredFrameURL &&
+            chainId == other.chainId &&
+            chainPosition == other.chainPosition &&
+            chainTitle == other.chainTitle
+    }
+
+    override fun hashCode(): Int {
+        var result = id?.hashCode() ?: 0
+        result = 31 * result + authorId.hashCode()
+        result = 31 * result + duration.hashCode()
+        result = 31 * result + (expirationHours ?: 0)
+        result = 31 * result + expirationDate.hashCode()
+        result = 31 * result + mediaItem.hashCode()
+        result = 31 * result + (profileImagePath?.hashCode() ?: 0)
+        result = 31 * result + timestamp.hashCode()
+        result = 31 * result + username.hashCode()
+        result = 31 * result + (audience?.hashCode() ?: 0)
+        result = 31 * result + (customListId?.hashCode() ?: 0)
+        result = 31 * result + (text?.hashCode() ?: 0)
+        result = 31 * result + (textPosition?.hashCode() ?: 0)
+        result = 31 * result + (textStyle?.hashCode() ?: 0)
+        result = 31 * result + (textPositionNormX?.hashCode() ?: 0)
+        result = 31 * result + (textPositionNormY?.hashCode() ?: 0)
+        result = 31 * result + (textColorHex?.hashCode() ?: 0)
+        result = 31 * result + (textFontSize?.hashCode() ?: 0)
+        result = 31 * result + (textAlignment?.hashCode() ?: 0)
+        result = 31 * result + (textBackgroundFill?.hashCode() ?: 0)
+        result = 31 * result + (textStroke?.hashCode() ?: 0)
+        result = 31 * result + (textVisualEffect?.hashCode() ?: 0)
+        result = 31 * result + (textMotion?.hashCode() ?: 0)
+        result = 31 * result + (forcesAllCaps?.hashCode() ?: 0)
+        result = 31 * result + (textLayerOrder ?: 0)
+        result = 31 * result + (textOverlayLive?.hashCode() ?: 0)
+        result = 31 * result + (textOverlays?.hashCode() ?: 0)
+        result = 31 * result + (stickers?.hashCode() ?: 0)
+        result = 31 * result + (drawingData?.let { Arrays.hashCode(it) } ?: 0)
+        result = 31 * result + (aspectRatio?.hashCode() ?: 0)
+        result = 31 * result + (backgroundFrameURL?.hashCode() ?: 0)
+        result = 31 * result + (backgroundBlurredFrameURL?.hashCode() ?: 0)
+        result = 31 * result + (chainId?.hashCode() ?: 0)
+        result = 31 * result + (chainPosition ?: 0)
+        result = 31 * result + (chainTitle?.hashCode() ?: 0)
+        return result
+    }
+
     companion object {
         /** Devuelve null si no hay media válido (imagen/vídeo), como el throw de iOS. */
         fun from(id: String?, data: Map<String, Any?>): Story? {
@@ -856,19 +1129,36 @@ data class Story(
     }
 }
 
-// MARK: - Visibilidad de contenido (ContentProtocol)
-enum class ContentVisibilityType { EVERYONE, MUTUALS, BEST_FRIENDS, CUSTOM }
+// MARK: - Visibilidad de contenido (ContentProtocol en Models.swift)
+// Enum canónico + interface viven en services/privacy (ContentVisibilityservice.kt).
+// Aquí solo las extensiones Moment/Story ≡ iOS (customViewers/hiddenFrom stub nil).
 
-private fun visibilityFrom(audience: String?): ContentVisibilityType = when (audience) {
-    "everyone" -> ContentVisibilityType.EVERYONE
-    "mutuals" -> ContentVisibilityType.MUTUALS
-    "bestFriends" -> ContentVisibilityType.BEST_FRIENDS
-    "custom" -> ContentVisibilityType.CUSTOM
-    else -> ContentVisibilityType.EVERYONE
-}
+val Moment.visibilityType: ContentVisibilityType
+    get() = when (audience) {
+        "everyone" -> ContentVisibilityType.EVERYONE
+        "mutuals" -> ContentVisibilityType.MUTUALS
+        "bestFriends" -> ContentVisibilityType.BEST_FRIENDS
+        "custom" -> ContentVisibilityType.CUSTOM
+        else -> ContentVisibilityType.EVERYONE
+    }
 
-val Moment.visibilityType: ContentVisibilityType get() = visibilityFrom(audience)
-val Story.visibilityType: ContentVisibilityType get() = visibilityFrom(audience)
+/** ≡ iOS stub (siempre nil hasta cablear lista custom). */
+val Moment.customViewers: List<String>? get() = null
+
+/** ≡ iOS stub. */
+val Moment.hiddenFrom: List<String>? get() = null
+
+val Story.visibilityType: ContentVisibilityType
+    get() = when (audience) {
+        "everyone" -> ContentVisibilityType.EVERYONE
+        "mutuals" -> ContentVisibilityType.MUTUALS
+        "bestFriends" -> ContentVisibilityType.BEST_FRIENDS
+        "custom" -> ContentVisibilityType.CUSTOM
+        else -> ContentVisibilityType.EVERYONE
+    }
+
+val Story.customViewers: List<String>? get() = null
+val Story.hiddenFrom: List<String>? get() = null
 
 // MARK: - NotificationType
 enum class NotificationType(val raw: String) {
@@ -932,9 +1222,13 @@ data class MomentsNotification(
     val isReactionPlural: Boolean? = null,
 ) {
     companion object {
-        /** null si el tipo es desconocido (como el throw del decoder de iOS). */
+        /**
+         * null solo si falta `type` (iOS throw en decode).
+         * Tipo desconocido → [NotificationType.NEW_FOLLOWER] (≡ `?? .newFollower`).
+         */
         fun from(id: String?, data: Map<String, Any?>): MomentsNotification? {
-            val type = NotificationType.from(data["type"] as? String) ?: return null
+            val typeRaw = data["type"] as? String ?: return null
+            val type = NotificationType.from(typeRaw) ?: NotificationType.NEW_FOLLOWER
             val isPending = data["isPending"] as? Boolean
                 ?: (data["isRead"] as? Boolean)?.let { !it }
                 ?: true
@@ -1009,6 +1303,9 @@ data class QuestionData(
     val createdAt: Date = Date(),
 ) {
     companion object {
+        /** ≡ iOS `init(questionText:)` — responses vacías, count 0, createdAt ahora. */
+        fun create(questionText: String) = QuestionData(questionText)
+
         fun from(data: Map<String, Any?>): QuestionData = QuestionData(
             questionText = data["questionText"] as? String ?: "",
             responses = (data["responses"] as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(QuestionResponse::from) } ?: emptyList(),

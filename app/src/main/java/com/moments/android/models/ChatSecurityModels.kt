@@ -4,13 +4,21 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import java.util.Date
 
-// MARK: - Identidad de chat (clave pública E2E)
+/**
+ * Port de `Models/ChatSecurityModels.swift`.
+ * Identidad E2E en `users/{uid}.chatKey` + bundle en `users/{uid}/chatRecovery`
+ * (no hay colección `chatIdentities`).
+ */
+
+// MARK: - ChatIdentityRecord
+
 data class ChatIdentityRecord(
     val keyId: String,
     val publicKeyBase64: String,
     val algorithm: String = "curve25519",
     val updatedAt: Date? = null,
 ) {
+    /** ≡ iOS `asFirestoreData()`. */
     fun asFirestoreData(): Map<String, Any> = mapOf(
         "keyId" to keyId,
         "publicKeyBase64" to publicKeyBase64,
@@ -19,6 +27,7 @@ data class ChatIdentityRecord(
     )
 
     companion object {
+        /** ≡ iOS `init?(map:)`. */
         fun from(map: Map<String, Any?>): ChatIdentityRecord? {
             val keyId = map["keyId"] as? String ?: return null
             val publicKeyBase64 = map["publicKeyBase64"] as? String ?: return null
@@ -32,7 +41,8 @@ data class ChatIdentityRecord(
     }
 }
 
-// MARK: - Parámetros KDF de recuperación
+// MARK: - ChatRecoveryKDFParams
+
 data class ChatRecoveryKDFParams(
     val iterations: Int = 200_000,
     val keyLength: Int = 32,
@@ -46,6 +56,7 @@ data class ChatRecoveryKDFParams(
 
     companion object {
         fun from(map: Map<String, Any?>): ChatRecoveryKDFParams? {
+            // Firestore suele devolver Long; Number cubre Int/Long como iOS.
             val iterations = (map["iterations"] as? Number)?.toInt() ?: return null
             val keyLength = (map["keyLength"] as? Number)?.toInt() ?: return null
             val hash = map["hash"] as? String ?: return null
@@ -54,7 +65,8 @@ data class ChatRecoveryKDFParams(
     }
 }
 
-// MARK: - Bundle de recuperación de clave privada cifrada
+// MARK: - ChatRecoveryBundle
+
 data class ChatRecoveryBundle(
     val keyId: String? = null,
     val encryptedPrivateKey: String,
@@ -89,7 +101,8 @@ data class ChatRecoveryBundle(
             val nonce = map["nonce"] as? String ?: return null
             val salt = map["salt"] as? String ?: return null
             val kdf = map["kdf"] as? String ?: return null
-            val kdfParams = (map["kdfParams"] as? Map<String, Any?>)?.let(ChatRecoveryKDFParams::from) ?: return null
+            val kdfParamsMap = map["kdfParams"] as? Map<String, Any?> ?: return null
+            val kdfParams = ChatRecoveryKDFParams.from(kdfParamsMap) ?: return null
             val keyVersion = (map["keyVersion"] as? Number)?.toInt() ?: return null
             return ChatRecoveryBundle(
                 keyId = map["keyId"] as? String,
@@ -107,24 +120,32 @@ data class ChatRecoveryBundle(
     }
 }
 
-// MARK: - Estado de intentos de recuperación (bloqueo)
+// MARK: - ChatRecoveryAttemptState
+
 data class ChatRecoveryAttemptState(
     val failedAttempts: Int = 0,
     val maxAttempts: Int = 5,
     val lockedUntil: Date? = null,
 ) {
-    val isLocked: Boolean get() = lockedUntil?.let { it.time - System.currentTimeMillis() > 0 } ?: false
+    /** ≡ iOS `isLocked` (`timeIntervalSinceNow > 0`). */
+    val isLocked: Boolean
+        get() = lockedUntil?.let { it.time > System.currentTimeMillis() } ?: false
 
-    /** Segundos restantes de bloqueo. */
+    /** ≡ iOS `remainingLockout` (segundos). */
     val remainingLockout: Double
-        get() = lockedUntil?.let { maxOf(0.0, (it.time - System.currentTimeMillis()) / 1000.0) } ?: 0.0
+        get() = lockedUntil?.let {
+            maxOf(0.0, (it.time - System.currentTimeMillis()) / 1000.0)
+        } ?: 0.0
 
-    val remainingLockoutInterval: Double? get() = if (isLocked) remainingLockout else null
+    val remainingLockoutInterval: Double?
+        get() = if (isLocked) remainingLockout else null
 
-    val remainingAttempts: Int get() = maxOf(0, maxAttempts - failedAttempts)
+    val remainingAttempts: Int
+        get() = maxOf(0, maxAttempts - failedAttempts)
 }
 
-// MARK: - Clave de conversación envuelta
+// MARK: - WrappedConversationKey
+
 data class WrappedConversationKey(
     val wrappedKey: String,
     val senderPublicKey: String,
@@ -157,7 +178,8 @@ data class WrappedConversationKey(
     }
 }
 
-// MARK: - Estado de acceso al chat cifrado
+// MARK: - ChatAccessState
+
 sealed interface ChatAccessState {
     data object Available : ChatAccessState
     data object NeedsPinSetup : ChatAccessState
@@ -165,6 +187,7 @@ sealed interface ChatAccessState {
     data class Unavailable(val reason: String) : ChatAccessState
 }
 
+/** ≡ iOS Timestamp/Date en `init?(map:)`. */
 private fun anyToDate(value: Any?): Date? = when (value) {
     is Timestamp -> value.toDate()
     is Date -> value

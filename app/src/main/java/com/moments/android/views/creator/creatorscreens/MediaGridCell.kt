@@ -1,10 +1,12 @@
 package com.moments.android.views.creator.creatorscreens
+
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -16,8 +18,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -28,6 +35,7 @@ import coil.compose.AsyncImage
 
 /**
  * Port de `MediaGridCell.swift`.
+ * Thumbnail Fit + badge selección/vídeo; placeholder con tint `#00A896`.
  */
 @Composable
 fun MediaGridCell(
@@ -39,59 +47,79 @@ fun MediaGridCell(
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BoxWithConstraints(
+    var isLoading by remember(uri) { mutableStateOf(true) }
+
+    Box(
         modifier
             .fillMaxSize()
+            .background(Color.Gray.copy(alpha = 0.3f))
             .clickable(onClick = onTap),
     ) {
         AsyncImage(
             model = uri,
             contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().background(Color.Gray.copy(0.3f)),
+            contentScale = ContentScale.Fit, // ≡ iOS .fit
+            modifier = Modifier.fillMaxSize(),
+            onLoading = { isLoading = true },
+            onSuccess = { isLoading = false },
+            onError = { isLoading = false },
         )
+
+        if (isLoading) {
+            CircularProgressIndicator(
+                color = Color(0xFF00A896),
+                strokeWidth = 2.dp,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(24.dp),
+            )
+        }
+
+        // ≡ overlay gradient top→bottom
         Box(
             Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(0.1f)),
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.1f)),
                     ),
                 ),
         )
+
         if (isSelected) {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFFF2D55).copy(0.3f))
+                    .background(Color(0xFFFF2D55).copy(alpha = 0.3f))
                     .border(3.dp, Color(0xFFFF2D55)),
             )
         }
+
         if (isVideo) {
-            Box(
+            Row(
                 Modifier
                     .align(Alignment.BottomEnd)
                     .padding(6.dp)
-                    .background(Color.Black.copy(0.5f), RoundedCornerShape(50))
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
                     .padding(horizontal = 6.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Filled.Videocam,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(10.dp),
-                    )
-                    Text(
-                        formatMediaDuration(durationSeconds ?: 0.0),
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 4.dp),
-                    )
-                }
+                Icon(
+                    Icons.Filled.Videocam,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(10.dp),
+                )
+                Text(
+                    formatMediaDuration(durationSeconds ?: 0.0),
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                )
             }
         }
+
         Box(
             Modifier
                 .align(Alignment.TopEnd)
@@ -101,6 +129,7 @@ fun MediaGridCell(
                 Box(
                     Modifier
                         .size(22.dp)
+                        .shadow(2.dp, CircleShape)
                         .background(
                             Brush.linearGradient(listOf(Color(0xFF9C27B0), Color(0xFFE91E63))),
                             CircleShape,
@@ -125,12 +154,13 @@ fun MediaGridCell(
     }
 }
 
+/** ≡ celda sin thumbnail (ProgressView iOS). */
 @Composable
 fun MediaGridCellPlaceholder(modifier: Modifier = Modifier) {
     Box(
         modifier
             .fillMaxSize()
-            .background(Color.Gray.copy(0.3f)),
+            .background(Color.Gray.copy(alpha = 0.3f)),
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(

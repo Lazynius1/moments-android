@@ -1,4 +1,5 @@
 package com.moments.android.views.creator.components
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -7,7 +8,6 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,7 +20,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import kotlinx.coroutines.delay
 
@@ -34,6 +39,7 @@ fun CaptureButton(
     onLongPressStart: () -> Unit,
     onLongPressEnd: () -> Unit,
     modifier: Modifier = Modifier,
+    lensIconURL: String? = null,
 ) {
     var isPressed by remember { mutableStateOf(false) }
     var longPressArmed by remember { mutableStateOf(false) }
@@ -60,12 +66,13 @@ fun CaptureButton(
         modifier
             .scale(scale)
             .size(88.dp)
-            .momentsChromeGlass(CircleShape, interactive = true)
-            .border(1.5.dp, Color.White.copy(0.22f), CircleShape)
-            .background(
-                if (isRecording) Color.Red.copy(0.55f) else Color.Transparent,
-                CircleShape,
+            .momentsChromeGlass(
+                shape = CircleShape,
+                interactive = true,
+                tintOpacity = if (isRecording) 0.55f else MomentsChromeGlass.defaultTintOpacity,
+                tint = if (isRecording) Color.Red else null,
             )
+            .border(1.5.dp, Color.White.copy(0.22f), CircleShape)
             .pointerInput(isRecording) {
                 detectDragGestures(
                     onDragStart = { isPressed = true },
@@ -87,11 +94,26 @@ fun CaptureButton(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            Modifier
-                .size(if (isRecording) 36.dp else 68.dp)
-                .clip(if (isRecording) RoundedCornerShape(8.dp) else CircleShape)
-                .background(Color.White),
-        )
+        if (!lensIconURL.isNullOrBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(lensIconURL)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(68.dp)
+                    .clip(CircleShape)
+                    .background(Color.White, CircleShape),
+            )
+        } else {
+            Box(
+                Modifier
+                    .size(68.dp)
+                    .clip(CircleShape)
+                    .background(Color.White),
+            )
+        }
     }
 }

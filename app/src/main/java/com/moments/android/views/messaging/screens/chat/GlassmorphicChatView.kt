@@ -28,10 +28,10 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
-import com.moments.android.models.Conversation
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageType
-import com.moments.android.models.PendingChatContext
+import com.moments.android.views.messaging.core.Conversation
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageType
+import com.moments.android.views.messaging.core.PendingChatContext
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.components.ChatAttachmentMediaAsset
 import com.moments.android.views.messaging.components.ChatAttachmentMediaSheetOverlay

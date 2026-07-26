@@ -1,11 +1,18 @@
 package com.moments.android.notifications.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Photo
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -13,134 +20,203 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
+import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.notifications.core.NotificationRowMetrics
 
+/**
+ * Port de NotificationRowComponents.swift —
+ * [NotificationLeadingAvatarView] + [NotificationStoryThumbnailView].
+ *
+ * [NotificationMomentThumbnail] es helper Android usado por Previews/Trailing
+ * (en iOS el thumb de momento va inline en EnhancedNotificationRow+Trailing).
+ */
+
+/** ≡ NotificationLeadingAvatarView — uno grande o dos solapados (atrás izq, delante der). */
 @Composable
 fun NotificationLeadingAvatarView(
     senderIds: List<String>,
-    profilePaths: Map<String, String?>,
     isDark: Boolean,
     onPrimaryTap: () -> Unit,
     onSecondaryTap: (() -> Unit)? = null,
+    @Suppress("UNUSED_PARAMETER")
+    profilePaths: Map<String, String?> = emptyMap(),
 ) {
-    if (senderIds.isEmpty()) {
+    val ringStroke = if (isDark) Color.Black else Color.White
+    val frontId = senderIds.firstOrNull() ?: return
+    val backId = senderIds.getOrNull(1)
+
+    if (backId != null) {
+        val size = NotificationRowMetrics.STACKED_AVATAR_SIZE_DP.dp
+        val overlap = NotificationRowMetrics.stackedOverlapDp.dp
+        Box(
+            modifier = Modifier.size(
+                NotificationRowMetrics.stackedRowWidthDp.dp,
+                NotificationRowMetrics.STACKED_AVATAR_SIZE_DP.dp,
+            ),
+        ) {
+            // Atrás (izquierda) — tap secundario
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .size(size)
+                    .zIndex(0f)
+                    .clip(CircleShape)
+                    .clickable { onSecondaryTap?.invoke() },
+            ) {
+                AsyncProfileImageView(userId = backId, modifier = Modifier.matchParentSize())
+            }
+            // Delante (derecha) — overlap ≡ HStack(spacing: -stackedOverlap)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = size - overlap)
+                    .size(size)
+                    .zIndex(1f)
+                    .clip(CircleShape)
+                    .border(2.dp, ringStroke, CircleShape)
+                    .clickable(onClick = onPrimaryTap),
+            ) {
+                AsyncProfileImageView(userId = frontId, modifier = Modifier.matchParentSize())
+            }
+        }
+    } else {
         Box(
             modifier = Modifier
                 .size(NotificationRowMetrics.AVATAR_SIZE_DP.dp)
                 .clip(CircleShape)
-                .background(Color.Gray.copy(alpha = 0.2f)),
-        )
-        return
-    }
-    if (senderIds.size == 1) {
-        NotificationAvatar(
-            userId = senderIds.first(),
-            imagePath = profilePaths[senderIds.first()],
-            sizeDp = NotificationRowMetrics.AVATAR_SIZE_DP,
-            isDark = isDark,
-            onClick = onPrimaryTap,
-        )
-        return
-    }
-    Box(modifier = Modifier.size(NotificationRowMetrics.stackedRowWidthDp.dp, NotificationRowMetrics.STACKED_AVATAR_SIZE_DP.dp)) {
-        NotificationAvatar(
-            userId = senderIds.getOrNull(1) ?: senderIds.first(),
-            imagePath = profilePaths[senderIds.getOrNull(1)],
-            sizeDp = NotificationRowMetrics.STACKED_AVATAR_SIZE_DP,
-            isDark = isDark,
-            onClick = { onSecondaryTap?.invoke() },
-            modifier = Modifier.align(Alignment.CenterStart),
-        )
-        NotificationAvatar(
-            userId = senderIds.first(),
-            imagePath = profilePaths[senderIds.first()],
-            sizeDp = NotificationRowMetrics.STACKED_AVATAR_SIZE_DP,
-            isDark = isDark,
-            onClick = onPrimaryTap,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .offset(x = (-NotificationRowMetrics.stackedOverlapDp).dp),
-        )
+                .border(2.dp, ringStroke, CircleShape)
+                .clickable(onClick = onPrimaryTap),
+        ) {
+            AsyncProfileImageView(userId = frontId, modifier = Modifier.matchParentSize())
+        }
     }
 }
 
+/** ≡ NotificationStoryThumbnailView */
 @Composable
-fun NotificationAvatar(
-    userId: String,
+fun NotificationStoryThumbnailView(
     imagePath: String?,
-    sizeDp: Float,
+    reaction: String?,
     isDark: Boolean,
-    onClick: () -> Unit,
+    loadFailed: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier
-            .size(sizeDp.dp)
-            .clip(CircleShape)
-            .background(if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f))
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (!imagePath.isNullOrBlank()) {
-            AsyncImage(
-                model = imagePath,
-                contentDescription = null,
-                modifier = Modifier.matchParentSize(),
-                contentScale = ContentScale.Crop,
-            )
-        } else {
+    val corner = RoundedCornerShape(NotificationRowMetrics.STORY_THUMB_CORNER_RADIUS_DP.dp)
+    val stroke = if (isDark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.1f)
+    Box(modifier = modifier, contentAlignment = Alignment.BottomEnd) {
+        Box(
+            modifier = Modifier
+                .size(
+                    NotificationRowMetrics.STORY_THUMB_WIDTH_DP.dp,
+                    NotificationRowMetrics.STORY_THUMB_HEIGHT_DP.dp,
+                )
+                .clip(corner)
+                .border(0.5.dp, stroke, corner),
+            contentAlignment = Alignment.Center,
+        ) {
+            val showImage = !imagePath.isNullOrBlank() && !loadFailed
+            if (showImage) {
+                AsyncImage(
+                    model = imagePath,
+                    contentDescription = null,
+                    modifier = Modifier.matchParentSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                StoryThumbPlaceholder(isDark = isDark, corner = corner)
+            }
+        }
+        if (!reaction.isNullOrBlank()) {
             Text(
-                text = userId.take(1).uppercase(),
-                fontSize = (sizeDp * 0.35f).sp,
-                fontWeight = FontWeight.SemiBold,
-                color = if (isDark) Color.White else Color.Black,
+                text = reaction,
+                fontSize = 15.sp,
+                modifier = Modifier
+                    .offset(x = 3.dp, y = 3.dp)
+                    .background(
+                        if (isDark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.08f),
+                        RoundedCornerShape(5.dp),
+                    )
+                    .padding(3.dp),
             )
         }
     }
 }
 
+@Composable
+private fun BoxScope.StoryThumbPlaceholder(isDark: Boolean, corner: RoundedCornerShape) {
+    Box(
+        modifier = Modifier
+            .matchParentSize()
+            .background(
+                if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.06f),
+                corner,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Photo,
+            contentDescription = null,
+            modifier = Modifier.size(14.dp),
+            tint = if (isDark) Color.White.copy(alpha = 0.55f) else Color.Black.copy(alpha = 0.45f),
+        )
+    }
+}
+
+/** Alias usado por Previews — ≡ NotificationStoryThumbnailView sin reacción. */
 @Composable
 fun NotificationStoryThumbnail(
     imageUrl: String?,
-    isLoading: Boolean,
+    @Suppress("UNUSED_PARAMETER") isLoading: Boolean,
     isDark: Boolean,
+    reaction: String? = null,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier
-            .size(
-                NotificationRowMetrics.STORY_THUMB_WIDTH_DP.dp,
-                NotificationRowMetrics.STORY_THUMB_HEIGHT_DP.dp,
-            )
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(NotificationRowMetrics.STORY_THUMB_CORNER_RADIUS_DP.dp))
-            .background(Color.Gray.copy(alpha = if (isDark) 0.25f else 0.15f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (!imageUrl.isNullOrBlank()) {
-            AsyncImage(model = imageUrl, contentDescription = null, modifier = Modifier.matchParentSize(), contentScale = ContentScale.Crop)
-        }
-    }
+    NotificationStoryThumbnailView(
+        imagePath = imageUrl,
+        reaction = reaction,
+        isDark = isDark,
+        loadFailed = false,
+        modifier = modifier,
+    )
 }
 
+/**
+ * Thumb cuadrado 44×44 para momentos (inline en iOS Trailing; helper aquí para Previews).
+ */
 @Composable
 fun NotificationMomentThumbnail(
     imageUrl: String?,
     isDark: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val corner = RoundedCornerShape(8.dp)
+    val stroke = if (isDark) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.1f)
     Box(
         modifier = modifier
             .size(44.dp)
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-            .background(Color.Gray.copy(alpha = if (isDark) 0.25f else 0.15f)),
+            .clip(corner)
+            .border(1.dp, stroke, corner)
+            .background(if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.06f)),
         contentAlignment = Alignment.Center,
     ) {
         if (!imageUrl.isNullOrBlank()) {
-            AsyncImage(model = imageUrl, contentDescription = null, modifier = Modifier.matchParentSize(), contentScale = ContentScale.Crop)
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = null,
+                modifier = Modifier.matchParentSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Outlined.Photo,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.5f),
+            )
         }
     }
 }

@@ -1,37 +1,41 @@
 package com.moments.android.services.network
 
 import android.graphics.BitmapFactory
-import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.models.BlockActionPayload
+import com.moments.android.views.messaging.core.ChatMediaPurpose
 import com.moments.android.models.CommentMentionEntity
 import com.moments.android.models.CommentPayload
 import com.moments.android.models.DeleteCommentPayload
 import com.moments.android.models.DeleteMomentPayload
-import com.moments.android.models.EnhancedMessage
+import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.models.FollowActionPayload
 import com.moments.android.models.FollowRequestActionPayload
 import com.moments.android.models.MarkAsReadPayload
 import com.moments.android.models.MediaMessagePayload
 import com.moments.android.models.MessagePayload
-import com.moments.android.models.MessageStatus
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.MessageStatus
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.models.ProfileUpdatePayload
 import com.moments.android.models.ReactionPayload
 import com.moments.android.models.ReportActionPayload
 import com.moments.android.models.SavePayload
 import com.moments.android.models.cache.CachedAction
-import com.moments.android.views.creator.BackgroundMomentUploadService
-import com.moments.android.views.creator.BackgroundStoryUploadService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.addComment
 import com.moments.android.services.firestore.deleteComment
 import com.moments.android.services.firestore.toggleSaveMoment
+import com.moments.android.services.firestore.updateProfilePicture
 import com.moments.android.services.messaging.ChatCacheStore
-import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.storage.StorageService
+import com.moments.android.views.creator.BackgroundMomentUploadService
+import com.moments.android.views.creator.BackgroundStoryUploadService
+import com.moments.android.views.messaging.services.ChatService
+import java.util.Date
+import kotlin.math.min
+import kotlin.math.pow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -40,23 +44,19 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
-import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
-import java.util.Date
-import java.util.concurrent.TimeUnit
-import kotlin.math.min
-import kotlin.math.pow
-import com.moments.android.services.firestore.updateProfilePicture
 
-/** Port de OfflineSyncService.swift. */
+/**
+ * Port de `OfflineSyncService.swift`.
+ * Cola offline + backoff exponencial (30s…1h, max 8 intentos) + optimización de toggles.
+ */
 object OfflineSyncService {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val syncMutex = Mutex()
 
     private var isAutomaticSyncEnabled = false
+    private var connectivityListenerStarted = false
 
     private const val MAX_ATTEMPTS_PER_ACTION = 8
     private const val BASE_RETRY_DELAY_SEC = 30L
@@ -65,10 +65,25 @@ object OfflineSyncService {
     private val firestoreService = FirestoreService()
     private val db = FirebaseFirestore.getInstance()
 
+    init {
+        // iOS: `setupConnectivityListener()` en `init` (solo actúa si automatic sync está on).
+        setupConnectivityListener()
+    }
+
     fun enableAutomaticSync() {
         if (isAutomaticSyncEnabled) return
         isAutomaticSyncEnabled = true
 
+        // Disparar sincronización inicial cuando la UI ya tuvo tiempo de arrancar.
+        scope.launch {
+            delay(2_000)
+            syncPendingActions()
+        }
+    }
+
+    private fun setupConnectivityListener() {
+        if (connectivityListenerStarted) return
+        connectivityListenerStarted = true
         NetworkMonitor.isConnectedFlow
             .onEach { connected ->
                 if (isAutomaticSyncEnabled && connected) {
@@ -76,11 +91,6 @@ object OfflineSyncService {
                 }
             }
             .launchIn(scope)
-
-        scope.launch {
-            delay(2000)
-            syncPendingActions()
-        }
     }
 
     suspend fun retryFromUserAction() {
@@ -201,14 +211,16 @@ object OfflineSyncService {
             CachedAction.ActionType.MEDIA_MESSAGE.raw -> {
                 decodeMediaMessagePayload(action.payloadData)?.let { payload ->
                     val type = MessageType.from(payload.typeRaw)
-                    val filePath = ChatCacheStore.decryptedMediaURL(
-                        payload.conversationId, payload.messageId,
-                        com.moments.android.models.ChatMediaPurpose.PRIMARY, payload.fileExtension,
+                    // iOS: bytes desde ChatCacheStore.decryptedMediaURL → Data(contentsOf:)
+                    val mediaFile = ChatCacheStore.decryptedMediaFile(
+                        payload.conversationId,
+                        payload.messageId,
+                        ChatMediaPurpose.PRIMARY,
+                        payload.fileExtension,
                     )
-                    val mediaData = runCatching {
-                        File(android.net.Uri.parse(filePath).path ?: "").readBytes()
-                    }.getOrNull()
+                    val mediaData = runCatching { mediaFile.readBytes() }.getOrNull()
                     if (mediaData == null) {
+                        // Sin bytes no hay reenvío posible: marcar fallido y retirar.
                         markQueuedMessageFailed(payload.conversationId, payload.messageId)
                         LocalPersistenceService.deleteAction(action.id)
                     } else {
@@ -334,22 +346,22 @@ object OfflineSyncService {
             CachedAction.ActionType.REPORT_CONTENT.raw -> {
                 decodeReportPayload(action.payloadData)?.let { payload ->
                     runCatching {
-                        db.collection("reports").add(
-                            mapOf(
-                                "reporterId" to payload.reporterId,
-                                "reportedUserId" to payload.reportedUserId,
-                                "reportedContentType" to payload.reportedContentType,
-                                "reportedContentId" to payload.reportedContentId,
-                                "category" to payload.category,
-                                "description" to payload.description,
-                                "status" to "pending",
-                                "priority" to payload.priority,
-                                "timestamp" to FieldValue.serverTimestamp(),
-                                "resolvedAt" to null,
-                                "moderatorId" to null,
-                                "moderatorNotes" to "",
-                            ),
-                        ).awaitTask()
+                        // iOS escribe NSNull() en resolvedAt/moderatorId.
+                        val reportData = hashMapOf<String, Any?>(
+                            "reporterId" to payload.reporterId,
+                            "reportedUserId" to payload.reportedUserId,
+                            "reportedContentType" to payload.reportedContentType,
+                            "reportedContentId" to payload.reportedContentId,
+                            "category" to payload.category,
+                            "description" to payload.description,
+                            "status" to "pending",
+                            "priority" to payload.priority,
+                            "timestamp" to FieldValue.serverTimestamp(),
+                            "resolvedAt" to null,
+                            "moderatorId" to null,
+                            "moderatorNotes" to "",
+                        )
+                        db.collection("reports").add(reportData).awaitTask()
                     }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
                 } ?: LocalPersistenceService.deleteAction(action.id)
             }
@@ -366,21 +378,25 @@ object OfflineSyncService {
 
             CachedAction.ActionType.DELETE_MOMENT.raw -> {
                 decodeDeleteMomentPayload(action.payloadData)?.let { payload ->
-                    runCatching {
+                    // 1. Eliminar documento de Firestore
+                    val deleted = runCatching {
                         db.collection("users").document(payload.userId)
                             .collection("moments").document(payload.momentId)
                             .delete().awaitTask()
-                        payload.imagePath?.takeIf { it.isNotEmpty() }?.let { path ->
-                            runCatching { StorageService.deleteMedia(path) }
-                        }
-                        payload.videoUrl?.takeIf { it.isNotEmpty() }?.let { path ->
-                            runCatching { StorageService.deleteMedia(path) }
-                        }
-                    }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
+                    }.isSuccess
+                    // 2. Storage fire & forget (no bloquea la cola si falla) — igual que iOS.
+                    payload.imagePath?.takeIf { it.isNotEmpty() }?.let { path ->
+                        runCatching { StorageService.deleteMedia(path) }
+                    }
+                    payload.videoUrl?.takeIf { it.isNotEmpty() }?.let { path ->
+                        runCatching { StorageService.deleteMedia(path) }
+                    }
+                    if (deleted) LocalPersistenceService.deleteAction(action.id)
                 } ?: LocalPersistenceService.deleteAction(action.id)
             }
         }
-        if (LocalPersistenceService.loadPendingActions().any { it.id == action.id }) {
+        // Si no se borró, vuelve a pendiente (iOS: updateActionStatus .pending al final).
+        if (LocalPersistenceService.hasPendingAction(action.id)) {
             LocalPersistenceService.updateActionStatus(action.id, CachedAction.ActionStatus.PENDING)
         }
     }

@@ -1,19 +1,29 @@
 package com.moments.android.services.messaging
 
 import com.google.firebase.auth.FirebaseAuth
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageSyncCursor
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageSyncCursor
 import com.moments.android.services.persistence.LocalPersistenceService
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-
 import com.moments.android.views.messaging.services.ChatService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
-/** Port de MessageIngestService.swift. */
+/** Port de `MessageIngestSource` en MessageIngestService.swift. */
+enum class MessageIngestSource(val raw: String) {
+    PUSH("push"),
+    NOTIFICATION_EXTENSION("notificationExtension"),
+    CATCH_UP("catchUp"),
+    MANUAL("manual"),
+}
+
+/** Port de `MessageIngestService.swift`. */
 object MessageIngestService {
-    private val mutex = Mutex()
-    private val inFlightKeys = mutableSetOf<String>()
-    private val recentlyIngestedKeys = mutableSetOf<String>()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val inFlightKeys = ConcurrentHashMap.newKeySet<String>()
+    private val recentlyIngestedKeys = ConcurrentHashMap.newKeySet<String>()
 
     fun resetOnSignOut() {
         inFlightKeys.clear()
@@ -26,11 +36,11 @@ object MessageIngestService {
     /**
      * Purga el caché local tras restaurar la identidad de chat.
      *
-     * Necesario porque el descifrado ocurre al ingerir (`ChatMessageMapper`) y, cuando falla, el
-     * contenido se guarda tal cual en cifrado (`decrypted ?: ciphertext`, igual que iOS). Los
-     * mensajes recibidos mientras la identidad era la equivocada quedaron persistidos ilegibles:
-     * sin tirar el caché seguirían mostrándose así para siempre aunque ya haya clave buena.
-     * Al vaciarlo se vuelven a bajar de Firestore y se descifran con la identidad restaurada.
+     * El descifrado ocurre al ingerir y, cuando falla, el contenido se guarda tal cual en cifrado
+     * (`decryptChatMessage(...) ?: content`). Los mensajes que entraron por push o catch-up
+     * mientras la identidad no estaba disponible quedaron persistidos ilegibles: sin tirar el
+     * caché seguirían mostrándose así aunque ya haya clave buena. Al vaciarlo se vuelven a bajar
+     * de Firestore y se descifran con la identidad restaurada.
      */
     fun resetAfterIdentityRestore() {
         inFlightKeys.clear()
@@ -48,9 +58,12 @@ object MessageIngestService {
 
         val processed = mutableListOf<PendingMessageIngest>()
         for (item in pending) {
-            if (ingest(item.conversationId, item.messageId, MessageIngestSource.NOTIFICATION_EXTENSION)) {
-                processed.add(item)
-            }
+            val didIngest = ingest(
+                item.conversationId,
+                item.messageId,
+                MessageIngestSource.NOTIFICATION_EXTENSION,
+            )
+            if (didIngest) processed.add(item)
         }
 
         if (processed.size != pending.size) {
@@ -63,10 +76,13 @@ object MessageIngestService {
 
     suspend fun ingest(userInfo: Map<String, Any?>): Boolean {
         if (!LocalFirstMessagingSettings.isEnabled) return false
-        val type = (userInfo["type"] as? String)?.trim()?.lowercase() ?: return false
+
+        val type = (userInfo["type"] as? String)?.trim()?.lowercase()
         if (type != "message" && type != "new_message") return false
+
         val conversationId = userInfo["conversationId"] as? String ?: return false
         val messageId = userInfo["messageId"] as? String ?: return false
+
         return ingest(conversationId, messageId, MessageIngestSource.PUSH)
     }
 
@@ -78,18 +94,28 @@ object MessageIngestService {
         if (!LocalFirstMessagingSettings.isEnabled) return 0
         if (messages.isEmpty()) return 0
 
-        val sorted = messages.sortedWith(compareBy<EnhancedMessage> { it.timestamp }.thenBy { it.id })
+        val sorted = messages.sortedWith(
+            compareBy<EnhancedMessage> { it.timestamp }.thenBy { it.id },
+        )
         LocalPersistenceService.saveMessagesInBackground(sorted, conversationId, sync = false)
 
         latestSyncCursor(sorted)?.let { latestCursor ->
             val stored = MessageSyncCursorStore.cursor(conversationId)
-            val next = if (stored != null && !latestCursor.isAfter(stored)) stored else latestCursor
+            val next = if (stored != null) {
+                if (latestCursor.isAfter(stored)) latestCursor else stored
+            } else {
+                latestCursor
+            }
             MessageSyncCursorStore.updateCursor(conversationId, next)
             sorted.lastOrNull()?.let { LocalPersistenceService.upsertConversationPreview(it) }
         }
 
-        sorted.forEach { rememberIngestedKey(dedupKey(conversationId, it.id)) }
+        for (message in sorted) {
+            rememberIngestedKey(dedupKey(conversationId, message.id))
+        }
 
+        // Doble check fiable: delivered se marca al ingerir por cualquier canal,
+        // no solo cuando el sistema entrega el push.
         FirebaseAuth.getInstance().currentUser?.uid?.let { currentUserId ->
             ChatService.markMessagesAsDelivered(sorted, conversationId, currentUserId)
         }
@@ -121,11 +147,8 @@ object MessageIngestService {
 
         val key = dedupKey(conv, msg)
         if (key in recentlyIngestedKeys) return true
-
-        mutex.withLock {
-            if (key in inFlightKeys) return false
-            inFlightKeys.add(key)
-        }
+        // add() false ⇒ ya in-flight (≡ iOS `inFlightKeys.contains` → false)
+        if (!inFlightKeys.add(key)) return false
 
         try {
             if (LocalPersistenceService.messageExistsInBackground(conv, msg)) {
@@ -143,7 +166,10 @@ object MessageIngestService {
                 ChatService.markMessagesAsDelivered(listOf(message), conv, currentUserId)
             }
 
-            MessageCatchUpService.sync(conv)
+            // El cursor NO avanza aquí: FCM/APNs colapsan pushes, y saltar hasta este
+            // mensaje dejaría fuera a los intermedios. El catch-up pagina contiguo.
+            // Fire-and-forget ≡ `Task { await MessageCatchUpService.shared.sync(...) }` en iOS.
+            scope.launch { MessageCatchUpService.sync(conv) }
 
             rememberIngestedKey(key)
 
@@ -160,16 +186,23 @@ object MessageIngestService {
             MessagingEvents.emitMessagesIngested(
                 MessagesIngestedEvent(conv, listOf(msg), source.raw),
             )
+
             return true
         } finally {
-            mutex.withLock { inFlightKeys.remove(key) }
+            inFlightKeys.remove(key)
         }
     }
 
     private fun dedupKey(conversationId: String, messageId: String) = "$conversationId:$messageId"
 
+    /**
+     * El set de dedup no puede crecer sin límite en sesiones largas; al superar el
+     * tope se vacía y el dedup cae al check de existencia en Room (barato).
+     */
     private fun rememberIngestedKey(key: String) {
-        if (recentlyIngestedKeys.size > 4000) recentlyIngestedKeys.clear()
+        if (recentlyIngestedKeys.size > 4000) {
+            recentlyIngestedKeys.clear()
+        }
         recentlyIngestedKeys.add(key)
     }
 

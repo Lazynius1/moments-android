@@ -1,7 +1,7 @@
 package com.moments.android.services.firestore
 
 import com.google.firebase.Timestamp
-import com.google.firebase.firestore.FieldPath
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Source
@@ -25,10 +25,16 @@ suspend fun FirestoreService.fetchUser(userId: String): AppUser {
     return AppUser.from(snap.id, data)
 }
 
-suspend fun FirestoreService.fetchUserProfile(userId: String): AppUser = fetchUser(userId)
+suspend fun FirestoreService.fetchUserProfile(userId: String): AppUser {
+    // iOS: siempre Source.DEFAULT (no cache-offline).
+    val snap = db.collection("users").document(userId).get(Source.DEFAULT).await()
+    if (!snap.exists()) error("Document not found")
+    @Suppress("UNCHECKED_CAST")
+    return AppUser.from(snap.id, snap.data as Map<String, Any?>)
+}
 
 suspend fun FirestoreService.fetchUserProfileWithAvailability(userId: String): Pair<AppUser, PublicProfileAvailability> {
-    val snap = db.collection("users").document(userId).get().await()
+    val snap = db.collection("users").document(userId).get(Source.DEFAULT).await()
     if (!snap.exists()) error("Document not found")
     @Suppress("UNCHECKED_CAST")
     val data = snap.data as Map<String, Any?>
@@ -37,8 +43,9 @@ suspend fun FirestoreService.fetchUserProfileWithAvailability(userId: String): P
 }
 
 suspend fun FirestoreService.checkPublicProfileAvailability(userId: String): PublicProfileAvailability {
-    val snap = runCatching { db.collection("users").document(userId).get().await() }.getOrNull()
-        ?: return PublicProfileAvailability.AVAILABLE
+    val snap = runCatching {
+        db.collection("users").document(userId).get(Source.DEFAULT).await()
+    }.getOrNull() ?: return PublicProfileAvailability.AVAILABLE
     if (!snap.exists()) return PublicProfileAvailability.UNAVAILABLE
     @Suppress("UNCHECKED_CAST")
     return PublicProfileAvailability.fromUserData(snap.data as Map<String, Any?>)
@@ -124,7 +131,7 @@ suspend fun FirestoreService.verifyUserCreation(userId: String): Boolean {
 suspend fun FirestoreService.changeUsername(userId: String, oldUsername: String, newUsername: String) {
     val clean = newUsername.trim().lowercase()
     require(clean.length in 3..30) { "Username must be between 3 and 30 characters" }
-    require(clean.all { it.isLetterOrDigit() || it == '_' }) { "Invalid username characters" }
+    require(clean.all { it in 'a'..'z' || it in '0'..'9' || it == '_' }) { "Invalid username characters" }
     require(clean != oldUsername.lowercase()) { "New username must be different" }
 
     val userRef = db.collection("users").document(userId)
@@ -145,7 +152,10 @@ suspend fun FirestoreService.changeUsername(userId: String, oldUsername: String,
     val newUsernameData = (oldSnap.data as? Map<String, Any?>)?.toMutableMap() ?: mutableMapOf()
     newUsernameData["userId"] = userId
     newUsernameData["updatedAt"] = FieldValue.serverTimestamp()
-    (userData["email"] as? String)?.takeIf { it.isNotBlank() }?.let { newUsernameData["email"] = it }
+    val userEmail = (userData["email"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+    val authEmail = FirebaseAuth.getInstance().currentUser?.email
+        ?.trim()?.takeIf { it.isNotEmpty() }
+    (userEmail ?: authEmail)?.let { newUsernameData["email"] = it }
     if (newUsernameData["createdAt"] == null) newUsernameData["createdAt"] = FieldValue.serverTimestamp()
 
     db.runBatch { batch ->
@@ -207,13 +217,17 @@ suspend fun FirestoreService.fetchMutualsWithTimestamps(userId: String): List<Pa
     }
 }
 
+/**
+ * Vive en FirestoreService.swift en iOS; aquí junto a perfiles por dependencia de `fetchUserProfile`.
+ * Misma query: `interests` arrayContainsAny (chunks 30), limit 50, filtro bloqueos bidireccional.
+ */
 suspend fun FirestoreService.fetchUsersWithSharedInterests(
     interests: List<String>,
     excludingUserId: String,
 ): List<AppUser> {
     if (interests.isEmpty()) return emptyList()
-    val current = runCatching { fetchUser(excludingUserId) }.getOrNull()
-    val blocked = current?.blockedUsers?.toSet().orEmpty()
+    val currentUser = fetchUserProfile(excludingUserId)
+    val blockedUsers = currentUser.blockedUsers.toSet()
     val seen = linkedMapOf<String, AppUser>()
     for (batch in interests.chunked(30)) {
         val snap = db.collection("users")
@@ -222,10 +236,12 @@ suspend fun FirestoreService.fetchUsersWithSharedInterests(
             .get()
             .await()
         for (doc in snap.documents) {
-            if (doc.id == excludingUserId || doc.id in blocked || doc.id in seen) continue
+            if (doc.id == excludingUserId || doc.id in blockedUsers || doc.id in seen) continue
             @Suppress("UNCHECKED_CAST")
             val data = doc.data as? Map<String, Any?> ?: continue
-            seen[doc.id] = AppUser.from(doc.id, data)
+            val user = AppUser.from(doc.id, data)
+            if (excludingUserId in user.blockedUsers) continue
+            seen[doc.id] = user
         }
     }
     return seen.values.toList()

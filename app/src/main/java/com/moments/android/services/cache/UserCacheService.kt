@@ -79,8 +79,9 @@ object UserCacheService {
                     evictIfNeeded()
                 }
             }
-            val fallback = result ?: userCache[userId]
-            callbacks.forEach { it(fallback) }
+            // Éxito → user; fallo → cache antiguo si existe (como iOS).
+            val toDeliver = result ?: userCache[userId]
+            callbacks.forEach { it(toDeliver) }
         }
     }
 
@@ -92,7 +93,8 @@ object UserCacheService {
         }
     }
 
-    fun handleMemoryWarning() {
+    /** Solo contenido en RAM; peticiones en vuelo siguen notificando callbacks. */
+    private fun handleMemoryWarning() {
         userCache.clear()
         lastFetchTimes.clear()
     }

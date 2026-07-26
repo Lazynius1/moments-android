@@ -13,7 +13,6 @@ import com.moments.android.services.firestore.fetchActiveStoriesForUsers
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.persistence.StorySeenStateService
 import com.moments.android.services.privacy.PrivacyService
-import com.moments.android.services.privacy.canUserViewStoryEnhanced
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope

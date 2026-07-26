@@ -1,29 +1,54 @@
 package com.moments.android.services.camera
 
+import com.moments.android.BuildConfig
+
 /**
- * Port de SnapCameraKitConfiguration.swift.
- * Snap Camera Kit (lentes AR) no está cableado en Android todavía;
- * mismos defaults: feature off hasta tener lentes reales + credenciales.
+ * Port de `SnapCameraKitConfiguration.swift`.
+ * BuildConfig ≡ Info.plist (`SCCameraKitAPIToken` / `SCCameraKitClientID`) + `SnapCameraKit.plist`.
+ * Snap SDK no cableado aún; [isFeatureEnabled] = false como iOS.
  */
 object SnapCameraKitConfiguration {
-    /** Flag maestro: desactiva filtros AR mientras no haya lentes reales. */
+
+    /** Flag maestro: desactiva filtros AR mientras solo haya lentes demo. */
     const val isFeatureEnabled: Boolean = false
 
-    /** Desde BuildConfig / meta-data cuando se integre Camera Kit. */
-    var apiToken: String? = null
-        private set
-    var clientID: String? = null
-        private set
-    var defaultLensGroupID: String? = null
-        private set
+    private data class Loaded(
+        val apiToken: String?,
+        val clientID: String?,
+        val lensGroupID: String?,
+    )
+
+    @Volatile
+    private var loaded: Loaded? = null
+
+    private fun values(): Loaded {
+        loaded?.let { return it }
+        synchronized(this) {
+            loaded?.let { return it }
+            val next = Loaded(
+                apiToken = normalized(BuildConfig.SC_CAMERA_KIT_API_TOKEN),
+                clientID = normalized(BuildConfig.SC_CAMERA_KIT_CLIENT_ID),
+                lensGroupID = normalized(BuildConfig.SC_CAMERA_KIT_LENS_GROUP_ID),
+            )
+            loaded = next
+            return next
+        }
+    }
+
+    val apiToken: String? get() = values().apiToken
+    val clientID: String? get() = values().clientID
+    val defaultLensGroupID: String? get() = values().lensGroupID
 
     val isConfigured: Boolean
         get() = apiToken != null && clientID != null && defaultLensGroupID != null
 
+    /** Override (tests / spike); iOS solo lee Bundle. */
     fun configure(apiToken: String?, clientID: String?, lensGroupID: String?) {
-        this.apiToken = normalized(apiToken)
-        this.clientID = normalized(clientID)
-        this.defaultLensGroupID = normalized(lensGroupID)
+        loaded = Loaded(
+            apiToken = normalized(apiToken),
+            clientID = normalized(clientID),
+            lensGroupID = normalized(lensGroupID),
+        )
     }
 
     private fun normalized(value: String?): String? {

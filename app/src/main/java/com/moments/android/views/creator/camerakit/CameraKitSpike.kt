@@ -12,7 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.moments.android.services.camera.SnapCameraKitConfiguration
 
-/** Modelo neutral de una lente para el carrusel, equivalente al `Lens` de Camera Kit. */
+/**
+ * Modelo neutral de una lente para el carrusel, equivalente al `Lens` de Camera Kit.
+ * ≡ `CameraKitSpike.swift` (tipos Lens del SDK).
+ */
 data class CameraKitLens(
     val id: String,
     val name: String? = null,
@@ -22,10 +25,11 @@ data class CameraKitLens(
 /**
  * Port de contrato de `CameraKitController` (CameraKitSpike.swift).
  *
- * El binario Android no incluye aún Snap Camera Kit: la cámara/captura nativa
- * sigue siendo CameraX (`StoryCameraView`). Este controller conserva el estado,
- * los callbacks y los límites de ciclo de vida para cablearlo cuando se añadan
- * dependencia y credenciales Snap reales, sin fingir que las lentes se aplican.
+ * Snap Camera Kit Android **no está enlazado** (igual que el flag iOS
+ * [SnapCameraKitConfiguration.isFeatureEnabled] = false). Conserva estado,
+ * callbacks y ciclo de vida híbrido (prepareLenses / activate / deactivate)
+ * para cablearlo cuando haya SDK + credenciales, sin fingir que las lentes
+ * se aplican.
  */
 class CameraKitController {
     var lenses by mutableStateOf<List<CameraKitLens>>(emptyList())
@@ -34,7 +38,7 @@ class CameraKitController {
         private set
     var appliedLensName by mutableStateOf<String?>(null)
         private set
-    var statusMessage by mutableStateOf("Starting camera…")
+    var statusMessage by mutableStateOf("Iniciando cámara…")
         private set
     var capturedImage by mutableStateOf<Bitmap?>(null)
         private set
@@ -49,44 +53,63 @@ class CameraKitController {
     var isCameraActive by mutableStateOf(false)
         private set
 
+    /** Hooks Fase 4 (subida real). ≡ `onCapturedPhoto` / `onCapturedVideo` Swift. */
     var onCapturedPhoto: ((Bitmap) -> Unit)? = null
     var onCapturedVideo: ((Uri) -> Unit)? = null
+
+    private var lensSelectionRequestID: Long = 0L
 
     fun start() {
         prepareLenses()
         activateCamera()
     }
 
+    /** Híbrido: solo carga la lista de lentes (SIN encender cámara CK). */
     fun prepareLenses() {
-        when {
-            !SnapCameraKitConfiguration.isFeatureEnabled -> {
-                lenses = emptyList()
-                statusMessage = "AR lenses are unavailable"
-            }
-            !SnapCameraKitConfiguration.isConfigured -> statusMessage = "Missing Snap credentials"
-            else -> statusMessage = "Snap Camera Kit Android SDK is not linked"
+        if (!SnapCameraKitConfiguration.isFeatureEnabled) return
+        if (!SnapCameraKitConfiguration.isConfigured) {
+            statusMessage = "Faltan credenciales Snap (Secrets.xcconfig)"
+            return
         }
+        if (SnapCameraKitConfiguration.defaultLensGroupID == null) {
+            statusMessage = "Lens Group ID vacío"
+            return
+        }
+        // SDK Android no enlazado: stub honesto (iOS aquí crea Session + observer).
+        statusMessage = "Snap Camera Kit Android SDK no enlazado"
     }
 
-    /** CameraX gestiona el input real hasta que Camera Kit Android esté enlazado. */
+    /**
+     * Híbrido: enciende la cámara CK al elegir una lente.
+     * Sin SDK, solo marca activo y aplica selección de contrato.
+     */
     fun activateCamera(applyingLens: CameraKitLens? = null) {
+        if (!SnapCameraKitConfiguration.isFeatureEnabled) return
+        if (isCameraActive) {
+            if (applyingLens != null) selectLens(applyingLens)
+            return
+        }
         isCameraActive = true
         if (applyingLens != null) selectLens(applyingLens)
-        else if (!SnapCameraKitConfiguration.isFeatureEnabled) statusMessage = "Native camera"
     }
 
+    /** Híbrido: apaga CK al volver a “sin filtro”. */
     fun deactivateCamera() {
+        if (!isCameraActive) return
         isCameraActive = false
         isRecording = false
     }
 
     fun stop() {
-        deactivateCamera()
+        isCameraActive = false
+        isRecording = false
         selectedLensID = null
         appliedLensName = null
+        lenses = emptyList()
     }
 
     fun setCameraPosition(position: Int) {
+        if (cameraLensFacing == position) return
         cameraLensFacing = position
     }
 
@@ -94,27 +117,34 @@ class CameraKitController {
         zoomFactor = factor.coerceIn(1f, 5f)
     }
 
+    /** ≡ `updateViewport(forCanvasSize:)` — crop 9:16 lo aplica el host CameraX. */
     fun updateViewportForCanvasSize(widthPx: Int, heightPx: Int) {
         if (widthPx <= 0 || heightPx <= 0) return
-        // CameraX PreviewView respeta FILL_CENTER; el crop 9:16 se aplica en su host.
     }
 
     fun selectLens(lens: CameraKitLens?) {
+        val requestID = ++lensSelectionRequestID
         if (lens == null) {
             selectedLensID = null
             appliedLensName = null
-            statusMessage = "No filter"
+            statusMessage = "Sin filtro"
             return
         }
         if (!SnapCameraKitConfiguration.isFeatureEnabled || !SnapCameraKitConfiguration.isConfigured) {
-            statusMessage = "Lens unavailable: Snap Camera Kit is not configured"
+            statusMessage = "No se pudo aplicar la lente"
             return
         }
-        // No cambiamos `selectedLensID`: el SDK no está presente y no se puede aplicar de verdad.
-        statusMessage = "Lens unavailable: Snap Camera Kit Android SDK is not linked"
+        // SDK ausente: no mutamos selectedLensID (no hay apply real).
+        if (lensSelectionRequestID != requestID) return
+        statusMessage = "Snap Camera Kit Android SDK no enlazado"
     }
 
-    /** Entrada para la captura CameraX real, equivalente al callback de PhotoCaptureOutput. */
+    /** ≡ `capturePhoto()` — sin SDK no hay PhotoCaptureOutput. */
+    fun capturePhoto() {
+        statusMessage = "Error foto: SDK no enlazado"
+    }
+
+    /** Entrada CameraX real, equivalente al callback de PhotoCaptureOutput. */
     fun receiveCapturedPhoto(image: Bitmap) {
         capturedImage = image
         onCapturedPhoto?.invoke(image)
@@ -123,28 +153,38 @@ class CameraKitController {
     fun startRecording() {
         if (!isCameraActive) return
         isRecording = true
-        statusMessage = "Recording…"
-    }
-
-    /** Entrada para el callback de vídeo CameraX real. */
-    fun receiveCapturedVideo(uri: Uri) {
-        isRecording = false
-        capturedVideoUri = uri
-        statusMessage = "Video saved"
-        onCapturedVideo?.invoke(uri)
+        statusMessage = "Grabando…"
     }
 
     fun stopRecording() {
-        if (isRecording) statusMessage = "Finishing video…"
+        if (!isRecording) return
         isRecording = false
+        statusMessage = "Vídeo en proceso…"
     }
 
-    /** Preparado para el observer del repositorio de lentes cuando se integre el SDK. */
+    /** Entrada CameraX real ≡ finishWriting completed. */
+    fun receiveCapturedVideo(uri: Uri) {
+        isRecording = false
+        capturedVideoUri = uri
+        statusMessage = "Vídeo guardado"
+        onCapturedVideo?.invoke(uri)
+    }
+
+    /** ≡ LensRepositoryGroupObserver.didUpdateLenses. */
     fun updateLenses(updatedLenses: List<CameraKitLens>) {
         lenses = updatedLenses
-        statusMessage = if (updatedLenses.isEmpty()) "The group has no lenses" else "Choose a lens"
+        statusMessage = if (updatedLenses.isEmpty()) {
+            "El grupo no tiene lentes."
+        } else {
+            "Elige una lente"
+        }
     }
 
+    fun reportLensesFailure(message: String?) {
+        statusMessage = "Error lentes: ${message ?: "desconocido"}"
+    }
+
+    /** ≡ ErrorHandler.handleError. */
     fun reportError(message: String) {
         statusMessage = "Camera Kit: $message"
     }

@@ -51,9 +51,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageStatus
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageStatus
+import com.moments.android.views.messaging.core.MessageType
 import kotlin.math.abs
 import java.net.URI
 

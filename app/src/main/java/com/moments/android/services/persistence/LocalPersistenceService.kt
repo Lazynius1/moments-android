@@ -3,15 +3,16 @@ package com.moments.android.services.persistence
 import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.models.AppUser
-import com.moments.android.models.Conversation
+import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.models.DeleteMomentPayload
-import com.moments.android.models.EnhancedMessage
+import com.moments.android.models.encode
+import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.models.FollowRequestActionPayload
 import com.moments.android.models.MarkAsReadPayload
 import com.moments.android.models.MediaItem
-import com.moments.android.models.MessageStatus
-import com.moments.android.models.MessageSyncCursor
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.MessageStatus
+import com.moments.android.views.messaging.core.MessageSyncCursor
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.models.Moment
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.ProfileUpdatePayload
@@ -25,8 +26,8 @@ import com.moments.android.models.cache.CachedNotification
 import com.moments.android.models.cache.CachedSearch
 import com.moments.android.models.cache.CachedStory
 import com.moments.android.models.cache.CachedUser
-import com.moments.android.models.decodeMessages
-import com.moments.android.models.encodeMessages
+import com.moments.android.views.messaging.core.decodeMessages
+import com.moments.android.views.messaging.core.encodeMessages
 import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.network.OfflineSyncService
@@ -44,9 +45,9 @@ import java.util.UUID
 
 /**
  * Persistencia local (SharedPreferences + filesDir JSON).
- * Port progresivo de LocalPersistenceService.swift — StorySeenStateService vive aparte.
- * Almacenamiento JSON vs SwiftData es divergencia de plataforma; búsqueda usa [SearchNormalization]
- * (paridad iOS folding diacritic/case insensitive).
+ * Port de LocalPersistenceService.swift — StorySeenStateService en archivo aparte (mismo Swift).
+ * Topes: feed 100, explore 50, users 200, conversations 50, notifs 100, searches 20, msgs/chat 2000.
+ * Δ líneas ≈ SwiftData/App Group/boilerplate OO vs JSON.
  */
 object LocalPersistenceService {
 
@@ -58,7 +59,7 @@ object LocalPersistenceService {
     private const val KEY_CONNECTIONS_PREFIX = "connections_"
     private const val KEY_SEARCH_HISTORY = "search_history"
 
-    private const val MAX_CONVERSATIONS = 200
+    private const val MAX_CONVERSATIONS = 50
     private const val MAX_NOTIFICATIONS = 100
 
     private const val MAX_FEED_MOMENTS = 100
@@ -66,6 +67,7 @@ object LocalPersistenceService {
     private const val MAX_CACHED_USERS = 200
     private const val MAX_DATA_AGE_DAYS = 7
     private const val MAX_SEARCHES = 20
+    private const val MAX_MESSAGES_PER_CHAT = 2000
 
     private const val RECENT_CHAT_WINDOW_SIZE = 20
     private const val STALE_CHAT_WINDOW_SIZE = 6
@@ -80,6 +82,7 @@ object LocalPersistenceService {
         if (appContext == null) {
             appContext = context.applicationContext
             MessagePersistenceStore.initialize(context)
+            StorySeenStateService.initialize(context)
         }
     }
 
@@ -103,13 +106,17 @@ object LocalPersistenceService {
 
     // MARK: - Current user
 
-    fun saveCurrentUser(user: AppUser) = saveUser(user, section = "currentUser").also {
-        prefs().edit().putString(KEY_CURRENT_USER_ID, user.id).apply()
-    }
+    fun saveCurrentUser(user: AppUser) = saveUser(user, section = "currentUser")
 
     fun loadCurrentUser(): AppUser? {
-        val id = prefs().getString(KEY_CURRENT_USER_ID, null) ?: return null
-        return loadUser(id)
+        prefs().getString(KEY_CURRENT_USER_ID, null)?.let { return loadUser(it) }
+        // ≡ iOS: FetchDescriptor por cacheSection == "currentUser"
+        prefs().all.keys.filter { it.startsWith(KEY_USER_PREFIX) }.forEach { key ->
+            val raw = prefs().getString(key, null) ?: return@forEach
+            val cached = CachedUser.decodeFromPrefsJson(raw) ?: return@forEach
+            if (cached.cacheSection == "currentUser") return cached.toAppUser()
+        }
+        return null
     }
 
     fun clearCurrentUser() {
@@ -122,9 +129,12 @@ object LocalPersistenceService {
     // MARK: - Users
 
     fun saveUser(user: AppUser, section: String = "profile") {
-        prefs().edit()
+        val editor = prefs().edit()
             .putString(KEY_USER_PREFIX + user.id, encodeUser(user, section))
-            .apply()
+        if (section == "currentUser") {
+            editor.putString(KEY_CURRENT_USER_ID, user.id)
+        }
+        editor.apply()
         trimCachedUsers()
     }
 
@@ -136,7 +146,9 @@ object LocalPersistenceService {
     // MARK: - Outbox / CachedAction
 
     fun saveActionOrThrow(action: CachedAction) {
+        if (appContext == null) throw ActionPersistenceException("Local persistence store is unavailable.")
         val actions = loadAllActions().toMutableList()
+        // ≡ iOS insert (SwiftData); evitar duplicados por id en JSON prefs.
         if (actions.any { it.id == action.id }) return
         actions += action
         saveAllActions(actions)
@@ -147,7 +159,8 @@ object LocalPersistenceService {
         val isUpload = action.type == CachedAction.ActionType.MOMENT_UPLOAD.raw ||
             action.type == CachedAction.ActionType.STORY_UPLOAD.raw
         if (NetworkMonitor.isConnected && !isUpload) {
-            ioScope.launch { OfflineSyncService.syncPendingActions(requireAutomaticSync = false) }
+            // iOS: `syncPendingActions()` (requireAutomaticSync = true por defecto).
+            ioScope.launch { OfflineSyncService.syncPendingActions() }
         }
     }
 
@@ -157,6 +170,9 @@ object LocalPersistenceService {
                 it.status == CachedAction.ActionStatus.EXECUTING.raw
         }.sortedBy { it.createdAt }
     }
+
+    /** Cualquier estado (PENDING / EXECUTING / FAILED) — cancel/retry outbox. */
+    fun loadAction(id: String): CachedAction? = loadAllActions().find { it.id == id }
 
     fun deleteAction(id: String) {
         saveAllActions(loadAllActions().filter { it.id != id })
@@ -276,12 +292,12 @@ object LocalPersistenceService {
         sync: Boolean = true,
     ) = saveMoments(moments, section = profileMomentsSection(userId, viewerId), sync = sync, maxCount = 50)
 
-    fun loadFeedMoments(): List<Moment> = loadMoments("feed")
+    fun loadFeedMoments(): List<Moment> = loadMoments("feed", MAX_FEED_MOMENTS)
 
-    fun loadExploreMoments(): List<Moment> = loadMoments("explore")
+    fun loadExploreMoments(): List<Moment> = loadMoments("explore", MAX_EXPLORE_MOMENTS)
 
     fun loadProfileMoments(userId: String, viewerId: String? = null): List<Moment> =
-        loadMoments(profileMomentsSection(userId, viewerId))
+        loadMoments(profileMomentsSection(userId, viewerId), maxCount = 50)
 
     private fun profileMomentsSection(userId: String, viewerId: String?): String =
         if (!viewerId.isNullOrEmpty()) "profile_${viewerId}_$userId" else "profile_$userId"
@@ -291,14 +307,17 @@ object LocalPersistenceService {
         val existingMap = existing.associateBy { it.momentId }.toMutableMap()
         moments.forEach { moment ->
             val id = moment.id ?: return@forEach
-            existingMap[id] = momentToCachedMoment(moment, section)
+            existingMap[id] = CachedMoment.from(moment, section)
         }
         val merged = existingMap.values.sortedByDescending { it.timestamp.time }.take(maxCount)
         writeCachedMoments(section, merged)
     }
 
-    private fun loadMoments(section: String): List<Moment> =
-        loadCachedMoments(section).mapNotNull { it.toMoment() }
+    private fun loadMoments(section: String, maxCount: Int): List<Moment> =
+        loadCachedMoments(section)
+            .sortedByDescending { it.timestamp.time }
+            .take(maxCount)
+            .mapNotNull { it.toMoment() }
 
     private fun loadCachedMoments(section: String): List<CachedMoment> {
         val file = momentsFile(section)
@@ -321,7 +340,7 @@ object LocalPersistenceService {
         val map = existing.associateBy { it.id }.toMutableMap()
         stories.forEach { story ->
             val id = story.id ?: return@forEach
-            storyToCachedStory(story)?.let { map[id] = it }
+            CachedStory.fromStory(story)?.let { map[id] = it }
         }
         writeAllCachedStories(map.values.toList())
     }
@@ -365,11 +384,11 @@ object LocalPersistenceService {
 
     fun toggleMomentReactionLocally(momentId: String, reaction: String, userId: String) {
         updateMomentsAcrossSections(momentId) { cached ->
-            val reactions = decodeReactions(cached.reactionsData).toMutableMap()
+            val reactions = CachedMoment.decodeReactions(cached.reactionsData).toMutableMap()
             val users = reactions.getOrPut(reaction) { mutableListOf() }.toMutableList()
             if (users.contains(userId)) users.remove(userId) else users.add(userId)
             if (users.isEmpty()) reactions.remove(reaction) else reactions[reaction] = users
-            cached.copy(reactionsData = encodeReactions(reactions), lastSyncedAt = Date())
+            cached.copy(reactionsData = CachedMoment.encodeReactions(reactions), lastSyncedAt = Date())
         }
     }
 
@@ -416,7 +435,7 @@ object LocalPersistenceService {
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.DELETE_MOMENT.raw,
-                payloadData = encodeDeleteMomentPayload(payload),
+                payloadData = payload.encode(),
             ),
         )
     }
@@ -461,7 +480,7 @@ object LocalPersistenceService {
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.UPDATE_PROFILE.raw,
-                payloadData = encodeProfileUpdatePayload(payload),
+                payloadData = payload.encode(),
             ),
         )
     }
@@ -478,7 +497,7 @@ object LocalPersistenceService {
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.ACCEPT_FOLLOW_REQUEST.raw,
-                payloadData = encodeFollowRequestPayload(payload),
+                payloadData = payload.encode(),
             ),
         )
     }
@@ -495,7 +514,7 @@ object LocalPersistenceService {
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.REJECT_FOLLOW_REQUEST.raw,
-                payloadData = encodeFollowRequestPayload(payload),
+                payloadData = payload.encode(),
             ),
         )
     }
@@ -522,7 +541,7 @@ object LocalPersistenceService {
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.REPORT_CONTENT.raw,
-                payloadData = encodeReportPayload(payload),
+                payloadData = payload.encode(),
             ),
         )
     }
@@ -534,7 +553,7 @@ object LocalPersistenceService {
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.MARK_AS_READ.raw,
-                payloadData = encodeMarkAsReadPayload(payload),
+                payloadData = payload.encode(),
             ),
         )
     }
@@ -579,9 +598,15 @@ object LocalPersistenceService {
         val map = existing.associateBy { it.id }.toMutableMap()
         conversations.forEach { conv ->
             val id = conv.id ?: return@forEach
-            map[id] = conversationToCached(conv)
+            val incoming = CachedConversation.from(conv)
+            val prev = map[id]
+            map[id] = if (prev != null) mergeCachedConversation(prev, incoming) else incoming
         }
-        writeCachedConversations(map.values.sortedWith(compareByDescending<CachedConversation> { it.isPinned }.thenByDescending { it.timestamp }).take(MAX_CONVERSATIONS))
+        writeCachedConversations(
+            map.values.sortedWith(
+                compareByDescending<CachedConversation> { it.isPinned }.thenByDescending { it.timestamp },
+            ).take(MAX_CONVERSATIONS),
+        )
     }
 
     fun loadConversations(): List<Conversation> =
@@ -589,9 +614,10 @@ object LocalPersistenceService {
             .sortedWith(compareByDescending<CachedConversation> { it.isPinned }.thenByDescending { it.timestamp })
             .map { it.toConversation() }
 
+    /** Helper Android (iOS: ChatService.isConversationArchived). Lee snapshot LPS. */
     fun isConversationArchived(conversationId: String, userId: String): Boolean {
         val conversation = loadCachedConversations().firstOrNull { it.id == conversationId } ?: return false
-        return conversation.isArchived
+        return conversation.toConversation().isArchived(userId)
     }
 
     fun saveMessages(messages: List<EnhancedMessage>, conversationId: String, sync: Boolean = false) {
@@ -807,10 +833,10 @@ object LocalPersistenceService {
         val index = conversations.indexOfFirst { it.id == conversationId }
         if (index >= 0) {
             val cached = conversations[index]
-            val readStatus = decodeStringBoolMap(cached.readStatusData).toMutableMap()
+            val readStatus = CachedConversation.decodeStringBoolMap(cached.readStatusData).toMutableMap()
             if (readStatus[currentUserId] != true) {
                 readStatus[currentUserId] = true
-                conversations[index] = cached.copy(readStatusData = encodeStringBoolMap(readStatus))
+                conversations[index] = cached.copy(readStatusData = CachedConversation.encodeStringBoolMap(readStatus))
                 writeCachedConversations(conversations)
             }
         }
@@ -837,7 +863,7 @@ object LocalPersistenceService {
         val map = existing.associateBy { it.id }.toMutableMap()
         notifications.forEach { notification ->
             val id = notification.id ?: return@forEach
-            map[id] = notificationToCached(notification)
+            map[id] = CachedNotification.from(notification)
         }
         writeCachedNotifications(map.values.sortedByDescending { it.timestamp }.take(MAX_NOTIFICATIONS))
     }
@@ -879,13 +905,14 @@ object LocalPersistenceService {
         MessagePersistenceStore.lastCursor(conversationId)
 
     fun upsertConversationPreview(message: EnhancedMessage) {
-        val previewText = messagePreview(message)
+        val ctx = appContext
+        val previewText = if (ctx != null) message.preview(ctx) else messagePreview(message)
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
         val conversations = loadCachedConversations().toMutableList()
         val index = conversations.indexOfFirst { it.id == message.conversationId }
         if (index >= 0) {
             val cached = conversations[index]
-            val readStatus = decodeStringBoolMap(cached.readStatusData).toMutableMap()
+            val readStatus = CachedConversation.decodeStringBoolMap(cached.readStatusData).toMutableMap()
             if (currentUserId.isNotEmpty() && message.senderId != currentUserId) {
                 readStatus[currentUserId] = false
             }
@@ -894,7 +921,7 @@ object LocalPersistenceService {
                 timestamp = message.timestamp,
                 lastMessageSenderId = message.senderId,
                 lastSyncedAt = Date(),
-                readStatusData = encodeStringBoolMap(readStatus),
+                readStatusData = CachedConversation.encodeStringBoolMap(readStatus),
                 lastMessageSeenAtData = if (message.senderId == currentUserId) null else cached.lastMessageSeenAtData,
                 lastMessageReactionData = if (message.senderId == currentUserId) null else cached.lastMessageReactionData,
             )
@@ -908,7 +935,7 @@ object LocalPersistenceService {
                 participants = emptyList(),
                 lastMessage = previewText,
                 timestamp = message.timestamp,
-                readStatusData = encodeStringBoolMap(readStatus),
+                readStatusData = CachedConversation.encodeStringBoolMap(readStatus),
                 otherParticipantId = if (message.senderId == currentUserId) "" else message.senderId,
                 otherParticipantUsername = null,
                 otherParticipantProfileImagePath = null,
@@ -1005,21 +1032,52 @@ object LocalPersistenceService {
         }
     }
 
+    /** ≡ iOS trimCachedUsersToLimit — excluye cacheSection == currentUser. */
     private fun trimCachedUsers() {
-        val allKeys = prefs().all.keys.filter { it.startsWith(KEY_USER_PREFIX) }
-        if (allKeys.size <= MAX_CACHED_USERS) return
-        val users = allKeys.mapNotNull { key ->
-            prefs().getString(key, null)?.let { raw ->
-                runCatching {
-                    val json = JSONObject(raw)
-                    key.removePrefix(KEY_USER_PREFIX) to Date(json.optLong("lastSyncedAt", 0L))
-                }.getOrNull()
-            }
-        }.sortedBy { it.second }
-        val toRemove = users.take(allKeys.size - MAX_CACHED_USERS)
+        val entries = prefs().all.keys.filter { it.startsWith(KEY_USER_PREFIX) }.mapNotNull { key ->
+            val raw = prefs().getString(key, null) ?: return@mapNotNull null
+            val cached = CachedUser.decodeFromPrefsJson(raw) ?: return@mapNotNull null
+            if (cached.cacheSection == "currentUser") return@mapNotNull null
+            Triple(key, cached.userId, cached.lastSyncedAt)
+        }
+        if (entries.size <= MAX_CACHED_USERS) return
+        val toRemove = entries.sortedBy { it.third.time }.take(entries.size - MAX_CACHED_USERS)
         val editor = prefs().edit()
-        toRemove.forEach { (id, _) -> editor.remove(KEY_USER_PREFIX + id) }
+        toRemove.forEach { (key, _, _) -> editor.remove(key) }
         editor.apply()
+    }
+
+    /** ≡ iOS updateCachedConversation — no retrocede lastMessage/timestamp. */
+    private fun mergeCachedConversation(
+        existing: CachedConversation,
+        new: CachedConversation,
+    ): CachedConversation {
+        val (timestamp, lastMessage) = when {
+            new.timestamp.after(existing.timestamp) -> new.timestamp to new.lastMessage
+            new.timestamp.time == existing.timestamp.time -> existing.timestamp to new.lastMessage
+            else -> existing.timestamp to existing.lastMessage
+        }
+        return existing.copy(
+            participants = new.participants,
+            readStatusData = new.readStatusData,
+            otherParticipantId = new.otherParticipantId,
+            otherParticipantUsername = new.otherParticipantUsername,
+            otherParticipantProfileImagePath = new.otherParticipantProfileImagePath,
+            isPinned = new.isPinned,
+            isMuted = new.isMuted,
+            isArchived = new.isArchived,
+            readReceiptPreferencesData = new.readReceiptPreferencesData,
+            forwardingPreferencesData = new.forwardingPreferencesData,
+            lastDeletedAtData = new.lastDeletedAtData,
+            lastReadAtData = new.lastReadAtData,
+            vanishModeActive = new.vanishModeActive,
+            lastMessageSenderId = new.lastMessageSenderId ?: existing.lastMessageSenderId,
+            lastMessageSeenAtData = new.lastMessageSeenAtData,
+            lastMessageReactionData = new.lastMessageReactionData,
+            lastSyncedAt = Date(),
+            timestamp = timestamp,
+            lastMessage = lastMessage,
+        )
     }
 
     private fun saveSearchHistory(searches: List<CachedSearch>) {
@@ -1139,16 +1197,13 @@ object LocalPersistenceService {
     }
 
     private fun trimCachedUsersByAge(cutoff: Date) {
-        val currentUserId = prefs().getString(KEY_CURRENT_USER_ID, null)
         val editor = prefs().edit()
         prefs().all.keys.filter { it.startsWith(KEY_USER_PREFIX) }.forEach { key ->
-            val userId = key.removePrefix(KEY_USER_PREFIX)
-            if (userId == currentUserId) return@forEach
             val raw = prefs().getString(key, null) ?: return@forEach
-            val lastSyncedAt = runCatching {
-                Date(JSONObject(raw).optLong("lastSyncedAt", System.currentTimeMillis()))
-            }.getOrDefault(Date())
-            if (lastSyncedAt.before(cutoff)) {
+            val cached = CachedUser.decodeFromPrefsJson(raw) ?: return@forEach
+            // ≡ iOS: no borrar cacheSection == currentUser
+            if (cached.cacheSection == "currentUser") return@forEach
+            if (cached.lastSyncedAt.before(cutoff)) {
                 editor.remove(key)
             }
         }
@@ -1200,241 +1255,14 @@ object LocalPersistenceService {
         MessageType.CHAT_NOTICE -> "Notice"
     }
 
-    private fun encodeProfileUpdatePayload(payload: ProfileUpdatePayload): ByteArray = JSONObject().apply {
-        put("userId", payload.userId)
-        payload.bio?.let { put("bio", it) }
-        payload.oldBio?.let { put("oldBio", it) }
-        payload.websiteUrl?.let { put("websiteUrl", it) }
-        payload.oldWebsiteUrl?.let { put("oldWebsiteUrl", it) }
-        payload.interests?.let { put("interests", JSONArray(it)) }
-        payload.profileImageLocalPath?.let { put("profileImageLocalPath", it) }
-        put("isImageUpdate", payload.isImageUpdate)
-    }.toString().toByteArray()
+    private fun encodeUser(user: AppUser, section: String): String =
+        CachedUser.from(user, section).encodeToPrefsJson()
 
-    private fun encodeFollowRequestPayload(payload: FollowRequestActionPayload): ByteArray = JSONObject().apply {
-        put("notificationId", payload.notificationId)
-        put("senderId", payload.senderId)
-        put("recipientId", payload.recipientId)
-        put("isAccept", payload.isAccept)
-    }.toString().toByteArray()
-
-    private fun encodeReportPayload(payload: ReportActionPayload): ByteArray = JSONObject().apply {
-        put("reporterId", payload.reporterId)
-        put("reportedUserId", payload.reportedUserId)
-        put("reportedContentType", payload.reportedContentType)
-        put("reportedContentId", payload.reportedContentId)
-        put("category", payload.category)
-        put("description", payload.description)
-        put("priority", payload.priority)
-    }.toString().toByteArray()
-
-    private fun encodeMarkAsReadPayload(payload: MarkAsReadPayload): ByteArray = JSONObject().apply {
-        put("notificationId", payload.notificationId)
-        put("userId", payload.userId)
-    }.toString().toByteArray()
-
-    private fun encodeDeleteMomentPayload(payload: DeleteMomentPayload): ByteArray = JSONObject().apply {
-        put("momentId", payload.momentId)
-        put("userId", payload.userId)
-        payload.imagePath?.let { put("imagePath", it) }
-        payload.videoUrl?.let { put("videoUrl", it) }
-    }.toString().toByteArray()
-
-    private fun encodeUser(user: AppUser, section: String): String = JSONObject().apply {
-        put("id", user.id)
-        put("username", user.username)
-        put("email", user.email)
-        put("bio", user.bio)
-        put("profileImagePath", user.profileImagePath)
-        put("websiteUrl", user.websiteUrl)
-        put("profileNote", user.profileNote)
-        put("followersCount", user.followersCount)
-        put("followingCount", user.followingCount)
-        put("momentsCount", user.momentsCount)
-        put("isVerified", user.isVerified)
-        put("isPrivate", user.isPrivate)
-        put("isActive", user.isActive)
-        put("showMutuals", user.showMutuals)
-        put("showFollowing", user.showFollowing)
-        put("showFollowers", user.showFollowers)
-        put("showReadReceipts", user.showReadReceipts)
-        put("selectedProfileTheme", user.selectedProfileTheme)
-        put("interests", JSONArray(user.interests))
-        put("blockedUsers", JSONArray(user.blockedUsers))
-        put("bestFriends", JSONArray(user.bestFriends))
-        put("cacheSection", section)
-        put("lastSyncedAt", System.currentTimeMillis())
-    }.toString()
-
-    private fun decodeUser(raw: String): AppUser? = runCatching {
-        val json = JSONObject(raw)
-        AppUser(
-            id = json.getString("id"),
-            username = json.optString("username", "Usuario Desconocido"),
-            email = json.optString("email"),
-            interests = json.optJSONArray("interests")?.toStringList() ?: emptyList(),
-            profileImagePath = json.stringOrNull("profileImagePath"),
-            bio = json.stringOrNull("bio"),
-            blockedUsers = json.optJSONArray("blockedUsers")?.toStringList() ?: emptyList(),
-            isPrivate = json.optBoolean("isPrivate", false),
-            showMutuals = json.optBoolean("showMutuals", true),
-            showFollowing = json.optBoolean("showFollowing", true),
-            showFollowers = json.optBoolean("showFollowers", true),
-            bestFriends = json.optJSONArray("bestFriends")?.toStringList() ?: emptyList(),
-            websiteUrl = json.stringOrNull("websiteUrl"),
-            profileNote = json.stringOrNull("profileNote"),
-            followersCount = json.optInt("followersCount"),
-            followingCount = json.optInt("followingCount"),
-            momentsCount = json.optInt("momentsCount"),
-            isActive = json.optBoolean("isActive", true),
-            selectedProfileTheme = json.stringOrNull("selectedProfileTheme"),
-            isVerified = json.optBoolean("isVerified", false),
-            showReadReceipts = json.optBoolean("showReadReceipts", true),
-        )
-    }.getOrNull()
+    private fun decodeUser(raw: String): AppUser? =
+        CachedUser.decodeFromPrefsJson(raw)?.toAppUser()
 }
 
-// MARK: - CachedMoment conversions
-
-private fun momentToCachedMoment(moment: Moment, section: String): CachedMoment = CachedMoment(
-    momentId = moment.id ?: java.util.UUID.randomUUID().toString(),
-    authorId = moment.authorId,
-    username = moment.username,
-    content = moment.content,
-    imagePath = moment.imagePath,
-    videoUrl = moment.videoUrl,
-    timestamp = moment.timestamp,
-    commentCount = moment.commentCount,
-    profileImagePath = moment.profileImagePath,
-    location = moment.location,
-    audience = moment.audience,
-    aspectRatio = moment.aspectRatio,
-    thumbnailUrl = moment.thumbnailUrl,
-    videoDuration = moment.videoDuration,
-    videoFileSize = moment.videoFileSize,
-    videoResolution = moment.videoResolution,
-    customListId = moment.customListId,
-    disableComments = moment.disableComments,
-    hideLikeCounts = moment.hideLikeCounts,
-    allowSharing = moment.allowSharing,
-    scheduledDate = moment.scheduledDate,
-    isPinned = moment.isPinned,
-    pinnedAt = moment.pinnedAt,
-    gridPreviewScale = moment.gridPreviewScale,
-    gridPreviewOffsetX = moment.gridPreviewOffsetX,
-    gridPreviewOffsetY = moment.gridPreviewOffsetY,
-    gridPreviewFitMode = moment.gridPreviewFitMode,
-    gridPreviewBackground = moment.gridPreviewBackground,
-    hasHiddenLayers = moment.hasHiddenLayers,
-    hiddenLayerCount = moment.hiddenLayerCount,
-    locationLatitude = moment.locationCoordinate?.latitude,
-    locationLongitude = moment.locationCoordinate?.longitude,
-    reactionsData = encodeReactions(moment.reactions),
-    mediaItemsData = encodeMediaItems(moment.mediaItems),
-    taggedUsersData = moment.taggedUsers?.let { JSONArray(it).toString().toByteArray() },
-    mentionedUsersData = moment.mentionedUsers?.let { JSONArray(it).toString().toByteArray() },
-    lastSyncedAt = Date(),
-    feedSection = section,
-)
-
-private fun CachedMoment.toMoment(): Moment? = Moment(
-    id = momentId,
-    authorId = authorId,
-    username = username,
-    content = content,
-    imagePath = imagePath,
-    videoUrl = videoUrl,
-    timestamp = timestamp,
-    reactions = decodeReactions(reactionsData),
-    commentCount = commentCount ?: 0,
-    profileImagePath = profileImagePath,
-    taggedUsers = taggedUsersData?.let { JSONArray(String(it)).toStringList() },
-    mentionedUsers = mentionedUsersData?.let { JSONArray(String(it)).toStringList() },
-    location = location,
-    locationCoordinate = if (locationLatitude != null && locationLongitude != null) {
-        Moment.LocationCoordinate(locationLatitude, locationLongitude)
-    } else null,
-    audience = audience,
-    mediaItems = decodeMediaItems(mediaItemsData),
-    aspectRatio = aspectRatio,
-    customListId = customListId,
-    thumbnailUrl = thumbnailUrl,
-    videoDuration = videoDuration,
-    videoFileSize = videoFileSize,
-    videoResolution = videoResolution,
-    disableComments = disableComments ?: false,
-    hideLikeCounts = hideLikeCounts ?: false,
-    allowSharing = allowSharing ?: true,
-    scheduledDate = scheduledDate,
-    isPinned = isPinned,
-    pinnedAt = pinnedAt,
-    gridPreviewScale = gridPreviewScale,
-    gridPreviewOffsetX = gridPreviewOffsetX,
-    gridPreviewOffsetY = gridPreviewOffsetY,
-    gridPreviewFitMode = gridPreviewFitMode,
-    gridPreviewBackground = gridPreviewBackground,
-    hasHiddenLayers = hasHiddenLayers ?: false,
-    hiddenLayerCount = hiddenLayerCount ?: 0,
-)
-
-private fun storyToCachedStory(story: Story): CachedStory? {
-    val id = story.id ?: return null
-    val mediaJson = encodeMediaItem(story.mediaItem) ?: return null
-    return CachedStory(
-        id = id,
-        authorId = story.authorId,
-        username = story.username,
-        profileImagePath = story.profileImagePath,
-        timestamp = story.timestamp,
-        expirationDate = story.expirationDate,
-        expirationHours = story.expirationHours,
-        mediaItemData = mediaJson,
-        audience = story.audience,
-        customListId = story.customListId,
-        text = story.text,
-        textPositionData = story.textPosition?.let { JSONObject(mapOf("x" to it.x, "y" to it.y)).toString().toByteArray() },
-        textStyle = story.textStyle,
-        aspectRatio = story.aspectRatio,
-        backgroundFrameURL = story.backgroundFrameURL,
-        backgroundBlurredFrameURL = story.backgroundBlurredFrameURL,
-        chainId = story.chainId,
-        chainPosition = story.chainPosition,
-        chainTitle = story.chainTitle,
-        drawingData = story.drawingData,
-        cachedAt = Date(),
-    )
-}
-
-private fun CachedStory.toStory(): Story {
-    val mediaItem = decodeMediaItem(mediaItemData) ?: MediaItem(type = MediaItem.MediaType.IMAGE, url = "")
-    val textPosition = textPositionData?.let {
-        val obj = JSONObject(String(it))
-        com.moments.android.models.Point(obj.getDouble("x"), obj.getDouble("y"))
-    }
-    return Story(
-        id = id,
-        authorId = authorId,
-        duration = 15.0,
-        expirationHours = expirationHours ?: if (chainId != null) 48 else 24,
-        expirationDate = expirationDate,
-        mediaItem = mediaItem,
-        profileImagePath = profileImagePath,
-        timestamp = timestamp,
-        username = username,
-        audience = audience,
-        customListId = customListId,
-        text = text,
-        textPosition = textPosition,
-        textStyle = textStyle,
-        aspectRatio = aspectRatio,
-        backgroundFrameURL = backgroundFrameURL,
-        backgroundBlurredFrameURL = backgroundBlurredFrameURL,
-        chainId = chainId,
-        chainPosition = chainPosition,
-        chainTitle = chainTitle,
-        drawingData = drawingData,
-    )
-}
+// MARK: - CachedMoment prefs I/O (from/toMoment viven en CachedMoment)
 
 private fun encodeCachedMoment(cached: CachedMoment): JSONObject = JSONObject().apply {
     put("momentId", cached.momentId)
@@ -1458,6 +1286,13 @@ private fun encodeCachedMoment(cached: CachedMoment): JSONObject = JSONObject().
     put("hideLikeCounts", cached.hideLikeCounts)
     put("allowSharing", cached.allowSharing)
     cached.scheduledDate?.let { put("scheduledDate", it.time) }
+    cached.isPinned?.let { put("isPinned", it) }
+    cached.pinnedAt?.let { put("pinnedAt", it.time) }
+    cached.gridPreviewScale?.let { put("gridPreviewScale", it) }
+    cached.gridPreviewOffsetX?.let { put("gridPreviewOffsetX", it) }
+    cached.gridPreviewOffsetY?.let { put("gridPreviewOffsetY", it) }
+    cached.gridPreviewFitMode?.let { put("gridPreviewFitMode", it) }
+    cached.gridPreviewBackground?.let { put("gridPreviewBackground", it) }
     put("hasHiddenLayers", cached.hasHiddenLayers)
     put("hiddenLayerCount", cached.hiddenLayerCount)
     cached.locationLatitude?.let { put("locationLatitude", it) }
@@ -1479,7 +1314,7 @@ private fun decodeCachedMoment(obj: JSONObject): CachedMoment? = runCatching {
         imagePath = obj.stringOrNull("imagePath"),
         videoUrl = obj.stringOrNull("videoUrl"),
         timestamp = Date(obj.getLong("timestamp")),
-        commentCount = obj.optInt("commentCount"),
+        commentCount = obj.optIntOrNull("commentCount") ?: obj.optInt("commentCount"),
         profileImagePath = obj.stringOrNull("profileImagePath"),
         location = obj.stringOrNull("location"),
         audience = obj.stringOrNull("audience"),
@@ -1489,12 +1324,19 @@ private fun decodeCachedMoment(obj: JSONObject): CachedMoment? = runCatching {
         videoFileSize = obj.optLongOrNull("videoFileSize"),
         videoResolution = obj.stringOrNull("videoResolution"),
         customListId = obj.stringOrNull("customListId"),
-        disableComments = obj.optBoolean("disableComments"),
-        hideLikeCounts = obj.optBoolean("hideLikeCounts"),
+        disableComments = if (obj.has("disableComments")) obj.optBoolean("disableComments") else false,
+        hideLikeCounts = if (obj.has("hideLikeCounts")) obj.optBoolean("hideLikeCounts") else false,
         allowSharing = obj.optBoolean("allowSharing", true),
         scheduledDate = obj.optLongOrNull("scheduledDate")?.let { Date(it) },
-        hasHiddenLayers = obj.optBoolean("hasHiddenLayers"),
-        hiddenLayerCount = obj.optInt("hiddenLayerCount"),
+        isPinned = if (obj.has("isPinned") && !obj.isNull("isPinned")) obj.optBoolean("isPinned") else null,
+        pinnedAt = obj.optLongOrNull("pinnedAt")?.let { Date(it) },
+        gridPreviewScale = obj.optDoubleOrNull("gridPreviewScale"),
+        gridPreviewOffsetX = obj.optDoubleOrNull("gridPreviewOffsetX"),
+        gridPreviewOffsetY = obj.optDoubleOrNull("gridPreviewOffsetY"),
+        gridPreviewFitMode = obj.stringOrNull("gridPreviewFitMode"),
+        gridPreviewBackground = obj.stringOrNull("gridPreviewBackground"),
+        hasHiddenLayers = if (obj.has("hasHiddenLayers")) obj.optBoolean("hasHiddenLayers") else false,
+        hiddenLayerCount = obj.optIntOrNull("hiddenLayerCount") ?: 0,
         locationLatitude = obj.optDoubleOrNull("locationLatitude"),
         locationLongitude = obj.optDoubleOrNull("locationLongitude"),
         reactionsData = obj.stringOrNull("reactionsData")?.let { Base64.getDecoder().decode(it) },
@@ -1520,6 +1362,9 @@ private fun encodeCachedStory(story: CachedStory): JSONObject = JSONObject().app
     put("text", story.text)
     story.textPositionData?.let { put("textPositionData", Base64.getEncoder().encodeToString(it)) }
     put("textStyle", story.textStyle)
+    story.textOverlayMetadataData?.let { put("textOverlayMetadataData", Base64.getEncoder().encodeToString(it)) }
+    story.textOverlaysData?.let { put("textOverlaysData", Base64.getEncoder().encodeToString(it)) }
+    story.stickersData?.let { put("stickersData", Base64.getEncoder().encodeToString(it)) }
     put("aspectRatio", story.aspectRatio)
     put("backgroundFrameURL", story.backgroundFrameURL)
     put("backgroundBlurredFrameURL", story.backgroundBlurredFrameURL)
@@ -1545,6 +1390,9 @@ private fun decodeCachedStory(obj: JSONObject): CachedStory? = runCatching {
         text = obj.stringOrNull("text"),
         textPositionData = obj.stringOrNull("textPositionData")?.let { Base64.getDecoder().decode(it) },
         textStyle = obj.stringOrNull("textStyle"),
+        textOverlayMetadataData = obj.stringOrNull("textOverlayMetadataData")?.let { Base64.getDecoder().decode(it) },
+        textOverlaysData = obj.stringOrNull("textOverlaysData")?.let { Base64.getDecoder().decode(it) },
+        stickersData = obj.stringOrNull("stickersData")?.let { Base64.getDecoder().decode(it) },
         aspectRatio = obj.stringOrNull("aspectRatio"),
         backgroundFrameURL = obj.stringOrNull("backgroundFrameURL"),
         backgroundBlurredFrameURL = obj.stringOrNull("backgroundBlurredFrameURL"),
@@ -1553,77 +1401,6 @@ private fun decodeCachedStory(obj: JSONObject): CachedStory? = runCatching {
         chainTitle = obj.stringOrNull("chainTitle"),
         drawingData = obj.stringOrNull("drawingData")?.let { Base64.getDecoder().decode(it) },
         cachedAt = Date(obj.optLong("cachedAt", System.currentTimeMillis())),
-    )
-}.getOrNull()
-
-private fun encodeReactions(reactions: Map<String, List<String>>): ByteArray =
-    JSONObject(reactions.mapValues { (_, v) -> JSONArray(v) }).toString().toByteArray()
-
-private fun decodeReactions(data: ByteArray?): Map<String, List<String>> {
-    if (data == null) return emptyMap()
-    return runCatching {
-        val obj = JSONObject(String(data))
-        obj.keys().asSequence().associateWith { key ->
-            obj.getJSONArray(key).toStringList()
-        }
-    }.getOrDefault(emptyMap())
-}
-
-private fun encodeMediaItems(items: List<MediaItem>?): ByteArray? {
-    if (items == null) return null
-    val arr = JSONArray()
-    items.forEach { item ->
-        arr.put(JSONObject().apply {
-            put("id", item.id)
-            put("type", item.type.raw)
-            put("url", item.url)
-            item.aspectRatio?.let { put("aspectRatio", it) }
-            item.thumbnailUrl?.let { put("thumbnailUrl", it) }
-        })
-    }
-    return arr.toString().toByteArray()
-}
-
-private fun decodeMediaItems(data: ByteArray?): List<MediaItem>? {
-    if (data == null) return null
-    return runCatching {
-        val arr = JSONArray(String(data))
-        (0 until arr.length()).mapNotNull { i ->
-            arr.optJSONObject(i)?.let { obj ->
-                val type = MediaItem.MediaType.entries.firstOrNull { it.raw == obj.optString("type") }
-                    ?: MediaItem.MediaType.IMAGE
-                MediaItem(
-                    id = obj.optString("id"),
-                    type = type,
-                    url = obj.getString("url"),
-                    aspectRatio = obj.stringOrNull("aspectRatio"),
-                    thumbnailUrl = obj.stringOrNull("thumbnailUrl"),
-                )
-            }
-        }
-    }.getOrNull()
-}
-
-private fun encodeMediaItem(item: MediaItem): ByteArray? = runCatching {
-    JSONObject().apply {
-        put("id", item.id)
-        put("type", item.type.raw)
-        put("url", item.url)
-        item.aspectRatio?.let { put("aspectRatio", it) }
-        item.thumbnailUrl?.let { put("thumbnailUrl", it) }
-    }.toString().toByteArray()
-}.getOrNull()
-
-private fun decodeMediaItem(data: ByteArray): MediaItem? = runCatching {
-    val obj = JSONObject(String(data))
-    val type = MediaItem.MediaType.entries.firstOrNull { it.raw == obj.optString("type") }
-        ?: MediaItem.MediaType.IMAGE
-    MediaItem(
-        id = obj.optString("id"),
-        type = type,
-        url = obj.getString("url"),
-        aspectRatio = obj.stringOrNull("aspectRatio"),
-        thumbnailUrl = obj.stringOrNull("thumbnailUrl"),
     )
 }.getOrNull()
 
@@ -1646,29 +1423,6 @@ private fun JSONObject.optIntOrNull(name: String): Int? =
     if (has(name) && !isNull(name)) optInt(name) else null
 
 // MARK: - CachedConversation / Notification conversions
-
-private fun conversationToCached(conversation: Conversation): CachedConversation = CachedConversation(
-    id = conversation.id ?: java.util.UUID.randomUUID().toString(),
-    participants = conversation.participants,
-    lastMessage = conversation.lastMessage,
-    timestamp = conversation.timestamp,
-    readStatusData = encodeStringBoolMap(conversation.readStatus),
-    otherParticipantId = conversation.otherParticipantId,
-    otherParticipantUsername = conversation.otherParticipantUsername,
-    otherParticipantProfileImagePath = conversation.otherParticipantProfileImagePath,
-    lastSyncedAt = Date(),
-)
-
-private fun CachedConversation.toConversation(): Conversation = Conversation(
-    id = id,
-    participants = participants,
-    lastMessage = lastMessage,
-    timestamp = timestamp,
-    readStatus = decodeStringBoolMap(readStatusData),
-    otherParticipantId = otherParticipantId,
-    otherParticipantUsername = otherParticipantUsername,
-    otherParticipantProfileImagePath = otherParticipantProfileImagePath,
-)
 
 private fun encodeCachedConversation(cached: CachedConversation): JSONObject = JSONObject().apply {
     put("id", cached.id)
@@ -1717,56 +1471,6 @@ private fun decodeCachedConversation(obj: JSONObject): CachedConversation? = run
         vanishModeActive = obj.optBoolean("vanishModeActive"),
     )
 }.getOrNull()
-
-private fun notificationToCached(notification: MomentsNotification): CachedNotification = CachedNotification(
-    id = notification.id ?: java.util.UUID.randomUUID().toString(),
-    type = notification.type.raw,
-    senderId = notification.senderId,
-    senderUsername = notification.senderUsername,
-    timestamp = notification.timestamp,
-    isPending = notification.isPending,
-    title = notification.title,
-    message = notification.message,
-    downloadURL = notification.downloadURL,
-    momentId = notification.momentId,
-    visitCount = notification.visitCount,
-    storyId = notification.storyId,
-    storyAuthorId = notification.storyAuthorId,
-    storyPreviewUrl = notification.storyPreviewUrl,
-    reaction = notification.reaction,
-    reactionCount = notification.reactionCount,
-    commentId = notification.commentId,
-    echoId = notification.echoId,
-    moderationScope = notification.moderationScope,
-    totalParts = notification.totalParts,
-    chainRole = notification.chainRole,
-    lastSyncedAt = Date(),
-)
-
-private fun CachedNotification.toNotification(): MomentsNotification = MomentsNotification(
-    id = id,
-    type = com.moments.android.models.NotificationType.from(type)
-        ?: com.moments.android.models.NotificationType.MESSAGE,
-    senderId = senderId,
-    senderUsername = senderUsername,
-    timestamp = timestamp,
-    isPending = isPending,
-    title = title,
-    message = message,
-    downloadURL = downloadURL,
-    momentId = momentId,
-    visitCount = visitCount,
-    storyId = storyId,
-    storyAuthorId = storyAuthorId,
-    storyPreviewUrl = storyPreviewUrl,
-    reaction = reaction,
-    reactionCount = reactionCount,
-    commentId = commentId,
-    echoId = echoId,
-    moderationScope = moderationScope,
-    totalParts = totalParts,
-    chainRole = chainRole,
-)
 
 private fun encodeCachedNotification(cached: CachedNotification): JSONObject = JSONObject().apply {
     put("id", cached.id)
@@ -1819,14 +1523,3 @@ private fun decodeCachedNotification(obj: JSONObject): CachedNotification? = run
         lastSyncedAt = Date(obj.optLong("lastSyncedAt", System.currentTimeMillis())),
     )
 }.getOrNull()
-
-private fun encodeStringBoolMap(map: Map<String, Boolean>): ByteArray =
-    JSONObject(map).toString().toByteArray()
-
-private fun decodeStringBoolMap(data: ByteArray?): Map<String, Boolean> {
-    if (data == null) return emptyMap()
-    return runCatching {
-        val obj = JSONObject(String(data))
-        obj.keys().asSequence().associateWith { obj.getBoolean(it) }
-    }.getOrDefault(emptyMap())
-}

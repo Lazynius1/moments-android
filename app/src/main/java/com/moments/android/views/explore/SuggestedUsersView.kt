@@ -60,7 +60,8 @@ import kotlinx.coroutines.delay
 @Composable
 fun SuggestedUsersView(
     onNavigateBack: () -> Unit = {},
-    onSelectUser: (String) -> Unit = {}
+    onSelectUser: (String) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
     val backgroundColor = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
@@ -77,6 +78,7 @@ fun SuggestedUsersView(
     }
 
     Scaffold(
+        modifier = modifier.fillMaxSize(),
         containerColor = backgroundColor,
         topBar = {
             TopAppBar(

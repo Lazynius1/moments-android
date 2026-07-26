@@ -12,6 +12,9 @@ data class ChatGiphyAsset(
     val width: Int = 0,
     val height: Int = 0,
 ) {
+    /** ≡ `downloadURL`. */
+    val downloadUri: android.net.Uri? get() = url.takeIf { it.isNotBlank() }?.let(android.net.Uri::parse)
+
     companion object {
         fun from(gif: GiphyGif): ChatGiphyAsset? {
             val image = gif.images.fixedHeight
@@ -32,6 +35,9 @@ data class ChatStickerAsset(
     val width: Int = 0,
     val height: Int = 0,
 ) {
+    /** ≡ `downloadURL`. */
+    val downloadUri: android.net.Uri? get() = url.takeIf { it.isNotBlank() }?.let(android.net.Uri::parse)
+
     companion object {
         fun from(gif: GiphyGif): ChatStickerAsset? {
             val image = gif.images.fixedHeight
@@ -114,8 +120,8 @@ data class ChatLocationPayload(
         JSONObject().apply {
             put("lat", lat)
             put("lng", lng)
-            put("name", name)
-            put("address", address)
+            if (name != null) put("name", name)
+            if (address != null) put("address", address)
         }.toString()
     }.getOrNull()
 
@@ -140,6 +146,22 @@ enum class LiveLocationDuration(
     FIFTEEN_MINUTES("15m", 15 * 60 * 1000L, com.moments.android.R.string.chat_location_live_15m),
     ONE_HOUR("1h", 60 * 60 * 1000L, com.moments.android.R.string.chat_location_live_1h),
     EIGHT_HOURS("8h", 8 * 60 * 60 * 1000L, com.moments.android.R.string.chat_location_live_8h);
+
+    /** ≡ `id` / `rawValue` iOS (`fifteenMinutes`…). */
+    val id: String
+        get() = when (this) {
+            FIFTEEN_MINUTES -> "fifteenMinutes"
+            ONE_HOUR -> "oneHour"
+            EIGHT_HOURS -> "eightHours"
+        }
+
+    /** ≡ `localizedTitleKey`. */
+    val localizedTitleKey: String
+        get() = when (this) {
+            FIFTEEN_MINUTES -> "chat.location.live15m"
+            ONE_HOUR -> "chat.location.live1h"
+            EIGHT_HOURS -> "chat.location.live8h"
+        }
 
     companion object {
         fun from(firestoreValue: String?): LiveLocationDuration? =

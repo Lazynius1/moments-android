@@ -3,10 +3,12 @@ package com.moments.android.views.creator
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,14 +19,16 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
@@ -33,6 +37,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,26 +48,39 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.components.StoryVideoGravity
 import com.moments.android.views.creator.components.StoryVideoPlayerView
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-/** Port of `StoryVideoTrimEditorView.swift`. */
+private const val MIN_CLIP_DURATION = 1.0
+
+/**
+ * Port de `StoryVideoTrimEditorView.swift`.
+ * Estética “Nitidez” (light/dark), canvas 9:16, timeline + handles + playhead.
+ */
 @Composable
 fun StoryVideoTrimEditorView(
     videoUri: Uri,
@@ -72,7 +90,20 @@ fun StoryVideoTrimEditorView(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val isDark = isSystemInDarkTheme()
     val maxClipDuration = min(StoryVideoProcessingService.maxStorySegmentDuration, duration)
+    val corner = storyViewerCanvasCornerRadius
+
+    // Adaptive aesthetics ≡ Swift workspaceBg / selectionColor / …
+    val workspaceBg = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+    val selectionColor = if (isDark) Color.White else Color.Black
+    val gripColor = if (isDark) Color.Black else Color.White
+    val dimmingColor = if (isDark) Color.Black else Color.White
+    val chromeIcon = if (isDark) Color.White else Color.Black.copy(0.82f)
+    val chromeStroke = if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.08f)
+    val shadowColor = if (isDark) Color.Black else Color.Gray.copy(0.3f)
+    val placeholderFill = if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.08f)
+
     var trimStart by remember(videoUri) { mutableDoubleStateOf(0.0) }
     var trimDuration by remember(videoUri) { mutableDoubleStateOf(maxClipDuration) }
     var thumbnails by remember(videoUri) { mutableStateOf<List<Bitmap>>(emptyList()) }
@@ -82,7 +113,8 @@ fun StoryVideoTrimEditorView(
     var playbackProgress by remember { mutableDoubleStateOf(0.0) }
     var previewTime by remember { mutableStateOf<Double?>(null) }
     var isDragging by remember { mutableStateOf(false) }
-    var lastHapticTick by remember { mutableDoubleStateOf(-1.0) }
+    var isScrubbingPlayhead by remember { mutableStateOf(false) }
+    var lastHapticTick by remember { mutableDoubleStateOf(0.0) }
     val trimEnd = min(trimStart + trimDuration, duration)
 
     LaunchedEffect(videoUri, duration) {
@@ -91,7 +123,7 @@ fun StoryVideoTrimEditorView(
 
     fun tick(time: Double) {
         val rounded = time.roundToInt().toDouble()
-        if (rounded != lastHapticTick) {
+        if (abs(rounded - lastHapticTick) >= 1.0) {
             lastHapticTick = rounded
             HapticManager.shared.lightImpact()
         }
@@ -100,6 +132,7 @@ fun StoryVideoTrimEditorView(
     fun export() {
         isProcessing = true
     }
+
     LaunchedEffect(isProcessing) {
         if (!isProcessing) return@LaunchedEffect
         runCatching {
@@ -109,18 +142,33 @@ fun StoryVideoTrimEditorView(
             onComplete(media)
         }.onFailure { error ->
             isProcessing = false
-            errorMessage = error.message ?: "Unable to trim this video."
+            errorMessage = error.message
+                ?: context.getString(R.string.story_video_error_export_failed)
         }
     }
 
-    Box(modifier.fillMaxSize().background(Color(0xFF0B1215))) {
-        Column(Modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().background(workspaceBg)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding(),
+        ) {
+            Spacer(Modifier.height(6.dp))
+
             Box(
                 Modifier
                     .fillMaxWidth()
                     .aspectRatio(9f / 16f)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Color.Black),
+                    .shadow(
+                        elevation = 12.dp,
+                        shape = RoundedCornerShape(corner),
+                        ambientColor = shadowColor.copy(if (isDark) 0.4f else 0.15f),
+                        spotColor = shadowColor.copy(if (isDark) 0.4f else 0.15f),
+                    )
+                    .clip(RoundedCornerShape(corner))
+                    .background(Color.Black)
+                    .border(1.dp, chromeStroke, RoundedCornerShape(corner)),
             ) {
                 StoryVideoPlayerView(
                     videoUri = videoUri,
@@ -129,82 +177,177 @@ fun StoryVideoTrimEditorView(
                     trimStart = trimStart,
                     trimEnd = trimEnd,
                     previewTime = previewTime,
-                    onPlayProgress = { progress -> if (!isDragging && previewTime == null) playbackProgress = progress },
+                    onPlayProgress = { progress ->
+                        if (!isDragging && !isScrubbingPlayhead) {
+                            playbackProgress = progress
+                        }
+                    },
                     modifier = Modifier.fillMaxSize(),
                 )
+
                 Row(
-                    Modifier.fillMaxWidth().padding(12.dp),
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    TrimChromeButton(Icons.AutoMirrored.Filled.ArrowBack, onClick = onCancel)
-                    TrimChromeButton(Icons.Filled.Check, enabled = !isProcessing, onClick = ::export)
+                    TrimChromeButton(
+                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        tint = chromeIcon,
+                        stroke = chromeStroke,
+                        onClick = onCancel,
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
+                    TrimChromeButton(
+                        Icons.Filled.Check,
+                        tint = chromeIcon,
+                        stroke = chromeStroke,
+                        enabled = !isProcessing,
+                        onClick = ::export,
+                        modifier = Modifier.padding(end = 12.dp),
+                    )
                 }
+
                 TrimChromeButton(
                     if (isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                    tint = chromeIcon,
+                    stroke = chromeStroke,
                     onClick = { isMuted = !isMuted },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp).size(38.dp),
+                    size = 38.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 16.dp),
                 )
+
+                // iOS hardcodes "%.1fs selected" (no Localizable key).
                 Text(
-                    "${"%.1f".format(trimDuration)}s selected",
+                    String.format("%.1fs selected", trimDuration),
                     color = Color.White,
                     fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 16.dp)
                         .momentsChromeGlass(RoundedCornerShape(50), interactive = false)
+                        .border(1.dp, chromeStroke, RoundedCornerShape(50))
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
+
             Spacer(Modifier.weight(1f))
+
             StoryTrimTimeline(
                 duration = duration,
                 trimStart = trimStart,
                 trimDuration = trimDuration,
                 playbackProgress = playbackProgress,
                 thumbnails = thumbnails,
-                onStartChange = { start ->
-                    isDragging = true
-                    trimStart = start.coerceIn(0.0, max(0.0, duration - trimDuration))
-                    previewTime = trimStart
-                    tick(trimStart)
+                selectionColor = selectionColor,
+                gripColor = gripColor,
+                dimmingColor = dimmingColor,
+                placeholderFill = placeholderFill,
+                outlineStroke = chromeStroke,
+                showPlayhead = !isDragging || isScrubbingPlayhead,
+                onSelectionDelta = { deltaSeconds ->
+                    if (!isDragging) {
+                        isDragging = true
+                        HapticManager.shared.lightImpact()
+                    }
+                    val clampedStart = min(
+                        max(trimStart + deltaSeconds, 0.0),
+                        max(duration - trimDuration, 0.0),
+                    )
+                    trimStart = clampedStart
+                    previewTime = clampedStart
+                    tick(clampedStart)
                 },
-                onDurationChange = { newDuration ->
-                    isDragging = true
-                    trimDuration = newDuration.coerceIn(1.0, min(maxClipDuration, duration - trimStart))
-                    previewTime = trimStart + trimDuration
-                    tick(trimStart + trimDuration)
+                onLeadingDelta = { deltaSeconds ->
+                    if (!isDragging) {
+                        isDragging = true
+                        HapticManager.shared.lightImpact()
+                    }
+                    val originalEnd = trimStart + trimDuration
+                    val newStart = min(
+                        max(0.0, trimStart + deltaSeconds),
+                        originalEnd - MIN_CLIP_DURATION,
+                    )
+                    trimStart = newStart
+                    trimDuration = min(maxClipDuration, max(MIN_CLIP_DURATION, originalEnd - newStart))
+                    previewTime = newStart
+                    tick(newStart)
                 },
-                onPlayheadChange = { time ->
-                    previewTime = time.coerceIn(trimStart, trimEnd)
-                    playbackProgress = previewTime ?: trimStart
-                    tick(previewTime ?: trimStart)
+                onTrailingDelta = { deltaSeconds ->
+                    if (!isDragging) {
+                        isDragging = true
+                        HapticManager.shared.lightImpact()
+                    }
+                    val newDuration = min(
+                        maxClipDuration,
+                        max(MIN_CLIP_DURATION, trimDuration + deltaSeconds),
+                    )
+                    val finalDuration = min(newDuration, duration - trimStart)
+                    trimDuration = finalDuration
+                    val currentEnd = trimStart + finalDuration
+                    previewTime = currentEnd
+                    tick(currentEnd)
+                },
+                onPlayheadDelta = { deltaSeconds ->
+                    if (!isScrubbingPlayhead) {
+                        isScrubbingPlayhead = true
+                        HapticManager.shared.lightImpact()
+                    }
+                    val target = (playbackProgress + deltaSeconds).coerceIn(trimStart, trimEnd)
+                    playbackProgress = target
+                    previewTime = target
+                    tick(target)
                 },
                 onDragFinished = {
                     isDragging = false
+                    isScrubbingPlayhead = false
                     previewTime = null
                 },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp),
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 14.dp),
             )
         }
+
         if (isProcessing) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .72f)), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.72f)),
+                contentAlignment = Alignment.Center,
+            ) {
                 Column(
-                    Modifier.momentsChromeGlass(RoundedCornerShape(24.dp), interactive = false).padding(28.dp),
+                    Modifier
+                        .momentsChromeGlass(RoundedCornerShape(24.dp), interactive = false)
+                        .padding(horizontal = 28.dp, vertical = 22.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     CircularProgressIndicator(color = Color.White)
-                    Text("Processing video…", color = Color.White)
+                    Text(
+                        stringResource(R.string.story_video_trim_processing),
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
                 }
             }
         }
     }
+
     errorMessage?.let { message ->
         AlertDialog(
             onDismissRequest = { errorMessage = null },
-            title = { Text("Video editor") },
+            title = { Text(stringResource(R.string.video_editor_error_title)) },
             text = { Text(message) },
-            confirmButton = { IconButton(onClick = { errorMessage = null }) { Icon(Icons.Filled.Check, null) } },
+            confirmButton = {
+                TextButton(onClick = { errorMessage = null }) {
+                    Text(stringResource(R.string.video_editor_ok))
+                }
+            },
         )
     }
 }
@@ -216,99 +359,184 @@ private fun StoryTrimTimeline(
     trimDuration: Double,
     playbackProgress: Double,
     thumbnails: List<Bitmap>,
-    onStartChange: (Double) -> Unit,
-    onDurationChange: (Double) -> Unit,
-    onPlayheadChange: (Double) -> Unit,
+    selectionColor: Color,
+    gripColor: Color,
+    dimmingColor: Color,
+    placeholderFill: Color,
+    outlineStroke: Color,
+    showPlayhead: Boolean,
+    onSelectionDelta: (Double) -> Unit,
+    onLeadingDelta: (Double) -> Unit,
+    onTrailingDelta: (Double) -> Unit,
+    onPlayheadDelta: (Double) -> Unit,
     onDragFinished: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier.fillMaxWidth().height(52.dp)) {
         val density = LocalDensity.current
         val totalWidth = constraints.maxWidth.toFloat().coerceAtLeast(1f)
-        val safeDuration = duration.coerceAtLeast(.1).toFloat()
+        val safeDuration = duration.coerceAtLeast(0.1)
         val handleHalfWidth = with(density) { 7.dp.toPx() }
-        val frameTop = with(density) { 4.dp.roundToPx() }
-        val playheadHalfWidth = with(density) { 2.dp.toPx() }
-        val playheadTop = with(density) { 3.dp.roundToPx() }
-        val startPx = (totalWidth * trimStart.toFloat() / safeDuration).coerceAtLeast(0f)
-        val windowPx = max(with(density) { 44.dp.toPx() }, totalWidth * trimDuration.toFloat() / safeDuration)
+        val startPx = (totalWidth * (trimStart / safeDuration).toFloat()).coerceAtLeast(0f)
+        val windowPx = max(
+            with(density) { 44.dp.toPx() },
+            totalWidth * (trimDuration / safeDuration).toFloat(),
+        )
         val clampedStart = min(startPx, max(0f, totalWidth - windowPx))
         val endPx = min(totalWidth, clampedStart + windowPx)
-        val playheadPx = (totalWidth * playbackProgress.toFloat() / safeDuration).coerceIn(clampedStart, endPx)
+        val needleX = (totalWidth * (playbackProgress / safeDuration).toFloat())
+            .coerceIn(clampedStart, endPx - with(density) { 3.dp.toPx() })
 
-        Row(Modifier.fillMaxWidth().height(44.dp).align(Alignment.Center).clip(RoundedCornerShape(10.dp))) {
-            if (thumbnails.isEmpty()) repeat(8) {
-                Box(Modifier.weight(1f).fillMaxSize().background(Color.White.copy(.08f)))
-            } else thumbnails.forEach { frame ->
-                Image(
-                    frame.asImageBitmap(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.weight(1f).fillMaxSize(),
-                )
+        fun secondsDelta(dx: Float): Double = (dx / totalWidth) * duration
+
+        // Thumbnail strip (44pt, centered in 52pt)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .align(Alignment.Center)
+                .clip(RoundedCornerShape(10.dp)),
+        ) {
+            if (thumbnails.isEmpty()) {
+                repeat(8) {
+                    Box(Modifier.weight(1f).fillMaxSize().background(placeholderFill))
+                }
+            } else {
+                thumbnails.forEach { frame ->
+                    Image(
+                        frame.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.weight(1f).fillMaxSize(),
+                    )
+                }
             }
         }
-        Box(Modifier.offset { IntOffset(0, frameTop) }.width(with(density) { clampedStart.toDp() }).height(44.dp).background(Color.Black.copy(.65f)))
+
+        // Inactive dimming (clipped to 44pt strip)
         Box(
             Modifier
-                .offset { IntOffset(endPx.roundToInt(), frameTop) }
-                .width(with(density) { (totalWidth - endPx).toDp() })
+                .fillMaxWidth()
                 .height(44.dp)
-                .background(Color.Black.copy(.65f)),
-        )
+                .align(Alignment.Center)
+                .clip(RoundedCornerShape(10.dp)),
+        ) {
+            Box(
+                Modifier
+                    .width(with(density) { clampedStart.toDp() })
+                    .fillMaxSize()
+                    .background(dimmingColor.copy(0.65f)),
+            )
+            Box(
+                Modifier
+                    .offset { IntOffset(endPx.roundToInt(), 0) }
+                    .width(with(density) { (totalWidth - endPx).coerceAtLeast(0f).toDp() })
+                    .fillMaxSize()
+                    .background(dimmingColor.copy(0.65f)),
+            )
+        }
+
         Box(
             Modifier
-                .offset { IntOffset(clampedStart.roundToInt(), 0) }
+                .fillMaxWidth()
+                .height(44.dp)
+                .align(Alignment.Center)
+                .border(1.dp, outlineStroke, RoundedCornerShape(10.dp)),
+        )
+
+        // Selection window (48pt stroke, offset y: 2)
+        Box(
+            Modifier
+                .offset { IntOffset(clampedStart.roundToInt(), with(density) { 2.dp.roundToPx() }) }
                 .width(with(density) { windowPx.toDp() })
-                .height(52.dp)
-                .border(4.dp, Color.White, RoundedCornerShape(11.dp))
-                .pointerInput(totalWidth, trimStart, trimDuration) {
+                .height(48.dp)
+                .border(4.dp, selectionColor, RoundedCornerShape(11.dp))
+                .pointerInput(totalWidth, duration) {
                     detectDragGestures(
-                        onDragStart = { HapticManager.shared.lightImpact() },
                         onDragEnd = onDragFinished,
                         onDragCancel = onDragFinished,
                     ) { change, drag ->
                         change.consume()
-                        onStartChange(trimStart + (drag.x / totalWidth * duration).toDouble())
+                        onSelectionDelta(secondsDelta(drag.x))
                     }
                 },
         )
-        TrimHandle(
-            Modifier.offset { IntOffset((clampedStart - handleHalfWidth).roundToInt(), 0) },
-            onMove = { delta -> onStartChange(trimStart + (delta / totalWidth * duration).toDouble()) },
-            onFinished = onDragFinished,
-        )
-        TrimHandle(
-            Modifier.offset { IntOffset((endPx - handleHalfWidth).roundToInt(), 0) },
-            onMove = { delta -> onDurationChange(trimDuration + (delta / totalWidth * duration).toDouble()) },
-            onFinished = onDragFinished,
-        )
-        Box(
-            Modifier
-                .offset { IntOffset((playheadPx - playheadHalfWidth).roundToInt(), playheadTop) }
-                .width(3.dp)
-                .height(46.dp)
-                .background(Color.White)
-                .pointerInput(totalWidth, trimStart, trimDuration) {
-                    detectDragGestures(onDragEnd = onDragFinished, onDragCancel = onDragFinished) { change, drag ->
-                        change.consume()
-                        onPlayheadChange(playbackProgress + (drag.x / totalWidth * duration).toDouble())
+
+        // Playhead needle + 32dp hitbox
+        if (showPlayhead) {
+            Box(
+                Modifier
+                    .offset {
+                        IntOffset(
+                            (needleX - with(density) { 14.5.dp.toPx() }).roundToInt(),
+                            0,
+                        )
                     }
-                },
+                    .size(width = 32.dp, height = 52.dp)
+                    .pointerInput(totalWidth, duration) {
+                        detectDragGestures(
+                            onDragEnd = onDragFinished,
+                            onDragCancel = onDragFinished,
+                        ) { change, drag ->
+                            change.consume()
+                            onPlayheadDelta(secondsDelta(drag.x))
+                        }
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .width(3.dp)
+                        .height(46.dp)
+                        .shadow(2.dp, ambientColor = Color.Black.copy(0.35f))
+                        .background(selectionColor),
+                )
+            }
+        }
+
+        TrimHandle(
+            gripColor = gripColor,
+            selectionColor = selectionColor,
+            modifier = Modifier.offset {
+                IntOffset(max(0, (clampedStart - handleHalfWidth).roundToInt()), 0)
+            },
+            onMove = { dx -> onLeadingDelta(secondsDelta(dx)) },
+            onFinished = onDragFinished,
+        )
+        TrimHandle(
+            gripColor = gripColor,
+            selectionColor = selectionColor,
+            modifier = Modifier.offset {
+                IntOffset(
+                    min(
+                        (totalWidth - with(density) { 14.dp.toPx() }).roundToInt(),
+                        (endPx - handleHalfWidth).roundToInt(),
+                    ),
+                    0,
+                )
+            },
+            onMove = { dx -> onTrailingDelta(secondsDelta(dx)) },
+            onFinished = onDragFinished,
         )
     }
 }
 
 @Composable
-private fun TrimHandle(modifier: Modifier, onMove: (Float) -> Unit, onFinished: () -> Unit) {
+private fun TrimHandle(
+    gripColor: Color,
+    selectionColor: Color,
+    onMove: (Float) -> Unit,
+    onFinished: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier
             .size(width = 14.dp, height = 52.dp)
+            .shadow(3.dp, RoundedCornerShape(7.dp), ambientColor = Color.Black.copy(0.2f))
             .clip(RoundedCornerShape(7.dp))
-            .background(Color.White)
+            .background(selectionColor)
             .pointerInput(Unit) {
                 detectDragGestures(
-                    onDragStart = { HapticManager.shared.lightImpact() },
                     onDragEnd = onFinished,
                     onDragCancel = onFinished,
                 ) { change, drag ->
@@ -319,31 +547,62 @@ private fun TrimHandle(modifier: Modifier, onMove: (Float) -> Unit, onFinished: 
         contentAlignment = Alignment.Center,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            repeat(3) { Box(Modifier.size(3.dp).background(Color.Black, CircleShape)) }
+            repeat(3) {
+                Box(
+                    Modifier
+                        .size(3.dp)
+                        .background(gripColor.copy(0.65f), CircleShape),
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun TrimChromeButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    enabled: Boolean = true,
+    icon: ImageVector,
+    tint: Color,
+    stroke: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    size: Dp = 42.dp,
 ) {
     IconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.size(42.dp).momentsChromeGlass(CircleShape, interactive = true),
-    ) { Icon(icon, null, tint = Color.White) }
+        modifier = modifier
+            .size(size)
+            .momentsChromeGlass(CircleShape, interactive = true)
+            .border(1.dp, stroke, CircleShape),
+    ) {
+        Icon(icon, contentDescription = null, tint = tint)
+    }
 }
 
-private fun timelineFrames(context: android.content.Context, uri: Uri, duration: Double): List<Bitmap> {
+/** ≡ `generateTimeline()` — 10 frames, maxSize 160×284. */
+private fun timelineFrames(
+    context: android.content.Context,
+    uri: Uri,
+    duration: Double,
+): List<Bitmap> {
     val retriever = MediaMetadataRetriever()
+    val count = 10
     return try {
         retriever.setDataSource(context, uri)
-        (0 until 10).mapNotNull { index ->
-            retriever.getFrameAtTime((duration * index / 9.0 * 1_000_000L).toLong())
+        (0 until count).mapNotNull { index ->
+            val seconds = duration * (index.toDouble() / max(count - 1, 1).toDouble())
+            val timeUs = (seconds * 1_000_000L).toLong()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                retriever.getScaledFrameAtTime(
+                    timeUs,
+                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                    160,
+                    284,
+                )
+            } else {
+                retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            }
         }
     } catch (_: Exception) {
         emptyList()

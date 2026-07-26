@@ -3,16 +3,23 @@ package com.moments.android.services.cache
 import android.content.Context
 import coil.imageLoader
 import coil.request.Disposable
+import coil.request.ErrorResult
 import coil.request.ImageRequest
+import coil.request.SuccessResult
 import java.net.URL
 import java.util.Collections
 
-/** Port de ImagePrefetchManager.swift — Kingfisher → Coil. */
+/**
+ * Port de `ImagePrefetchManager.swift` — Kingfisher ImagePrefetcher → Coil enqueue.
+ * Tope global 20 URLs en vuelo; cancelAll detiene descargas reales.
+ */
 object ImagePrefetchManager {
 
     private val currentlyPrefetchingUrls = Collections.synchronizedSet(mutableSetOf<String>())
-    private val inFlightDisposables = Collections.synchronizedList(mutableListOf<Disposable>())
-    private val maxInFlightUrls = 20
+    private val inFlightDisposables = Collections.synchronizedMap(mutableMapOf<String, Disposable>())
+    private const val MAX_IN_FLIGHT_URLS = 20
+    /** iOS DelayRetryStrategy(maxRetryCount: 2, retryInterval: .seconds(2)). */
+    private const val MAX_RETRY_COUNT = 2
 
     @Volatile private var appContext: Context? = null
 
@@ -26,7 +33,7 @@ object ImagePrefetchManager {
 
         val urlsToProcess: List<URL>
         synchronized(currentlyPrefetchingUrls) {
-            val availableSlots = (maxInFlightUrls - currentlyPrefetchingUrls.size).coerceAtLeast(0)
+            val availableSlots = (MAX_IN_FLIGHT_URLS - currentlyPrefetchingUrls.size).coerceAtLeast(0)
             if (availableSlots == 0) {
                 urlsToProcess = emptyList()
             } else {
@@ -39,17 +46,7 @@ object ImagePrefetchManager {
 
         val loader = context.imageLoader
         for (url in urlsToProcess) {
-            val key = url.toString()
-            val request = ImageRequest.Builder(context)
-                .data(url)
-                .listener(
-                    onSuccess = { _, _ -> currentlyPrefetchingUrls.remove(key) },
-                    onError = { _, _ -> currentlyPrefetchingUrls.remove(key) },
-                    onCancel = { currentlyPrefetchingUrls.remove(key) },
-                )
-                .build()
-            val disposable = loader.enqueue(request)
-            synchronized(inFlightDisposables) { inFlightDisposables.add(disposable) }
+            enqueueWithRetry(context, loader, url, attempt = 0)
         }
     }
 
@@ -59,9 +56,55 @@ object ImagePrefetchManager {
 
     fun cancelAll() {
         synchronized(inFlightDisposables) {
-            inFlightDisposables.forEach { it.dispose() }
+            inFlightDisposables.values.forEach { it.dispose() }
             inFlightDisposables.clear()
         }
         currentlyPrefetchingUrls.clear()
+    }
+
+    private fun enqueueWithRetry(
+        context: Context,
+        loader: coil.ImageLoader,
+        url: URL,
+        attempt: Int,
+    ) {
+        val key = url.toString()
+        val request = ImageRequest.Builder(context)
+            .data(url)
+            .listener(
+                object : ImageRequest.Listener {
+                    override fun onSuccess(request: ImageRequest, result: SuccessResult) {
+                        finish(key)
+                    }
+
+                    override fun onError(request: ImageRequest, result: ErrorResult) {
+                        if (attempt < MAX_RETRY_COUNT) {
+                            // Reintento tras ~2s (paridad DelayRetryStrategy).
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                if (currentlyPrefetchingUrls.contains(key)) {
+                                    enqueueWithRetry(context, loader, url, attempt + 1)
+                                }
+                            }, 2_000L)
+                        } else {
+                            finish(key)
+                        }
+                    }
+
+                    override fun onCancel(request: ImageRequest) {
+                        finish(key)
+                    }
+                },
+            )
+            .build()
+        val disposable = loader.enqueue(request)
+        synchronized(inFlightDisposables) {
+            inFlightDisposables[key]?.dispose()
+            inFlightDisposables[key] = disposable
+        }
+    }
+
+    private fun finish(key: String) {
+        currentlyPrefetchingUrls.remove(key)
+        synchronized(inFlightDisposables) { inFlightDisposables.remove(key) }
     }
 }

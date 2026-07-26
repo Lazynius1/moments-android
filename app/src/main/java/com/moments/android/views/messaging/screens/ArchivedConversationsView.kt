@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
-import com.moments.android.models.Conversation
+import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.components.ConversationContextMenuInsets
 import com.moments.android.views.messaging.components.ConversationContextMenuOverlay
 import com.moments.android.views.messaging.components.ConversationMenuData

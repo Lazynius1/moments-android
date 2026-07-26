@@ -4,77 +4,113 @@ import android.net.Uri
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
 import com.google.firebase.storage.UploadTask
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-// Errores de Storage (port de StorageError.swift).
-sealed class StorageError(message: String) : Exception(message) {
-    object InvalidData : StorageError("invalid data")
-    object UploadFailed : StorageError("upload failed")
-    object UrlRetrievalFailed : StorageError("url retrieval failed")
-    object DeleteFailed : StorageError("delete failed")
-    object InvalidPath : StorageError("invalid path")
-}
-
-// Carga a subir: bytes en memoria o fichero (Uri). Port de MediaUploadPayload.
+/** Port de `MediaUploadPayload`. */
 sealed class MediaUploadPayload {
-    data class Data(val bytes: ByteArray) : MediaUploadPayload()
+    data class Data(val bytes: ByteArray) : MediaUploadPayload() {
+        override fun equals(other: Any?): Boolean =
+            other is Data && bytes.contentEquals(other.bytes)
+
+        override fun hashCode(): Int = bytes.contentHashCode()
+    }
+
     data class File(val uri: Uri) : MediaUploadPayload()
 }
 
-// Port de MediaUploadService.swift. Retiene las UploadTask activas para poder cancelarlas
-// por prefijo de ruta (equivalente a `sessions` en iOS).
+/** Port de `UploadSession` — retiene la UploadTask para cancelación por prefijo. */
+private class UploadSession(
+    val objectPath: String,
+    val task: UploadTask,
+) {
+    @Volatile var didFinish: Boolean = false
+}
+
+/**
+ * Port de `MediaUploadService.swift`.
+ *
+ * Retiene las `UploadTask` activas en `sessions` (como iOS): si no se retienen,
+ * el GC / fin de scope puede cancelar la subida y el backend responde mal.
+ *
+ * `StorageError` vive en [StorageService] (paridad iOS: StorageService.swift).
+ */
 object MediaUploadService {
 
     private val storage get() = FirebaseStorage.getInstance().reference
-    private val sessions = ConcurrentHashMap<String, UploadTask>()
+    private val sessions = ConcurrentHashMap<String, UploadSession>()
 
-    // MARK: - Subidas públicas (resuelven downloadURL con token)
+    // MARK: - Subidas públicas
 
+    /**
+     * Port de `upload(target:payload:progress:) async throws`.
+     * Data con `encrypted=true` → `uploadEncryptedBlob` (objectPath, no downloadURL).
+     */
     suspend fun upload(
         target: StorageUploadTarget,
         payload: MediaUploadPayload,
-        progress: ((Double) -> Unit)? = null
+        progress: ((Double) -> Unit)? = null,
     ): String {
-        // Data marcada como cifrada → devuelve objectPath, no downloadURL.
         if (payload is MediaUploadPayload.Data && target.customMetadata["encrypted"] == "true") {
             return uploadEncryptedBlob(target, payload.bytes, progress)
         }
-        return startUpload(target.objectPath, target, payload, progress)
+        return startUpload(
+            path = target.objectPath,
+            target = target,
+            payload = payload,
+            progress = progress,
+        )
     }
 
-    // Subida cifrada (blob en memoria): devuelve el objectPath en vez de downloadURL.
+    /**
+     * Port de `uploadEncryptedBlob`.
+     * `returnObjectPath=true` → startUpload devuelve objectPath, no downloadURL.
+     */
     suspend fun uploadEncryptedBlob(
         target: StorageUploadTarget,
         data: ByteArray,
-        progress: ((Double) -> Unit)? = null
+        progress: ((Double) -> Unit)? = null,
     ): String {
         val patched = target.copy(
-            customMetadata = target.customMetadata + ("returnObjectPath" to "true")
+            customMetadata = target.customMetadata + ("returnObjectPath" to "true"),
         )
-        return startUpload(patched.objectPath, patched, MediaUploadPayload.Data(data), progress)
+        return startUpload(
+            path = patched.objectPath,
+            target = patched,
+            payload = MediaUploadPayload.Data(data),
+            progress = progress,
+        )
     }
 
-    // Variante para ciphertext grande leído desde fichero.
+    /**
+     * Port de `uploadEncryptedFile` — ciphertext grande desde fichero.
+     */
     suspend fun uploadEncryptedFile(
         target: StorageUploadTarget,
         fileUri: Uri,
-        progress: ((Double) -> Unit)? = null
+        progress: ((Double) -> Unit)? = null,
     ): String {
         val patched = target.copy(
-            customMetadata = target.customMetadata + ("returnObjectPath" to "true")
+            customMetadata = target.customMetadata + ("returnObjectPath" to "true"),
         )
-        return startUpload(patched.objectPath, patched, MediaUploadPayload.File(fileUri), progress)
+        return startUpload(
+            path = patched.objectPath,
+            target = patched,
+            payload = MediaUploadPayload.File(fileUri),
+            progress = progress,
+        )
     }
+
+    // MARK: - startUpload (núcleo)
 
     private suspend fun startUpload(
         path: String,
         target: StorageUploadTarget,
         payload: MediaUploadPayload,
-        progress: ((Double) -> Unit)?
+        progress: ((Double) -> Unit)?,
     ): String {
         val ref = storage.child(path)
         val metadata = StorageMetadata.Builder().apply {
@@ -82,54 +118,101 @@ object MediaUploadService {
             target.customMetadata.forEach { (k, v) -> setCustomMetadata(k, v) }
         }.build()
 
-        // Solo chat cifrado devuelve objectPath; moments/stories necesitan downloadURL con token.
+        // Solo returnObjectPath → objectPath; moments/stories necesitan downloadURL con token.
         val shouldResolveDownloadURL = target.customMetadata["returnObjectPath"] != "true"
 
         val uploadTask: UploadTask = when (payload) {
             is MediaUploadPayload.Data -> ref.putBytes(payload.bytes, metadata)
             is MediaUploadPayload.File -> ref.putFile(payload.uri, metadata)
         }
-        sessions[path] = uploadTask
+
+        val session = UploadSession(objectPath = path, task = uploadTask)
+        sessions[path] = session
 
         try {
-            suspendCancellableCoroutine { cont ->
+            suspendCancellableCoroutine<Unit> { cont ->
+                var finished = false
+                fun finishSuccess() {
+                    if (finished) return
+                    finished = true
+                    cont.resume(Unit)
+                }
+                fun finishFailure(e: Exception) {
+                    if (finished) return
+                    finished = true
+                    cont.resumeWithException(e)
+                }
+
                 if (progress != null) {
                     uploadTask.addOnProgressListener { snapshot ->
-                        if (snapshot.totalByteCount > 0) {
-                            progress(snapshot.bytesTransferred.toDouble() / snapshot.totalByteCount.toDouble())
+                        val total = snapshot.totalByteCount
+                        if (total > 0) {
+                            progress(snapshot.bytesTransferred.toDouble() / total.toDouble())
                         }
                     }
                 }
-                uploadTask.addOnSuccessListener { cont.resume(Unit) }
-                uploadTask.addOnFailureListener { e -> cont.resumeWithException(e) }
-                cont.invokeOnCancellation { uploadTask.cancel() }
+                uploadTask.addOnSuccessListener { finishSuccess() }
+                uploadTask.addOnFailureListener { e ->
+                    finishFailure(e as? Exception ?: StorageError.UploadFailed)
+                }
+                cont.invokeOnCancellation {
+                    if (!session.didFinish) {
+                        uploadTask.cancel()
+                    }
+                }
             }
-        } finally {
+        } catch (e: Exception) {
+            session.didFinish = true
             sessions.remove(path)
+            throw e
         }
 
-        if (!shouldResolveDownloadURL) return path
-        val url = ref.downloadUrl.await() ?: throw StorageError.UrlRetrievalFailed
-        return url.toString()
+        // iOS: finish() (quita sesión) solo tras success o tras resolver downloadURL.
+        // Aquí resolvemos URL mientras la sesión sigue viva (cancelable), luego limpiamos.
+        return try {
+            if (!shouldResolveDownloadURL) {
+                path
+            } else {
+                val url = ref.downloadUrl.await()
+                    ?: throw StorageError.UrlRetrievalFailed
+                url.toString()
+            }
+        } finally {
+            session.didFinish = true
+            sessions.remove(path)
+        }
     }
 
-    // Cancela subidas activas cuyo path empiece por el prefijo dado.
+    /**
+     * Cancela subidas activas cuyo path empieza por el prefijo
+     * (p. ej. `users/{uid}/moments/{momentId}/`).
+     */
     fun cancelUploads(pathPrefix: String) {
         val paths = sessions.keys.filter { it.startsWith(pathPrefix) }
         for (path in paths) {
-            sessions.remove(path)?.cancel()
+            val session = sessions[path] ?: continue
+            if (session.didFinish) continue
+            session.task.cancel()
+            session.didFinish = true
+            sessions.remove(path)
         }
     }
 
-    // Convierte object path guardado en Firestore a URL HTTPS con token.
+    /**
+     * Convierte object path guardado en Firestore a URL HTTPS con token
+     * (para mostrar en feed/perfil).
+     */
     suspend fun resolveDownloadURL(storedValue: String): String {
         val trimmed = storedValue.trim()
-        if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) return trimmed
+        if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
+            return trimmed
+        }
 
         val objectPath = StoragePathBuilder.extractObjectPath(trimmed)
         if (objectPath.isEmpty()) throw StorageError.InvalidPath
 
-        val url = storage.child(objectPath).downloadUrl.await() ?: throw StorageError.UrlRetrievalFailed
+        val url = storage.child(objectPath).downloadUrl.await()
+            ?: throw StorageError.UrlRetrievalFailed
         return url.toString()
     }
 

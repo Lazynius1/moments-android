@@ -7,11 +7,12 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.moments.android.MomentsApplication
 import com.moments.android.R
-import com.moments.android.models.AcceptMessageRequestResult
-import com.moments.android.models.MessageRequest
+import com.moments.android.views.messaging.core.AcceptMessageRequestResult
+import com.moments.android.views.messaging.core.MessageRequest
 import com.moments.android.models.MessageRequestPolicy
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.firestore.fetchUser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,9 +25,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Date
-import com.moments.android.services.firestore.fetchUser
 
-/** Port de MessageRequestService.swift. */
+/** Port de `MessageRequestService.swift`. */
 class MessageRequestService(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val firestoreService: FirestoreService = FirestoreService(),
@@ -141,27 +141,21 @@ class MessageRequestService(
             runCatching {
                 val allowed = verifyReceiverAcceptsRequests(currentUser.uid, receiverId)
                 if (!allowed) error(localized(R.string.chat_request_error_not_allowed))
+
+                // ≡ checkExistingRequestAndSend: si ya hay pendiente → error 409, NO update.
+                // (`updateExistingRequest` existe en iOS pero no se llama desde el send path.)
                 val existing = checkExistingRequest(currentUser.uid, receiverId)
                 if (existing != null) {
-                    // Paridad iOS (`updateExistingRequest`): si ya hay solicitud pendiente se
-                    // actualiza con el mensaje nuevo, NO se falla ni se duplica.
-                    updateExistingRequest(
-                        existingRequest = existing,
-                        newMessage = message,
-                        messageType = messageType,
-                        mediaUrl = mediaUrl,
-                        thumbnailUrl = thumbnailUrl,
-                    )
-                } else {
-                    createNewRequest(
-                        senderId = currentUser.uid,
-                        receiverId = receiverId,
-                        message = message,
-                        messageType = messageType,
-                        mediaUrl = mediaUrl,
-                        thumbnailUrl = thumbnailUrl,
-                    )
+                    error(localized(R.string.chat_request_error_already_pending))
                 }
+                createNewRequest(
+                    senderId = currentUser.uid,
+                    receiverId = receiverId,
+                    message = message,
+                    messageType = messageType,
+                    mediaUrl = mediaUrl,
+                    thumbnailUrl = thumbnailUrl,
+                )
             }.onSuccess {
                 _isLoading.value = false
                 onComplete(Result.success(Unit))
@@ -184,15 +178,16 @@ class MessageRequestService(
             return
         }
         if (currentUser.uid != request.receiverId) {
-            onComplete(Result.failure(IllegalStateException("No autorizado")))
+            onComplete(Result.failure(IllegalStateException(localized(R.string.message_requests_accept_error_forbidden))))
             return
         }
         _isLoading.value = true
         scope.launch {
             runCatching {
                 val idToken = currentUser.getIdToken(false).await().token
-                    ?: error("Token no disponible")
-                val projectId = FirebaseApp.getInstance().options.projectId ?: error("Proyecto no configurado")
+                    ?: error(localized(R.string.messaging_error_service_unavailable))
+                val projectId = FirebaseApp.getInstance().options.projectId
+                    ?: error(localized(R.string.messaging_error_service_unavailable))
                 val region = "europe-southwest1"
                 val url = URL("https://$region-$projectId.cloudfunctions.net/acceptMessageRequest")
                 val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -215,11 +210,14 @@ class MessageRequestService(
                     }.getOrNull()?.let(AcceptRequestServerErrorCode::from)
                     throw IllegalStateException(localizedAcceptRequestError(errorCode, code))
                 }
-                val json = JSONObject(body)
-                AcceptMessageRequestResult(
-                    conversationId = json.getString("conversationId"),
-                    messageId = json.getString("messageId"),
-                )
+                val json = runCatching { JSONObject(body) }.getOrElse {
+                    error(localized(R.string.messaging_error_service_unavailable))
+                }
+                val conversationId = json.optString("conversationId").takeIf { it.isNotEmpty() }
+                    ?: error(localized(R.string.messaging_error_service_unavailable))
+                val messageId = json.optString("messageId").takeIf { it.isNotEmpty() }
+                    ?: error(localized(R.string.messaging_error_service_unavailable))
+                AcceptMessageRequestResult(conversationId = conversationId, messageId = messageId)
             }.onSuccess { result ->
                 _isLoading.value = false
                 onComplete(Result.success(result))
@@ -231,22 +229,37 @@ class MessageRequestService(
     }
 
     fun rejectRequest(request: MessageRequest, onComplete: (Result<Unit>) -> Unit) {
-        val requestId = request.id ?: return onComplete(Result.failure(IllegalStateException("ID inválido")))
+        val requestId = request.id
+            ?: return onComplete(Result.failure(IllegalStateException("ID de solicitud no válido")))
         scope.launch {
             runCatching {
                 db.collection("messageRequests").document(requestId).delete().await()
-            }.fold(onSuccess = { onComplete(Result.success(Unit)) }, onFailure = { onComplete(Result.failure(it)) })
+            }.fold(
+                onSuccess = { onComplete(Result.success(Unit)) },
+                onFailure = { onComplete(Result.failure(it)) },
+            )
         }
     }
 
     fun cancelRequest(request: MessageRequest, onComplete: (Result<Unit>) -> Unit) {
-        val requestId = request.id ?: return onComplete(Result.failure(IllegalStateException("ID inválido")))
+        val requestId = request.id
+            ?: return onComplete(Result.failure(IllegalStateException("ID de solicitud no válido")))
         if (FirebaseAuth.getInstance().currentUser?.uid != request.senderId) {
-            return onComplete(Result.failure(IllegalStateException("No autorizado")))
+            return onComplete(
+                Result.failure(IllegalStateException(localized(R.string.message_requests_accept_error_forbidden))),
+            )
         }
-        rejectRequest(request, onComplete)
+        scope.launch {
+            runCatching {
+                db.collection("messageRequests").document(requestId).delete().await()
+            }.fold(
+                onSuccess = { onComplete(Result.success(Unit)) },
+                onFailure = { onComplete(Result.failure(it)) },
+            )
+        }
     }
 
+    /** Igual que iOS: solo borra la solicitud (no invoca block social). */
     fun blockUser(request: MessageRequest, onComplete: (Result<Unit>) -> Unit) = rejectRequest(request, onComplete)
 
     suspend fun getPendingRequestCount(userId: String): Int = runCatching {
@@ -258,8 +271,11 @@ class MessageRequestService(
 
     fun canSendRequest(senderId: String, receiverId: String, onComplete: (Boolean) -> Unit) {
         scope.launch {
-            val existing = runCatching { checkExistingRequest(senderId, receiverId) }.getOrNull()
-            onComplete(existing == null)
+            val canSend = runCatching { checkExistingRequest(senderId, receiverId) }.fold(
+                onSuccess = { it == null },
+                onFailure = { false },
+            )
+            onComplete(canSend)
         }
     }
 
@@ -284,6 +300,7 @@ class MessageRequestService(
             .get().await()
         val doc = snap.documents.firstOrNull() ?: return null
         return MessageRequest.fromFirestoreData(doc.data ?: emptyMap(), doc.id)
+            ?: error("Datos de solicitud incompletos")
     }
 
     private suspend fun createNewRequest(
@@ -307,10 +324,14 @@ class MessageRequestService(
             mediaUrl = mediaUrl,
             thumbnailUrl = thumbnailUrl,
         )
-        db.collection("messageRequests").add(request.encode()).await()
+        saveRequest(request)
     }
 
-    /** Port de `updateExistingRequest`: refresca la solicitud pendiente con el mensaje más reciente. */
+    /**
+     * Existe en iOS pero **no** se invoca desde `checkExistingRequestAndSend`
+     * (el send path falla con alreadyPending). Se conserva por paridad estructural.
+     */
+    @Suppress("unused")
     private suspend fun updateExistingRequest(
         existingRequest: MessageRequest,
         newMessage: String,
@@ -318,32 +339,38 @@ class MessageRequestService(
         mediaUrl: String?,
         thumbnailUrl: String?,
     ) {
-        val requestId = existingRequest.id ?: error("Invalid request id")
-        val updates = mutableMapOf<String, Any?>(
+        val requestId = existingRequest.id ?: error("ID de solicitud no válido")
+        val updates = mapOf(
             "message" to newMessage,
             "messageType" to messageType.raw,
             "mediaUrl" to mediaUrl,
             "thumbnailUrl" to thumbnailUrl,
-            "timestamp" to com.google.firebase.Timestamp(Date()),
+            "timestamp" to Timestamp(Date()),
         )
         db.collection("messageRequests").document(requestId).update(updates).await()
     }
 
-    /** Textos localizados como en iOS (`messageRequests.acceptError.*`), nunca hardcodeados. */
+    private suspend fun saveRequest(request: MessageRequest) {
+        db.collection("messageRequests").add(request.encode()).await()
+    }
+
     private fun localized(resId: Int): String =
         MomentsApplication.instance?.getString(resId).orEmpty()
 
     private fun localizedAcceptRequestError(code: AcceptRequestServerErrorCode?, statusCode: Int): String =
         when (code) {
             AcceptRequestServerErrorCode.REQUEST_FORBIDDEN,
-            AcceptRequestServerErrorCode.REQUEST_UNTRUSTED -> localized(R.string.message_requests_accept_error_forbidden)
+            AcceptRequestServerErrorCode.REQUEST_UNTRUSTED ->
+                localized(R.string.message_requests_accept_error_forbidden)
             AcceptRequestServerErrorCode.REQUEST_NOT_FOUND,
             AcceptRequestServerErrorCode.REQUEST_NOT_PENDING,
             AcceptRequestServerErrorCode.USER_NOT_FOUND,
             AcceptRequestServerErrorCode.INACTIVE_USER,
-            AcceptRequestServerErrorCode.BLOCKED_RELATIONSHIP -> localized(R.string.message_requests_accept_error_not_available)
-            AcceptRequestServerErrorCode.REQUEST_ACCEPT_FAILED -> localized(R.string.message_requests_accept_error_server)
+            AcceptRequestServerErrorCode.BLOCKED_RELATIONSHIP ->
+                localized(R.string.message_requests_accept_error_not_available)
+            AcceptRequestServerErrorCode.REQUEST_ACCEPT_FAILED ->
+                localized(R.string.message_requests_accept_error_server)
             null -> if (statusCode == 401) localized(R.string.messaging_error_not_authenticated)
-                    else localized(R.string.message_requests_accept_error_server)
+            else localized(R.string.message_requests_accept_error_server)
         }
 }

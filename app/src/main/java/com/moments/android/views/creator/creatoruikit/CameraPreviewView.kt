@@ -2,12 +2,15 @@ package com.moments.android.views.creator.creatoruikit
 
 import android.content.Context
 import android.net.Uri
+import android.util.Rational
 import android.view.Surface
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
+import androidx.camera.core.ViewPort
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
@@ -21,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -34,10 +38,16 @@ import java.util.UUID
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlin.math.abs
 
 /**
- * Cámara reutilizable para Creator y Chat, contraparte CameraX de `CameraPreviewView.swift`.
- * Center Stage no existe como API Android; el parámetro se conserva para no romper el contrato.
+ * Port CameraX de `CameraPreviewRepresentable` + `CameraPreviewView.swift`.
+ *
+ * - Preview FILL_CENTER ≡ `.resizeAspectFill`
+ * - [ViewPort] en el grupo de use-cases ≡ `cropImageToVisiblePreview` (salida = lo visible)
+ * - `prefersMaximumCaptureQuality` → foto MAXIMIZE_QUALITY + vídeo UHD/FHD; si no → latency + HD
+ * - Center Stage: sin API Android → [onCenterStageAvailabilityChange](false) si `enablesCenterStageControls`
+ * - Hardware shutter (`AVCaptureEventInteraction`): N/A en Compose; el host maneja captura
  */
 @Composable
 fun CameraPreviewView(
@@ -49,16 +59,20 @@ fun CameraPreviewView(
     captureAudio: Boolean,
     prefersMaximumCaptureQuality: Boolean,
     enablesCenterStageControls: Boolean = false,
+    centerStageEnabled: Boolean = false,
     targetRotation: Int = Surface.ROTATION_0,
     onRecordingStateChange: (Boolean) -> Unit,
     onImageCaptured: (Uri) -> Unit,
     onVideoCaptured: (Uri) -> Unit,
     onCaptureError: () -> Unit = {},
+    onCenterStageAvailabilityChange: (Boolean) -> Unit = {},
+    onCenterStageEnabledChangeFromSystem: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { Executors.newSingleThreadExecutor() }
+
     val imageCapture = remember(prefersMaximumCaptureQuality) {
         ImageCapture.Builder()
             .setCaptureMode(
@@ -68,18 +82,35 @@ fun CameraPreviewView(
             .setTargetRotation(targetRotation)
             .build()
     }
-    val videoCapture = remember {
+    val videoCapture = remember(prefersMaximumCaptureQuality) {
+        val qualities = if (prefersMaximumCaptureQuality) {
+            listOf(Quality.UHD, Quality.FHD, Quality.HD)
+        } else {
+            listOf(Quality.HD, Quality.SD)
+        }
         val recorder = Recorder.Builder()
-            .setQualitySelector(
-                QualitySelector.fromOrderedList(listOf(Quality.UHD, Quality.FHD, Quality.HD)),
-            )
+            .setQualitySelector(QualitySelector.fromOrderedList(qualities))
             .build()
         VideoCapture.withOutput(recorder)
     }
+
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
+    var previewSize by remember { mutableStateOf(0 to 0) }
     var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var boundCamera by remember { mutableStateOf<Camera?>(null) }
     var activeRecording by remember { mutableStateOf<Recording?>(null) }
+    var appliedZoom by remember { mutableFloatStateOf(1f) }
+
+    // ≡ publishCenterStageAvailability(false) — stub honesto
+    LaunchedEffect(enablesCenterStageControls) {
+        if (enablesCenterStageControls) {
+            onCenterStageAvailabilityChange(false)
+        }
+    }
+    @Suppress("UNUSED_PARAMETER")
+    val unusedCenterStageToggle = centerStageEnabled
+    @Suppress("UNUSED_PARAMETER")
+    val unusedCenterStageFromSystem = onCenterStageEnabledChangeFromSystem
 
     DisposableEffect(Unit) {
         onDispose {
@@ -89,35 +120,69 @@ fun CameraPreviewView(
         }
     }
 
-    LaunchedEffect(previewView, cameraPosition) {
+    LaunchedEffect(targetRotation) {
+        imageCapture.targetRotation = targetRotation
+        videoCapture.targetRotation = targetRotation
+    }
+
+    LaunchedEffect(previewView, cameraPosition, prefersMaximumCaptureQuality, previewSize, targetRotation) {
         val view = previewView ?: return@LaunchedEffect
-        val cameraProvider = suspendCoroutine<ProcessCameraProvider> { continuation ->
+        val (w, h) = previewSize
+        if (w <= 0 || h <= 0) return@LaunchedEffect
+        // No reconfigurar sesión mientras graba (equiv. a no interrupir movieOutput).
+        if (activeRecording != null) return@LaunchedEffect
+
+        val cameraProvider = provider ?: suspendCoroutine { continuation ->
             val future = ProcessCameraProvider.getInstance(context)
-            future.addListener({ continuation.resume(future.get()) }, ContextCompat.getMainExecutor(context))
-        }
-        provider = cameraProvider
-        val preview = Preview.Builder().setTargetRotation(targetRotation).build().also {
-            it.surfaceProvider = view.surfaceProvider
-        }
+            future.addListener(
+                { continuation.resume(future.get()) },
+                ContextCompat.getMainExecutor(context),
+            )
+        }.also { provider = it }
+
+        val preview = Preview.Builder()
+            .setTargetRotation(targetRotation)
+            .build()
+            .also { it.surfaceProvider = view.surfaceProvider }
+
+        // ≡ cropImageToVisiblePreview / metadataOutputRectConverted
+        val viewPort = ViewPort.Builder(
+            Rational(w, h),
+            targetRotation,
+        ).setScaleType(ViewPort.FILL_CENTER).build()
+
+        val useCaseGroup = UseCaseGroup.Builder()
+            .setViewPort(viewPort)
+            .addUseCase(preview)
+            .addUseCase(imageCapture)
+            .addUseCase(videoCapture)
+            .build()
+
         boundCamera = runCatching {
             cameraProvider.unbindAll()
             cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 CameraSelector.Builder().requireLensFacing(cameraPosition).build(),
-                preview,
-                imageCapture,
-                videoCapture,
+                useCaseGroup,
             )
         }.getOrElse {
             onCaptureError()
             null
         }
+        appliedZoom = 1f
     }
 
-    LaunchedEffect(flashMode) { imageCapture.flashMode = flashMode }
+    LaunchedEffect(flashMode) {
+        imageCapture.flashMode = flashMode
+    }
+
+    // ≡ updateZoom: umbral abs > 0.1; clamp a min(5, maxZoom)
     LaunchedEffect(zoomLevel, boundCamera) {
+        if (abs(zoomLevel - appliedZoom) <= 0.1f) return@LaunchedEffect
         val max = minOf(5f, boundCamera?.cameraInfo?.zoomState?.value?.maxZoomRatio ?: 5f)
-        boundCamera?.cameraControl?.setZoomRatio(zoomLevel.coerceIn(1f, max))
+        val next = zoomLevel.coerceIn(1f, max)
+        boundCamera?.cameraControl?.setZoomRatio(next)
+        appliedZoom = next
     }
 
     LaunchedEffect(capturePhotoToken) {
@@ -128,8 +193,11 @@ fun CameraPreviewView(
             executor,
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(result: ImageCapture.OutputFileResults) {
-                    ContextCompat.getMainExecutor(context).execute { onImageCaptured(Uri.fromFile(output)) }
+                    ContextCompat.getMainExecutor(context).execute {
+                        onImageCaptured(result.savedUri ?: Uri.fromFile(output))
+                    }
                 }
+
                 override fun onError(exception: ImageCaptureException) {
                     ContextCompat.getMainExecutor(context).execute(onCaptureError)
                 }
@@ -140,8 +208,9 @@ fun CameraPreviewView(
     LaunchedEffect(isRecording, captureAudio) {
         if (isRecording) {
             if (activeRecording != null) return@LaunchedEffect
-            val output = File(captureDirectory(context), "creator_video_${UUID.randomUUID()}.mp4")
-            val pending = videoCapture.output.prepareRecording(context, FileOutputOptions.Builder(output).build())
+            val output = File(captureDirectory(context), "story_video_${System.currentTimeMillis()}.mp4")
+            val pending = videoCapture.output
+                .prepareRecording(context, FileOutputOptions.Builder(output).build())
                 .let { if (captureAudio) it.withAudioEnabled() else it }
                 .start(ContextCompat.getMainExecutor(context)) { event ->
                     when (event) {
@@ -149,7 +218,8 @@ fun CameraPreviewView(
                         is VideoRecordEvent.Finalize -> {
                             activeRecording = null
                             onRecordingStateChange(false)
-                            if (event.hasError()) onCaptureError() else onVideoCaptured(Uri.fromFile(output))
+                            if (event.hasError()) onCaptureError()
+                            else onVideoCaptured(Uri.fromFile(output))
                         }
                     }
                 }
@@ -162,15 +232,23 @@ fun CameraPreviewView(
     AndroidView(
         factory = { viewContext ->
             PreviewView(viewContext).apply {
+                setBackgroundColor(android.graphics.Color.BLACK)
                 scaleType = PreviewView.ScaleType.FILL_CENTER
                 implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                    val w = right - left
+                    val h = bottom - top
+                    val oldW = oldRight - oldLeft
+                    val oldH = oldBottom - oldTop
+                    if (w > 0 && h > 0 && (w != oldW || h != oldH)) {
+                        previewSize = w to h
+                    }
+                }
             }.also { previewView = it }
         },
         modifier = modifier,
     )
-
-    @Suppress("UNUSED_VARIABLE")
-    val centerStageUnsupportedOnAndroid = enablesCenterStageControls
 }
 
-private fun captureDirectory(context: Context): File = File(context.cacheDir, "creator_captures").also { it.mkdirs() }
+private fun captureDirectory(context: Context): File =
+    File(context.cacheDir, "creator_captures").also { it.mkdirs() }

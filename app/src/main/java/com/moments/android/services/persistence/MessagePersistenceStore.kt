@@ -1,11 +1,11 @@
 package com.moments.android.services.persistence
 
 import android.content.Context
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageSyncCursor
-import com.moments.android.models.MessageType
-import com.moments.android.models.decodeMessages
-import com.moments.android.models.encodeMessages
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageSyncCursor
+import com.moments.android.views.messaging.core.MessageType
+import com.moments.android.views.messaging.core.decodeMessages
+import com.moments.android.views.messaging.core.encodeMessages
 import com.moments.android.services.messaging.ChatCacheStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,9 +18,10 @@ import kotlin.concurrent.read
 import kotlin.concurrent.write
 
 /**
- * Port de MessagePersistenceStore.swift (SwiftData @ModelActor).
- * Persistencia JSON en filesDir; mutaciones expuestas aquí y delegadas desde LocalPersistenceService
- * (misma separación actor/capa que iOS). API parity: save/reconcile/recent/before/after/search/mutations.
+ * Port de MessagePersistenceStore.swift (@ModelActor).
+ * Core: save/reconcile/recent/before/after/all/contains/lastCursor + merge/trim.
+ * Extras (search, mutations, cleanup) = helpers que en iOS viven en LocalPersistenceService
+ * y aquí se apoyan en el mismo almacén JSON por conversación.
  */
 object MessagePersistenceStore {
     private const val DIR = "message_cache"
@@ -170,7 +171,7 @@ object MessagePersistenceStore {
 
     fun updateMessageStatus(conversationId: String, messageId: String, status: String) = lock.write {
         val messages = loadMessagesUnsafe(conversationId).map { msg ->
-            if (msg.id == messageId) msg.copy(status = com.moments.android.models.MessageStatus.from(status)) else msg
+            if (msg.id == messageId) msg.copy(status = com.moments.android.views.messaging.core.MessageStatus.from(status)) else msg
         }
         writeMessagesUnsafe(conversationId, messages)
     }
@@ -402,8 +403,17 @@ object MessagePersistenceStore {
     }
 
     private fun mergeCached(new: EnhancedMessage, existing: EnhancedMessage): EnhancedMessage {
+        // ≡ iOS MessagePersistenceStore.merge(_:into:)
         if (new.isDeleted) {
             return new.copy(
+                content = null,
+                mediaUrl = null,
+                thumbnailUrl = null,
+                mediaObjectPath = null,
+                thumbnailObjectPath = null,
+                mediaEncryption = null,
+                thumbnailEncryption = null,
+                audioWaveform = null,
                 isRead = existing.isRead || new.isRead,
                 vanishedFor = (existing.vanishedFor + new.vanishedFor).distinct(),
                 vanishExpiresAt = new.vanishExpiresAt ?: existing.vanishExpiresAt,
@@ -418,9 +428,12 @@ object MessagePersistenceStore {
         )
     }
 
+    /** ≡ iOS `shouldPreserveLocalMediaURL` — solo file:// que exista en disco. */
     private fun isLocalFilePresent(urlString: String?): Boolean {
         if (urlString.isNullOrEmpty()) return false
-        return urlString.startsWith("file://") && File(android.net.Uri.parse(urlString).path ?: "").exists()
+        if (!urlString.startsWith("file://")) return false
+        val path = android.net.Uri.parse(urlString).path ?: return false
+        return File(path).exists()
     }
 
     private fun trimMessagesUnsafe(conversationId: String, messages: List<EnhancedMessage>) {

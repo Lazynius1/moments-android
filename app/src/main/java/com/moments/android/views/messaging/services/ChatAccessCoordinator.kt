@@ -1,6 +1,8 @@
 package com.moments.android.views.messaging.services
 
 import com.google.firebase.auth.FirebaseAuth
+import com.moments.android.MomentsApplication
+import com.moments.android.R
 import com.moments.android.models.ChatAccessState
 import com.moments.android.services.messaging.EncryptionService
 import kotlinx.coroutines.CoroutineScope
@@ -16,9 +18,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * Port 1:1 de `ChatAccessCoordinator.swift`.
+ * Port de `ChatAccessCoordinator.swift`.
  * Resuelve el acceso cripto al chat una vez por sesión vía
- * [EncryptionService.chatAccessState] (users/{uid}.chatKey + chatRecovery).
+ * [EncryptionService.chatAccessState] (`users/{uid}.chatKey` + `chatRecovery`).
  */
 object ChatAccessCoordinator {
 
@@ -31,12 +33,16 @@ object ChatAccessCoordinator {
     @Volatile private var resolvedUserId: String? = null
     @Volatile private var resolveJob: Job? = null
 
-    /** Paridad iOS `ensureAccess()` — estado cacheado o resolución por sesión. */
+    private fun unavailableTitle(): String =
+        MomentsApplication.instance?.getString(R.string.chat_recovery_unavailable_title)
+            ?: "Secure access unavailable"
+
+    /** Devuelve el estado cacheado o lo resuelve si aún no se ha hecho en esta sesión. */
     suspend fun ensureAccess(): ChatAccessState = mutex.withLock {
         val userId = FirebaseAuth.getInstance().currentUser?.uid
         if (userId == null) {
-            invalidateAll()
-            return ChatAccessState.Unavailable("Chat unavailable")
+            invalidateAllUnlocked()
+            return ChatAccessState.Unavailable(unavailableTitle())
         }
 
         if (resolvedUserId != userId) {
@@ -53,7 +59,7 @@ object ChatAccessCoordinator {
             inFlight.join()
             val after = _accessState.value
             if (resolvedUserId == userId && after != null) return after
-            return ChatAccessState.Unavailable("Chat unavailable")
+            return ChatAccessState.Unavailable(unavailableTitle())
         }
 
         val job = scope.launch {
@@ -68,10 +74,10 @@ object ChatAccessCoordinator {
         resolveJob = job
         job.join()
         return _accessState.value
-            ?: ChatAccessState.Unavailable("Chat unavailable")
+            ?: ChatAccessState.Unavailable(unavailableTitle())
     }
 
-    /** Paridad iOS `refreshAccess()` — tras PIN setup/restore o retry. */
+    /** Tras PIN setup/restore o retry manual. */
     suspend fun refreshAccess() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid
         if (userId == null) {
@@ -90,6 +96,7 @@ object ChatAccessCoordinator {
         _accessState.value = state
     }
 
+    /** Sign-out o cambio de identidad. */
     fun invalidate() {
         invalidateAll()
     }

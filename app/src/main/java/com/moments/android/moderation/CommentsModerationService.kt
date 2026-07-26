@@ -1,23 +1,19 @@
 package com.moments.android.moderation
 
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Date
-import java.util.UUID
 import kotlin.coroutines.resume
 
-/** Port de CommentsModerationService.swift */
+/** Port de CommentsModerationService.swift (`CommentModerationService`). */
 class CommentsModerationService private constructor() {
     private val functionsRegion = "europe-southwest1"
     private val moderationFunctionName = "proxyOpenAIModeration"
@@ -26,7 +22,7 @@ class CommentsModerationService private constructor() {
     private var lastFetchTime: Long? = null
     private val cacheValidityDurationMs = 300_000L
 
-    suspend fun moderateComment(text: String): ModerationAction {
+    suspend fun moderateComment(text: String): ModerationAction = withContext(Dispatchers.IO) {
         val settings = loadModerationSettings()
         val request = createModerationRequest(text)
         val connection = (URL(request.first).openConnection() as HttpURLConnection).apply {
@@ -34,16 +30,23 @@ class CommentsModerationService private constructor() {
             setRequestProperty("Authorization", "Bearer ${request.second}")
             setRequestProperty("Content-Type", "application/json")
             doOutput = true
-            outputStream.use { it.write(request.third.toByteArray()) }
+            outputStream.use { it.write(request.third.toByteArray(Charsets.UTF_8)) }
         }
-        val code = connection.responseCode
-        val body = (if (code in 200..299) connection.inputStream else connection.errorStream)
-            ?.bufferedReader()?.use { it.readText() }.orEmpty()
-        connection.disconnect()
-        if (code != 200) throw CommentsModerationError.ApiError
-        val json = JSONObject(body)
-        val result = ModerationResponse.fromJson(json).results.firstOrNull()
-        return processModerationResult(result, settings)
+        try {
+            val code = connection.responseCode
+            val body = (if (code in 200..299) connection.inputStream else connection.errorStream)
+                ?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (code != 200) throw CommentsModerationError.ApiError
+            val json = try {
+                JSONObject(body)
+            } catch (_: Exception) {
+                throw CommentsModerationError.InvalidResponse
+            }
+            val result = ModerationResponse.fromJson(json).results.firstOrNull()
+            processModerationResult(result, settings)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     suspend fun moderateAndHandle(
@@ -127,6 +130,20 @@ class CommentsModerationService private constructor() {
                 "violence" to result.categoryScores.violence,
                 "violenceGraphic" to result.categoryScores.violenceGraphic,
             )
+            // ≡ iOS categoriesDetailed
+            logData["categoriesDetailed"] = mapOf(
+                "harassment" to result.categories.harassment,
+                "harassmentThreatening" to result.categories.harassmentThreatening,
+                "hate" to result.categories.hate,
+                "hateThreatening" to result.categories.hateThreatening,
+                "selfHarm" to result.categories.selfHarm,
+                "selfHarmInstructions" to result.categories.selfHarmInstructions,
+                "selfHarmIntent" to result.categories.selfHarmIntent,
+                "sexual" to result.categories.sexual,
+                "sexualMinors" to result.categories.sexualMinors,
+                "violence" to result.categories.violence,
+                "violenceGraphic" to result.categories.violenceGraphic,
+            )
         }
         db.collection("moderationLogs").add(logData)
     }
@@ -184,8 +201,12 @@ class CommentsModerationService private constructor() {
             return@suspendCancellableCoroutine
         }
         user.getIdToken(false).addOnCompleteListener { task ->
-            if (task.isSuccessful) cont.resume(task.result?.token ?: "")
-            else cont.resumeWith(Result.failure(CommentsModerationError.NotAuthenticated))
+            val token = task.result?.token
+            if (task.isSuccessful && !token.isNullOrEmpty()) {
+                cont.resume(token)
+            } else {
+                cont.resumeWith(Result.failure(CommentsModerationError.NotAuthenticated))
+            }
         }
     }
 

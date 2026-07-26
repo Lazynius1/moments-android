@@ -5,12 +5,24 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import com.google.firebase.storage.FirebaseStorage
 import com.moments.android.services.messaging.EncryptionService
+import java.io.File
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.util.UUID
 
+// MARK: - Types (StorageService.swift)
+
+/** Port de `StorageError` (StorageService.swift). */
+sealed class StorageError(message: String) : Exception(message) {
+    data object InvalidData : StorageError("invalid data")
+    data object UploadFailed : StorageError("upload failed")
+    data object UrlRetrievalFailed : StorageError("url retrieval failed")
+    data object DeleteFailed : StorageError("delete failed")
+    data object InvalidPath : StorageError("invalid path")
+}
+
+/** Port de `UploadMediaItem` + `MediaType` locales al StorageService iOS. */
 enum class UploadMediaKind { IMAGE, VIDEO }
 
 data class UploadMediaItem(
@@ -19,19 +31,29 @@ data class UploadMediaItem(
     val videoUri: Uri? = null,
 )
 
+/** Port de `FeedMediaUploadContext`. */
 sealed class FeedMediaUploadContext {
-    data class Moment(val momentId: String, val mediaId: String = UUID.randomUUID().toString()) :
-        FeedMediaUploadContext()
+    data class Moment(
+        val momentId: String,
+        val mediaId: String = UUID.randomUUID().toString(),
+    ) : FeedMediaUploadContext()
 
-    data class Story(val storyId: String, val mediaId: String = UUID.randomUUID().toString()) :
-        FeedMediaUploadContext()
+    data class Story(
+        val storyId: String,
+        val mediaId: String = UUID.randomUUID().toString(),
+    ) : FeedMediaUploadContext()
 }
 
+/** Port de `ModerationError` (definido en StorageService.swift). */
 sealed class ModerationError(message: String) : Exception(message) {
-    data class ContentRejected(val reason: String) : ModerationError("Contenido no permitido: $reason")
+    data class ContentRejected(val reason: String) :
+        ModerationError("Contenido no permitido: $reason")
 }
 
-// Port de StorageService.swift. Orquesta MediaUploadService + VideoCompression + (stub) Encryption.
+/**
+ * Port de `StorageService.swift`.
+ * Orquesta MediaUploadService + VideoCompressionService + EncryptionService.
+ */
 object StorageService {
 
     private val uploader get() = MediaUploadService
@@ -41,8 +63,11 @@ object StorageService {
     // MARK: - Profile
 
     suspend fun uploadProfileImage(userId: String, image: Bitmap): String {
-        val imageData = image.storageUploadJpegData(compressionQuality = 0.75f, maxPixelDimension = 1080)
-            ?: throw StorageError.InvalidData
+        val imageData = image.storageUploadJpegData(
+            compressionQuality = 0.75f,
+            maxPixelDimension = 1080,
+        ) ?: throw StorageError.InvalidData
+
         val target = StoragePathBuilder.build(userId, StorageUploadDomain.ProfileAvatar())
         return completeWithPublicDownloadURL(
             uploader.upload(target, MediaUploadPayload.Data(imageData)),
@@ -57,8 +82,11 @@ object StorageService {
         messageId: String,
         image: Bitmap,
     ): String {
-        val imageData = image.storageUploadJpegData(compressionQuality = 0.82f, maxPixelDimension = 1080)
-            ?: throw StorageError.InvalidData
+        val imageData = image.storageUploadJpegData(
+            compressionQuality = 0.82f,
+            maxPixelDimension = 1080,
+        ) ?: throw StorageError.InvalidData
+
         val target = StoragePathBuilder.build(
             userId,
             StorageUploadDomain.NovaConversationImage(conversationId, messageId),
@@ -89,7 +117,7 @@ object StorageService {
             ?: throw StorageError.InvalidData
     }
 
-    // MARK: - Feed media
+    // MARK: - Feed media (moments / stories)
 
     suspend fun uploadMedia(
         userId: String,
@@ -108,8 +136,10 @@ object StorageService {
         mediaId: String = UUID.randomUUID().toString(),
         progress: ((Double) -> Unit)? = null,
     ): String {
-        val imageData = image.storageUploadJpegData(compressionQuality = 0.8f, maxPixelDimension = 720)
-            ?: throw StorageError.InvalidData
+        val imageData = image.storageUploadJpegData(
+            compressionQuality = 0.8f,
+            maxPixelDimension = 720,
+        ) ?: throw StorageError.InvalidData
         val target = StoragePathBuilder.build(
             userId,
             StorageUploadDomain.MomentThumbnail(momentId, mediaId),
@@ -119,6 +149,11 @@ object StorageService {
         )
     }
 
+    /**
+     * Espejo de `uploadMomentThumbnail` para stories usando dominio `storyThumbnail`
+     * (existe en PathBuilder; iOS sube thumbs de story desde BackgroundStoryUploadService
+     * vía MediaUploadService + storyFrame — este helper lo usan callers Android del resume/story).
+     */
     suspend fun uploadStoryThumbnail(
         userId: String,
         storyId: String,
@@ -126,8 +161,10 @@ object StorageService {
         mediaId: String = UUID.randomUUID().toString(),
         progress: ((Double) -> Unit)? = null,
     ): String {
-        val imageData = image.storageUploadJpegData(compressionQuality = 0.8f, maxPixelDimension = 720)
-            ?: throw StorageError.InvalidData
+        val imageData = image.storageUploadJpegData(
+            compressionQuality = 0.8f,
+            maxPixelDimension = 720,
+        ) ?: throw StorageError.InvalidData
         val target = StoragePathBuilder.build(
             userId,
             StorageUploadDomain.StoryThumbnail(storyId, mediaId),
@@ -143,8 +180,10 @@ object StorageService {
         layerId: String,
         image: Bitmap,
     ): String {
-        val imageData = image.storageUploadJpegData(compressionQuality = 0.82f, maxPixelDimension = 1080)
-            ?: throw StorageError.InvalidData
+        val imageData = image.storageUploadJpegData(
+            compressionQuality = 0.82f,
+            maxPixelDimension = 1080,
+        ) ?: throw StorageError.InvalidData
         val target = StoragePathBuilder.build(
             userId,
             StorageUploadDomain.MomentHiddenLayerImage(momentId, layerId),
@@ -180,6 +219,7 @@ object StorageService {
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     suspend fun deleteProfileImage(userId: String, oldImagePath: String?) {
         val oldPath = oldImagePath?.takeIf { it.isNotEmpty() } ?: return
         val ok = oldPath.contains("firebasestorage.googleapis.com")
@@ -189,8 +229,9 @@ object StorageService {
         deleteMedia(oldPath)
     }
 
-    // MARK: - Private
+    // MARK: - Private upload helpers
 
+    /** Asegura URL HTTPS con token; corrige subidas que guardaron solo object path. */
     private suspend fun completeWithPublicDownloadURL(value: String): String {
         if (value.startsWith("https://") || value.startsWith("http://")) return value
         return uploader.resolveDownloadURL(value)
@@ -202,8 +243,10 @@ object StorageService {
         context: FeedMediaUploadContext,
         progress: ((Double) -> Unit)?,
     ): String {
-        val imageData = image?.storageUploadJpegData(compressionQuality = 0.8f, maxPixelDimension = 1280)
-            ?: throw StorageError.InvalidData
+        val imageData = image?.storageUploadJpegData(
+            compressionQuality = 0.8f,
+            maxPixelDimension = 1280,
+        ) ?: throw StorageError.InvalidData
 
         val target = when (context) {
             is FeedMediaUploadContext.Moment ->

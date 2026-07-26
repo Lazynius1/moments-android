@@ -1,6 +1,7 @@
 package com.moments.android.views.creator.creatorscreens
 
 import com.moments.android.views.creator.creatoruikit.CropViewWrapper
+import com.moments.android.views.creator.creatoruikit.ToolIconButton
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -55,7 +56,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -71,6 +71,7 @@ import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.CreatorAspectRatio
 import com.moments.android.views.creator.CreatorFlow
 import com.moments.android.views.creator.CreatorMedia
+import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -121,6 +122,13 @@ fun MediaEditingView(
 
     val current = selectedMediaItems.getOrNull(currentMediaIndex) ?: selectedMediaItems.first()
     val recommended = current.recommendedAspectRatio ?: current.aspectRatio
+    // ≡ iOS: si ratio actual es square y hay recomendado distinto → usar recomendado en crop
+    val cropAspectRatio =
+        if (current.aspectRatio == CreatorAspectRatio.SQUARE && recommended != CreatorAspectRatio.SQUARE) {
+            recommended
+        } else {
+            current.aspectRatio
+        }
 
     fun updatePreview() {
         filterJob?.cancel()
@@ -186,32 +194,8 @@ fun MediaEditingView(
         }
     }
 
-    if (showingCrop) {
-        CropViewWrapper(
-            imageUri = current.uri,
-            aspectRatio = current.aspectRatio,
-            allowFreeCrop = true,
-            onComplete = { uri, newRatio ->
-                val updated = selectedMediaItems.toMutableList()
-                updated[currentMediaIndex] = current.copy(uri = uri, aspectRatio = newRatio, hasEdits = true)
-                onSelectedMediaItemsChange(updated)
-                showingCrop = false
-            },
-            onCancel = { showingCrop = false },
-            modifier = modifier,
-        )
-        return
-    }
-
+    // Fondo sólido negro (sin blur de imagen — decisión de plataforma ≡ CaptionAndDetails)
     Box(modifier.fillMaxSize().background(Color.Black)) {
-        AsyncImage(
-            model = current.uri,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().alpha(0.35f),
-        )
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(0.4f)))
-
         Column(Modifier.fillMaxSize()) {
             Box(
                 Modifier
@@ -290,7 +274,7 @@ fun MediaEditingView(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.55f),
+                    .fillMaxHeight(0.6f),
                 contentAlignment = Alignment.Center,
             ) {
                 if (showingFilterToolbar && previewBitmap != null && pagerState.currentPage == currentMediaIndex) {
@@ -472,11 +456,37 @@ fun MediaEditingView(
                             Modifier.padding(end = 20.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            ToolIconButton(Icons.Filled.Crop) { showingCrop = true }
-                            ToolIconButton(Icons.Filled.Filter) { enterFilterMode() }
+                            ToolIconButton(Icons.Filled.Crop, onClick = { showingCrop = true })
+                            ToolIconButton(Icons.Filled.Filter, onClick = { enterFilterMode() })
                         }
                     }
                 }
+            }
+        }
+
+        // ≡ iOS `.sheet` CropViewWrapper (no full-screen replace)
+        if (showingCrop) {
+            MomentsModalSheet(
+                onDismissRequest = { showingCrop = false },
+                largeOnly = true,
+                containerColor = Color.Black,
+                showDragHandle = false,
+            ) {
+                CropViewWrapper(
+                    imageUri = current.uri,
+                    aspectRatio = cropAspectRatio,
+                    allowFreeCrop = true,
+                    onComplete = { uri, newRatio ->
+                        val updated = selectedMediaItems.toMutableList()
+                        updated[currentMediaIndex] = current.copy(uri = uri, aspectRatio = newRatio, hasEdits = true)
+                        onSelectedMediaItemsChange(updated)
+                        showingCrop = false
+                    },
+                    onCancel = { showingCrop = false },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
             }
         }
     }
@@ -519,18 +529,3 @@ private fun AspectRatioChip(
     }
 }
 
-@Composable
-private fun ToolIconButton(icon: ImageVector, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .size(44.dp)
-            .momentsChromeGlass(CircleShape, interactive = true)
-            .clickable {
-                HapticManager.shared.lightImpact()
-                onClick()
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-    }
-}

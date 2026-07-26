@@ -4,28 +4,42 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
+import androidx.annotation.StringRes
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.effect.Presentation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
-import kotlinx.coroutines.suspendCancellableCoroutine
+import com.moments.android.R
+import com.moments.android.views.creator.creatoruikit.materializeStoryVideoIfNeeded
 import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.max
 import kotlin.math.min
+import kotlinx.coroutines.suspendCancellableCoroutine
 
-/** Errors mirrored from `StoryVideoProcessingError`. */
-sealed class StoryVideoProcessingError(message: String) : Exception(message) {
-    object MissingVideo : StoryVideoProcessingError("Missing video")
-    object InvalidDuration : StoryVideoProcessingError("Invalid video duration")
-    object ExceedsAutoSplitLimit : StoryVideoProcessingError("Video exceeds automatic split limit")
-    object ExportFailed : StoryVideoProcessingError("Story video export failed")
-    object ThumbnailFailed : StoryVideoProcessingError("Story video thumbnail failed")
+/**
+ * Errors ≡ `StoryVideoProcessingError` (LocalizedError + `storyVideo.error.*`).
+ */
+sealed class StoryVideoProcessingError(
+    @StringRes val messageRes: Int,
+) : Exception() {
+    object MissingVideo : StoryVideoProcessingError(R.string.story_video_error_missing_video)
+    object InvalidDuration : StoryVideoProcessingError(R.string.story_video_error_invalid_duration)
+    object ExceedsAutoSplitLimit : StoryVideoProcessingError(R.string.story_video_error_exceeds_auto_split_limit)
+    object ExportFailed : StoryVideoProcessingError(R.string.story_video_error_export_failed)
+    object ThumbnailFailed : StoryVideoProcessingError(R.string.story_video_error_thumbnail_failed)
+
+    override val message: String?
+        get() = StoryVideoProcessingService.localizedMessage(messageRes)
 }
 
 data class StoryVideoClip(
@@ -34,17 +48,27 @@ data class StoryVideoClip(
     val duration: Double,
 )
 
-/** Media3 equivalent of `StoryVideoProcessingService.swift`. */
+/**
+ * Port de `StoryVideoProcessingService.swift` (Media3 + MediaMetadataRetriever).
+ * Constantes ≡ `maxStorySegmentDuration` / `maxAutoSplitPartCount` / `maxAutoSplitDuration`.
+ */
 object StoryVideoProcessingService {
     const val maxStorySegmentDuration = 60.0
     const val maxAutoSplitPartCount = 5
     val maxAutoSplitDuration: Double get() = CreatorMedia.MAX_MOMENT_VIDEO_DURATION_SECONDS
+
+    /** iOS `AVAssetImageGenerator.maximumSize` = 540×960. */
+    private const val THUMB_MAX_WIDTH = 540
+    private const val THUMB_MAX_HEIGHT = 960
 
     private var appContext: Context? = null
 
     fun initialize(context: Context) {
         if (appContext == null) appContext = context.applicationContext
     }
+
+    internal fun localizedMessage(@StringRes messageRes: Int): String? =
+        appContext?.getString(messageRes)
 
     suspend fun duration(videoUri: Uri): Double {
         val context = appContext ?: throw StoryVideoProcessingError.MissingVideo
@@ -73,11 +97,26 @@ object StoryVideoProcessingService {
         if (clipDuration <= 0.0) throw StoryVideoProcessingError.InvalidDuration
 
         val output = File(context.cacheDir, "story_clip_${UUID.randomUUID()}.mp4")
-        exportClip(context, videoUri, safeStart, safeEnd, output)
+        try {
+            exportClip(context, videoUri, safeStart, safeEnd, output)
+        } catch (_: Exception) {
+            output.delete()
+            val materialized = materializeStoryVideoIfNeeded(context, videoUri)
+            if (materialized == videoUri) throw StoryVideoProcessingError.ExportFailed
+            exportClip(context, materialized, safeStart, safeEnd, output)
+        }
+
+        val outputUri = Uri.fromFile(output)
+        // ≡ iOS: thumbnail from exported clip at 0.1s, then CreatorMedia(image:)
+        val thumbnail = generateStoryThumbnail(outputUri, time = 0.1)
+        val thumbnailUri = persistStoryThumbnail(context, thumbnail)
+            ?: throw StoryVideoProcessingError.ThumbnailFailed
+
         return CreatorMedia(
-            uri = Uri.fromFile(output),
+            uri = outputUri,
             isVideo = true,
             durationSeconds = clipDuration,
+            thumbnailUri = thumbnailUri,
             aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
             recommendedAspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
             hasEdits = true,
@@ -112,8 +151,18 @@ object StoryVideoProcessingService {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(context, videoUri)
-            retriever.getFrameAtTime((max(0.0, time) * 1_000_000L).toLong())
-                ?: throw StoryVideoProcessingError.ThumbnailFailed
+            val timeUs = (max(0.0, time) * 1_000_000L).toLong()
+            val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                retriever.getScaledFrameAtTime(
+                    timeUs,
+                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                    THUMB_MAX_WIDTH,
+                    THUMB_MAX_HEIGHT,
+                )
+            } else {
+                retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            }
+            frame ?: throw StoryVideoProcessingError.ThumbnailFailed
         } catch (error: StoryVideoProcessingError) {
             throw error
         } catch (_: Exception) {
@@ -123,6 +172,13 @@ object StoryVideoProcessingService {
         }
     }
 
+    private fun persistStoryThumbnail(context: Context, bitmap: Bitmap): Uri? = runCatching {
+        val output = File(context.cacheDir, "story_thumb_${UUID.randomUUID()}.jpg")
+        FileOutputStream(output).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+        Uri.fromFile(output)
+    }.getOrNull()
+
+    /** ≡ `AVAssetExportPreset1280x720` via Media3 `Presentation.createForHeight(720)`. */
     private suspend fun exportClip(
         context: Context,
         input: Uri,
@@ -139,6 +195,14 @@ object StoryVideoProcessingService {
                     .build(),
             )
             .build()
+        val edited = EditedMediaItem.Builder(item)
+            .setEffects(
+                Effects(
+                    /* audioProcessors = */ emptyList(),
+                    /* videoEffects = */ listOf(Presentation.createForHeight(720)),
+                ),
+            )
+            .build()
         val transformer = Transformer.Builder(context)
             .setVideoMimeType(MimeTypes.VIDEO_H264)
             .addListener(object : Transformer.Listener {
@@ -152,11 +216,13 @@ object StoryVideoProcessingService {
                     exportException: ExportException,
                 ) {
                     output.delete()
-                    if (continuation.isActive) continuation.resumeWithException(StoryVideoProcessingError.ExportFailed)
+                    if (continuation.isActive) {
+                        continuation.resumeWithException(StoryVideoProcessingError.ExportFailed)
+                    }
                 }
             })
             .build()
-        transformer.start(EditedMediaItem.Builder(item).build(), output.absolutePath)
+        transformer.start(edited, output.absolutePath)
         continuation.invokeOnCancellation {
             runCatching { transformer.cancel() }
             output.delete()

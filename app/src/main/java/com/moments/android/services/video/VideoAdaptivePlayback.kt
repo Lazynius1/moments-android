@@ -1,7 +1,6 @@
 package com.moments.android.services.video
 
 import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
@@ -126,7 +125,8 @@ object VideoPlaybackRecovery {
         onReplaceItem: (MediaItem) -> Unit,
     ) {
         if (!isPlaying) return
-        if (player.playbackState == Player.STATE_IDLE && player.playerError != null) return
+        // iOS: guard player.currentItem?.status != .failed
+        if (player.playerError != null) return
 
         val newItem = adaptive?.handleStall()
         if (newItem != null) {

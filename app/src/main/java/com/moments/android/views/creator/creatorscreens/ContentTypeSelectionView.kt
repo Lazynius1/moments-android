@@ -1,4 +1,5 @@
 package com.moments.android.views.creator.creatorscreens
+
 import android.Manifest
 import android.content.ContentUris
 import android.content.pm.PackageManager
@@ -40,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,17 +64,21 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.moments.android.R
-import com.moments.android.extensions.MomentsGlassButtonTint
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.CreatorContentType
 import com.moments.android.views.creator.CreatorFlow
 import com.moments.android.views.creator.creatoruikit.BackgroundCameraView
+import com.moments.android.views.creator.creatoruikit.StopBackgroundCameraSession
+import com.moments.android.views.permission.shared.PermissionPrimerGate
+import com.moments.android.views.permission.shared.PermissionPrimerGateHost
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
- * Port de `ContentTypeSelectionView.swift` (chunk UI principal).
- * PermissionPrimerGate fotos: pendiente de su archivo iOS.
+ * Port de `ContentTypeSelectionView.swift`.
+ * matchedGeometryEffect iOS (momentSource) no aplica en Compose aquí.
  */
 @Composable
 fun ContentTypeSelectionView(
@@ -87,7 +93,10 @@ fun ContentTypeSelectionView(
     var recentImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var shutterScale by remember { mutableFloatStateOf(1f) }
     var dialTransientOffset by remember { mutableFloatStateOf(0f) }
+    var backgroundCameraActive by remember { mutableStateOf(true) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val photosGate = remember { PermissionPrimerGate(PermissionPrimerGate.Kind.PHOTOS) }
     val hasCameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
         PackageManager.PERMISSION_GRANTED
     val density = LocalDensity.current
@@ -103,25 +112,30 @@ fun ContentTypeSelectionView(
     val dialVisualMode =
         if (dialPillOffset <= 0f) CreatorContentType.MOMENT else CreatorContentType.STORY
 
+    // iOS breathing: 10s easeInOut autoreverses
     val infinite = rememberInfiniteTransition(label = "creatorBreath")
     val breathScale by infinite.animateFloat(
         initialValue = 1f,
         targetValue = 1.035f,
-        animationSpec = infiniteRepeatable(tween(5000), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(tween(10_000), RepeatMode.Reverse),
         label = "breath",
     )
+    // iOS ring: linear 9s forever
     val ringRotation by infinite.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(tween(9_000, easing = LinearEasing), RepeatMode.Restart),
         label = "ring",
     )
 
-    LaunchedEffect(Unit) {
+    fun reloadRecentPhotos() {
         recentImageUris = loadRecentImageUris(context, limit = 4)
     }
 
-    // currentFlow se mantiene en la firma por paridad iOS (@Binding); el shell lo actualiza vía onCurrentFlowChange.
+    LaunchedEffect(Unit) {
+        photosGate.requestAccess(context) { reloadRecentPhotos() }
+    }
+
     @Suppress("UNUSED_PARAMETER")
     val unusedFlow = currentFlow
 
@@ -129,33 +143,42 @@ fun ContentTypeSelectionView(
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             if (selectedMode == CreatorContentType.MOMENT) {
                 if (recentImageUris.isNotEmpty()) {
-                    recentImageUris.take(4).forEachIndexed { index, uri ->
-                        FloatingRecentImage(uri = uri, index = index)
+                    Box(Modifier.fillMaxSize().blur(8.dp)) {
+                        recentImageUris.take(4).forEachIndexed { index, uri ->
+                            FloatingRecentImage(uri = uri, index = index)
+                        }
                     }
-                    Box(Modifier.fillMaxSize().background(Color.Black.copy(0.15f)))
+                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.15f)))
                     Box(
                         Modifier
                             .fillMaxSize()
                             .background(
                                 Brush.verticalGradient(
-                                    colors = listOf(Color.Transparent, Color.Black.copy(0.8f)),
+                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
                                 ),
                             ),
                     )
                 } else {
-                    Box(Modifier.fillMaxSize().background(Color.Gray.copy(0.1f)))
+                    Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)))
                 }
             } else {
                 if (hasCameraPermission) {
-                    BackgroundCameraView(modifier = Modifier.fillMaxSize().blur(10.dp))
-                    Box(Modifier.fillMaxSize().background(Color.Black.copy(.1f)))
+                    BackgroundCameraView(
+                        isActive = backgroundCameraActive,
+                        modifier = Modifier.fillMaxSize().blur(10.dp),
+                    )
+                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.1f)))
                 } else {
                     Box(
                         Modifier
                             .fillMaxSize()
                             .background(
                                 Brush.verticalGradient(
-                                    listOf(Color.Black, Color(0xFF4A148C).copy(0.2f), Color(0xFFE91E63).copy(0.1f)),
+                                    listOf(
+                                        Color.Black,
+                                        Color(0xFF4A148C).copy(alpha = 0.2f),
+                                        Color(0xFFE91E63).copy(alpha = 0.1f),
+                                    ),
                                 ),
                             ),
                     )
@@ -163,12 +186,7 @@ fun ContentTypeSelectionView(
             }
         }
 
-        Column(
-            Modifier
-                .fillMaxSize(),
-        ) {
-            // iOS topToolbar: leading 16 + top 10, close 44
-            // Safe area la aporta el Dialog (safeDrawingPadding).
+        Column(Modifier.fillMaxSize()) {
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -194,7 +212,6 @@ fun ContentTypeSelectionView(
 
             Spacer(Modifier.weight(1f))
 
-            // iOS: shutter.padding(.bottom, 28)
             Box(
                 Modifier
                     .align(Alignment.CenterHorizontally)
@@ -208,13 +225,21 @@ fun ContentTypeSelectionView(
                                 shutterScale = 1f
                             },
                             onTap = {
+                                // ≡ confirmSelection
                                 HapticManager.shared.mediumImpact()
                                 onContentTypeChange(selectedMode)
                                 when (selectedMode) {
                                     CreatorContentType.MOMENT ->
                                         onCurrentFlowChange(CreatorFlow.MEDIA_SELECTION)
-                                    CreatorContentType.STORY ->
-                                        onCurrentFlowChange(CreatorFlow.STORY_CAMERA)
+                                    CreatorContentType.STORY -> {
+                                        // ≡ enterStoryCameraFlow — StopBackgroundCameraSession + delay 0.1s
+                                        StopBackgroundCameraSession.post()
+                                        backgroundCameraActive = false
+                                        scope.launch {
+                                            delay(100)
+                                            onCurrentFlowChange(CreatorFlow.STORY_CAMERA)
+                                        }
+                                    }
                                 }
                             },
                         )
@@ -228,7 +253,6 @@ fun ContentTypeSelectionView(
                 }
             }
 
-            // iOS: dialSelector.padding(.bottom, 30)
             Box(
                 Modifier
                     .align(Alignment.CenterHorizontally)
@@ -236,17 +260,16 @@ fun ContentTypeSelectionView(
                     .width(dialControlWidth)
                     .height(44.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(Color.Black.copy(0.3f))
-                    .border(1.dp, Color.White.copy(0.08f), RoundedCornerShape(50))
+                    .background(Color.Black.copy(alpha = 0.3f))
+                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .pointerInput(selectedMode, dialTravelPx, dialBaseOffset) {
                         detectDragGestures(
                             onDragEnd = {
-                                val threshold = dialTravelPx * 0.7f
-                                val currentOffset = dialBaseOffset + dialTransientOffset
+                                val threshold = minOf(size.width * 0.16f, dialTravelPx * 0.7f)
                                 val target = when {
                                     dialTransientOffset < -threshold -> CreatorContentType.MOMENT
                                     dialTransientOffset > threshold -> CreatorContentType.STORY
-                                    else -> if (currentOffset <= 0f) {
+                                    else -> if (dialBaseOffset + dialTransientOffset <= 0f) {
                                         CreatorContentType.MOMENT
                                     } else {
                                         CreatorContentType.STORY
@@ -270,9 +293,7 @@ fun ContentTypeSelectionView(
                         .offset { IntOffset(dialPillOffset.roundToInt(), 0) }
                         .width(dialPillWidth)
                         .height(36.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(MomentsGlassButtonTint.canvas(true))
-                        .border(0.5.dp, Color.Black.copy(0.14f), RoundedCornerShape(50)),
+                        .momentsChromeGlass(RoundedCornerShape(50), interactive = true),
                 )
                 Row(Modifier.fillMaxSize().padding(horizontal = dialInnerPadding)) {
                     DialLabel(
@@ -298,6 +319,8 @@ fun ContentTypeSelectionView(
                 }
             }
         }
+
+        PermissionPrimerGateHost(gate = photosGate)
     }
 }
 
@@ -311,7 +334,7 @@ private fun DialLabel(
     Box(modifier.clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Text(
             text,
-            color = if (active) Color.White.copy(0.96f) else Color.White.copy(0.58f),
+            color = if (active) Color.White.copy(alpha = 0.96f) else Color.White.copy(alpha = 0.58f),
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
         )
@@ -327,7 +350,7 @@ private fun MomentShutter(recentUri: Uri?) {
                 .rotate(-10f)
                 .size(60.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color.White.copy(0.8f)),
+                .background(Color.White.copy(alpha = 0.8f)),
         )
         Box(
             Modifier
@@ -335,7 +358,7 @@ private fun MomentShutter(recentUri: Uri?) {
                 .rotate(5f)
                 .size(60.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color.White.copy(0.9f)),
+                .background(Color.White.copy(alpha = 0.9f)),
         )
         if (recentUri != null) {
             AsyncImage(
@@ -363,7 +386,6 @@ private fun MomentShutter(recentUri: Uri?) {
 
 @Composable
 private fun StoryShutter(breathScale: Float, ringRotation: Float) {
-    // iOS: frame 88, ring 81 stroke 7, chrome glass on the circle
     Box(
         Modifier
             .size(88.dp)
@@ -392,13 +414,13 @@ private fun FloatingRecentImage(uri: Uri, index: Int) {
     val dx by infinite.animateFloat(
         initialValue = 0f,
         targetValue = if (index % 2 == 0) 40f else -40f,
-        animationSpec = infiniteRepeatable(tween(18000), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(tween(18_000), RepeatMode.Reverse),
         label = "dx",
     )
     val dy by infinite.animateFloat(
         initialValue = 0f,
         targetValue = if (index < 2) 30f else -30f,
-        animationSpec = infiniteRepeatable(tween(20000), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(tween(20_000), RepeatMode.Reverse),
         label = "dy",
     )
     Box(

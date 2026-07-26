@@ -84,7 +84,8 @@ import com.moments.android.views.feed.moments.HiddenLayersOverlayView
 import com.moments.android.views.feed.moments.MomentCarouselLayoutRules
 import com.moments.android.views.feed.moments.MomentMediaCarousel
 import com.moments.android.views.feed.moments.ClickableHashtagsView
-import com.moments.android.views.feed.reactions.PostActionButtons
+import com.moments.android.views.components.ModernActionButtons
+import com.moments.android.views.components.ModernFollowButton
 import com.moments.android.views.feed.uploads.StoryUploadProgressManager
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
@@ -333,67 +334,6 @@ fun ExpandableContentView(
                         .graphicsLayer { rotationZ = if (isExpanded) 0f else 180f },
                 )
             }
-        }
-    }
-}
-
-/** Port de `ModernFollowButton` (MomentRailComponents.swift) — cápsula glass, no fill teal. */
-@Composable
-fun ModernFollowButton(
-    state: FollowButtonState,
-    isLoading: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = rememberFeedAdaptiveColors()
-    val context = LocalContext.current
-    val density = LocalDensity.current
-    val label = when (state) {
-        FollowButtonState.FOLLOWING -> stringResource(R.string.feed_following_action)
-        FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
-        FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
-        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> stringResource(R.string.feed_follow_cancel_request)
-        FollowButtonState.BLOCKED -> stringResource(R.string.user_profile_blocked)
-        else -> stringResource(R.string.feed_follow)
-    }
-    val icon = when (state) {
-        FollowButtonState.FOLLOWING -> Icons.Filled.Verified
-        FollowButtonState.CAN_REQUEST_FOLLOW -> Icons.Filled.PersonAdd
-        FollowButtonState.REQUEST_PENDING -> Icons.Filled.AccessTime
-        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> Icons.Filled.Close
-        else -> Icons.Filled.PersonAdd
-    }
-    val isPassive = state == FollowButtonState.OWN_PROFILE ||
-        state == FollowButtonState.BLOCKED ||
-        state == FollowButtonState.REQUEST_PENDING
-    Row(
-        modifier
-            .graphicsLayer { alpha = if (isPassive) 0.78f else 1f }
-            .momentsChromeGlass(
-                shape = RoundedCornerShape(percent = 50),
-                interactive = state.isActionable,
-                style = MomentsGlassStyle.NATIVE,
-            )
-            .clickable(enabled = !isLoading && state.isActionable, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        if (isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(14.dp),
-                color = colors.primary,
-                strokeWidth = 1.5.dp,
-            )
-        } else {
-            Icon(icon, contentDescription = null, tint = colors.primary, modifier = Modifier.size(14.dp))
-            Text(
-                text = label,
-                color = colors.primary,
-                fontSize = with(density) { legacyPoppinsSize(context, 14).toSp() },
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-            )
         }
     }
 }
@@ -685,20 +625,16 @@ fun ModernPostCardView(
                     }
 
                     Box(Modifier.align(Alignment.BottomEnd)) {
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = !isImmersive,
-                            enter = fadeIn(),
-                            exit = fadeOut(),
-                        ) {
-                            PostActionButtons(
-                                moment = moment,
-                                onOpenComments = onOpenComments,
-                                onShare = onShare,
-                                onContextMenu = { onContextMenu(moment) },
-                                isSaved = isSaved,
-                                onSave = { toggleSave() },
-                            )
-                        }
+                        ModernActionButtons(
+                            moment = moment,
+                            isSaved = isSaved,
+                            isSaveLoading = isSaveLoading,
+                            commentCount = moment.commentCount,
+                            onComment = onOpenComments,
+                            onSave = { toggleSave() },
+                            onContextMenu = { onContextMenu(moment) },
+                            isImmersive = isImmersive,
+                        )
                     }
                 }
             }
@@ -709,6 +645,17 @@ fun ModernPostCardView(
                 MomentCaptionView(
                     content = moment.content,
                     onHashtagTap = onOpenHashtag,
+                    authorId = moment.authorId,
+                    username = moment.username,
+                    audience = moment.audience,
+                    previewImageUrl = moment.visibleMediaItems.firstOrNull()?.let { item ->
+                        when (item.type.lowercase()) {
+                            "video" -> item.thumbnailUrl?.trim()?.takeIf { it.isNotEmpty() }
+                                ?: item.url.trim().takeIf { it.isNotEmpty() }
+                            else -> item.url.trim().takeIf { it.isNotEmpty() }
+                        }
+                    },
+                    isVideo = moment.visibleMediaItems.firstOrNull()?.type?.equals("video", ignoreCase = true),
                 )
             }
         }

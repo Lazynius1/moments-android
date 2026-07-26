@@ -13,31 +13,47 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculateCentroidSize
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateRotation
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.moments.android.utilities.HapticManager
@@ -47,6 +63,7 @@ import java.util.UUID
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -70,8 +87,11 @@ fun StickerOverlayView(
     isEditingInline: Boolean,
     onUpdate: (StoryStickerDraft) -> Unit,
     onDelete: () -> Unit,
-    onDragChanged: (StoryStickerDraft) -> Unit = onUpdate,
-    onDragEnded: (StoryStickerDraft) -> Unit = onUpdate,
+    /** Segundo arg ≡ `isPointOverTrash` sobre el punto propuesto (sin clamp), como el dedo en iOS. */
+    onDragChanged: (StoryStickerDraft, Boolean) -> Unit = { draft, _ -> onUpdate(draft) },
+    onDragEnded: (StoryStickerDraft, Boolean) -> Unit = { draft, overTrash ->
+        if (overTrash) onDelete() else onUpdate(draft)
+    },
     onStickerTapped: (StoryStickerDraft) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
@@ -79,7 +99,6 @@ fun StickerOverlayView(
     var contentWidthPx by remember(sticker.id) { mutableIntStateOf(0) }
     var contentHeightPx by remember(sticker.id) { mutableIntStateOf(0) }
     var interactionFeedback by remember(sticker.id) { mutableStateOf(false) }
-    var latestTransformUpdate by remember(sticker.id) { mutableStateOf<StoryStickerDraft?>(null) }
 
     LaunchedEffect(interactionFeedback) {
         if (interactionFeedback) {
@@ -109,50 +128,19 @@ fun StickerOverlayView(
         canvasHeightPx = canvasHeightPx,
     )
 
-    fun updateTransform(
-        panX: Float = 0f,
-        panY: Float = 0f,
-        zoom: Float = 1f,
-        rotationDelta: Float = 0f,
-    ) {
-        if (isEditingInline || canvasWidthPx <= 0 || canvasHeightPx <= 0) return
-        if (isContentEditing && sticker.type == "frame") {
-            val nextScale = (sticker.contentScale?.toFloat() ?: 1f) * zoom
-            val safeScale = nextScale.coerceIn(1f, 4f)
-            val proposedX = (sticker.contentOffsetX?.toFloat() ?: 0f) + panX / currentScale.coerceAtLeast(.0001f)
-            val proposedY = (sticker.contentOffsetY?.toFloat() ?: 0f) + panY / currentScale.coerceAtLeast(.0001f)
-            val offset = clampFrameContentOffset(sticker, proposedX, proposedY, safeScale)
-            onUpdate(
-                sticker.copy(
-                    contentScale = safeScale.toDouble(),
-                    contentOffsetX = offset.first.toDouble(),
-                    contentOffsetY = offset.second.toDouble(),
-                ),
-            )
-            return
-        }
-
-        val nextScale = (currentScale * dampedMagnification(zoom)).coerceIn(minScale, maxScale)
-        val nextRotation = currentRotation + rotationDelta
-        val position = clampStickerPosition(
-            x = clampedPosition.first + panX,
-            y = clampedPosition.second + panY,
-            contentWidthPx = contentWidthPx,
-            contentHeightPx = contentHeightPx,
-            scale = nextScale,
-            rotationRadians = nextRotation,
-            canvasWidthPx = canvasWidthPx,
-            canvasHeightPx = canvasHeightPx,
-        )
-        val updated = sticker.copy(
-            normalizedX = (position.first / canvasWidthPx).toDouble(),
-            normalizedY = (position.second / canvasHeightPx).toDouble(),
-            scale = nextScale.toDouble(),
-            rotationRadians = nextRotation.toDouble(),
-        )
-        latestTransformUpdate = updated
-        onDragChanged(updated)
-    }
+    val latestSticker by rememberUpdatedState(sticker)
+    val latestClamped by rememberUpdatedState(clampedPosition)
+    val latestScale by rememberUpdatedState(currentScale)
+    val latestRotation by rememberUpdatedState(currentRotation)
+    val latestMinScale by rememberUpdatedState(minScale)
+    val latestMaxScale by rememberUpdatedState(maxScale)
+    val latestContentW by rememberUpdatedState(contentWidthPx)
+    val latestContentH by rememberUpdatedState(contentHeightPx)
+    val latestIsContentEditing by rememberUpdatedState(isContentEditing)
+    val latestOnDragChanged by rememberUpdatedState(onDragChanged)
+    val latestOnDragEnded by rememberUpdatedState(onDragEnded)
+    val latestOnUpdate by rememberUpdatedState(onUpdate)
+    val latestOnStickerTapped by rememberUpdatedState(onStickerTapped)
 
     Box(
         modifier = modifier
@@ -178,38 +166,155 @@ fun StickerOverlayView(
                     Modifier
                 } else {
                     Modifier
-                        .pointerInput(sticker.id, canvasWidthPx, canvasHeightPx, isContentEditing, currentScale, currentRotation) {
-                            detectTransformGestures { _, pan, zoom, rotation ->
-                                updateTransform(
-                                    panX = pan.x,
-                                    panY = pan.y,
-                                    zoom = zoom,
-                                    rotationDelta = Math.toRadians(rotation.toDouble()).toFloat(),
-                                )
-                            }
-                        }
-                        // `detectTransformGestures` expone el cambio continuo pero no un callback
-                        // final. Observamos el levantamiento del dedo para conservar el `onEnded`
-                        // de Swift (papelera, persistencia y limpieza del estado de arrastre).
-                        .pointerInput(sticker.id) {
+                        // Gesto propio (≡ Drag+Magnify+Rotate de Swift) con onEnded fiable
+                        // para la papelera. Acumula en locals: el clamped de composición queda
+                        // obsoleto dentro de `pointerInput` y rompía el arrastre.
+                        .pointerInput(sticker.id, canvasWidthPx, canvasHeightPx) {
                             awaitEachGesture {
                                 awaitFirstDown(requireUnconsumed = false)
-                                var touchesActive: Boolean
+                                var liveX = latestClamped.first
+                                var liveY = latestClamped.second
+                                var liveScale = latestScale
+                                var liveRotation = latestRotation
+                                val pinchStartScale = liveScale
+                                var accumulatedZoom = 1f
+                                var contentPinchStart: Float? = null
+                                var contentAccumulatedZoom = 1f
+                                var latestDraft: StoryStickerDraft? = null
+                                var isOverTrash = false
+                                var transformed = false
+                                var rotation = 0f
+                                var zoom = 1f
+                                var pan = Offset.Zero
+                                var pastTouchSlop = false
+                                val touchSlop = viewConfiguration.touchSlop
+
                                 do {
-                                    touchesActive = awaitPointerEvent(PointerEventPass.Main)
-                                        .changes.any { it.pressed }
-                                } while (touchesActive)
-                                latestTransformUpdate?.let(onDragEnded)
-                                latestTransformUpdate = null
+                                    val event = awaitPointerEvent()
+                                    val canceled = event.changes.any { it.isConsumed }
+                                    if (canceled) break
+
+                                    val zoomChange = event.calculateZoom()
+                                    val rotationChange = event.calculateRotation()
+                                    val panChange = event.calculatePan()
+
+                                    if (!pastTouchSlop) {
+                                        zoom *= zoomChange
+                                        rotation += rotationChange
+                                        pan += panChange
+                                        val centroidSize = event.calculateCentroidSize(useCurrent = false)
+                                        val zoomMotion = abs(1 - zoom) * centroidSize
+                                        val rotationMotion =
+                                            abs(rotation * PI.toFloat() * centroidSize / 180f)
+                                        val panMotion = pan.getDistance()
+                                        if (zoomMotion > touchSlop ||
+                                            rotationMotion > touchSlop ||
+                                            panMotion > touchSlop
+                                        ) {
+                                            pastTouchSlop = true
+                                        }
+                                    }
+
+                                    if (pastTouchSlop) {
+                                        event.calculateCentroid(useCurrent = false)
+                                        if (rotationChange != 0f ||
+                                            zoomChange != 1f ||
+                                            panChange != Offset.Zero
+                                        ) {
+                                            val active = latestSticker
+                                            if (latestIsContentEditing && active.type == "frame") {
+                                                if (contentPinchStart == null) {
+                                                    contentPinchStart =
+                                                        (active.contentScale?.toFloat() ?: 1f)
+                                                            .coerceAtLeast(1f)
+                                                    contentAccumulatedZoom = 1f
+                                                }
+                                                contentAccumulatedZoom *= zoomChange
+                                                val safeScale = (
+                                                    (contentPinchStart ?: 1f) *
+                                                        dampedMagnification(contentAccumulatedZoom)
+                                                    ).coerceIn(1f, 4f)
+                                                val proposedX =
+                                                    (active.contentOffsetX?.toFloat() ?: 0f) +
+                                                        panChange.x / liveScale.coerceAtLeast(.0001f)
+                                                val proposedY =
+                                                    (active.contentOffsetY?.toFloat() ?: 0f) +
+                                                        panChange.y / liveScale.coerceAtLeast(.0001f)
+                                                val offset = clampFrameContentOffset(
+                                                    active,
+                                                    proposedX,
+                                                    proposedY,
+                                                    safeScale,
+                                                )
+                                                latestOnUpdate(
+                                                    active.copy(
+                                                        contentScale = safeScale.toDouble(),
+                                                        contentOffsetX = offset.first.toDouble(),
+                                                        contentOffsetY = offset.second.toDouble(),
+                                                    ),
+                                                )
+                                            } else {
+                                                accumulatedZoom *= zoomChange
+                                                liveScale = (
+                                                    pinchStartScale *
+                                                        dampedMagnification(accumulatedZoom)
+                                                    ).coerceIn(
+                                                    latestMinScale,
+                                                    latestMaxScale,
+                                                )
+                                                liveRotation += Math.toRadians(
+                                                    rotationChange.toDouble(),
+                                                ).toFloat()
+                                                liveX += panChange.x
+                                                liveY += panChange.y
+                                                val visual = clampStickerPosition(
+                                                    x = liveX,
+                                                    y = liveY,
+                                                    contentWidthPx = latestContentW,
+                                                    contentHeightPx = latestContentH,
+                                                    scale = liveScale,
+                                                    rotationRadians = liveRotation,
+                                                    canvasWidthPx = canvasWidthPx,
+                                                    canvasHeightPx = canvasHeightPx,
+                                                )
+                                                isOverTrash = isPointOverStoryOverlayTrash(
+                                                    x = liveX,
+                                                    y = liveY,
+                                                    canvasWidthPx = canvasWidthPx.toFloat(),
+                                                    canvasHeightPx = canvasHeightPx.toFloat(),
+                                                )
+                                                val updated = active.copy(
+                                                    normalizedX =
+                                                        (visual.first / canvasWidthPx).toDouble(),
+                                                    normalizedY =
+                                                        (visual.second / canvasHeightPx).toDouble(),
+                                                    scale = liveScale.toDouble(),
+                                                    rotationRadians = liveRotation.toDouble(),
+                                                )
+                                                latestDraft = updated
+                                                transformed = true
+                                                latestOnDragChanged(updated, isOverTrash)
+                                            }
+                                        }
+                                        event.changes.forEach {
+                                            if (it.positionChanged()) it.consume()
+                                        }
+                                    }
+                                } while (event.changes.any { it.pressed })
+
+                                if (transformed) {
+                                    latestDraft?.let { latestOnDragEnded(it, isOverTrash) }
+                                }
                             }
                         }
                         .pointerInput(sticker.id, sticker.type) {
                             detectTapGestures(
                                 onTap = {
-                                    if (sticker.type != "selfie" || sticker.caption != "selfie_live") {
+                                    val active = latestSticker
+                                    if (active.type != "selfie" || active.caption != "selfie_live") {
                                         interactionFeedback = true
                                         HapticManager.shared.lightImpact()
-                                        onStickerTapped(sticker)
+                                        latestOnStickerTapped(active)
                                     }
                                 },
                             )
@@ -318,6 +423,8 @@ fun SelfieStickerLiveCameraView(
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
     var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    // ≡ lastSelfieSwitchAt — evita capturar justo tras flip
+    var lastSwitchAtMs by remember { mutableLongStateOf(0L) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -346,6 +453,8 @@ fun SelfieStickerLiveCameraView(
     }
 
     fun capture() {
+        if (System.currentTimeMillis() - lastSwitchAtMs < 350L) return
+        HapticManager.shared.mediumImpact()
         val outputFile = File(context.cacheDir, "selfie_stickers").also { it.mkdirs() }
             .resolve("selfie_${UUID.randomUUID()}.jpg")
         imageCapture.takePicture(
@@ -367,29 +476,43 @@ fun SelfieStickerLiveCameraView(
         )
     }
 
-    AndroidView(
-        factory = { previewContext ->
-            PreviewView(previewContext).apply {
-                scaleType = PreviewView.ScaleType.FILL_CENTER
-                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-            }.also { previewView = it }
-        },
-        modifier = modifier
-            .clip(androidx.compose.foundation.shape.CircleShape)
-            .pointerInput(lensFacing) {
-                detectTapGestures(
-                    onTap = { capture() },
-                    onLongPress = {
-                        lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
-                            CameraSelector.LENS_FACING_BACK
-                        } else {
-                            CameraSelector.LENS_FACING_FRONT
-                        }
-                    },
-                )
-            }
-            .fillMaxSize(),
-    )
+    Box(modifier = modifier) {
+        AndroidView(
+            factory = { previewContext ->
+                PreviewView(previewContext).apply {
+                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                }.also { previewView = it }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .pointerInput(lensFacing) {
+                    detectTapGestures(
+                        onTap = { capture() },
+                        onLongPress = {
+                            lastSwitchAtMs = System.currentTimeMillis()
+                            lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
+                                CameraSelector.LENS_FACING_BACK
+                            } else {
+                                CameraSelector.LENS_FACING_FRONT
+                            }
+                            HapticManager.shared.mediumImpact()
+                        },
+                    )
+                },
+        )
+        // ≡ badge camera.circle.fill
+        Icon(
+            Icons.Filled.CameraAlt,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(8.dp)
+                .size(22.dp),
+        )
+    }
 }
 
 /** Port de `makeCapturedSelfieStickerImage` de este mismo archivo Swift. */

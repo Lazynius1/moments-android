@@ -1,9 +1,11 @@
 package com.moments.android.views.creator.components
+
 import android.graphics.Bitmap
 import android.graphics.BlurMaskFilter
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -32,12 +35,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material.icons.filled.NorthEast
-import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,10 +52,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -60,6 +65,7 @@ import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -70,23 +76,37 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.Image
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
+import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint as AndroidPaint
 import android.graphics.Path as AndroidPath
 
+
 /**
- * Port de `StoryDrawingEditorOverlay.swift` (chunk dibujo).
- * PencilKit → Compose Canvas. Glow/arrow aproximados; ColorPicker sistema deferred.
+ * Port de `StoryDrawingEditorOverlay.swift`.
+ * PencilKit → Compose Canvas (glow/arrow/marker/eraser 1:1 en parámetros).
  */
 enum class StoryDrawingBrush {
     PEN, ARROW, GLOW, MARKER, PENCIL, ERASER,
+}
+
+/** ≡ `GlowConfig` del canvas PencilKit (bake/live usan `brushWidth`; core×0.3 solo ink PK invisible). */
+object StoryDrawingGlowConfig {
+    const val coreWidthMultiplier = 0.3f
+    const val shadowRadiusMultiplier = 0.35f
+    const val shadowRadiusMinimum = 2f
+
+    fun coreWidth(brushWidth: Float): Float = maxOf(2f, brushWidth * coreWidthMultiplier)
+    fun shadowRadius(brushWidth: Float): Float =
+        maxOf(shadowRadiusMinimum, brushWidth * shadowRadiusMultiplier)
 }
 
 data class StoryDrawingStroke(
@@ -94,11 +114,13 @@ data class StoryDrawingStroke(
     val color: Color,
     val widthPx: Float,
     val points: List<Offset>,
+    /** Ancho del slider (para blur glow ≡ iOS `brushWidth`). */
+    val brushSizePx: Float = widthPx,
 )
 
+/** ≡ `drawingPalette` (sin Light/Dark Moments, que van aparte). */
 object StoryDrawingPalette {
     val swatches: List<String> = listOf(
-        "FAF9F6", "0B1215",
         "FFFFFF", "000000",
         "FF3B30", "FF9500", "FFCC00", "34C759", "007AFF", "5856D6",
         "AF52DE", "FF2D55", "A2845E", "F2C94C", "00C7BE", "8E8E93",
@@ -112,11 +134,15 @@ fun StoryDrawingEditorOverlay(
     onCancel: () -> Unit,
     onDone: (Bitmap?) -> Unit,
     modifier: Modifier = Modifier,
+    /** ≡ iOS `canvasRect` — acota el área de dibujo al captureRect compartido. */
+    canvasRect: Rect? = null,
+    onOpenColorPicker: (() -> Unit)? = null,
 ) {
     val isDark = isSystemInDarkTheme()
-    val controlFg = if (isDark) Color.White else Color.Black.copy(0.82f)
-    val controlStroke = if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.08f)
-    val secondary = controlFg.copy(if (isDark) 0.58f else 0.62f)
+    val controlFg = StoryEditorChromeColor.icon(isDark)
+    val secondary = controlFg.copy(alpha = if (isDark) 0.58f else 0.62f)
+    val dividerColor = controlFg.copy(alpha = if (isDark) 0.16f else 0.12f)
+    val controlStroke = controlFg.copy(alpha = if (isDark) 0.12f else 0.10f)
 
     var brush by remember { mutableStateOf(StoryDrawingBrush.PEN) }
     var colorHex by remember { mutableStateOf("FFFFFF") }
@@ -124,10 +150,14 @@ fun StoryDrawingEditorOverlay(
     var strokes by remember { mutableStateOf<List<StoryDrawingStroke>>(emptyList()) }
     var redoStack by remember { mutableStateOf<List<StoryDrawingStroke>>(emptyList()) }
     var activeStroke by remember { mutableStateOf<StoryDrawingStroke?>(null) }
+    var isColorPickerOpen by remember { mutableStateOf(false) }
 
     val density = LocalDensity.current
     val brushWidthPx = with(density) { brushWidthDp.dp.toPx() }
     val strokeColor = parseStoryColorHex(colorHex)
+    val paletteColors = remember {
+        StoryDrawingPalette.swatches.map(::parseStoryColorHex)
+    }
 
     fun commitStroke(stroke: StoryDrawingStroke) {
         if (stroke.points.size < 2) return
@@ -152,11 +182,36 @@ fun StoryDrawingEditorOverlay(
 
     Box(modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val canvasW = constraints.maxWidth.toFloat().coerceAtLeast(1f)
-            val canvasH = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+            val fullW = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+            val fullH = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+            val drawRect = canvasRect ?: Rect(0f, 0f, fullW, fullH)
+            val canvasW = drawRect.width.coerceAtLeast(1f)
+            val canvasH = drawRect.height.coerceAtLeast(1f)
+            // ≡ StoryTextEditor: centrar chrome (92dp) en el hueco bajo el canvas
+            val chromeHeightPx = with(density) { 92.dp.toPx() }
+            val canvasBottomGapPx = (fullH - drawRect.bottom).coerceAtLeast(0f)
+            val bottomChromePadding = with(density) {
+                maxOf(
+                    8.dp,
+                    ((canvasBottomGapPx - chromeHeightPx) / 2f).coerceAtLeast(0f).toDp(),
+                )
+            }
 
-            // Drawing surface
-            Box(Modifier.fillMaxSize()) {
+            // ≡ iOS: base + strokes clipped to captureRect
+            Box(
+                Modifier
+                    .offset {
+                        androidx.compose.ui.unit.IntOffset(
+                            drawRect.left.roundToInt(),
+                            drawRect.top.roundToInt(),
+                        )
+                    }
+                    .size(
+                        width = with(density) { canvasW.toDp() },
+                        height = with(density) { canvasH.toDp() },
+                    )
+                    .clip(RoundedCornerShape(storyViewerCanvasCornerRadius)),
+            ) {
                 if (baseDrawing != null) {
                     Image(
                         bitmap = baseDrawing.asImageBitmap(),
@@ -173,16 +228,18 @@ fun StoryDrawingEditorOverlay(
                         .pointerInput(brush, colorHex, brushWidthPx) {
                             detectDragGestures(
                                 onDragStart = { offset ->
+                                    val width = when (brush) {
+                                        StoryDrawingBrush.MARKER -> maxOf(10f, brushWidthPx * 2.4f)
+                                        StoryDrawingBrush.GLOW -> brushWidthPx
+                                        StoryDrawingBrush.ARROW -> maxOf(3f, brushWidthPx)
+                                        else -> brushWidthPx
+                                    }
                                     activeStroke = StoryDrawingStroke(
                                         brush = brush,
                                         color = strokeColor,
-                                        widthPx = when (brush) {
-                                            StoryDrawingBrush.MARKER -> maxOf(10f, brushWidthPx * 2.4f)
-                                            StoryDrawingBrush.GLOW -> maxOf(2f, brushWidthPx * 0.3f)
-                                            StoryDrawingBrush.ARROW -> maxOf(3f, brushWidthPx)
-                                            else -> brushWidthPx
-                                        },
+                                        widthPx = width,
                                         points = listOf(offset),
+                                        brushSizePx = brushWidthPx,
                                     )
                                 },
                                 onDrag = { change, _ ->
@@ -200,17 +257,15 @@ fun StoryDrawingEditorOverlay(
                         },
                 ) {
                     val drawList = strokes + listOfNotNull(activeStroke)
-                    drawList.forEach { stroke ->
-                        drawStoryStroke(stroke)
-                    }
+                    drawList.forEach { stroke -> drawStoryStroke(stroke) }
                 }
             }
 
-            // Vertical size slider (left)
+            // Left size slider
             Box(
                 Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 12.dp, bottom = 100.dp),
+                    .padding(start = 16.dp, bottom = 100.dp),
             ) {
                 StoryVerticalBrushSlider(
                     value = brushWidthDp,
@@ -222,11 +277,13 @@ fun StoryDrawingEditorOverlay(
                 )
             }
 
-            // Top chrome
+            // Top chrome — mismo layout que StoryTextEditor (statusBarsPadding + 16)
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 14.dp)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 16.dp)
                     .align(Alignment.TopCenter),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -243,7 +300,6 @@ fun StoryDrawingEditorOverlay(
                     fontSize = 15.sp,
                     modifier = Modifier
                         .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
-                        .border(1.dp, controlStroke, RoundedCornerShape(50))
                         .clickable {
                             val exported = rasterizeDrawing(
                                 base = baseDrawing,
@@ -257,45 +313,71 @@ fun StoryDrawingEditorOverlay(
                 )
             }
 
-            // Bottom palette + brushes
+            // Bottom: palette (40) + toolbar (44), spacing 8
             Column(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = bottomChromePadding),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(
                     Modifier
                         .fillMaxWidth()
+                        .height(40.dp)
                         .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 12.dp),
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // ≡ customColorPicker (ColorPicker nativo iOS → panel HSB)
+                    Box(
+                        Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.sweepGradient(
+                                    listOf(
+                                        Color.Red, Color.Yellow, Color.Green,
+                                        Color.Cyan, Color.Blue, Color.Magenta, Color.Red,
+                                    ),
+                                ),
+                            )
+                            .border(1.dp, controlStroke, CircleShape)
+                            .clickable {
+                                if (onOpenColorPicker != null) {
+                                    onOpenColorPicker()
+                                } else {
+                                    isColorPickerOpen = !isColorPickerOpen
+                                }
+                            },
+                    )
+                    Box(Modifier.width(1.dp).height(20.dp).background(dividerColor))
+                    DrawingColorSwatch(
+                        hex = "FAF9F6",
+                        selected = colorHex.equals("FAF9F6", ignoreCase = true),
+                        onSelect = {
+                            colorHex = it
+                            isColorPickerOpen = false
+                        },
+                    )
+                    DrawingColorSwatch(
+                        hex = "0B1215",
+                        selected = colorHex.equals("0B1215", ignoreCase = true),
+                        onSelect = {
+                            colorHex = it
+                            isColorPickerOpen = false
+                        },
+                    )
+                    Box(Modifier.width(1.dp).height(20.dp).background(dividerColor))
                     StoryDrawingPalette.swatches.forEach { hex ->
-                        val selected = hex.equals(colorHex, ignoreCase = true)
-                        val swatch = parseStoryColorHex(hex)
-                        val light = isPerceptuallyLight(swatch)
-                        Box(
-                            Modifier
-                                .size(24.dp)
-                                .clip(CircleShape)
-                                .background(swatch)
-                                .border(
-                                    width = if (selected) 2.5.dp else 1.dp,
-                                    color = when {
-                                        selected && light -> Color.Black.copy(0.9f)
-                                        selected -> Color.White
-                                        light -> Color.Black.copy(0.5f)
-                                        else -> Color.White.copy(0.92f)
-                                    },
-                                    shape = CircleShape,
-                                )
-                                .clickable {
-                                    colorHex = hex
-                                    HapticManager.shared.lightImpact()
-                                },
+                        DrawingColorSwatch(
+                            hex = hex,
+                            selected = hex.equals(colorHex, ignoreCase = true),
+                            onSelect = {
+                                colorHex = it
+                                isColorPickerOpen = false
+                            },
                         )
                     }
                 }
@@ -306,24 +388,93 @@ fun StoryDrawingEditorOverlay(
                         .fillMaxWidth()
                         .height(44.dp)
                         .momentsChromeGlass(RoundedCornerShape(14.dp), interactive = false)
-                        .border(1.dp, controlStroke, RoundedCornerShape(14.dp)),
+                        .shadow(
+                            elevation = 12.dp,
+                            shape = RoundedCornerShape(14.dp),
+                            ambientColor = Color.Black.copy(alpha = if (isDark) 0.20f else 0.10f),
+                            spotColor = Color.Black.copy(alpha = if (isDark) 0.20f else 0.10f),
+                        ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    BrushTool(Icons.Filled.Brush, StoryDrawingBrush.PEN, brush, controlFg, secondary) { brush = it }
-                    BrushDivider(controlFg)
-                    BrushTool(Icons.Filled.NorthEast, StoryDrawingBrush.ARROW, brush, controlFg, secondary) { brush = it }
-                    BrushDivider(controlFg)
-                    BrushTool(Icons.Filled.Highlight, StoryDrawingBrush.MARKER, brush, controlFg, secondary) { brush = it }
-                    BrushDivider(controlFg)
-                    BrushTool(Icons.Filled.Edit, StoryDrawingBrush.PENCIL, brush, controlFg, secondary) { brush = it }
-                    BrushDivider(controlFg)
-                    BrushTool(Icons.Filled.AutoAwesome, StoryDrawingBrush.GLOW, brush, controlFg, secondary) { brush = it }
-                    BrushDivider(controlFg)
-                    BrushTool(Icons.Filled.AutoFixHigh, StoryDrawingBrush.ERASER, brush, controlFg, secondary) { brush = it }
+                    BrushTool(Icons.Filled.Brush, StoryDrawingBrush.PEN, brush, controlFg, secondary, strokeColor) {
+                        brush = it
+                    }
+                    BrushDivider(dividerColor)
+                    BrushTool(Icons.Filled.NorthEast, StoryDrawingBrush.ARROW, brush, controlFg, secondary, strokeColor) {
+                        brush = it
+                    }
+                    BrushDivider(dividerColor)
+                    BrushTool(Icons.Filled.Highlight, StoryDrawingBrush.MARKER, brush, controlFg, secondary, strokeColor) {
+                        brush = it
+                    }
+                    BrushDivider(dividerColor)
+                    BrushTool(Icons.Filled.Edit, StoryDrawingBrush.PENCIL, brush, controlFg, secondary, strokeColor) {
+                        brush = it
+                    }
+                    BrushDivider(dividerColor)
+                    BrushTool(Icons.Filled.AutoAwesome, StoryDrawingBrush.GLOW, brush, controlFg, secondary, strokeColor) {
+                        brush = it
+                    }
+                    BrushDivider(dividerColor)
+                    BrushTool(Icons.Filled.AutoFixHigh, StoryDrawingBrush.ERASER, brush, controlFg, secondary, strokeColor) {
+                        brush = it
+                    }
                 }
+            }
+
+            if (isColorPickerOpen && onOpenColorPicker == null) {
+                StoryColorPickerPanel(
+                    selectedColor = strokeColor,
+                    onSelectedColorChange = { colorHex = it.toStoryHex() },
+                    swatchColors = paletteColors,
+                    suggestedColors = listOf(
+                        parseStoryColorHex("FAF9F6"),
+                        parseStoryColorHex("0B1215"),
+                    ),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 18.dp)
+                        .padding(bottom = bottomChromePadding + 100.dp),
+                )
             }
         }
     }
+}
+
+@Composable
+private fun DrawingColorSwatch(
+    hex: String,
+    selected: Boolean,
+    onSelect: (String) -> Unit,
+) {
+    val swatch = parseStoryColorHex(hex)
+    val light = isPerceptuallyLight(swatch)
+    Box(
+        Modifier
+            .size(24.dp)
+            .shadow(
+                elevation = 2.dp,
+                shape = CircleShape,
+                ambientColor = Color.Black.copy(alpha = if (light) 0.16f else 0.10f),
+                spotColor = Color.Black.copy(alpha = if (light) 0.16f else 0.10f),
+            )
+            .clip(CircleShape)
+            .background(swatch)
+            .border(
+                width = if (selected) 2.5.dp else 1.dp,
+                color = when {
+                    selected && light -> Color.Black.copy(alpha = 0.9f)
+                    selected -> Color.White
+                    light -> Color.Black.copy(alpha = 0.5f)
+                    else -> Color.White.copy(alpha = 0.92f)
+                },
+                shape = CircleShape,
+            )
+            .clickable {
+                onSelect(hex)
+                HapticManager.shared.lightImpact()
+            },
+    )
 }
 
 @Composable
@@ -352,6 +503,7 @@ private fun RowScope.BrushTool(
     selected: StoryDrawingBrush,
     active: Color,
     inactive: Color,
+    selectedColor: Color,
     onSelect: (StoryDrawingBrush) -> Unit,
 ) {
     val isSelected = selected == type
@@ -366,19 +518,69 @@ private fun RowScope.BrushTool(
             icon,
             null,
             tint = if (isSelected) active else inactive,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier
+                .size(18.dp)
+                .then(
+                    if (isSelected && type == StoryDrawingBrush.GLOW) {
+                        Modifier.shadow(
+                            elevation = 6.dp,
+                            shape = CircleShape,
+                            ambientColor = selectedColor.copy(alpha = 0.8f),
+                            spotColor = selectedColor.copy(alpha = 0.8f),
+                        )
+                    } else {
+                        Modifier
+                    },
+                ),
         )
     }
 }
 
 @Composable
-private fun BrushDivider(fg: Color) {
+private fun BrushDivider(color: Color) {
     Box(
         Modifier
             .width(1.dp)
             .height(24.dp)
-            .background(fg.copy(0.14f)),
+            .background(color),
     )
+}
+
+/** ≡ `TaperedSliderTrack` (StoryTextEditor.swift). */
+private fun taperedSliderTrackPath(width: Float, height: Float): Path {
+    val topWidth = 12f
+    val bottomWidth = 2.5f
+    val midX = width / 2f
+    val topCenterY = topWidth / 2f
+    val bottomCenterY = height - bottomWidth / 2f
+    return Path().apply {
+        // Top semicircle
+        arcTo(
+            rect = androidx.compose.ui.geometry.Rect(
+                midX - topWidth / 2f,
+                0f,
+                midX + topWidth / 2f,
+                topWidth,
+            ),
+            startAngleDegrees = 180f,
+            sweepAngleDegrees = 180f,
+            forceMoveTo = true,
+        )
+        lineTo(midX + bottomWidth / 2f, bottomCenterY)
+        arcTo(
+            rect = androidx.compose.ui.geometry.Rect(
+                midX - bottomWidth / 2f,
+                height - bottomWidth,
+                midX + bottomWidth / 2f,
+                height,
+            ),
+            startAngleDegrees = 0f,
+            sweepAngleDegrees = 180f,
+            forceMoveTo = false,
+        )
+        lineTo(midX - topWidth / 2f, topCenterY)
+        close()
+    }
 }
 
 @Composable
@@ -390,10 +592,11 @@ private fun StoryVerticalBrushSlider(
 ) {
     var dragging by remember { mutableStateOf(false) }
     BoxWithConstraints(modifier) {
+        val density = LocalDensity.current
         val h = constraints.maxHeight.toFloat().coerceAtLeast(1f)
-        val trackH = h - with(LocalDensity.current) { 32.dp.toPx() }
+        val trackH = h - with(density) { 32.dp.toPx() }
         val progress = ((value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
-        val knobY = with(LocalDensity.current) { 16.dp.toPx() } + (1f - progress) * trackH
+        val knobY = with(density) { 16.dp.toPx() } + (1f - progress) * trackH
 
         Box(
             Modifier
@@ -414,20 +617,29 @@ private fun StoryVerticalBrushSlider(
                     )
                 },
         ) {
-            Box(
+            Canvas(
                 Modifier
-                    .align(Alignment.Center)
-                    .width(16.dp)
-                    .fillMaxHeight()
-                    .padding(vertical = 16.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White.copy(0.32f)),
-            )
-            Box(
-                Modifier
-                    .offset(y = with(LocalDensity.current) { (knobY - 14.dp.toPx()).toDp() })
                     .align(Alignment.TopCenter)
-                    .size(if (dragging) 30.dp else 28.dp)
+                    .padding(top = 16.dp)
+                    .width(16.dp)
+                    .height(with(density) { trackH.toDp() }),
+            ) {
+                drawPath(
+                    path = taperedSliderTrackPath(size.width, size.height),
+                    color = Color.White.copy(alpha = 0.32f),
+                )
+            }
+            Box(
+                Modifier
+                    .offset(y = with(density) { (knobY - 14.dp.toPx()).toDp() })
+                    .align(Alignment.TopCenter)
+                    .size(if (dragging) 31.dp else 28.dp)
+                    .shadow(
+                        elevation = if (dragging) 5.dp else 3.dp,
+                        shape = CircleShape,
+                        ambientColor = Color.Black.copy(alpha = if (dragging) 0.35f else 0.22f),
+                        spotColor = Color.Black.copy(alpha = if (dragging) 0.35f else 0.22f),
+                    )
                     .clip(CircleShape)
                     .background(Color.White),
             )
@@ -453,18 +665,17 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawStoryStroke(str
             }
         }
         StoryDrawingBrush.GLOW -> {
+            // ≡ CAShapeLayer bake: white stroke + colored shadow (opacity 1), lineWidth = brushWidth
             drawIntoCanvas { canvas ->
+                val blur = StoryDrawingGlowConfig.shadowRadius(stroke.brushSizePx)
                 val glow = AndroidPaint().apply {
                     isAntiAlias = true
                     style = AndroidPaint.Style.STROKE
                     strokeCap = AndroidPaint.Cap.ROUND
                     strokeJoin = AndroidPaint.Join.ROUND
-                    strokeWidth = stroke.widthPx * 3.2f
-                    color = stroke.color.copy(alpha = 0.55f).toArgb()
-                    maskFilter = BlurMaskFilter(
-                        maxOf(2f, stroke.widthPx * 1.2f),
-                        BlurMaskFilter.Blur.NORMAL,
-                    )
+                    strokeWidth = stroke.widthPx
+                    color = stroke.color.copy(alpha = 1f).toArgb()
+                    maskFilter = BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL)
                 }
                 val core = AndroidPaint().apply {
                     isAntiAlias = true
@@ -515,22 +726,26 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawArrowHead(
     val tip = points.last()
     val prev = points[points.lastIndex - 1]
     val angle = atan2(tip.y - prev.y, tip.x - prev.x)
-    val len = width * 3.2f
+    val headLength = maxOf(12f, width * 3.2f)
+    val spread = (PI / 7).toFloat()
     val left = Offset(
-        tip.x - len * cos(angle - 0.45f).toFloat(),
-        tip.y - len * sin(angle - 0.45f).toFloat(),
+        tip.x - headLength * cos(angle - spread),
+        tip.y - headLength * sin(angle - spread),
     )
     val right = Offset(
-        tip.x - len * cos(angle + 0.45f).toFloat(),
-        tip.y - len * sin(angle + 0.45f).toFloat(),
+        tip.x - headLength * cos(angle + spread),
+        tip.y - headLength * sin(angle + spread),
     )
-    val head = Path().apply {
-        moveTo(tip.x, tip.y)
-        lineTo(left.x, left.y)
-        lineTo(right.x, right.y)
-        close()
-    }
-    drawPath(head, color)
+    val strokeW = maxOf(3f, width * 0.9f)
+    drawPath(
+        path = Path().apply {
+            moveTo(left.x, left.y)
+            lineTo(tip.x, tip.y)
+            lineTo(right.x, right.y)
+        },
+        color = color,
+        style = Stroke(width = strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round),
+    )
 }
 
 private fun smoothPath(points: List<Offset>): Path {
@@ -584,6 +799,7 @@ fun rasterizeDrawing(
     strokes.forEach { stroke ->
         val scaled = stroke.copy(
             widthPx = stroke.widthPx * ((scaleX + scaleY) / 2f),
+            brushSizePx = stroke.brushSizePx * ((scaleX + scaleY) / 2f),
             points = stroke.points.map { Offset(it.x * scaleX, it.y * scaleY) },
         )
         drawStrokeOnAndroidCanvas(canvas, scaled)
@@ -607,14 +823,15 @@ private fun drawStrokeOnAndroidCanvas(canvas: AndroidCanvas, stroke: StoryDrawin
             canvas.drawPath(path, paint)
         }
         StoryDrawingBrush.GLOW -> {
+            val blur = StoryDrawingGlowConfig.shadowRadius(stroke.brushSizePx)
             val glow = AndroidPaint().apply {
                 isAntiAlias = true
                 style = AndroidPaint.Style.STROKE
                 strokeCap = AndroidPaint.Cap.ROUND
                 strokeJoin = AndroidPaint.Join.ROUND
-                strokeWidth = stroke.widthPx * 3.2f
-                color = stroke.color.copy(alpha = 0.55f).toArgb()
-                maskFilter = BlurMaskFilter(maxOf(2f, stroke.widthPx * 1.2f), BlurMaskFilter.Blur.NORMAL)
+                strokeWidth = stroke.widthPx
+                color = stroke.color.copy(alpha = 1f).toArgb()
+                maskFilter = BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL)
             }
             val core = AndroidPaint().apply {
                 isAntiAlias = true
@@ -684,24 +901,27 @@ private fun drawAndroidArrowHead(canvas: AndroidCanvas, points: List<Offset>, co
     val tip = points.last()
     val prev = points[points.lastIndex - 1]
     val angle = atan2((tip.y - prev.y).toDouble(), (tip.x - prev.x).toDouble())
-    val len = width * 3.2f
+    val headLength = maxOf(12.0, width * 3.2)
+    val spread = PI / 7
     val left = Offset(
-        (tip.x - len * cos(angle - 0.45)).toFloat(),
-        (tip.y - len * sin(angle - 0.45)).toFloat(),
+        (tip.x - headLength * cos(angle - spread)).toFloat(),
+        (tip.y - headLength * sin(angle - spread)).toFloat(),
     )
     val right = Offset(
-        (tip.x - len * cos(angle + 0.45)).toFloat(),
-        (tip.y - len * sin(angle + 0.45)).toFloat(),
+        (tip.x - headLength * cos(angle + spread)).toFloat(),
+        (tip.y - headLength * sin(angle + spread)).toFloat(),
     )
     val path = AndroidPath().apply {
-        moveTo(tip.x, tip.y)
-        lineTo(left.x, left.y)
+        moveTo(left.x, left.y)
+        lineTo(tip.x, tip.y)
         lineTo(right.x, right.y)
-        close()
     }
     val paint = AndroidPaint().apply {
         isAntiAlias = true
-        style = AndroidPaint.Style.FILL
+        style = AndroidPaint.Style.STROKE
+        strokeCap = AndroidPaint.Cap.ROUND
+        strokeJoin = AndroidPaint.Join.ROUND
+        strokeWidth = maxOf(3f, width * 0.9f)
         this.color = color.toArgb()
     }
     canvas.drawPath(path, paint)

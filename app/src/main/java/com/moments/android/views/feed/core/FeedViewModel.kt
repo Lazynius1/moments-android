@@ -21,8 +21,6 @@ import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.performance.VideoMomentsIndex
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.PrivacyService
-import com.moments.android.services.privacy.canUserViewMomentEnhanced
-import com.moments.android.services.privacy.canUserViewStoryEnhanced
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.video.VideoPlaybackSelector
 import com.moments.android.views.feed.controls.FeedType
@@ -988,6 +986,7 @@ class FeedViewModel {
             reactionCount = reactions.values.sumOf { it.size },
             hideLikeCounts = hideLikeCounts,
             disableComments = disableComments,
+            allowSharing = allowSharing,
             hasHiddenLayers = hasHiddenLayers,
             hiddenLayerCount = hiddenLayerCount,
             audience = audience,
@@ -1269,6 +1268,7 @@ class FeedViewModel {
                                 reactionCount = o.optInt("reactionCount"),
                                 hideLikeCounts = o.optBoolean("hideLikeCounts"),
                                 disableComments = o.optBoolean("disableComments"),
+                                allowSharing = o.optBoolean("allowSharing", true),
                                 hasHiddenLayers = o.optBoolean("hasHiddenLayers"),
                                 hiddenLayerCount = o.optInt("hiddenLayerCount"),
                                 audience = o.optString("audience").ifBlank { null },

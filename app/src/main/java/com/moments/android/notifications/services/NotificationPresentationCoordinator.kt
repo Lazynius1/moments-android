@@ -9,8 +9,6 @@ import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.messaging.services.ChatSessionEngine
 import com.moments.android.services.messaging.MessageIngestService
 import com.moments.android.services.messaging.MessageIngestSource
-import com.moments.android.services.messaging.MessagingEvents
-import com.moments.android.services.persistence.LocalPersistenceService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -75,7 +73,8 @@ object NotificationPresentationCoordinator {
             val conversationId = notification.conversationId
             if (!conversationId.isNullOrBlank()) {
                 val userId = FirebaseAuth.getInstance().currentUser?.uid
-                if (userId != null && LocalPersistenceService.isConversationArchived(conversationId, userId)) {
+                // ≡ ChatService.shared.isConversationArchived(conversationId, for: userId)
+                if (userId != null && ChatService.isConversationArchived(conversationId, userId)) {
                     return false
                 }
                 if (conversationId == ChatSessionEngine.activeConversationId) return false
@@ -95,21 +94,21 @@ object NotificationPresentationCoordinator {
         val bucket = (notification.timestamp.time / DEDUP_WINDOW_MS).toInt()
         return when (notification.type) {
             NotificationType.MESSAGE ->
-                "message|${notification.conversationId}|${notification.senderId}|$bucket"
+                "message|${notification.conversationId.orEmpty()}|${notification.senderId}|$bucket"
             NotificationType.MESSAGE_REACTION ->
-                "messageReaction|${notification.conversationId}|${notification.messageId}|${notification.senderId}|$bucket"
+                "messageReaction|${notification.conversationId.orEmpty()}|${notification.messageId.orEmpty()}|${notification.senderId}|$bucket"
             NotificationType.CHAT_BUZZ ->
-                "chatBuzz|${notification.conversationId}|${notification.buzzEventId ?: notification.senderId}|$bucket"
+                "chatBuzz|${notification.conversationId.orEmpty()}|${notification.buzzEventId ?: notification.senderId}|$bucket"
             NotificationType.LIKE, NotificationType.REACTION, NotificationType.COMMENT,
             NotificationType.MENTION, NotificationType.PHOTO_TAG, NotificationType.STORY_REACTION,
             ->
-                "${notification.type.raw}|${notification.senderId}|${notification.momentId}|${notification.storyId}|${notification.commentId}|$bucket"
+                "${notification.type.raw}|${notification.senderId}|${notification.momentId.orEmpty()}|${notification.storyId.orEmpty()}|${notification.commentId.orEmpty()}|$bucket"
             NotificationType.NEW_FOLLOWER, NotificationType.FOLLOW_REQUEST,
             NotificationType.REQUEST_ACCEPTED, NotificationType.MUTUAL_CONNECTION,
             ->
                 "${notification.type.raw}|${notification.senderId}|$bucket"
             NotificationType.STORY_CHAIN_CONTINUED ->
-                "${notification.type.raw}|${notification.senderId}|${notification.chainId}|${notification.chainPosition}|$bucket"
+                "${notification.type.raw}|${notification.senderId}|${notification.chainId.orEmpty()}|${notification.chainPosition ?: 0}|$bucket"
             else -> notification.id?.takeIf { it.isNotBlank() }
                 ?.let { "${notification.type.raw}|$it" }
                 ?: "${notification.type.raw}|${notification.senderId}|$bucket"
@@ -130,13 +129,13 @@ object NotificationPresentationCoordinator {
             NotificationType.MESSAGE_REACTION -> {
                 val conversationId = notification.conversationId ?: return
                 val messageId = notification.messageId ?: return
-                MessagingEvents.emitMessageReactionHighlight(conversationId, messageId)
+                ChatNavigationIntentStore.emitMessageReactionHighlight(conversationId, messageId)
             }
             NotificationType.CHAT_BUZZ -> {
                 val conversationId = notification.conversationId ?: return
                 ChatNavigationIntentStore.enqueueBuzz(conversationId, notification.buzzEventId)
                 if (conversationId == ChatSessionEngine.activeConversationId) {
-                    MessagingEvents.emitChatBuzzHighlight(conversationId, notification.buzzEventId)
+                    ChatNavigationIntentStore.emitChatBuzzHighlight(conversationId, notification.buzzEventId)
                 }
             }
             else -> Unit

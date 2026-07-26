@@ -1,103 +1,488 @@
 package com.moments.android.views.feed.uploads
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PriorityHigh
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.moments.android.R
+import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.services.performance.MotionPolicy
+import com.moments.android.utilities.HapticManager
+import com.moments.android.views.creator.BackgroundMomentUploadService
+import com.moments.android.views.creator.UploadingMoment
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+import kotlinx.coroutines.delay
 
 private val OrbSize = 58.dp
+private val PanelWidth = 238.dp
+private val PanelHeight = 72.dp
 
-/** Port de `FloatingMomentUploadOverlay.swift`. */
+/**
+ * Port de `FloatingMomentUploadOverlay.swift`.
+ * Fuente: `BackgroundMomentUploadService.uploadingMoments` (no MomentUploadTracker).
+ */
 @Composable
 fun FloatingMomentUploadOverlay(
     topInset: Float,
     modifier: Modifier = Modifier,
 ) {
-    val items = MomentUploadTracker.items
+    val uploadService = BackgroundMomentUploadService
+    val moments = uploadService.uploadingMoments
+    val isDark = isSystemInDarkTheme()
+
+    var isVisible by remember { mutableStateOf(false) }
+    var activeMoment by remember { mutableStateOf<UploadingMoment?>(null) }
     var isExpanded by remember { mutableStateOf(false) }
 
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
-        AnimatedVisibility(visible = items.isNotEmpty()) {
-            ColumnUploadCluster(
-                items = items,
+    LaunchedEffect(moments.size, moments.firstOrNull()?.tempId) {
+        val first = moments.firstOrNull()
+        if (first != null) {
+            activeMoment = first
+            isVisible = true
+        } else {
+            isVisible = false
+            delay(400)
+            if (uploadService.uploadingMoments.isEmpty()) {
+                activeMoment = null
+                isExpanded = false
+            }
+        }
+    }
+
+    Box(
+        modifier
+            .fillMaxSize()
+            .then(if (isVisible) Modifier else Modifier),
+        contentAlignment = Alignment.TopEnd,
+    ) {
+        AnimatedVisibility(
+            visible = isVisible && activeMoment != null,
+            enter = slideInVertically { -it / 3 } + fadeIn() + scaleIn(initialScale = 0.92f),
+            exit = slideOutVertically { -it / 4 } + fadeOut() + scaleOut(targetScale = 0.92f),
+            modifier = Modifier.padding(top = topInset.dp, end = 16.dp),
+        ) {
+            val moment = activeMoment ?: return@AnimatedVisibility
+            UploadCluster(
+                moment = moment,
+                extraUploadsCount = max(0, moments.size - 1),
                 isExpanded = isExpanded,
-                onToggleExpanded = { isExpanded = !isExpanded },
-                modifier = Modifier.padding(top = topInset.toInt().dp, end = 16.dp),
+                isDark = isDark,
+                onToggleExpanded = {
+                    if (moment.status == UploadStatus.Completed || moment.status == UploadStatus.Moderated) return@UploadCluster
+                    HapticManager.shared.lightImpact()
+                    if (!MotionPolicy.reduceMotion) {
+                        isExpanded = !isExpanded
+                    } else {
+                        isExpanded = !isExpanded
+                    }
+                },
+                onRetry = {
+                    HapticManager.shared.mediumImpact()
+                    uploadService.retryUpload(moment)
+                },
+                onCancel = {
+                    HapticManager.shared.lightImpact()
+                    uploadService.cancelUpload(moment)
+                },
+                onForceExpand = { isExpanded = true },
+                onCollapse = { isExpanded = false },
             )
         }
     }
 }
 
 @Composable
-private fun ColumnUploadCluster(
-    items: List<UploadProgressItem>,
+private fun UploadCluster(
+    moment: UploadingMoment,
+    extraUploadsCount: Int,
     isExpanded: Boolean,
+    isDark: Boolean,
     onToggleExpanded: () -> Unit,
-    modifier: Modifier = Modifier,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+    onForceExpand: () -> Unit,
+    onCollapse: () -> Unit,
 ) {
-    val active = items.firstOrNull() ?: return
-    val extraCount = maxOf(0, items.size - 1)
-    val progress by animateFloatAsState(
-        targetValue = active.progress.toFloat().coerceIn(0f, 1f),
-        label = "uploadOrbProgress",
-    )
+    // Observables del momento (Compose lee properties con by)
+    val status = moment.status
+    val progress = moment.uploadProgress
+    val content = moment.content
+    val mediaCount = moment.mediaCount
+    val currentIndex = moment.currentMediaIndex
+    val errorMessage = moment.errorMessage
+    val thumb = moment.currentMediaThumbnailBitmap ?: moment.thumbnailBitmap
 
-    Column(modifier, horizontalAlignment = Alignment.End) {
-        AnimatedVisibility(visible = isExpanded) {
-            FeedUploadProgressRow(
-                active,
-                modifier = Modifier
-                    .padding(bottom = 8.dp)
-                    .shadow(10.dp, RoundedCornerShape(16.dp)),
+    var renderedProgress by remember(moment.tempId) { mutableDoubleStateOf(0.0) }
+    var showsCompletionIcon by remember(moment.tempId) { mutableStateOf(false) }
+    var completionAnimationScheduled by remember(moment.tempId) { mutableStateOf(false) }
+    var completionPulse by remember(moment.tempId) { mutableStateOf(false) }
+
+    val arrowOffset = remember(moment.tempId) { Animatable(0f) }
+    val arrowOpacity = remember(moment.tempId) { Animatable(1f) }
+    val checkmarkScale = remember(moment.tempId) { Animatable(0f) }
+    val checkmarkRotation = remember(moment.tempId) { Animatable(-15f) }
+    val checkmarkOpacity = remember(moment.tempId) { Animatable(0f) }
+    val rippleScale = remember(moment.tempId) { Animatable(0.2f) }
+    val rippleOpacity = remember(moment.tempId) { Animatable(0f) }
+
+    fun resetAnimationStates() {
+        showsCompletionIcon = false
+        completionAnimationScheduled = false
+        completionPulse = false
+    }
+
+    LaunchedEffect(progress, status, moment.tempId) {
+        val target = min(1.0, max(0.0, progress))
+        if (status == UploadStatus.Completed || status == UploadStatus.Moderated) {
+            if (!completionAnimationScheduled) {
+                completionAnimationScheduled = true
+                HapticManager.shared.notification(HapticManager.NotificationType.SUCCESS)
+                renderedProgress = 1.0
+                arrowOffset.snapTo(0f)
+                arrowOpacity.snapTo(1f)
+                arrowOffset.animateTo(-35f, tween(350, easing = LinearEasing))
+                arrowOpacity.animateTo(0f, tween(350, easing = LinearEasing))
+                rippleScale.snapTo(0.2f)
+                rippleOpacity.snapTo(0.8f)
+                rippleScale.animateTo(1.6f, tween(550, easing = LinearEasing))
+                rippleOpacity.animateTo(0f, tween(550, easing = LinearEasing))
+                delay(300)
+                showsCompletionIcon = true
+                checkmarkScale.snapTo(0f)
+                checkmarkRotation.snapTo(-15f)
+                checkmarkOpacity.snapTo(0f)
+                checkmarkScale.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f))
+                checkmarkRotation.animateTo(0f, spring(dampingRatio = 0.5f, stiffness = 400f))
+                checkmarkOpacity.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f))
+                completionPulse = true
+                onCollapse()
+                delay(250)
+                completionPulse = false
+            }
+            return@LaunchedEffect
+        }
+        if (status == UploadStatus.Failed) {
+            HapticManager.shared.notification(HapticManager.NotificationType.ERROR)
+            onForceExpand()
+            resetAnimationStates()
+        }
+        val delta = abs(target - renderedProgress)
+        val durationMs = (min(0.55, max(0.14, delta * 1.1)) * 1000).toInt()
+        val start = renderedProgress
+        val anim = Animatable(0f)
+        anim.animateTo(1f, tween(durationMs, easing = LinearEasing)) {
+            renderedProgress = start + (target - start) * value.toDouble()
+        }
+    }
+
+    val infinite = rememberInfiniteTransition(label = "uploadOrbBob")
+    val arrowBob by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = if (status == UploadStatus.Uploading || status == UploadStatus.Processing) -3f else 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "arrowBob",
+    )
+    val auraProgress by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "aura",
+    )
+    val auraActive = status == UploadStatus.Uploading || status == UploadStatus.Processing
+    val auraOffset = if (auraActive) 10f + (auraProgress * -28f) else 0f
+    val auraOpacity = if (auraActive) 0.6f * (1f - auraProgress) else 0f
+    val auraScale = if (auraActive) 0.8f + auraProgress * 0.5f else 1f
+
+    val colors = OverlayColors(isDark)
+    val gradient = progressBrush(status, renderedProgress)
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = fadeIn() + scaleIn(initialScale = 0.85f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)),
+            exit = fadeOut() + scaleOut(targetScale = 0.85f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)),
+        ) {
+            ExpandedPanel(
+                content = content,
+                mediaCount = mediaCount,
+                currentIndex = currentIndex,
+                status = status,
+                errorMessage = errorMessage,
+                thumb = thumb,
+                renderedProgress = renderedProgress,
+                colors = colors,
+                gradient = gradient,
+                onToggle = onToggleExpanded,
+                onRetry = onRetry,
+                onCancel = onCancel,
             )
         }
-        Box(contentAlignment = Alignment.TopEnd) {
+
+        CompactOrb(
+            status = status,
+            renderedProgress = renderedProgress,
+            extraUploadsCount = extraUploadsCount,
+            colors = colors,
+            gradient = gradient,
+            completionPulse = completionPulse,
+            showsCompletionIcon = showsCompletionIcon,
+            arrowBob = arrowBob,
+            arrowOffset = arrowOffset.value,
+            arrowOpacity = arrowOpacity.value,
+            checkmarkScale = checkmarkScale.value,
+            checkmarkRotation = checkmarkRotation.value,
+            checkmarkOpacity = checkmarkOpacity.value,
+            rippleScale = rippleScale.value,
+            rippleOpacity = rippleOpacity.value,
+                auraOffset = auraOffset,
+                auraOpacity = auraOpacity,
+                auraScale = auraScale,
+                onToggle = onToggleExpanded,
+            )
+    }
+}
+
+@Composable
+private fun CompactOrb(
+    status: UploadStatus,
+    renderedProgress: Double,
+    extraUploadsCount: Int,
+    colors: OverlayColors,
+    gradient: Brush,
+    completionPulse: Boolean,
+    showsCompletionIcon: Boolean,
+    arrowBob: Float,
+    arrowOffset: Float,
+    arrowOpacity: Float,
+    checkmarkScale: Float,
+    checkmarkRotation: Float,
+    checkmarkOpacity: Float,
+    rippleScale: Float,
+    rippleOpacity: Float,
+    auraOffset: Float,
+    auraOpacity: Float,
+    auraScale: Float,
+    onToggle: () -> Unit,
+) {
+    Box(contentAlignment = Alignment.TopEnd) {
+        Box(
+            Modifier
+                .size(OrbSize)
+                .scale(if (completionPulse) 1.06f else 1f)
+                .shadow(12.dp, CircleShape, ambientColor = colors.shadow, spotColor = colors.shadow)
+                .momentsChromeGlass(CircleShape, interactive = true)
+                .clickable(onClick = onToggle),
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(Modifier.size(OrbSize)) {
+                val stroke = 4.dp.toPx()
+                val inset = stroke / 2
+                drawArc(
+                    color = colors.track,
+                    startAngle = 0f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = Offset(inset, inset),
+                    size = Size(size.width - stroke, size.height - stroke),
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                )
+                drawArc(
+                    brush = gradient,
+                    startAngle = -90f,
+                    sweepAngle = (360f * max(0.04, min(1.0, renderedProgress))).toFloat(),
+                    useCenter = false,
+                    topLeft = Offset(inset, inset),
+                    size = Size(size.width - stroke, size.height - stroke),
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                )
+            }
+            // Ripple
             Box(
                 Modifier
                     .size(OrbSize)
-                    .shadow(12.dp, CircleShape)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.92f))
-                    .clickable(onClick = onToggleExpanded),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularUploadRing(progress = progress)
-                Text(
-                    "${(progress * 100).toInt()}%",
-                    color = Color(0xFF0B1215),
-                    fontSize = 11.sp,
+                    .scale(rippleScale)
+                    .alpha(rippleOpacity)
+                    .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape),
+            )
+            OrbIcon(
+                status = status,
+                colors = colors,
+                showsCompletionIcon = showsCompletionIcon,
+                arrowBob = arrowBob,
+                arrowOffset = arrowOffset,
+                arrowOpacity = arrowOpacity,
+                checkmarkScale = checkmarkScale,
+                checkmarkRotation = checkmarkRotation,
+                checkmarkOpacity = checkmarkOpacity,
+                auraOffset = auraOffset,
+                auraOpacity = auraOpacity,
+                auraScale = auraScale,
+            )
+        }
+        if (extraUploadsCount > 0) {
+            Text(
+                "+$extraUploadsCount",
+                color = Color.White,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .offset(x = 5.dp, y = (-3).dp)
+                    .background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(50))
+                    .padding(horizontal = 6.dp, vertical = 3.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun OrbIcon(
+    status: UploadStatus,
+    colors: OverlayColors,
+    showsCompletionIcon: Boolean,
+    arrowBob: Float,
+    arrowOffset: Float,
+    arrowOpacity: Float,
+    checkmarkScale: Float,
+    checkmarkRotation: Float,
+    checkmarkOpacity: Float,
+    auraOffset: Float,
+    auraOpacity: Float,
+    auraScale: Float,
+) {
+    when (status) {
+        UploadStatus.Initializing -> Icon(
+            Icons.Filled.KeyboardArrowUp,
+            contentDescription = null,
+            tint = colors.iconMuted,
+            modifier = Modifier.size(22.dp),
+        )
+        UploadStatus.Completed, UploadStatus.Moderated -> {
+            if (showsCompletionIcon) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = colors.icon,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .scale(checkmarkScale)
+                        .rotate(checkmarkRotation)
+                        .alpha(checkmarkOpacity),
+                )
+            } else {
+                Icon(
+                    Icons.Filled.KeyboardArrowUp,
+                    contentDescription = null,
+                    tint = colors.icon,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .offset(y = arrowOffset.dp)
+                        .alpha(arrowOpacity),
                 )
             }
-            if (extraCount > 0) {
-                Text(
-                    "+$extraCount",
-                    color = Color.White,
-                    fontSize = 10.sp,
+        }
+        UploadStatus.Failed -> Icon(
+            Icons.Filled.PriorityHigh,
+            contentDescription = null,
+            tint = colors.icon,
+            modifier = Modifier.size(22.dp),
+        )
+        UploadStatus.Uploading, UploadStatus.Processing -> {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Filled.KeyboardArrowUp,
+                    contentDescription = null,
+                    tint = colors.icon,
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 2.dp, end = 2.dp)
-                        .background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(50))
-                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                        .size(22.dp)
+                        .offset(y = auraOffset.dp)
+                        .scale(auraScale)
+                        .alpha(auraOpacity)
+                        .graphicsLayer { this.alpha = auraOpacity },
+                )
+                Icon(
+                    Icons.Filled.KeyboardArrowUp,
+                    contentDescription = null,
+                    tint = colors.icon,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .offset(y = arrowBob.dp),
                 )
             }
         }
@@ -105,12 +490,231 @@ private fun ColumnUploadCluster(
 }
 
 @Composable
-private fun CircularUploadRing(progress: Float) {
-    androidx.compose.material3.CircularProgressIndicator(
-        progress = { progress.coerceAtLeast(0.04f) },
-        modifier = Modifier.size(OrbSize),
-        strokeWidth = 4.dp,
-        color = Color(0xFF00A896),
-        trackColor = Color(0xFF0B1215).copy(alpha = 0.08f),
+private fun ExpandedPanel(
+    content: String,
+    mediaCount: Int,
+    currentIndex: Int,
+    status: UploadStatus,
+    errorMessage: String?,
+    thumb: android.graphics.Bitmap?,
+    renderedProgress: Double,
+    colors: OverlayColors,
+    gradient: Brush,
+    onToggle: () -> Unit,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val title = content.ifBlank { stringResource(R.string.feed_uploading_new_moment) }
+    val detail = detailText(status, mediaCount, currentIndex, errorMessage)
+    val label = statusLabel(status)
+
+    Row(
+        Modifier
+            .width(PanelWidth)
+            .height(PanelHeight)
+            .shadow(16.dp, RoundedCornerShape(26.dp), ambientColor = colors.shadow.copy(alpha = 0.8f), spotColor = colors.shadow.copy(alpha = 0.8f))
+            .momentsChromeGlass(RoundedCornerShape(26.dp), interactive = true)
+            .border(0.75.dp, colors.border, RoundedCornerShape(26.dp))
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ThumbnailView(thumb, mediaCount, currentIndex, colors)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                title,
+                color = colors.primaryText,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                detail,
+                color = colors.secondaryText,
+                fontWeight = FontWeight.Medium,
+                fontSize = 10.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            ProgressCapsule(renderedProgress, label, colors, gradient)
+        }
+        if (status == UploadStatus.Failed) {
+            FailedActions(colors = colors, onRetry = onRetry, onCancel = onCancel)
+        }
+    }
+}
+
+@Composable
+private fun ThumbnailView(
+    thumb: android.graphics.Bitmap?,
+    mediaCount: Int,
+    currentIndex: Int,
+    colors: OverlayColors,
+) {
+    Box(contentAlignment = Alignment.BottomEnd) {
+        Box(
+            Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(15.dp))
+                .background(Color.White.copy(alpha = 0.10f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (thumb != null) {
+                androidx.compose.foundation.Image(
+                    bitmap = thumb.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Text("▢", color = colors.iconMuted, fontSize = 14.sp)
+            }
+        }
+        if (mediaCount > 1) {
+            Text(
+                "${currentIndex + 1}/$mediaCount",
+                color = Color.White,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .offset(x = 4.dp, y = 4.dp)
+                    .background(Color.Black.copy(alpha = 0.58f), RoundedCornerShape(50))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProgressCapsule(
+    renderedProgress: Double,
+    label: String,
+    colors: OverlayColors,
+    gradient: Brush,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .height(6.dp),
+        ) {
+            val h = size.height
+            drawRoundRect(color = colors.track, cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2, h / 2))
+            val w = max(18f, size.width * min(1f, renderedProgress.toFloat()))
+            drawRoundRect(
+                brush = gradient,
+                size = Size(w, h),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2, h / 2),
+            )
+        }
+        Row(Modifier.fillMaxWidth()) {
+            Text(label, color = colors.secondaryText, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.weight(1f))
+            Text(
+                "${(renderedProgress * 100).toInt()}%",
+                color = colors.primaryText,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FailedActions(
+    colors: OverlayColors,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val isDark = isSystemInDarkTheme()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFFF9800).copy(alpha = 0.75f))
+                .clickable(onClick = onRetry),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.Refresh, null, tint = Color.White, modifier = Modifier.size(14.dp))
+        }
+        Box(
+            Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = if (isDark) 0.10f else 0.30f))
+                .clickable(onClick = onCancel),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.Close, null, tint = colors.primaryText, modifier = Modifier.size(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun detailText(
+    status: UploadStatus,
+    mediaCount: Int,
+    currentIndex: Int,
+    errorMessage: String?,
+): String {
+    val fileDetail = stringResource(R.string.feed_uploading_files, mediaCount)
+    return when (status) {
+        UploadStatus.Initializing -> stringResource(R.string.feed_uploading_initializing)
+        UploadStatus.Uploading -> {
+            val statusTxt = stringResource(R.string.feed_uploading_uploading)
+            if (mediaCount > 1) {
+                "$statusTxt · ${currentIndex + 1}/$mediaCount · $fileDetail"
+            } else {
+                "$statusTxt · $fileDetail"
+            }
+        }
+        UploadStatus.Processing -> stringResource(R.string.feed_uploading_creating)
+        UploadStatus.Completed, UploadStatus.Moderated -> stringResource(R.string.feed_uploading_available)
+        UploadStatus.Failed -> errorMessage ?: stringResource(R.string.feed_uploading_error)
+    }
+}
+
+@Composable
+private fun statusLabel(status: UploadStatus): String = when (status) {
+    UploadStatus.Initializing -> stringResource(R.string.feed_uploading_initializing)
+    UploadStatus.Uploading -> stringResource(R.string.feed_uploading_uploading)
+    UploadStatus.Processing -> stringResource(R.string.feed_uploading_processing)
+    UploadStatus.Completed, UploadStatus.Moderated -> stringResource(R.string.feed_uploading_published)
+    UploadStatus.Failed -> stringResource(R.string.feed_uploading_retry)
+}
+
+private data class OverlayColors(
+    val isDark: Boolean,
+) {
+    val primaryText = if (isDark) Color.White.copy(alpha = 0.94f) else Color.Black.copy(alpha = 0.84f)
+    val secondaryText = if (isDark) Color.White.copy(alpha = 0.72f) else Color.Black.copy(alpha = 0.62f)
+    val icon = if (isDark) Color.White else Color.Black
+    val iconMuted = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.45f)
+    val track = if (isDark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.10f)
+    val border = if (isDark) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.35f)
+    val shadow = Color.Black.copy(alpha = if (isDark) 0.24f else 0.12f)
+}
+
+private fun progressBrush(status: UploadStatus, renderedProgress: Double): Brush {
+    if (status == UploadStatus.Failed) {
+        return Brush.linearGradient(listOf(Color.Red, Color(0xFFFF9800)))
+    }
+    val p = min(1.0, max(0.0, renderedProgress))
+    val start = interpolateColor(Color(0xFF6A11CB), Color(0xFF34C759), p)
+    val end = interpolateColor(Color(0xFF007AFF), Color(0xFF1EA84C), p)
+    return Brush.linearGradient(listOf(start, end))
+}
+
+/** Port de `Color.interpolate` (FloatingMomentUploadOverlay.swift). */
+private fun interpolateColor(from: Color, to: Color, fraction: Double): Color {
+    val f = min(1f, max(0f, fraction.toFloat()))
+    return Color(
+        red = from.red + (to.red - from.red) * f,
+        green = from.green + (to.green - from.green) * f,
+        blue = from.blue + (to.blue - from.blue) * f,
+        alpha = from.alpha + (to.alpha - from.alpha) * f,
     )
 }

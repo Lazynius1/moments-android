@@ -1,6 +1,11 @@
 package com.moments.android.services.performance
 
-/** Port de FeedVisibilityCoordinator.swift. */
+/**
+ * Port de `FeedVisibilityCoordinator.swift`.
+ * Elige un único vídeo activo en el feed según la fracción visible de cada post.
+ *
+ * La parte SwiftUI (`MomentVisibilityPreference` / `feedMomentVisibility`) vive en la capa View.
+ */
 object FeedVisibilityCoordinator {
     private const val PLAY_THRESHOLD = 0.55f
 
@@ -9,27 +14,37 @@ object FeedVisibilityCoordinator {
         private set
 
     private val visibilityByMomentId = mutableMapOf<String, Float>()
+    private val lock = Any()
 
     fun update(all: Map<String, Float>) {
-        visibilityByMomentId.clear()
-        visibilityByMomentId.putAll(all)
-        pickWinner()
+        synchronized(lock) {
+            visibilityByMomentId.clear()
+            visibilityByMomentId.putAll(all)
+            pickWinnerLocked()
+        }
     }
 
     fun report(momentId: String, fraction: Float) {
-        visibilityByMomentId[momentId] = fraction
-        pickWinner()
+        synchronized(lock) {
+            visibilityByMomentId[momentId] = fraction
+            pickWinnerLocked()
+        }
     }
 
     fun clear(momentId: String) {
-        visibilityByMomentId.remove(momentId)
-        pickWinner()
+        synchronized(lock) {
+            visibilityByMomentId.remove(momentId)
+            pickWinnerLocked()
+        }
     }
 
+    /** Fija un único vídeo activo (p. ej. durante hero → detalle). */
     fun pinActiveVideo(momentId: String) {
-        visibilityByMomentId.clear()
-        visibilityByMomentId[momentId] = 1f
-        activeVideoMomentId = momentId
+        synchronized(lock) {
+            visibilityByMomentId.clear()
+            visibilityByMomentId[momentId] = 1f
+            activeVideoMomentId = momentId
+        }
     }
 
     fun isActive(momentId: String?): Boolean {
@@ -37,7 +52,7 @@ object FeedVisibilityCoordinator {
         return momentId != null && active == momentId
     }
 
-    private fun pickWinner() {
+    private fun pickWinnerLocked() {
         PerformanceSignposts.begin("FeedPickActiveVideo")
         val candidate = visibilityByMomentId
             .filter { it.value >= PLAY_THRESHOLD }

@@ -17,13 +17,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 /** Port de `StoryViewerSkeletonView.swift`. */
 @Composable
 fun StoryViewerSkeletonView(segmentCount: Int = 3, modifier: Modifier = Modifier) {
     val surface = Color.White.copy(.16f)
-    Column(modifier.fillMaxSize().shimmer(true)) {
+    Column(modifier.fillMaxSize().shimmer(true).semantics { hideFromAccessibility() }) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(segmentCount.coerceAtLeast(1)) {
                 Box(Modifier.weight(1f).height(2.5.dp).background(surface, RoundedCornerShape(2.dp)))

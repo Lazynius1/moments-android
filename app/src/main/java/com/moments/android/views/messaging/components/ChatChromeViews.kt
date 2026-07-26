@@ -61,9 +61,9 @@ import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.extensions.momentsChromeGlass
-import com.moments.android.models.MessageType
-import com.moments.android.models.PendingChatContext
-import com.moments.android.models.PendingChatTimelineMessage
+import com.moments.android.views.messaging.core.MessageType
+import com.moments.android.views.messaging.core.PendingChatContext
+import com.moments.android.views.messaging.core.PendingChatTimelineMessage
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.components.VerifiedBadge
 import java.util.Calendar

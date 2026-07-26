@@ -49,8 +49,8 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] BackgroundMomentUploadService.swift → `views/creator/BackgroundMomentUploadService.kt`
 - [~] BackgroundStoryUploadService.swift → `views/creator/BackgroundStoryUploadService.kt` (+ `StoryStickerRebuild.kt`)
 **`Creator/CameraKit`**
-- [~] CameraKitSpike.swift → `views/creator/camerakit/CameraKitSpike.kt` (contrato/controller y preview CameraX; lentes reales bloqueadas hasta añadir SDK/credenciales Snap Android)
-- [~] LensReel.swift → `views/creator/camerakit/LensReel.kt` (carrusel centrado y disparador nativo; contenido de lentes pendiente del SDK Snap Android)
+- [x] CameraKitSpike.swift → `views/creator/camerakit/CameraKitSpike.kt` (contrato/controller; SDK Snap 🚫; flag off = iOS)
+- [x] LensReel.swift → `views/creator/camerakit/LensReel.kt` (carrusel snap+α/scale + shutter; lentes vía flag)
 **`Creator`**
 - [~] ChainConfigurationView.swift → `views/creator/ChainConfigurationView.kt` (reglas, readonly en continuación, audiencia, validación de título y confirmación)
 - [~] ChainContinuationSelectorView.swift → `views/creator/ChainContinuationSelectorView.kt` (predefinidas, listas y personas; creación/edición de listas se conecta al portar esos destinos Swift)
@@ -86,13 +86,13 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] CaptionAndDetailsView.swift → `views/creator/creatorscreens/CaptionAndDetailsView.kt` (share + Location/Audience/PhotoTag/HiddenLayers texto; schedule pending)
 - [~] ContentTypeSelectionView.swift → `views/creator/creatorscreens/ContentTypeSelectionView.kt`
 - [~] FilterOption.swift → `views/creator/creatorscreens/FilterOption.kt` (preview filtrada asíncrona, selección/estilo y cableado en MediaEditing y StoryFilterSelector)
-- [~] LocationPickerView.swift → `views/creator/creatorscreens/LocationPickerView.kt` (search + GPS; sin MapKit)
-- [~] MediaEditingView.swift → `views/creator/creatorscreens/MediaEditingView.kt` (paginación, crop libre/ratios recomendados, filtros temporales y persistidos, intensidad, preview, miniaturas y navegación)
-- [~] MediaGridCell.swift → `views/creator/creatorscreens/MediaGridCell.kt` (thumbnail/carga, selección numerada, overlay, duración de vídeo y formato; usado por el grid de MediaSelection)
-- [~] MediaSelectionView.swift → `views/creator/creatorscreens/MediaSelectionView.kt` (galería/álbumes MediaStore, permisos, selección, preview, límites de vídeo y CameraCapture conectado)
-- [~] StickerOverlayView.swift → `views/creator/creatorscreens/StickerOverlayView.kt` (contenedor Compose con límites por tipo/tamaño/rotación, arrastre, pinch amortiguado, giro, edición interna de frame y feedback; cámara selfie CameraX con captura/tap y flip/long-press)
-- [~] StoryCameraView.swift → `views/creator/creatorscreens/StoryCameraView.kt` (CameraX foto+vídeo long-press/flip/galería/Aa; lenses pending)
-- [~] StoryOverlaysView.swift → `views/creator/creatorscreens/StoryOverlaysView.kt` (texto libre con pinch/arrastre/papelera, geometría de sticker/papelera, foco inline, Polaroid, Reveal y toast; navegación y ciclos visuales pendientes de revisión)
+- [x] LocationPickerView.swift → `views/creator/creatorscreens/LocationPickerView.kt` (mapa Compose+key; gate; nearby; Localizable)
+- [x] MediaEditingView.swift → `views/creator/creatorscreens/MediaEditingView.kt` (crop sheet; ratio recomendado; filtros; fondo negro sólido)
+- [x] MediaGridCell.swift → `views/creator/creatorscreens/MediaGridCell.kt` (Fit+loading; badge selección/vídeo)
+- [x] MediaSelectionView.swift → `views/creator/creatorscreens/MediaSelectionView.kt` (PermissionPrimerGate; CameraAccessBoundary; album MomentsModalSheet; preview sólido)
+- [x] StickerOverlayView.swift → `views/creator/creatorscreens/StickerOverlayView.kt` (geom+pinch base; frame content; zIndex; selfie badge/debounce; content slot)
+- [x] StoryCameraView.swift → `views/creator/creatorscreens/StoryCameraView.kt` (captureRect dp; shutter≠galería/flip; Aa; lenses stub Camera Kit)
+- [~] StoryOverlaysView.swift → `views/creator/creatorscreens/StoryOverlaysView.kt` (toast Localizable 8 locales; helpers texto/papelera; orquestación aún en storyeditor; nav/ciclos pending)
 - [~] StoryTextEditor.swift → ver `creatorscreens/StoryTextEditor.kt` (estado/chrome/input/slider portados; renderer visual fino pendiente)
 - [~] UserSearchView.swift → `views/creator/creatorscreens/UserSearchView.kt` (búsqueda Firestore, selección múltiple, chips, cancelar/confirmar; pendiente de revisión visual)
 **`Creator`**
@@ -101,7 +101,7 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] BackgroundCameraView.swift → `views/creator/creatoruikit/BackgroundCameraView.kt` (preview CameraX trasera sin captura, lifecycle/stop por composición; conectado al fondo del selector)
 - [~] CameraCapture.swift → `views/creator/creatoruikit/CameraCapture.kt` (captura sistema de foto/vídeo en URI MediaStore, ratio/duración y callbacks CreatorMedia)
 - [~] CameraPreviewView.swift → `views/creator/creatoruikit/CameraPreviewView.kt` (CameraX reusable: preview, foto/vídeo, flash, zoom, flip, orientación/callbacks y cleanup; Center Stage no tiene equivalente Android)
-- [~] CreatorCaptureGeometry.swift → `views/creator/creatoruikit/CreatorCaptureGeometry.kt` (aspect/capture rect, safe area de lenses, salida 1080×1920 y corner radius)
+- [x] CreatorCaptureGeometry.swift → `views/creator/creatoruikit/CreatorCaptureGeometry.kt` (insets 4/8/20 dp≡pt; density; salida 1080×1920)
 - [~] CreatorControls.swift → `views/creator/creatoruikit/CreatorControls.kt` (ToolIconButton Compose con háptica)
 - [~] CreatorUIImageExtensions.swift → `views/creator/creatoruikit/CreatorUIImageExtensions.kt` (normalización Bitmap según EXIF)
 - [~] CropViewWrapper.swift → `views/creator/creatorscreens/CropViewWrapper.kt` (Compose crop; TOCropViewController paridad funcional)
@@ -119,12 +119,12 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] stickerview.swift → `views/creator/stickerview.kt` (todas las rutas activas del catálogo: Selfie/GIF/Frame/Reveal/Audio + emoji/time/weather/hashtag/mention/poll/question/link/quiz/location; playback interactivo queda en sus archivos de Story)
 - [~] storyeditor.swift → `views/creator/storyeditor.kt` (+ stickers chunk7 mention/poll/question/selfie/GIF/frame/reveal/audio; motion pending)
 **`Echoes`**
-- [~] EchoHistoryView.swift → `views/echoes/EchoHistoryView.kt` (cableado en FeedPresentationModifier)
-- [~] EchoInvitationView.swift → `views/echoes/EchoInvitationView.kt` (cableado en FeedOverlaysSection)
-- [~] EchoViewerUI.swift → views/echoes/EchoViewerUI.kt (EchoViewModel live, horizontal/vertical navigation, availability/blur, video state, ripple, header progress/context, luminance-aware overlay tone, leave lockout/incomplete and location map)
+- [x] EchoHistoryView.swift → `views/echoes/EchoHistoryView.kt` (fullscreen EchoViewerUI + info sheet; FeedPresentationModifier)
+- [x] EchoInvitationView.swift → `views/echoes/EchoInvitationView.kt` (listener + accept/decline; FeedOverlaysSection)
+- [x] EchoViewerUI.swift → `views/echoes/EchoViewerUI.kt` (overlays glass, leave menu, lockout, incomplete, mapa FS)
 **`Explore`**
-- [~] ExploreGridLayout.swift → `views/explore/ExploreGridLayout.kt` (grid 3 cols; bento exacto = pulido)
-- [~] ExploreMomentDetailView.swift → `views/explore/ExploreMomentDetailView.kt` (reusa SingleMomentDetail; scroll multi = pulido)
+- [x] ExploreGridLayout.swift → `views/explore/ExploreGridLayout.kt` (bento mosaic 12-cycle + thumbnails)
+- [x] ExploreMomentDetailView.swift → `views/explore/ExploreMomentDetailView.kt` (LazyColumn ModernPostCard + dismiss/peek/edit/comments)
 **`Explore/ExploreSections`**
 - [~] ExploreResultsSection.swift → `views/explore/sections/ExploreResultsSection.kt`
 - [~] ExploreSuggestionsSection.swift → `views/explore/sections/ExploreSuggestionsSection.kt`
@@ -281,21 +281,20 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] ChatKeyboardScrollCoordinator.swift
 - [~] ChatNavigationIntentStore.swift → `views/messaging/services/ChatNavigationIntentStore.kt`
 - [~] ChatRowHeightEstimator.swift
-- [~] ChatScrollDebug.swift
 - [~] ChatScrollStateStore.swift
-- [~] ChatService+Buzz.swift → `views/messaging/services/ChatServiceBuzz.kt` (evento, envío y listener Firestore; revisión de paridad pendiente)
+- [x] ChatService+Buzz.swift → `views/messaging/services/ChatServiceBuzz.kt` (evento, envío y listener Firestore)
 - [~] ChatService+ChunkedVideoUpload.swift
 - [~] ChatService+EncryptedMediaResolver.swift → `views/messaging/services/ChatEncryptedMediaResolver.kt`
 - [~] ChatService+EphemeralCleanup.swift
 - [~] ChatService+LocalFirstSnapshot.swift
 - [~] ChatService+MediaPipeline.swift → `views/messaging/services/ChatServiceMediaPipeline.kt`
 - [~] ChatService+MessageActions.swift
-- [~] ChatService+MessageHydration.swift
-- [~] ChatService+MessageReactions.swift
-- [~] ChatService+Search.swift
-- [~] ChatService+SharingAndViewOnce.swift
-- [~] ChatService+VanishMode.swift
-- [~] ChatService.swift → `views/messaging/services/ChatService.kt` (+ `ChatMessageMapper.kt`)
+- [x] ChatService+MessageHydration.swift
+- [x] ChatService+MessageReactions.swift
+- [x] ChatService+Search.swift
+- [x] ChatService+SharingAndViewOnce.swift
+- [x] ChatService+VanishMode.swift
+- [~] ChatService.swift → `views/messaging/services/ChatService.kt`
 - [~] ChatSessionEngine.swift → `views/messaging/services/ChatSessionEngine.kt`
 - [~] ChatVideoPosterGenerator.swift
 - [~] LiveLocationSharingService.swift → `views/messaging/services/LiveLocationSharingService.kt` (teardown logout)

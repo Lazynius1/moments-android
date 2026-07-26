@@ -13,6 +13,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Source
+import com.moments.android.R
 import com.moments.android.models.AppUser
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.messaging.MessageCatchUpService
@@ -51,13 +52,8 @@ import com.moments.android.services.firestore.verifyUserCreation
 import com.moments.android.services.firestore.changeUsername
 
 /**
- * Port de AuthService.swift — email + Google únicamente.
- *
- * N/A en Android (comentado en código donde aplica):
- * - Sign in with Apple (startAppleSignIn, signInWithApple, linkWithApple, unlinkFromApple, …)
- * - Passkeys (signInWithPasskeyToken)
- * - Widget sync (syncProfileDataToWidget)
- * - Apple private relay / backup email para Apple ID
+ * Port de AuthService.swift — email + Google Sign-In.
+ * Sign in with Apple / Passkeys / Widget: 🚫 (solo iOS).
  */
 object AuthService {
 
@@ -68,7 +64,8 @@ object AuthService {
     class AuthServiceException(message: String, val code: Int = -1, cause: Throwable? = null) :
         Exception(message, cause)
 
-    enum class BackupEmailStatus { MISSING, APPLE_RELAY, USABLE }
+    /** En Android: email presente o no (sin Apple relay). */
+    enum class BackupEmailStatus { MISSING, USABLE }
 
     enum class RegistrationState { IDLE, REGISTERING, COMPLETING }
 
@@ -76,7 +73,6 @@ object AuthService {
 
     sealed class AccountDeletionConfirmation {
         data class Password(val password: String) : AccountDeletionConfirmation()
-        // iOS: .appleVerified — N/A en Android (sin Sign in with Apple)
     }
 
     data class CachedAccountStatus(
@@ -175,9 +171,7 @@ object AuthService {
     val backupEmailStatus: BackupEmailStatus
         get() {
             val email = _currentFirebaseUser.value?.email?.trim().orEmpty()
-            if (email.isEmpty()) return BackupEmailStatus.MISSING
-            // N/A: Apple private relay — solo aplica a Sign in with Apple en iOS
-            return BackupEmailStatus.USABLE
+            return if (email.isEmpty()) BackupEmailStatus.MISSING else BackupEmailStatus.USABLE
         }
 
     val requiresBackupEmailSetup: Boolean
@@ -187,6 +181,12 @@ object AuthService {
         val trimmed = email.trim()
         return Regex("^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}$").matches(trimmed)
     }
+
+    private fun authString(resId: Int): String =
+        (appContext ?: error("AuthService.initialize required")).getString(resId)
+
+    private fun authError(resId: Int, code: Int = -1): AuthServiceException =
+        AuthServiceException(authString(resId), code)
 
     fun initialize(context: Context) {
         if (appContext != null) return
@@ -351,32 +351,41 @@ object AuthService {
     // MARK: - Login
 
     suspend fun login(identifier: String, password: String) {
-        require(identifier.isNotEmpty() && password.isNotEmpty()) { "Empty fields" }
+        if (identifier.isEmpty() || password.isEmpty()) {
+            throw authError(R.string.auth_error_emptyFields)
+        }
         val emailRegex = Regex("^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}$")
-        val user: FirebaseUser = if (emailRegex.matches(identifier)) {
-            auth.signInWithEmailAndPassword(identifier, password).await().user
-                ?: error("Unknown login error")
-        } else {
-            val username = identifier.lowercase()
-            val cachedEmail = prefs().getString("cachedEmail_$username", null)
-            val email = cachedEmail ?: resolveEmailForUsername(username)
-            auth.signInWithEmailAndPassword(email, password).await().user
-                ?: error("Unknown login error")
+        val user: FirebaseUser = try {
+            if (emailRegex.matches(identifier)) {
+                auth.signInWithEmailAndPassword(identifier, password).await().user
+                    ?: throw authError(R.string.login_error_unknown)
+            } else {
+                val username = identifier.lowercase()
+                val cachedEmail = prefs().getString("cachedEmail_$username", null)
+                val email = cachedEmail ?: resolveEmailForUsername(username)
+                auth.signInWithEmailAndPassword(email, password).await().user
+                    ?: throw authError(R.string.login_error_unknown)
+            }
+        } catch (e: AuthServiceException) {
+            throw e
+        } catch (e: Exception) {
+            throw mapAuthError(e)
         }
         finishCredentialLogin(user)
     }
 
     private suspend fun resolveEmailForUsername(username: String): String {
         val doc = db.collection("usernames").document(username).get().await()
-        val data = doc.data ?: error("Username not found")
+        val data = doc.data ?: throw authError(R.string.auth_error_usernameNotFound)
         val email = data["email"] as? String
         if (!email.isNullOrEmpty()) {
             prefs().edit().putString("cachedEmail_$username", email).apply()
             return email
         }
-        val userId = data["userId"] as? String ?: error("Username not found")
+        val userId = data["userId"] as? String ?: throw authError(R.string.auth_error_usernameNotFound)
         val userDoc = db.collection("users").document(userId).get().await()
-        val userEmail = userDoc.getString("email") ?: error("Username not found")
+        val userEmail = userDoc.getString("email")
+            ?: throw authError(R.string.auth_error_usernameNotFound)
         db.collection("usernames").document(username).set(
             mapOf("email" to userEmail, "updatedAt" to FieldValue.serverTimestamp()),
             com.google.firebase.firestore.SetOptions.merge(),
@@ -461,7 +470,7 @@ object AuthService {
             ServerProfileCheck.Unreachable -> {
                 _isVerifyingAccount.value = false
                 authMutex.withLock { transitionLock = false }
-                failCredentialLogin(Exception("Network error"))
+                failCredentialLogin(authError(R.string.auth_error_network, code = -1009))
             }
         }
     }
@@ -476,7 +485,7 @@ object AuthService {
         throw mapAuthError(error)
     }
 
-    // MARK: - Google Sign-In (equivalente al flujo social de iOS, sin Apple)
+    // MARK: - Google Sign-In (social; en iOS el equivalente es Apple)
 
     /**
      * @return true si el usuario ya tenía perfil completo (login); false si requiere onboarding.
@@ -547,17 +556,17 @@ object AuthService {
         profileImage: Bitmap?,
     ) = completeSocialRegistration(username, interests, profileImage)
 
-    /** Equivalente a completeSocialRegistration de iOS (allí orientado a Apple). */
+    /** Completa perfil tras Google (≡ completeSocialRegistration iOS). */
     suspend fun completeSocialRegistration(
         username: String,
         interests: List<String>,
         profileImage: Bitmap?,
         fallbackEmail: String? = null,
     ) {
-        val firebaseUser = auth.currentUser ?: error("No Firebase user")
+        val firebaseUser = auth.currentUser ?: throw authError(R.string.auth_error_userIdNotFound)
         val email = firebaseUser.email?.takeIf { it.isNotEmpty() }
             ?: fallbackEmail?.takeIf { it.isNotEmpty() }
-            ?: error("Email required to finish social registration")
+            ?: throw authError(R.string.onboarding_social_email_missing)
         val profilePath = profileImage?.let {
             runCatching { StorageService.uploadProfileImage(firebaseUser.uid, it) }.getOrNull()
         }
@@ -574,7 +583,7 @@ object AuthService {
         privacyPolicyAccepted: Boolean,
         profileImage: Bitmap?,
     ) {
-        require(privacyPolicyAccepted) { "Privacy policy required" }
+        if (!privacyPolicyAccepted) throw authError(R.string.auth_error_privacyPolicyRequired)
         authMutex.withLock {
             registrationState = RegistrationState.REGISTERING
             authProcessingEnabled = false
@@ -593,7 +602,7 @@ object AuthService {
         val usernameDoc = db.collection("usernames").document(usernameLower).get().await()
         if (usernameDoc.exists()) {
             clearRegistrationState()
-            error("Username unavailable")
+            throw authError(R.string.auth_error_usernameUnavailable)
         }
 
         val existingUser = auth.currentUser
@@ -620,20 +629,20 @@ object AuthService {
             when (val resolution = resolveAuthenticatedUserForRegistration(existingUser)) {
                 RegistrationSessionResolution.Suspended -> {
                     clearRegistrationState()
-                    error("User disabled")
+                    throw authError(R.string.auth_error_userDisabled)
                 }
                 is RegistrationSessionResolution.AccountComplete -> {
                     hydrateAuthenticatedSession(existingUser, resolution.user)
                     clearRegistrationState()
                     throw AuthServiceException(
-                        "Account already complete",
+                        authString(R.string.auth_error_accountAlreadyComplete),
                         RegistrationRecoveryCode.ACCOUNT_ALREADY_COMPLETE,
                     )
                 }
                 is RegistrationSessionResolution.Deactivated -> {
                     clearRegistrationState()
                     applyDeactivatedSession(existingUser, resolution.user)
-                    error("User disabled")
+                    throw authError(R.string.auth_error_userDisabled)
                 }
                 RegistrationSessionResolution.IncompleteProfile -> {
                     OnboardingDraftStore.updateUID(existingUser.uid)
@@ -648,7 +657,7 @@ object AuthService {
             val result = auth.createUserWithEmailAndPassword(email.trim(), password).await()
             val user = result.user ?: run {
                 clearRegistrationState()
-                error("User ID not found")
+                throw authError(R.string.auth_error_userIdNotFound)
             }
             runCatching { user.sendEmailVerification().await() }
             finalizeRegistration(user, user.uid)
@@ -683,25 +692,25 @@ object AuthService {
             val user = auth.signInWithEmailAndPassword(email, password).await().user
                 ?: run {
                     clearRegistrationState()
-                    error("User ID not found")
+                    throw authError(R.string.auth_error_userIdNotFound)
                 }
             when (val resolution = resolveAuthenticatedUserForRegistration(user)) {
                 RegistrationSessionResolution.Suspended -> {
                     clearRegistrationState()
-                    error("User disabled")
+                    throw authError(R.string.auth_error_userDisabled)
                 }
                 is RegistrationSessionResolution.AccountComplete -> {
                     hydrateAuthenticatedSession(user, resolution.user)
                     clearRegistrationState()
                     throw AuthServiceException(
-                        "Account already complete",
+                        authString(R.string.auth_error_accountAlreadyComplete),
                         RegistrationRecoveryCode.ACCOUNT_ALREADY_COMPLETE,
                     )
                 }
                 is RegistrationSessionResolution.Deactivated -> {
                     clearRegistrationState()
                     applyDeactivatedSession(user, resolution.user)
-                    error("User disabled")
+                    throw authError(R.string.auth_error_userDisabled)
                 }
                 RegistrationSessionResolution.IncompleteProfile -> {
                     OnboardingDraftStore.updateUID(user.uid)
@@ -709,15 +718,20 @@ object AuthService {
                     finalizeRegistration(user, user.uid)
                 }
             }
+        } catch (e: AuthServiceException) {
+            throw e
         } catch (e: FirebaseAuthException) {
             clearRegistrationState()
             _isResumingOnboarding.value = false
-            val message = when (e.errorCode) {
-                "ERROR_WRONG_PASSWORD", "ERROR_INVALID_CREDENTIAL", "ERROR_INVALID_LOGIN_CREDENTIALS" ->
-                    "Wrong password for incomplete registration"
-                else -> mapAuthError(e).message ?: e.errorCode
+            if (e.errorCode in listOf(
+                    "ERROR_WRONG_PASSWORD",
+                    "ERROR_INVALID_CREDENTIAL",
+                    "ERROR_INVALID_LOGIN_CREDENTIALS",
+                )
+            ) {
+                throw authError(R.string.auth_error_incompleteRegistrationWrongPassword)
             }
-            throw Exception(message, e)
+            throw mapAuthError(e)
         }
     }
 
@@ -757,6 +771,7 @@ object AuthService {
         _isVerifyingAccount.value = true
         _currentFirebaseUser.value = user
 
+        // ≡ iOS: 1s para que Firestore esté listo
         delay(1_000)
 
         val check = checkAccountStatus(user.uid)
@@ -767,6 +782,7 @@ object AuthService {
         if (check.isActive && check.user != null) {
             OnboardingDraftStore.clear()
             hydrateAuthenticatedSession(user, check.user)
+            // ≡ iOS: isRegistering→false a +2s; transitionLock→false a +3s (desde éxito)
             scope.launch {
                 delay(2_000)
                 _isRegistering.value = false
@@ -790,8 +806,9 @@ object AuthService {
                 authMutex.withLock {
                     registrationState = RegistrationState.IDLE
                     authProcessingEnabled = true
-                    transitionLock = false
                 }
+                delay(1_000)
+                authMutex.withLock { transitionLock = false }
             }
         } else {
             _authState.value = AuthState.Deactivated
@@ -810,28 +827,66 @@ object AuthService {
         deleteIncompleteAccount: Boolean = false,
         signOut: Boolean = true,
     ) {
+        val finishCleanup = {
+            _isRegistering.value = false
+            _isResumingOnboarding.value = false
+            _isLoggedIn.value = false
+            _currentUser.value = null
+            _isAccountDeactivated.value = false
+            _deactivatedUserData.value = null
+            _isVerifyingAccount.value = false
+            _authState.value = AuthState.Unauthenticated
+            OnboardingDraftStore.clear()
+        }
+
+        if (!deleteIncompleteAccount) {
+            authMutex.withLock {
+                registrationState = RegistrationState.IDLE
+                authProcessingEnabled = true
+                transitionLock = false
+            }
+            finishCleanup()
+            if (signOut) runCatching { auth.signOut() }
+            _currentFirebaseUser.value = null
+            return
+        }
+
+        val user = auth.currentUser
+        if (user == null) {
+            authMutex.withLock {
+                registrationState = RegistrationState.IDLE
+                authProcessingEnabled = true
+                transitionLock = false
+            }
+            finishCleanup()
+            if (signOut) runCatching { auth.signOut() }
+            _currentFirebaseUser.value = null
+            return
+        }
+
+        val snap = db.collection("users").document(user.uid).get().await()
+        if (!snap.exists()) {
+            try {
+                user.delete().await()
+            } catch (e: Exception) {
+                authMutex.withLock {
+                    registrationState = RegistrationState.IDLE
+                    authProcessingEnabled = true
+                    transitionLock = false
+                }
+                finishCleanup()
+                if (signOut) runCatching { auth.signOut() }
+                _currentFirebaseUser.value = null
+                throw mapAuthError(e)
+            }
+        }
+
         authMutex.withLock {
             registrationState = RegistrationState.IDLE
             authProcessingEnabled = true
             transitionLock = false
         }
-        _isRegistering.value = false
-        _isResumingOnboarding.value = false
-        _isLoggedIn.value = false
-        _currentUser.value = null
-        _isAccountDeactivated.value = false
-        _deactivatedUserData.value = null
-        _isVerifyingAccount.value = false
-        _authState.value = AuthState.Unauthenticated
-        OnboardingDraftStore.clear()
-
-        val user = auth.currentUser
-        if (deleteIncompleteAccount && user != null) {
-            val snap = db.collection("users").document(user.uid).get().await()
-            if (!snap.exists()) {
-                runCatching { user.delete().await() }
-            }
-        }
+        finishCleanup()
         if (signOut) runCatching { auth.signOut() }
         _currentFirebaseUser.value = null
     }
@@ -1134,7 +1189,8 @@ object AuthService {
     }
 
     private fun startSuspensionListener() {
-        val userId = _currentUser.value?.id ?: auth.currentUser?.uid ?: return
+        // ≡ iOS: solo currentUser?.id (sin fallback a auth.uid)
+        val userId = _currentUser.value?.id ?: return
         suspensionRegistration?.remove()
         suspensionRegistration = db.collection("users").document(userId)
             .addSnapshotListener { snap, _ ->
@@ -1244,13 +1300,13 @@ object AuthService {
         _isVerifyingAccount.value = true
         _authState.value = AuthState.VerifyingAccount
         try {
+            // ≡ AccountManagementService.reactivateAccount (sin updatedAt extra)
             db.collection("users").document(userId).update(
                 mapOf(
                     "isActive" to true,
-                    "reactivatedAt" to FieldValue.serverTimestamp(),
+                    "reactivatedAt" to Timestamp(Date()),
                     "deactivatedAt" to FieldValue.delete(),
                     "deactivatedBy" to FieldValue.delete(),
-                    "updatedAt" to FieldValue.serverTimestamp(),
                 ),
             ).await()
             val check = checkAccountStatus(userId)
@@ -1269,12 +1325,12 @@ object AuthService {
 
     suspend fun deactivateAccount() {
         val userId = _currentFirebaseUser.value?.uid ?: error("Usuario no autenticado")
+        // ≡ AccountManagementService.deactivateAccount
         db.collection("users").document(userId).update(
             mapOf(
                 "isActive" to false,
-                "deactivatedAt" to FieldValue.serverTimestamp(),
+                "deactivatedAt" to Timestamp(Date()),
                 "deactivatedBy" to "user",
-                "updatedAt" to FieldValue.serverTimestamp(),
             ),
         ).await()
         val userData = _currentUser.value ?: firestoreService.fetchUser(userId)
@@ -1335,23 +1391,31 @@ object AuthService {
     }
 
     suspend fun linkPassword(email: String, password: String) {
-        val user = auth.currentUser ?: error("User not found")
-        require(!isPasswordLinked) { "Password already set" }
+        val user = auth.currentUser ?: throw authError(R.string.auth_error_userNotFound)
+        if (isPasswordLinked) throw authError(R.string.settings_security_password_alreadySet)
         val normalized = email.trim().lowercase()
-        require(isValidEmail(normalized)) { "Invalid email" }
-        val credential = EmailAuthProvider.getCredential(normalized, password)
-        val linked = user.linkWithCredential(credential).await().user
-        _currentFirebaseUser.value = linked ?: auth.currentUser
+        if (!isValidEmail(normalized)) throw authError(R.string.auth_error_invalidEmail)
+        try {
+            val credential = EmailAuthProvider.getCredential(normalized, password)
+            val linked = user.linkWithCredential(credential).await().user
+            _currentFirebaseUser.value = linked ?: auth.currentUser
+        } catch (e: Exception) {
+            throw mapAuthError(e)
+        }
     }
 
     suspend fun updateAccountEmail(email: String) {
-        val user = auth.currentUser ?: error("User not found")
+        val user = auth.currentUser ?: throw authError(R.string.auth_error_userNotFound)
         val normalized = email.trim().lowercase()
-        require(isValidEmail(normalized)) { "Invalid email" }
-        user.updateEmail(normalized).await()
-        _currentFirebaseUser.value = auth.currentUser
-        runCatching { user.sendEmailVerification().await() }
-        updateUserField("email", normalized)
+        if (!isValidEmail(normalized)) throw authError(R.string.auth_error_invalidEmail)
+        try {
+            user.updateEmail(normalized).await()
+            _currentFirebaseUser.value = auth.currentUser
+            runCatching { user.sendEmailVerification().await() }
+            updateUserField("email", normalized)
+        } catch (e: Exception) {
+            throw mapAuthError(e)
+        }
     }
 
     fun refreshLinkedProviders() {
@@ -1507,34 +1571,40 @@ object AuthService {
     }
 
     fun mapAuthError(error: Throwable): Throwable {
+        if (error is AuthServiceException) return error
         if (error is FirebaseAuthException) {
-            val message = when (error.errorCode) {
-                "ERROR_EMAIL_ALREADY_IN_USE" -> "Email already registered"
-                "ERROR_INVALID_EMAIL" -> "Invalid email"
-                "ERROR_WRONG_PASSWORD" -> "Wrong password"
-                "ERROR_USER_NOT_FOUND" -> "User not found"
-                "ERROR_WEAK_PASSWORD" -> "Weak password"
-                "ERROR_NETWORK_REQUEST_FAILED" -> "Network error"
-                "ERROR_TOO_MANY_REQUESTS" -> "Too many requests"
-                "ERROR_INVALID_CREDENTIAL", "ERROR_INVALID_LOGIN_CREDENTIALS" -> "Invalid credentials"
-                "ERROR_USER_DISABLED" -> "User disabled"
-                "ERROR_REQUIRES_RECENT_LOGIN" -> "Recent login required"
-                else -> error.message ?: error.errorCode
+            val messageRes = when (error.errorCode) {
+                "ERROR_EMAIL_ALREADY_IN_USE" -> R.string.auth_error_emailInUse
+                "ERROR_INVALID_EMAIL" -> R.string.auth_error_invalidEmail
+                "ERROR_WRONG_PASSWORD" -> R.string.auth_error_wrongPassword
+                "ERROR_USER_NOT_FOUND" -> R.string.auth_error_userNotFound
+                "ERROR_WEAK_PASSWORD" -> R.string.auth_error_weakPassword
+                "ERROR_NETWORK_REQUEST_FAILED" -> R.string.auth_error_network
+                "ERROR_TOO_MANY_REQUESTS" -> R.string.auth_error_tooManyRequests
+                "ERROR_INVALID_CREDENTIAL", "ERROR_INVALID_LOGIN_CREDENTIALS" ->
+                    R.string.auth_error_invalidCredentials
+                "ERROR_USER_DISABLED" -> R.string.auth_error_userDisabled
+                "ERROR_REQUIRES_RECENT_LOGIN" -> R.string.auth_error_requiresRecentLogin
+                else -> null
             }
-            return Exception(message, error)
+            if (messageRes != null) {
+                return AuthServiceException(authString(messageRes), cause = error)
+            }
+            // ≡ iOS default: heurística por mensaje
+            val raw = (error.message ?: error.localizedMessage ?: "").lowercase()
+            val heuristicRes = when {
+                raw.contains("malformed") || raw.contains("expired") ||
+                    raw.contains("invalid credential") -> R.string.auth_error_invalidCredentials
+                raw.contains("password") || raw.contains("contraseña") ||
+                    raw.contains("contrasenya") -> R.string.auth_error_wrongPassword
+                raw.contains("user") || raw.contains("usuario") || raw.contains("usuari") ||
+                    raw.contains("not found") -> R.string.auth_error_userNotFound
+                raw.contains("network") || raw.contains("conexión") || raw.contains("connexió") ||
+                    raw.contains("connection") -> R.string.auth_error_network
+                else -> R.string.auth_error_generic
+            }
+            return AuthServiceException(authString(heuristicRes), cause = error)
         }
         return error
     }
-
-    // MARK: - N/A Apple / Passkey (stubs documentados para paridad de API)
-
-    // fun startAppleSignIn(): String — N/A
-    // fun signInWithApple(...) — N/A
-    // fun linkWithApple(...) — N/A
-    // fun unlinkFromApple(...) — N/A
-    // fun reauthenticateWithApple(...) — N/A
-    // fun signInWithPasskeyToken(...) — N/A
-    // static isApplePrivateRelayEmail — N/A
-    // var isAppleLinked / canUnlinkApple / isAppleOnlyAccess — N/A
-    // var currentNonce / pendingAppleRegistrationEmail — N/A
 }

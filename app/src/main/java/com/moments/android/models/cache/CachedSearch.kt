@@ -2,12 +2,14 @@ package com.moments.android.models.cache
 
 import java.util.Date
 
-// Entidad de caché local (SwiftData @Model en iOS → Room en Android).
-
-// MARK: - CachedSearch
+/**
+ * Port de `Models/Cache/CachedSearch.swift` (SwiftData @Model → data class / JSON prefs).
+ * id compuesto: query_type_targetId
+ */
 data class CachedSearch(
     val query: String,
-    val type: String, // "user" | "hashtag" | "text"
+    /** `"user"` | `"hashtag"` | `"text"` */
+    val type: String,
     val targetId: String? = null,
     val timestamp: Date = Date(),
 ) {

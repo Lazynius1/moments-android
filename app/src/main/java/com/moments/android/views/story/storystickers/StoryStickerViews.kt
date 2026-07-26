@@ -48,6 +48,10 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.models.StickerData
+import com.moments.android.views.components.StickerHashtagCardView
+import com.moments.android.views.components.StickerLocationCardView
+import com.moments.android.views.components.StickerMentionCardView
+import com.moments.android.views.components.InteractiveAudioStickerView
 import com.moments.android.views.story.StoryDeckGestureGate
 import com.moments.android.views.story.QuestionResponsesView
 import com.moments.android.views.story.storyviewer.StoryGestureSuppressionScope
@@ -567,6 +571,16 @@ fun StoryStickerView(
             accent = Color(0xFF1C1C1E),
             modifier = modifier,
         )
+        "audio" -> {
+            val url = sticker.audioURL
+            if (!url.isNullOrBlank()) {
+                InteractiveAudioStickerView(
+                    audioURL = url,
+                    duration = sticker.audioDuration ?: 15.0,
+                    modifier = modifier,
+                )
+            }
+        }
         "shareMoment" -> StorySharedMomentSticker(
             sticker = sticker,
             onClick = { sticker.momentId?.let { moment -> sticker.userId?.let { author -> onMomentTap(moment, author) } } },
@@ -848,15 +862,16 @@ fun InteractiveLocationSticker(
     modifier: Modifier = Modifier,
 ) {
     var showingMap by remember { mutableStateOf(false) }
-    Button(
-        onClick = {
+    Box(
+        modifier = modifier.clickable {
             showingMap = true
             onPauseStory()
         },
-        colors = ButtonDefaults.buttonColors(containerColor = tapCycleColor(styleVariant)),
-        modifier = modifier,
     ) {
-        Text("📍 ${locationName.uppercase()}", fontWeight = FontWeight.Black, maxLines = 1)
+        StickerLocationCardView(
+            locationName = locationName,
+            styleVariant = styleVariant,
+        )
     }
     if (showingMap) {
         ModalBottomSheet(onDismissRequest = {
@@ -879,12 +894,11 @@ fun InteractiveMentionSticker(
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Button(
-        onClick = onTap,
-        colors = ButtonDefaults.buttonColors(containerColor = tapCycleColor(styleVariant)),
-        modifier = modifier,
-    ) {
-        Text("@${username.uppercase()}", fontSize = 20.sp, fontWeight = FontWeight.Black)
+    Box(modifier = modifier.clickable(onClick = onTap)) {
+        StickerMentionCardView(
+            username = username,
+            styleVariant = styleVariant,
+        )
     }
 }
 
@@ -899,15 +913,16 @@ fun InteractiveHashtagSticker(
     modifier: Modifier = Modifier,
 ) {
     var showingExplore by remember { mutableStateOf(false) }
-    Button(
-        onClick = {
+    Box(
+        modifier = modifier.clickable {
             showingExplore = true
             onPauseStory()
         },
-        colors = ButtonDefaults.buttonColors(containerColor = tapCycleColor(styleVariant)),
-        modifier = modifier,
     ) {
-        Text("#${hashtag.uppercase()}", fontSize = 18.sp, fontWeight = FontWeight.Black)
+        StickerHashtagCardView(
+            hashtag = hashtag,
+            styleVariant = styleVariant,
+        )
     }
     if (showingExplore) {
         ModalBottomSheet(onDismissRequest = {
@@ -920,13 +935,4 @@ fun InteractiveHashtagSticker(
             }
         }
     }
-}
-
-private fun tapCycleColor(styleVariant: Int): Color = when ((styleVariant % 6 + 6) % 6) {
-    0 -> Color(0xFF161616)
-    1 -> Color(0xFF0A84FF)
-    2 -> Color(0xFFAF52DE)
-    3 -> Color(0xFFFF2D55)
-    4 -> Color(0xFFFF9500)
-    else -> Color(0xFF30D158)
 }

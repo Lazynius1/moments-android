@@ -1,9 +1,8 @@
 package com.moments.android.services.messaging
 
 import java.util.Date
-import java.util.concurrent.TimeUnit
 
-/** Port de VanishMessageTimer.swift. */
+/** Port de `VanishMessageTimer.swift`. */
 enum class VanishMessageTimer(val raw: String) {
     ONCE_SEEN("onceSeen"),
     HOURS_24("hours24"),
@@ -14,15 +13,16 @@ enum class VanishMessageTimer(val raw: String) {
     companion object {
         val DEFAULT: VanishMessageTimer = HOURS_24
 
+        /** ≡ `init(storedValue:)`. */
         fun fromStored(storedValue: String?): VanishMessageTimer =
-            storedValue?.let { raw -> entries.firstOrNull { it.raw == raw } } ?: DEFAULT
+            storedValue?.let { v -> entries.firstOrNull { it.raw == v } } ?: DEFAULT
 
         const val DISABLED_NOTICE_TOKEN = "disappearing:disabled"
         const val SCREENSHOT_NOTICE_TOKEN = "disappearing:screenshot"
         const val SCREEN_RECORDING_NOTICE_TOKEN = "disappearing:screenRecording"
 
         fun parseEnabledNotice(content: String): VanishMessageTimer? {
-            val parts = content.split(":").map { it.trim() }
+            val parts = content.split(":")
             if (parts.size != 3 || parts[0] != "disappearing" || parts[1] != "enabled") return null
             return entries.firstOrNull { it.raw == parts[2] }
         }
@@ -42,10 +42,10 @@ enum class VanishMessageTimer(val raw: String) {
 
     val enabledNoticeToken: String get() = "disappearing:enabled:$raw"
 
-    /** Offset desde el ancla "everyone has seen" (no desde el envío). */
+    /** Offset desde el ancla "everyone has seen" (no desde el envío). 86_400 s ≡ iOS. */
     fun expiresAt(from: Date = Date()): Date? = when (this) {
         ONCE_SEEN -> null
-        HOURS_24 -> Date(from.time + TimeUnit.HOURS.toMillis(24))
-        DAYS_7 -> Date(from.time + TimeUnit.DAYS.toMillis(7))
+        HOURS_24 -> Date(from.time + 86_400_000L)
+        DAYS_7 -> Date(from.time + 7 * 86_400_000L)
     }
 }

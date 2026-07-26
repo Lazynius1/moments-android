@@ -16,7 +16,7 @@ import com.moments.android.services.cache.PersistentVideoCache
 import com.moments.android.services.cache.VideoThumbnailCache
 import com.moments.android.services.incognito.IncognitoModeService
 import com.moments.android.services.messaging.ChatCacheStore
-import com.moments.android.services.messaging.ChatCommunicationNotificationService
+import com.moments.android.services.messaging.ChatCommunicationIntentDonor
 import com.moments.android.services.messaging.EncryptionService
 import com.moments.android.services.messaging.ChatMediaDownloadPolicy
 import com.moments.android.services.messaging.LocalFirstMessagingSettings
@@ -42,7 +42,14 @@ import com.moments.android.ad.AdMobConfiguration
 import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.notifications.services.NotificationBadgeService
 import com.moments.android.notifications.services.NotificationService
+import com.moments.android.services.security.MomentsAppCheckProviderFactory
+import com.google.firebase.appcheck.FirebaseAppCheck
 
+/**
+ * Application process entry — pares con [MomentsApp] Compose.
+ * Cubre `MomentsApp.init` (AppCheck) + bootstrap de servicios que iOS hace
+ * en onAppear diferido / AppDelegate.
+ */
 class MomentsApplication : Application() {
     companion object {
         @Volatile
@@ -53,6 +60,8 @@ class MomentsApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        // iOS: AppCheck.setAppCheckProviderFactory antes de FirebaseApp.configure().
+        FirebaseAppCheck.getInstance().installAppCheckProviderFactory(MomentsAppCheckProviderFactory)
         NetworkMonitor.initialize(this)
         TimeSpentManager.initialize(this)
         VideoCompressionService.initialize(this)
@@ -74,8 +83,12 @@ class MomentsApplication : Application() {
         MessageSyncCursorStore.initialize(this)
         ChatMediaDownloadPolicy.initialize(this)
         ChatCacheStore.initialize(this)
+        com.moments.android.views.messaging.services.ChatBuzzProcessedStore.initialize(this)
+        com.moments.android.views.messaging.services.ChatDraftStore.initialize(this)
+        com.moments.android.views.messaging.services.ChatScrollStateStore.initialize(this)
         CacheManager.initialize(this)
         UserCacheService.initialize(this)
+        com.moments.android.views.creator.components.ChatGIFImageCache.initialize(this)
         MotionPolicy.initialize(this)
         HapticManager.initialize(this)
         MomentsFormat.initialize(this)
@@ -91,9 +104,11 @@ class MomentsApplication : Application() {
         SharedVideoPlayerPool.initialize(this)
         ReelPrebufferService.initialize(this)
         IncognitoModeService.initialize(this)
-        ChatCommunicationNotificationService.initialize(this)
+        ChatCommunicationIntentDonor.initialize(this)
         EncryptionService.initialize(this)
         OnlineStatusService.initialize(this)
+        // ≡ MomentsApp @StateObject EphemeralCleanupManager
+        com.moments.android.views.messaging.services.EphemeralCleanupManager.startCleanupSystem()
         // LocalFirstMessaging / ChatCache ya inicializados arriba (antes de CacheManager)
         OfflineSyncService.enableAutomaticSync()
         NotificationService.initialize(this)

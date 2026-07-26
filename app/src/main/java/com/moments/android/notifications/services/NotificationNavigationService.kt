@@ -3,7 +3,6 @@ package com.moments.android.notifications.services
 import com.moments.android.coordinators.AppRouter
 import com.moments.android.coordinators.legacyPendingNavigation
 import com.moments.android.views.messaging.services.ChatNavigationIntentStore
-import com.moments.android.services.messaging.MessagingEvents
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -73,8 +72,11 @@ object NotificationNavigationService {
                     .firstNotNullOfOrNull { userInfo[it] as? String }
                 navigateToStory(storyId, authorId)
             }
-            "newFollower", "requestAccepted", "mutualConnection" -> {
+            "newFollower" -> {
                 firstString(userInfo, listOf("followerId", "senderId", "targetId"))?.let { navigateToProfile(it) }
+            }
+            "mutualConnection", "requestAccepted" -> {
+                firstString(userInfo, listOf("senderId", "targetId"))?.let { navigateToProfile(it) }
             }
             "message" -> {
                 (userInfo["conversationId"] as? String)?.let { navigateToConversation(it) }
@@ -90,7 +92,7 @@ object NotificationNavigationService {
                 val conversationId = userInfo["conversationId"] as? String ?: return
                 val buzzEventId = firstString(userInfo, listOf("buzzEventId"))
                 ChatNavigationIntentStore.enqueueBuzz(conversationId, buzzEventId)
-                MessagingEvents.emitChatBuzzHighlight(conversationId, buzzEventId)
+                ChatNavigationIntentStore.emitChatBuzzHighlight(conversationId, buzzEventId)
                 navigateToConversation(conversationId)
             }
             "followRequest" -> {
@@ -114,9 +116,9 @@ object NotificationNavigationService {
                 }
             }
             "like", "photoTag" -> {
-                val momentId = firstString(userInfo, listOf("momentId", "targetId"))
+                val momentId = firstString(userInfo, listOf("momentId", "targetId")) ?: return
                 val userId = firstString(userInfo, listOf("targetAuthorId", "momentOwnerId", "senderId"))
-                if (momentId != null && userId != null) navigateToMoment(momentId, userId)
+                if (userId != null) navigateToMoment(momentId, userId)
                 else navigateToNotifications(null)
             }
             "mediaModeration" -> handleModeration(userInfo)
@@ -176,9 +178,11 @@ object NotificationNavigationService {
         "follow_request" -> "followRequest"
         "new_message" -> "message"
         "message_reaction" -> "messageReaction"
+        "chat_buzz" -> "chat_buzz"
         "photo_tag" -> "photoTag"
         "media_moderation" -> "mediaModeration"
         "echo_suggestion" -> "echoSuggestion"
+        "data_export_ready" -> "data_export_ready"
         else -> rawType
     }
 

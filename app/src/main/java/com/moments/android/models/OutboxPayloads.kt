@@ -1,15 +1,14 @@
 package com.moments.android.models
 
+import com.moments.android.views.messaging.core.EnhancedMessage
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Date
 
-// MARK: - Payloads de la cola offline (Outbox)
-
-data class MessagePayload(
-    val message: EnhancedMessage,
-    val useServerTimestamp: Boolean = true,
-)
+/**
+ * Port de `Models/OutboxPayloads.swift`.
+ * Payloads de la cola offline; `encode()` ≡ JSONEncoder Codable en iOS.
+ */
 
 data class ReactionPayload(
     val momentId: String,
@@ -40,6 +39,12 @@ data class DeleteCommentPayload(
     val authorId: String,
 )
 
+data class MessagePayload(
+    val message: EnhancedMessage,
+    val useServerTimestamp: Boolean,
+)
+
+/** Bytes en caché descifrada; ruta re-derivada con ChatCacheStore. */
 data class MediaMessagePayload(
     val conversationId: String,
     val senderId: String,
@@ -50,7 +55,7 @@ data class MediaMessagePayload(
     val duration: Double? = null,
     val audioWaveform: List<Float>? = null,
     val mediaBatchId: String? = null,
-    val isVanishModeMessage: Boolean = false,
+    val isVanishModeMessage: Boolean,
     val vanishExpiresAt: Date? = null,
     val replyTo: String? = null,
 )
@@ -105,27 +110,10 @@ data class ProfileUpdatePayload(
     val oldWebsiteUrl: String? = null,
     val interests: List<String>? = null,
     val profileImageLocalPath: String? = null,
-    val isImageUpdate: Boolean = false,
+    val isImageUpdate: Boolean,
 )
 
-// MARK: - JSON encoding (paridad con JSONEncoder en iOS)
-
-fun MediaMessagePayload.encode(): ByteArray = JSONObject().apply {
-    put("conversationId", conversationId)
-    put("senderId", senderId)
-    put("messageId", messageId)
-    put("typeRaw", typeRaw)
-    put("fileExtension", fileExtension)
-    fileName?.let { put("fileName", it) }
-    duration?.let { put("duration", it) }
-    audioWaveform?.let { list ->
-        put("audioWaveform", JSONArray().apply { list.forEach { put(it.toDouble()) } })
-    }
-    mediaBatchId?.let { put("mediaBatchId", it) }
-    if (isVanishModeMessage) put("isVanishModeMessage", true)
-    vanishExpiresAt?.let { put("vanishExpiresAt", it.time) }
-    replyTo?.let { put("replyTo", it) }
-}.toString().toByteArray()
+// MARK: - encode (≡ JSONEncoder)
 
 fun ReactionPayload.encode(): ByteArray = JSONObject().apply {
     put("momentId", momentId)
@@ -148,9 +136,7 @@ fun CommentPayload.encode(): ByteArray = JSONObject().apply {
     commentId?.let { put("commentId", it) }
     mentions?.let { list ->
         put("mentions", JSONArray().apply {
-            list.forEach { mention ->
-                put(JSONObject(mention.toMap()))
-            }
+            list.forEach { put(JSONObject(it.toMap())) }
         })
     }
 }.toString().toByteArray()
@@ -162,9 +148,77 @@ fun DeleteCommentPayload.encode(): ByteArray = JSONObject().apply {
     put("authorId", authorId)
 }.toString().toByteArray()
 
+fun MessagePayload.encode(): ByteArray = JSONObject().apply {
+    put("message", message.toJson())
+    put("useServerTimestamp", useServerTimestamp)
+}.toString().toByteArray()
+
+fun MediaMessagePayload.encode(): ByteArray = JSONObject().apply {
+    put("conversationId", conversationId)
+    put("senderId", senderId)
+    put("messageId", messageId)
+    put("typeRaw", typeRaw)
+    put("fileExtension", fileExtension)
+    fileName?.let { put("fileName", it) }
+    duration?.let { put("duration", it) }
+    audioWaveform?.let { list ->
+        put("audioWaveform", JSONArray().apply { list.forEach { put(it.toDouble()) } })
+    }
+    mediaBatchId?.let { put("mediaBatchId", it) }
+    put("isVanishModeMessage", isVanishModeMessage)
+    vanishExpiresAt?.let { put("vanishExpiresAt", it.time) }
+    replyTo?.let { put("replyTo", it) }
+}.toString().toByteArray()
+
 fun FollowActionPayload.encode(): ByteArray = JSONObject().apply {
     put("followerId", followerId)
     put("followedId", followedId)
     put("followedUsername", followedUsername)
     put("isFollow", isFollow)
+}.toString().toByteArray()
+
+fun BlockActionPayload.encode(): ByteArray = JSONObject().apply {
+    put("currentUserId", currentUserId)
+    put("targetUserId", targetUserId)
+    put("isBlock", isBlock)
+}.toString().toByteArray()
+
+fun FollowRequestActionPayload.encode(): ByteArray = JSONObject().apply {
+    put("notificationId", notificationId)
+    put("senderId", senderId)
+    put("recipientId", recipientId)
+    put("isAccept", isAccept)
+}.toString().toByteArray()
+
+fun ReportActionPayload.encode(): ByteArray = JSONObject().apply {
+    put("reporterId", reporterId)
+    put("reportedUserId", reportedUserId)
+    put("reportedContentType", reportedContentType)
+    put("reportedContentId", reportedContentId)
+    put("category", category)
+    put("description", description)
+    put("priority", priority)
+}.toString().toByteArray()
+
+fun MarkAsReadPayload.encode(): ByteArray = JSONObject().apply {
+    put("notificationId", notificationId)
+    put("userId", userId)
+}.toString().toByteArray()
+
+fun DeleteMomentPayload.encode(): ByteArray = JSONObject().apply {
+    put("momentId", momentId)
+    put("userId", userId)
+    imagePath?.let { put("imagePath", it) }
+    videoUrl?.let { put("videoUrl", it) }
+}.toString().toByteArray()
+
+fun ProfileUpdatePayload.encode(): ByteArray = JSONObject().apply {
+    put("userId", userId)
+    bio?.let { put("bio", it) }
+    oldBio?.let { put("oldBio", it) }
+    websiteUrl?.let { put("websiteUrl", it) }
+    oldWebsiteUrl?.let { put("oldWebsiteUrl", it) }
+    interests?.let { put("interests", JSONArray(it)) }
+    profileImageLocalPath?.let { put("profileImageLocalPath", it) }
+    put("isImageUpdate", isImageUpdate)
 }.toString().toByteArray()

@@ -7,20 +7,24 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalTextStyle
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,18 +36,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
@@ -51,17 +53,18 @@ import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.components.StoryColorPickerPanel
 import com.moments.android.views.creator.components.StoryDominantColorsExtractor
 import com.moments.android.views.creator.components.StoryMomentsEditorChrome
-import com.moments.android.views.creator.components.StoryTextAttributesBuilder
+import com.moments.android.views.creator.components.StoryTextBackgroundFill
 import com.moments.android.views.creator.components.StoryTextEditorContext
+import com.moments.android.views.creator.components.StoryTextEditorInput
+import com.moments.android.views.creator.components.StoryTextEffect
 import com.moments.android.views.creator.components.StoryTextGradientSettings
 import com.moments.android.views.creator.components.StoryTextRenderConfiguration
+import com.moments.android.views.creator.components.StoryTextStroke
 import com.moments.android.views.creator.components.StoryTextStyle
 import com.moments.android.views.creator.components.parseStoryColorHex
-import com.moments.android.views.creator.components.rememberStoryFontFamily
-import com.moments.android.views.creator.components.rememberStoryTextMotionFrame
-import com.moments.android.views.creator.components.resolvedGradientStops
-import com.moments.android.views.creator.components.storyTextMotion
 import com.moments.android.views.creator.components.toStoryHex
+import com.moments.android.views.creator.creatoruikit.creatorMomentsCaptureRect
+import androidx.compose.ui.geometry.Size as ComposeSize
 
 /**
  * Port de StoryTextEditor.swift.
@@ -69,6 +72,10 @@ import com.moments.android.views.creator.components.toStoryHex
  * Todo el estado que Swift mantiene mediante bindings vive en storyeditor.kt;
  * así cerrar o reabrir el editor conserva los raws que se persisten en
  * StoryTextOverlayDraft, en vez de dejar motion/gradiente como UI efímera.
+ *
+ * Los tipos legacy del final del Swift (`StoryStyledTextView`, `TextStyleOption`,
+ * `ColorOption`) no se portan aquí: el input Compose es `StoryTextEditorInput`
+ * y el chrome es `StoryMomentsEditorChrome` (ya [x]).
  */
 @Composable
 fun StoryTextEditor(
@@ -103,7 +110,13 @@ fun StoryTextEditor(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val density = LocalDensity.current
+    val imeBottomPx = WindowInsets.ime.getBottom(density)
+    // Solo para levantar el slider; el chrome usa imePadding().
+    // No aplicamos IME al texto centrado: el canvas/dialog ya no debe encogerse.
+    val fontSliderLift = if (imeBottomPx > 0) (-40).dp else 0.dp
+
     val textColor = parseStoryColorHex(colorHex)
     val selectedGradientIndex = selectedGradientStopIndex.coerceIn(
         0,
@@ -122,12 +135,6 @@ fun StoryTextEditor(
         gradientStops = StoryTextGradientSettings.normalizedStops(gradientStops, textColor),
         gradientAngle = gradientAngle,
     )
-    val attributes = StoryTextAttributesBuilder.coreAttributes(configuration)
-    val fontFamily = rememberStoryFontFamily(selectedStyle)
-    val motionReplayToken = remember(visualEffectRaw, gradientStops, gradientAngle, textMotionRaw) {
-        (visualEffectRaw + gradientStops.joinToString { it.toStoryHex() } + gradientAngle + textMotionRaw).hashCode()
-    }
-    val motionFrame = rememberStoryTextMotionFrame(textMotionRaw, motionReplayToken)
     val suggestedColors = remember(mediaSampleImage) {
         StoryDominantColorsExtractor.extract(mediaSampleImage)
     }
@@ -136,6 +143,9 @@ fun StoryTextEditor(
     var isColorPickerOpen by remember { mutableStateOf(false) }
     var isTextFieldFocused by remember { mutableStateOf(false) }
     var localReplayToken by remember { mutableIntStateOf(0) }
+    val motionReplayToken = remember(visualEffectRaw, gradientStops, gradientAngle, textMotionRaw, localReplayToken) {
+        (visualEffectRaw + gradientStops.joinToString { it.toStoryHex() } + gradientAngle + textMotionRaw + localReplayToken).hashCode()
+    }
 
     fun applyTextColor(color: Color) {
         onColorHexChange(color.toStoryHex())
@@ -153,41 +163,35 @@ fun StoryTextEditor(
             onGradientStopsChange(StoryTextGradientSettings.defaultStops(textColor))
             onSelectedGradientStopIndexChange(0)
         }
-        if (effect == "gradient") activeContext = StoryTextEditorContext.COLORS
+        // ≡ TextEffect.opensColorContextOnSelect
+        if (StoryTextEffect.fromRaw(effect).opensColorContextOnSelect) {
+            activeContext = StoryTextEditorContext.COLORS
+        }
         localReplayToken++
+        HapticManager.shared.lightImpact()
     }
 
     fun applyStyle(style: StoryTextStyle) {
+        val applied = style.applyPreset()
         onStyleChange(style)
-        onColorHexChange(style.defaultColorHex)
-        onTextBackgroundFillRawChange(
-            when (style) {
-                StoryTextStyle.TYPEWRITER, StoryTextStyle.BOLD -> "solid"
-                else -> "none"
-            },
-        )
-        onVisualEffectRawChange(
-            when (style) {
-                StoryTextStyle.MARKER -> "marker"
-                StoryTextStyle.NEON -> "neon"
-                StoryTextStyle.CHALK -> "chalk"
-                else -> "none"
-            },
-        )
-        onTextStrokeRawChange(if (style == StoryTextStyle.MEME) "thick" else "none")
-        onForcesAllCapsChange(style.usesAllCaps)
+        onColorHexChange(applied.colorHex)
+        onTextBackgroundFillRawChange(applied.backgroundFill.raw)
+        onVisualEffectRawChange(applied.effect.raw)
+        onTextStrokeRawChange(applied.stroke.raw)
+        // iOS fuerza thick otra vez para meme tras applyPreset (preset ya lo trae).
+        if (style == StoryTextStyle.MEME) {
+            onTextStrokeRawChange(StoryTextStroke.THICK.raw)
+        }
+        onForcesAllCapsChange(applied.forcesAllCaps)
         localReplayToken++
+        HapticManager.shared.lightImpact()
     }
 
     fun cycleTextBackgroundFill() {
         onTextBackgroundFillRawChange(
-            when (textBackgroundFillRaw.lowercase()) {
-                "none" -> "solid"
-                "solid" -> "inverted"
-                "inverted" -> "semiTransparent"
-                else -> "none"
-            },
+            StoryTextBackgroundFill.fromRaw(textBackgroundFillRaw).cycled().raw,
         )
+        HapticManager.shared.lightImpact()
     }
 
     fun cycleTextAlignment() {
@@ -198,14 +202,26 @@ fun StoryTextEditor(
                 else -> "leading"
             },
         )
+        HapticManager.shared.lightImpact()
     }
 
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(Unit) {
+        if (selectedStyle.usesAllCaps) onForcesAllCapsChange(true)
+        isTextFieldFocused = true
+    }
 
     Box(
         modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = .35f))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Black.copy(alpha = 0.28f),
+                        Color.Black.copy(alpha = 0.08f),
+                        Color.Black.copy(alpha = 0.45f),
+                    ),
+                ),
+            )
             .pointerInput(isEyedropperActive, mediaSampleImage) {
                 detectTapGestures { location ->
                     val image = mediaSampleImage
@@ -218,29 +234,62 @@ fun StoryTextEditor(
                             ),
                         )
                         isEyedropperActive = false
+                        HapticManager.shared.lightImpact()
+                    } else {
+                        // ≡ hideKeyboard() al tocar el fondo
+                        isTextFieldFocused = false
+                        focusManager.clearFocus()
+                        isColorPickerOpen = false
                     }
                 }
             },
     ) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val captureRect = creatorMomentsCaptureRect(
+                inSize = ComposeSize(
+                    constraints.maxWidth.toFloat(),
+                    constraints.maxHeight.toFloat(),
+                ),
+                topInsetPx = 0f,
+                bottomInsetPx = WindowInsets.navigationBars.getBottom(density).toFloat(),
+                density = density,
+            )
+            val chromeHeightPx = with(density) { 92.dp.toPx() }
+            val canvasBottomGap = (constraints.maxHeight - captureRect.bottom).coerceAtLeast(0f)
+            val centeredGapPadding = maxOf(
+                with(density) { 8.dp.toPx() },
+                (canvasBottomGap - chromeHeightPx) / 2f,
+            )
+            val bottomToolbarPadding = if (imeBottomPx > 0) {
+                with(density) { 8.dp.toPx() }
+            } else {
+                centeredGapPadding
+            }
+            val bottomToolbarPaddingDp = with(density) { bottomToolbarPadding.toDp() }
+
         if (isEyedropperActive) {
             Text(
-                text = "Tap photo to pick color",
+                text = stringResource(R.string.story_text_editor_eyedropper_hint),
                 color = Color.White,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 76.dp)
-                    .clip(CircleShape)
+                    .statusBarsPadding()
+                    .padding(top = 72.dp)
+                    .clip(RoundedCornerShape(percent = 50))
                     .background(Color.Black.copy(alpha = .65f))
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             )
         }
 
+        // ≡ top bar: X + Done capsule (no check icon)
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(14.dp)
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp)
+                .padding(top = 16.dp)
                 .align(Alignment.TopCenter),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -254,61 +303,35 @@ fun StoryTextEditor(
                 Icon(Icons.Filled.Close, null, tint = Color.White, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.weight(1f))
-            Box(
-                Modifier
-                    .size(42.dp)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .border(1.dp, Color.White.copy(alpha = .2f), CircleShape)
-                    .clickable(onClick = onDone),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(18.dp))
-            }
+            Text(
+                text = stringResource(R.string.story_text_editor_done),
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
+                    .clickable(onClick = onDone)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            )
         }
 
-        BasicTextField(
-            value = text,
-            onValueChange = { raw ->
+        StoryTextEditorInput(
+            text = text,
+            onTextChange = { raw ->
                 onTextChange(if (forcesAllCaps || selectedStyle.usesAllCaps) raw.uppercase() else raw)
             },
-            textStyle = LocalTextStyle.current.copy(
-                color = attributes.foreground,
-                background = attributes.background ?: Color.Transparent,
-                fontSize = textFontSize.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = attributes.letterSpacing.em,
-                textAlign = attributes.textAlign,
-                fontFamily = fontFamily,
-            ),
-            cursorBrush = SolidColor(attributes.foreground),
+            isFocused = isTextFieldFocused,
+            onFocusedChange = { isTextFieldFocused = it },
+            configuration = configuration,
+            motionRaw = textMotionRaw,
+            maxWidth = 280.dp,
+            replayToken = motionReplayToken,
+            placeholder = stringResource(R.string.story_editor_text_placeholder),
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
                 .padding(horizontal = 56.dp)
-                .shadow(
-                    elevation = if (visualEffectRaw in setOf("neon", "glow", "depth", "echo")) 8.dp else 0.dp,
-                    shape = CircleShape,
-                    ambientColor = textColor.copy(alpha = .65f),
-                    spotColor = textColor.copy(alpha = .65f),
-                )
-                .storyTextMotion(motionFrame.copy(typewriterProgress = motionFrame.typewriterProgress + localReplayToken * 0f))
-                .focusRequester(focusRequester)
-                .onFocusChanged { isTextFieldFocused = it.isFocused },
-            decorationBox = { inner ->
-                Box(contentAlignment = Alignment.Center) {
-                    if (text.isEmpty()) {
-                        Text(
-                            text = androidx.compose.ui.res.stringResource(R.string.story_editor_text_placeholder),
-                            color = attributes.foreground.copy(alpha = .45f),
-                            fontSize = textFontSize.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = attributes.textAlign,
-                            fontFamily = fontFamily,
-                        )
-                    }
-                    inner()
-                }
-            },
+                .padding(bottom = bottomToolbarPaddingDp),
         )
 
         if (isTextFieldFocused) {
@@ -317,7 +340,9 @@ fun StoryTextEditor(
                 onValueChange = onTextFontSizeChange,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 8.dp),
+                    .padding(start = 16.dp)
+                    .padding(bottom = bottomToolbarPaddingDp)
+                    .offset(y = fontSliderLift),
             )
         }
 
@@ -335,7 +360,9 @@ fun StoryTextEditor(
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 18.dp, vertical = 132.dp),
+                    .imePadding()
+                    .padding(horizontal = 18.dp)
+                    .padding(bottom = bottomToolbarPaddingDp + 120.dp),
             )
         }
 
@@ -377,11 +404,13 @@ fun StoryTextEditor(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 20.dp),
+                .imePadding()
+                .padding(horizontal = 12.dp)
+                .padding(bottom = bottomToolbarPaddingDp),
         )
+        } // BoxWithConstraints
     }
 }
-
 private val editorPalette = listOf(
     "FFFFFF", "000000", "FF3B30", "FF9500", "FFCC00", "34C759",
     "007AFF", "5856D6", "AF52DE", "FF2D55", "A2845E", "F2C94C",

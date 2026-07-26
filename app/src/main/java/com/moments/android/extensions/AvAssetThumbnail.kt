@@ -10,8 +10,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Port de `AVAssetImageGenerator+Thumbnail.swift`.
- * Equivalente Android con [MediaMetadataRetriever] (misma semántica que iOS: ~0.8s, máx. 480px).
+ * Helpers de thumbnail de vídeo (MediaMetadataRetriever).
+ *
+ * El Swift `AVAssetImageGenerator+Thumbnail.swift` está vacío (solo import);
+ * la semántica 0.8s / máx. 480px vive en iOS en `VideoThumbnailCache` y call sites.
+ * Aquí centralizamos el equivalente Android para cache/pipeline.
  */
 object AvAssetThumbnailDefaults {
     const val DEFAULT_TIME_US = 800_000L

@@ -1,43 +1,31 @@
 package com.moments.android.views.creator
-import android.net.Uri
+
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.moments.android.coordinators.CoordinatorNavigationEvent
+import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.models.StickerData
+import com.moments.android.utilities.MomentsAudioSession
 import com.moments.android.views.creator.creatorscreens.CaptionAndDetailsView
 import com.moments.android.views.creator.creatorscreens.ContentTypeSelectionView
-import com.moments.android.views.creator.creatorscreens.CreatorFlowPendingScreen
 import com.moments.android.views.creator.creatorscreens.MediaEditingView
 import com.moments.android.views.creator.creatorscreens.MediaSelectionView
 import com.moments.android.views.creator.creatorscreens.StoryCameraView
-import com.moments.android.views.creator.StoryEditingView
-import com.moments.android.views.story.RevealSurfaceView
 
 /**
- * Port de `CreatorView.swift` — orquestador de flujos.
+ * Port de `CreatorView.swift` — orquestador de flujos (MARK Main Creator View).
+ * Reveal sticker editor → [RevealStickerEditor.kt].
+ * Modelos compartidos → [CreatorSharedModels].
  */
 enum class CreatorFlow {
     TYPE_SELECTION,
@@ -54,66 +42,6 @@ enum class CreatorContentType {
     STORY,
 }
 
-/** Espejo de `CreatorMedia.AspectRatio` (CreatorSharedModels.swift). */
-enum class CreatorAspectRatio(val displayName: String, val ratio: Float) {
-    SQUARE("1:1", 1f),
-    PORTRAIT("4:5", 0.8f),
-    LANDSCAPE("16:9", 16f / 9f),
-    NINE_BY_SIXTEEN("9:16", 9f / 16f);
-
-    companion object {
-        fun fromRatio(imageRatio: Float): CreatorAspectRatio {
-            val tolerance = 0.15f
-            return when {
-                kotlin.math.abs(imageRatio - 0.5625f) < tolerance -> NINE_BY_SIXTEEN
-                kotlin.math.abs(imageRatio - 0.8f) < tolerance -> PORTRAIT
-                kotlin.math.abs(imageRatio - 1f) < tolerance -> SQUARE
-                kotlin.math.abs(imageRatio - 1.777f) < tolerance -> LANDSCAPE
-                imageRatio < 0.65f -> NINE_BY_SIXTEEN
-                imageRatio < 0.85f -> PORTRAIT
-                imageRatio < 1.15f -> SQUARE
-                else -> LANDSCAPE
-            }
-        }
-    }
-}
-
-/** Espejo de `CreatorMedia.StoryVideoMode` (CreatorSharedModels.swift). */
-enum class StoryVideoMode {
-    NORMAL,
-    TRIMMED,
-    AUTO_SPLIT,
-}
-
-/** Espejo de `CreatorMedia` (CreatorSharedModels.swift) para el flujo. */
-data class CreatorMedia(
-    val id: String = java.util.UUID.randomUUID().toString(),
-    val uri: Uri,
-    val isVideo: Boolean = false,
-    val durationSeconds: Double? = null,
-    /** `CreatorMedia.thumbnailURL` — custom video cover when the editor chooses one. */
-    val thumbnailUri: Uri? = null,
-    val storyVideoMode: StoryVideoMode = StoryVideoMode.NORMAL,
-    val aspectRatio: CreatorAspectRatio = CreatorAspectRatio.SQUARE,
-    val recommendedAspectRatio: CreatorAspectRatio? = null,
-    val hasEdits: Boolean = false,
-    /** Etiquetas espaciales — iOS `CreatorMedia.tags`. */
-    val tags: List<com.moments.android.models.PhotoTag> = emptyList(),
-) {
-    companion object {
-        /** iOS `CreatorMedia.maxMomentVideoDuration` = 5 min */
-        const val MAX_MOMENT_VIDEO_DURATION_SECONDS = 5.0 * 60.0
-    }
-}
-
-/** Álbumes MediaStore — espejo de `AlbumInfo` sin PHAssetCollection. */
-data class CreatorAlbumInfo(
-    val id: String,
-    val title: String,
-    val bucketId: String?,
-    val assetCount: Int,
-)
-
 @Composable
 fun CreatorView(
     showCreatorView: Boolean,
@@ -121,7 +49,7 @@ fun CreatorView(
     isCreatingStory: Boolean,
     onIsCreatingStoryChange: (Boolean) -> Unit,
     openInStoryMode: Boolean = false,
-    /** Hasta portar `StickerItem` UI de stickerview.swift; usamos StickerData. */
+    /** iOS `StickerItem`; Android [StickerData] hasta paridad total de stickerview. */
     initialSticker: StickerData? = null,
     initialMedia: List<CreatorMedia>? = null,
     startInCameraWhenOnlySticker: Boolean = false,
@@ -148,21 +76,103 @@ fun CreatorView(
             },
         )
     }
-    var selectedMediaItems by remember {
-        mutableStateOf(initialMedia.orEmpty())
-    }
+    var selectedMediaItems by remember { mutableStateOf(initialMedia.orEmpty()) }
     var storyStartsInTextMode by remember { mutableStateOf(false) }
+    // ≡ responseSticker
+    var responseSticker by remember { mutableStateOf(initialSticker) }
+    // ≡ pendingChain*
+    var pendingChainId by remember { mutableStateOf<String?>(null) }
+    var pendingChainTitle by remember { mutableStateOf<String?>(null) }
+    var pendingChainPosition by remember { mutableStateOf<Int?>(null) }
+    var skipContentTypeEffect by remember { mutableStateOf(true) }
 
-    DisposableEffect(Unit) {
+    fun applyFlow(flow: CreatorFlow) {
+        currentFlow = flow
+        onIsCreatingStoryChange(
+            flow == CreatorFlow.STORY_CAMERA || flow == CreatorFlow.STORY_EDITING,
+        )
+    }
+
+    fun cleanupVideoAndAudio() {
+        selectedMediaItems = emptyList()
+        MomentsAudioSession.deactivate()
+        NavigationEventBus.emit(CoordinatorNavigationEvent.CleanupVideoPlayer)
+    }
+
+    // ≡ onAppear setupResponseStickerListener + setupContinueChainListener
+    LaunchedEffect(Unit) {
         if (openInStoryMode || initialSticker != null || initialMedia != null) {
             onIsCreatingStoryChange(true)
         }
-        onDispose {
-            // iOS cleanupVideoAndAudio — se cablea al portar StoryCamera / editors
+        if (initialSticker != null && responseSticker == null) {
+            responseSticker = initialSticker
+        }
+        NavigationEventBus.events.collect { event ->
+            when (event) {
+                is CoordinatorNavigationEvent.AddResponseStickerToCreator -> {
+                    responseSticker = event.sticker
+                    contentType = CreatorContentType.STORY
+                    applyFlow(CreatorFlow.STORY_EDITING)
+                }
+                is CoordinatorNavigationEvent.ContinueStoryChain -> {
+                    contentType = CreatorContentType.STORY
+                    applyFlow(CreatorFlow.STORY_CAMERA)
+                    onIsCreatingStoryChange(true)
+                    pendingChainId = event.chainId
+                    pendingChainTitle = event.chainTitle
+                    pendingChainPosition = event.chainPosition
+                    NavigationEventBus.emit(
+                        CoordinatorNavigationEvent.SetChainContext(
+                            event.chainId,
+                            event.chainTitle,
+                            event.chainPosition,
+                        ),
+                    )
+                }
+                is CoordinatorNavigationEvent.SetContentType -> {
+                    if (event.contentType == "story") {
+                        contentType = CreatorContentType.STORY
+                        applyFlow(CreatorFlow.STORY_CAMERA)
+                        onIsCreatingStoryChange(true)
+                    }
+                }
+                is CoordinatorNavigationEvent.SetChainContext -> {
+                    pendingChainId = event.chainId
+                    pendingChainTitle = event.chainTitle
+                    pendingChainPosition = event.chainPosition
+                }
+                else -> Unit
+            }
         }
     }
 
-    androidx.compose.foundation.layout.Box(
+    // ≡ onChange(of: contentType) con guards iOS (no en el primer composition)
+    LaunchedEffect(contentType) {
+        if (skipContentTypeEffect) {
+            skipContentTypeEffect = false
+            return@LaunchedEffect
+        }
+        if (initialSticker != null || responseSticker != null) {
+            if (currentFlow == CreatorFlow.STORY_EDITING) return@LaunchedEffect
+        }
+        if (currentFlow != CreatorFlow.TYPE_SELECTION) return@LaunchedEffect
+        if (contentType == CreatorContentType.STORY) {
+            applyFlow(
+                if (initialMedia != null) CreatorFlow.STORY_EDITING else CreatorFlow.STORY_CAMERA,
+            )
+            onIsCreatingStoryChange(true)
+        } else {
+            applyFlow(CreatorFlow.MEDIA_SELECTION)
+            onIsCreatingStoryChange(false)
+        }
+    }
+
+    // ≡ onDisappear cleanup
+    DisposableEffect(Unit) {
+        onDispose { cleanupVideoAndAudio() }
+    }
+
+    Box(
         modifier
             .fillMaxSize()
             .background(Color.Black),
@@ -172,19 +182,13 @@ fun CreatorView(
                 contentType = contentType,
                 onContentTypeChange = { contentType = it },
                 currentFlow = currentFlow,
-                onCurrentFlowChange = { flow ->
-                    currentFlow = flow
-                    onIsCreatingStoryChange(flow == CreatorFlow.STORY_CAMERA || flow == CreatorFlow.STORY_EDITING)
-                },
+                onCurrentFlowChange = { applyFlow(it) },
                 onDismiss = { onShowCreatorViewChange(false) },
             )
             CreatorFlow.MEDIA_SELECTION -> MediaSelectionView(
                 selectedMediaItems = selectedMediaItems,
                 onSelectedMediaItemsChange = { selectedMediaItems = it },
-                onCurrentFlowChange = { flow ->
-                    currentFlow = flow
-                    onIsCreatingStoryChange(false)
-                },
+                onCurrentFlowChange = { currentFlow = it },
                 onDismiss = { onShowCreatorViewChange(false) },
             )
             CreatorFlow.MEDIA_EDITING -> MediaEditingView(
@@ -193,7 +197,7 @@ fun CreatorView(
                 onCurrentFlowChange = { currentFlow = it },
                 onDismiss = { onShowCreatorViewChange(false) },
             )
-            CreatorFlow.VIDEO_EDITING -> SocialVideoEditorView(
+            CreatorFlow.VIDEO_EDITING -> MediaEditingView(
                 selectedMediaItems = selectedMediaItems,
                 onSelectedMediaItemsChange = { selectedMediaItems = it },
                 onCurrentFlowChange = { currentFlow = it },
@@ -208,79 +212,29 @@ fun CreatorView(
             CreatorFlow.STORY_CAMERA -> StoryCameraView(
                 selectedMediaItems = selectedMediaItems,
                 onSelectedMediaItemsChange = { selectedMediaItems = it },
-                onCurrentFlowChange = { flow ->
-                    currentFlow = flow
-                    onIsCreatingStoryChange(flow == CreatorFlow.STORY_CAMERA || flow == CreatorFlow.STORY_EDITING)
-                },
+                onCurrentFlowChange = { applyFlow(it) },
                 onStoryStartsInTextModeChange = { storyStartsInTextMode = it },
                 onDismiss = { onShowCreatorViewChange(false) },
             )
             CreatorFlow.STORY_EDITING -> StoryEditingView(
                 selectedMediaItems = selectedMediaItems,
                 onSelectedMediaItemsChange = { selectedMediaItems = it },
-                onCurrentFlowChange = { flow ->
-                    currentFlow = flow
-                    onIsCreatingStoryChange(flow == CreatorFlow.STORY_CAMERA || flow == CreatorFlow.STORY_EDITING)
-                },
+                onCurrentFlowChange = { applyFlow(it) },
                 startInTextMode = storyStartsInTextMode,
                 onStartInTextModeChange = { storyStartsInTextMode = it },
+                initialSticker = responseSticker,
+                initialChainId = pendingChainId,
+                initialChainTitle = pendingChainTitle,
+                initialChainPosition = pendingChainPosition,
                 onDismiss = { onShowCreatorViewChange(false) },
             )
         }
     }
 
-    // Suppress unused until sticker/chain entry consume them (paridad iOS state).
     @Suppress("UNUSED_VARIABLE")
-    val keep = Pair(initialSticker, isCreatingStory)
+    val keepCreatingFlag = isCreatingStory
 }
 
-/** Primer bloque de `RevealStickerEditorView` de CreatorView.swift. */
-@Composable
-fun RevealStickerEditorView(
-    stickers: List<StoryStickerDraft>,
-    editingId: String?,
-    onEditingIdChange: (String?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val sticker = stickers.firstOrNull { it.id == editingId }
-    Box(modifier.fillMaxSize().clip(androidx.compose.foundation.shape.RoundedCornerShape(28.dp))) {
-        if (sticker != null) {
-            RevealSurfaceView(
-                type = sticker.revealType,
-                pattern = sticker.revealPattern,
-                primaryColor = sticker.revealPrimaryColor,
-                secondaryColor = sticker.revealSecondaryColor,
-                effectColor = sticker.revealEffectColor,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .background(Color.Black.copy(.35f), CircleShape)
-                    .clickable { onEditingIdChange(null) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.Close, null, tint = Color.White)
-            }
-            Spacer(Modifier.weight(1f))
-            Text("Customize Reveal", color = Color.White, fontSize = 17.sp)
-            Spacer(Modifier.weight(1f))
-            Text(
-                "Done",
-                color = Color.White,
-                fontSize = 15.sp,
-                modifier = Modifier
-                    .background(Color.Black.copy(.35f), CircleShape)
-                    .clickable { onEditingIdChange(null) }
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
-            )
-        }
-    }
-}
+// Reveal sticker editor → `RevealStickerEditor.kt` (MARK en CreatorView.swift).
+// ModernSelectionInterface / CornerBorders / RotationControl / ScaleControl:
+// 0 call sites en iOS (código muerto en el mismo archivo) — no portados.

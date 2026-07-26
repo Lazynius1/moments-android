@@ -2,7 +2,7 @@ package com.moments.android.views.messaging.services
 
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.MomentsApplication
-import com.moments.android.models.Conversation
+import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.messaging.LocalFirstMessagingSettings
 import com.moments.android.services.messaging.MessageCatchUpService
@@ -166,7 +166,7 @@ object ChatSessionEngine {
         val userId = currentUserId
         val cachedConversations = LocalPersistenceService.loadConversations()
         cachedConversations
-            .filter { it.readStatus[userId] != true }
+            .filter { !(it.readStatus[userId] ?: true) }
             .mapNotNull { it.id }
             .forEach { ids.add(it) }
 
@@ -185,7 +185,8 @@ object ChatSessionEngine {
         if (sessions.size < MAX_CACHED_SESSIONS) return
         val evictable = sessions.values
             .filter { it.conversation.id != excluding && it.conversation.id != activeConversationId }
-            .sortedBy { it.conversation.timestamp }
+            // ≡ iOS: timestamp ?? .distantPast
+            .sortedBy { it.conversation.timestamp?.time ?: Long.MIN_VALUE }
         evictable.take((sessions.size - MAX_CACHED_SESSIONS + 1).coerceAtLeast(0)).forEach { session ->
             val id = session.conversation.id ?: return@forEach
             session.stopListening()

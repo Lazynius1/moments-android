@@ -1,4 +1,5 @@
 package com.moments.android.views.creator.components
+
 import android.content.Context
 import android.graphics.Typeface
 import androidx.compose.runtime.Composable
@@ -14,11 +15,42 @@ import java.util.concurrent.ConcurrentHashMap
 object StoryFontRegistry {
     private val cache = ConcurrentHashMap<String, Typeface>()
 
+    val bundledFiles = listOf(
+        "BebasNeue-Regular",
+        "Lora-Regular",
+        "Anton-Regular",
+        "Pacifico-Regular",
+        "VarelaRound-Regular",
+        "BarlowCondensed-Bold",
+        "PlayfairDisplay-Bold",
+        "IBMPlexSerif-Regular",
+        "PoiretOne-Regular",
+        "Caveat-Bold",
+        "Bangers-Regular",
+        "DancingScript-Bold",
+        "CormorantGaramond-Italic",
+        "Oswald-Bold",
+        "Montserrat-Black",
+        "RobotoSlab-Bold",
+        "Satisfy-Regular",
+        "GreatVibes-Regular",
+        "PermanentMarker-Regular",
+        "IndieFlower-Regular",
+        "LeagueSpartan-Bold",
+        "Silkscreen-Regular",
+        "Audiowide-Regular",
+        "Monoton-Regular",
+        "Shrikhand-Regular",
+        "BlackOpsOne-Regular",
+        "AbrilFatface-Regular",
+    )
+
     fun typeface(context: Context, fileName: String?): Typeface {
         if (fileName.isNullOrBlank()) return Typeface.DEFAULT
-        return cache.getOrPut(fileName) {
+        val key = fileName.removeSuffix(".ttf")
+        return cache.getOrPut(key) {
             runCatching {
-                Typeface.createFromAsset(context.assets, "fonts/$fileName")
+                Typeface.createFromAsset(context.assets, "fonts/$key.ttf")
             }.getOrDefault(Typeface.DEFAULT)
         }
     }
@@ -31,6 +63,8 @@ fun rememberStoryFontFamily(style: StoryTextStyle): FontFamily {
         when {
             style.fontFile != null -> FontFamily(StoryFontRegistry.typeface(context, style.fontFile))
             style == StoryTextStyle.TYPEWRITER -> FontFamily.Monospace
+            style == StoryTextStyle.CHALK -> FontFamily.Default // iOS ChalkboardSE-Bold fallback
+            style == StoryTextStyle.CLEAN -> FontFamily.Default
             else -> FontFamily.Default
         }
     }

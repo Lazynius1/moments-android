@@ -14,10 +14,17 @@ import com.moments.android.views.creator.CreatorAspectRatio
 import com.moments.android.views.creator.CreatorMedia
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.util.UUID
 
 /**
- * Android photo-picker counterpart of `StoryMediaPicker.swift`.
- * The system picker owns its own scoped photo access, so no broad gallery permission is needed.
+ * Port de `StoryMediaPicker.swift` (PHPicker: images+videos, selectionLimit=1).
+ *
+ * iOS escribe el vídeo a temp porque el ItemProvider no da un file URL estable.
+ * Android Photo Picker entrega `content://` usable por MediaMetadataRetriever /
+ * Media3 / upload → **no** copiamos a cache al elegir (I/O innecesario).
+ * La copia local queda para [materializeStoryVideoIfNeeded] cuando un pipeline
+ * concreto exija fichero (p. ej. fallo raro de Transformer).
  */
 @Composable
 fun StoryMediaPicker(
@@ -38,10 +45,32 @@ fun StoryMediaPicker(
     }
 }
 
+/**
+ * Copia a cache solo si hace falta un path de fichero.
+ * No usar en el picker: el `content://` del sistema basta en el caso normal.
+ */
+fun materializeStoryVideoIfNeeded(context: Context, uri: Uri): Uri {
+    if (uri.scheme == "file") return uri
+    val type = context.contentResolver.getType(uri).orEmpty()
+    val looksVideo = type.startsWith("video") ||
+        uri.toString().endsWith(".mp4", ignoreCase = true) ||
+        uri.path?.endsWith(".mp4", ignoreCase = true) == true
+    if (!looksVideo) return uri
+    return runCatching {
+        val out = File(context.cacheDir, "temp_video_${UUID.randomUUID()}.mp4")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            FileOutputStream(out).use { output -> input.copyTo(output) }
+        } ?: return uri
+        Uri.fromFile(out)
+    }.getOrDefault(uri)
+}
+
 /** Shared media decoding for the one-item Story picker and Story camera. */
 fun storyMediaFromUri(context: Context, uri: Uri): CreatorMedia? {
     val type = context.contentResolver.getType(uri).orEmpty()
-    val isVideo = type.startsWith("video") || uri.toString().endsWith(".mp4", ignoreCase = true)
+    val isVideo = type.startsWith("video") ||
+        uri.toString().endsWith(".mp4", ignoreCase = true) ||
+        uri.path?.endsWith(".mp4", ignoreCase = true) == true
     return if (isVideo) {
         val retriever = MediaMetadataRetriever()
         try {

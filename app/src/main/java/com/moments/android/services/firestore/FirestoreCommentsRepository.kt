@@ -5,6 +5,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.Source
 import com.moments.android.models.Comment
 import com.moments.android.models.CommentMentionEntity
 import com.moments.android.models.CommentPayload
@@ -24,7 +25,8 @@ import java.util.UUID
 
 data class CommentsPage(val comments: List<Comment>, val lastDocument: DocumentSnapshot?)
 
-/** Port de FirestoreCommentsRepository.swift. Menciones/push vía NotificationService stub. */
+/** Port de FirestoreCommentsRepository.swift. */
+
 suspend fun FirestoreService.fetchComments(
     momentId: String,
     userId: String,
@@ -54,6 +56,7 @@ suspend fun FirestoreService.addComment(
     mentions: List<CommentMentionEntity>? = null,
 ) {
     val resolvedCommentId = commentId ?: UUID.randomUUID().toString()
+    val usesValidatedMentions = mentions != null
     val sanitizedMentions = sanitizeCommentMentions(mentions ?: emptyList(), content)
 
     if (shouldQueueFirestoreOutbox()) {
@@ -66,7 +69,6 @@ suspend fun FirestoreService.addComment(
             commentId = resolvedCommentId,
             mentions = sanitizedMentions,
         )
-        LocalPersistenceService.updateCommentCountLocally(momentId, increment = 1)
         LocalPersistenceService.saveAction(
             CachedAction(
                 id = UUID.randomUUID().toString(),
@@ -74,24 +76,25 @@ suspend fun FirestoreService.addComment(
                 payloadData = payload.encode(),
             ),
         )
+        LocalPersistenceService.updateCommentCountLocally(momentId, increment = 1)
         return
     }
 
     val user = fetchUser(authorId)
+    LocalPersistenceService.updateCommentCountLocally(momentId, increment = 1)
+
     val now = Date()
-    val commentData = buildMap<String, Any?> {
+    val commentData = buildMap<String, Any> {
         put("authorId", authorId)
         put("username", user.username)
         put("content", content)
         put("text", content)
         put("timestamp", Timestamp(now))
-        put("profileImagePath", user.profileImagePath)
-        put("updatedAt", null)
+        user.profileImagePath?.let { put("profileImagePath", it) }
         put("reactions", emptyMap<String, List<String>>())
         put("isEdited", false)
-        put("editedTimestamp", null)
         put("mentions", sanitizedMentions.map { it.toMap() })
-        put("parentCommentId", parentCommentId)
+        if (parentCommentId != null) put("parentCommentId", parentCommentId)
     }
     db.runBatch { batch ->
         val commentRef = db.collection("users").document(userId).collection("moments")
@@ -102,8 +105,48 @@ suspend fun FirestoreService.addComment(
             "commentCount", FieldValue.increment(1),
         )
     }.await()
-    LocalPersistenceService.updateCommentCountLocally(momentId, increment = 1)
-    // Menciones / reply notifications: NotificationService stub (servidor crea en producción).
+
+    suspend fun sendMentions(momentAuthorUsername: String?, excludedUserIds: Set<String>) {
+        if (usesValidatedMentions) {
+            handleEntityMentions(
+                sanitizedMentions,
+                momentId = momentId,
+                momentAuthorId = userId,
+                momentAuthorUsername = momentAuthorUsername,
+                commentId = resolvedCommentId,
+                fromUsername = user.username,
+                content = content,
+                excludedUserIds = excludedUserIds,
+            )
+        } else {
+            handleRegexMentions(
+                extractMentions(content),
+                momentId = momentId,
+                momentAuthorId = userId,
+                momentAuthorUsername = momentAuthorUsername,
+                commentId = resolvedCommentId,
+                fromUsername = user.username,
+                content = content,
+                excludedUserIds = excludedUserIds,
+            )
+        }
+    }
+
+    if (parentCommentId != null) {
+        val (parentAuthorId, momentAuthorUsername) = notifyCommentReply(
+            parentCommentId = parentCommentId,
+            replyCommentId = resolvedCommentId,
+            momentId = momentId,
+            momentAuthorId = userId,
+            fromUsername = user.username,
+            content = content,
+        )
+        val excluded = mutableSetOf(authorId)
+        if (parentAuthorId != null) excluded.add(parentAuthorId)
+        sendMentions(momentAuthorUsername, excluded)
+    } else {
+        sendMentions(fetchUsername(userId), setOf(authorId))
+    }
 }
 
 suspend fun FirestoreService.updateComment(
@@ -113,17 +156,68 @@ suspend fun FirestoreService.updateComment(
     content: String,
     mentions: List<CommentMentionEntity>? = null,
 ) {
-    val sanitizedMentions = sanitizeCommentMentions(mentions ?: emptyList(), content)
-    db.collection("users").document(userId).collection("moments")
+    val commentRef = db.collection("users").document(userId).collection("moments")
         .document(momentId).collection("comments").document(commentId)
-        .update(
-            mapOf(
-                "content" to content,
-                "isEdited" to true,
-                "editedTimestamp" to Timestamp(Date()),
-                "mentions" to sanitizedMentions.map { it.toMap() },
-            ),
-        ).await()
+    val snapshot = commentRef.get().await()
+    val usesValidatedMentions = mentions != null
+    @Suppress("UNCHECKED_CAST")
+    val data = snapshot.data as? Map<String, Any?>
+    val previousContent = data?.get("content") as? String ?: ""
+    val previousEntities = decodeCommentMentions(data?.get("mentions"))
+    val previousMentionUserIds = previousEntities.map { it.userId }.toSet()
+    val previousMentions = extractMentions(previousContent).map { it.lowercase() }.toSet()
+    val sanitizedMentions = sanitizeCommentMentions(mentions ?: emptyList(), content)
+
+    commentRef.update(
+        mapOf(
+            "content" to content,
+            "isEdited" to true,
+            "editedTimestamp" to Timestamp(Date()),
+            "mentions" to sanitizedMentions.map { it.toMap() },
+        ),
+    ).await()
+
+    val mentionsToNotify = sanitizedMentions.filter { it.userId !in previousMentionUserIds }
+    val regexMentions = extractMentions(content)
+    val newRegexMentions = regexMentions.filter { it.lowercase() !in previousMentions }
+
+    if (mentionsToNotify.isEmpty() &&
+        !(
+            !usesValidatedMentions &&
+                regexMentions.isNotEmpty() &&
+                sanitizedMentions.isEmpty() &&
+                newRegexMentions.isNotEmpty()
+            )
+    ) {
+        return
+    }
+
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+    val senderUsername = runCatching { fetchUserProfile(currentUserId).username }.getOrDefault("Alguien")
+
+    if (mentionsToNotify.isNotEmpty()) {
+        handleEntityMentions(
+            mentionsToNotify,
+            momentId = momentId,
+            momentAuthorId = userId,
+            momentAuthorUsername = null,
+            commentId = commentId,
+            fromUsername = senderUsername,
+            content = content,
+            excludedUserIds = setOf(currentUserId),
+        )
+    } else if (!usesValidatedMentions) {
+        handleRegexMentions(
+            newRegexMentions,
+            momentId = momentId,
+            momentAuthorId = userId,
+            momentAuthorUsername = null,
+            commentId = commentId,
+            fromUsername = senderUsername,
+            content = content,
+            excludedUserIds = setOf(currentUserId),
+        )
+    }
 }
 
 suspend fun FirestoreService.deleteComment(momentId: String, commentId: String, userId: String, authorId: String) {
@@ -142,6 +236,7 @@ suspend fun FirestoreService.deleteComment(momentId: String, commentId: String, 
     val commentRef = db.collection("users").document(userId).collection("moments")
         .document(momentId).collection("comments").document(commentId)
     if (!commentRef.get().await().exists()) error("Comment not found")
+    val momentRef = db.collection("users").document(userId).collection("moments").document(momentId)
     val nested = db.collection("users").document(userId).collection("moments")
         .document(momentId).collection("comments")
         .whereEqualTo("parentCommentId", commentId)
@@ -149,16 +244,10 @@ suspend fun FirestoreService.deleteComment(momentId: String, commentId: String, 
         .await()
     db.runBatch { batch ->
         batch.delete(commentRef)
-        batch.update(
-            db.collection("users").document(userId).collection("moments").document(momentId),
-            "commentCount", FieldValue.increment(-1),
-        )
+        batch.update(momentRef, "commentCount", FieldValue.increment(-1))
         for (nestedDoc in nested.documents) {
             batch.delete(nestedDoc.reference)
-            batch.update(
-                db.collection("users").document(userId).collection("moments").document(momentId),
-                "commentCount", FieldValue.increment(-1),
-            )
+            batch.update(momentRef, "commentCount", FieldValue.increment(-1))
             (nestedDoc.data?.get("authorId") as? String)?.let { replyAuthorId ->
                 NotificationService.removeNotification(
                     NotificationType.COMMENT, replyAuthorId, authorId,
@@ -188,9 +277,7 @@ suspend fun FirestoreService.addCommentReaction(
     if (existingReactions == null) {
         val initialReactions = mapOf(reaction to listOf(currentUserId))
         commentRef.update("reactions", initialReactions).await()
-        if (authorId != currentUserId) {
-            sendCommentReactionNotification(authorId, currentUserId, momentId, commentId, reaction)
-        }
+        sendCommentReactionNotification(authorId, currentUserId, momentId, commentId, reaction)
         return
     }
     val reactions = existingReactions.toMutableMap()
@@ -271,6 +358,60 @@ suspend fun FirestoreService.hasUserReactedToComment(
     return reactions[reaction]?.contains(currentUserId) == true
 }
 
+/**
+ * @return Pair(parentAuthorId, momentAuthorUsername)
+ */
+private suspend fun FirestoreService.notifyCommentReply(
+    parentCommentId: String,
+    replyCommentId: String,
+    momentId: String,
+    momentAuthorId: String,
+    fromUsername: String,
+    content: String,
+): Pair<String?, String?> {
+    val snap = db.collection("users").document(momentAuthorId).collection("moments")
+        .document(momentId).collection("comments").document(parentCommentId)
+        .get().await()
+    val parentAuthorId = snap.data?.get("authorId") as? String ?: return null to null
+    val momentAuthorUsername = fetchUsername(momentAuthorId)
+
+    if (canUserViewMoment(momentId, momentAuthorId, parentAuthorId)) {
+        NotificationService.sendInteractionNotification(
+            type = NotificationType.COMMENT,
+            targetUserId = parentAuthorId,
+            momentId = momentId,
+            commentId = replyCommentId,
+            reaction = content,
+            senderUsername = fromUsername,
+            mentionContext = "reply",
+            targetAuthorId = momentAuthorId,
+            targetAuthorUsername = momentAuthorUsername,
+        )
+    }
+    return parentAuthorId to momentAuthorUsername
+}
+
+private fun extractMentions(text: String): List<String> {
+    val regex = Regex("""@(\w+)""")
+    return regex.findAll(text).map { it.groupValues[1] }.toList()
+}
+
+private fun decodeCommentMentions(value: Any?): List<CommentMentionEntity> {
+    val raw = value as? List<*> ?: return emptyList()
+    return raw.mapNotNull { item ->
+        @Suppress("UNCHECKED_CAST")
+        val data = item as? Map<String, Any?> ?: return@mapNotNull null
+        val userId = data["userId"] as? String ?: return@mapNotNull null
+        val username = data["username"] as? String ?: return@mapNotNull null
+        CommentMentionEntity(
+            userId = userId,
+            username = username,
+            rangeStart = (data["rangeStart"] as? Number)?.toInt() ?: 0,
+            rangeLength = (data["rangeLength"] as? Number)?.toInt() ?: 0,
+        )
+    }
+}
+
 private fun sanitizeCommentMentions(mentions: List<CommentMentionEntity>, text: String): List<CommentMentionEntity> {
     val seen = mutableSetOf<String>()
     val sanitized = mutableListOf<CommentMentionEntity>()
@@ -285,11 +426,75 @@ private fun sanitizeCommentMentions(mentions: List<CommentMentionEntity>, text: 
     return sanitized
 }
 
+private suspend fun FirestoreService.handleRegexMentions(
+    mentions: List<String>,
+    momentId: String,
+    momentAuthorId: String,
+    momentAuthorUsername: String?,
+    commentId: String,
+    fromUsername: String,
+    content: String,
+    excludedUserIds: Set<String>,
+) {
+    for (mention in mentions.map { it.lowercase() }.toSet()) {
+        val snap = db.collection("users")
+            .whereEqualTo("username", mention.lowercase())
+            .get(Source.DEFAULT)
+            .await()
+        val userDoc = snap.documents.firstOrNull() ?: continue
+        val mentionedUserId = userDoc.id
+        if (mentionedUserId in excludedUserIds) continue
+        if (!canUserViewMoment(momentId, momentAuthorId, mentionedUserId)) continue
+        NotificationService.sendCommentMentionNotification(
+            targetUserId = mentionedUserId,
+            momentId = momentId,
+            momentAuthorId = momentAuthorId,
+            momentAuthorUsername = momentAuthorUsername,
+            commentId = commentId,
+            commentText = content,
+            senderUsername = fromUsername,
+        )
+    }
+}
+
+private suspend fun FirestoreService.handleEntityMentions(
+    mentions: List<CommentMentionEntity>,
+    momentId: String,
+    momentAuthorId: String,
+    momentAuthorUsername: String?,
+    commentId: String,
+    fromUsername: String,
+    content: String,
+    excludedUserIds: Set<String>,
+) {
+    for (mention in mentions) {
+        val mentionedUserId = mention.userId
+        if (mentionedUserId in excludedUserIds) continue
+        if (!canUserViewMoment(momentId, momentAuthorId, mentionedUserId)) continue
+        NotificationService.sendCommentMentionNotification(
+            targetUserId = mentionedUserId,
+            momentId = momentId,
+            momentAuthorId = momentAuthorId,
+            momentAuthorUsername = momentAuthorUsername,
+            commentId = commentId,
+            commentText = content,
+            senderUsername = fromUsername,
+        )
+    }
+}
+
+private suspend fun FirestoreService.fetchUsername(userId: String): String? {
+    if (userId.isEmpty()) return null
+    val snap = db.collection("users").document(userId).get().await()
+    return snap.data?.get("username") as? String
+}
+
 internal suspend fun FirestoreService.canUserViewMoment(
     momentId: String,
     momentAuthorId: String,
     viewerId: String,
 ): Boolean {
+    if (momentId.isEmpty() || momentAuthorId.isEmpty() || viewerId.isEmpty()) return false
     if (momentAuthorId == viewerId) return true
     val snap = db.collection("users").document(momentAuthorId)
         .collection("moments").document(momentId).get().await()
@@ -306,6 +511,7 @@ internal suspend fun FirestoreService.canUserViewMoment(
         }
         ContentAudience.CUSTOM_LIST.raw -> {
             val listId = data["customListId"] as? String ?: return false
+            if (listId.isEmpty()) return false
             val members = fetchCustomListMembers(listId, momentAuthorId)
             ContentVisibilityService.canUserSeeContent(
                 momentAuthorId, viewerId, ContentVisibilityType.CUSTOM, members,
@@ -326,17 +532,14 @@ internal suspend fun FirestoreService.canUserViewMoment(
 private suspend fun FirestoreService.fetchCustomMomentAudience(momentId: String, authorId: String): List<String> {
     val ref = db.collection("users").document(authorId).collection("customAudiences")
     val specific = ref.document("moment_$momentId").get().await()
-    @Suppress("UNCHECKED_CAST")
     val specificUsers = (specific.data?.get("allowedUsers") as? List<*>)?.filterIsInstance<String>()
     if (!specificUsers.isNullOrEmpty()) return specificUsers
     val default = ref.document("default_moment").get().await()
-    @Suppress("UNCHECKED_CAST")
     return (default.data?.get("allowedUsers") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 }
 
 private suspend fun FirestoreService.fetchCustomListMembers(listId: String, ownerId: String): List<String> {
     val snap = db.collection("users").document(ownerId)
         .collection("customAudienceLists").document(listId).get().await()
-    @Suppress("UNCHECKED_CAST")
     return (snap.data?.get("members") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 }

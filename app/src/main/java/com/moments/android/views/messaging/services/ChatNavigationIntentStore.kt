@@ -1,57 +1,95 @@
 package com.moments.android.views.messaging.services
 
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+
+/** ≡ Notification.Name.chatMessageReactionHighlight */
+data class ChatReactionHighlightEvent(val conversationId: String, val messageId: String)
+
+/** ≡ Notification.Name.chatBuzzHighlight */
+data class ChatBuzzHighlightEvent(val conversationId: String, val buzzEventId: String?)
+
 /**
- * Port mínimo de ChatNavigationIntentStore.swift — intenciones al abrir chat desde push.
+ * Port de `ChatNavigationIntentStore.swift`.
+ * Intenciones al abrir un chat desde push (scroll, zumbido, resaltar mensaje).
+ * Peek al entrar; clear solo al procesar — nunca consumir en el init de la vista.
+ * SharedFlows ≡ NotificationCenter de los dos `Notification.Name` del mismo archivo Swift.
  */
 object ChatNavigationIntentStore {
     data class OpenIntent(
-        var playBuzzOnOpen: Boolean = false,
-        var buzzEventId: String? = null,
-        val highlightMessageIds: MutableSet<String> = mutableSetOf(),
+        val playBuzzOnOpen: Boolean = false,
+        val buzzEventId: String? = null,
+        val highlightMessageIds: Set<String> = emptySet(),
     )
 
     private val lock = Any()
     private val pending = mutableMapOf<String, OpenIntent>()
 
-    private fun updateIntent(conversationId: String, update: (OpenIntent) -> Unit) {
-        if (conversationId.isBlank()) return
+    private val _messageReactionHighlight =
+        MutableSharedFlow<ChatReactionHighlightEvent>(extraBufferCapacity = 16)
+    val messageReactionHighlight: SharedFlow<ChatReactionHighlightEvent> =
+        _messageReactionHighlight.asSharedFlow()
+
+    private val _chatBuzzHighlight =
+        MutableSharedFlow<ChatBuzzHighlightEvent>(extraBufferCapacity = 16)
+    val chatBuzzHighlight: SharedFlow<ChatBuzzHighlightEvent> =
+        _chatBuzzHighlight.asSharedFlow()
+
+    fun emitMessageReactionHighlight(conversationId: String, messageId: String) {
+        _messageReactionHighlight.tryEmit(ChatReactionHighlightEvent(conversationId, messageId))
+    }
+
+    fun emitChatBuzzHighlight(conversationId: String, buzzEventId: String?) {
+        _chatBuzzHighlight.tryEmit(ChatBuzzHighlightEvent(conversationId, buzzEventId))
+    }
+
+    private fun updateIntent(conversationId: String, update: (OpenIntent) -> OpenIntent) {
+        if (conversationId.isEmpty()) return
         synchronized(lock) {
-            val intent = pending.getOrPut(conversationId) { OpenIntent() }
-            update(intent)
-            pending[conversationId] = intent
+            pending[conversationId] = update(pending[conversationId] ?: OpenIntent())
         }
     }
 
     fun enqueueHighlight(conversationId: String, messageId: String) {
-        if (messageId.isBlank()) return
-        updateIntent(conversationId) { it.highlightMessageIds.add(messageId) }
+        if (messageId.isEmpty()) return
+        updateIntent(conversationId) {
+            it.copy(highlightMessageIds = it.highlightMessageIds + messageId)
+        }
     }
 
     fun enqueueBuzz(conversationId: String, buzzEventId: String? = null) {
         updateIntent(conversationId) {
-            it.playBuzzOnOpen = true
-            if (!buzzEventId.isNullOrBlank()) it.buzzEventId = buzzEventId
+            it.copy(
+                playBuzzOnOpen = true,
+                buzzEventId = if (!buzzEventId.isNullOrEmpty()) buzzEventId else it.buzzEventId,
+            )
         }
     }
 
     fun clearBuzz(conversationId: String) {
         updateIntent(conversationId) {
-            it.playBuzzOnOpen = false
-            it.buzzEventId = null
+            it.copy(playBuzzOnOpen = false, buzzEventId = null)
         }
     }
 
     fun clearHighlights(conversationId: String) {
-        updateIntent(conversationId) { it.highlightMessageIds.clear() }
+        updateIntent(conversationId) {
+            it.copy(highlightMessageIds = emptySet())
+        }
     }
 
     fun peek(conversationId: String): OpenIntent? {
-        if (conversationId.isBlank()) return null
-        synchronized(lock) { return pending[conversationId]?.copy(highlightMessageIds = pending[conversationId]!!.highlightMessageIds.toMutableSet()) }
+        if (conversationId.isEmpty()) return null
+        synchronized(lock) {
+            return pending[conversationId]
+        }
     }
 
     fun clear(conversationId: String) {
-        if (conversationId.isBlank()) return
-        synchronized(lock) { pending.remove(conversationId) }
+        if (conversationId.isEmpty()) return
+        synchronized(lock) {
+            pending.remove(conversationId)
+        }
     }
 }

@@ -212,7 +212,7 @@ private fun FirestoreService.makeStoryPayload(
     story: Story,
     textPosition: Point?,
     stickers: List<StickerData>?,
-): Map<String, Any?> {
+): Map<String, Any> {
     val storyData = story.toMap().toMutableMap()
     storyData.remove("stickers")
     storyData.remove("textPosition")
@@ -220,24 +220,34 @@ private fun FirestoreService.makeStoryPayload(
         storyData["textPositionX"] = it.x
         storyData["textPositionY"] = it.y
     }
+    // iOS re-escribe estos campos tras el encode.
+    story.textPositionNormX?.let { storyData["textPositionNormX"] = it }
+    story.textPositionNormY?.let { storyData["textPositionNormY"] = it }
+    story.textLayerOrder?.let { storyData["textLayerOrder"] = it }
     story.textOverlays?.let { overlays ->
         storyData["textOverlays"] = overlays.map { overlay ->
-            mapOf(
-                "id" to overlay.id,
-                "text" to overlay.text,
-                "normalizedPosition" to mapOf("x" to overlay.normalizedPosition.x, "y" to overlay.normalizedPosition.y),
-                "layerOrder" to overlay.layerOrder,
-                "styleRaw" to overlay.styleRaw,
-                "colorHex" to overlay.colorHex,
-                "fontSize" to overlay.fontSize,
-                "alignmentRaw" to overlay.alignmentRaw,
-                "backgroundFillRaw" to overlay.backgroundFillRaw,
-                "strokeRaw" to overlay.strokeRaw,
-                "visualEffectRaw" to overlay.visualEffectRaw,
-                "motionRaw" to overlay.motionRaw,
-                "forcesAllCaps" to overlay.forcesAllCaps,
-                "isLiveOverlay" to overlay.isLiveOverlay,
-            )
+            buildMap<String, Any> {
+                put("id", overlay.id)
+                put("text", overlay.text)
+                put(
+                    "normalizedPosition",
+                    mapOf(
+                        "x" to overlay.normalizedPosition.x,
+                        "y" to overlay.normalizedPosition.y,
+                    ),
+                )
+                put("layerOrder", overlay.layerOrder)
+                put("styleRaw", overlay.styleRaw)
+                overlay.colorHex?.let { put("colorHex", it) }
+                overlay.fontSize?.let { put("fontSize", it) }
+                overlay.alignmentRaw?.let { put("alignmentRaw", it) }
+                overlay.backgroundFillRaw?.let { put("backgroundFillRaw", it) }
+                overlay.strokeRaw?.let { put("strokeRaw", it) }
+                overlay.visualEffectRaw?.let { put("visualEffectRaw", it) }
+                overlay.motionRaw?.let { put("motionRaw", it) }
+                put("forcesAllCaps", overlay.forcesAllCaps)
+                put("isLiveOverlay", overlay.isLiveOverlay)
+            }
         }
     }
     stickers?.let { storyData["stickers"] = it.map { s -> serializedStorySticker(s) } }
@@ -258,10 +268,61 @@ private fun FirestoreService.makeStoryPayload(
     return storyData
 }
 
-private fun serializedStorySticker(sticker: StickerData): Map<String, Any?> = sticker.toMap()
+private fun serializedStorySticker(sticker: StickerData): Map<String, Any> = buildMap {
+    // iOS escribe positionX/positionY (no mapa `position`).
+    put("type", sticker.type)
+    put("content", sticker.content)
+    put("positionX", sticker.position.x)
+    put("positionY", sticker.position.y)
+    put("scale", sticker.scale)
+    put("rotation", sticker.rotation)
+    sticker.zIndex?.let { put("zIndex", it) }
+    sticker.stickerId?.let { put("stickerId", it) }
+    sticker.username?.let { put("username", it) }
+    sticker.userId?.let { put("userId", it) }
+    sticker.hashtag?.let { put("hashtag", it) }
+    sticker.location?.let { put("location", it) }
+    if (sticker.latitude != null && sticker.longitude != null) {
+        put("latitude", sticker.latitude)
+        put("longitude", sticker.longitude)
+    }
+    sticker.styleVariant?.let { put("styleVariant", it) }
+    sticker.questionText?.let { put("questionText", it) }
+    sticker.pollOptions?.let { put("pollOptions", it) }
+    sticker.weatherSymbol?.let { put("weatherSymbol", it) }
+    sticker.linkURL?.let { put("linkURL", it) }
+    sticker.linkTitle?.let { put("linkTitle", it) }
+    sticker.countdownTitle?.let { put("countdownTitle", it) }
+    sticker.countdownTargetAtMs?.let { put("countdownTargetAtMs", it) }
+    sticker.sliderEmoji?.let { put("sliderEmoji", it) }
+    sticker.sliderPrompt?.let { put("sliderPrompt", it) }
+    sticker.caption?.let { put("caption", it) }
+    sticker.profileImagePath?.let { put("profileImagePath", it) }
+    sticker.momentId?.let { put("momentId", it) }
+    sticker.mediaCount?.let { put("mediaCount", it) }
+    sticker.quizQuestion?.let { put("quizQuestion", it) }
+    sticker.quizOptions?.let { put("quizOptions", it) }
+    sticker.quizCorrectIndex?.let { put("quizCorrectIndex", it) }
+    sticker.revealType?.let { put("revealType", it) }
+    sticker.revealPattern?.let { put("revealPattern", it) }
+    sticker.revealPrimaryColor?.let { put("revealPrimaryColor", it) }
+    sticker.revealSecondaryColor?.let { put("revealSecondaryColor", it) }
+    sticker.revealEffectColor?.let { put("revealEffectColor", it) }
+    sticker.frameStyle?.let { put("frameStyle", it) }
+    sticker.contentScale?.let { put("contentScale", it) }
+    sticker.contentOffsetX?.let { put("contentOffsetX", it) }
+    sticker.contentOffsetY?.let { put("contentOffsetY", it) }
+    sticker.audioURL?.let { put("audioURL", it) }
+    sticker.audioDuration?.let { put("audioDuration", it) }
+    if (sticker.isAnimated) {
+        put("isAnimated", true)
+        sticker.gifURL?.let { put("gifURL", it.toString()) }
+        sticker.videoURL?.let { put("videoURL", it) }
+    }
+}
 
 private suspend fun FirestoreService.applyChainConfiguration(
-    storyData: MutableMap<String, Any?>,
+    storyData: MutableMap<String, Any>,
     userId: String,
     chainId: String?,
     chainPosition: Int?,
@@ -506,13 +567,16 @@ suspend fun FirestoreService.updateHighlight(
     storyIds: List<String>,
     coverImageUrl: String?,
 ) {
+    val updateData = buildMap<String, Any> {
+        put("title", title)
+        put("storyIds", storyIds)
+        put("storiesCount", storyIds.size)
+        // iOS escribe `coverImageUrl as Any` (null → NSNull). En Android null no vale en update.
+        if (coverImageUrl != null) put("coverImageUrl", coverImageUrl)
+        else put("coverImageUrl", FieldValue.delete())
+    }
     db.collection("users").document(userId).collection("highlights").document(highlightId)
-        .update(mapOf(
-            "title" to title,
-            "storyIds" to storyIds,
-            "storiesCount" to storyIds.size,
-            "coverImageUrl" to coverImageUrl,
-        )).await()
+        .update(updateData).await()
 }
 
 suspend fun FirestoreService.prefetchStoriesForUser(userId: String) {
@@ -530,16 +594,23 @@ suspend fun FirestoreService.prefetchStoriesForUser(userId: String) {
     val authorized = coroutineScope {
         stories.map { story ->
             async {
+                // Mapeo de audiencia idéntico a prefetchStoriesForUser.swift
                 val visibilityType = when (story.audience) {
+                    "everyone" -> ContentVisibilityType.EVERYONE
                     "mutuals" -> ContentVisibilityType.MUTUALS
                     "bestFriends" -> ContentVisibilityType.BEST_FRIENDS
                     "custom", "customList" -> ContentVisibilityType.CUSTOM
                     "onlyMe" -> ContentVisibilityType.ONLY_ME
                     else -> ContentVisibilityType.EVERYONE
                 }
+                // iOS: customListId != nil ? [id] : []  (lista vacía, no nil)
+                val customViewers = story.customListId?.let { listOf(it) } ?: emptyList()
                 val canSee = ContentVisibilityService.canUserSeeContent(
-                    story.authorId, currentUserId, visibilityType,
-                    story.customListId?.let { listOf(it) },
+                    contentOwnerId = story.authorId,
+                    viewerId = currentUserId,
+                    contentType = visibilityType,
+                    customViewers = customViewers,
+                    hiddenFrom = emptyList(),
                 )
                 if (canSee) story else null
             }

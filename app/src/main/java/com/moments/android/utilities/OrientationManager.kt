@@ -54,7 +54,8 @@ class OrientationManager private constructor() : SensorEventListener {
         if (activeConsumers != 1) return
         val manager = sensorManager ?: return
         val sensor = accelerometer ?: return
-        manager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+        // ≡ iOS accelerometerUpdateInterval = 0.3
+        manager.registerListener(this, sensor, 300_000)
     }
 
     fun stopTracking() {

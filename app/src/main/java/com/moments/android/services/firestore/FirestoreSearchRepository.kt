@@ -1,16 +1,33 @@
 package com.moments.android.services.firestore
 
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldPath
-import com.google.firebase.firestore.Query
 import com.moments.android.models.AppUser
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.tasks.await
 
-/** Port de FirestoreSearchRepository.swift. */
+/**
+ * Port de FirestoreSearchRepository.swift.
+ * `fetchUsers` / `fetchMutedUserIds` viven en FirestoreService.kt (mismo API).
+ * `fetchPublicUsersForExplore` = helper de ExploreViewModel.swift (no está en este .swift).
+ */
 suspend fun FirestoreService.searchUsers(query: String, limit: Int = 10): List<AppUser> {
+    // Port de searchUsers(query:limit:) — limit Firestore 20, luego prefix(limit).
+    if (query.isEmpty()) return emptyList()
+    val lower = query.lowercase()
+    val snap = db.collection("users")
+        .whereGreaterThanOrEqualTo("username", lower)
+        .whereLessThanOrEqualTo("username", lower + "\uF8FF")
+        .limit(20)
+        .get()
+        .await()
+    val users = snap.documents.mapNotNull { doc ->
+        @Suppress("UNCHECKED_CAST")
+        runCatching { AppUser.from(doc.id, doc.data as Map<String, Any?>) }.getOrNull()
+    }
+    return applySearchMuteFilterIfNeeded(users).take(limit.coerceAtLeast(1))
+}
+
+/** Port de searchUsers(query:) sin limit — trim + exclude self + limit 30. */
+suspend fun FirestoreService.searchUsersUncapped(query: String): List<AppUser> {
     val cleanQuery = query.lowercase().trim()
     if (cleanQuery.isEmpty()) return emptyList()
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
@@ -24,7 +41,7 @@ suspend fun FirestoreService.searchUsers(query: String, limit: Int = 10): List<A
         @Suppress("UNCHECKED_CAST")
         runCatching { AppUser.from(doc.id, doc.data as Map<String, Any?>) }.getOrNull()
     }.filter { it.id != currentUserId }
-    return applySearchMuteFilterIfNeeded(users).take(limit.coerceAtLeast(1))
+    return applySearchMuteFilterIfNeeded(users)
 }
 
 suspend fun FirestoreService.fetchUsersInBatches(userIds: List<String>): List<AppUser> {
@@ -41,7 +58,7 @@ suspend fun FirestoreService.fetchUserDataForNova(userId: String): AppUser = fet
 suspend fun FirestoreService.fetchSuggestedUsers(): List<AppUser> =
     fetchNewConversationSuggestions(recentPartnerIds = emptyList())
 
-/** Usuarios públicos para Explore (fallback iOS `fetchPopularUsersForExplore`). */
+/** Port de ExploreViewModel.fetchPopularUsersForExplore (privado en iOS). */
 suspend fun FirestoreService.fetchPublicUsersForExplore(
     excludingUserId: String,
     limit: Int = 30,
@@ -63,10 +80,11 @@ suspend fun FirestoreService.fetchNewConversationSuggestions(
     limit: Int = 40,
 ): List<AppUser> {
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return emptyList()
-    val orderedRecentIds = recentPartnerIds
-        .map { it.trim() }
-        .filter { it.isNotEmpty() && it != currentUserId }
-        .distinct()
+    val orderedRecentIds = uniquePreservingOrder(
+        recentPartnerIds
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && it != currentUserId },
+    )
 
     val recentUsers = if (orderedRecentIds.isNotEmpty()) {
         runCatching { fetchUsers(orderedRecentIds) }.getOrDefault(emptyList())
@@ -80,6 +98,11 @@ suspend fun FirestoreService.fetchNewConversationSuggestions(
         orderedRecentIds, recentUsers, mutualUsers, followingUsers, currentUserId, limit,
     )
     return applySearchMuteFilterIfNeeded(merged)
+}
+
+private fun uniquePreservingOrder(values: List<String>): List<String> {
+    val seen = mutableSetOf<String>()
+    return values.filter { seen.add(it) }
 }
 
 private fun mergeNewConversationSuggestions(
@@ -112,7 +135,10 @@ private suspend fun FirestoreService.applySearchMuteFilterIfNeeded(users: List<A
     val hideFromSearch = muteSettings["hideFromSearch"] as? Boolean ?: false
     if (!hideFromSearch) return users
     @Suppress("UNCHECKED_CAST")
-    val mutedUsers = (muteSettings["mutedUsers"] as? List<*>)?.filterIsInstance<String>()?.toSet().orEmpty()
+    val mutedUsers = (muteSettings["mutedUsers"] as? List<*>)?.filterIsInstance<String>()
+        ?.filter { it.isNotEmpty() }
+        ?.toSet()
+        .orEmpty()
     if (mutedUsers.isEmpty()) return users
     return users.filter { it.id !in mutedUsers }
 }

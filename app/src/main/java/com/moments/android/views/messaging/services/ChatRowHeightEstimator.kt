@@ -5,8 +5,8 @@ import android.text.StaticLayout
 import android.text.TextPaint
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.components.ChatTextBubbleMetrics
 import com.moments.android.views.messaging.components.ClusterMediaLayout
 import com.moments.android.views.messaging.core.ChatRenderRow
@@ -15,18 +15,25 @@ import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
-/** Estimaciones de altura previas a la medición real de las filas del chat. */
+/**
+ * Port de `ChatRowHeightEstimator.swift`.
+ * Estimaciones previas a la medición real (UICollectionView estimatedHeights / LazyColumn).
+ *
+ * Unidades: se trabaja en “pt” vía `Dp.value` (1:1 como CGFloat iOS). StaticLayout mide
+ * en ese espacio ficticio; el resultado se reinterpreta como Dp — no usar px de pantalla.
+ */
 object ChatRowHeightEstimator {
-    private const val baseFontSize = 15f
+    private val maxBubbleWidthFraction = ChatTextBubbleMetrics.maxWidthFraction
     private val textHorizontalPadding = ChatTextBubbleMetrics.horizontalPadding * 2
     private val textVerticalPadding = ChatTextBubbleMetrics.verticalPadding * 2
+    private const val BASE_FONT_SIZE = 15f
     private val replyBlockHeight = 46.dp
     private val reactionsRowHeight = 28.dp
 
-    private const val mediaDefaultAspect = 4f / 5f
+    private const val MEDIA_DEFAULT_ASPECT = 4f / 5f
     private val mediaMinHeight = 140.dp
     private val mediaMaxHeight = 420.dp
-    private const val gifDefaultAspect = 200f / 150f
+    private const val GIF_DEFAULT_ASPECT = 200f / 150f
 
     private val voiceNoteHeight = 68.dp
     private val locationHeight = 205.dp
@@ -48,14 +55,17 @@ object ChatRowHeightEstimator {
     val fallbackHeight = 60.dp
 
     fun estimatedHeight(row: ChatRenderRow, containerWidth: Dp): Dp {
-        val bubbleWidth = maxOf(120.dp, containerWidth * ChatTextBubbleMetrics.maxWidthFraction)
+        val bubbleWidth = maxOf(120.dp, containerWidth * maxBubbleWidthFraction)
         return when (row) {
             is ChatRenderRow.ConversationIntro -> conversationIntroHeight
             is ChatRenderRow.RequestDisclaimer -> requestDisclaimerHeight
             is ChatRenderRow.PendingRequestMessage -> {
                 val text = row.message.text.trim()
-                if (text.isEmpty()) viewOncePillHeight + viewOnceRowVerticalPadding
-                else maxOf(46.dp, textHeight(text, bubbleWidth) + 6.dp)
+                if (text.isEmpty()) {
+                    viewOncePillHeight + viewOnceRowVerticalPadding
+                } else {
+                    maxOf(46.dp, textHeight(text, bubbleWidth, minAvailableWidth = 80f) + 6.dp)
+                }
             }
             is ChatRenderRow.Header -> headerHeight
             is ChatRenderRow.Buzz -> buzzHeight
@@ -65,12 +75,19 @@ object ChatRowHeightEstimator {
         }
     }
 
-    private fun textHeight(text: String, bubbleWidth: Dp): Dp {
-        val availableWidth = max(80f, bubbleWidth.value - textHorizontalPadding.value)
-        val paint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply { textSize = baseFontSize }
-        val layout = StaticLayout.Builder.obtain(text, 0, text.length, paint, availableWidth.toInt())
+    /**
+     * ≡ `textHeight(for:bubbleWidth:)` simple — min available width 80.
+     * Mensaje usa min 40 (ver overload de mensaje).
+     */
+    private fun textHeight(text: String, bubbleWidth: Dp, minAvailableWidth: Float): Dp {
+        val availableWidth = max(minAvailableWidth, bubbleWidth.value - textHorizontalPadding.value)
+        val paint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply { textSize = BASE_FONT_SIZE }
+        val widthPx = max(1, availableWidth.toInt())
+        val layout = StaticLayout.Builder
+            .obtain(text, 0, text.length, paint, widthPx)
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
             .setIncludePad(true)
+            .setLineSpacing(0f, 1f)
             .build()
         return ceil(layout.height.toDouble()).toFloat().dp + textVerticalPadding
     }
@@ -90,10 +107,14 @@ object ChatRowHeightEstimator {
 
     private fun estimatedHeight(message: EnhancedMessage, bubbleWidth: Dp): Dp = when (message.type) {
         MessageType.TEXT -> textHeight(message, bubbleWidth)
-        MessageType.IMAGE, MessageType.VIDEO -> mediaHeight(message, bubbleWidth, mediaDefaultAspect)
-        MessageType.GIF, MessageType.STICKER -> mediaHeight(message, bubbleWidth, gifDefaultAspect)
+        MessageType.IMAGE, MessageType.VIDEO ->
+            mediaHeight(message, bubbleWidth, MEDIA_DEFAULT_ASPECT)
+        MessageType.GIF, MessageType.STICKER ->
+            mediaHeight(message, bubbleWidth, GIF_DEFAULT_ASPECT)
         MessageType.AUDIO -> voiceNoteHeight
-        MessageType.LOCATION -> locationHeight + if (message.isLiveLocation == true) liveLocationExtraHeight else 0.dp
+        MessageType.LOCATION ->
+            if (message.isLiveLocation == true) locationHeight + liveLocationExtraHeight
+            else locationHeight
         MessageType.FILE -> fileHeight
         MessageType.VIEW_ONCE_IMAGE, MessageType.VIEW_ONCE_VIDEO -> viewOnceHeight(message)
         MessageType.EPHEMERAL -> ephemeralHeight
@@ -102,29 +123,48 @@ object ChatRowHeightEstimator {
     }
 
     private fun textHeight(message: EnhancedMessage, bubbleWidth: Dp): Dp {
-        if (message.content.isNullOrEmpty()) return fallbackHeight
-        var height = textHeight(message.content, bubbleWidth)
+        val text = message.content.orEmpty()
+        if (text.isEmpty()) return fallbackHeight
+
+        // iOS: max(40, bubbleWidth - padding)
+        var height = textHeight(text, bubbleWidth, minAvailableWidth = 40f)
         if (message.replyTo != null) height += replyBlockHeight
         if (!message.reactions.isNullOrEmpty()) height += reactionsRowHeight
-        return maxOf(height, fallbackHeight * .7f)
+        return maxOf(height, fallbackHeight * 0.7f)
     }
 
-    private fun mediaHeight(message: EnhancedMessage, bubbleWidth: Dp, fallbackAspect: Float): Dp {
-        val aspect = if ((message.mediaWidth ?: 0) > 0 && (message.mediaHeight ?: 0) > 0) {
-            message.mediaWidth!!.toFloat() / message.mediaHeight!!.toFloat()
-        } else {
-            fallbackAspect
+    private fun mediaHeight(
+        message: EnhancedMessage,
+        bubbleWidth: Dp,
+        fallbackAspect: Float,
+    ): Dp {
+        val aspect = run {
+            val w = message.mediaWidth
+            val h = message.mediaHeight
+            if (w != null && h != null && w > 0 && h > 0) w.toFloat() / h.toFloat()
+            else fallbackAspect
         }
-        var height = (bubbleWidth.value / max(aspect, .35f)).dp
-        height = height.coerceIn(mediaMinHeight, mediaMaxHeight)
-        if (!message.content.isNullOrEmpty()) height += textHeight(message, bubbleWidth) - textVerticalPadding
-        if (!message.reactions.isNullOrEmpty()) height += reactionsRowHeight
+
+        var height = (bubbleWidth.value / max(aspect, 0.35f)).dp
+        height = minOf(maxOf(height, mediaMinHeight), mediaMaxHeight)
+
+        val caption = message.content
+        if (!caption.isNullOrEmpty()) {
+            // Misma suma que iOS (incluye reply/reactions del textHeight de mensaje;
+            // luego puede volver a sumar reactions — paridad con el bug iOS).
+            height += textHeight(message, bubbleWidth) - textVerticalPadding
+        }
+        if (!message.reactions.isNullOrEmpty()) {
+            height += reactionsRowHeight
+        }
         return height
     }
 
     private fun viewOnceHeight(message: EnhancedMessage): Dp {
         var height = viewOncePillHeight + viewOnceRowVerticalPadding
-        if (!message.reactions.isNullOrEmpty()) height += reactionsRowHeight
+        if (!message.reactions.isNullOrEmpty()) {
+            height += reactionsRowHeight
+        }
         return height
     }
 }

@@ -2,31 +2,79 @@ package com.moments.android.notifications.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.moments.android.notifications.components.NotificationLeadingAvatarView
+import androidx.compose.ui.window.DialogProperties
+import com.google.firebase.auth.FirebaseAuth
+import com.moments.android.R
+import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.models.NotificationType
 import com.moments.android.notifications.core.NotificationGroup
 import com.moments.android.notifications.core.NotificationsViewModel
-import com.moments.android.notifications.core.uniqueSenderIds
-import com.moments.android.views.feed.FeedCanvas
-import com.moments.android.views.feed.FeedInk
+import com.moments.android.services.privacy.FollowButtonState
+import com.moments.android.services.privacy.FollowStateStore
+import com.moments.android.services.privacy.PrivacyService
+import com.moments.android.views.components.MomentRowButton
+import com.moments.android.views.components.VerifiedBadgeView
+import com.moments.android.views.story.StoryRingAvatarView
+import kotlinx.coroutines.launch
+import kotlin.coroutines.resume
 
-/** Port de NotificationGroupedFollowersOverlay.swift */
+/** ≡ GroupedFollowerItem */
+data class GroupedFollowerItem(
+    val id: String,
+    val username: String,
+)
+
+private object GroupedFollowersLayout {
+    val rowHeight = 52.dp
+    val rowSpacing = 6.dp
+    const val maxVisibleRows = 10
+}
+
+/**
+ * Port de NotificationGroupedFollowersOverlay.swift.
+ *
+ * @param onOpenStory ≡ StoriesView(startWithUserId:) — si null y hay story, no inventamos ruta
+ * (mismo criterio que FeedMomentComponents).
+ */
 @Composable
 fun NotificationGroupedFollowersOverlay(
     group: NotificationGroup,
@@ -34,46 +82,350 @@ fun NotificationGroupedFollowersOverlay(
     isDark: Boolean,
     onDismiss: () -> Unit,
     onOpenProfile: (String) -> Unit,
+    onOpenStory: ((String) -> Unit)? = null,
 ) {
-    val senderIds = uniqueSenderIds(group)
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
+    val unknownUser = stringResource(R.string.notifications_grouped_followers_unknown_user)
+    val items = remember(group) {
+        val seen = mutableSetOf<String>()
+        group.notifications.mapNotNull { notification ->
+            val id = notification.senderId.trim()
+            if (id.isEmpty() || !seen.add(id)) return@mapNotNull null
+            val username = notification.senderUsername.trim()
+            GroupedFollowerItem(id, username.ifEmpty { unknownUser })
+        }
+    }
+
+    val overlayTitle = when (group.notifications.firstOrNull()?.type) {
+        NotificationType.MUTUAL_CONNECTION ->
+            stringResource(R.string.notifications_grouped_followers_title_mutual)
+        else ->
+            stringResource(R.string.notifications_grouped_followers_title_followers)
+    }
+
+    val primaryText = if (isDark) Color.White else Color.Black
+    val scope = rememberCoroutineScope()
+    val followStates = remember { mutableStateMapOf<String, FollowButtonState>() }
+    val loadingStates = remember { mutableStateMapOf<String, Boolean>() }
+    var unfollowTargetId by remember { mutableStateOf<String?>(null) }
+
+    val visibleRows = minOf(items.size, GroupedFollowersLayout.maxVisibleRows)
+    val listAreaHeight = if (visibleRows <= 0) {
+        0.dp
+    } else {
+        GroupedFollowersLayout.rowHeight * visibleRows +
+            GroupedFollowersLayout.rowSpacing * (visibleRows - 1)
+    }
+    val listNeedsScroll = items.size > GroupedFollowersLayout.maxVisibleRows
+
+    LaunchedEffect(items) {
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return@LaunchedEffect
+        items.forEach { item ->
+            FollowStateStore.state(item.id)?.let { followStates[item.id] = it }
+            val network = PrivacyService.getFollowButtonState(currentUserId, item.id)
+            val reconciled = FollowStateStore.reconciledState(network, item.id)
+            followStates[item.id] = reconciled
+            FollowStateStore.setState(reconciled, item.id)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val listener: (String, FollowButtonState) -> Unit = { userId, state ->
+            followStates[userId] = state
+        }
+        FollowStateStore.addListener(listener)
+        onDispose { FollowStateStore.removeListener(listener) }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(if (isDark) FeedInk else FeedCanvas, RoundedCornerShape(16.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.28f))
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = group.notifications.firstOrNull()?.senderUsername ?: "",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-                color = if (isDark) Color.White else FeedInk,
-            )
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(senderIds) { userId ->
-                    val notification = group.notifications.first { it.senderId == userId }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onOpenProfile(userId) }
-                            .padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        NotificationLeadingAvatarView(
-                            senderIds = listOf(userId),
-                            profilePaths = mapOf(userId to viewModel.getProfileImagePath(userId)),
+            val cardShape = RoundedCornerShape(28.dp)
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .widthIn(max = 320.dp)
+                    .fillMaxWidth()
+                    .shadow(
+                        24.dp,
+                        cardShape,
+                        ambientColor = Color.Black.copy(alpha = if (isDark) 0.24f else 0.12f),
+                        spotColor = Color.Black.copy(alpha = if (isDark) 0.24f else 0.12f),
+                    )
+                    .momentsChromeGlass(cardShape, interactive = false)
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                        onClick = {},
+                    ),
+            ) {
+                Text(
+                    text = overlayTitle,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = primaryText,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp)
+                        .padding(top = 20.dp, bottom = 12.dp),
+                )
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(listAreaHeight),
+                    verticalArrangement = Arrangement.spacedBy(GroupedFollowersLayout.rowSpacing),
+                    userScrollEnabled = listNeedsScroll,
+                ) {
+                    items(items, key = { it.id }) { item ->
+                        FollowerRow(
+                            item = item,
+                            state = followStates[item.id] ?: FollowButtonState.CAN_FOLLOW,
+                            isLoading = loadingStates[item.id] == true,
                             isDark = isDark,
-                            onPrimaryTap = { onOpenProfile(userId) },
-                        )
-                        Text(
-                            text = notification.senderUsername,
-                            color = if (isDark) Color.White else FeedInk,
-                            fontSize = 14.sp,
+                            primaryText = primaryText,
+                            onOpenProfile = {
+                                val trimmed = item.id.trim()
+                                if (trimmed.isNotEmpty()) onOpenProfile(trimmed)
+                            },
+                            onAvatarTap = { hasStory ->
+                                if (hasStory) {
+                                    onOpenStory?.invoke(item.id)
+                                } else {
+                                    val trimmed = item.id.trim()
+                                    if (trimmed.isNotEmpty()) onOpenProfile(trimmed)
+                                }
+                            },
+                            onFollowClick = {
+                                val state = followStates[item.id] ?: FollowButtonState.CAN_FOLLOW
+                                if (state == FollowButtonState.FOLLOWING) {
+                                    unfollowTargetId = item.id
+                                } else {
+                                    scope.launch {
+                                        performFollowToggle(
+                                            userId = item.id,
+                                            viewModel = viewModel,
+                                            followStates = followStates,
+                                            loadingStates = loadingStates,
+                                        )
+                                    }
+                                }
+                            },
                         )
                     }
                 }
+
+                MomentRowButton(action = onDismiss) {
+                    Text(
+                        text = stringResource(R.string.common_close),
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = primaryText,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp)
+                            .padding(vertical = 16.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    unfollowTargetId?.let { targetId ->
+        AlertDialog(
+            onDismissRequest = { unfollowTargetId = null },
+            title = { Text(stringResource(R.string.user_profile_unfollow_confirm_title)) },
+            text = { Text(stringResource(R.string.user_profile_unfollow_confirm_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        unfollowTargetId = null
+                        scope.launch {
+                            performFollowToggle(
+                                userId = targetId,
+                                viewModel = viewModel,
+                                followStates = followStates,
+                                loadingStates = loadingStates,
+                            )
+                        }
+                    },
+                ) {
+                    Text(
+                        stringResource(R.string.user_profile_unfollow_confirm_action),
+                        color = Color.Red,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { unfollowTargetId = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun FollowerRow(
+    item: GroupedFollowerItem,
+    state: FollowButtonState,
+    isLoading: Boolean,
+    isDark: Boolean,
+    primaryText: Color,
+    onOpenProfile: () -> Unit,
+    onAvatarTap: (Boolean) -> Unit,
+    onFollowClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(GroupedFollowersLayout.rowHeight)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        StoryRingAvatarView(
+            userId = item.id,
+            size = 44.dp,
+            lineWidth = 2.2.dp,
+            showBaseStroke = true,
+            baseStrokeColor = if (isDark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.14f),
+            baseStrokeWidth = 0.9.dp,
+            onTap = onAvatarTap,
+        )
+
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = onOpenProfile),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = item.username,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = primaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            VerifiedBadgeView(userId = item.id, size = 12.dp)
+        }
+
+        CompactFollowButton(
+            state = state,
+            isLoading = isLoading,
+            isDark = isDark,
+            primaryText = primaryText,
+            onClick = onFollowClick,
+        )
+    }
+}
+
+@Composable
+private fun CompactFollowButton(
+    state: FollowButtonState,
+    isLoading: Boolean,
+    isDark: Boolean,
+    primaryText: Color,
+    onClick: () -> Unit,
+) {
+    val title = when (state) {
+        FollowButtonState.FOLLOWING -> stringResource(R.string.user_profile_following)
+        FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
+        FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
+        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> stringResource(R.string.feed_follow_cancel_request)
+        FollowButtonState.BLOCKED -> stringResource(R.string.user_profile_blocked)
+        else -> stringResource(R.string.user_profile_follow)
+    }
+    val enabled = !isLoading && state.isActionable
+    val passive = state == FollowButtonState.REQUEST_PENDING
+
+    Box(
+        modifier = Modifier
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .momentsChromeGlass(CircleShape, interactive = state.isActionable)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.height(14.dp).padding(horizontal = 8.dp),
+                strokeWidth = 2.dp,
+                color = primaryText,
+            )
+        } else {
+            Text(
+                text = title,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = primaryText.copy(alpha = if (passive) 0.78f else 1f),
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+private suspend fun performFollowToggle(
+    userId: String,
+    viewModel: NotificationsViewModel,
+    followStates: MutableMap<String, FollowButtonState>,
+    loadingStates: MutableMap<String, Boolean>,
+) {
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+    val currentState = followStates[userId] ?: FollowButtonState.CAN_FOLLOW
+    loadingStates[userId] = true
+
+    when (currentState) {
+        FollowButtonState.FOLLOWING -> {
+            val err = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+                viewModel.unfollowUser(currentUserId, userId) { e ->
+                    cont.resume(e) {}
+                }
+            }
+            loadingStates[userId] = false
+            if (err == null) {
+                followStates[userId] = FollowButtonState.CAN_FOLLOW
+                FollowStateStore.setState(FollowButtonState.CAN_FOLLOW, userId)
+            }
+        }
+        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> {
+            val err = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+                viewModel.cancelFollowRequest(currentUserId, userId) { e ->
+                    cont.resume(e) {}
+                }
+            }
+            loadingStates[userId] = false
+            if (err == null) {
+                followStates[userId] = FollowButtonState.CAN_REQUEST_FOLLOW
+                FollowStateStore.setState(FollowButtonState.CAN_REQUEST_FOLLOW, userId)
+            }
+        }
+        else -> {
+            val err = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+                viewModel.followUser(currentUserId, userId) { e ->
+                    cont.resume(e) {}
+                }
+            }
+            loadingStates[userId] = false
+            if (err == null) {
+                val newState = if (currentState == FollowButtonState.CAN_REQUEST_FOLLOW) {
+                    FollowButtonState.REQUEST_PENDING_CANCELLABLE
+                } else {
+                    FollowButtonState.FOLLOWING
+                }
+                followStates[userId] = newState
+                FollowStateStore.setState(newState, userId)
             }
         }
     }

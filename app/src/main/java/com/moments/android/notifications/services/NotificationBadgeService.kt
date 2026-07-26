@@ -141,6 +141,31 @@ object NotificationBadgeService {
         updateAppBadgeFromCounts()
     }
 
+    /**
+     * ≡ NotificationService.handleServerCounts (NSE) —
+     * aplica conteos del payload push a prefs/widget.
+     * @return true si venían ambos unreadMessages + unreadNotifications.
+     */
+    fun applyServerCounts(
+        unreadMessages: Int,
+        unreadNotifications: Int,
+        unreadEchoes: Int = 0,
+        unreadTags: Int = 0,
+    ): Boolean {
+        _unreadMessagesCount.value = unreadMessages.coerceAtLeast(0)
+        _unreadNotificationsCount.value = unreadNotifications.coerceAtLeast(0)
+        _unreadEchoesCount.value = unreadEchoes.coerceAtLeast(0)
+        _unreadTagsCount.value = unreadTags.coerceAtLeast(0)
+        prefs()?.edit()?.apply {
+            putInt(KEY_UNREAD_MESSAGES, _unreadMessagesCount.value)
+            putInt(KEY_UNREAD_NOTIFICATIONS, _unreadNotificationsCount.value)
+            putInt(KEY_UNREAD_ECHOES, _unreadEchoesCount.value)
+            putInt(KEY_UNREAD_TAGS, _unreadTagsCount.value)
+        }?.apply()
+        updateAppBadgeFromCounts()
+        return true
+    }
+
     fun clearMessageBadge() {
         _unreadMessagesCount.value = 0
         prefs()?.edit()?.putInt(KEY_UNREAD_MESSAGES, 0)?.apply()

@@ -40,11 +40,12 @@ object StoryDominantColorsExtractor {
             .sortedByDescending { it.count }
             .take(maxColors)
             .map { bucket ->
-                val count = bucket.count.coerceAtLeast(1)
+                // iOS: Double(bucket.r / count) / 255 — división entera primero
+                val count = maxOf(bucket.count, 1)
                 Color(
-                    red = bucket.red.toFloat() / count / 255f,
-                    green = bucket.green.toFloat() / count / 255f,
-                    blue = bucket.blue.toFloat() / count / 255f,
+                    red = (bucket.red / count).toFloat() / 255f,
+                    green = (bucket.green / count).toFloat() / 255f,
+                    blue = (bucket.blue / count).toFloat() / 255f,
                 )
             }
     }
@@ -60,14 +61,15 @@ object StoryDominantColorsExtractor {
         val localX = (location.x - (viewSize.width - displayedWidth) / 2f) / displayedWidth
         val localY = (location.y - (viewSize.height - displayedHeight) / 2f) / displayedHeight
         if (localX !in 0f..1f || localY !in 0f..1f) return Color.White
-        val pixelX = (localX * image.width).toInt().coerceIn(0, image.width - 1)
-        val pixelY = (localY * image.height).toInt().coerceIn(0, image.height - 1)
+        val pixelX = (localX * image.width).toInt()
+        val pixelY = (localY * image.height).toInt()
+        if (pixelX !in 0 until image.width || pixelY !in 0 until image.height) return Color.White
         val pixel = image.getPixel(pixelX, pixelY)
+        // iOS Color(red:green:blue:) — opaco
         return Color(
             red = AndroidColor.red(pixel) / 255f,
             green = AndroidColor.green(pixel) / 255f,
             blue = AndroidColor.blue(pixel) / 255f,
-            alpha = AndroidColor.alpha(pixel) / 255f,
         )
     }
 

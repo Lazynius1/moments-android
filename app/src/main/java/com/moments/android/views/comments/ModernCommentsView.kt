@@ -420,7 +420,13 @@ fun ModernCommentsView(
                             .height(listHeight),
                     ) {
                         when {
-                            isLoading && comments.isEmpty() -> CommentRowSkeletonList(rows = 4)
+                            // iOS: CommentRowSkeletonList(rows: 4).padding(.horizontal, 20).padding(.top, 8)
+                            isLoading && comments.isEmpty() -> CommentRowSkeletonList(
+                                rows = 4,
+                                modifier = Modifier
+                                    .padding(horizontal = 20.dp)
+                                    .padding(top = 8.dp),
+                            )
                             rootComments.isEmpty() -> {
                                 Column(
                                     Modifier.fillMaxSize().padding(horizontal = 40.dp),

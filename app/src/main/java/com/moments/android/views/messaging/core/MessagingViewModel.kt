@@ -9,15 +9,15 @@ import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.MomentsApplication
 import com.moments.android.R
 import com.moments.android.models.AppUser
-import com.moments.android.models.Conversation
-import com.moments.android.models.EnhancedMessage
+import com.moments.android.views.messaging.core.Conversation
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchNewConversationSuggestions
-import com.moments.android.services.firestore.searchUsers
+import com.moments.android.services.firestore.searchUsersUncapped
 import com.moments.android.services.messaging.LocalFirstMessagingSettings
 import com.moments.android.services.messaging.MessageCatchUpService
 import com.moments.android.services.persistence.LocalPersistenceService
-import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.views.messaging.services.ChatDraftStore
 import com.moments.android.views.messaging.services.ChatScrollStateStore
 import com.moments.android.views.messaging.services.ChatService
@@ -29,6 +29,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Date
+
+/** ≡ iOS `!(readStatus[uid] ?? true)` — missing cuenta como leído. */
+private fun Conversation.isUnreadFor(userId: String): Boolean =
+    readStatus[userId] == false
 
 /** Resultado de búsqueda global de mensajes (port de `GlobalMessageSearchResult`). */
 data class GlobalMessageSearchResult(
@@ -97,7 +101,7 @@ class MessagingViewModel(
             val archived = reconcilingOptimisticReadState(cached.filter { it.isArchived(userId) }, userId)
             conversations = active
             archivedConversations = archived
-            hasUnreadMessages = (active + archived).any { it.readStatus[userId] != true }
+            hasUnreadMessages = (active + archived).any { it.isUnreadFor(userId) }
             isLoading = false
         }
 
@@ -114,7 +118,7 @@ class MessagingViewModel(
                 )
                 conversations = active
                 archivedConversations = archived
-                hasUnreadMessages = (active + archived).any { it.readStatus[userId] != true }
+                hasUnreadMessages = (active + archived).any { it.isUnreadFor(userId) }
                 errorMessage = null
                 isLoading = false
 
@@ -147,7 +151,7 @@ class MessagingViewModel(
         }
         conversations = markRead(conversations)
         archivedConversations = markRead(archivedConversations)
-        hasUnreadMessages = (conversations + archivedConversations).any { it.readStatus[userId] != true }
+        hasUnreadMessages = (conversations + archivedConversations).any { it.isUnreadFor(userId) }
     }
 
     private fun reconcilingOptimisticReadState(list: List<Conversation>, userId: String): List<Conversation> {
@@ -188,9 +192,134 @@ class MessagingViewModel(
     }
 
     fun archivedUnreadCount(userId: String): Int =
-        archivedConversations.count { it.readStatus[userId] != true }
+        archivedConversations.count { it.isUnreadFor(userId) }
 
-    // MARK: - Búsqueda (bandeja: conversaciones + usuarios + mensajes)
+    // MARK: - Refresh de perfiles visibles (≡ refreshUserData / refreshVisibleUsers)
+
+    fun refreshUserData(userId: String) {
+        UserCacheService.refreshUser(userId) { user ->
+            val username = user?.username ?: localized(R.string.messaging_user_default)
+            val imagePath = user?.profileImagePath.orEmpty()
+            conversations = applyRefreshedParticipant(userId, username, imagePath, conversations)
+            archivedConversations = applyRefreshedParticipant(userId, username, imagePath, archivedConversations)
+            filteredConversations = applyRefreshedParticipant(userId, username, imagePath, filteredConversations)
+        }
+    }
+
+    /** Muta solo username/avatar del participante (paridad iOS: no reconstruir el resto). */
+    private fun applyRefreshedParticipant(
+        userId: String,
+        username: String,
+        imagePath: String,
+        list: List<Conversation>,
+    ): List<Conversation> {
+        var changed = false
+        list.forEach { conversation ->
+            if (conversation.otherParticipantId == userId) {
+                if (conversation.otherParticipantUsername != username ||
+                    conversation.otherParticipantProfileImagePath != imagePath
+                ) {
+                    conversation.otherParticipantUsername = username
+                    conversation.otherParticipantProfileImagePath = imagePath
+                    changed = true
+                }
+            }
+        }
+        return if (changed) list.toList() else list
+    }
+
+    fun refreshVisibleUsers() {
+        conversations.take(10).forEach { refreshUserData(it.otherParticipantId) }
+    }
+
+    /**
+     * ≡ `applyLocalConversationState` — actualiza pin/mute/archive en memoria y reordena.
+     * Usado por la UI de bandeja; los toggles con escritura Firestore siguen en [togglePinned]/[toggleMuted]/archive.
+     */
+    fun applyLocalConversationState(
+        conversationId: String,
+        isPinned: Boolean? = null,
+        isMuted: Boolean? = null,
+        isArchived: Boolean? = null,
+    ) {
+        fun updateList(list: List<Conversation>): List<Conversation> =
+            sortConversationsForInbox(
+                list.map { conversation ->
+                    if (conversation.id == conversationId) {
+                        updatingConversation(conversation, isPinned, isMuted, isArchived)
+                    } else {
+                        conversation
+                    }
+                },
+            )
+
+        if (isArchived != null) {
+            if (isArchived) {
+                val conversation = conversations.firstOrNull { it.id == conversationId }
+                if (conversation != null) {
+                    conversations = conversations.filterNot { it.id == conversationId }
+                    val updated = updatingConversation(conversation, isPinned, isMuted, true)
+                    archivedConversations = sortConversationsForInbox(
+                        listOf(updated) + archivedConversations.filterNot { it.id == conversationId },
+                    )
+                }
+            } else {
+                val conversation = archivedConversations.firstOrNull { it.id == conversationId }
+                if (conversation != null) {
+                    archivedConversations = archivedConversations.filterNot { it.id == conversationId }
+                    val updated = updatingConversation(conversation, isPinned, isMuted, false)
+                    conversations = sortConversationsForInbox(
+                        listOf(updated) + conversations.filterNot { it.id == conversationId },
+                    )
+                }
+            }
+        } else {
+            conversations = updateList(conversations)
+            archivedConversations = updateList(archivedConversations)
+        }
+        filteredConversations = updateList(filteredConversations)
+        LocalPersistenceService.saveConversations(conversations + archivedConversations, sync = true)
+    }
+
+    private fun updatingConversation(
+        conversation: Conversation,
+        isPinned: Boolean? = null,
+        isMuted: Boolean? = null,
+        isArchived: Boolean? = null,
+    ): Conversation {
+        val userId = currentUserId
+        var pinnedIds = conversation.pinnedByUserIds.orEmpty().toMutableList()
+        var mutedIds = conversation.mutedByUserIds.orEmpty().toMutableList()
+        var archivedIds = conversation.archivedByUserIds.orEmpty().toMutableList()
+        if (userId != null && userId.isNotEmpty()) {
+            if (isPinned != null) {
+                if (isPinned) {
+                    if (userId !in pinnedIds) pinnedIds.add(userId)
+                } else {
+                    pinnedIds.remove(userId)
+                }
+            }
+            if (isMuted != null) {
+                if (isMuted) {
+                    if (userId !in mutedIds) mutedIds.add(userId)
+                } else {
+                    mutedIds.remove(userId)
+                }
+            }
+            if (isArchived != null) {
+                if (isArchived) {
+                    if (userId !in archivedIds) archivedIds.add(userId)
+                } else {
+                    archivedIds.remove(userId)
+                }
+            }
+        }
+        return conversation.copy(
+            pinnedByUserIds = pinnedIds.takeIf { it.isNotEmpty() },
+            mutedByUserIds = mutedIds.takeIf { it.isNotEmpty() },
+            archivedByUserIds = archivedIds.takeIf { it.isNotEmpty() },
+        )
+    }
 
     fun searchConversationsAndUsers(query: String) {
         val trimmed = query.trim()
@@ -220,7 +349,7 @@ class MessagingViewModel(
         val existingUserIds = (conversations + archivedConversations).map { it.otherParticipantId }.toSet()
         searchJob = viewModelScope.launch {
             delay(250) // debounce, como el DispatchWorkItem de iOS
-            val users = runCatching { firestoreService.searchUsers(trimmed) }.getOrDefault(emptyList())
+            val users = runCatching { firestoreService.searchUsersUncapped(trimmed) }.getOrDefault(emptyList())
             if (activeSearchQuery != trimmed) return@launch
             isSearchingContent = false
             searchedUsers = users.filter { it.id != currentUserId && it.id !in existingUserIds }
@@ -265,7 +394,7 @@ class MessagingViewModel(
 
         userSearchJob = viewModelScope.launch {
             delay(250)
-            runCatching { firestoreService.searchUsers(trimmed) }
+            runCatching { firestoreService.searchUsersUncapped(trimmed) }
                 .onSuccess { users ->
                     if (activeUserSearchQuery != trimmed) return@onSuccess
                     suggestedUsers = users
@@ -343,7 +472,7 @@ class MessagingViewModel(
         }
 
         viewModelScope.launch {
-            val canSend = runCatching { PrivacyService.canSendMessage(fromUserId, user.id) }.getOrDefault(false)
+            val canSend = ChatService.canSendMessage(fromUserId, user.id).getOrDefault(false)
             if (!canSend) {
                 errorMessage = localized(R.string.messaging_error_cannot_start)
                 requiresMessageRequest = false
@@ -453,7 +582,7 @@ class MessagingViewModel(
         conversations = conversations.filterNot { it.id == conversationId }
         archivedConversations = archivedConversations.filterNot { it.id == conversationId }
         filteredConversations = filteredConversations.filterNot { it.id == conversationId }
-        hasUnreadMessages = (conversations + archivedConversations).any { it.readStatus[userId] != true }
+        hasUnreadMessages = (conversations + archivedConversations).any { it.isUnreadFor(userId) }
         ChatSessionEngine.invalidateSession(conversationId)
         MomentsApplication.instance?.let { ChatScrollStateStore.clear(it, conversationId) }
         LocalPersistenceService.saveConversations(conversations + archivedConversations, sync = true)

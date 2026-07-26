@@ -2,6 +2,7 @@ package com.moments.android.services.storage
 
 import android.content.Context
 import android.net.Uri
+import android.text.format.Formatter
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.effect.Presentation
@@ -11,37 +12,58 @@ import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
-import kotlinx.coroutines.suspendCancellableCoroutine
+import com.moments.android.R
 import java.io.File
 import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
 
-// Límites de CreatorMedia (aún no portado el modelo completo).
+/**
+ * Límites de `CreatorMedia` (CreatorSharedModels.swift).
+ * Viven aquí para que Services/Storage no dependa de Views/Creator.
+ */
 object CreatorMediaLimits {
-    const val MAX_MOMENT_VIDEO_UPLOAD_SIZE_BYTES: Long = 300L * 1024 * 1024
-    const val MAX_STORY_VIDEO_READY_SIZE_BYTES: Long = 60L * 1024 * 1024
+    /** iOS `CreatorMedia.maxMomentVideoUploadSizeBytes` */
+    const val MAX_MOMENT_VIDEO_UPLOAD_SIZE_BYTES: Long =
+        com.moments.android.views.creator.CreatorMedia.MAX_MOMENT_VIDEO_UPLOAD_SIZE_BYTES
+
+    /** iOS `CreatorMedia.maxMomentVideoReadySizeBytes` — por encima → processing pending. */
+    const val MAX_MOMENT_VIDEO_READY_SIZE_BYTES: Long =
+        com.moments.android.views.creator.CreatorMedia.MAX_MOMENT_VIDEO_READY_SIZE_BYTES
+
+    /** iOS `CreatorMedia.maxStoryVideoReadySizeBytes` */
+    const val MAX_STORY_VIDEO_READY_SIZE_BYTES: Long =
+        com.moments.android.views.creator.CreatorMedia.MAX_STORY_VIDEO_READY_SIZE_BYTES
 }
 
+/** Port de `VideoCompressionPreset`. */
 enum class VideoCompressionPreset {
     MOMENT,
     STORY,
     CHAT,
 }
 
+/**
+ * Port de `VideoCompressionError` (LocalizedError → strings `errors.video.*`).
+ */
 sealed class VideoCompressionError(message: String) : Exception(message) {
-    object InvalidSource : VideoCompressionError("invalid video source")
-    object ExportFailed : VideoCompressionError("video export failed")
-    data class OutputTooLarge(val size: Long, val limit: Long) :
-        VideoCompressionError("video too large: $size > $limit")
+    class InvalidSource(message: String) : VideoCompressionError(message)
+    class ExportFailed(message: String) : VideoCompressionError(message)
+    class OutputTooLarge(val size: Long, val limit: Long, message: String) :
+        VideoCompressionError(message)
 }
 
+/** Port de `VideoCompressionLimits`. */
 data class VideoCompressionLimits(
     val compressIfLargerThan: Long,
     val maxOutputBytes: Long,
 )
 
-// Port de VideoCompressionService.swift. AVAssetExportPreset1280x720 → Media3 Transformer @ 720p.
+/**
+ * Port de `VideoCompressionService.swift`.
+ * `AVAssetExportPreset1280x720` + `shouldOptimizeForNetworkUse` → Media3 Transformer H.264 @ 720p.
+ */
 object VideoCompressionService {
 
     private var appContext: Context? = null
@@ -69,10 +91,10 @@ object VideoCompressionService {
         inputUri: Uri,
         preset: VideoCompressionPreset,
     ): Uri {
-        val context = appContext ?: throw VideoCompressionError.ExportFailed
+        val context = requireContext()
         val limits = limits(preset)
         val inputSize = fileSize(context, inputUri)
-            ?: throw VideoCompressionError.InvalidSource
+            ?: throw invalidSource(context)
 
         if (inputSize <= limits.compressIfLargerThan) {
             return inputUri
@@ -80,14 +102,16 @@ object VideoCompressionService {
 
         val compressedUri = compressVideo(context, inputUri)
         val compressedSize = fileSize(context, compressedUri)
-            ?: throw VideoCompressionError.ExportFailed
+            ?: throw exportFailed(context)
 
         if (compressedSize > limits.maxOutputBytes) {
             if (compressedUri != inputUri) {
-                runCatching { File(compressedUri.path!!).delete() }
+                runCatching { compressedUri.path?.let { File(it).delete() } }
             }
-            throw VideoCompressionError.OutputTooLarge(compressedSize, limits.maxOutputBytes)
+            throw outputTooLarge(context, compressedSize, limits.maxOutputBytes)
         }
+
+        // Caller uploads compressed file; original can remain for local preview until upload completes.
         return compressedUri
     }
 
@@ -96,7 +120,7 @@ object VideoCompressionService {
         preset: VideoCompressionPreset,
         preferredExtension: String = "mp4",
     ): Uri {
-        val context = appContext ?: throw VideoCompressionError.ExportFailed
+        val context = requireContext()
         val temp = File(
             context.cacheDir,
             "video_upload_${UUID.randomUUID()}.$preferredExtension",
@@ -104,6 +128,16 @@ object VideoCompressionService {
         temp.writeBytes(data)
         return prepareVideoForUpload(Uri.fromFile(temp), preset)
     }
+
+    /**
+     * ≡ iOS `compressVideoForStory` — siempre exporta 720p (caller decide cuándo).
+     */
+    suspend fun compressVideoForStory(inputUri: Uri): Uri {
+        val context = requireContext()
+        return compressVideo(context, inputUri)
+    }
+
+    // MARK: - Private
 
     private suspend fun compressVideo(context: Context, inputUri: Uri): Uri =
         suspendCancellableCoroutine { cont ->
@@ -132,7 +166,7 @@ object VideoCompressionService {
                     ) {
                         outputFile.delete()
                         if (cont.isActive) {
-                            cont.resumeWithException(VideoCompressionError.ExportFailed)
+                            cont.resumeWithException(exportFailed(context))
                         }
                     }
                 })
@@ -152,5 +186,38 @@ object VideoCompressionService {
             return if (file.exists()) file.length() else null
         }
         return context.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize }
+    }
+
+    private fun requireContext(): Context =
+        appContext ?: throw exportFailed(null)
+
+    private fun invalidSource(context: Context?): VideoCompressionError.InvalidSource =
+        VideoCompressionError.InvalidSource(
+            context?.getString(R.string.errors_video_invalid_source)
+                ?: "Could not read the video.",
+        )
+
+    private fun exportFailed(context: Context?): VideoCompressionError.ExportFailed =
+        VideoCompressionError.ExportFailed(
+            context?.getString(R.string.errors_video_export_failed)
+                ?: "Could not compress the video.",
+        )
+
+    private fun outputTooLarge(
+        context: Context,
+        size: Long,
+        limit: Long,
+    ): VideoCompressionError.OutputTooLarge {
+        val sizeLabel = Formatter.formatFileSize(context, size)
+        val limitLabel = Formatter.formatFileSize(context, limit)
+        return VideoCompressionError.OutputTooLarge(
+            size = size,
+            limit = limit,
+            message = context.getString(
+                R.string.errors_video_output_too_large,
+                sizeLabel,
+                limitLabel,
+            ),
+        )
     }
 }

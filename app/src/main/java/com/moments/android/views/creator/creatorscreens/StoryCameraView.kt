@@ -1,6 +1,5 @@
 package com.moments.android.views.creator.creatorscreens
 
-import com.moments.android.views.creator.components.CaptureButton
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -29,14 +28,16 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -52,6 +53,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -61,15 +63,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
@@ -78,23 +85,29 @@ import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.CreatorFlow
 import com.moments.android.views.creator.CreatorMedia
+import com.moments.android.services.camera.SnapCameraKitConfiguration
+import com.moments.android.views.creator.camerakit.CameraKitController
 import com.moments.android.views.creator.camerakit.LensReel
 import com.moments.android.views.creator.creatoruikit.StoryGalleryPicker
+import com.moments.android.views.creator.creatoruikit.creatorMomentsCaptureRect
 import com.moments.android.views.creator.creatoruikit.storyMediaFromUri
+import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
+import com.moments.android.views.permissions.CameraAccessBoundary
 import kotlinx.coroutines.delay
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 /** iOS `StoryVideoProcessingService.maxAutoSplitDuration` = 5 × 60s */
 private const val MAX_STORY_RECORD_SECONDS = 5.0 * 60.0
 
 /**
- * Port de `StoryCameraView.swift`:
- * preview CameraX, foto (tap), vídeo (long-press), flash, flip, galería, Aa → story editing.
- * Camera Kit / LensReel: chunks siguientes.
+ * Port de `StoryCameraView.swift`.
+ * Preview con `creatorMomentsCaptureRect` (inset 4 / top 8 / radius 12) — sin padding inventado.
  */
 @Composable
 fun StoryCameraView(
@@ -154,6 +167,9 @@ fun StoryCameraView(
     var activeRecording by remember { mutableStateOf<Recording?>(null) }
     var boundCamera by remember { mutableStateOf<Camera?>(null) }
     var zoomLevel by remember { mutableStateOf(1f) }
+    // ≡ StoryCameraView.swift @StateObject cameraKit + usingCameraKit híbrido
+    val cameraKit = remember { CameraKitController() }
+    var usingCameraKit by remember { mutableStateOf(false) }
 
     val imageCapture = remember {
         ImageCapture.Builder()
@@ -167,10 +183,15 @@ fun StoryCameraView(
         VideoCapture.withOutput(recorder)
     }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    LaunchedEffect(Unit) {
+        cameraKit.prepareLenses()
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             activeRecording?.stop()
             activeRecording = null
+            cameraKit.stop()
             cameraExecutor.shutdown()
         }
     }
@@ -312,48 +333,65 @@ fun StoryCameraView(
         lastGalleryThumb = latestGalleryImageUri(context)
     }
 
-    @Suppress("UNUSED_VARIABLE")
-    val keepSelected = selectedMediaItems
+    @Suppress("UNUSED_PARAMETER")
+    val unusedSelected = selectedMediaItems
 
-    Box(modifier.fillMaxSize().background(canvas)) {
-        if (!hasCameraPermission) {
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    stringResource(R.string.creator_story_camera_permission),
-                    color = controlFg,
-                    fontSize = 15.sp,
-                )
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    stringResource(R.string.creator_permissions_open_settings),
-                    color = Color(0xFF007AFF),
-                    modifier = Modifier.clickable {
-                        permissionLauncher.launch(
-                            arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO),
-                        )
-                    },
-                )
-            }
-            return@Box
+    // ≡ iOS CameraAccessBoundary + GeometryReader + creatorMomentsCaptureRect
+    CameraAccessBoundary(
+        requiresMicrophone = true,
+        onCancel = { onCurrentFlowChange(CreatorFlow.TYPE_SELECTION) },
+    ) {
+        SideEffect {
+            hasCameraPermission = true
+            hasAudioPermission =
+                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                    PackageManager.PERMISSION_GRANTED
         }
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
+        BoxWithConstraints(modifier.fillMaxSize().background(canvas)) {
+            val density = LocalDensity.current
+            val bottomInsetPx = WindowInsets.navigationBars.getBottom(density).toFloat()
+            // ≡ iOS points → dp (antes px crudos → galería/flip pegados al shutter)
+            val controlGapBelowCanvasPx = with(density) { 104.dp.toPx() }
+            val controlFloorPx = with(density) { 20.dp.toPx() }
+            val shutterCenterInsetPx = with(density) { 10.dp.toPx() }
+            val recordingCenterInsetPx = with(density) { 108.dp.toPx() }
+            val aaCenterFromRightPx = with(density) { 26.dp.toPx() }
+            val sideControlsExtraWidthPx = with(density) { 54.dp.toPx() }
+            val sideControlsScreenMarginPx = with(density) { 72.dp.toPx() }
+            val lensReelHalfHeightPx = with(density) { 50.dp.toPx() } // LensReel height 100.dp
+            val sideButtonHalfHeightPx = with(density) { 24.dp.toPx() } // 48.dp / 2
+            val aaHalfSizePx = with(density) { 24.dp.toPx() }
+
+            val captureRect = creatorMomentsCaptureRect(
+                inSize = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()),
+                topInsetPx = 0f,
+                bottomInsetPx = bottomInsetPx,
+                density = density,
+            )
+            val corner = storyViewerCanvasCornerRadius
+            // Shutter en borde del canvas; galería/flip ~104.dp debajo (no en la misma línea)
+            val controlYPx = min(
+                constraints.maxHeight - bottomInsetPx - controlFloorPx,
+                captureRect.bottom + controlGapBelowCanvasPx,
+            )
+            val captureButtonYPx = captureRect.bottom - shutterCenterInsetPx
+            val bottomControlsWidthPx = min(
+                captureRect.width + sideControlsExtraWidthPx,
+                constraints.maxWidth - sideControlsScreenMarginPx,
+            ).coerceAtLeast(0f)
+
+            // Preview + top chrome (dentro del clip ≡ topControlsOverlay)
             Box(
                 Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clip(RoundedCornerShape(28.dp))
+                    .offset {
+                        IntOffset(captureRect.left.roundToInt(), captureRect.top.roundToInt())
+                    }
+                    .size(
+                        width = with(density) { captureRect.width.toDp() },
+                        height = with(density) { captureRect.height.toDp() },
+                    )
+                    .clip(RoundedCornerShape(corner))
                     .background(Color.Black),
             ) {
                 AndroidView(
@@ -369,8 +407,6 @@ fun StoryCameraView(
                     },
                     modifier = Modifier
                         .fillMaxSize()
-                        // Equivalente del MagnifyGesture de StoryCameraView.swift. CameraX informa
-                        // del máximo real por dispositivo, manteniendo el tope visual de 5× de iOS.
                         .pointerInput(boundCamera) {
                             detectTransformGestures { _, _, zoom, _ ->
                                 val maxZoom = minOf(
@@ -387,19 +423,20 @@ fun StoryCameraView(
                     Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopCenter)
-                        .padding(14.dp),
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ChromeCircleButton(
                         onClick = {
                             if (isRecording) stopRecording()
-                            else onCurrentFlowChange(CreatorFlow.TYPE_SELECTION)
+                            else onDismiss()
                         },
                         stroke = controlStroke,
                     ) {
                         Icon(Icons.Filled.Close, null, tint = controlFg, modifier = Modifier.size(18.dp))
                     }
+                    // Center Stage: solo Apple — no portar
                     ChromeCircleButton(
                         onClick = {
                             if (isRecording) return@ChromeCircleButton
@@ -424,38 +461,6 @@ fun StoryCameraView(
                     }
                 }
 
-                Box(
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 10.dp)
-                        .size(48.dp)
-                        .momentsChromeGlass(CircleShape, interactive = true)
-                        .border(1.dp, controlStroke, CircleShape)
-                        .clickable(enabled = !isRecording) { goTextMode() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        stringResource(R.string.creator_story_text_mode),
-                        color = controlFg,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp,
-                    )
-                }
-
-                if (isRecording) {
-                    Text(
-                        formatRecordingTime(recordingDuration),
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 100.dp)
-                            .momentsChromeGlass(RoundedCornerShape(50), interactive = false)
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                    )
-                }
-
                 if (isCapturing) {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center).size(36.dp),
@@ -465,12 +470,74 @@ fun StoryCameraView(
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            // Aa — ≡ textModeButtonOverlay (fuera del clip; centro maxX−26, midY)
+            Box(
+                Modifier
+                    .offset {
+                        IntOffset(
+                            (captureRect.right - aaCenterFromRightPx - aaHalfSizePx).roundToInt(),
+                            (captureRect.center.y - aaHalfSizePx).roundToInt(),
+                        )
+                    }
+                    .size(48.dp)
+                    .zIndex(2f)
+                    .momentsChromeGlass(CircleShape, interactive = true)
+                    .border(1.dp, controlStroke, CircleShape)
+                    .clickable(enabled = !isRecording) { goTextMode() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    stringResource(R.string.creator_story_text_mode),
+                    color = controlFg,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                )
+            }
 
+            // Recording — ≡ recordingStatusView (centro midX, maxY−108)
+            var recW by remember { mutableIntStateOf(0) }
+            var recH by remember { mutableIntStateOf(0) }
+            if (isRecording) {
+                Row(
+                    Modifier
+                        .offset {
+                            IntOffset(
+                                (captureRect.center.x - recW / 2f).roundToInt(),
+                                (captureRect.bottom - recordingCenterInsetPx - recH / 2f).roundToInt(),
+                            )
+                        }
+                        .onSizeChanged {
+                            recW = it.width
+                            recH = it.height
+                        }
+                        .zIndex(2f)
+                        .background(Color.Black.copy(0.5f), RoundedCornerShape(20.dp))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(Modifier.size(10.dp).background(Color.Red, CircleShape))
+                    Text(
+                        formatRecordingTime(recordingDuration),
+                        color = Color.White,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 16.sp,
+                    )
+                }
+            }
+
+            // Galería + flip — ≡ bottomSideControls en controlY (bajo el shutter)
             Row(
                 Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 28.dp),
+                    .offset {
+                        IntOffset(
+                            ((constraints.maxWidth - bottomControlsWidthPx) / 2f).roundToInt(),
+                            (controlYPx - sideButtonHalfHeightPx).roundToInt(),
+                        )
+                    }
+                    .width(with(density) { bottomControlsWidthPx.toDp() })
+                    .padding(horizontal = 18.dp)
+                    .zIndex(1f),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -479,9 +546,7 @@ fun StoryCameraView(
                         .size(48.dp)
                         .momentsChromeGlass(CircleShape, interactive = true)
                         .border(1.dp, Color.White.copy(0.18f), CircleShape)
-                        .clickable(enabled = !isRecording) {
-                            isGalleryPickerPresented = true
-                        },
+                        .clickable(enabled = !isRecording) { isGalleryPickerPresented = true },
                     contentAlignment = Alignment.Center,
                 ) {
                     if (lastGalleryThumb != null) {
@@ -495,19 +560,6 @@ fun StoryCameraView(
                         Icon(Icons.Filled.PhotoLibrary, null, tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                 }
-
-                // LensReel se mantiene aunque Camera Kit esté deshabilitado: Swift también
-                // conserva el carrusel con la única celda passthrough y el disparador centrado.
-                LensReel(
-                    lenses = emptyList(),
-                    isRecording = isRecording,
-                    onSelect = { /* Camera Kit Android permanece apagado hasta enlazar su SDK. */ },
-                    onCapturePhoto = { takePhoto() },
-                    onStartVideo = { startRecording() },
-                    onStopVideo = { stopRecording() },
-                    modifier = Modifier.weight(1f),
-                )
-
                 Box(
                     Modifier
                         .size(48.dp)
@@ -519,8 +571,6 @@ fun StoryCameraView(
                             } else {
                                 CameraSelector.LENS_FACING_BACK
                             }
-                            // Swift restablece el zoom al invertir cámara para no pedir una ratio
-                            // inválida al sensor que acaba de activarse.
                             zoomLevel = 1f
                             boundCamera?.cameraControl?.setZoomRatio(1f)
                         },
@@ -530,13 +580,43 @@ fun StoryCameraView(
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
-            Text(
-                stringResource(R.string.common_cancel),
-                color = controlFg.copy(0.55f),
-                modifier = Modifier.clickable(enabled = !isRecording, onClick = onDismiss),
-            )
-            Spacer(Modifier.height(8.dp))
+            // LensReel + shutter — ≡ captureButtonY (centro en borde inferior del canvas)
+            Box(
+                Modifier
+                    .offset {
+                        IntOffset(
+                            captureRect.left.roundToInt(),
+                            (captureButtonYPx - lensReelHalfHeightPx).roundToInt(),
+                        )
+                    }
+                    .width(with(density) { captureRect.width.toDp() }),
+                contentAlignment = Alignment.Center,
+            ) {
+                // ≡ iOS: lenses vacías si flag off; shutter sigue en cámara nativa
+                LensReel(
+                    lenses = if (SnapCameraKitConfiguration.isFeatureEnabled) cameraKit.lenses else emptyList(),
+                    isRecording = isRecording,
+                    onSelect = { lens ->
+                        if (!SnapCameraKitConfiguration.isFeatureEnabled) return@LensReel
+                        if (lens != null) {
+                            if (usingCameraKit) {
+                                cameraKit.selectLens(lens)
+                            } else {
+                                usingCameraKit = true
+                                cameraKit.activateCamera(applyingLens = lens)
+                            }
+                        } else {
+                            cameraKit.selectLens(null)
+                            cameraKit.deactivateCamera()
+                            usingCameraKit = false
+                        }
+                    },
+                    onCapturePhoto = { takePhoto() },
+                    onStartVideo = { startRecording() },
+                    onStopVideo = { stopRecording() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         if (isGalleryPickerPresented) {

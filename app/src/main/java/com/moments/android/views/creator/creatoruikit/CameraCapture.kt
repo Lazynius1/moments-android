@@ -1,12 +1,15 @@
 package com.moments.android.views.creator.creatoruikit
 
+import android.app.Activity
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +29,7 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,23 +38,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.moments.android.R
 import com.moments.android.views.creator.CreatorAspectRatio
 import com.moments.android.views.creator.CreatorMedia
 import java.util.UUID
 
-/** Tipos equivalentes a public.image/public.movie de CameraCapture.swift. */
+/** Tipos equivalentes a `public.image` / `public.movie` de `CameraCapture.swift`. */
 enum class CameraCaptureMediaType { IMAGE, VIDEO }
 
 /**
- * Port de CameraCapture.swift.
+ * Port de `CameraCapture.swift` (`UIImagePickerController` sourceType `.camera`).
  *
- * En Android el picker del sistema se expresa como dos contratos de actividad;
- * ambos reciben un URI MediaStore para que la captura quede disponible también
- * para el cargador de la biblioteca.
+ * Android no tiene un único picker foto+vídeo del sistema: se usan
+ * `TakePicture` / captura de vídeo con `EXTRA_DURATION_LIMIT=60` y
+ * `EXTRA_VIDEO_QUALITY=1` (≡ `videoMaximumDuration` / `videoQuality.typeHigh`).
+ * Si hay un solo tipo → se lanza al instante (como iOS). Si hay ambos →
+ * chooser mínimo (necesidad de plataforma; iOS cambia modo dentro del picker).
  */
 @Composable
 fun CameraCapture(
@@ -62,6 +71,11 @@ fun CameraCapture(
     val context = LocalContext.current
     var pendingImageUri by remember { mutableStateOf<Uri?>(null) }
     var pendingVideoUri by remember { mutableStateOf<Uri?>(null) }
+    var didAutoLaunch by remember { mutableStateOf(false) }
+
+    val allowImage = CameraCaptureMediaType.IMAGE in mediaTypes
+    val allowVideo = CameraCaptureMediaType.VIDEO in mediaTypes
+    val needsChooser = allowImage && allowVideo
 
     fun deliver(uri: Uri, isVideo: Boolean) {
         val ratio = readCaptureAspectRatio(context, uri, isVideo)
@@ -79,27 +93,53 @@ fun CameraCapture(
     val photoCapture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
         val uri = pendingImageUri
         pendingImageUri = null
-        if (saved && uri != null) deliver(uri, isVideo = false)
-        else uri?.let { context.contentResolver.delete(it, null, null) }
-        if (saved) onDismiss()
+        if (saved && uri != null) {
+            deliver(uri, isVideo = false)
+        } else {
+            uri?.let { context.contentResolver.delete(it, null, null) }
+        }
+        // ≡ imagePickerControllerDidCancel / didFinish → siempre dismiss
+        onDismiss()
     }
-    val videoCapture = rememberLauncherForActivityResult(ActivityResultContracts.CaptureVideo()) { saved ->
+
+    val videoCapture = rememberLauncherForActivityResult(CaptureVideoHighQuality60s()) { saved ->
         val uri = pendingVideoUri
         pendingVideoUri = null
-        if (saved && uri != null) deliver(uri, isVideo = true)
-        else uri?.let { context.contentResolver.delete(it, null, null) }
-        if (saved) onDismiss()
+        if (saved && uri != null) {
+            deliver(uri, isVideo = true)
+        } else {
+            uri?.let { context.contentResolver.delete(it, null, null) }
+        }
+        onDismiss()
     }
 
     fun launchPhoto() {
-        val uri = createCaptureUri(context, isVideo = false) ?: return
+        val uri = createCaptureUri(context, isVideo = false) ?: run {
+            onDismiss()
+            return
+        }
         pendingImageUri = uri
         photoCapture.launch(uri)
     }
+
     fun launchVideo() {
-        val uri = createCaptureUri(context, isVideo = true) ?: return
+        val uri = createCaptureUri(context, isVideo = true) ?: run {
+            onDismiss()
+            return
+        }
         pendingVideoUri = uri
         videoCapture.launch(uri)
+    }
+
+    // Un solo tipo → cámara del sistema al instante (sin chooser inventado).
+    LaunchedEffect(mediaTypes) {
+        if (didAutoLaunch || needsChooser) return@LaunchedEffect
+        didAutoLaunch = true
+        when {
+            allowImage -> launchPhoto()
+            allowVideo -> launchVideo()
+            else -> onDismiss()
+        }
     }
 
     Box(modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
@@ -109,28 +149,32 @@ fun CameraCapture(
                 .padding(18.dp)
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = .14f))
+                .background(Color.White.copy(alpha = 0.14f))
                 .clickable(onClick = onDismiss),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Filled.Close, null, tint = Color.White)
+            Icon(Icons.Filled.Close, contentDescription = null, tint = Color.White)
         }
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text("Camera", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            if (CameraCaptureMediaType.IMAGE in mediaTypes) {
+
+        if (needsChooser) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(
+                    stringResource(R.string.creator_camera),
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                )
                 CameraCaptureChoice(
                     icon = Icons.Filled.CameraAlt,
-                    label = "Photo",
+                    label = stringResource(R.string.camera_capture_photo),
                     onClick = ::launchPhoto,
                 )
-            }
-            if (CameraCaptureMediaType.VIDEO in mediaTypes) {
                 CameraCaptureChoice(
                     icon = Icons.Filled.Videocam,
-                    label = "Video",
+                    label = stringResource(R.string.camera_capture_video),
                     onClick = ::launchVideo,
                 )
             }
@@ -140,22 +184,37 @@ fun CameraCapture(
 
 @Composable
 private fun CameraCaptureChoice(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     label: String,
     onClick: () -> Unit,
 ) {
     Row(
         Modifier
             .clip(RoundedCornerShape(24.dp))
-            .background(Color.White.copy(alpha = .14f))
+            .background(Color.White.copy(alpha = 0.14f))
             .clickable(onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(icon, null, tint = Color.White)
+        Icon(icon, contentDescription = null, tint = Color.White)
         Text(label, color = Color.White, fontWeight = FontWeight.SemiBold)
     }
+}
+
+/**
+ * `CaptureVideo` + `videoMaximumDuration = 60` + `videoQuality = .typeHigh`.
+ */
+private class CaptureVideoHighQuality60s : ActivityResultContract<Uri, Boolean>() {
+    override fun createIntent(context: Context, input: Uri): Intent =
+        Intent(MediaStore.ACTION_VIDEO_CAPTURE)
+            .putExtra(MediaStore.EXTRA_OUTPUT, input)
+            .putExtra(MediaStore.EXTRA_DURATION_LIMIT, 60)
+            .putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1)
+            .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+    override fun parseResult(resultCode: Int, intent: Intent?): Boolean =
+        resultCode == Activity.RESULT_OK
 }
 
 private fun createCaptureUri(context: Context, isVideo: Boolean): Uri? {
@@ -164,7 +223,10 @@ private fun createCaptureUri(context: Context, isVideo: Boolean): Uri? {
         put(MediaStore.MediaColumns.DISPLAY_NAME, "moments_${now}_${UUID.randomUUID()}")
         put(MediaStore.MediaColumns.MIME_TYPE, if (isVideo) "video/mp4" else "image/jpeg")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            put(MediaStore.MediaColumns.RELATIVE_PATH, if (isVideo) "Movies/Moments" else "Pictures/Moments")
+            put(
+                MediaStore.MediaColumns.RELATIVE_PATH,
+                if (isVideo) "Movies/Moments" else "Pictures/Moments",
+            )
         }
     }
     val collection = if (isVideo) {
@@ -181,8 +243,10 @@ private fun readCaptureAspectRatio(context: Context, uri: Uri, isVideo: Boolean)
             val retriever = MediaMetadataRetriever()
             try {
                 retriever.setDataSource(context, uri)
-                val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toFloatOrNull() ?: 1f
-                val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toFloatOrNull()?.coerceAtLeast(1f) ?: 1f
+                val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                    ?.toFloatOrNull() ?: 1f
+                val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                    ?.toFloatOrNull()?.coerceAtLeast(1f) ?: 1f
                 CreatorAspectRatio.fromRatio(width / height)
             } finally {
                 retriever.release()
@@ -191,7 +255,9 @@ private fun readCaptureAspectRatio(context: Context, uri: Uri, isVideo: Boolean)
             context.contentResolver.openInputStream(uri)?.use { input ->
                 val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 android.graphics.BitmapFactory.decodeStream(input, null, options)
-                CreatorAspectRatio.fromRatio(options.outWidth.toFloat() / options.outHeight.coerceAtLeast(1).toFloat())
+                CreatorAspectRatio.fromRatio(
+                    options.outWidth.toFloat() / options.outHeight.coerceAtLeast(1).toFloat(),
+                )
             } ?: CreatorAspectRatio.SQUARE
         }
     }.getOrDefault(CreatorAspectRatio.SQUARE)
@@ -201,7 +267,9 @@ private fun readVideoDurationSeconds(context: Context, uri: Uri): Double? =
         val retriever = MediaMetadataRetriever()
         try {
             retriever.setDataSource(context, uri)
-            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toDoubleOrNull()?.div(1_000.0)
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                ?.toDoubleOrNull()
+                ?.div(1_000.0)
         } finally {
             retriever.release()
         }

@@ -1,12 +1,13 @@
 package com.moments.android.notifications.services
 
-import com.moments.android.models.MessageType
+import com.google.firebase.firestore.FirebaseFirestore
+import com.moments.android.MomentsApplication
+import com.moments.android.R
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
-import com.moments.android.views.shared.ChatPreviewPrivacy
 import com.moments.android.services.messaging.EncryptionService
+import com.moments.android.views.shared.ChatPreviewPrivacy
 import kotlinx.coroutines.tasks.await
-import com.google.firebase.firestore.FirebaseFirestore
 
 /** Port de InAppNotificationPreviewResolver.swift */
 object InAppNotificationPreviewResolver {
@@ -126,7 +127,9 @@ object InAppNotificationPreviewResolver {
         if (trimmed.isEmpty()) return true
         val neutralPrefixes = listOf("💬", "📷", "🎥", "🎵", "🎞", "😊", "📍", "📎", "📸", "⏱")
         if (neutralPrefixes.any { trimmed.startsWith(it) }) return true
-        return trimmed.equals("Message", ignoreCase = true)
+        // ≡ MessageType.text.conversationPreview → NSLocalizedString("chat.preview.text")
+        val textPreview = MomentsApplication.instance?.getString(R.string.chat_preview_text) ?: "New message"
+        return trimmed == textPreview
     }
 
     private fun looksLikeEncryptedPayload(text: String): Boolean {

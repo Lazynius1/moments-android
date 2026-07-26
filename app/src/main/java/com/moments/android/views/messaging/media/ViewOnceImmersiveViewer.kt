@@ -41,8 +41,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.timeAgoDisplay
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.utilities.EmojiReactionDefaults
 import com.moments.android.utilities.EmojiUsageTracker
 import com.moments.android.views.feed.video.FeedVideoPage

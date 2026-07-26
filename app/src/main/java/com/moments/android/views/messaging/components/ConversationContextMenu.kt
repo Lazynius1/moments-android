@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
-import com.moments.android.models.Conversation
+import com.moments.android.views.messaging.core.Conversation
 import kotlin.math.max
 
 /** Port de `Views/Messaging/Components/ConversationContextMenu.swift`. */

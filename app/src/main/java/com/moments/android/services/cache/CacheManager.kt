@@ -72,9 +72,10 @@ object CacheManager : DefaultLifecycleObserver {
     }
 
     private fun cleanupOldCache() {
+        // iOS: clearMemoryCache + cleanExpiredDiskCache (NO borra todo el disco).
+        // Coil no expone cleanExpired; el disk cache se autorregula por maxSize.
         if (getCurrentCacheSize() > MAX_CACHE_SIZE) {
             requireContext().imageLoader.memoryCache?.clear()
-            requireContext().imageLoader.diskCache?.clear()
         }
     }
 
@@ -99,13 +100,15 @@ object CacheManager : DefaultLifecycleObserver {
     }
 
     private fun cleanupTemporaryFiles() {
+        // iOS: FileManager.temporaryDirectory — en Android los temps de upload viven en cacheDir.
         val tempDir = requireContext().cacheDir
-        val thresholdMs = 1800_000L
+        val thresholdMs = 1_800_000L // 30 minutos
         val now = System.currentTimeMillis()
         tempDir.listFiles()?.forEach { file ->
             val name = file.name
             val ours = name.contains("story_video") || name.contains("compressed_") ||
                 name.contains("thumbnail_") || name.contains("Glowsy") ||
+                name.contains("video_upload_") ||
                 name.endsWith(".mp4") || name.endsWith(".mov") ||
                 name.endsWith(".jpg") || name.endsWith(".jpeg") ||
                 name.endsWith(".m4a") || name.endsWith(".wav")

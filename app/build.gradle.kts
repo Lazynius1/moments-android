@@ -22,6 +22,10 @@ android {
         versionName = "0.1.0"
         buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"REPLACE_WHEN_YOU_HAVE_GOOGLE_KEY\"")
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = "REPLACE_WHEN_YOU_HAVE_GOOGLE_KEY"
+        // Snap Camera Kit ≡ iOS Info.plist SCCameraKit* + SnapCameraKit.plist (vacío = no configurado).
+        buildConfigField("String", "SC_CAMERA_KIT_API_TOKEN", "\"\"")
+        buildConfigField("String", "SC_CAMERA_KIT_CLIENT_ID", "\"\"")
+        buildConfigField("String", "SC_CAMERA_KIT_LENS_GROUP_ID", "\"6249bcf5-6bb2-4845-9021-0a6c5464963f\"")
     }
 
     buildFeatures {

@@ -91,7 +91,7 @@ object FCMTokenService {
     }
 
     private fun notifyBackendTokenCleared(userId: String) {
-        // REPLACE_WHEN_YOU_HAVE_GOOGLE_KEY: Cloud Function clearUserToken si el backend lo expone.
+        // ≡ iOS stub: futuro httpsCallable("clearUserToken") si el backend lo expone.
         android.util.Log.d(TAG, "FCM token cleared for $userId")
     }
 

@@ -3,11 +3,9 @@ package com.moments.android.models
 import java.util.Date
 
 /**
- * Afinidad hacia otro usuario, calculada en local. Nunca sale del dispositivo; se usa
- * para ordenar feeds y sugerencias. Equivalente al @Model (SwiftData) UserAffinity de iOS.
- *
- * NOTA: la persistencia local (SwiftData → Room) se añadirá al montar la capa de caché;
- * por ahora es solo el modelo de datos.
+ * Port de `Models/UserAffinity.swift`.
+ * Afinidad local hacia otro usuario; nunca sale del dispositivo (feeds/sugerencias).
+ * Persistencia vía AffinityTracker (SharedPrefs ≈ SwiftData).
  */
 data class UserAffinity(
     val ownerUserId: String,
@@ -16,10 +14,11 @@ data class UserAffinity(
     val lastInteractionDate: Date = Date(),
     val interactionCounts: Map<String, Int> = emptyMap(),
 ) {
-    /** Clave compuesta única: ownerUserId|targetUserId (evita mezclar cuentas locales). */
+    /** Clave compuesta: ownerUserId|targetUserId */
     val affinityKey: String get() = makeAffinityKey(ownerUserId, targetUserId)
 
     companion object {
-        fun makeAffinityKey(ownerUserId: String, targetUserId: String): String = "$ownerUserId|$targetUserId"
+        fun makeAffinityKey(ownerUserId: String, targetUserId: String): String =
+            "$ownerUserId|$targetUserId"
     }
 }

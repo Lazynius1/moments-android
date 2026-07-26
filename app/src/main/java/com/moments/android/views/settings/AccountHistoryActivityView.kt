@@ -173,11 +173,11 @@ private fun HistoryFilters(
         }
         HistoryChipMenu(
             titleRes = R.string.user_activity_filters_type,
-            value = selectedType?.let { stringResource(it.titleRes()) } ?: stringResource(R.string.user_activity_account_history_filter_all),
+            value = selectedType?.let { stringResource(it.labelRes) } ?: stringResource(R.string.user_activity_account_history_filter_all),
         ) { dismiss ->
             DropdownMenuItem(text = { Text(stringResource(R.string.user_activity_account_history_filter_all)) }, onClick = { onType(null); dismiss() })
             AccountHistoryEventType.entries.forEach { type ->
-                DropdownMenuItem(text = { Text(stringResource(type.titleRes())) }, onClick = { onType(type); dismiss() })
+                DropdownMenuItem(text = { Text(stringResource(type.labelRes)) }, onClick = { onType(type); dismiss() })
             }
         }
     }
@@ -227,7 +227,7 @@ private fun AccountHistoryRow(
         }
 
         Column(Modifier.weight(1f).padding(top = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(stringResource(item.type.titleRes()), fontSize = 16.sp, fontWeight = FontWeight.Medium, color = primary)
+            Text(stringResource(item.type.labelRes), fontSize = 16.sp, fontWeight = FontWeight.Medium, color = primary)
             Text(MomentsFormat.smartDate(from = item.timestamp, context = MomentsFormat.DateContext.MEDIUM_DATE_TIME), fontSize = 13.sp, color = Color.Gray)
 
             val old = item.oldValue
@@ -254,14 +254,6 @@ private fun ChangeLine(@StringRes labelRes: Int, value: String, labelColor: Colo
 }
 
 // MARK: - Helpers
-
-private fun AccountHistoryEventType.titleRes(): Int = when (this) {
-    AccountHistoryEventType.JOIN -> R.string.user_activity_account_history_type_join
-    AccountHistoryEventType.USERNAME -> R.string.user_activity_account_history_type_username
-    AccountHistoryEventType.BIO -> R.string.user_activity_account_history_type_bio
-    AccountHistoryEventType.WEBSITE -> R.string.user_activity_account_history_type_website
-    AccountHistoryEventType.PRIVACY -> R.string.user_activity_account_history_type_privacy
-}
 
 private fun AccountHistoryEventType.icon(): ImageVector = when (this) {
     AccountHistoryEventType.JOIN -> Icons.Filled.PersonAdd

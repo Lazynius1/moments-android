@@ -21,12 +21,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -37,17 +42,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
 import com.moments.android.R
-import com.moments.android.coordinators.AppRouter
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.Echo
 import com.moments.android.models.EchoStatus
@@ -60,17 +67,20 @@ import java.util.Date
 
 /**
  * Port 1:1 de `EchoHistoryView.swift`.
- * Tap → [AppRouter.Destination.Echo] (visor completo cuando exista).
+ * Tap → fullScreenCover [EchoViewerUI] (history permanece debajo).
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EchoHistoryView(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
+    val canvas = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     val primary = if (isDark) Color.White else Color.Black
     var echoes by remember { mutableStateOf<List<Echo>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var selectedEcho by remember { mutableStateOf<Echo?>(null) }
     var showInfoSheet by remember { mutableStateOf(false) }
     val activeCount = echoes.count { it.status == EchoStatus.ACTIVE }
 
@@ -88,54 +98,72 @@ fun EchoHistoryView(
         onDispose { registration?.remove() }
     }
 
-    Box(modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            EchoHistoryHeader(
-                primary = primary,
-                onDismiss = onDismiss,
-                onInfo = { showInfoSheet = true },
-            )
-            when {
-                isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = primary, strokeWidth = 2.dp)
+    Column(modifier.fillMaxSize().background(canvas)) {
+        EchoHistoryHeader(
+            primary = primary,
+            onDismiss = onDismiss,
+            onInfo = { showInfoSheet = true },
+        )
+        when {
+            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = primary, strokeWidth = 2.dp)
+            }
+            echoes.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                EchoHistoryEmpty(primary = primary)
+            }
+            else -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(
+                    Modifier.padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    // ≡ waveform.path.ecg / dot.radiowaves.left.and.right
+                    InfoChip(icon = Icons.Filled.GraphicEq, text = "${echoes.size} Echoes", primary = primary)
+                    InfoChip(
+                        icon = Icons.Filled.Sensors,
+                        text = "$activeCount ${stringResource(R.string.echo_status_active)}",
+                        primary = primary,
+                    )
                 }
-                echoes.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    EchoHistoryEmpty(primary = primary)
-                }
-                else -> Column(Modifier.fillMaxSize()) {
-                    Row(
-                        Modifier.padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        InfoChip(text = "${echoes.size} Echoes", primary = primary)
-                        InfoChip(
-                            text = "$activeCount ${stringResource(R.string.echo_status_active)}",
+                LazyColumn(
+                    Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(echoes, key = { it.id.orEmpty() }) { echo ->
+                        EchoHistoryCard(
+                            echo = echo,
                             primary = primary,
+                            onTap = { selectedEcho = echo },
                         )
                     }
-                    Spacer(Modifier.height(14.dp))
-                    LazyColumn(
-                        Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(echoes, key = { it.id.orEmpty() }) { echo ->
-                            EchoHistoryCard(
-                                echo = echo,
-                                primary = primary,
-                                onTap = {
-                                    val id = echo.id ?: return@EchoHistoryCard
-                                    AppRouter.navigate(AppRouter.Destination.Echo(id))
-                                    onDismiss()
-                                },
-                            )
-                        }
-                        item { Spacer(Modifier.height(20.dp)) }
-                    }
+                    item { Spacer(Modifier.height(20.dp)) }
                 }
             }
         }
+    }
 
-        if (showInfoSheet) {
+    // ≡ .fullScreenCover(item: $selectedEcho)
+    selectedEcho?.let { echo ->
+        Dialog(
+            onDismissRequest = { selectedEcho = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            EchoViewerUI(
+                echoId = echo.id.orEmpty(),
+                initialEcho = echo,
+                onDismiss = { selectedEcho = null },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+
+    // ≡ .sheet + presentationDetents([.medium, .large])
+    if (showInfoSheet) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        ModalBottomSheet(
+            onDismissRequest = { showInfoSheet = false },
+            sheetState = sheetState,
+            containerColor = canvas,
+        ) {
             EchoHistoryInfoSheet(onDismiss = { showInfoSheet = false }, primary = primary)
         }
     }
@@ -161,7 +189,7 @@ private fun EchoHistoryHeader(
                     .clickable(onClick = onDismiss),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.KeyboardArrowDown, null, tint = primary)
+                Icon(Icons.Filled.KeyboardArrowDown, null, tint = primary, modifier = Modifier.size(16.dp))
             }
             Box(
                 Modifier
@@ -170,7 +198,7 @@ private fun EchoHistoryHeader(
                     .clickable(onClick = onInfo),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Info, null, tint = primary, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Info, null, tint = primary, modifier = Modifier.size(16.dp))
             }
         }
         Text(
@@ -210,16 +238,17 @@ private fun EchoHistoryEmpty(primary: Color) {
 }
 
 @Composable
-private fun InfoChip(text: String, primary: Color) {
-    Text(
-        text,
-        color = primary,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier
+private fun InfoChip(icon: ImageVector, text: String, primary: Color) {
+    Row(
+        Modifier
             .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = false)
             .padding(horizontal = 10.dp, vertical = 6.dp),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(icon, null, tint = primary, modifier = Modifier.size(12.dp))
+        Text(text, color = primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    }
 }
 
 @Composable
@@ -313,7 +342,7 @@ private fun EchoHistoryCard(
                     .background(statusColor.copy(alpha = 0.12f))
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
-            Icon(Icons.Filled.KeyboardArrowRight, null, tint = secondary, modifier = Modifier.size(14.dp))
+            Icon(Icons.Filled.KeyboardArrowRight, null, tint = secondary, modifier = Modifier.size(12.dp))
         }
     }
 }
@@ -321,12 +350,7 @@ private fun EchoHistoryCard(
 @Composable
 private fun EchoHistoryInfoSheet(onDismiss: () -> Unit, primary: Color) {
     val secondary = primary.copy(alpha = 0.6f)
-    Column(
-        Modifier
-            .fillMaxSize()
-            .momentsChromeGlass(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), interactive = false)
-            .padding(bottom = 24.dp),
-    ) {
+    Column(Modifier.padding(bottom = 24.dp)) {
         Box(
             Modifier
                 .fillMaxWidth()
@@ -341,7 +365,7 @@ private fun EchoHistoryInfoSheet(onDismiss: () -> Unit, primary: Color) {
                     .align(Alignment.CenterStart),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = primary)
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = primary, modifier = Modifier.size(16.dp))
             }
             Text(
                 stringResource(R.string.echo_info_title),

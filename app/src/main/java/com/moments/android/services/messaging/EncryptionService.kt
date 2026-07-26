@@ -5,13 +5,12 @@ import android.util.Base64
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.moments.android.models.ChatMediaPurpose
+import com.moments.android.views.messaging.core.ChatMediaPurpose
 import com.moments.android.models.ChatAccessState
 import com.moments.android.models.ChatIdentityRecord
 import com.moments.android.models.ChatRecoveryAttemptState
 import com.moments.android.models.ChatRecoveryBundle
-import com.moments.android.models.EncryptedChatMediaMetadata
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.EncryptedChatMediaMetadata
 import com.moments.android.models.WrappedConversationKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -27,14 +26,11 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Port progresivo de EncryptionService.swift.
- *
- * Crypto REAL: AES-GCM, HKDF-SHA256, PBKDF2 (ChatRecoveryCrypto), Android Keystore,
- * X25519 ECDH (BouncyCastle) para wrappedKeys, claves legacy Firestore, Nova blobs.
+ * Port de `EncryptionService.swift` (contrato crypto + identidad/recuperación + media/Nova).
+ * AES-GCM / HKDF / PBKDF2 / X25519 viven en helpers de plataforma
+ * (`CryptoHelpers`, `Curve25519Helper`, `EncryptionKeyStore`, `ChatRecoveryCrypto`).
  */
 object EncryptionService {
-
-    class NotPortedYet(message: String) : Exception(message)
 
     sealed class EncryptionError(message: String) : Exception(message) {
         object InvalidInput : EncryptionError("invalid input")
@@ -67,6 +63,11 @@ object EncryptionService {
     private const val CHAT_MEDIA_SALT = "moments.chat.media.salt.v1"
     private const val CHAT_WRAP_INFO = "moments.chat.wrap.v1"
     private const val CURVE25519_PRIVATE_KEY_BYTES = 32
+    // Firestore paths (mismos strings literales que iOS)
+    private const val USERS_COLLECTION = "users"
+    private const val CHAT_KEY_FIELD = "chatKey"
+    private const val CHAT_RECOVERY_COLLECTION = "chatRecovery"
+    private const val CHAT_RECOVERY_DOC = "default"
 
     @Volatile private var initialized = false
     @Volatile private var appContext: Context? = null
@@ -148,9 +149,6 @@ object EncryptionService {
         }
     }
 
-    suspend fun conversationKey(conversationId: String): ByteArray? =
-        runCatching { getConversationKey(conversationId) }.getOrNull()
-
     // MARK: - Chat media (REAL cuando hay clave de conversación)
 
     suspend fun decryptChatMediaFile(
@@ -158,6 +156,7 @@ object EncryptionService {
         outputFile: File,
         conversationId: String,
         metadata: EncryptedChatMediaMetadata,
+        messageId: String,
     ) = withContext(Dispatchers.IO) {
         requireInitialized()
         if (metadata.version != ChatMediaChunkedCipher.METADATA_VERSION ||
@@ -166,10 +165,10 @@ object EncryptionService {
             throw EncryptionError.DecryptionFailed
         }
         val convKey = getConversationKey(conversationId)
-        val mediaKey = deriveChatMediaKey(convKey, conversationId, metadata.mediaId, metadata.purpose)
+        val mediaKey = deriveChatMediaKey(convKey, conversationId, messageId, metadata.purpose)
         val aad = mediaAuthenticatedData(
             conversationId,
-            metadata.mediaId,
+            messageId,
             metadata.purpose,
             metadata.contentType,
         )
@@ -284,7 +283,10 @@ object EncryptionService {
 
     suspend fun chatAccessState(): ChatAccessState = withContext(Dispatchers.IO) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid
-            ?: return@withContext ChatAccessState.Unavailable("User not authenticated")
+            ?: return@withContext ChatAccessState.Unavailable(
+                appContext?.getString(com.moments.android.R.string.messaging_error_not_authenticated)
+                    ?: "User not authenticated",
+            )
         try {
             val hasLocalIdentity = hasLocalChatIdentity(userId)
             val hasRecoveryBundle = hasChatRecoveryBundle(userId)
@@ -324,10 +326,10 @@ object EncryptionService {
     }
 
     suspend fun hasChatRecoveryBundle(userId: String): Boolean = withContext(Dispatchers.IO) {
-        db.collection(ChatIdentityContract.usersCollection)
-            .document(ChatIdentityContract.requireUserId(userId))
-            .collection(ChatIdentityContract.recoveryCollection)
-            .document(ChatIdentityContract.recoveryDocumentId)
+        db.collection(USERS_COLLECTION)
+            .document(requireUserId(userId))
+            .collection(CHAT_RECOVERY_COLLECTION)
+            .document(CHAT_RECOVERY_DOC)
             .get()
             .await()
             .exists()
@@ -336,6 +338,23 @@ object EncryptionService {
     fun chatRecoveryAttemptState(userId: String? = FirebaseAuth.getInstance().currentUser?.uid): ChatRecoveryAttemptState {
         if (userId.isNullOrBlank()) return ChatRecoveryAttemptState(maxAttempts = CHAT_RECOVERY_MAX_ATTEMPTS)
         return currentRecoveryAttemptState(userId)
+    }
+
+    /** Port de `chatRecoveryLockoutMessage(for:)`. */
+    fun chatRecoveryLockoutMessage(state: ChatRecoveryAttemptState): String? {
+        val remaining = state.remainingLockoutInterval ?: return null
+        val ctx = appContext ?: return null
+        return ctx.getString(
+            com.moments.android.R.string.chat_recovery_error_locked_timer,
+            formatRecoveryLockoutDuration(remaining),
+        )
+    }
+
+    private fun formatRecoveryLockoutDuration(intervalSeconds: Double): String {
+        val totalSeconds = maxOf(1, kotlin.math.ceil(intervalSeconds).toInt())
+        val minutes = totalSeconds / 60
+        val seconds = totalSeconds % 60
+        return "%d:%02d".format(minutes, seconds)
     }
 
     suspend fun createRecoveryBundle(pin: String) = withContext(Dispatchers.IO) {
@@ -364,10 +383,10 @@ object EncryptionService {
             kdfParams = kdfParams,
             encryptedUserKey = Base64.encodeToString(encryptedUserKey, Base64.NO_WRAP),
         )
-        db.collection(ChatIdentityContract.usersCollection)
+        db.collection(USERS_COLLECTION)
             .document(userId)
-            .collection(ChatIdentityContract.recoveryCollection)
-            .document(ChatIdentityContract.recoveryDocumentId)
+            .collection(CHAT_RECOVERY_COLLECTION)
+            .document(CHAT_RECOVERY_DOC)
             .set(bundle.asFirestoreData(), com.google.firebase.firestore.SetOptions.merge())
             .await()
         syncChatIdentityRecord(identity, userId)
@@ -381,10 +400,10 @@ object EncryptionService {
         val attempts = currentRecoveryAttemptState(userId)
         if (attempts.isLocked) throw EncryptionError.RecoveryLocked(attempts.remainingLockout)
         val normalizedPin = validateRecoveryPin(pin)
-        val snapshot = db.collection(ChatIdentityContract.usersCollection)
+        val snapshot = db.collection(USERS_COLLECTION)
             .document(userId)
-            .collection(ChatIdentityContract.recoveryCollection)
-            .document(ChatIdentityContract.recoveryDocumentId)
+            .collection(CHAT_RECOVERY_COLLECTION)
+            .document(CHAT_RECOVERY_DOC)
             .get()
             .await()
         val bundle = snapshot.data?.let { ChatRecoveryBundle.from(it) } ?: throw EncryptionError.KeyNotFound
@@ -449,10 +468,10 @@ object EncryptionService {
         val trimmed = pin.trim()
         if (trimmed.length != 6 || !trimmed.all(Char::isDigit)) return@withContext false
         runCatching {
-            val snapshot = db.collection(ChatIdentityContract.usersCollection)
+            val snapshot = db.collection(USERS_COLLECTION)
                 .document(userId)
-                .collection(ChatIdentityContract.recoveryCollection)
-                .document(ChatIdentityContract.recoveryDocumentId)
+                .collection(CHAT_RECOVERY_COLLECTION)
+                .document(CHAT_RECOVERY_DOC)
                 .get()
                 .await()
             val bundle = snapshot.data?.let { ChatRecoveryBundle.from(it) } ?: return@runCatching false
@@ -499,14 +518,6 @@ object EncryptionService {
             requireInitialized()
             val key = getConversationKey(conversationId)
             decryptText(encryptedText, key)
-        }.onFailure {
-            // Diagnóstico temporal (sin loguear texto ni claves): distingue "sin clave" de
-            // "clave equivocada" (AEADBadTagException) para localizar el bug de mensajes cifrados
-            // tras restaurar identidad. Quitar cuando esté confirmado y arreglado.
-            android.util.Log.w(
-                "EncryptionService",
-                "decryptChatMessage failed conv=$conversationId cause=${it::class.simpleName}: ${it.message}",
-            )
         }.getOrDefault(encryptedText)
     }
 
@@ -566,27 +577,23 @@ object EncryptionService {
             if (wrappedKeyMap != null) {
                 val wrapped = WrappedConversationKey.from(wrappedKeyMap)
                     ?: throw EncryptionError.DecryptionFailed
-                return@withContext runCatching { unwrapConversationKey(wrapped, currentUserId) }
-                    .onFailure {
-                        // Diagnóstico temporal: si esto falla con AEADBadTagException, la clave
-                        // de conversación fue envuelta contra una clave pública distinta a la
-                        // identidad local vigente (p. ej. Firestore corrompido con la identidad
-                        // equivocada antes de restaurar). Quitar cuando esté confirmado/arreglado.
-                        android.util.Log.w(
-                            "EncryptionService",
-                            "unwrapConversationKey failed conv=$conversationId wrappedBy=${wrapped.wrappedBy} cause=${it::class.simpleName}: ${it.message}",
-                        )
-                    }.getOrThrow()
+                return@withContext unwrapConversationKey(wrapped, currentUserId)
             }
 
             (data["sharedEncryptionKey"] as? String)?.let { keyB64 ->
                 val keyData = Base64.decode(keyB64, Base64.DEFAULT)
-                if (keyData.isNotEmpty()) return@withContext keyData
+                if (keyData.isNotEmpty()) {
+                    upgradeLegacyConversationKeyIfPossible(conversationId, data, keyData, currentUserId)
+                    return@withContext keyData
+                }
             }
 
             (data["encryptionKey"] as? String)?.let { keyB64 ->
                 val keyData = Base64.decode(keyB64, Base64.DEFAULT)
-                if (keyData.isNotEmpty()) return@withContext keyData
+                if (keyData.isNotEmpty()) {
+                    upgradeLegacyConversationKeyIfPossible(conversationId, data, keyData, currentUserId)
+                    return@withContext keyData
+                }
             }
 
             val participants = (data["participants"] as? List<*>)?.filterIsInstance<String>().orEmpty()
@@ -596,6 +603,99 @@ object EncryptionService {
 
             throw EncryptionError.KeyNotFound
         }
+
+    /**
+     * Port de `upgradeLegacyConversationKeyIfPossible`: migra clave en claro → wrappedKeys
+     * y borra campos legacy solo cuando todos los participantes quedan cubiertos.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun upgradeLegacyConversationKeyIfPossible(
+        conversationId: String,
+        conversationData: Map<String, Any>,
+        conversationKey: ByteArray,
+        currentUserId: String,
+    ) {
+        val participants = (conversationData["participants"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+        if (participants.isEmpty() || currentUserId !in participants) return
+
+        val existingWrappedKeys = (conversationData["wrappedKeys"] as? Map<String, Any>).orEmpty()
+        val missingParticipants = participants.filter { existingWrappedKeys[it] == null }
+
+        val newWrappedKeys = if (missingParticipants.isNotEmpty()) {
+            val built = runCatching {
+                buildWrappedConversationKeys(missingParticipants, conversationKey, currentUserId)
+            }.getOrNull() ?: return
+            if (built.size != missingParticipants.size) return
+            built
+        } else {
+            emptyMap()
+        }
+
+        val upgradeData = mutableMapOf<String, Any>(
+            "conversationKeyVersion" to 1,
+            "encryptionVersion" to "3.0",
+            "sharedEncryptionKey" to FieldValue.delete(),
+            "encryptionKey" to FieldValue.delete(),
+            "encryptionKeyCreatedAt" to FieldValue.delete(),
+            "keyMetadata" to FieldValue.delete(),
+        )
+        if (newWrappedKeys.isNotEmpty()) {
+            upgradeData["wrappedKeys"] = newWrappedKeys
+        }
+
+        runCatching {
+            db.collection("conversations").document(conversationId)
+                .set(upgradeData, com.google.firebase.firestore.SetOptions.merge())
+                .await()
+        }
+    }
+
+    /** Port de `buildWrappedConversationKeys` — omite participantes sin identidad (como iOS). */
+    suspend fun buildWrappedConversationKeys(
+        participantIds: List<String>,
+        conversationKey: ByteArray,
+        wrappedBy: String,
+    ): Map<String, Map<String, Any>> {
+        val wrappedKeys = mutableMapOf<String, Map<String, Any>>()
+        for (participantId in participantIds) {
+            val identity = fetchChatIdentity(participantId) ?: continue
+            val wrapped = wrapConversationKey(
+                conversationKey,
+                identity.publicKeyBase64,
+                identity.keyId,
+                wrappedBy,
+            )
+            wrappedKeys[participantId] = wrapped.asFirestoreData()
+        }
+        return wrappedKeys
+    }
+
+    /**
+     * Port de `createNewSharedConversationKey`.
+     * Sin fallback en claro: si no se puede wrappear para todos → PeerKeyUnavailable.
+     */
+    private suspend fun createAndPublishConversationKey(
+        conversationId: String,
+        participants: List<String>,
+        currentUserId: String,
+    ): ByteArray {
+        val conversationKey = CryptoHelpers.randomBytes(32)
+        val wrappedMaps = buildWrappedConversationKeys(participants, conversationKey, currentUserId)
+        if (wrappedMaps.size != participants.size) {
+            throw EncryptionError.PeerKeyUnavailable
+        }
+
+        db.collection("conversations").document(conversationId).set(
+            mapOf(
+                "wrappedKeys" to wrappedMaps,
+                "conversationKeyVersion" to 1,
+                "encryptionVersion" to "3.0",
+            ),
+            com.google.firebase.firestore.SetOptions.merge(),
+        ).await()
+
+        return conversationKey
+    }
 
     /** Desenvuelve clave de conversación (paridad unwrapConversationKey iOS). */
     private fun unwrapConversationKey(wrappedKey: WrappedConversationKey, userId: String): ByteArray {
@@ -644,8 +744,8 @@ object EncryptionService {
         )
     }
 
-    /** Crea la clave privada local; [ensureChatIdentity] publica el registro canónico. */
-    fun ensureLocalChatIdentity(userId: String): ByteArray {
+    /** Crea/lee la clave privada local; [ensureChatIdentity] publica el registro canónico. */
+    private fun ensureLocalChatIdentity(userId: String): ByteArray {
         requireInitialized()
         val tag = CHAT_IDENTITY_KEY_PREFIX + userId
         EncryptionKeyStore.retrieve(tag)?.let { return it }
@@ -654,56 +754,19 @@ object EncryptionService {
         return pair.privateKey
     }
 
-    fun localChatPublicKeyBase64(userId: String): String? {
-        val privateKey = EncryptionKeyStore.retrieve(CHAT_IDENTITY_KEY_PREFIX + userId) ?: return null
-        val publicKey = Curve25519Helper.publicKeyFromPrivate(privateKey)
-        return Base64.encodeToString(publicKey, Base64.NO_WRAP)
-    }
-
-    /** Reads iOS' canonical `users/{uid}.chatKey` field, never the legacy Android-only collection. */
+    /** Lee `users/{uid}.chatKey` (campo canónico iOS). */
     suspend fun fetchChatIdentity(userId: String): ChatIdentityRecord? = withContext(Dispatchers.IO) {
-        val normalizedUserId = ChatIdentityContract.requireUserId(userId)
+        val normalizedUserId = requireUserId(userId)
         if (normalizedUserId == FirebaseAuth.getInstance().currentUser?.uid) {
             return@withContext ensureChatIdentity()
         }
-        val snapshot = db.collection(ChatIdentityContract.usersCollection)
+        val snapshot = db.collection(USERS_COLLECTION)
             .document(normalizedUserId)
             .get()
             .await()
         @Suppress("UNCHECKED_CAST")
-        val chatKey = snapshot.data?.get(ChatIdentityContract.identityField) as? Map<String, Any?>
+        val chatKey = snapshot.data?.get(CHAT_KEY_FIELD) as? Map<String, Any?>
         chatKey?.let(ChatIdentityRecord::from)
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private suspend fun createAndPublishConversationKey(
-        conversationId: String,
-        participants: List<String>,
-        currentUserId: String,
-    ): ByteArray {
-        val conversationKey = CryptoHelpers.randomBytes(32)
-        val wrappedBy = currentUserId
-        val wrappedMaps = mutableMapOf<String, Map<String, Any>>()
-
-        for (participantId in participants) {
-            val identity = fetchChatIdentity(participantId) ?: throw EncryptionError.PeerKeyUnavailable
-            val wrapped = wrapConversationKey(
-                conversationKey,
-                identity.publicKeyBase64,
-                identity.keyId,
-                wrappedBy,
-            )
-            wrappedMaps[participantId] = wrapped.asFirestoreData()
-        }
-
-        db.collection("conversations").document(conversationId).update(
-            mapOf(
-                "wrappedKeys" to wrappedMaps,
-                "encryptionVersion" to "3.0",
-            ),
-        ).await()
-
-        return conversationKey
     }
 
     private fun deriveNovaBlobKey(userKey: ByteArray, userId: String, purpose: String): ByteArray =
@@ -897,16 +960,9 @@ object EncryptionService {
         @Suppress("UNCHECKED_CAST")
         val participants = (snapshot.data?.get("participants") as? List<*>)?.filterIsInstance<String>()
             ?: listOf(currentUserId)
-        val wrappedMaps = mutableMapOf<String, Map<String, Any>>()
-        for (participantId in participants) {
-            val identity = fetchChatIdentity(participantId) ?: throw EncryptionError.PeerKeyUnavailable
-            wrappedMaps[participantId] = wrapConversationKey(
-                newKey,
-                identity.publicKeyBase64,
-                identity.keyId,
-                currentUserId,
-            ).asFirestoreData()
-        }
+        val wrappedMaps = buildWrappedConversationKeys(participants, newKey, currentUserId)
+        if (wrappedMaps.size != participants.size) throw EncryptionError.PeerKeyUnavailable
+
         db.collection("conversations").document(conversationId).set(
             mapOf(
                 "wrappedKeys" to wrappedMaps,
@@ -942,6 +998,18 @@ object EncryptionService {
         EncryptionKeyStore.delete(CONVERSATION_KEYS_PREFIX + conversationId)
     }
 
+    /** ≡ `SymmetricKey(size: .bits256)` al crear conversación. */
+    fun randomConversationKey(): ByteArray = CryptoHelpers.randomBytes(32)
+
+    /** ≡ `cacheConversationKeyLocally(conversationId:key:)`. */
+    suspend fun cacheConversationKeyLocally(conversationId: String, key: ByteArray) {
+        if (conversationId.isBlank() || key.isEmpty()) return
+        conversationKeyCache[conversationId] = key
+        withContext(Dispatchers.IO) {
+            EncryptionKeyStore.store(CONVERSATION_KEYS_PREFIX + conversationId, key)
+        }
+    }
+
     suspend fun toggleEncryption(enabled: Boolean) {
         isEncryptionEnabled = enabled
     }
@@ -957,10 +1025,10 @@ object EncryptionService {
 
     private suspend fun syncChatIdentityRecord(record: ChatIdentityRecord, userId: String) {
         persistLocalChatKeyId(record.keyId, userId)
-        db.collection(ChatIdentityContract.usersCollection)
-            .document(ChatIdentityContract.requireUserId(userId))
+        db.collection(USERS_COLLECTION)
+            .document(requireUserId(userId))
             .set(
-                mapOf(ChatIdentityContract.identityField to record.asFirestoreData()),
+                mapOf(CHAT_KEY_FIELD to record.asFirestoreData()),
                 com.google.firebase.firestore.SetOptions.merge(),
             )
             .await()
@@ -977,19 +1045,19 @@ object EncryptionService {
         }
         storedLocalChatKeyId(userId)?.takeIf(String::isNotBlank)?.let { return it }
 
-        val userSnapshot = db.collection(ChatIdentityContract.usersCollection).document(userId).get().await()
+        val userSnapshot = db.collection(USERS_COLLECTION).document(userId).get().await()
         @Suppress("UNCHECKED_CAST")
-        val remoteIdentity = (userSnapshot.data?.get(ChatIdentityContract.identityField) as? Map<String, Any?>)
+        val remoteIdentity = (userSnapshot.data?.get(CHAT_KEY_FIELD) as? Map<String, Any?>)
             ?.let(ChatIdentityRecord::from)
         if (remoteIdentity?.publicKeyBase64 == publicKeyBase64) {
             persistLocalChatKeyId(remoteIdentity.keyId, userId)
             return remoteIdentity.keyId
         }
 
-        val recoverySnapshot = db.collection(ChatIdentityContract.usersCollection)
+        val recoverySnapshot = db.collection(USERS_COLLECTION)
             .document(userId)
-            .collection(ChatIdentityContract.recoveryCollection)
-            .document(ChatIdentityContract.recoveryDocumentId)
+            .collection(CHAT_RECOVERY_COLLECTION)
+            .document(CHAT_RECOVERY_DOC)
             .get()
             .await()
         val recoveryKeyId = recoverySnapshot.data
@@ -1044,6 +1112,10 @@ object EncryptionService {
         return trimmed
     }
 
+    private fun requireUserId(userId: String): String = userId.trim().also {
+        require(it.isNotEmpty()) { "A chat identity requires a user id" }
+    }
+
     private fun identityPrefs() =
         (appContext ?: error("EncryptionService.initialize required"))
             .getSharedPreferences(CHAT_IDENTITY_PREFS, Context.MODE_PRIVATE)
@@ -1092,25 +1164,5 @@ object EncryptionService {
             .remove(CHAT_RECOVERY_ATTEMPTS_PREFIX + userId)
             .remove(CHAT_RECOVERY_LOCKOUT_PREFIX + userId)
             .apply()
-    }
-}
-
-/**
- * Firestore paths owned by EncryptionService.swift's identity/recovery section.
- * Keeping it in this Kotlin file preserves the iOS ↔ Android source mapping.
- */
-internal object ChatIdentityContract {
-    const val usersCollection = "users"
-    const val identityField = "chatKey"
-    const val recoveryCollection = "chatRecovery"
-    const val recoveryDocumentId = "default"
-
-    fun userDocumentPath(userId: String): String = "$usersCollection/${requireUserId(userId)}"
-
-    fun recoveryBundlePath(userId: String): String =
-        "${userDocumentPath(userId)}/$recoveryCollection/$recoveryDocumentId"
-
-    fun requireUserId(userId: String): String = userId.trim().also {
-        require(it.isNotEmpty()) { "A chat identity requires a user id" }
     }
 }

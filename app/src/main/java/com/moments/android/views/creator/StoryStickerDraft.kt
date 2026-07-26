@@ -25,6 +25,8 @@ data class StoryStickerDraft(
     val weatherSymbol: String? = null,
     val username: String? = null,
     val userId: String? = null,
+    /** Avatar mention — ≡ `StickerInteractionData.profileImagePath`. */
+    val profileImagePath: String? = null,
     /** iOS time sticker: hora en questionText, fecha en caption. */
     val questionText: String? = null,
     val caption: String? = null,
@@ -53,6 +55,8 @@ data class StoryStickerDraft(
     val contentScale: Double? = null,
     val contentOffsetX: Double? = null,
     val contentOffsetY: Double? = null,
+    /** ≡ StickerInteractionData.styleVariant — tipografía/estilo ciclable. */
+    val styleVariant: Int? = null,
     val revealType: String? = null,
     val revealPattern: String? = null,
     val revealPrimaryColor: String? = null,

@@ -1,8 +1,8 @@
 package com.moments.android.views.messaging.screens.chat
 
-import com.moments.android.models.Conversation
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageSyncCursor
+import com.moments.android.views.messaging.core.Conversation
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageSyncCursor
 import com.moments.android.views.messaging.components.ClusterMessageGrouper
 import com.moments.android.views.messaging.core.ChatRenderRow
 import com.moments.android.views.messaging.core.EnhancedChatViewModel

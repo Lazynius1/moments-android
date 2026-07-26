@@ -6,41 +6,107 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
-/** Port de `Views/Messaging/Services/ChatDraftStore.swift`. */
+/**
+ * Port de `ChatDraftStore.swift` + `Notification.Name` del mismo archivo.
+ * SharedFlow ≡ NotificationCenter (chatDraft / vanish / markedRead).
+ */
 sealed interface ChatDraftEvent {
     data class Changed(val conversationId: String) : ChatDraftEvent
-    data class VanishModeChanged(val conversationId: String) : ChatDraftEvent
+    /** ≡ `conversationVanishModeDidChange` — userInfo: conversationId + vanishModeActive. */
+    data class VanishModeChanged(val conversationId: String, val vanishModeActive: Boolean) : ChatDraftEvent
+    /** ≡ `conversationMarkedReadLocally`. */
     data class MarkedReadLocally(val conversationId: String) : ChatDraftEvent
 }
 
 object ChatDraftEvents {
     private val _events = MutableSharedFlow<ChatDraftEvent>(extraBufferCapacity = 32)
     val events: SharedFlow<ChatDraftEvent> = _events.asSharedFlow()
-    fun emit(event: ChatDraftEvent) { _events.tryEmit(event) }
+    fun emit(event: ChatDraftEvent) {
+        _events.tryEmit(event)
+    }
 }
 
 object ChatDraftStore {
-    private const val preferences = "chat_drafts"
-    private const val keyPrefix = "chatDraft"
+    private const val PREFS = "chat_drafts"
+    private const val KEY_PREFIX = "chatDraft"
 
-    fun draft(context: Context, conversationId: String, userId: String? = FirebaseAuth.getInstance().currentUser?.uid): String {
+    @Volatile private var appContext: Context? = null
+
+    fun initialize(context: Context) {
+        if (appContext == null) appContext = context.applicationContext
+    }
+
+    private fun prefs() =
+        (appContext ?: error("ChatDraftStore.initialize required"))
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    fun draft(
+        conversationId: String,
+        userId: String? = FirebaseAuth.getInstance().currentUser?.uid,
+    ): String {
         val key = storageKey(conversationId, userId) ?: return ""
-        return context.applicationContext.getSharedPreferences(preferences, Context.MODE_PRIVATE).getString(key, "").orEmpty()
+        return prefs().getString(key, null).orEmpty()
     }
 
-    fun setDraft(context: Context, text: String, conversationId: String, userId: String? = FirebaseAuth.getInstance().currentUser?.uid) {
+    fun draft(
+        context: Context,
+        conversationId: String,
+        userId: String? = FirebaseAuth.getInstance().currentUser?.uid,
+    ): String {
+        initialize(context)
+        return draft(conversationId, userId)
+    }
+
+    fun setDraft(
+        text: String,
+        conversationId: String,
+        userId: String? = FirebaseAuth.getInstance().currentUser?.uid,
+    ) {
         val key = storageKey(conversationId, userId) ?: return
-        val prefs = context.applicationContext.getSharedPreferences(preferences, Context.MODE_PRIVATE)
-        val previous = prefs.getString(key, "").orEmpty()
-        if (text.trim().isEmpty()) prefs.edit().remove(key).apply() else prefs.edit().putString(key, text).apply()
-        if (previous != prefs.getString(key, "").orEmpty()) ChatDraftEvents.emit(ChatDraftEvent.Changed(conversationId))
+        val p = prefs()
+        val previous = p.getString(key, null).orEmpty()
+        val normalized = text.trim()
+        if (normalized.isEmpty()) {
+            p.edit().remove(key).apply()
+        } else {
+            // iOS guarda `text` original (no trimmed) si normalized no está vacío.
+            p.edit().putString(key, text).apply()
+        }
+        val next = p.getString(key, null).orEmpty()
+        if (previous != next) {
+            ChatDraftEvents.emit(ChatDraftEvent.Changed(conversationId))
+        }
     }
 
-    fun clearDraft(context: Context, conversationId: String, userId: String? = FirebaseAuth.getInstance().currentUser?.uid) = setDraft(context, "", conversationId, userId)
+    fun setDraft(
+        context: Context,
+        text: String,
+        conversationId: String,
+        userId: String? = FirebaseAuth.getInstance().currentUser?.uid,
+    ) {
+        initialize(context)
+        setDraft(text, conversationId, userId)
+    }
+
+    fun clearDraft(
+        conversationId: String,
+        userId: String? = FirebaseAuth.getInstance().currentUser?.uid,
+    ) {
+        setDraft("", conversationId, userId)
+    }
+
+    fun clearDraft(
+        context: Context,
+        conversationId: String,
+        userId: String? = FirebaseAuth.getInstance().currentUser?.uid,
+    ) {
+        initialize(context)
+        clearDraft(conversationId, userId)
+    }
 
     private fun storageKey(conversationId: String, userId: String?): String? {
-        val clean = conversationId.trim()
-        if (clean.isBlank() || userId.isNullOrBlank()) return null
-        return "$keyPrefix.$userId.$clean"
+        val cleanConversationId = conversationId.trim()
+        if (userId.isNullOrBlank() || cleanConversationId.isEmpty()) return null
+        return "$KEY_PREFIX.$userId.$cleanConversationId"
     }
 }

@@ -67,9 +67,10 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import com.moments.android.R
-import com.moments.android.models.Conversation
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageType
+import com.moments.android.MomentsApplication
+import com.moments.android.views.messaging.core.Conversation
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.messaging.VanishMessageTimer
@@ -80,7 +81,12 @@ import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.messaging.services.ChatEncryptedMediaResolver
+import com.moments.android.views.messaging.services.setVanishMode
+import com.moments.android.views.messaging.services.sendChatNotice
+import com.moments.android.views.messaging.services.updateChatNotice
 import com.moments.android.views.feed.video.FeedVideoPage
+import com.moments.android.views.shared.ChatPreviewPrivacy
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 
 /** Port de `Views/Messaging/Screens/ConversationSettingsView.swift`. */
@@ -132,13 +138,22 @@ class ConversationSettingsViewModel(
     var messagePreviewEnabled by mutableStateOf(true)
     var buzzEnabled by mutableStateOf(true)
 
-    fun loadConversationData(value: Conversation) {
+    fun loadConversationData(value: Conversation, context: android.content.Context? = null) {
         conversation = value
         vanishModeActive = value.vanishModeActive == true
         vanishTimer = VanishMessageTimer.fromStored(value.vanishMessageTimer)
         notificationsEnabled = !value.isMuted(currentUserId)
         conversationMediaBytes = value.id?.let(ChatCacheStore::bytes) ?: 0L
         value.id?.let { conversationId ->
+            val prefsCtx = context ?: MomentsApplication.instance
+            if (prefsCtx != null) {
+                messagePreviewEnabled = ChatPreviewPrivacy.isUserPreviewEnabled(prefsCtx, conversationId)
+                val local = prefsCtx.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE)
+                readReceiptsEnabled = local.getBoolean("read_receipts_$conversationId", true)
+                forwardingEnabled = local.getBoolean("forwarding_$conversationId", true)
+                typingIndicatorEnabled = local.getBoolean("typing_$conversationId", true)
+                buzzEnabled = local.getBoolean("buzz_$conversationId", true)
+            }
             processMessages(LocalPersistenceService.loadMessagesFast(conversationId))
             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                 MessageCatchUpService.sync(conversationId)
@@ -189,7 +204,7 @@ class ConversationSettingsViewModel(
         sharedGalleryMessages = sharedGalleryMessages.filterNot { it.id == message.id }
         sharedMedia = sharedMedia.filterNot { it.id == message.id }
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            ChatService.deleteMessageForEveryone(id, message.id)
+            ChatService.deleteMessageWithCleanup(id, message.id)
         }
     }
 
@@ -207,7 +222,7 @@ class ConversationSettingsViewModel(
         vanishModeActive = active
         vanishTimer = timer
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            ChatService.setVanishMode(id, active, timer.takeIf { active })
+            ChatService.setVanishMode(id, active, currentUserId, timer.takeIf { active })
             val conversationRef = FirebaseFirestore.getInstance().collection("conversations").document(id)
             if (active) {
                 conversation?.vanishDisabledNoticeMessageId?.let { disabledId ->
@@ -240,11 +255,12 @@ class ConversationSettingsViewModel(
 
     fun persistPreferences(context: android.content.Context) {
         val id = conversation?.id ?: return
+        // Vista previa: misma clave que ChatPreviewPrivacy / NSE iOS App Group
+        ChatPreviewPrivacy.setUserPreviewEnabled(context, id, messagePreviewEnabled)
         context.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE).edit()
             .putBoolean("read_receipts_$id", readReceiptsEnabled)
             .putBoolean("forwarding_$id", forwardingEnabled)
             .putBoolean("typing_$id", typingIndicatorEnabled)
-            .putBoolean("preview_$id", messagePreviewEnabled)
             .putBoolean("buzz_$id", buzzEnabled)
             .apply()
         FirebaseFirestore.getInstance().collection("conversations").document(id).update(
@@ -339,6 +355,7 @@ fun ConversationSettingsView(
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
+    val context = LocalContext.current
     val model = remember(conversation.id) { ConversationSettingsViewModel() }
     var tab by remember { mutableStateOf(SharedContentTab.MEDIA) }
     var clearMediaConfirm by remember { mutableStateOf(false) }
@@ -347,7 +364,7 @@ fun ConversationSettingsView(
     var showPreferences by remember { mutableStateOf(false) }
     var showVanish by remember { mutableStateOf(false) }
     var selectedMedia by remember { mutableStateOf<SharedMedia?>(null) }
-    LaunchedEffect(conversation.id) { model.loadConversationData(conversation) }
+    LaunchedEffect(conversation.id) { model.loadConversationData(conversation, context) }
 
     Column(modifier.fillMaxSize().background(colors.chatBackground.first())) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {

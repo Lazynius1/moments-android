@@ -1,5 +1,6 @@
 package com.moments.android.coordinators
 
+import com.moments.android.models.StickerData
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -49,6 +50,16 @@ sealed class CoordinatorNavigationEvent {
         val chainTitle: String,
         val chainPosition: Int,
     ) : CoordinatorNavigationEvent()
+    /** iOS `AddResponseStickerToCreator`. */
+    data class AddResponseStickerToCreator(val sticker: StickerData) : CoordinatorNavigationEvent()
+    /** iOS `ContinueStoryChain`. */
+    data class ContinueStoryChain(
+        val chainId: String,
+        val chainTitle: String,
+        val chainPosition: Int,
+    ) : CoordinatorNavigationEvent()
+    /** iOS `CleanupVideoPlayer`. */
+    data object CleanupVideoPlayer : CoordinatorNavigationEvent()
     data class NavigateToUserProfile(val userId: String) : CoordinatorNavigationEvent()
     data object NavigateToOwnProfileTab : CoordinatorNavigationEvent()
     /** iOS NotificationCenter "NotificationsCleared". */

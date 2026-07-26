@@ -11,13 +11,16 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 enum class OnboardingDraftContext(val raw: String) {
-    /** Legacy iOS; en Android no se usa Sign in with Apple. */
-    APPLE("apple"),
     EMAIL("email"),
     GOOGLE("google");
 
     companion object {
-        fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: EMAIL
+        /** `"apple"` legacy (borradores viejos) → [EMAIL]. */
+        fun from(raw: String?) = when (raw) {
+            "google" -> GOOGLE
+            "email", "apple", null -> EMAIL
+            else -> entries.firstOrNull { it.raw == raw } ?: EMAIL
+        }
     }
 }
 
@@ -30,7 +33,6 @@ data class OnboardingDraft(
     var selectedInterests: List<String> = emptyList(),
     var privacyPolicyAccepted: Boolean = false,
     var profileImageFilename: String? = null,
-    var pendingAppleEmail: String? = null,
     var startedAt: Date = Date(),
     var updatedAt: Date = Date(),
 )
@@ -76,12 +78,10 @@ object OnboardingDraftStore {
     fun markStarted(
         context: OnboardingDraftContext,
         firebaseUID: String? = null,
-        pendingAppleEmail: String? = null,
     ) {
         val draft = load() ?: OnboardingDraft(context = context, firebaseUID = firebaseUID)
         draft.context = context
         if (firebaseUID != null) draft.firebaseUID = firebaseUID
-        if (pendingAppleEmail != null) draft.pendingAppleEmail = pendingAppleEmail
         draft.updatedAt = Date()
         save(draft)
     }
@@ -101,7 +101,6 @@ object OnboardingDraftStore {
         privacyPolicyAccepted: Boolean? = null,
         profileImage: Bitmap? = null,
         firebaseUID: String? = null,
-        pendingAppleEmail: String? = null,
     ) {
         val draft = load() ?: return
         if (step != null) draft.step = step.coerceIn(1, 3)
@@ -110,7 +109,6 @@ object OnboardingDraftStore {
         if (selectedInterests != null) draft.selectedInterests = selectedInterests
         if (privacyPolicyAccepted != null) draft.privacyPolicyAccepted = privacyPolicyAccepted
         if (firebaseUID != null) draft.firebaseUID = firebaseUID
-        if (pendingAppleEmail != null) draft.pendingAppleEmail = pendingAppleEmail
         if (profileImage != null) {
             draft.profileImageFilename?.let { removeProfileImage(it) }
             draft.profileImageFilename = saveProfileImage(profileImage)
@@ -157,7 +155,6 @@ object OnboardingDraftStore {
         put("selectedInterests", JSONArray(d.selectedInterests))
         put("privacyPolicyAccepted", d.privacyPolicyAccepted)
         put("profileImageFilename", d.profileImageFilename)
-        put("pendingAppleEmail", d.pendingAppleEmail)
         put("startedAt", d.startedAt.time)
         put("updatedAt", d.updatedAt.time)
     }
@@ -176,7 +173,6 @@ object OnboardingDraftStore {
             selectedInterests = interests,
             privacyPolicyAccepted = json.optBoolean("privacyPolicyAccepted"),
             profileImageFilename = json.optString("profileImageFilename").takeIf { it.isNotEmpty() && !json.isNull("profileImageFilename") },
-            pendingAppleEmail = json.optString("pendingAppleEmail").takeIf { it.isNotEmpty() && !json.isNull("pendingAppleEmail") },
             startedAt = Date(json.optLong("startedAt", System.currentTimeMillis())),
             updatedAt = Date(json.optLong("updatedAt", System.currentTimeMillis())),
         )

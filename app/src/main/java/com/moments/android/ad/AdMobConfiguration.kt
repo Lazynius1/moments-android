@@ -352,7 +352,6 @@ class PlusAdManager(
     }
 
     fun updateAdDisplayStatus() {
-        // Plus N/A on Android — no isPlusSubscriber / hasActivePlusSubscription on AppUser.
         _shouldShowAds.value = PlusStatusHelper.shouldShowAds(authService.currentUser.value)
         _isPlus.value = PlusStatusHelper.isActivePlus(authService.currentUser.value)
     }
@@ -360,14 +359,12 @@ class PlusAdManager(
     fun refreshAdStatus() = updateAdDisplayStatus()
 }
 
-/** Plus helpers — [AppUser] has no Plus fields; ads always shown for now. */
+/** ≡ iOS `shouldHideAds` / flag Plus básico (sin PlusSubscription 🚫). */
 object PlusStatusHelper {
-    /** Returns true unless user model gains `shouldHideAds` / active Plus subscription. */
     fun shouldShowAds(user: AppUser?): Boolean {
         user ?: return true
-        // Plus discarded in models — extend when Firestore Plus fields are ported.
-        return true
+        return !user.shouldHideAds
     }
 
-    fun isActivePlus(user: AppUser?): Boolean = false
+    fun isActivePlus(user: AppUser?): Boolean = user?.isPlusSubscriber == true
 }

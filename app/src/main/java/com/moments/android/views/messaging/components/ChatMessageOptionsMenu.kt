@@ -40,8 +40,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageType
 import java.util.Date
 
 data class ChatMessageMenuSelection(val rowId: String, val message: EnhancedMessage, val anchorFrame: Rect = Rect.Zero, val anchorCornerRadius: Float = ChatBubbleAnchorMetrics.cornerRadiusFor(message), val isOutgoing: Boolean, val clusterMessages: List<EnhancedMessage>? = null)

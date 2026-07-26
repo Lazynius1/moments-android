@@ -66,9 +66,9 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import coil.compose.AsyncImage
 import com.moments.android.R
-import com.moments.android.models.EnhancedMessage
-import com.moments.android.models.MessageStatus
-import com.moments.android.models.MessageType
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageStatus
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.models.ChatLocationPayload
 import com.moments.android.views.story.storyviewer.StoryReplyMessageBubble
 import java.net.URL

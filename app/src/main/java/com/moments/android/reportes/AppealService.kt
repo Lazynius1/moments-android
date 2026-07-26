@@ -3,6 +3,8 @@ package com.moments.android.reportes
 import android.content.Context
 import android.os.Build
 import com.moments.android.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -32,7 +34,7 @@ class AppealService private constructor(
         message: String,
         email: String,
         additionalInfo: String? = null,
-    ): AppealResponse {
+    ): AppealResponse = withContext(Dispatchers.IO) {
         if (userId.isEmpty()) throw AppealError.InvalidUserId
         if (message.isEmpty()) throw AppealError.EmptyMessage
 
@@ -55,7 +57,7 @@ class AppealService private constructor(
             appVersion = appVersion(),
         ).toJson()
 
-        return postJson(url, body) { (code, json) ->
+        postJson(url, body) { (code, json) ->
             val response = AppealResponse.fromJson(json)
             when (code) {
                 201 -> response
@@ -81,7 +83,7 @@ class AppealService private constructor(
         email: String,
         additionalInfo: String? = null,
         notificationId: String? = null,
-    ): ModerationReviewCreateResponse {
+    ): ModerationReviewCreateResponse = withContext(Dispatchers.IO) {
         if (userId.isEmpty()) throw AppealError.InvalidUserId
         if (contentId.isEmpty()) {
             throw AppealError.ValidationError(appContext.getString(R.string.appeal_errors_invalidContent))
@@ -110,7 +112,7 @@ class AppealService private constructor(
             appVersion = appVersion(),
         ).toJson()
 
-        return postJson(url, body) { (code, json) ->
+        postJson(url, body) { (code, json) ->
             val response = ModerationReviewCreateResponse.fromJson(json)
             when (code) {
                 201 -> response
@@ -127,11 +129,11 @@ class AppealService private constructor(
         }
     }
 
-    suspend fun fetchUserAppeals(userId: String): List<AppealStatus> {
+    suspend fun fetchUserAppeals(userId: String): List<AppealStatus> = withContext(Dispatchers.IO) {
         if (userId.isEmpty()) throw AppealError.InvalidUserId
         val encoded = URLEncoder.encode(userId, Charsets.UTF_8.name())
         val url = URL("$baseUrl/api/appeals-status?userId=$encoded")
-        return getJson(url) { (code, json) ->
+        getJson(url) { (code, json) ->
             when (code) {
                 200 -> AppealsListResponse.fromJson(json).appeals.map { AppealStatus.from(it) }
                 404 -> emptyList()
@@ -144,13 +146,13 @@ class AppealService private constructor(
         }
     }
 
-    suspend fun fetchAppealByTicket(ticketNumber: String): AppealStatus {
+    suspend fun fetchAppealByTicket(ticketNumber: String): AppealStatus = withContext(Dispatchers.IO) {
         if (ticketNumber.isEmpty()) {
             throw AppealError.ValidationError("Número de ticket requerido")
         }
         val encoded = URLEncoder.encode(ticketNumber, Charsets.UTF_8.name())
         val url = URL("$baseUrl/api/appeals-status?ticketNumber=$encoded")
-        return getJson(url) { (code, json) ->
+        getJson(url) { (code, json) ->
             when (code) {
                 200 -> AppealStatus.from(SingleAppealResponse.fromJson(json).appeal)
                 404 -> throw AppealError.ValidationError("Apelación no encontrada")
@@ -163,22 +165,25 @@ class AppealService private constructor(
         }
     }
 
-    suspend fun fetchUserModerationReviews(userId: String): List<ModerationReviewStatus> {
-        if (userId.isEmpty()) throw AppealError.InvalidUserId
-        val encoded = URLEncoder.encode(userId, Charsets.UTF_8.name())
-        val url = URL("$baseUrl/api/moderation-review-requests?userId=$encoded")
-        return getJson(url) { (code, json) ->
-            when (code) {
-                200 -> ModerationReviewListResponse.fromJson(json).requests.map { ModerationReviewStatus.from(it) }
-                404 -> emptyList()
-                400 -> throw AppealError.ValidationError(
-                    AppealResponse.fromJson(json).error ?: "Error de validación",
-                )
-                500 -> throw AppealError.ServerError
-                else -> throw AppealError.HttpError(code)
+    suspend fun fetchUserModerationReviews(userId: String): List<ModerationReviewStatus> =
+        withContext(Dispatchers.IO) {
+            if (userId.isEmpty()) throw AppealError.InvalidUserId
+            val encoded = URLEncoder.encode(userId, Charsets.UTF_8.name())
+            val url = URL("$baseUrl/api/moderation-review-requests?userId=$encoded")
+            getJson(url) { (code, json) ->
+                when (code) {
+                    200 -> ModerationReviewListResponse.fromJson(json).requests.map {
+                        ModerationReviewStatus.from(it)
+                    }
+                    404 -> emptyList()
+                    400 -> throw AppealError.ValidationError(
+                        AppealResponse.fromJson(json).error ?: "Error de validación",
+                    )
+                    500 -> throw AppealError.ServerError
+                    else -> throw AppealError.HttpError(code)
+                }
             }
         }
-    }
 
     private fun mapValidationError(response: AppealResponse, currentLength: Int, required: Int): AppealError {
         return when (response.code) {

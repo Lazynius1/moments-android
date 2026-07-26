@@ -2,7 +2,8 @@ package com.moments.android.services.storage
 
 import java.util.UUID
 
-// Convenciones de rutas de Storage (users/{uid}/…). Port de StoragePathBuilder.swift.
+// MARK: - Storage path conventions (users/{uid}/…) — port de StoragePathBuilder.swift
+
 sealed class StorageUploadDomain {
     data class ProfileAvatar(val uploadId: String = UUID.randomUUID().toString()) : StorageUploadDomain()
     data class NovaConversationImage(
@@ -183,13 +184,14 @@ object StoragePathBuilder {
         val trimmed = urlOrPath.trim()
         if (trimmed.isEmpty()) return trimmed
 
+        // iOS: URLComponents.path.components(separatedBy: "/o/").last → strip query → percent-decode
         if (trimmed.startsWith("https://firebasestorage.googleapis.com")) {
-            val pathComponent = trimmed.substringBefore("?").substringAfter("/o/", missingDelimiterValue = "")
-            if (pathComponent.isEmpty()) return trimmed
+            val afterO = trimmed.split("/o/").lastOrNull() ?: return trimmed
+            val pathWithoutQuery = afterO.substringBefore("?")
             return try {
-                java.net.URLDecoder.decode(pathComponent, "UTF-8")
+                java.net.URLDecoder.decode(pathWithoutQuery, Charsets.UTF_8.name())
             } catch (_: Exception) {
-                pathComponent
+                pathWithoutQuery
             }
         }
 

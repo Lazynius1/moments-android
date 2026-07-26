@@ -80,13 +80,24 @@ private data class BackendMediaModerationResponse(
     }
 }
 
-/** Port de MediaModerationService.swift — moderación de media vía Cloud Functions + Firestore. */
+/** Port de MediaModerationService.swift — CF `moderateMediaContent` + hide/queue Firestore.
+ * Δ: no porta Vision/Sightengine/audio client-side (muerto en iOS; ruta viva = backend).
+ */
 class MediaModerationService private constructor() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val functionsRegion = "europe-southwest1"
     private val backendModerationFunctionName = "moderateMediaContent"
     private val activeModerationTasks = mutableSetOf<String>()
     private val taskLock = Mutex()
+
+    companion object {
+        private const val INTERNAL_MODERATION_REASON =
+            "Revisión manual pendiente por error interno de moderación"
+        private const val TRANSIENT_MODERATION_REASON =
+            "Revisión manual pendiente por indisponibilidad temporal del sistema de moderación"
+
+        val shared: MediaModerationService by lazy { MediaModerationService() }
+    }
 
     fun moderateMedia(
         mediaURL: String,
@@ -144,16 +155,19 @@ class MediaModerationService private constructor() {
     ) {
         scope.launch {
             val stream = java.io.ByteArrayOutputStream()
-            if (preserveAlpha) {
-                if (!image.compress(Bitmap.CompressFormat.PNG, 85, stream)) {
+            val compressed = if (preserveAlpha) {
+                image.compress(Bitmap.CompressFormat.PNG, 85, stream) ||
                     image.compress(Bitmap.CompressFormat.JPEG, 85, stream)
-                }
             } else {
-                if (!image.compress(Bitmap.CompressFormat.JPEG, 85, stream)) {
+                image.compress(Bitmap.CompressFormat.JPEG, 85, stream) ||
                     image.compress(Bitmap.CompressFormat.PNG, 85, stream)
-                }
             }
             val imageData = stream.toByteArray()
+            // ≡ iOS: sin imageData → .approved
+            if (!compressed || imageData.isEmpty()) {
+                withContext(Dispatchers.Main) { completion(MediaModerationAction.Approved) }
+                return@launch
+            }
             val result = requestBackendModeration(
                 mediaType = "story_sticker",
                 imageBase64 = Base64.getEncoder().encodeToString(imageData),
@@ -467,7 +481,10 @@ class MediaModerationService private constructor() {
         mediaItemId: String? = null,
     ): MediaModerationResult {
         val url = cloudFunctionURL(backendModerationFunctionName)
-            ?: return systemWarningResult("backend_unavailable")
+            ?: return systemWarningResult(
+                provider = "backend_unavailable",
+                reason = INTERNAL_MODERATION_REASON,
+            )
         val body = JSONObject().apply {
             put("mediaType", mediaType)
             mediaURL?.let { put("mediaURL", it) }
@@ -476,7 +493,10 @@ class MediaModerationService private constructor() {
             contentType?.let { put("contentType", it.raw) }
             mediaItemId?.let { put("mediaItemId", it) }
         }
-        val token = fetchIdToken() ?: return systemWarningResult("backend_missing_auth")
+        val token = fetchIdToken() ?: return systemWarningResult(
+            provider = "backend_missing_auth",
+            reason = INTERNAL_MODERATION_REASON,
+        )
         return try {
             val connection = (URL(url).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
@@ -485,15 +505,32 @@ class MediaModerationService private constructor() {
                 doOutput = true
                 connectTimeout = 120_000
                 readTimeout = 120_000
-                outputStream.use { it.write(body.toString().toByteArray()) }
+                outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             }
             val responseText = (if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream)
                 ?.bufferedReader()?.use { it.readText() }.orEmpty()
             connection.disconnect()
-            if (responseText.isEmpty()) return systemWarningResult("backend_empty_response")
-            mediaModerationResult(BackendMediaModerationResponse.fromJson(JSONObject(responseText)))
+            if (responseText.isEmpty()) {
+                return systemWarningResult(
+                    provider = "backend_empty_response",
+                    reason = TRANSIENT_MODERATION_REASON,
+                )
+            }
+            try {
+                mediaModerationResult(BackendMediaModerationResponse.fromJson(JSONObject(responseText)))
+            } catch (error: Exception) {
+                systemWarningResult(
+                    provider = "backend_decode_failed",
+                    reason = TRANSIENT_MODERATION_REASON,
+                    error = error.localizedMessage ?: "",
+                )
+            }
         } catch (error: Exception) {
-            systemWarningResult("backend_request_failed", error.localizedMessage ?: "")
+            systemWarningResult(
+                provider = "backend_request_failed",
+                reason = TRANSIENT_MODERATION_REASON,
+                error = error.localizedMessage ?: "",
+            )
         }
     }
 
@@ -515,13 +552,18 @@ class MediaModerationService private constructor() {
         )
     }
 
-    private fun systemWarningResult(provider: String, error: String = ""): MediaModerationResult =
+    /** ≡ iOS fallbacks en `requestBackendModeration` (razón varía: interno vs temporal). */
+    private fun systemWarningResult(
+        provider: String,
+        reason: String,
+        error: String = "",
+    ): MediaModerationResult =
         MediaModerationResult(
             visualScore = 0.0,
             audioScore = null,
             combinedScore = 0.0,
             action = MediaModerationAction.Warning(
-                reason = "Revisión manual pendiente por indisponibilidad temporal del sistema de moderación",
+                reason = reason,
                 category = ModerationCategory.SYSTEM_ERROR.raw,
             ),
             details = buildMap {
@@ -908,10 +950,6 @@ class MediaModerationService private constructor() {
         user.getIdToken(false).addOnCompleteListener { task ->
             cont.resume(if (task.isSuccessful) task.result?.token else null)
         }
-    }
-
-    companion object {
-        val shared: MediaModerationService by lazy { MediaModerationService() }
     }
 }
 
