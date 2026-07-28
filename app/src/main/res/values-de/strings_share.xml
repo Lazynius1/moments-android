@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_moment_title">Moment teilen</string>
+    <string name="share_moment_from">Von %1$s</string>
+    <string name="share_send_to">Senden an...</string>
+    <string name="share_moment_by">Moment von %1$s</string>
+    <string name="share_select_contacts">Kontakte auswählen</string>
+    <string name="share_send_to_count">An %d senden</string>
+    <string name="share_add_to_story">Zur Story hinzufügen</string>
+    <string name="share_preparing">Wird vorbereitet...</string>
+    <string name="share_moment_unavailable">Dieser Moment ist nicht verfügbar</string>
+    <string name="share_no_permission">Du hast keine Berechtigung, diesen Inhalt anzusehen</string>
+    <string name="share_video">Video</string>
+    <string name="share_moment">Moment</string>
+    <string name="share_view_moment">Moment ansehen</string>
+    <string name="share_cancel">Abbrechen</string>
+    <string name="share_favorites">Favoriten</string>
+    <string name="share_recents">Zuletzt</string>
+    <string name="share_search_placeholder">Kontakte suchen...</string>
+    <string name="share_search_no_results">Keine Kontakte gefunden</string>
+    <string name="share_search_global_results">Andere Nutzer</string>
+    <string name="share_empty_title">Noch keine Unterhaltungen</string>
+    <string name="share_empty_subtitle">Verbinde dich mit Personen, um Momente zu teilen</string>
+    <string name="share_favorites_empty">Noch keine Favoriten</string>
+    <string name="context_menu_copy_link">Link kopieren</string>
+    <string name="context_menu_copy_link_subtitle">Außerhalb der App teilen</string>
+    <string name="creator_story_subtitle">Teile Momente, die verschwinden</string>
+    <string name="errors_moment_image_unavailable">Moment-Bild konnte nicht geladen werden.</string>
+    <string name="errors_sticker_generation_failed">Sticker konnte nicht erstellt werden.</string>
+    <string name="share_story_title">Story teilen</string>
+    <string name="share_story_by">Story von %1$s</string>
+    <string name="share_story_unavailable">Diese Story ist nicht verfügbar</string>
+    <string name="share_story_denied_expired">Diese Story ist abgelaufen.</string>
+    <string name="share_story_denied_not_found">Diese Story wurde entfernt oder existiert nicht mehr.</string>
+    <string name="share_story_denied_blocked_title">Story nicht verfügbar</string>
+    <string name="share_story_denied_blocked">Du kannst diese Story nicht ansehen, weil einer von euch den anderen blockiert hat.</string>
+    <string name="share_story_denied_private_title">Privates Konto</string>
+    <string name="share_story_denied_private">Folge dieser Person, um ihre Stories zu sehen.</string>
+    <string name="share_story_denied_restricted">Du hast keine Berechtigung, diese Story anzusehen.</string>
+</resources>

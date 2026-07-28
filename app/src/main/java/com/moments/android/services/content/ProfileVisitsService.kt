@@ -2,6 +2,7 @@ package com.moments.android.services.content
 
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
+import com.moments.android.extensions.optStringOrNull
 import com.moments.android.models.GroupedVisit
 import com.moments.android.models.Visit
 import com.moments.android.models.VisitGrouping
@@ -56,7 +57,7 @@ object ProfileVisitsService {
                         // iOS: Date(timeIntervalSince1970: timestamp / 1000) — epoch millis.
                         val epochMs = v.getDouble("timestamp")
                         visits += Visit(
-                            id = v.optString("id").takeIf { it.isNotEmpty() },
+                            id = v.optStringOrNull("id"),
                             visitorId = visitorId,
                             timestamp = Date(epochMs.toLong()),
                         )

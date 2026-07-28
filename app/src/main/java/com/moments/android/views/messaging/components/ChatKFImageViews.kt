@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -13,6 +14,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import coil.ImageLoader
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
@@ -71,7 +73,11 @@ fun ChatMediaResolvingPlaceholder(modifier: Modifier = Modifier) {
         ),
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator(color = Color.White.copy(alpha = .85f))
+        CircularProgressIndicator(
+            color = Color.White.copy(alpha = .85f),
+            modifier = Modifier.size(28.dp),
+            strokeWidth = 2.dp,
+        )
     }
 }
 

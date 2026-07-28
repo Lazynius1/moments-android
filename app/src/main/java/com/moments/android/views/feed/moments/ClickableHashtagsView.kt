@@ -3,44 +3,52 @@ package com.moments.android.views.feed.moments
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moments.android.utilities.legacyPoppinsSize
 
 private val HashtagColor = Color(0xFF667EEA)
 
+/** Port de `ContentPart.ContentType` (ClickableHashtagsView.swift). */
 enum class ContentPartType { Text, Hashtag }
 
+/** Port de `ContentPart`. */
 data class ContentPart(
     val content: String,
     val type: ContentPartType,
 )
 
+/** Port de `WordItem`. */
 data class WordItem(val content: String)
 
+/** Port de `WordLine`. */
 data class WordLine(val words: List<WordItem>)
 
-/** Port de `parseContentForHashtags` (ClickableHashtagsView.swift). */
+/**
+ * Port de `parseContentForHashtags` (ClickableHashtagsView.swift).
+ * iOS: `components(separatedBy: .whitespacesAndNewlines)` + espacio entre tokens.
+ */
 fun parseContentForHashtags(content: String): List<ContentPart> {
     val parts = mutableListOf<ContentPart>()
-    val words = content.split(Regex("[\\s\\n]+")).filter { it.isNotEmpty() }
+    val words = content.split(Regex("\\s+")).filter { it.isNotEmpty() }
     words.forEachIndexed { index, word ->
         if (word.startsWith("#") && word.length > 1) {
             parts += ContentPart(word, ContentPartType.Hashtag)
@@ -54,7 +62,36 @@ fun parseContentForHashtags(content: String): List<ContentPart> {
     return parts
 }
 
-/** Port de `ClickableHashtagsView.swift`. */
+/**
+ * Port de `ClickableHashtagsView.groupWordsInLines`.
+ * Nota iOS: `parseContentForHashtags` nunca emite `"\n"`, así que suele ser una sola línea.
+ */
+fun groupWordsInLines(content: String): List<WordLine> {
+    val parts = parseContentForHashtags(content)
+    val lines = mutableListOf<WordLine>()
+    var currentWords = mutableListOf<WordItem>()
+
+    for (part in parts) {
+        if (part.content == "\n") {
+            if (currentWords.isNotEmpty()) {
+                lines += WordLine(currentWords)
+                currentWords = mutableListOf()
+            }
+        } else {
+            currentWords += WordItem(part.content)
+        }
+    }
+    if (currentWords.isNotEmpty()) {
+        lines += WordLine(currentWords)
+    }
+    return if (lines.isEmpty()) {
+        listOf(WordLine(listOf(WordItem(content))))
+    } else {
+        lines
+    }
+}
+
+/** Port de `ClickableHashtagsView` (ClickableHashtagsView.swift). */
 @Composable
 fun ClickableHashtagsView(
     content: String,
@@ -66,45 +103,48 @@ fun ClickableHashtagsView(
     val density = LocalDensity.current
     val bodySize = with(density) { legacyPoppinsSize(context, 14).toSp() }
     val textColor = if (isDarkTheme) Color.White.copy(alpha = 0.95f) else Color.Black.copy(alpha = 0.9f)
-    val lines = content.split('\n').ifEmpty { listOf(content) }
+    val lines = remember(content) { groupWordsInLines(content) }
 
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    // iOS LazyVStack(alignment: .leading, spacing: 2)
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
         lines.forEach { line ->
-            val annotated = buildAnnotatedString {
-                parseContentForHashtags(line).forEach { part ->
-                    when (part.type) {
-                        ContentPartType.Hashtag -> {
-                            pushStringAnnotation(tag = "hashtag", annotation = part.content.removePrefix("#"))
-                            withStyle(
-                                SpanStyle(
-                                    color = HashtagColor,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = bodySize,
-                                ),
-                            ) {
-                                append(part.content)
-                            }
-                            pop()
-                        }
-                        ContentPartType.Text -> append(part.content)
+            // iOS HStack(spacing: 0) + Spacer
+            Row(Modifier.fillMaxWidth()) {
+                line.words.forEach { word ->
+                    if (word.content.startsWith("#") && word.content.length > 1) {
+                        val interaction = remember(word.content) { MutableInteractionSource() }
+                        Text(
+                            text = word.content,
+                            color = HashtagColor,
+                            fontSize = bodySize,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clickable(
+                                interactionSource = interaction,
+                                indication = null,
+                                onClick = { onHashtagTap(word.content.removePrefix("#")) },
+                            ),
+                        )
+                    } else {
+                        Text(
+                            text = word.content,
+                            color = textColor,
+                            fontSize = bodySize,
+                        )
                     }
                 }
+                Spacer(Modifier.weight(1f))
             }
-            ClickableText(
-                text = annotated,
-                style = androidx.compose.ui.text.TextStyle(color = textColor, fontSize = bodySize),
-                onClick = { offset ->
-                    annotated.getStringAnnotations("hashtag", offset, offset).firstOrNull()?.let {
-                        onHashtagTap(it.item)
-                    }
-                },
-            )
         }
     }
 }
 
-/** Port de `ClickableHashtagsHStackView` — hashtags con cápsula. */
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * Port de `ClickableHashtagsHStackView` + `FeedFlowLayout`.
+ * iOS FeedFlowLayout = VStack (no wrap horizontal); spacing 4.
+ */
 @Composable
 fun ClickableHashtagsHStackView(
     content: String,
@@ -117,15 +157,20 @@ fun ClickableHashtagsHStackView(
     val bodySize = with(density) { legacyPoppinsSize(context, 14).toSp() }
     val textColor = if (isDarkTheme) Color.White.copy(alpha = 0.95f) else Color.Black.copy(alpha = 0.9f)
     val chipShape = RoundedCornerShape(percent = 50)
+    val parts = remember(content) { parseContentForHashtags(content) }
 
-    FlowRow(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        parseContentForHashtags(content.replace("\n", " ")).forEach { part ->
+    FeedFlowLayout(modifier = modifier, spacing = 4.dp) {
+        parts.forEach { part ->
             when (part.type) {
+                ContentPartType.Text -> {
+                    Text(
+                        text = part.content,
+                        color = textColor,
+                        fontSize = bodySize,
+                    )
+                }
                 ContentPartType.Hashtag -> {
+                    val interaction = remember(part.content) { MutableInteractionSource() }
                     Text(
                         text = part.content,
                         color = HashtagColor,
@@ -134,16 +179,31 @@ fun ClickableHashtagsHStackView(
                         modifier = Modifier
                             .background(HashtagColor.copy(alpha = 0.1f), chipShape)
                             .border(1.dp, HashtagColor.copy(alpha = 0.3f), chipShape)
-                            .clickable { onHashtagTap(part.content.removePrefix("#")) }
+                            .clickable(
+                                interactionSource = interaction,
+                                indication = null,
+                                onClick = { onHashtagTap(part.content.removePrefix("#")) },
+                            )
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                     )
                 }
-                ContentPartType.Text -> {
-                    if (part.content.isNotBlank()) {
-                        Text(text = part.content, color = textColor, fontSize = bodySize)
-                    }
-                }
             }
         }
+    }
+}
+
+/** Port de `FeedFlowLayout` (ClickableHashtagsView.swift) — VStack, no FlowRow. */
+@Composable
+fun FeedFlowLayout(
+    modifier: Modifier = Modifier,
+    spacing: Dp = 8.dp,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(spacing),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        content()
     }
 }

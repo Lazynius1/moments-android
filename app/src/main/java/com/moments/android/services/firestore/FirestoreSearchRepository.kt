@@ -63,16 +63,36 @@ suspend fun FirestoreService.fetchPublicUsersForExplore(
     excludingUserId: String,
     limit: Int = 30,
 ): List<AppUser> {
-    val snap = db.collection("users")
+    val page = fetchPublicUsersPage(excludingUserId = excludingUserId, limit = limit, startAfter = null)
+    return page.users
+}
+
+/**
+ * Página de usuarios públicos para SuggestedUsersView (paginación `startAfter` ≡ iOS).
+ */
+data class PublicUsersPage(
+    val users: List<AppUser>,
+    val lastDocument: com.google.firebase.firestore.DocumentSnapshot?,
+)
+
+suspend fun FirestoreService.fetchPublicUsersPage(
+    excludingUserId: String,
+    limit: Int = 10,
+    startAfter: com.google.firebase.firestore.DocumentSnapshot? = null,
+): PublicUsersPage {
+    var query = db.collection("users")
         .whereEqualTo("isPrivate", false)
         .limit(limit.toLong())
-        .get()
-        .await()
-    return snap.documents.mapNotNull { doc ->
+    if (startAfter != null) {
+        query = query.startAfter(startAfter)
+    }
+    val snap = query.get().await()
+    val users = snap.documents.mapNotNull { doc ->
         if (doc.id == excludingUserId) return@mapNotNull null
         @Suppress("UNCHECKED_CAST")
-        AppUser.from(doc.id, doc.data as Map<String, Any?>)
+        runCatching { AppUser.from(doc.id, doc.data as Map<String, Any?>) }.getOrNull()
     }
+    return PublicUsersPage(users = users, lastDocument = snap.documents.lastOrNull())
 }
 
 suspend fun FirestoreService.fetchNewConversationSuggestions(

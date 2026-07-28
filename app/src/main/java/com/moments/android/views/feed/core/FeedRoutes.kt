@@ -5,7 +5,7 @@ package com.moments.android.views.feed.core
  *
  * iOS `FeedProfileSheetRoute.zoomSourceID` usa
  * `UserProfileZoomNavigation.sourceID(userId:)` → `"user-profile-\(userId)"`.
- * Hasta portar Profile/Core, replicamos esa misma fórmula aquí.
+ * Android: misma key para Compose `SharedTransition` (`userProfileZoomSource` / destination).
  */
 private fun userProfileZoomSourceId(userId: String): String = "user-profile-$userId"
 

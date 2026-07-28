@@ -7,9 +7,6 @@ import android.location.Address
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,15 +26,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -54,9 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -78,7 +66,12 @@ import com.moments.android.utilities.HapticManager
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
+import com.moments.android.views.messaging.components.ChatAttachmentSearchField
+import com.moments.android.views.messaging.components.ChatAttachmentSheetMetrics
 import com.moments.android.views.messaging.models.LiveLocationDuration
+import com.moments.android.views.permission.shared.LocationPermissionAccessLevel
+import com.moments.android.views.permission.shared.LocationPermissionGate
+import com.moments.android.views.permission.shared.LocationPermissionGateHost
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -124,7 +117,7 @@ fun ChatLocationSheetContent(
     var searchJob by remember { mutableStateOf<Job?>(null) }
     var requestVersion by remember { mutableIntStateOf(0) }
     var showLiveDurationDialog by remember { mutableStateOf(false) }
-    var pendingLiveDuration by remember { mutableStateOf<LiveLocationDuration?>(null) }
+    val locationGate = remember { LocationPermissionGate() }
 
     fun loadCurrentLocation() {
         scope.launch {
@@ -145,42 +138,13 @@ fun ChatLocationSheetContent(
         }
     }
 
-    fun startLiveIfPermitted(duration: LiveLocationDuration) {
-        pendingLiveDuration = null
-        onStartLive(duration)
-    }
-
-    val backgroundLocationLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) {
-        // iOS continúa en primer plano si el usuario rechaza Always; Android hace lo mismo.
-        pendingLiveDuration?.let(::startLiveIfPermitted)
-    }
-    val foregroundLocationLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { grants ->
-        if (!grants.values.any { it }) return@rememberLauncherForActivityResult
-        val duration = pendingLiveDuration
-        if (duration != null && requiresBackgroundLocation(context)) {
-            backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-        } else if (duration != null) {
-            startLiveIfPermitted(duration)
-        } else {
-            loadCurrentLocation()
-        }
-    }
-
     fun requestLiveLocation(duration: LiveLocationDuration) {
-        pendingLiveDuration = duration
-        if (!hasForegroundLocationPermission(context)) {
-            foregroundLocationLauncher.launch(
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-            )
-        } else if (requiresBackgroundLocation(context)) {
-            backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-        } else {
-            startLiveIfPermitted(duration)
-        }
+        // ≡ locationGate.requestAccess(level: .always) { onStartLive(duration) }
+        locationGate.requestAccess(
+            context = context,
+            level = LocationPermissionAccessLevel.ALWAYS,
+            onGranted = { onStartLive(duration) },
+        )
     }
 
     fun scheduleSearch(query: String) {
@@ -222,7 +186,7 @@ fun ChatLocationSheetContent(
     val listedPlaces = if (isShowingSearch) searchResults else nearbyPlaces
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
-            contentPadding = PaddingValues(top = SEARCH_OVERLAY_HEIGHT, bottom = 24.dp),
+            contentPadding = PaddingValues(top = ChatAttachmentSheetMetrics.searchOverlayHeight, bottom = 24.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
             if (!isShowingSearch) {
@@ -299,11 +263,10 @@ fun ChatLocationSheetContent(
                 }
             }
         }
-        ChatLocationSearchField(
-            value = searchText,
-            primaryText = primaryText,
-            secondaryText = secondaryText,
-            onValueChange = ::scheduleSearch,
+        ChatAttachmentSearchField(
+            placeholderRes = R.string.chat_location_search_places,
+            text = searchText,
+            onTextChange = ::scheduleSearch,
             onClear = { scheduleSearch("") },
             modifier = Modifier.align(Alignment.TopCenter),
         )
@@ -341,6 +304,9 @@ fun ChatLocationSheetContent(
             },
         )
     }
+
+    // ≡ .locationPermissionGate(locationGate)
+    LocationPermissionGateHost(locationGate)
 }
 
 @Composable
@@ -422,58 +388,11 @@ private fun ChatLocationSectionHeader(@StringRes titleRes: Int, secondaryText: C
     )
 }
 
-@Composable
-private fun ChatLocationSearchField(
-    value: String,
-    primaryText: Color,
-    secondaryText: Color,
-    onValueChange: (String) -> Unit,
-    onClear: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (primaryText == Color.White) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-    ) {
-        Icon(Icons.Filled.Search, contentDescription = null, tint = secondaryText, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(8.dp))
-        Box(Modifier.weight(1f)) {
-            if (value.isEmpty()) Text(stringResource(R.string.chat_location_search_places), color = secondaryText, fontSize = 16.sp)
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                singleLine = true,
-                textStyle = TextStyle(color = primaryText, fontSize = 16.sp),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {}),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (value.isNotEmpty()) {
-            Icon(
-                Icons.Filled.Close,
-                contentDescription = stringResource(R.string.common_close),
-                tint = secondaryText,
-                modifier = Modifier.size(20.dp).clickable(onClick = onClear),
-            )
-        }
-    }
-}
-
 private data class ReverseGeocodedAddress(val name: String?, val shortAddress: String?)
 
 private fun hasForegroundLocationPermission(context: Context): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
-private fun requiresBackgroundLocation(context: Context): Boolean =
-    Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED
 
 @Suppress("DEPRECATION")
 private fun currentLastKnownLocation(context: Context): Location? {
@@ -511,7 +430,7 @@ private fun placeFields() = listOf(Place.Field.ID, Place.Field.DISPLAY_NAME, Pla
 private suspend fun searchNearbyPlaces(context: Context, latitude: Double, longitude: Double): List<ChatLocationPlace> {
     val client = ensurePlacesClient(context) ?: return emptyList()
     val request = SearchNearbyRequest.builder(CircularBounds.newInstance(LatLng(latitude, longitude), NEARBY_RADIUS_METERS), placeFields())
-        .setMaxResultCount(20)
+        .setMaxResultCount(25)
         .build()
     return client.searchNearby(request).await().places.mapNotNull(::toChatLocationPlace)
 }
@@ -524,7 +443,7 @@ private suspend fun searchPlaces(
 ): List<ChatLocationPlace> {
     val client = ensurePlacesClient(context) ?: return emptyList()
     val request = SearchByTextRequest.builder(query, placeFields())
-        .setMaxResultCount(20)
+        .setMaxResultCount(25)
         .setLocationBias(CircularBounds.newInstance(LatLng(latitude, longitude), SEARCH_RADIUS_METERS))
         .build()
     return client.searchByText(request).await().places.mapNotNull(::toChatLocationPlace)
@@ -533,10 +452,14 @@ private suspend fun searchPlaces(
 private fun toChatLocationPlace(place: Place): ChatLocationPlace? {
     val coordinate = place.location ?: return null
     val name = place.displayName?.takeIf { it.isNotBlank() } ?: return null
+    // Prefer short address (thoroughfare+locality style) when Places only gives formatted
+    val address = place.formattedAddress?.takeIf { it.isNotBlank() }?.let { formatted ->
+        formatted.split(",").take(2).joinToString(",").trim().ifBlank { formatted }
+    }
     return ChatLocationPlace(
         id = place.id ?: "${coordinate.latitude}:${coordinate.longitude}:$name",
         name = name,
-        address = place.formattedAddress?.takeIf { it.isNotBlank() },
+        address = address,
         latitude = coordinate.latitude,
         longitude = coordinate.longitude,
     )
@@ -548,4 +471,3 @@ private const val MAP_PREVIEW_ZOOM = 16f
 private const val NEARBY_RADIUS_METERS = 1_000.0
 private const val SEARCH_RADIUS_METERS = 10_000.0
 private const val SEARCH_DEBOUNCE_MILLIS = 350L
-private val SEARCH_OVERLAY_HEIGHT = 60.dp

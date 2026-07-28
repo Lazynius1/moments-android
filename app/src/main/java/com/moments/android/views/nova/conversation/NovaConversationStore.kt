@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.WriteBatch
+import com.moments.android.extensions.optStringOrNull
 import com.moments.android.R
 import com.moments.android.services.messaging.EncryptionService
 import com.moments.android.services.storage.StorageService
@@ -156,7 +157,7 @@ object NovaConversationStore {
     private suspend fun decryptGroundingData(data: String?, userId: String): NovaGroundingPayload? = runCatching {
         val objectData = JSONObject(encryptionService.decryptNovaData(data ?: return null, userId))
         val sources = objectData.optJSONArray("sources")?.let { array -> List(array.length()) { index -> array.getJSONObject(index) }.map { NovaGroundingSource(it.optString("title"), it.optString("url")) } }.orEmpty()
-        NovaGroundingPayload(sources, objectData.optString("searchSuggestionsHTML").takeIf { it.isNotEmpty() })
+        NovaGroundingPayload(sources, objectData.optStringOrNull("searchSuggestionsHTML"))
     }.getOrNull()
 
     private suspend fun decryptTitle(data: Map<String, Any?>, userId: String): NovaConversationTitle? = NovaConversationTitle.fromFirestoreData(data)?.let { it.copy(title = encryptionService.decryptNovaData(it.title, userId)) }

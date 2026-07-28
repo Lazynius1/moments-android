@@ -2,6 +2,8 @@ package com.moments.android.views.messaging.screens.chat
 
 import android.content.Context
 import android.location.LocationManager
+import com.moments.android.MomentsApplication
+import com.moments.android.R
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageStatus
 import com.moments.android.views.messaging.core.MessageType
@@ -148,7 +150,11 @@ fun MomentsChatViewModel.sendSticker(context: Context, asset: ChatStickerAsset, 
 }
 
 fun MomentsChatViewModel.sendStaticLocation(latitude: Double, longitude: Double, name: String?, address: String?) {
-    if (conversationId.isBlank()) return
+    if (conversationId.isBlank()) {
+        val app = MomentsApplication.instance
+        reportError(app?.getString(R.string.chat_error_invalid_conversation))
+        return
+    }
     val messageId = UUID.randomUUID().toString()
     appendOutgoingMessage(
         EnhancedMessage(
@@ -162,18 +168,28 @@ fun MomentsChatViewModel.sendStaticLocation(latitude: Double, longitude: Double,
     chatMediaScope.launch {
         ChatService.sendStaticLocationMessage(conversationId, currentUserId, latitude, longitude, name, address, messageId, marksOutgoingAsVanish)
             .onSuccess { sent -> applyOutgoingMessageUpdate(messageId, sent.status) }
-            .onFailure { applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED) }
+            .onFailure { applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED); reportError(it.message) }
     }
 }
 
 fun MomentsChatViewModel.startLiveLocation(context: Context, duration: LiveLocationDuration) {
-    if (conversationId.isBlank()) return
-    val manager = context.applicationContext.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return
+    if (conversationId.isBlank()) {
+        reportError(context.getString(R.string.chat_error_invalid_conversation))
+        return
+    }
+    val manager = context.applicationContext.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
     val location = runCatching {
-        listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-            .mapNotNull { manager.getLastKnownLocation(it) }
-            .maxByOrNull { it.time }
-    }.getOrNull() ?: return
+        manager?.let { mgr ->
+            listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+                .mapNotNull { mgr.getLastKnownLocation(it) }
+                .maxByOrNull { it.time }
+        }
+    }.getOrNull()
+    if (location == null) {
+        // ≡ chat.location.permissionNeeded — el sheet ya gatea permiso; aquí falta fix GPS
+        reportError(context.getString(R.string.chat_location_permission_needed))
+        return
+    }
     val messageId = UUID.randomUUID().toString()
     val sessionId = UUID.randomUUID().toString()
     val expiresAt = Date(Date().time + duration.timeIntervalMillis)
@@ -194,7 +210,7 @@ fun MomentsChatViewModel.startLiveLocation(context: Context, duration: LiveLocat
         ).onSuccess { sent ->
             applyOutgoingMessageUpdate(messageId, sent.status)
             LiveLocationSharingService.startSession(conversationId, messageId, sessionId, duration, expiresAt)
-        }.onFailure { applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED) }
+        }.onFailure { applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED); reportError(it.message) }
     }
 }
 

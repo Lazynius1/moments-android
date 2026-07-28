@@ -954,6 +954,28 @@ data class MessageRequest(
     val isPending: Boolean get() = status == RequestStatus.PENDING
     val canSendMoreRequests: Boolean get() = status != RequestStatus.BLOCKED
 
+    /** ≡ `MessageRequest.messagePreview` (MessageModel.swift). */
+    fun messagePreview(context: Context): String = when (messageType) {
+        MessageType.TEXT ->
+            if (message.length > 50) message.take(47) + "..." else message
+        MessageType.IMAGE -> context.getString(R.string.chat_preview_photo)
+        MessageType.VIDEO -> context.getString(R.string.chat_preview_video)
+        MessageType.AUDIO -> context.getString(R.string.chat_preview_audio)
+        MessageType.GIF -> context.getString(R.string.chat_preview_gif)
+        MessageType.FILE -> context.getString(R.string.chat_preview_file)
+        MessageType.LOCATION -> context.getString(R.string.chat_preview_location)
+        MessageType.STICKER -> context.getString(R.string.chat_preview_sticker)
+        MessageType.EPHEMERAL -> context.getString(R.string.chat_preview_ephemeral)
+        MessageType.SHARED_MOMENT -> context.getString(R.string.chat_preview_shared_moment)
+        MessageType.SHARED_STORY -> context.getString(R.string.chat_preview_shared_story)
+        MessageType.VIEW_ONCE_IMAGE -> context.getString(R.string.chat_preview_view_once_photo)
+        MessageType.VIEW_ONCE_VIDEO -> context.getString(R.string.chat_preview_view_once_video)
+        MessageType.CHAT_NOTICE -> {
+            val localized = message
+            if (localized.length > 50) localized.take(47) + "..." else localized
+        }
+    }
+
     companion object {
         fun fromFirestoreData(data: Map<String, Any?>, id: String): MessageRequest? {
             val senderId = data["senderId"] as? String ?: return null

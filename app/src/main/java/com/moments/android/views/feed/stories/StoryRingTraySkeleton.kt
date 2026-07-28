@@ -21,23 +21,26 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.moments.android.R
-import com.moments.android.views.feed.FeedCanvas
-import com.moments.android.views.feed.StoryRingColors
-import com.moments.android.views.feed.StoryRingViewed
+import com.moments.android.coordinators.AsyncProfileImageView
+import com.moments.android.views.components.shimmer
 import com.moments.android.views.feed.core.sections.rememberShimmerBrush
+import com.moments.android.views.story.StorySegmentedRing
 
-/** Port de `StoryRingTraySkeleton.swift`. */
+/**
+ * Port de `StoryRingTraySkeleton.swift` — mismas medidas que RealStoryCircle / YourStoryCircle.
+ */
+
 @Composable
 fun StoryRingTraySkeletonCell(
     isOwnStory: Boolean,
     userId: String? = null,
     modifier: Modifier = Modifier,
 ) {
-    val shimmer = rememberShimmerBrush()
+    val shimmerBrush = rememberShimmerBrush()
     val label = stringResource(R.string.feed_story_ring_loading)
-    val outerSize = StoryRingLayout.outerFrameSize()
     val avatarSize = StoryRingLayout.feedHeaderAvatarSize
-    val ringColors = if (isOwnStory) StoryRingViewed else StoryRingColors
+    val ringLineWidth = StoryRingLayout.feedHeaderLineWidth
+    val outerSize = StoryRingLayout.outerFrameSize(avatarSize, ringLineWidth)
 
     Column(
         modifier
@@ -50,32 +53,45 @@ fun StoryRingTraySkeletonCell(
             Modifier.size(outerSize),
             contentAlignment = Alignment.Center,
         ) {
-            Box(
-                Modifier
-                    .size(StoryRingLayout.ringStrokeDiameter())
-                    .alpha(if (isOwnStory) 1f else 0.55f)
-                    .clip(CircleShape)
-                    .background(androidx.compose.ui.graphics.Brush.linearGradient(ringColors)),
+            StorySegmentedRing(
+                storyCount = if (isOwnStory) 0 else 1,
+                hasStory = !isOwnStory,
+                hasUnseenStory = !isOwnStory,
+                storyViewedStatus = if (isOwnStory) emptyList() else listOf(false),
+                storyAudiences = emptyList(),
+                isOwnStory = isOwnStory,
+                ringSize = StoryRingLayout.ringStrokeDiameter(avatarSize, ringLineWidth),
+                lineWidth = ringLineWidth,
+                hapticsEnabled = false,
+                modifier = Modifier.alpha(if (isOwnStory) 1f else 0.55f),
             )
-            Box(
-                Modifier
-                    .size(avatarSize + StoryRingLayout.ringGap * 2)
-                    .clip(CircleShape)
-                    .background(FeedCanvas),
-            )
-            Box(
-                Modifier
-                    .size(avatarSize)
-                    .clip(CircleShape)
-                    .background(shimmer),
-            )
+
+            if (!userId.isNullOrBlank()) {
+                AsyncProfileImageView(
+                    userId = userId,
+                    modifier = Modifier
+                        .size(avatarSize)
+                        .clip(CircleShape)
+                        .alpha(0.4f)
+                        .shimmer(isAnimating = true),
+                )
+            } else {
+                Box(
+                    Modifier
+                        .size(avatarSize)
+                        .clip(CircleShape)
+                        .background(shimmerBrush)
+                        .shimmer(isAnimating = true),
+                )
+            }
         }
         Box(
             Modifier
                 .width(if (isOwnStory) 52.dp else 44.dp)
                 .height(10.dp)
                 .clip(RoundedCornerShape(3.dp))
-                .background(shimmer),
+                .background(shimmerBrush)
+                .shimmer(isAnimating = true),
         )
     }
 }

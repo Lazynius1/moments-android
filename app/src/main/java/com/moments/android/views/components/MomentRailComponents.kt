@@ -107,10 +107,8 @@ fun ModernActionButtons(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             MomentReactionButton(
-                momentId = moment.id,
-                authorId = moment.authorId,
-                reactionCount = moment.reactionCount,
-                hideLikeCounts = !showReactionCount,
+                moment = moment,
+                showCount = showReactionCount,
             )
 
             if (!moment.disableComments) {

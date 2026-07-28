@@ -24,7 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -131,20 +131,37 @@ fun ModernLoadingMoreView(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val density = LocalDensity.current
     val isDark = isSystemInDarkTheme()
-    var scale by remember { mutableFloatStateOf(if (MotionPolicy.reduceMotion) 1f else 0.8f) }
-    var opacity by remember { mutableFloatStateOf(if (MotionPolicy.reduceMotion) 1f else 0.6f) }
+    var expand by remember { mutableStateOf(!MotionPolicy.reduceMotion) }
 
     LaunchedEffect(Unit) {
         if (MotionPolicy.reduceMotion) return@LaunchedEffect
         while (true) {
-            scale = 1.2f
-            opacity = 1f
+            expand = true
             delay(1200)
-            scale = 0.8f
-            opacity = 0.6f
+            expand = false
             delay(1200)
         }
     }
+
+    // iOS withAnimation(.easeInOut(1.2).repeatForever) scale 0.8→1.2, opacity 0.6→1
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = when {
+            MotionPolicy.reduceMotion -> 1f
+            expand -> 1.2f
+            else -> 0.8f
+        },
+        animationSpec = androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        label = "loadingMoreScale",
+    )
+    val opacity by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = when {
+            MotionPolicy.reduceMotion -> 1f
+            expand -> 1f
+            else -> 0.6f
+        },
+        animationSpec = androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        label = "loadingMoreOpacity",
+    )
 
     Row(
         modifier

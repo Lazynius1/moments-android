@@ -1,7 +1,6 @@
 package com.moments.android.views.messaging.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,85 +9,202 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import com.moments.android.views.feed.rememberAdaptiveColors
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
-import com.moments.android.views.messaging.core.Conversation
+import com.moments.android.utilities.momentsEmptyStateAppear
+import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.components.ConversationContextMenuInsets
 import com.moments.android.views.messaging.components.ConversationContextMenuOverlay
+import com.moments.android.views.messaging.components.ConversationListInteraction
 import com.moments.android.views.messaging.components.ConversationMenuData
 import com.moments.android.views.messaging.components.ConversationMenuSelection
+import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.MessagingViewModel
 
-/** Port de `ArchivedConversationsView.swift`. */
+/**
+ * Port de `Views/Messaging/Screens/ArchivedConversationsView.swift`.
+ * Perfil desde fila: callback [onOpenProfile] (navegación de perfil pendiente de cablear).
+ */
 @Composable
 fun ArchivedConversationsView(
     viewModel: MessagingViewModel,
     onBack: () -> Unit,
     onOpenConversation: (Conversation) -> Unit,
     onOpenProfile: (String) -> Unit = {},
-    onDelete: (Conversation) -> Unit = {},
+    onMarkUnread: (Conversation) -> Unit = { viewModel.markConversationAsUnread(it) },
+    onPin: (Conversation) -> Unit = { viewModel.togglePinned(it) },
+    onMute: (Conversation) -> Unit = { viewModel.toggleMuted(it) },
+    onUnarchive: (Conversation) -> Unit = { viewModel.unarchiveConversation(it) },
+    onDelete: (Conversation) -> Unit = { viewModel.deleteConversation(it) },
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
-    var selection by remember { mutableStateOf<ConversationMenuSelection?>(null) }
+    val uid = FirebaseAuth.getInstance().currentUser?.uid
+    var conversationMenuSelection by remember { mutableStateOf<ConversationMenuSelection?>(null) }
+    var conversationRowFrames by remember { mutableStateOf<Map<String, Rect>>(emptyMap()) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
-    Box(modifier.fillMaxSize().background(colors.background).onSizeChanged { containerSize = it }) {
+    val archived = viewModel.archivedConversations
+
+    LaunchedEffect(archived.isEmpty()) {
+        if (archived.isEmpty()) onBack()
+    }
+
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(colors.surfaceBackground)
+            .onSizeChanged { containerSize = it },
+    ) {
         Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.ArrowBack, stringResource(R.string.common_back), modifier = Modifier.size(28.dp).combinedClickable(onClick = onBack))
-                Text(stringResource(R.string.messaging_archived), fontWeight = FontWeight.SemiBold, color = colors.primary, modifier = Modifier.padding(start = 18.dp))
-            }
-            if (viewModel.archivedConversations.isEmpty()) {
-                Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Icon(Icons.Filled.Archive, null, tint = colors.secondary, modifier = Modifier.size(44.dp))
-                    Text(stringResource(R.string.messaging_archived), color = colors.secondary, modifier = Modifier.padding(top = 12.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 4.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = stringResource(R.string.common_back),
+                        tint = colors.primary,
+                    )
                 }
-            } else LazyColumn(Modifier.fillMaxSize()) {
-                items(viewModel.archivedConversations, key = { it.id.orEmpty() }) { conversation ->
-                    ArchivedConversationRow(conversation, onClick = { onOpenConversation(conversation) }, onProfile = onOpenProfile, onLongPress = { frame ->
-                        val uid = FirebaseAuth.getInstance().currentUser?.uid
-                        selection = ConversationMenuSelection(ConversationMenuData(conversation, unreadCount = conversation.unreadCount(uid.orEmpty()), isPinned = conversation.isPinned(uid), isMuted = conversation.isMuted(uid), isArchived = true), frame)
-                    })
+                Text(
+                    stringResource(R.string.messaging_section_archived),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 17.sp,
+                    color = colors.primary,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            if (archived.isEmpty()) {
+                ArchivedEmptyState()
+            } else {
+                LazyColumn(
+                    Modifier.fillMaxSize(),
+                    userScrollEnabled = conversationMenuSelection == null,
+                ) {
+                    items(
+                        archived.filter { !it.id.isNullOrBlank() },
+                        key = { it.id.orEmpty() },
+                    ) { conversation ->
+                        val id = conversation.id.orEmpty()
+                        val selected = conversationMenuSelection?.item?.conversation?.id == id
+                        GlassmorphicConversationRow(
+                            conversation = conversation,
+                            onOpenProfile = {
+                                val trimmed = conversation.otherParticipantId.trim()
+                                if (trimmed.isNotEmpty()) onOpenProfile(trimmed)
+                            },
+                            onTap = { onOpenConversation(conversation) },
+                            isMenuSelected = selected,
+                            listInteraction = ConversationListInteraction(
+                                onTap = { onOpenConversation(conversation) },
+                                onLongPress = {
+                                    val frame = conversationRowFrames[id] ?: return@ConversationListInteraction
+                                    if (frame.width <= 0f || frame.height <= 0f) return@ConversationListInteraction
+                                    conversationMenuSelection = ConversationMenuSelection(
+                                        item = ConversationMenuData(
+                                            conversation = conversation,
+                                            unreadCount = conversation.unreadCount(uid.orEmpty()),
+                                            isPinned = conversation.isPinned(uid),
+                                            isMuted = conversation.isMuted(uid),
+                                            isArchived = true,
+                                        ),
+                                        rowFrame = frame,
+                                    )
+                                },
+                                onPressingChanged = {},
+                            ),
+                            modifier = Modifier.onGloballyPositioned { coords ->
+                                conversationRowFrames = conversationRowFrames + (id to coords.boundsInRoot())
+                            },
+                        )
+                    }
                 }
             }
         }
-        ConversationContextMenuOverlay(selection, containerSize, ConversationContextMenuInsets(), onDismiss = { selection = null }, onMarkUnread = { viewModel.markConversationAsUnread(it); selection = null }, onPin = { selection = null }, onMute = { selection = null }, onArchive = { selection = null }, onUnarchive = { viewModel.unarchiveConversation(it); selection = null }, onDelete = { onDelete(it); selection = null })
+
+        ConversationContextMenuOverlay(
+            selection = conversationMenuSelection,
+            containerSize = containerSize,
+            safeAreaInsets = ConversationContextMenuInsets(),
+            onDismiss = { conversationMenuSelection = null },
+            onMarkUnread = {
+                onMarkUnread(it)
+                conversationMenuSelection = null
+            },
+            onPin = {
+                onPin(it)
+                conversationMenuSelection = null
+            },
+            onMute = {
+                onMute(it)
+                conversationMenuSelection = null
+            },
+            onArchive = { conversationMenuSelection = null },
+            onUnarchive = {
+                onUnarchive(it)
+                conversationMenuSelection = null
+            },
+            onDelete = {
+                onDelete(it)
+                conversationMenuSelection = null
+            },
+        )
     }
 }
 
-@Composable private fun ArchivedConversationRow(conversation: Conversation, onClick: () -> Unit, onProfile: (String) -> Unit, onLongPress: (Rect) -> Unit) {
-    val colors = rememberAdaptiveColors(); var frame by remember { mutableStateOf(Rect.Zero) }
-    Row(Modifier.fillMaxWidth().onGloballyPositioned { frame = it.boundsInRoot() }.combinedClickable(onClick = onClick, onLongClick = { onLongPress(frame) }).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        AsyncImage(conversation.otherParticipantProfileImagePath, null, Modifier.size(52.dp).clip(CircleShape).combinedClickable(onClick = { onProfile(conversation.otherParticipantId) }), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
-        Column(Modifier.weight(1f)) { Text(conversation.otherParticipantUsername ?: stringResource(R.string.messaging_user_default), color = colors.primary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(conversation.lastMessage.orEmpty(), color = colors.secondary, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+@Composable
+private fun ArchivedEmptyState() {
+    val colors = rememberAdaptiveColors()
+    Column(
+        Modifier
+            .fillMaxSize()
+            .momentsEmptyStateAppear(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            Icons.Filled.Inventory2,
+            contentDescription = null,
+            tint = colors.primary.copy(alpha = 0.5f),
+            modifier = Modifier.size(44.dp),
+        )
+        Text(
+            stringResource(R.string.messaging_section_archived),
+            color = colors.primary.copy(alpha = 0.7f),
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 16.sp,
+            modifier = Modifier.padding(top = 12.dp),
+        )
     }
 }

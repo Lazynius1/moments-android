@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_moment_title">Condividi momento</string>
+    <string name="share_moment_from">Di %1$s</string>
+    <string name="share_send_to">Invia a...</string>
+    <string name="share_moment_by">Momento di %1$s</string>
+    <string name="share_select_contacts">Seleziona contatti</string>
+    <string name="share_send_to_count">Invia a %d</string>
+    <string name="share_add_to_story">Aggiungi alla storia</string>
+    <string name="share_preparing">Preparazione...</string>
+    <string name="share_moment_unavailable">Questo momento non è disponibile</string>
+    <string name="share_no_permission">Non hai il permesso di vedere questo contenuto</string>
+    <string name="share_video">Video</string>
+    <string name="share_moment">Momento</string>
+    <string name="share_view_moment">Vedi momento</string>
+    <string name="share_cancel">Annulla</string>
+    <string name="share_favorites">Preferiti</string>
+    <string name="share_recents">Recenti</string>
+    <string name="share_search_placeholder">Cerca contatti...</string>
+    <string name="share_search_no_results">Nessun contatto trovato</string>
+    <string name="share_search_global_results">Altri utenti</string>
+    <string name="share_empty_title">Nessuna conversazione ancora</string>
+    <string name="share_empty_subtitle">Connettiti con le persone per condividere momenti</string>
+    <string name="share_favorites_empty">Nessun preferito ancora</string>
+    <string name="context_menu_copy_link">Copia link</string>
+    <string name="context_menu_copy_link_subtitle">Condividi fuori dall\'app</string>
+    <string name="creator_story_subtitle">Condividi momenti che scompaiono</string>
+    <string name="errors_moment_image_unavailable">Impossibile caricare l\'immagine del momento.</string>
+    <string name="errors_sticker_generation_failed">Impossibile generare lo sticker.</string>
+    <string name="share_story_title">Condividi storia</string>
+    <string name="share_story_by">Storia di %1$s</string>
+    <string name="share_story_unavailable">Questa storia non è disponibile</string>
+    <string name="share_story_denied_expired">Questa storia è scaduta.</string>
+    <string name="share_story_denied_not_found">Questa storia è stata rimossa o non esiste più.</string>
+    <string name="share_story_denied_blocked_title">Storia non disponibile</string>
+    <string name="share_story_denied_blocked">Non puoi vedere questa storia perché c\'è un blocco tra voi.</string>
+    <string name="share_story_denied_private_title">Account privato</string>
+    <string name="share_story_denied_private">Segui questa persona per vedere le sue storie.</string>
+    <string name="share_story_denied_restricted">Non hai il permesso di vedere questa storia.</string>
+</resources>

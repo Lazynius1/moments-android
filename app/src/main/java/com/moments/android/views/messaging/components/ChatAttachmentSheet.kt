@@ -11,16 +11,27 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,7 +43,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -47,11 +58,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,12 +72,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -85,6 +96,7 @@ import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.messaging.attachments.ChatGiphyPickerContent
 import com.moments.android.views.messaging.attachments.ChatGiphyPickerKind
@@ -93,6 +105,8 @@ import com.moments.android.views.messaging.models.ChatGiphyAsset
 import com.moments.android.views.messaging.models.ChatRecentStickersStore
 import com.moments.android.views.messaging.models.ChatStickerAsset
 import com.moments.android.views.messaging.models.LiveLocationDuration
+import com.moments.android.views.permission.shared.PermissionPrimerGate
+import com.moments.android.views.permission.shared.PermissionPrimerGateHost
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -124,12 +138,29 @@ enum class ChatAttachmentSheetKind {
 object ChatAttachmentSheetMetrics {
     val horizontalInset = 10.dp
     val cornerRadius = 24.dp
+    /** Clearance between popover bottom edge and the top of the + button. */
     val menuPopoverGap = 16.dp
+    val menuPopoverTextExtraMargin = 20.dp
+    val menuPopoverMinWidth = 168.dp
     const val heightFraction = 0.58f
     val searchFieldHorizontalInset = 28.dp
     val searchFieldCornerRadius = 16.dp
     val searchOverlayTopPadding = 8.dp
     val searchOverlayHeight = 60.dp
+
+    fun sheetHeight(containerHeight: Dp): Dp = containerHeight * heightFraction
+}
+
+/** Port de `ChatAttachmentMenuPopoverLayout`. */
+private object ChatAttachmentMenuPopoverLayout {
+    val rowIconWidth = 40.dp
+    val rowVerticalPadding = 16.dp
+    val cardVerticalPadding = 20.dp
+
+    fun estimatedHeight(canSendBuzz: Boolean): Dp {
+        val rows = if (canSendBuzz) 6 else 5
+        return (rowIconWidth + rowVerticalPadding) * rows + cardVerticalPadding
+    }
 }
 
 private fun chatDeviceSheetCornerRadius(screenWidth: Dp): Dp = when {
@@ -178,8 +209,7 @@ fun ChatAttachmentScrollUnderSearchLayout(
     }
 }
 
-/** Native Android sheets for GIFs, stickers and locations. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** Native Android sheets for GIFs, stickers and locations. ≡ iOS `.sheet` medium+large. */
 @Composable
 fun ChatAttachmentPickerSheet(
     kind: ChatAttachmentSheetKind,
@@ -192,18 +222,16 @@ fun ChatAttachmentPickerSheet(
 ) {
     if (!kind.isPickerSheet) return
     val context = LocalContext.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val recents = remember(kind, context) {
         if (kind == ChatAttachmentSheetKind.STICKER) ChatRecentStickersStore.load(context) else emptyList()
     }
-    val isDark = isSystemInDarkTheme()
 
-    ModalBottomSheet(
+    // ≡ `chatPickerSheetPresentation()` → [.medium, .large]
+    com.moments.android.views.shared.MomentsModalSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = if (isDark) androidx.compose.ui.graphics.Color(0xFF0B1215) else androidx.compose.ui.graphics.Color(0xFFFAF9F6),
+        largeOnly = false,
     ) {
-        Box(Modifier.fillMaxWidth().height(560.dp)) {
+        Box(Modifier.fillMaxWidth().weight(1f)) {
             when (kind) {
                 ChatAttachmentSheetKind.GIF -> ChatGiphyPickerContent(
                     kind = ChatGiphyPickerKind.GIF,
@@ -243,18 +271,21 @@ fun ChatAttachmentPickerSheet(
     }
 }
 
-/** The same 44pt glass + control, including its bounds for the anchored popover. */
+/** The same 44pt control, including its bounds for the anchored popover. */
 @Composable
 fun ChatAttachmentPlusButton(
     isMenuOpen: Boolean,
     onClick: () -> Unit,
     onAnchorBoundsChanged: (IntRect) -> Unit = {},
+    /** Android composer (Telegram-like): icono plano sin glass. */
+    flat: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
+    // ≡ MotionPolicy.Spring.sheet (duration 0.18)
     val rotation by animateFloatAsState(
         targetValue = if (isMenuOpen) 45f else 0f,
-        animationSpec = tween(180),
+        animationSpec = tween((MotionPolicy.Spring.SHEET_DURATION * 1000).toInt()),
         label = "attachmentPlusRotation",
     )
     Box(
@@ -271,9 +302,16 @@ fun ChatAttachmentPlusButton(
                     ),
                 )
             }
-            .clip(CircleShape)
-            .momentsChromeGlass(CircleShape, interactive = true)
-            .clickable(onClick = onClick),
+            .then(
+                if (flat) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                        .clip(CircleShape)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clickable(onClick = onClick)
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -281,7 +319,7 @@ fun ChatAttachmentPlusButton(
             contentDescription = stringResource(R.string.chat_attachment_accessibility),
             tint = if (isDark) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Black,
             modifier = Modifier
-                .size(18.dp)
+                .size(if (flat) 22.dp else 18.dp)
                 .graphicsLayer { rotationZ = rotation },
         )
     }
@@ -299,44 +337,76 @@ fun ChatAttachmentMenuPopover(
     onSheetSelected: (ChatAttachmentSheetKind) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (isPresented != ChatAttachmentSheetKind.MENU) return
+    val visible = isPresented == ChatAttachmentSheetKind.MENU
     val isDark = isSystemInDarkTheme()
-    var cardWidth by remember { mutableFloatStateOf(168f) }
-    var cardHeight by remember { mutableFloatStateOf(if (canSendBuzz) 372f else 316f) }
+    val density = LocalDensity.current
+    var cardWidth by remember {
+        mutableFloatStateOf(with(density) { ChatAttachmentSheetMetrics.menuPopoverMinWidth.toPx() })
+    }
+    var cardHeight by remember(canSendBuzz) {
+        mutableFloatStateOf(with(density) { ChatAttachmentMenuPopoverLayout.estimatedHeight(canSendBuzz).toPx() })
+    }
+    var overlayOrigin by remember { mutableStateOf(Offset.Zero) }
     val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp
-    val density = androidx.compose.ui.platform.LocalDensity.current
+    val gapPx = with(density) { ChatAttachmentSheetMetrics.menuPopoverGap.toPx() }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = if (isDark) 0.12f else 0.08f))
-            .clickable(onClick = onDismiss),
+    LaunchedEffect(canSendBuzz) {
+        cardHeight = with(density) { ChatAttachmentMenuPopoverLayout.estimatedHeight(canSendBuzz).toPx() }
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween((MotionPolicy.Spring.SHEET_DURATION * 1000).toInt())) +
+            scaleIn(
+                animationSpec = tween((MotionPolicy.Spring.SHEET_DURATION * 1000).toInt()),
+                initialScale = 0.88f,
+                transformOrigin = TransformOrigin(0.5f, 1f),
+            ),
+        exit = fadeOut(tween((MotionPolicy.Spring.SHEET_DURATION * 1000).toInt())) +
+            scaleOut(
+                animationSpec = tween((MotionPolicy.Spring.SHEET_DURATION * 1000).toInt()),
+                targetScale = 0.88f,
+                transformOrigin = TransformOrigin(0.5f, 1f),
+            ),
+        modifier = modifier.fillMaxSize(),
     ) {
-        if (anchorBounds != null) {
-            val widthPx = with(density) { screenWidth.toPx() }
-            val x = min(max(anchorBounds.left.toFloat(), 16f), max(0f, widthPx - 16f - cardWidth))
-            val y = max(0f, anchorBounds.top - 16f - cardHeight)
-            ChatAttachmentMenuPopoverCard(
-                canSendBuzz = canSendBuzz,
-                onOpenCamera = {
-                    onDismiss()
-                    onOpenCamera()
-                },
-                onSendBuzz = {
-                    onDismiss()
-                    onSendBuzz()
-                },
-                onSheetSelected = {
-                    onSheetSelected(it)
-                },
-                modifier = Modifier
-                    .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
-                    .onGloballyPositioned { coordinates ->
-                        cardWidth = coordinates.size.width.toFloat()
-                        cardHeight = coordinates.size.height.toFloat()
-                    }
-                    .clickable(enabled = false) {},
-            )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { overlayOrigin = it.positionInWindow() }
+                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = if (isDark) 0.12f else 0.08f))
+                .clickable(onClick = onDismiss),
+        ) {
+            if (anchorBounds != null) {
+                // ≡ localAnchor = anchorFrame − overlayOrigin (window → local)
+                val localLeft = anchorBounds.left - overlayOrigin.x
+                val localTop = anchorBounds.top - overlayOrigin.y
+                val widthPx = with(density) { screenWidth.toPx() }
+                val margin = 16f
+                val maxLeading = widthPx - margin - cardWidth
+                val x = min(max(localLeft, margin), max(0f, maxLeading))
+                // ≡ popoverBottom = localAnchor.minY - gap; top = bottom - height
+                val y = max(0f, localTop - gapPx - cardHeight)
+                ChatAttachmentMenuPopoverCard(
+                    canSendBuzz = canSendBuzz,
+                    onOpenCamera = {
+                        onDismiss()
+                        onOpenCamera()
+                    },
+                    onSendBuzz = {
+                        onDismiss()
+                        onSendBuzz()
+                    },
+                    onSheetSelected = onSheetSelected,
+                    modifier = Modifier
+                        .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
+                        .onGloballyPositioned { coordinates ->
+                            cardWidth = coordinates.size.width.toFloat()
+                            cardHeight = coordinates.size.height.toFloat()
+                        }
+                        .clickable(enabled = false) {},
+                )
+            }
         }
     }
 }
@@ -352,8 +422,11 @@ private fun ChatAttachmentMenuPopoverCard(
     val isDark = isSystemInDarkTheme()
     val textColor = if (isDark) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Black
     val circleFill = if (isDark) androidx.compose.ui.graphics.Color.White.copy(alpha = .10f) else androidx.compose.ui.graphics.Color.Black.copy(alpha = .06f)
+    // ≡ iOS `.fixedSize(horizontal: true)`: ancho = contenido (min 168), no la pantalla.
     Column(
         modifier = modifier
+            .width(IntrinsicSize.Max)
+            .widthIn(min = ChatAttachmentSheetMetrics.menuPopoverMinWidth)
             .clip(RoundedCornerShape(ChatAttachmentSheetMetrics.cornerRadius))
             .momentsChromeGlass(RoundedCornerShape(ChatAttachmentSheetMetrics.cornerRadius), interactive = true)
             .padding(vertical = 10.dp, horizontal = 12.dp),
@@ -413,8 +486,13 @@ private fun ChatAttachmentMenuRow(
             }
         }
         Spacer(Modifier.width(14.dp))
-        Text(stringResource(titleRes), color = textColor, fontSize = 17.sp, fontWeight = FontWeight.Medium)
-        Spacer(Modifier.width(20.dp))
+        Text(
+            text = stringResource(titleRes),
+            color = textColor,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+        )
     }
 }
 
@@ -429,12 +507,31 @@ fun ChatAttachmentMediaSheetOverlay(
     modifier: Modifier = Modifier,
 ) {
     var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+    val dragAnim = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
     val isDark = isSystemInDarkTheme()
+    LaunchedEffect(activeSheet) {
+        if (activeSheet != ChatAttachmentSheetKind.PHOTOS) {
+            dragOffsetPx = 0f
+            dragAnim.snapTo(0f)
+        }
+    }
+    val displayOffsetPx = if (dragAnim.isRunning) dragAnim.value else dragOffsetPx
     AnimatedVisibility(visible = activeSheet == ChatAttachmentSheetKind.PHOTOS, modifier = modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val density = androidx.compose.ui.platform.LocalDensity.current
-            val sheetHeight = maxHeight * ChatAttachmentSheetMetrics.heightFraction
+            val density = LocalDensity.current
+            val sheetHeight = ChatAttachmentSheetMetrics.sheetHeight(maxHeight)
             val sheetHeightPx = with(density) { sheetHeight.toPx() }
+            val navBottom = with(density) {
+                WindowInsets.navigationBars.getBottom(this).toDp()
+            }
+            val bottomInset = ChatInputBarLayout.attachmentSheetBottomInset(navBottom)
+            val dragState = rememberDraggableState { delta ->
+                if (dragAnim.isRunning) {
+                    scope.launch { dragAnim.stop() }
+                }
+                dragOffsetPx = max(0f, dragOffsetPx + delta)
+            }
             Box(
                 Modifier
                     .fillMaxSize()
@@ -445,18 +542,36 @@ fun ChatAttachmentMediaSheetOverlay(
                 height = sheetHeight,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(horizontal = ChatAttachmentSheetMetrics.horizontalInset)
-                    .padding(bottom = ChatInputBarLayout.sheetAboveInputGap)
-                    .offset { IntOffset(0, dragOffsetPx.roundToInt()) }
-                    .pointerInput(sheetHeightPx) {
-                        detectVerticalDragGestures(
-                            onVerticalDrag = { _, delta -> dragOffsetPx = max(0f, dragOffsetPx + delta) },
-                            onDragEnd = {
-                                if (dragOffsetPx > sheetHeightPx * .20f) onDismiss() else dragOffsetPx = 0f
-                            },
-                        )
-                    },
+                    .padding(bottom = bottomInset)
+                    .offset { IntOffset(0, displayOffsetPx.roundToInt()) }
+                    .draggable(
+                        state = dragState,
+                        orientation = Orientation.Vertical,
+                        onDragStopped = { velocity ->
+                            // ≡ translation > 20% || predictedEndTranslation > 35%
+                            val predictedEnd = dragOffsetPx + velocity * 0.15f
+                            val shouldDismiss =
+                                dragOffsetPx > sheetHeightPx * 0.20f ||
+                                    predictedEnd > sheetHeightPx * 0.35f
+                            if (shouldDismiss) {
+                                onDismiss()
+                            } else {
+                                // ≡ MotionPolicy.Spring.header snap-back
+                                scope.launch {
+                                    dragAnim.snapTo(dragOffsetPx)
+                                    dragAnim.animateTo(
+                                        0f,
+                                        spring(
+                                            dampingRatio = MotionPolicy.Spring.HEADER_DAMPING.toFloat(),
+                                            stiffness = Spring.StiffnessMediumLow,
+                                        ),
+                                    )
+                                    dragOffsetPx = 0f
+                                }
+                            }
+                        },
+                    ),
             ) {
                 ChatAttachmentMediaGridSheet(
                     accentColor = accentColor,
@@ -498,40 +613,48 @@ private fun ChatAttachmentMediaGridSheet(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val isDark = isSystemInDarkTheme()
+    val photosGate = remember { PermissionPrimerGate(PermissionPrimerGate.Kind.PHOTOS) }
     var assets by remember { mutableStateOf<List<ChatAttachmentMediaAsset>>(emptyList()) }
     var selectedIds by remember { mutableStateOf<List<String>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isConfirming by remember { mutableStateOf(false) }
     var permissionDenied by remember { mutableStateOf(false) }
+    var permissionGranted by remember { mutableStateOf(false) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { grants ->
-        permissionDenied = !grants.values.any { it }
-        if (!permissionDenied) {
-            scope.launch {
-                isLoading = true
-                assets = withContext(Dispatchers.IO) { loadAttachmentGalleryAssets(context) }
-                isLoading = false
-            }
-        } else {
+    fun loadLibrary() {
+        scope.launch {
+            isLoading = true
+            assets = withContext(Dispatchers.IO) { loadAttachmentGalleryAssets(context) }
+            permissionGranted = true
+            permissionDenied = false
             isLoading = false
         }
     }
+
     val nativePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(ChatInputBarLayout.maxMediaSelectionCount),
     ) { uris ->
         if (uris.isNotEmpty()) onPickerUris(uris.take(ChatInputBarLayout.maxMediaSelectionCount))
     }
 
+    // ≡ requestPhotoLibraryAccess + PermissionPrimerGate(.photos)
     LaunchedEffect(Unit) {
         if (hasAttachmentGalleryPermission(context)) {
-            assets = withContext(Dispatchers.IO) { loadAttachmentGalleryAssets(context) }
-            isLoading = false
+            loadLibrary()
         } else {
-            permissionLauncher.launch(attachmentGalleryPermissions())
+            photosGate.requestAccess(context) { loadLibrary() }
         }
+    }
+
+    var wasPhotosGatePresenting by remember { mutableStateOf(false) }
+    LaunchedEffect(photosGate.isPresenting) {
+        if (wasPhotosGatePresenting && !photosGate.isPresenting && !permissionGranted) {
+            if (!hasAttachmentGalleryPermission(context)) {
+                permissionDenied = true
+                isLoading = false
+            }
+        }
+        wasPhotosGatePresenting = photosGate.isPresenting
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -585,6 +708,8 @@ private fun ChatAttachmentMediaGridSheet(
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
+
+    PermissionPrimerGateHost(gate = photosGate)
 }
 
 @Composable
@@ -652,7 +777,8 @@ private fun ChatAttachmentFooter(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .padding(bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ChatAttachmentRoundButton(onClick = onBack)
@@ -674,11 +800,17 @@ private fun ChatAttachmentFooter(
 @Composable
 private fun ChatAttachmentRoundButton(onClick: () -> Unit) {
     val isDark = isSystemInDarkTheme()
+    val stroke = if (isDark) {
+        androidx.compose.ui.graphics.Color.White.copy(alpha = 0.12f)
+    } else {
+        androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.08f)
+    }
     Box(
         modifier = Modifier
             .size(42.dp)
             .clip(CircleShape)
             .momentsChromeGlass(CircleShape, interactive = true)
+            .border(1.dp, stroke, CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -702,19 +834,27 @@ private fun ChatAttachmentPillButton(
     val isDark = isSystemInDarkTheme()
     val label = if (formatArg == null) stringResource(titleRes) else stringResource(titleRes, formatArg)
     val shape = RoundedCornerShape(50)
+    val stroke = if (isDark) {
+        androidx.compose.ui.graphics.Color.White.copy(alpha = 0.12f)
+    } else {
+        androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.08f)
+    }
     Box(
         modifier = Modifier
             .clip(shape)
             .momentsChromeGlass(shape, interactive = !disabled, tint = tint?.copy(alpha = if (disabled) .35f else .92f))
+            .border(1.dp, stroke, shape)
             .clickable(enabled = !disabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
-            color = tint?.let { androidx.compose.ui.graphics.Color.White } ?: if (isDark) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Black,
+            color = tint?.let { androidx.compose.ui.graphics.Color.White }
+                ?: if (isDark) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Black,
             fontSize = 14.sp,
             fontWeight = if (tint == null) FontWeight.Medium else FontWeight.SemiBold,
+            modifier = Modifier.graphicsLayer { alpha = if (disabled) 0.5f else 1f },
         )
     }
 }

@@ -2,8 +2,12 @@ package com.moments.android.views.creator.creatorscreens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
 import android.provider.MediaStore
+import android.view.Surface
 import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -89,12 +93,14 @@ import com.moments.android.services.camera.SnapCameraKitConfiguration
 import com.moments.android.views.creator.camerakit.CameraKitController
 import com.moments.android.views.creator.camerakit.LensReel
 import com.moments.android.views.creator.creatoruikit.StoryGalleryPicker
+import com.moments.android.views.creator.creatoruikit.CREATOR_MOMENTS_CAPTURE_ASPECT_RATIO
 import com.moments.android.views.creator.creatoruikit.creatorMomentsCaptureRect
 import com.moments.android.views.creator.creatoruikit.storyMediaFromUri
 import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
 import com.moments.android.views.permissions.CameraAccessBoundary
 import kotlinx.coroutines.delay
 import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -104,6 +110,55 @@ import kotlin.math.roundToInt
 
 /** iOS `StoryVideoProcessingService.maxAutoSplitDuration` = 5 × 60s */
 private const val MAX_STORY_RECORD_SECONDS = 5.0 * 60.0
+
+/**
+ * Swift normalizes the JPEG and crops it to the visible preview before opening the editor.
+ * Some OEM CameraX pipelines (the Xiaomi one included) write the sensor buffer as-is and
+ * omit EXIF orientation, so do both operations in pixels here as well.
+ */
+private fun normalizeAndCropStoryPhoto(file: File, rotationDegrees: Int) {
+    val source = BitmapFactory.decodeFile(file.absolutePath) ?: return
+    var upright = source
+    if (rotationDegrees % 180 != 0 && source.width > source.height) {
+        upright = runCatching {
+            Bitmap.createBitmap(
+                source,
+                0,
+                0,
+                source.width,
+                source.height,
+                Matrix().apply { postRotate(rotationDegrees.toFloat()) },
+                true,
+            )
+        }.getOrNull() ?: source
+        if (upright !== source) source.recycle()
+    }
+
+    // Same centre crop as PreviewView.ScaleType.FILL_CENTER / iOS's preview metadata rect.
+    val sourceRatio = upright.width.toFloat() / upright.height.coerceAtLeast(1)
+    val cropWidth: Int
+    val cropHeight: Int
+    if (sourceRatio > CREATOR_MOMENTS_CAPTURE_ASPECT_RATIO) {
+        cropHeight = upright.height
+        cropWidth = (cropHeight * CREATOR_MOMENTS_CAPTURE_ASPECT_RATIO).toInt()
+    } else {
+        cropWidth = upright.width
+        cropHeight = (cropWidth / CREATOR_MOMENTS_CAPTURE_ASPECT_RATIO).toInt()
+    }
+    val left = ((upright.width - cropWidth) / 2).coerceAtLeast(0)
+    val top = ((upright.height - cropHeight) / 2).coerceAtLeast(0)
+    val previewMatched = runCatching {
+        Bitmap.createBitmap(upright, left, top, cropWidth, cropHeight)
+    }.getOrNull() ?: upright
+    if (previewMatched !== upright) upright.recycle()
+
+    runCatching {
+        FileOutputStream(file, false).use { output ->
+            previewMatched.compress(Bitmap.CompressFormat.JPEG, 95, output)
+        }
+    }
+    previewMatched.recycle()
+}
 
 /**
  * Port de `StoryCameraView.swift`.
@@ -174,6 +229,7 @@ fun StoryCameraView(
     val imageCapture = remember {
         ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .setTargetRotation(Surface.ROTATION_0)
             .build()
     }
     val videoCapture = remember {
@@ -210,9 +266,14 @@ fun StoryCameraView(
                 ContextCompat.getMainExecutor(context),
             )
         }
-        val preview = Preview.Builder().build().also {
+        val preview = Preview.Builder()
+            .setTargetRotation(view.display?.rotation ?: Surface.ROTATION_0)
+            .build()
+            .also {
             it.surfaceProvider = view.surfaceProvider
         }
+        imageCapture.targetRotation = view.display?.rotation ?: Surface.ROTATION_0
+        videoCapture.targetRotation = view.display?.rotation ?: Surface.ROTATION_0
         val selector = CameraSelector.Builder()
             .requireLensFacing(lensFacing)
             .build()
@@ -261,6 +322,7 @@ fun StoryCameraView(
     fun takePhoto() {
         if (isCapturing || isRecording || !hasCameraPermission) return
         isCapturing = true
+        imageCapture.targetRotation = previewView?.display?.rotation ?: Surface.ROTATION_0
         val name = "story_${UUID.randomUUID()}.jpg"
         val dir = File(context.cacheDir, "story_captures").also { it.mkdirs() }
         val photoFile = File(dir, name)
@@ -271,6 +333,9 @@ fun StoryCameraView(
             cameraExecutor,
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                    val rotationDegrees = boundCamera?.cameraInfo
+                        ?.getSensorRotationDegrees(imageCapture.targetRotation) ?: 0
+                    normalizeAndCropStoryPhoto(photoFile, rotationDegrees)
                     val uri = outputFileResults.savedUri ?: Uri.fromFile(photoFile)
                     val media = storyMediaFromUri(context, uri)
                     mainExecutor.execute {

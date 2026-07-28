@@ -55,11 +55,11 @@ import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.utilities.momentsPressIcon
 import com.moments.android.views.components.EchoesIconMetrics
 import com.moments.android.views.components.EchoesIconViewBrandHorizontal
-import com.moments.android.views.feed.FeedInk
+import com.moments.android.views.feed.stories.StoryRingTrayLoadingTail
+import com.moments.android.views.feed.stories.StoryRingTraySkeletonRow
 import com.moments.android.views.feed.controls.FeedType
 import com.moments.android.views.feed.controls.FloatingGlassFeedToggle
 import com.moments.android.views.feed.rememberAdaptiveColors
-import com.moments.android.views.feed.stories.StoryRingTraySkeleton
 
 /** Port 1:1 de `FeedHeaderSection.swift`. */
 
@@ -68,7 +68,7 @@ fun FeedRefreshIndicator(mod: Modifier = Modifier) {
     val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
     val density = LocalDensity.current
-    // iOS ProgressView scaleEffect 0.72 ≈ 14–16dp indicator
+    // iOS ProgressView ~20pt × scaleEffect(0.72) ≈ 14dp
     Row(
         mod
             .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = false)
@@ -77,7 +77,7 @@ fun FeedRefreshIndicator(mod: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         CircularProgressIndicator(
-            modifier = Modifier.size((16 * 0.72f).dp),
+            modifier = Modifier.size(14.dp),
             strokeWidth = 2.dp,
             color = if (isDark) Color.White else Color.Black,
         )
@@ -105,7 +105,8 @@ fun FeedHeaderBar(
     onOpenMessages: () -> Unit,
     onOpenEchoHistory: () -> Unit = {},
     onOpenEchoInvitation: (String) -> Unit = {},
-    onLoadMoreRing: () -> Unit = {},
+    /** iOS `loadMoreRingUsersIfNeeded(visibleIndex:)` — índice en el tray completo (own = 0). */
+    onLoadMoreRing: (visibleIndex: Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val headerBg = rememberAdaptiveColors().surfaceBackground
@@ -113,27 +114,34 @@ fun FeedHeaderBar(
     val unreadMessages by NotificationBadgeService.unreadMessagesCount.collectAsState()
     var echoMenuExpanded by remember { mutableStateOf(false) }
 
-    // iOS: first = current user; ForEach dropFirst
+    // iOS: YourStory usa storyUsers.first si first.userId == currentUser
+    val firstUser = storyUsers.firstOrNull()
     val ownFromTray = remember(storyUsers, currentUserId) {
         when {
             currentUserId != null -> storyUsers.firstOrNull { it.userId == currentUserId }
             else -> storyUsers.firstOrNull()
         }
     }
-    val otherStoryUsers = remember(storyUsers, currentUserId, ownFromTray) {
-        when {
-            currentUserId != null -> storyUsers.filter { it.userId != currentUserId }
-            storyUsers.isNotEmpty() -> storyUsers.drop(1)
-            else -> emptyList()
-        }
+    // iOS ForEach(storyUsers.dropFirst())
+    val otherStoryUsers = remember(storyUsers) {
+        if (storyUsers.isNotEmpty()) storyUsers.drop(1) else emptyList()
     }
-    val resolvedOwnHasStory = ownFromTray?.hasStory == true || ownStoryCount > 0
-    val resolvedOwnCount = ownFromTray?.storyCount?.takeIf { it > 0 } ?: ownStoryCount
+    val resolvedOwnHasStory = when {
+        firstUser != null && firstUser.userId == currentUserId -> firstUser.hasStory
+        else -> ownFromTray?.hasStory == true || ownStoryCount > 0
+    }
+    val resolvedOwnCount = when {
+        firstUser != null && firstUser.userId == currentUserId -> firstUser.storyCount
+        else -> ownFromTray?.storyCount?.takeIf { it > 0 } ?: ownStoryCount
+    }
+    val resolvedOwnAudiences = when {
+        firstUser != null && firstUser.userId == currentUserId -> firstUser.storyAudiences
+        else -> ownFromTray?.storyAudiences.orEmpty()
+    }
 
     // iOS FeedHeaderBar:
     //   .padding(.top, 16).padding(.bottom, 4)
     //   .background(Rectangle().fill(...).ignoresSafeArea(edges: .top))
-    // Compose: background antes de statusBarsPadding → color bajo la status bar.
     Row(
         modifier
             .fillMaxWidth()
@@ -143,34 +151,27 @@ fun FeedHeaderBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(start = 12.dp, end = 4.dp),
-            modifier = Modifier.weight(1f),
-        ) {
-            if (isLoadingStories && storyUsers.isEmpty()) {
-                items(6) { index ->
-                    StoryRingTraySkeleton(isOwnStory = index == 0)
-                }
-            } else {
+        // iOS: skeleton row OR horizontal ScrollView — no ambos
+        if (isLoadingStories && storyUsers.isEmpty()) {
+            StoryRingTraySkeletonRow(
+                currentUserId = currentUserId,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(start = 12.dp, end = 4.dp),
+                modifier = Modifier.weight(1f),
+            ) {
                 item {
                     YourStoryRing(
                         onClick = {
-                            // iOS: si ya hay story propia → abrir; si no → creator
-                            val own = ownFromTray
-                            if (resolvedOwnHasStory && own != null && own.userId.isNotBlank()) {
-                                onOpenStory(own)
-                            } else if (resolvedOwnHasStory && currentUserId != null) {
-                                onOpenStory(
-                                    FeedStoryUserState(
-                                        userId = currentUserId,
-                                        username = "",
-                                        profileImageUrl = ownStoryProfileImageUrl,
-                                        hasStory = true,
-                                        storyCount = resolvedOwnCount,
-                                        storyAudiences = ownFromTray?.storyAudiences.orEmpty(),
-                                    ),
-                                )
+                            // iOS: first.hasStory && first.userId == current → open; else creator
+                            if (currentUserId != null &&
+                                firstUser?.hasStory == true &&
+                                firstUser.userId == currentUserId
+                            ) {
+                                onOpenStory(firstUser)
                             } else {
                                 onCreateStory()
                             }
@@ -178,10 +179,14 @@ fun FeedHeaderBar(
                         profileImageUrl = ownStoryProfileImageUrl ?: ownFromTray?.profileImageUrl,
                         hasStory = resolvedOwnHasStory,
                         storyCount = resolvedOwnCount,
-                        storyAudiences = ownFromTray?.storyAudiences.orEmpty(),
+                        storyAudiences = resolvedOwnAudiences,
                     )
                 }
                 itemsIndexed(otherStoryUsers, key = { _, u -> u.userId }) { index, user ->
+                    // iOS onAppear: loadMoreRingUsersIfNeeded(visibleIndex: index + 1)
+                    androidx.compose.runtime.LaunchedEffect(user.userId, index) {
+                        onLoadMoreRing(index + 1)
+                    }
                     UserStoryRing(
                         userId = user.userId,
                         username = user.username,
@@ -191,17 +196,16 @@ fun FeedHeaderBar(
                         storyCount = user.storyCount,
                         viewedStatuses = user.storyViewedStatus,
                         storyAudiences = user.storyAudiences,
-                        onClick = { onOpenStory(user) },
+                        onClick = {
+                            if (user.userId.isNotEmpty()) onOpenStory(user)
+                        },
                     )
-                    if (index >= otherStoryUsers.size - 3) onLoadMoreRing()
                 }
                 if (isLoadingMoreRing) {
                     item { StoryRingTrayLoadingTail() }
                 }
             }
         }
-
-        // iOS Spacer() — weight(1f) en LazyRow ya empuja iconos a la derecha
 
         Row(
             Modifier.padding(end = 12.dp),
@@ -267,7 +271,7 @@ fun FeedHeaderSection(
     isLoadingMoreRing: Boolean = false,
     onOpenEchoHistory: () -> Unit = {},
     onOpenEchoInvitation: (String) -> Unit = {},
-    onLoadMoreRing: () -> Unit = {},
+    onLoadMoreRing: (visibleIndex: Int) -> Unit = {},
 ) {
     FeedHeaderBar(
         storyUsers = storyUsers,
@@ -318,6 +322,8 @@ fun FeedFloatingSelector(
                 spotColor = Color.Black.copy(alpha = 0.15f),
             ),
         )
+        // iOS: chip solo si `#unavailable(iOS 26)` (en 26+ va Liquid Glass).
+        // Android no tiene esa gota → mantener FeedRefreshIndicator (= rama pre-26).
         AnimatedVisibility(
             visible = isManualRefreshing,
             enter = fadeIn() + slideInVertically(),
@@ -326,6 +332,7 @@ fun FeedFloatingSelector(
             FeedRefreshIndicator(mod = Modifier.padding(top = 8.dp))
         }
     }
+    // Animación del inset vive en FeedView (animateDpAsState) — paridad Spring.header
     @Suppress("UNUSED_EXPRESSION")
     isFeedHeaderHidden
     @Suppress("UNUSED_EXPRESSION")
@@ -361,24 +368,5 @@ private fun EchoApertureIcon(pendingCount: Int, onClick: () -> Unit) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun StoryRingTrayLoadingTail() {
-    val isDark = isSystemInDarkTheme()
-    Box(
-        Modifier
-            .padding(horizontal = 8.dp)
-            .size(58.dp)
-            .clip(CircleShape)
-            .background(if (isDark) Color.White.copy(0.06f) else FeedInk.copy(alpha = 0.06f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(18.dp),
-            strokeWidth = 2.dp,
-            color = if (isDark) Color.White.copy(0.4f) else FeedInk.copy(alpha = 0.4f),
-        )
     }
 }

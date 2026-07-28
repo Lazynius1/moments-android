@@ -1,6 +1,8 @@
 package com.moments.android.views.feed.moments
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -26,9 +28,11 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,6 +45,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ColorMatrixColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -53,17 +58,18 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import com.moments.android.R
 import com.moments.android.services.content.FeedMediaItem
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.performance.VideoMomentsIndex
-import com.moments.android.services.video.SharedVideoPlayerPool
+import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.feed.FeedInk
 import com.moments.android.views.feed.video.FeedVideoPage
 import com.moments.android.views.feed.video.LiveVideoTimeLabel
-import com.moments.android.views.feed.video.ReelsVideoItem
-import com.moments.android.views.feed.video.ReelsViewerPlaceholder
+import com.moments.android.views.feed.video.ReelsViewer
+import com.moments.android.views.feed.video.ReelsBadgeOverlay
 import com.moments.android.views.shared.PhotoTagOverlayView
 
 private val MediaCorner = RoundedCornerShape(MomentCarouselLayoutRules.mediaCornerRadius)
@@ -87,9 +93,14 @@ fun MomentMediaCarousel(
     onTagTap: ((String) -> Unit)? = null,
     /** Altura fija (iOS cardHeight). Si null, usa aspectRatio. */
     fixedHeight: Dp? = null,
+    /**
+     * iOS EnhancedCarouselView recibe `mediaItems` del PostCard (ya resueltos).
+     * Si null → visibleMediaItems del moment.
+     */
+    mediaItemsOverride: List<FeedMediaItem>? = null,
 ) {
-    // iOS ModernPostCardView.mediaItems → visibleMediaItems (+ legacy fallback en iOS)
-    val mediaItems = moment.visibleMediaItems.ifEmpty { moment.mediaItems }
+    // iOS: mediaItems pasados desde ModernPostCardView
+    val mediaItems = mediaItemsOverride ?: moment.visibleMediaItems
     val pagerState = rememberPagerState(pageCount = { mediaItems.size.coerceAtLeast(1) })
     // iOS EnhancedCarouselView pasa `aspectRatio` del card (detected), no el de cada página
     val rawRatio = MomentCarouselLayoutRules.aspectRatioValue(moment.aspectRatio)
@@ -97,6 +108,8 @@ fun MomentMediaCarousel(
     val isCarousel = mediaItems.size > 1
     var showReelsViewer by remember { mutableStateOf(false) }
     var reelsStartIndex by remember { mutableStateOf(0) }
+    var reelsStartSeconds by remember { mutableFloatStateOf(0f) }
+    var reelsHandoffItem by remember { mutableStateOf<FeedMediaItem?>(null) }
     val indexedVideos by VideoMomentsIndex.videoMoments.collectAsState()
 
     LaunchedEffect(pagerState.currentPage) {
@@ -118,36 +131,32 @@ fun MomentMediaCarousel(
         Modifier.fillMaxWidth().aspectRatio(canvasAspectRatio)
     }
 
+    fun dismissReelsViewer() {
+        showReelsViewer = false
+        onImmersiveChange(false)
+        // iOS fullScreenCover onDismiss: completeReelsFeedHandoff + playVideo
+        GlobalVideoManager.completeReelsFeedHandoff(moment, reelsHandoffItem)
+        val resumeId = if (reelsHandoffItem != null) {
+            GlobalVideoManager.profileVideoConsumerId(moment, reelsHandoffItem!!)
+        } else {
+            GlobalVideoManager.profileVideoConsumerId(moment)
+        }
+        GlobalVideoManager.playVideo(resumeId)
+        reelsHandoffItem = null
+    }
+
     if (showReelsViewer) {
         // iOS MediaItemView.fullScreenCover → ReelsViewer
         Dialog(
-            onDismissRequest = {
-                showReelsViewer = false
-                onImmersiveChange(false)
-                // iOS: completeReelsFeedHandoff + playVideo — aquí reanudamos el consumer activo
-                runCatching {
-                    SharedVideoPlayerPool.player(consumerId).play()
-                }
-            },
+            onDismissRequest = { dismissReelsViewer() },
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
-            val reels = indexedVideos.map { vm ->
-                val media = vm.moment.mediaItems?.getOrNull(vm.mediaIndex)
-                ReelsVideoItem(
-                    momentId = vm.moment.id.orEmpty(),
-                    videoUrl = media?.url ?: vm.moment.videoUrl.orEmpty(),
-                    authorId = vm.moment.authorId,
-                    username = vm.moment.username,
-                    thumbnailUrl = media?.thumbnailUrl ?: vm.moment.imagePath,
-                )
-            }
-            ReelsViewerPlaceholder(
+            val reels = indexedVideos
+            ReelsViewer(
                 videos = reels,
                 startIndex = reelsStartIndex,
-                onClose = {
-                    showReelsViewer = false
-                    onImmersiveChange(false)
-                },
+                initialStartSeconds = reelsStartSeconds.toDouble(),
+                onClose = { dismissReelsViewer() },
             )
         }
     }
@@ -162,11 +171,17 @@ fun MomentMediaCarousel(
         } else {
             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                 // iOS: allowsVideoPlayback && index == currentIndex
+                val item = mediaItems[page]
                 val allowsVideoPlayback = !isCarousel || page == pagerState.currentPage
-                MediaItemView(
-                    item = mediaItems[page],
+                val pageConsumerId = GlobalVideoManager.feedVideoConsumerId(
                     moment = moment,
-                    consumerId = if (isCarousel) "${consumerId}_$page" else consumerId,
+                    item = item,
+                    prefersUnifiedCarouselFrame = isCarousel,
+                )
+                MediaItemView(
+                    item = item,
+                    moment = moment,
+                    consumerId = pageConsumerId,
                     canvasAspectRatio = canvasAspectRatio,
                     prefersUnifiedCarouselFrame = isCarousel,
                     showTags = showTags,
@@ -175,51 +190,37 @@ fun MomentMediaCarousel(
                     allowsVideoPlayback = allowsVideoPlayback,
                     onTagTap = onTagTap,
                     onOpenReels = {
-                        // iOS openReelsViewer: pauseAll + isImmersive = true + showReelsViewer
-                        runCatching { SharedVideoPlayerPool.player("${consumerId}_$page").pause() }
+                        // iOS openReelsViewer
+                        val handoffMedia = if (isCarousel) item else null
+                        GlobalVideoManager.capturePlaybackPosition(pageConsumerId)
+                        GlobalVideoManager.markReelsFeedHandoff(moment, handoffMedia)
+                        GlobalVideoManager.pauseAllVideos()
                         onImmersiveChange(true)
+                        reelsHandoffItem = handoffMedia
+                        reelsStartSeconds = GlobalVideoManager.playbackPosition(pageConsumerId).toFloat()
                         reelsStartIndex = VideoMomentsIndex.reelsStartIndex(moment.id)
                         showReelsViewer = true
                     },
                 )
             }
-            // iOS ModernPostCardView: MomentCarouselPageIndicators fuera del carousel, top 20
             AnimatedVisibility(
                 visible = mediaItems.size > 1 && !isImmersive,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.TopCenter),
             ) {
-                Row(
-                    Modifier.padding(top = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(MomentCarouselIndicatorStyle.spacing),
-                ) {
-                    repeat(mediaItems.size) { index ->
-                        val active = index == pagerState.currentPage
-                        Box(
-                            Modifier
-                                .size(
-                                    width = MomentCarouselIndicatorStyle.dotWidth,
-                                    height = MomentCarouselIndicatorStyle.dotHeight,
-                                )
-                                .clip(RoundedCornerShape(50))
-                                .background(
-                                    if (active) {
-                                        MomentCarouselIndicatorStyle.activeColor(index)
-                                    } else {
-                                        MomentCarouselIndicatorStyle.inactiveColor
-                                    },
-                                ),
-                        )
-                    }
-                }
+                MomentCarouselPageIndicators(
+                    count = mediaItems.size,
+                    currentIndex = pagerState.currentPage,
+                    modifier = Modifier.padding(top = 20.dp),
+                )
             }
         }
     }
 }
 
 /**
- * Port de `MediaItemView` + `CroppedVideoPlayer` (FeedMomentComponents.swift).
+ * Port de `MediaItemView` (FeedMomentComponents.swift).
  */
 @Composable
 private fun MediaItemView(
@@ -240,16 +241,59 @@ private fun MediaItemView(
         return
     }
 
-    val itemRatio = MomentCarouselLayoutRules.aspectRatioValue(item.aspectRatio)
-    // iOS usesBlurredFitLayout: solo si prefersUnifiedCarouselFrame && fitWithBlur
+    // iOS @State loadedAspectRatio + resolvedItemAspectRatio
+    var loadedAspectRatio by remember(item.id, item.url) { mutableStateOf<Float?>(null) }
+    val resolvedItemAspectRatio = remember(loadedAspectRatio, item.aspectRatio, canvasAspectRatio) {
+        val loaded = loadedAspectRatio
+        when {
+            loaded != null && loaded.isFinite() && loaded > 0f -> loaded
+            else -> item.resolvedAspectRatioValue?.takeIf { it.isFinite() && it > 0f }
+                ?: canvasAspectRatio
+        }
+    }
+    // iOS usesBlurredFitLayout
     val usesBlurredFitLayout = prefersUnifiedCarouselFrame &&
-        MomentCarouselLayoutRules.presentationMode(itemRatio, canvasAspectRatio) ==
+        MomentCarouselLayoutRules.presentationMode(resolvedItemAspectRatio, canvasAspectRatio) ==
         MomentCarouselPresentationMode.FitWithBlur
     val tags = item.tags.orEmpty()
     // iOS CroppedVideoPlayer.isReelsFormat: aspectRatio < 0.7 || currentMoment.aspectRatio == "9:16"
     val isReelsFormat = canvasAspectRatio < 0.7f || moment.aspectRatio == "9:16"
 
-    Box(Modifier.fillMaxSize()) {
+    // iOS isVisible + opacity/scale appear (solo si !prefersUnifiedCarouselFrame)
+    var isVisible by remember(item.id) { mutableStateOf(prefersUnifiedCarouselFrame) }
+    LaunchedEffect(prefersUnifiedCarouselFrame, item.id) {
+        if (prefersUnifiedCarouselFrame) {
+            isVisible = true
+        } else {
+            isVisible = true
+        }
+    }
+    DisposableEffect(item.id) {
+        onDispose {
+            if (!prefersUnifiedCarouselFrame) isVisible = false
+        }
+    }
+    val appearAlpha by animateFloatAsState(
+        targetValue = if (prefersUnifiedCarouselFrame || isVisible) 1f else 0.8f,
+        animationSpec = if (prefersUnifiedCarouselFrame) tween(0) else tween(400),
+        label = "mediaAppearAlpha",
+    )
+    val appearScale by animateFloatAsState(
+        targetValue = if (prefersUnifiedCarouselFrame || isVisible) 1f else 0.98f,
+        animationSpec = if (prefersUnifiedCarouselFrame) tween(0) else tween(400),
+        label = "mediaAppearScale",
+    )
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(0.dp))
+            .graphicsLayer {
+                alpha = appearAlpha
+                scaleX = appearScale
+                scaleY = appearScale
+            },
+    ) {
         if (!prefersUnifiedCarouselFrame) {
             // iOS: RoundedRectangle.fill(.ultraThinMaterial) cuando no es carousel unificado
             Box(Modifier.fillMaxSize().background(FeedInk.copy(alpha = 0.08f)))
@@ -258,6 +302,7 @@ private fun MediaItemView(
         if (item.type == "video") {
             CroppedVideoPlayer(
                 item = item,
+                moment = moment,
                 consumerId = consumerId,
                 usesBlurredFitLayout = usesBlurredFitLayout,
                 isReelsFormat = isReelsFormat,
@@ -273,7 +318,7 @@ private fun MediaItemView(
                 },
             )
         } else {
-            // iOS image branch
+            // iOS image branch + onSuccess → loadedAspectRatio
             Box(
                 Modifier
                     .fillMaxSize()
@@ -287,20 +332,22 @@ private fun MediaItemView(
             ) {
                 if (usesBlurredFitLayout) {
                     CarouselMediaBackdropView(item = item)
-                    AsyncImage(
-                        model = item.url,
-                        contentDescription = moment.username,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    AsyncImage(
-                        model = item.url,
-                        contentDescription = moment.username,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
                 }
+                AsyncImage(
+                    model = item.url,
+                    contentDescription = moment.username,
+                    contentScale = if (usesBlurredFitLayout) ContentScale.Fit else ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    onSuccess = { state: AsyncImagePainter.State.Success ->
+                        val size = state.painter.intrinsicSize
+                        if (size.width > 0f && size.height > 0f && size.width.isFinite() && size.height.isFinite()) {
+                            val ratio = size.width / size.height
+                            if (ratio.isFinite() && ratio > 0f) {
+                                loadedAspectRatio = ratio
+                            }
+                        }
+                    },
+                )
             }
         }
 
@@ -320,6 +367,7 @@ private fun MediaItemView(
 @Composable
 private fun CroppedVideoPlayer(
     item: FeedMediaItem,
+    moment: FeedMoment,
     consumerId: String,
     usesBlurredFitLayout: Boolean,
     isReelsFormat: Boolean,
@@ -327,7 +375,13 @@ private fun CroppedVideoPlayer(
     isImmersive: Boolean,
     onTap: () -> Unit,
 ) {
-    val posterUrl = item.thumbnailUrl?.takeIf { it.isNotBlank() }
+    // iOS videoPosterURLString(for:) + item.thumbnailUrl fallback
+    val posterUrl = GlobalVideoManager.videoPosterUrl(moment, item)
+    val totalDuration = item.videoDuration ?: moment.videoDuration
+    // iOS mute overlay siempre si allowsVideoPlayback (código); comment dice hide immersive —
+    // seguimos el código: visible cuando allowsVideoPlayback. FeedVideoPage hideMute en immersive
+    // para no tapear mute encima de Reels.
+    val showMute = allowsVideoPlayback && !isImmersive
 
     Box(Modifier.fillMaxSize()) {
         when {
@@ -355,7 +409,7 @@ private fun CroppedVideoPlayer(
                         .padding(vertical = 10.dp, horizontal = 6.dp),
                     allowsPlayback = true,
                     allowsPauseInteraction = true,
-                    showMute = true,
+                    showMute = showMute,
                     onTap = null,
                 )
                 AnimatedVisibility(
@@ -366,7 +420,7 @@ private fun CroppedVideoPlayer(
                 ) {
                     LiveVideoTimeLabel(
                         consumerId = consumerId,
-                        totalDuration = item.videoDuration,
+                        totalDuration = totalDuration,
                         modifier = Modifier.padding(top = 8.dp, end = 8.dp),
                     )
                 }
@@ -380,7 +434,7 @@ private fun CroppedVideoPlayer(
                     modifier = Modifier.fillMaxSize(),
                     allowsPlayback = true,
                     allowsPauseInteraction = false,
-                    showMute = true,
+                    showMute = showMute,
                     onTap = onTap,
                 )
                 Box(
@@ -427,7 +481,7 @@ private fun CroppedVideoPlayer(
                         }
                         LiveVideoTimeLabel(
                             consumerId = consumerId,
-                            totalDuration = item.videoDuration,
+                            totalDuration = totalDuration,
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(top = 12.dp, end = 12.dp),
@@ -444,7 +498,7 @@ private fun CroppedVideoPlayer(
                     modifier = Modifier.fillMaxSize(),
                     allowsPlayback = true,
                     allowsPauseInteraction = true,
-                    showMute = true,
+                    showMute = showMute,
                     onTap = null,
                 )
                 AnimatedVisibility(
@@ -455,7 +509,7 @@ private fun CroppedVideoPlayer(
                     Box(Modifier.fillMaxSize()) {
                         LiveVideoTimeLabel(
                             consumerId = consumerId,
-                            totalDuration = item.videoDuration,
+                            totalDuration = totalDuration,
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(top = 8.dp, end = 8.dp),

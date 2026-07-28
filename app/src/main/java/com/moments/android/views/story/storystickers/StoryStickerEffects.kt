@@ -1,11 +1,13 @@
 package com.moments.android.views.story.storystickers
 
+import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -16,6 +18,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
@@ -31,6 +36,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.DpSize
@@ -45,7 +51,9 @@ import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import com.moments.android.services.performance.MotionPolicy
+import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.min
@@ -69,6 +77,7 @@ fun AnimatedWeatherSticker(
         animationSpec = infiniteRepeatable(tween(2_000, easing = LinearEasing)),
         label = "weatherPhase",
     )
+    val shape = RoundedCornerShape(storyViewerCanvasCornerRadius)
 
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -76,8 +85,9 @@ fun AnimatedWeatherSticker(
         modifier = modifier
             .background(
                 color = weatherColors(weatherSymbol).first().copy(alpha = 0.3f),
-                shape = RoundedCornerShape(14.dp),
+                shape = shape,
             )
+            .border(0.5.dp, Color.White.copy(alpha = 0.2f), shape)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Text(
@@ -85,7 +95,12 @@ fun AnimatedWeatherSticker(
             color = Color.White,
             fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.shadow(2.dp),
+            // ≡ iOS `.shadow(color: .black.opacity(0.5), radius: 2, x: 1, y: 1)`
+            modifier = Modifier.shadow(
+                elevation = 2.dp,
+                ambientColor = Color.Black.copy(alpha = 0.5f),
+                spotColor = Color.Black.copy(alpha = 0.5f),
+            ),
         )
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(30.dp)) {
             Text(weatherSymbol, fontSize = 20.sp)
@@ -179,13 +194,15 @@ private fun WindAnimation(phase: Float) {
 private fun ThunderAnimation(phase: Float) {
     Box(Modifier.fillMaxSize()) {
         repeat(2) { index ->
-            Text(
-                text = "⚡",
-                color = Color.Yellow,
-                fontSize = 12.sp,
+            // ≡ iOS `Image(systemName: "bolt.fill")` size 12
+            Icon(
+                imageVector = Icons.Filled.Bolt,
+                contentDescription = null,
+                tint = Color.Yellow,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .offset(x = ((index - 0.5f) * 20).dp, y = (-8f + phase * 15f).dp)
+                    .size(12.dp)
                     .alpha((0.3f + 0.7f * sin(phase * 2f + index)).coerceIn(0f, 1f)),
             )
         }
@@ -242,33 +259,55 @@ data class FloatingHeart(
     val id: String = UUID.randomUUID().toString(),
 )
 
-/** Port de `FloatingHeartsView`; no intercepta los gestos del visor. */
+/**
+ * Port de `FloatingHeartsView`.
+ * Sin pointer handlers → hits pasan al visor (≡ `.allowsHitTesting(false)`).
+ * `onHeartExpired` ≡ callback de `StoryReactionBurst.emit` tras delay+duration+0.2s.
+ */
 @Composable
 fun FloatingHeartsView(
     hearts: List<FloatingHeart>,
     containerSize: DpSize = DpSize.Zero,
+    onHeartExpired: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.size(containerSize)) {
         hearts.forEach { heart ->
-            FloatingHeartParticleView(heart)
+            FloatingHeartParticleView(heart = heart, onExpired = onHeartExpired)
         }
     }
 }
 
 @Composable
-private fun FloatingHeartParticleView(heart: FloatingHeart) {
+private fun FloatingHeartParticleView(
+    heart: FloatingHeart,
+    onExpired: (String) -> Unit,
+) {
     val progress = remember(heart.id) { androidx.compose.animation.core.Animatable(0f) }
+    val density = LocalDensity.current
     LaunchedEffect(heart.id) {
+        // ≡ iOS `DispatchQueue.main.asyncAfter(deadline: .now() + delay + duration + 0.2)`
+        launch {
+            delay(heart.delay + heart.duration + 200L)
+            onExpired(heart.id)
+        }
         progress.snapTo(0f)
         if (MotionPolicy.reduceMotion) {
-            progress.animateTo(1f, tween(min(heart.duration, 1_400L).toInt()))
+            // ≡ iOS `withAnimation(.easeOut(duration: min(heart.duration, 1.4)))`
+            progress.animateTo(
+                1f,
+                tween(min(heart.duration, 1_400L).toInt(), easing = EaseOut),
+            )
         } else {
             delay(heart.delay)
-            progress.animateTo(1f, tween(heart.duration.toInt()))
+            progress.animateTo(
+                1f,
+                tween(heart.duration.toInt(), easing = EaseOut),
+            )
         }
     }
     val value = progress.value
+    // Coordenadas en dp (≡ puntos iOS); verticalTravel/lateralDrift vienen en dp desde emit.
     val xOffset = if (MotionPolicy.reduceMotion) {
         value * heart.lateralDrift * 0.5f
     } else {
@@ -290,20 +329,33 @@ private fun FloatingHeartParticleView(heart: FloatingHeart) {
         value > 0.75f -> 1f - (value - 0.75f) / 0.25f
         else -> 1f
     }
+    val shadowRadius = if (heart.fontSize > 42f) 3.dp else 1.5.dp
 
-    Text(
-        text = heart.emoji,
-        fontSize = heart.fontSize.sp,
-        modifier = Modifier
-            .offset(x = (heart.startX + xOffset).dp, y = (heart.startY + yOffset).dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                this.alpha = alpha.coerceIn(0f, 1f)
-                rotationZ = heart.rotation + value * heart.rotationDelta
-                shadowElevation = if (heart.fontSize > 42f) 3.dp.toPx() else 1.5.dp.toPx()
-            },
-    )
+    // Box transforma (position/scale/α/rot); Text lleva sombra ≡ iOS shadow luego flight modifier
+    Box(
+        modifier = Modifier.graphicsLayer {
+            val pxX = with(density) { (heart.startX + xOffset).dp.toPx() }
+            val pxY = with(density) { (heart.startY + yOffset).dp.toPx() }
+            translationX = pxX - size.width / 2f
+            translationY = pxY - size.height / 2f
+            scaleX = scale
+            scaleY = scale
+            this.alpha = alpha.coerceIn(0f, 1f)
+            rotationZ = heart.rotation + value * heart.rotationDelta
+        },
+    ) {
+        Text(
+            text = heart.emoji,
+            fontSize = heart.fontSize.sp,
+            // ≡ iOS `.shadow(color: .black.opacity(0.25), radius: …, x: 0, y: 1)`
+            modifier = Modifier.shadow(
+                elevation = shadowRadius,
+                ambientColor = Color.Black.copy(alpha = 0.25f),
+                spotColor = Color.Black.copy(alpha = 0.25f),
+                clip = false,
+            ),
+        )
+    }
 }
 
 /**
@@ -333,6 +385,9 @@ fun StickerVideoPlayer(
             PlayerView(viewContext).apply {
                 useController = false
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                // ≡ iOS playerLayer.backgroundColor = clear
+                setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 this.player = player
                 layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -340,7 +395,10 @@ fun StickerVideoPlayer(
                 )
             }
         },
-        update = { it.player = player },
+        update = { view ->
+            view.player = player
+            if (!player.isPlaying) player.play()
+        },
         modifier = modifier,
     )
 }

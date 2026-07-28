@@ -82,12 +82,14 @@ class HapticManager private constructor() {
 
     /** Tick háptico continuo durante pull de vanish. */
     fun vanishPullStep(view: View? = null) {
-        performHaptic(view, HapticFeedbackConstants.CLOCK_TICK)
+        // `CLOCK_TICK` se pierde fácilmente en algunos Xiaomi. Un impacto corto
+        // y suave conserva la cadencia del pull sin sentirse como un buzz.
+        performImpact(view, intensity = 0.26f, durationMs = 8L)
     }
 
     /** Umbral alcanzado al completar el arco. */
     fun vanishPullThresholdReached(view: View? = null) {
-        performImpact(view, intensity = 0.72f, durationMs = 18L)
+        performImpact(view, intensity = 0.82f, durationMs = 20L)
     }
 
     /** Muesca suave al avanzar o retroceder por el recorrido de reply. */

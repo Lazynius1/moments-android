@@ -101,6 +101,7 @@ import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.extensions.fromHex
 import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.extensions.rawPadding
 import com.moments.android.services.cache.PersistentAudioCache
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.utilities.HapticManager
@@ -667,7 +668,7 @@ fun StickerPolaroidFrameView(
                 shakeOpacity = shakeOpacity,
                 modifier = Modifier
                     .matchParentSize()
-                    .padding((-36).dp),
+                    .rawPadding((-36).dp),
             )
         }
     }

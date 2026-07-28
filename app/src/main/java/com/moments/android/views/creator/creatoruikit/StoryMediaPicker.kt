@@ -2,6 +2,7 @@ package com.moments.android.views.creator.creatoruikit
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.media.ExifInterface
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -106,8 +107,17 @@ fun storyMediaFromUri(context: Context, uri: Uri): CreatorMedia? {
             stream?.use { input ->
                 val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeStream(input, null, options)
-                val width = options.outWidth.toFloat()
-                val height = options.outHeight.toFloat().coerceAtLeast(1f)
+                val decodedWidth = options.outWidth.toFloat()
+                val decodedHeight = options.outHeight.toFloat().coerceAtLeast(1f)
+                // CameraX can keep sensor pixels and store the portrait transform in EXIF.
+                // The editor renders upright pixels, so its initial ratio must match that.
+                val orientation = uri.exifOrientation(context)
+                val rotateDimensions = orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+                    orientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+                    orientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+                    orientation == ExifInterface.ORIENTATION_TRANSVERSE
+                val width = if (rotateDimensions) decodedHeight else decodedWidth
+                val height = if (rotateDimensions) decodedWidth else decodedHeight
                 if (width <= 0f) CreatorAspectRatio.NINE_BY_SIXTEEN else CreatorAspectRatio.fromRatio(width / height)
             } ?: CreatorAspectRatio.NINE_BY_SIXTEEN
         }.getOrDefault(CreatorAspectRatio.NINE_BY_SIXTEEN)

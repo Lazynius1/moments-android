@@ -60,7 +60,7 @@ Orden sugerido (de más núcleo a más periférico):
   - Nuevo `services/network/CloudFunctionsClient.kt`: POST autenticado a Cloud Functions (`HttpURLConnection` + `getIdToken`), extraído para dejar de copiar ese bloque en cada servicio. Los servicios ya portados conservan su copia — migrarlos es limpieza aparte.
 - [ ] **Nova** (32) — asistente/IA.
 - [~] **story** (27) — **viewer MVP usable** (`StoriesView` + `StoryViewerScreen`); frame Polaroid con shake-to-reveal y Reveal scratch persistente ya cableados; efectos de Reveal/reply/ads/chains/archived siguen abiertos.
-- [~] **Explore** (9) — **lote usable:** tab + búsqueda + sugeridos + grid + detalle; Profile sheet / bento exacto / ModernExploreDetailHeader / SuggestedUsers paginado = abiertos.
+- [~] **Explore** (9) — **lote usable:** tab + búsqueda + sugeridos + grid + detalle; profile + zoom cableados; MomentDetailView N/A (dead iOS).
 - [ ] **Permission / Permissions** (12+2) — primers de permisos (cámara, micro, etc.).
 - [ ] **comments** (3), **Echoes** (3), **Misc** (1)
 - [ ] **Components / Shared** (22+10) — se portan a demanda según los vaya necesitando cada pantalla.

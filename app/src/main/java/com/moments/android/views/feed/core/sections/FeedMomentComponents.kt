@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -22,24 +21,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import android.media.MediaMetadataRetriever
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -59,10 +55,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
-import com.moments.android.extensions.MomentsGlassStyle
 import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.services.content.FeedMediaItem
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.checkIfSaved
@@ -83,14 +84,20 @@ import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.moments.HiddenLayersOverlayView
 import com.moments.android.views.feed.moments.MomentCarouselLayoutRules
 import com.moments.android.views.feed.moments.MomentMediaCarousel
-import com.moments.android.views.feed.moments.ClickableHashtagsView
 import com.moments.android.views.components.ModernActionButtons
 import com.moments.android.views.components.ModernFollowButton
 import com.moments.android.views.feed.uploads.StoryUploadProgressManager
+import com.moments.android.views.messaging.components.AttachmentIcon
+import com.moments.android.views.messaging.components.AttachmentIconPreset
+import com.moments.android.views.messaging.components.AttachmentIconView
+import com.moments.android.views.story.StoriesView
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // Métricas compartidas — port de `FeedMomentCardLayout` (iOS).
 private val ListHorizontalPadding = FeedMomentCardLayout.listHorizontalPadding
@@ -100,7 +107,133 @@ private val ActionRowHorizontalPadding = FeedMomentCardLayout.actionRowHorizonta
 private val PostAvatarSize = 44.dp
 private val HeaderIconHitSize = 36.dp
 private val HeaderIconSize = 22.dp
-private val MediaCorner = FeedMomentCardLayout.mediaCornerRadius
+private val MediaCornerShape = FeedMomentCardLayout.continuousRoundedRectShape
+
+/** Port de `ModernPostCardView.AspectRatioType` (FeedMomentComponents.swift). */
+private enum class PostCardAspectRatioType(
+    val maxHeight: Float,
+    val exactRatio: Float,
+    val displayName: String,
+) {
+    SQUARE(400f, 1.0f, "1:1"),
+    PORTRAIT(500f, 0.8f, "4:5"),
+    LANDSCAPE(300f, 1.78f, "16:9"),
+    REELS(600f, 0.5625f, "9:16"),
+}
+
+/** Port de `classifyAspectRatio` (FeedMomentComponents.swift). */
+private fun classifyAspectRatio(ratio: Float): PostCardAspectRatioType {
+    val tolerance = 0.05f
+    return when {
+        abs(ratio - 1.0f) < tolerance -> PostCardAspectRatioType.SQUARE
+        abs(ratio - 0.8f) < tolerance -> PostCardAspectRatioType.PORTRAIT
+        abs(ratio - 0.5625f) < tolerance -> PostCardAspectRatioType.REELS
+        ratio > 1.4f -> PostCardAspectRatioType.LANDSCAPE
+        ratio < 0.7f -> PostCardAspectRatioType.REELS
+        else -> PostCardAspectRatioType.SQUARE
+    }
+}
+
+/**
+ * Port de `ModernPostCardView.mediaItems` (FeedMomentComponents.swift).
+ * visible → si vacío, placeholder vacío (legacy ya resuelto al construir FeedMoment).
+ */
+private fun FeedMoment.postCardMediaItems(): List<FeedMediaItem> {
+    val visible = visibleMediaItems
+    if (visible.isNotEmpty()) return visible
+    return listOf(
+        FeedMediaItem(
+            id = "${id}_empty",
+            type = "image",
+            url = "",
+            thumbnailUrl = null,
+            aspectRatio = aspectRatio,
+        ),
+    )
+}
+
+private fun initialDisplayAspectRatio(moment: FeedMoment, media: List<FeedMediaItem>): Float {
+    val raw = MomentCarouselLayoutRules.aspectRatioValue(
+        moment.aspectRatio ?: media.firstOrNull()?.aspectRatio,
+    )
+    return MomentCarouselLayoutRules.feedDisplayAspectRatio(raw)
+}
+
+private fun initialRealAspectRatio(moment: FeedMoment, media: List<FeedMediaItem>): Float =
+    MomentCarouselLayoutRules.aspectRatioValue(
+        moment.aspectRatio ?: media.firstOrNull()?.aspectRatio,
+    )
+
+/** Port de `detectAspectRatio` — DB first; fallback Coil / MediaMetadataRetriever. */
+private suspend fun detectPostCardAspectRatio(
+    context: android.content.Context,
+    moment: FeedMoment,
+    mediaItems: List<FeedMediaItem>,
+    currentDetected: Float,
+): Triple<Float, Float, PostCardAspectRatioType>? {
+    val saved = moment.aspectRatio?.takeIf { it.isNotBlank() }
+    if (saved != null) {
+        val expected = MomentCarouselLayoutRules.aspectRatioValue(saved)
+        val display = MomentCarouselLayoutRules.feedDisplayAspectRatio(expected)
+        if (currentDetected == display) return null
+        val type = when {
+            display < 0.7f -> PostCardAspectRatioType.REELS
+            display < 0.9f -> PostCardAspectRatioType.PORTRAIT
+            display < 1.3f -> PostCardAspectRatioType.SQUARE
+            else -> PostCardAspectRatioType.LANDSCAPE
+        }
+        return Triple(display, expected, type)
+    }
+
+    // Solo fallback si aún no se detectó (iOS: detected == 1.0 || == 0)
+    if (currentDetected != 1f && currentDetected != 0f) return null
+
+    val first = mediaItems.firstOrNull()
+    if (first == null || first.url.isBlank()) {
+        return Triple(0.8f, 0.8f, PostCardAspectRatioType.PORTRAIT)
+    }
+
+    return if (first.type == "image") {
+        val ratio = withContext(Dispatchers.IO) {
+            runCatching {
+                val req = ImageRequest.Builder(context).data(first.url).build()
+                val result = context.imageLoader.execute(req)
+                if (result !is SuccessResult) return@runCatching null
+                val d = result.drawable
+                val w = d.intrinsicWidth
+                val h = d.intrinsicHeight
+                if (w > 0 && h > 0) w.toFloat() / h.toFloat() else null
+            }.getOrNull()
+        }
+        when {
+            ratio != null && ratio > 0f && ratio.isFinite() ->
+                Triple(ratio, ratio, classifyAspectRatio(ratio))
+            else -> Triple(0.8f, 0.8f, PostCardAspectRatioType.PORTRAIT)
+        }
+    } else {
+        // iOS: default reels 0.5625, then refine with track size
+        val videoRatio = withContext(Dispatchers.IO) {
+            runCatching {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(first.url, HashMap())
+                    val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                        ?.toIntOrNull() ?: return@runCatching null
+                    val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                        ?.toIntOrNull() ?: return@runCatching null
+                    if (w > 0 && h > 0) w.toFloat() / h.toFloat() else null
+                } finally {
+                    retriever.release()
+                }
+            }.getOrNull()
+        }
+        when {
+            videoRatio != null && videoRatio > 0f && videoRatio.isFinite() ->
+                Triple(videoRatio, videoRatio, classifyAspectRatio(videoRatio))
+            else -> Triple(0.5625f, 0.5625f, PostCardAspectRatioType.REELS)
+        }
+    }
+}
 
 private data class FeedAdaptiveColors(
     val primary: Color,
@@ -299,11 +432,19 @@ fun ExpandableContentView(
         modifier.padding(horizontal = 4.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // iOS MomentHashtagText (base blanco en este contexto)
-        ClickableHashtagsView(
+        // iOS MomentHashtagText(base white, mention 007AFF, shadow)
+        com.moments.android.views.components.MomentHashtagText(
             content = display,
             onHashtagTap = onHashtagTap,
-            isDarkTheme = true,
+            baseColor = Color.White,
+            mentionColor = Color(0xFF007AFF),
+            fontSize = 14.sp,
+            shadow = androidx.compose.ui.graphics.Shadow(
+                color = Color.Black.copy(alpha = 0.4f),
+                offset = androidx.compose.ui.geometry.Offset(0f, 1f),
+                blurRadius = 3f,
+            ),
+            onMentionTap = com.moments.android.utilities.MomentMentionNavigation::openProfile,
         )
 
         if (needsExpansion) {
@@ -360,6 +501,7 @@ fun ModernPostCardView(
 ) {
     val isDark = isSystemInDarkTheme()
     val density = LocalDensity.current
+    val context = LocalContext.current
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val scope = rememberCoroutineScope()
     val firestore = remember { FirestoreService() }
@@ -372,20 +514,28 @@ fun ModernPostCardView(
     var displayUsername by remember(moment.id) { mutableStateOf(moment.username) }
     var isSaved by remember(moment.id) { mutableStateOf(false) }
     var isSaveLoading by remember { mutableStateOf(false) }
+    // iOS showSpecificUserStories / fullScreenCover StoriesView
+    var showSpecificUserStories by remember { mutableStateOf(false) }
     val savedIds by firestore.savedMomentIds.collectAsState()
     val viewerId = FirebaseAuth.getInstance().currentUser?.uid
     val showFollow = viewerId != null && viewerId != moment.authorId
-    val visibleMedia = moment.visibleMediaItems.ifEmpty { moment.mediaItems }
-    val detectedAspectRatio = MomentCarouselLayoutRules.feedDisplayAspectRatio(
-        MomentCarouselLayoutRules.aspectRatioValue(moment.aspectRatio ?: visibleMedia.firstOrNull()?.aspectRatio),
-    )
-    val realAspectRatio = MomentCarouselLayoutRules.aspectRatioValue(
-        moment.aspectRatio ?: visibleMedia.firstOrNull()?.aspectRatio,
-    )
-    val currentMedia = visibleMedia.getOrNull(currentImageIndex)
+    // iOS ModernPostCardView.mediaItems
+    val mediaItems = remember(moment.id, moment.mediaItems, moment.aspectRatio) {
+        moment.postCardMediaItems()
+    }
+    var detectedAspectRatio by remember(moment.id) {
+        mutableFloatStateOf(initialDisplayAspectRatio(moment, mediaItems))
+    }
+    var realAspectRatio by remember(moment.id) {
+        mutableFloatStateOf(initialRealAspectRatio(moment, mediaItems))
+    }
+    var aspectRatioType by remember(moment.id) {
+        mutableStateOf(classifyAspectRatio(detectedAspectRatio))
+    }
+    val currentMedia = mediaItems.getOrNull(currentImageIndex)
     val currentTags = currentMedia?.tags.orEmpty()
 
-    // iOS calculateCardHeight: idealHeight = width/ratio, capped at availableHeight * 0.95
+    // iOS calculateCardHeight / refreshCardHeight
     val cardHeightDp = availableHeight?.let { availPx ->
         with(density) {
             val maxWidthPx = (screenWidthDp.dp.toPx() -
@@ -397,7 +547,25 @@ fun ModernPostCardView(
         }
     }
 
-    LaunchedEffect(moment.id) { onNearEnd() }
+    // iOS onAppear: detectAspectRatio + refreshCardHeight + onNearEnd
+    LaunchedEffect(moment.id, mediaItems) {
+        onNearEnd()
+        val result = detectPostCardAspectRatio(
+            context = context,
+            moment = moment,
+            mediaItems = mediaItems,
+            currentDetected = detectedAspectRatio,
+        )
+        if (result != null) {
+            detectedAspectRatio = result.first
+            realAspectRatio = result.second
+            aspectRatioType = result.third
+        }
+    }
+
+    // Suppress unused until DEBUG_ASPECT_RATIO overlay (iOS ProcessInfo env)
+    @Suppress("UNUSED_VARIABLE")
+    val debugAspectLabel = aspectRatioType.displayName
 
     // iOS: onChange savedMomentIds + loadAllPostData checkIfSaved
     LaunchedEffect(savedIds, moment.id) {
@@ -529,14 +697,23 @@ fun ModernPostCardView(
                     // iOS handleAuthorAvatarTap(hasStory:)
                     when {
                         onAuthorAvatarTap != null -> onAuthorAvatarTap(moment.authorId, hasStory)
-                        hasStory -> {
-                            // iOS fullScreenCover StoriesView(startWithUserId:) — sin callback del padre,
-                            // el feed cablea onAuthorAvatarTap; aquí no inventamos otra ruta.
-                        }
+                        hasStory -> showSpecificUserStories = true
                         else -> onOpenProfile()
                     }
                 },
             )
+        }
+
+        if (showSpecificUserStories) {
+            Dialog(
+                onDismissRequest = { showSpecificUserStories = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false),
+            ) {
+                StoriesView(
+                    startWithUserId = moment.authorId,
+                    onDismiss = { showSpecificUserStories = false },
+                )
+            }
         }
 
         Box(
@@ -545,23 +722,24 @@ fun ModernPostCardView(
                 .padding(horizontal = ActionRowHorizontalPadding),
             contentAlignment = Alignment.BottomEnd,
         ) {
-            if (visibleMedia.isNotEmpty()) {
+            if (mediaItems.isNotEmpty()) {
                 Box(Modifier.fillMaxWidth()) {
                     MomentMediaCarousel(
                         moment = moment,
                         consumerId = "feed_${moment.id}",
+                        mediaItemsOverride = mediaItems,
                         modifier = Modifier
                             .fillMaxWidth()
                             .shadow(
                                 elevation = 8.dp,
-                                shape = RoundedCornerShape(MediaCorner),
+                                shape = MediaCornerShape,
                                 clip = false,
                                 ambientColor = Color.Black.copy(alpha = if (isDark) 0.22f else 0.08f),
                                 spotColor = Color.Black.copy(alpha = if (isDark) 0.22f else 0.08f),
                             )
-                            .clip(RoundedCornerShape(MediaCorner))
+                            .clip(MediaCornerShape)
                             .carouselImmersivePeekGesture(
-                                mediaItems = visibleMedia,
+                                mediaItems = mediaItems,
                                 currentImageIndex = currentImageIndex,
                                 detectedAspectRatio = detectedAspectRatio,
                                 realAspectRatio = realAspectRatio,
@@ -580,8 +758,9 @@ fun ModernPostCardView(
 
                     if (moment.hasHiddenLayers &&
                         moment.hiddenLayerCount > 0 &&
-                        visibleMedia.size == 1 &&
-                        visibleMedia.first().type == "image"
+                        mediaItems.size == 1 &&
+                        mediaItems.first().type == "image" &&
+                        currentImageIndex == 0
                     ) {
                         HiddenLayersOverlayView(
                             momentId = moment.id,
@@ -592,11 +771,11 @@ fun ModernPostCardView(
                             requiresFocusForIntro = true,
                             modifier = Modifier
                                 .matchParentSize()
-                                .clip(RoundedCornerShape(MediaCorner)),
+                                .clip(MediaCornerShape),
                         )
                     }
 
-                    // iOS: botón glass etiquetas (esquina inferior izquierda)
+                    // iOS: AttachmentIconView(.tagged, .overlayTaggedGlass)
                     Box(Modifier.align(Alignment.BottomStart)) {
                         androidx.compose.animation.AnimatedVisibility(
                             visible = !isImmersive &&
@@ -614,11 +793,10 @@ fun ModernPostCardView(
                                     .clickable { showTags = !showTags },
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Person,
-                                    contentDescription = null,
-                                    tint = if (showTags) Color(0xFF007AFF) else Color.White,
-                                    modifier = Modifier.size(18.dp),
+                                AttachmentIconView(
+                                    icon = AttachmentIcon.TAGGED,
+                                    preset = AttachmentIconPreset.OVERLAY_TAGGED_GLASS,
+                                    tintColor = if (showTags) Color(0xFF007AFF) else Color.White,
                                 )
                             }
                         }
@@ -640,24 +818,24 @@ fun ModernPostCardView(
             }
         }
 
-        if (moment.content.isNotBlank()) {
-            AnimatedVisibility(visible = !isImmersive, enter = fadeIn(), exit = fadeOut()) {
-                MomentCaptionView(
-                    content = moment.content,
-                    onHashtagTap = onOpenHashtag,
-                    authorId = moment.authorId,
-                    username = moment.username,
-                    audience = moment.audience,
-                    previewImageUrl = moment.visibleMediaItems.firstOrNull()?.let { item ->
-                        when (item.type.lowercase()) {
-                            "video" -> item.thumbnailUrl?.trim()?.takeIf { it.isNotEmpty() }
-                                ?: item.url.trim().takeIf { it.isNotEmpty() }
-                            else -> item.url.trim().takeIf { it.isNotEmpty() }
-                        }
-                    },
-                    isVideo = moment.visibleMediaItems.firstOrNull()?.type?.equals("video", ignoreCase = true),
-                )
-            }
+        // iOS siempre monta MomentCaptionView(style: .feed) — vacío = no-op interno
+        AnimatedVisibility(visible = !isImmersive, enter = fadeIn(), exit = fadeOut()) {
+            MomentCaptionView(
+                content = moment.content,
+                onHashtagTap = onOpenHashtag,
+                style = com.moments.android.views.components.MomentCaptionPresentationStyle.Feed,
+                authorId = moment.authorId,
+                username = moment.username,
+                audience = moment.audience,
+                previewImageUrl = moment.visibleMediaItems.firstOrNull()?.let { item ->
+                    when (item.type.lowercase()) {
+                        "video" -> item.thumbnailUrl?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: item.url.trim().takeIf { it.isNotEmpty() }
+                        else -> item.url.trim().takeIf { it.isNotEmpty() }
+                    }
+                },
+                isVideo = moment.visibleMediaItems.firstOrNull()?.type?.equals("video", ignoreCase = true),
+            )
         }
     }
 }
@@ -794,7 +972,11 @@ fun StoryProgressCircle(
     isUploading: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val p = progress.coerceIn(0.0, 1.0).toFloat()
+    val p by animateFloatAsState(
+        targetValue = progress.coerceIn(0.0, 1.0).toFloat(),
+        animationSpec = spring(dampingRatio = 0.72f),
+        label = "storyProgress",
+    )
     val brush = if (isUploading) {
         Brush.linearGradient(listOf(Color(0xFF007AFF), Color(0xFFAF52DE)))
     } else {

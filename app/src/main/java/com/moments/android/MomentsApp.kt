@@ -32,6 +32,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.coordinators.TabBarScreen
 import com.moments.android.notifications.services.NotificationBadgeService
+import com.moments.android.services.auth.AuthService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.updateLastAppOpenAt
 import com.moments.android.services.incognito.IncognitoModeService
@@ -80,7 +81,17 @@ fun MomentsApp(
     var showSplash by remember { mutableStateOf(true) }
     var showWhatsNew by remember { mutableStateOf(false) }
     var didPostLaunchInit by remember { mutableStateOf(false) }
-    var signedIn by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser != null) }
+    // ≡ iOS `shouldShowMainApp = authService.isLoggedIn && authState == .authenticated`.
+    // Ojo: NO basta con `FirebaseAuth.currentUser != null` — tras un login social nuevo
+    // la sesión de Firebase existe pero el perfil de Firestore todavía no, y entrar así
+    // dejaba al usuario dentro de la app sin username ni documento (perfil fantasma).
+    // `AuthService.isLoggedIn` solo pasa a true tras `hydrateAuthenticatedSession`.
+    val hasProfileSession by AuthService.isLoggedIn.collectAsState()
+    // El registro por correo escribe el perfil por su cuenta y avisa con `onAuthenticated`
+    // antes de que el listener de AuthService llegue a hidratar la sesión; se respeta ese
+    // aviso para no rebotar al login en ese hueco.
+    var manuallyAuthenticated by remember { mutableStateOf(false) }
+    val signedIn = hasProfileSession || manuallyAuthenticated
     var accountState by remember { mutableStateOf<AccountState>(AccountState.Loading) }
 
     val incognitoActive by IncognitoModeService.isActive.collectAsState()
@@ -89,13 +100,13 @@ fun MomentsApp(
     DisposableEffect(Unit) {
         val listener = FirebaseAuth.AuthStateListener { auth ->
             val user = auth.currentUser
-            signedIn = user != null
             if (user != null) {
                 NotificationBadgeService.setupListeners()
                 syncLastAppOpenIfNeeded(prefs, force = true, scope = scope)
                 IncognitoModeService.loadState()
                 scope.launch { MessageIngestService.drainPendingQueue() }
             } else {
+                manuallyAuthenticated = false
                 NotificationBadgeService.cleanup()
                 IncognitoModeService.resetForSignedOutUser()
                 LiveLocationSharingService.handleUserSignedOut()
@@ -156,7 +167,7 @@ fun MomentsApp(
     Box(Modifier.fillMaxSize()) {
         // Contenido principal (bajo el splash, como iOS ZStack)
         when {
-            !signedIn -> LoginScreen(onAuthenticated = { signedIn = true })
+            !signedIn -> LoginScreen(onAuthenticated = { manuallyAuthenticated = true })
             accountState is AccountState.Loading -> AccountLoading()
             accountState is AccountState.Deactivated -> DeactivatedScreen(accountState as AccountState.Deactivated) {
                 scope.launch {

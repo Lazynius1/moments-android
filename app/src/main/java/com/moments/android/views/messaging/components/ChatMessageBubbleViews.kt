@@ -3,17 +3,21 @@
 package com.moments.android.views.messaging.components
 
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import java.net.URL
+import java.net.URLConnection
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -23,32 +27,29 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
-import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Forward
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Done
-import androidx.compose.material.icons.filled.VideoFile
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.LocationOff
+import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -61,30 +62,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import coil.compose.AsyncImage
+import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.extensions.rawPadding
+import com.moments.android.views.feed.sharing.SharedMomentMessageBubble
+import com.moments.android.views.feed.sharing.SharedStoryMessageBubble
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageStatus
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.models.ChatLocationPayload
 import com.moments.android.views.story.storyviewer.StoryReplyMessageBubble
-import java.net.URL
-import java.net.URLConnection
-import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
-/** Port de `Views/Messaging/Components/ChatMessageBubbleViews.swift`.
- *
- * Las piezas de chrome, gesto de reply y texto enriquecido viven aquí hasta que
- * sus ficheros Swift homónimos se porten; las callbacks mantienen el contrato
- * del row y evitan que la vista dependa del estado de la pantalla.
- */
 data class ChatMessageBubbleCallbacks(
     val onReply: () -> Unit = {},
     val onReaction: (String) -> Unit = {},
@@ -98,6 +88,7 @@ data class ChatMessageBubbleCallbacks(
     val onHydrateMedia: ((EnhancedMessage) -> Unit)? = null,
     val onLongPress: (() -> Unit)? = null,
     val onViewOnceOpen: ((EnhancedMessage, Boolean) -> Unit)? = null,
+    val onRetryFailed: ((EnhancedMessage) -> Unit)? = null,
 )
 
 @Composable
@@ -117,95 +108,163 @@ fun GlassmorphicMessageRow(
     downloadProgress: Double? = null,
     isDownloadingMedia: Boolean = false,
     showSeenLabel: Boolean = false,
+    isStarred: Boolean = false,
+    timestampRevealState: ChatTimestampRevealState = remember { ChatTimestampRevealState() },
     callbacks: ChatMessageBubbleCallbacks = ChatMessageBubbleCallbacks(),
     modifier: Modifier = Modifier,
 ) {
-    var revealTimestamp by remember(message.id) { mutableStateOf(false) }
-    val horizontalReplyOffset by animateFloatAsState(if (revealTimestamp) -67f else 0f, tween(160), label = "messageTimestampOffset")
+    val swipeState = rememberChatReplySwipeState()
+    val revealOffset = timestampRevealState.offset
     val tail = groupPosition == ChatMessageGroupPosition.LAST || groupPosition == ChatMessageGroupPosition.SINGLE
     val head = groupPosition == ChatMessageGroupPosition.FIRST || groupPosition == ChatMessageGroupPosition.SINGLE
+    val resolvedReactions = if (isMenuSelected) null else displayReactions ?: message.reactions
+    val hasReactions = !resolvedReactions.isNullOrEmpty()
+    val reactionSpacing = if (hasReactions || isStarred) 6.dp else 4.dp
+    val bottomPad = run {
+        val base = if (tail) 5.dp else 1.dp
+        if (hasReactions || isStarred) {
+            base + if (tail) 8.dp else 4.dp
+        } else {
+            base
+        }
+    }
+    val cornerRadius = ChatBubbleAnchorMetrics.cornerRadiusFor(message)
+    var isPressing by remember { mutableStateOf(false) }
+    val canRetry = isCurrentUser &&
+        message.status == MessageStatus.FAILED &&
+        callbacks.onRetryFailed != null
+    val timestampAlpha = ((-revealOffset) / 40f).coerceIn(0f, 1f)
 
     Row(
-        modifier.fillMaxWidth().padding(start = 8.dp, top = if (head) 5.dp else 1.dp, end = 8.dp, bottom = if (tail) 8.dp else 1.dp),
+        modifier
+            .fillMaxWidth()
+            .padding(start = 8.dp, top = if (head) 5.dp else 1.dp, end = 8.dp, bottom = bottomPad)
+            .offset { IntOffset(revealOffset.roundToInt(), 0) }
+            .then(
+                if (!isCurrentUser) Modifier.chatTimestampRevealGesture(true, timestampRevealState)
+                else Modifier,
+            ),
         verticalAlignment = Alignment.Bottom,
     ) {
         Row(
-            Modifier.weight(1f).offset { IntOffset(horizontalReplyOffset.roundToInt(), 0) }
-                .pointerInput(message.id, isCurrentUser) {
-                    var total = 0f
-                    detectHorizontalDragGestures(
-                        onHorizontalDrag = { _, drag -> total += drag },
-                        onDragEnd = {
-                            if (!isCurrentUser && total < -40f) revealTimestamp = !revealTimestamp
-                            if (isCurrentUser && total < -72f) callbacks.onReply()
-                            total = 0f
-                        },
-                    )
-                },
+            Modifier
+                .weight(1f)
+                .rawPadding(end = (-67).dp),
             verticalAlignment = Alignment.Bottom,
         ) {
+            if (isCurrentUser) {
+                // ≡ iOS `Color.clear.chatTimestampRevealGutter` — altura = burbuja (Row).
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .chatTimestampRevealGesture(true, timestampRevealState),
+                )
+            }
             if (!isCurrentUser) {
                 ChatIncomingAvatarGutter(showAvatar, otherUserId, isOtherParticipantUnavailable, callbacks.onAvatarTap)
             }
-            Column(horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start) {
-                repliedMessage?.let { ChatReplyQuote(it, isCurrentUser, otherParticipantName, callbacks.onReplyTap) }
-                GlassmorphicMessageBubble(
-                    message = message,
-                    reactions = if (isMenuSelected) null else displayReactions ?: message.reactions,
-                    isCurrentUser = isCurrentUser,
-                    groupPosition = groupPosition,
-                    otherParticipantName = otherParticipantName,
-                    progress = progress,
-                    downloadProgress = downloadProgress,
-                    isDownloadingMedia = isDownloadingMedia,
-                    callbacks = callbacks,
-                    isFlashing = isBubbleFlashing,
+            if (canRetry) {
+                Icon(
+                    imageVector = Icons.Default.ErrorOutline,
+                    contentDescription = stringResource(R.string.messaging_retry),
+                    tint = Color.Red,
+                    modifier = Modifier
+                        .padding(end = 2.dp)
+                        .size(32.dp)
+                        .combinedClickable(onClick = {
+                            com.moments.android.utilities.HapticManager.shared.lightImpact()
+                            callbacks.onRetryFailed?.invoke(message)
+                        })
+                        .padding(6.dp),
                 )
             }
+            Column(
+                horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(reactionSpacing),
+            ) {
+                repliedMessage?.let {
+                    StackedReplyQuote(it, isCurrentUser, otherParticipantName, callbacks.onReplyTap)
+                }
+                ChatBubbleReplySwipeContainer(
+                    state = swipeState,
+                    isOutgoing = isCurrentUser,
+                    cornerRadius = cornerRadius,
+                    onReply = callbacks.onReply,
+                ) {
+                    ChatMessageBubbleChrome(
+                        isMenuSelected = isMenuSelected,
+                        isOutgoing = isCurrentUser,
+                        cornerRadius = cornerRadius,
+                        isFlashing = isBubbleFlashing,
+                        isPressing = isPressing,
+                    ) {
+                        val bubble: @Composable () -> Unit = {
+                            GlassmorphicMessageBubble(
+                                message = message,
+                                reactions = resolvedReactions,
+                                isCurrentUser = isCurrentUser,
+                                groupPosition = groupPosition,
+                                otherParticipantId = otherUserId,
+                                otherParticipantName = otherParticipantName,
+                                progress = progress,
+                                downloadProgress = downloadProgress,
+                                isDownloadingMedia = isDownloadingMedia,
+                                isStarred = isStarred,
+                                callbacks = callbacks,
+                                modifier = Modifier.chatMessageLongPress(
+                                    onPressingChanged = { isPressing = it },
+                                ) { callbacks.onLongPress?.invoke() },
+                            )
+                        }
+                        if (message.isVanishModeMessage) {
+                            com.moments.android.views.shared.ScreenshotProtectedView(isProtected = true) {
+                                bubble()
+                            }
+                        } else {
+                            bubble()
+                        }
+                    }
+                }
+            }
+            if (!isCurrentUser) {
+                Spacer(Modifier.weight(1f))
+            }
         }
-        AnimatedVisibility(!isCurrentUser && revealTimestamp) {
-            ChatMessageTimestamp(message, showSeenLabel, Modifier.width(67.dp).padding(start = 12.dp))
-        }
-    }
-}
-
-@Composable
-private fun ChatReplyQuote(message: EnhancedMessage, outgoing: Boolean, otherName: String, onTap: ((String) -> Unit)?) {
-    val title = if (outgoing) otherName else stringResource(R.string.chat_input_placeholder)
-    Column(
-        Modifier.width(208.dp).padding(bottom = 4.dp).clip(RoundedCornerShape(10.dp))
-            .background(if (androidx.compose.foundation.isSystemInDarkTheme()) Color.White.copy(.09f) else Color.Black.copy(.06f))
-            .combinedClickable(onClick = { onTap?.invoke(message.id) }).padding(horizontal = 10.dp, vertical = 7.dp),
-    ) {
-        Text(title, fontSize = 11.sp, color = Color(0xFF3F6F8F), fontWeight = FontWeight.SemiBold, maxLines = 1)
-        Text(message.content ?: message.fileName ?: stringResource(R.string.chat_message_unsupported), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun ChatMessageTimestamp(message: EnhancedMessage, showSeen: Boolean, modifier: Modifier = Modifier) {
-    val pattern = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-    Column(modifier, horizontalAlignment = Alignment.Start) {
-        Text(pattern.format(message.timestamp), color = Color.Gray, fontSize = 10.sp)
-        if (showSeen && message.status == MessageStatus.READ) Icon(Icons.Default.Done, null, tint = Color.Gray, modifier = Modifier.size(11.dp))
+        MessageTimestamp(
+            message = message,
+            isCurrentUser = isCurrentUser,
+            showSeenLabel = showSeenLabel,
+            modifier = Modifier
+                .width(55.dp)
+                .padding(start = 12.dp)
+                .graphicsLayer { alpha = timestampAlpha },
+        )
     }
 }
 
 @Composable
 fun DeletedMessageBubble(message: EnhancedMessage, isCurrentUser: Boolean, modifier: Modifier = Modifier) {
-    val colors = com.moments.android.views.feed.AdaptiveColors(androidx.compose.foundation.isSystemInDarkTheme())
+    val colors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme())
+    // ≡ getDeletedIcon / getDeletedText
     val (icon, label) = when (message.type) {
-        MessageType.AUDIO -> Icons.Default.AudioFile to R.string.chat_deleted_audio
+        MessageType.AUDIO -> Icons.Default.MicOff to R.string.chat_deleted_audio
         MessageType.IMAGE -> Icons.Default.Image to R.string.chat_deleted_image
-        MessageType.VIDEO -> Icons.Default.VideoFile to R.string.chat_deleted_video
+        MessageType.VIDEO -> Icons.Default.VideocamOff to R.string.chat_deleted_video
         MessageType.FILE -> Icons.Default.Description to R.string.chat_deleted_file
-        MessageType.LOCATION -> Icons.Default.LocationOn to R.string.chat_deleted_location
+        MessageType.LOCATION -> Icons.Default.LocationOff to R.string.chat_deleted_location
         MessageType.EPHEMERAL -> Icons.Default.Article to R.string.chat_deleted_ephemeral
-        else -> Icons.Default.Article to R.string.chat_deleted_text
+        MessageType.TEXT -> Icons.Default.Article to R.string.chat_deleted_text
+        else -> Icons.Default.Delete to R.string.chat_deleted_text
     }
     Row(
-        modifier.clip(RoundedCornerShape(20.dp)).background(colors.messageBubbleBackground).padding(horizontal = 16.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
+        modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(colors.messageBubbleBackground.copy(alpha = 0.5f))
+            .border(0.5.dp, colors.messageBubbleStroke, RoundedCornerShape(20.dp))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = colors.messageTextColor.copy(.5f), modifier = Modifier.size(16.dp))
         Text(stringResource(label), color = colors.messageTextColor.copy(.6f), fontSize = 14.sp, fontStyle = FontStyle.Italic)
@@ -218,101 +277,247 @@ fun GlassmorphicMessageBubble(
     reactions: Map<String, List<String>>?,
     isCurrentUser: Boolean,
     groupPosition: ChatMessageGroupPosition = ChatMessageGroupPosition.SINGLE,
+    otherParticipantId: String? = null,
     otherParticipantName: String,
     progress: Double?,
     downloadProgress: Double?,
     isDownloadingMedia: Boolean,
+    isStarred: Boolean = false,
     callbacks: ChatMessageBubbleCallbacks,
-    isFlashing: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") isFlashing: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val colors = com.moments.android.views.feed.AdaptiveColors(androidx.compose.foundation.isSystemInDarkTheme())
+    val colors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme())
     if (message.isDeleted) {
         DeletedMessageBubble(message, isCurrentUser, modifier)
         return
     }
-    val shape = chatBubbleShape(isCurrentUser, groupPosition)
+    val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid.orEmpty() }
+    val starred = isStarred || message.isStarred(currentUserId)
+
     Box(modifier) {
-        ChatMessageSwipeSurface(isCurrentUser, callbacks.onReply, callbacks.onLongPress) {
-            when (message.type) {
-                MessageType.TEXT -> {
-                    if (message.storyReplyData != null) {
-                        StoryReplyMessageBubble(message, isCurrentUser, message.storyReplyData)
-                    } else {
-                        Column(Modifier.clip(shape).background(if (isCurrentUser) colors.userAccentColor else colors.messageBubbleBackground).padding(horizontal = 13.dp, vertical = 9.dp)) {
-                            if (message.content != null) {
-                                if (message.content.startsWith("↪")) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Forward, null, tint = colors.messageTextColor.copy(.55f), modifier = Modifier.size(13.dp))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(stringResource(R.string.chat_forwarded), color = colors.messageTextColor.copy(.55f), fontSize = 11.sp)
-                                    }
-                                }
-                                ChatLinkedText(message.content, colors.messageTextColor)
-                                ChatLinkOpener.firstUrl(message.content)?.let { LinkPreviewCard(it, isCurrentUser, Modifier.padding(top = 8.dp)) }
+        when (message.type) {
+            MessageType.TEXT -> {
+                // iOS: texto NO usa attachBubbleBadges — ChatTextBubbleView lleva overlay propio
+                if (message.storyReplyData != null) {
+                    AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                        StoryReplyMessageBubble(
+                            message = message,
+                            isCurrentUser = isCurrentUser,
+                            otherParticipantId = otherParticipantId,
+                            onHydrateMedia = callbacks.onHydrateMedia,
+                            onOpenMedia = callbacks.onOpenMedia,
+                        )
+                    }
+                } else {
+                    val content = message.content.orEmpty()
+                    Column(horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start) {
+                        if (message.isForwarded == true) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Forward,
+                                    null,
+                                    tint = colors.messageTextColor.copy(.55f),
+                                    modifier = Modifier.size(10.dp),
+                                )
+                                Text(
+                                    stringResource(R.string.chat_forwarded),
+                                    color = colors.messageTextColor.copy(.55f),
+                                    fontSize = 11.sp,
+                                )
                             }
                         }
+                        ChatTextBubbleView(
+                            text = content,
+                            isOutgoing = isCurrentUser,
+                            messageId = message.id,
+                            groupPosition = groupPosition,
+                            reactions = reactions,
+                            isStarred = starred,
+                            repliedMessage = null,
+                            otherParticipantName = otherParticipantName,
+                            onReaction = callbacks.onReaction,
+                        )
                     }
                 }
-                MessageType.IMAGE -> MediaBubble(message, false, isCurrentUser, groupPosition, progress, downloadProgress, isDownloadingMedia, callbacks)
-                MessageType.VIDEO -> MediaBubble(message, true, isCurrentUser, groupPosition, progress, downloadProgress, isDownloadingMedia, callbacks)
-                MessageType.AUDIO -> ChatAudioMessageContent(message, isCurrentUser, progress, callbacks.onHydrateMedia)
-                MessageType.EPHEMERAL, MessageType.VIEW_ONCE_IMAGE, MessageType.VIEW_ONCE_VIDEO -> {
-                    ChatEphemeralMessageContent(message = message, layout = ChatEphemeralLayout.STANDARD, onHydrateMedia = callbacks.onHydrateMedia, onOpenMedia = callbacks.onOpenMedia, onMarkViewed = { viewed ->
-                        callbacks.onMessageViewed?.invoke(viewed.id)
-                        if (message.type.isViewOnce) callbacks.onViewOnceOpen?.invoke(message, message.isViewed)
-                    })
+            }
+            MessageType.IMAGE -> AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                MediaBubble(message, false, isCurrentUser, groupPosition, progress, downloadProgress, isDownloadingMedia, callbacks)
+            }
+            MessageType.VIDEO -> AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                MediaBubble(message, true, isCurrentUser, groupPosition, progress, downloadProgress, isDownloadingMedia, callbacks)
+            }
+            MessageType.AUDIO -> AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                ChatAudioMessageContent(message, isCurrentUser, progress, callbacks.onHydrateMedia, groupPosition)
+            }
+            MessageType.VIEW_ONCE_IMAGE, MessageType.VIEW_ONCE_VIDEO ->
+                AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                    ViewOnceMessageBubble(
+                        message = message,
+                        isCurrentUser = isCurrentUser,
+                        otherParticipantName = otherParticipantName,
+                        progress = progress,
+                        currentUserId = currentUserId,
+                        onOpenViewer = { replay -> callbacks.onViewOnceOpen?.invoke(message, replay) },
+                    )
                 }
-                MessageType.GIF -> ChatGifMessageBubble(message, progress)
-                MessageType.STICKER -> {
-                    ChatStickerMessageBubble(message, progress)
-                    LaunchedEffect(message.id) { callbacks.onHydrateMedia?.invoke(message) }
+            MessageType.EPHEMERAL -> AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                if (message.storyReplyData != null) {
+                    StoryReplyMessageBubble(
+                        message = message,
+                        isCurrentUser = isCurrentUser,
+                        otherParticipantId = otherParticipantId,
+                        onHydrateMedia = callbacks.onHydrateMedia,
+                        onOpenMedia = callbacks.onOpenMedia,
+                    )
+                } else {
+                    ChatEphemeralMessageContent(
+                        message = message,
+                        layout = ChatEphemeralLayout.STANDARD,
+                        onHydrateMedia = callbacks.onHydrateMedia,
+                        onOpenMedia = callbacks.onOpenMedia,
+                        onMarkViewed = { viewed -> callbacks.onMessageViewed?.invoke(viewed.id) },
+                    )
                 }
-                MessageType.LOCATION -> ChatLocationPayload.decode(message.content.orEmpty())?.let { payload ->
-                    ChatLocationMessageBubble(payload, isCurrentUser, onStopLive = { callbacks.onStopLiveLocation?.invoke(message.id) })
-                } ?: ChatUnsupportedBubble(colors)
-                MessageType.SHARED_MOMENT -> ChatSharedContent(R.string.chat_shared_moment, message, callbacks.onMomentNavigation)
-                MessageType.SHARED_STORY -> ChatSharedContent(R.string.chat_shared_story, message, callbacks.onStoryNavigation)
-                else -> ChatUnsupportedBubble(colors)
+            }
+            MessageType.GIF -> AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                ChatGifMessageBubble(message, progress)
+                LaunchedEffect(message.id) { callbacks.onHydrateMedia?.invoke(message) }
+            }
+            MessageType.STICKER -> AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                ChatStickerMessageBubble(
+                    message = message,
+                    progress = progress,
+                    isSending = message.status == MessageStatus.SENDING,
+                )
+                LaunchedEffect(message.id) { callbacks.onHydrateMedia?.invoke(message) }
+            }
+            MessageType.LOCATION -> {
+                val payload = message.latitude?.let { lat ->
+                    message.longitude?.let { lng ->
+                        ChatLocationPayload(
+                            lat = lat,
+                            lng = lng,
+                            name = message.locationName,
+                            address = message.locationAddress,
+                        )
+                    }
+                } ?: ChatLocationPayload.decode(message.content.orEmpty())
+                AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                    payload?.let {
+                        ChatLocationMessageBubble(
+                            payload = it,
+                            isCurrentUser = isCurrentUser,
+                            isLive = message.isLiveLocationMessage,
+                            isLiveActive = message.isLiveLocationActive,
+                            expiresAt = message.liveLocationExpiresAt,
+                            senderId = message.senderId,
+                            onStopLive = { callbacks.onStopLiveLocation?.invoke(message.id) },
+                        )
+                    } ?: ChatUnsupportedBubble(colors)
+                }
+            }
+            MessageType.SHARED_MOMENT -> AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                SharedMomentMessageBubble(
+                    message = message,
+                    isCurrentUser = isCurrentUser,
+                    onTap = { callbacks.onMomentNavigation?.invoke(message) },
+                )
+            }
+            MessageType.SHARED_STORY -> AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                SharedStoryMessageBubble(
+                    message = message,
+                    isCurrentUser = isCurrentUser,
+                    onTap = { callbacks.onStoryNavigation?.invoke(message) },
+                )
+            }
+            else -> AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                ChatUnsupportedBubble(colors)
             }
         }
-        if (!reactions.isNullOrEmpty()) {
-            ChatReactionBadges(reactions, isCurrentUser, callbacks.onReaction, Modifier.align(if (isCurrentUser) Alignment.BottomStart else Alignment.BottomEnd).offset(y = 12.dp))
-        }
-        if (isFlashing) Box(Modifier.matchParentSize().clip(shape).background(Color.White.copy(.24f)))
     }
 }
 
+/** ≡ iOS `attachBubbleBadges` / `messageReactionOverlay`. */
 @Composable
-private fun ChatMessageSwipeSurface(outgoing: Boolean, onReply: () -> Unit, onLongPress: (() -> Unit)?, content: @Composable () -> Unit) {
-    var displacement by remember { mutableFloatStateOf(0f) }
-    Box(
-        Modifier.offset { IntOffset(displacement.roundToInt(), 0) }.combinedClickable(onClick = {}, onLongClick = onLongPress)
-            .pointerInput(outgoing) {
-                detectHorizontalDragGestures(
-                    onHorizontalDrag = { _, delta -> displacement = (displacement + delta).coerceIn(-88f, 88f) },
-                    onDragEnd = { if (abs(displacement) >= 72f) onReply(); displacement = 0f },
-                    onDragCancel = { displacement = 0f },
-                )
-            },
-    ) { content() }
+private fun AttachBubbleBadges(
+    isOutgoing: Boolean,
+    reactions: Map<String, List<String>>?,
+    isStarred: Boolean,
+    onReaction: (String) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    MessageReactionOverlayBox(
+        isOutgoing = isOutgoing,
+        reactions = reactions,
+        isStarred = isStarred,
+        compact = false,
+        onTap = onReaction,
+        content = content,
+    )
 }
 
 @Composable
 private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Boolean, position: ChatMessageGroupPosition, progress: Double?, downloadProgress: Double?, downloading: Boolean, callbacks: ChatMessageBubbleCallbacks) {
     val mediaModifier = Modifier.size(208.dp, 272.dp).clip(chatBubbleShape(outgoing, position))
     if (video) {
-        GlassmorphicVideoMessage(message.mediaUrl, message.thumbnailUrl, message.status == MessageStatus.SENDING, isDownloadingMedia = downloading, downloadProgress = downloadProgress, progress = progress, onTap = { callbacks.onOpenMedia(message) }, modifier = mediaModifier)
+        GlassmorphicVideoMessage(
+            videoUrl = message.mediaUrl,
+            thumbnailUrl = message.thumbnailUrl,
+            isSending = message.status == MessageStatus.SENDING,
+            isResolvingMedia = (message.isMediaPendingResolution || message.needsVideoThumbnailForDisplay) &&
+                !message.isMediaAwaitingManualDownload &&
+                !downloading,
+            isAwaitingManualDownload = message.isMediaAwaitingManualDownload && !downloading,
+            isDownloadingMedia = downloading,
+            downloadProgress = downloadProgress,
+            downloadSizeLabel = message.formattedDownloadSize,
+            progress = progress,
+            onTap = { callbacks.onOpenMedia(message) },
+            modifier = mediaModifier,
+        )
     } else {
-        GlassmorphicImageMessage(message.mediaUrl, message.thumbnailUrl, message.status == MessageStatus.SENDING, isDownloadingMedia = downloading, downloadProgress = downloadProgress, progress = progress, onTap = { callbacks.onOpenMedia(message) }, modifier = mediaModifier)
+        GlassmorphicImageMessage(
+            imageUrl = message.mediaUrl,
+            previewThumbnailUrl = message.previewThumbnailURLForDisplay ?: message.thumbnailUrl,
+            isSending = message.status == MessageStatus.SENDING,
+            isResolvingMedia = message.isMediaPendingResolution &&
+                !message.isMediaAwaitingManualDownload &&
+                !downloading,
+            isAwaitingManualDownload = message.isMediaAwaitingManualDownload && !downloading,
+            isDownloadingMedia = downloading,
+            downloadProgress = downloadProgress,
+            downloadSizeLabel = message.formattedDownloadSize,
+            progress = progress,
+            onTap = { callbacks.onOpenMedia(message) },
+            modifier = mediaModifier,
+        )
     }
     LaunchedEffect(message.id) { callbacks.onHydrateMedia?.invoke(message) }
 }
 
 @Composable
-private fun ChatAudioMessageContent(message: EnhancedMessage, outgoing: Boolean, sendingProgress: Double?, onHydrate: ((EnhancedMessage) -> Unit)?) {
+private fun ChatAudioMessageContent(
+    message: EnhancedMessage,
+    outgoing: Boolean,
+    sendingProgress: Double?,
+    onHydrate: ((EnhancedMessage) -> Unit)?,
+    groupPosition: ChatMessageGroupPosition = ChatMessageGroupPosition.SINGLE,
+) {
     LaunchedEffect(message.id) { onHydrate?.invoke(message) }
-    GlassmorphicAudioMessage(message.id, message.mediaUrl, message.duration ?: 0.0, message.audioWaveform, outgoing, message.status == MessageStatus.SENDING, sendingProgress)
+    GlassmorphicAudioMessage(
+        messageId = message.id,
+        audioUrl = message.mediaUrl,
+        duration = message.duration ?: 0.0,
+        waveformSamples = message.audioWaveform,
+        isCurrentUser = outgoing,
+        isSending = message.status == MessageStatus.SENDING,
+        progress = sendingProgress,
+        groupPosition = groupPosition,
+    )
 }
 
 @Composable
@@ -356,6 +561,9 @@ object ChatLinkOpener {
     private val expression = Regex("(?i)\\b((?:https?://|www\\.)[^\\s<]+)")
     fun firstUrl(text: String): String? = expression.find(text.replace("||", ""))?.value?.let { if (it.startsWith("www.")) "https://$it" else it }
     fun containsLink(text: String): Boolean = firstUrl(text) != null
+    fun openFirstLink(text: String, openUri: (String) -> Unit) {
+        firstUrl(text)?.let(openUri)
+    }
     fun annotated(text: String, color: Color): AnnotatedString = buildAnnotatedString {
         append(text)
         expression.findAll(text.replace("||", "")).forEach { match ->
@@ -389,19 +597,81 @@ private object LinkMetadataCache {
 }
 
 @Composable
-fun LinkPreviewCard(url: String, outgoing: Boolean, modifier: Modifier = Modifier) {
+fun LinkPreviewCard(
+    url: String,
+    outgoing: Boolean,
+    modifier: Modifier = Modifier,
+    embedded: Boolean = false,
+) {
     var metadata by remember(url) { mutableStateOf<LinkPreviewMetadata?>(null) }
     var loading by remember(url) { mutableStateOf(true) }
     val uriHandler = LocalUriHandler.current
+    val dark = isSystemInDarkTheme()
+    val host = remember(url) { Uri.parse(url).host.orEmpty() }
+    val panelBg = when {
+        embedded && outgoing -> Color.White.copy(.16f)
+        embedded && dark -> Color.White.copy(.08f)
+        embedded -> Color.White.copy(.55f)
+        dark -> Color.White.copy(.08f)
+        else -> Color.White.copy(.6f)
+    }
+    val titleColor = when {
+        embedded && outgoing -> Color.White
+        dark -> Color.White
+        else -> Color.Black
+    }
+    val hostColor = when {
+        embedded && outgoing -> Color.White.copy(.85f)
+        else -> Color(0xFF007AFF)
+    }
+    val corner = if (embedded) 13.dp else 10.dp
+    val imageMax = if (embedded) 150.dp else 120.dp
     LaunchedEffect(url) { metadata = LinkMetadataCache.fetch(url); loading = false }
     Column(
-        modifier.width(220.dp).clip(RoundedCornerShape(13.dp)).background(if (outgoing) Color.White.copy(.16f) else Color.White.copy(.10f)).combinedClickable(onClick = { uriHandler.openUri(url) }),
+        modifier
+            .then(if (embedded) Modifier.fillMaxWidth() else Modifier.width(240.dp))
+            .clip(RoundedCornerShape(corner))
+            .background(panelBg)
+            .then(
+                if (!embedded) Modifier.border(1.dp, Color.White.copy(if (dark) .1f else .3f), RoundedCornerShape(corner))
+                else Modifier,
+            )
+            .combinedClickable(onClick = {
+                com.moments.android.utilities.HapticManager.shared.lightImpact()
+                uriHandler.openUri(url)
+            }),
     ) {
-        metadata?.imageUrl?.let { AsyncImage(it, null, Modifier.fillMaxWidth().height(120.dp), contentScale = ContentScale.Crop) }
-        Column(Modifier.padding(9.dp)) {
-            Text(metadata?.title ?: Uri.parse(url).host.orEmpty(), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (loading) Text(stringResource(R.string.chat_link_preview_loading), color = Color.White.copy(.7f), fontSize = 10.sp)
-            else Text(Uri.parse(url).host.orEmpty(), color = Color.White.copy(.75f), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        when {
+            loading -> {
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(Modifier.size(14.dp), color = hostColor, strokeWidth = 1.5.dp)
+                    Text(host.ifBlank { url }, color = if (embedded && outgoing) Color.White.copy(.8f) else Color.Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            metadata?.title != null || metadata != null -> {
+                val title = metadata?.title ?: host.ifBlank { url }
+                metadata?.imageUrl?.let {
+                    AsyncImage(it, null, Modifier.fillMaxWidth().height(imageMax), contentScale = ContentScale.Crop)
+                }
+                Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(title, color = titleColor, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(host, color = hostColor, fontSize = 10.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            else -> {
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.Link, null, tint = hostColor, modifier = Modifier.size(12.dp))
+                    Text(host.ifBlank { url }, color = titleColor, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
         }
     }
 }

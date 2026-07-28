@@ -7,40 +7,52 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.util.Base64
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PanTool
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -49,8 +61,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -59,19 +71,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
+import androidx.compose.ui.zIndex
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
 import com.moments.android.extensions.fromHex
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.extensions.revealContrastingEffectColor
 import com.moments.android.models.StickerData
+import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.components.StickerDitherPattern
 import com.moments.android.views.components.StickerPolaroidFrameView
+import com.moments.android.views.components.StickerQuizCardView
 import com.moments.android.views.components.StoryPolaroidFrameStyle
-import com.moments.android.views.story.storyviewer.StoryGestureSuppressionScope
+import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
+import com.moments.android.views.story.storyviewer.RevealScratchPanOverlay
 import com.moments.android.views.story.storyviewer.StoryGestureCoordinator
+import com.moments.android.views.story.storyviewer.StoryGestureIntent
+import com.moments.android.views.story.storyviewer.StoryGestureSuppressionScope
+import com.moments.android.views.story.storyviewer.storyDeckInteractionExclusion
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.abs
 import kotlin.math.cos
@@ -80,60 +105,276 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
- * Port parcial de `Views/story/StoryInteractiveStickers.swift`.
- *
- * Este chunk contiene el Polaroid: se revela al agitar, pausa el progreso de la
- * story durante la interacción y persiste el resultado por story, como iOS.
+ * Port de `Views/story/StoryInteractiveStickers.swift`:
+ * quiz (voto + confetti), polaroid shake-to-reveal, scratch reveal + superficies.
  */
+
+// MARK: - 1. QUIZ STICKER
+
+/** Port de `InteractiveQuizSticker`. */
+@Composable
+fun InteractiveQuizSticker(
+    storyId: String,
+    userId: String,
+    stickerId: String,
+    question: String,
+    options: List<String>,
+    correctIndex: Int,
+    isEditing: Boolean = false,
+    styleVariant: Int = 0,
+    modifier: Modifier = Modifier,
+) {
+    var selectedIndex by remember(storyId, stickerId) { mutableStateOf<Int?>(null) }
+    var showConfetti by remember(storyId, stickerId) { mutableStateOf(false) }
+    var confettiElapsed by remember(storyId, stickerId) { mutableFloatStateOf(0f) }
+    val scope = rememberCoroutineScope()
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+
+    fun interactionDocument() =
+        if (currentUserId == null) {
+            null
+        } else {
+            FirebaseFirestore.getInstance()
+                .collection("users").document(userId)
+                .collection("stories").document(storyId)
+                .collection("stickerInteractions")
+                .document("${stickerId}_$currentUserId")
+        }
+
+    fun submitVote(index: Int) {
+        if (currentUserId == null || selectedIndex != null) return
+        val correct = index == correctIndex
+        selectedIndex = index
+        if (correct) {
+            HapticManager.shared.success()
+            showConfetti = true
+            scope.launch {
+                delay(2_500)
+                showConfetti = false
+            }
+        } else {
+            HapticManager.shared.error()
+        }
+        scope.launch {
+            runCatching {
+                interactionDocument()?.set(
+                    mapOf(
+                        "userId" to currentUserId,
+                        "stickerId" to stickerId,
+                        "type" to "quiz",
+                        "selectedIndex" to index,
+                        "isCorrect" to correct,
+                        "timestamp" to FieldValue.serverTimestamp(),
+                    ),
+                )?.await()
+            }
+        }
+    }
+
+    LaunchedEffect(storyId, stickerId, isEditing, userId) {
+        if (isEditing || userId == "preview" || storyId == "preview") return@LaunchedEffect
+        val index = runCatching {
+            (interactionDocument()?.get()?.await()?.get("selectedIndex") as? Number)?.toInt()
+        }.getOrNull()
+        if (index != null) selectedIndex = index
+    }
+
+    LaunchedEffect(showConfetti) {
+        if (!showConfetti) {
+            confettiElapsed = 0f
+            return@LaunchedEffect
+        }
+        var startNanos = 0L
+        withFrameNanos { startNanos = it }
+        while (showConfetti) {
+            withFrameNanos { now ->
+                confettiElapsed = ((now - startNanos) / 1_000_000_000.0).toFloat()
+            }
+        }
+    }
+
+    Box(modifier.width(300.dp)) {
+        StickerQuizCardView(
+            question = question,
+            options = options,
+            selectedIndex = selectedIndex,
+            correctIndex = correctIndex,
+            onSelect = ::submitVote,
+            styleVariant = styleVariant,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AnimatedVisibility(
+            visible = showConfetti,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.matchParentSize(),
+        ) {
+            Canvas(Modifier.fillMaxSize()) {
+                QuizConfettiRenderer.draw(this, size, confettiElapsed.toDouble())
+            }
+        }
+    }
+}
+
+/** Port de `QuizConfettiRenderer` (partículas con seed determinista). */
+private object QuizConfettiRenderer {
+    private data class Particle(
+        val x: Float,
+        val vx: Float,
+        val vy: Float,
+        val colorIndex: Int,
+        val size: Float,
+        val rotSpeed: Float,
+    )
+
+    private val colors = listOf(
+        Color(0xFF34C759),
+        Color(0xFFFFCC00),
+        Color.White,
+        Color(0xFF32ADE6),
+        Color(0xFF00C7BE),
+        Color(0xFFE6FF99),
+    )
+
+    private val particles: List<Particle> = run {
+        var rng = 0xDEADBEEFUL
+        fun rand(): Float {
+            rng = rng * 6364136223846793005UL + 1442695040888963407UL
+            return (rng shr 33).toUInt().toFloat() / UInt.MAX_VALUE.toFloat()
+        }
+        List(52) {
+            Particle(
+                x = rand(),
+                vx = (rand() - 0.5f) * 120f,
+                vy = -(rand() * 180f + 80f),
+                colorIndex = (rand() * colors.size).toInt().coerceIn(0, colors.lastIndex),
+                size = rand() * 6f + 5f,
+                rotSpeed = (rand() - 0.5f) * 8f,
+            )
+        }
+    }
+
+    fun draw(scope: androidx.compose.ui.graphics.drawscope.DrawScope, canvasSize: Size, elapsed: Double) {
+        if (elapsed >= 2.5) return
+        val t = elapsed.toFloat()
+        val gravity = 220f
+        for (p in particles) {
+            val x = canvasSize.width * p.x + p.vx * t
+            val y = canvasSize.height * 0.3f + p.vy * t + 0.5f * gravity * t * t
+            val opacity = (1.0 - t / 2.0).toFloat().coerceAtLeast(0f)
+            if (opacity <= 0f || y >= canvasSize.height + 20f) continue
+            val color = colors[p.colorIndex % colors.size].copy(alpha = opacity)
+            val w = p.size
+            val h = p.size * 0.55f
+            scope.rotate(degrees = Math.toDegrees((p.rotSpeed * t).toDouble()).toFloat(), pivot = Offset(x, y)) {
+                drawRect(
+                    color = color,
+                    topLeft = Offset(x - w / 2f, y - h / 2f),
+                    size = Size(w, h),
+                )
+            }
+        }
+    }
+}
+
+// MARK: - 2. POLAROID FRAME (SHAKE TO REVEAL)
+
 @Composable
 fun StoryInteractiveStickerLayer(
     storyId: String,
     stickers: List<StickerData>,
     onPauseStory: () -> Unit,
     onResumeStory: () -> Unit,
+    gestureGate: StoryDeckGestureGate? = null,
+    reportsDeckInteractionExclusion: Boolean = true,
+    /** Si se pasa, no hay Box fillMaxSize intermedio → zIndex interleave con texto. */
+    containerWidthPx: Float? = null,
+    containerHeightPx: Float? = null,
     modifier: Modifier = Modifier,
 ) {
-    BoxWithConstraints(modifier) {
-        val density = LocalDensity.current
-        val widthPx = with(density) { maxWidth.toPx() }
-        val heightPx = with(density) { maxHeight.toPx() }
-        val displayScale = (widthPx / 375f).coerceAtLeast(0.01f)
-
-        stickers
-            .filter { it.type == "frame" }
-            .sortedBy { it.zIndex ?: 0 }
-            .forEach { sticker ->
-                val xPx = (sticker.position.x * widthPx).toFloat()
-                val yPx = (sticker.position.y * heightPx).toFloat()
-                val frameWidthPx = with(density) { 200.dp.toPx() }
-                val frameHeightPx = with(density) { 240.dp.toPx() }
-
-                InteractiveFrameSticker(
-                    storyId = "$storyId.${sticker.stickerId.orEmpty()}",
-                    imageContent = sticker.content,
-                    caption = sticker.caption,
-                    frameStyle = StoryPolaroidFrameStyle.fromRawOrDefault(sticker.frameStyle),
-                    contentScale = sticker.contentScale?.toFloat() ?: 1f,
-                    contentOffsetX = sticker.contentOffsetX?.toFloat() ?: 0f,
-                    contentOffsetY = sticker.contentOffsetY?.toFloat() ?: 0f,
-                    onPauseStory = onPauseStory,
-                    onResumeStory = onResumeStory,
-                    modifier = Modifier
-                        .size(width = 200.dp, height = 240.dp)
-                        .offset {
-                            IntOffset(
-                                (xPx - frameWidthPx / 2f).roundToInt(),
-                                (yPx - frameHeightPx / 2f).roundToInt(),
-                            )
-                        }
-                        .graphicsLayer {
-                            scaleX = sticker.scale.toFloat() * displayScale
-                            scaleY = sticker.scale.toFloat() * displayScale
-                            rotationZ = Math.toDegrees(sticker.rotation).toFloat()
-                        },
-                )
-            }
+    if (containerWidthPx != null && containerHeightPx != null) {
+        StoryInteractiveFrameStickers(
+            storyId = storyId,
+            stickers = stickers,
+            widthPx = containerWidthPx,
+            heightPx = containerHeightPx,
+            onPauseStory = onPauseStory,
+            onResumeStory = onResumeStory,
+            gestureGate = gestureGate,
+            reportsDeckInteractionExclusion = reportsDeckInteractionExclusion,
+        )
+    } else {
+        BoxWithConstraints(modifier) {
+            val density = LocalDensity.current
+            StoryInteractiveFrameStickers(
+                storyId = storyId,
+                stickers = stickers,
+                widthPx = with(density) { maxWidth.toPx() },
+                heightPx = with(density) { maxHeight.toPx() },
+                onPauseStory = onPauseStory,
+                onResumeStory = onResumeStory,
+                gestureGate = gestureGate,
+                reportsDeckInteractionExclusion = reportsDeckInteractionExclusion,
+            )
+        }
     }
+}
+
+@Composable
+private fun StoryInteractiveFrameStickers(
+    storyId: String,
+    stickers: List<StickerData>,
+    widthPx: Float,
+    heightPx: Float,
+    onPauseStory: () -> Unit,
+    onResumeStory: () -> Unit,
+    gestureGate: StoryDeckGestureGate?,
+    reportsDeckInteractionExclusion: Boolean,
+) {
+    val density = LocalDensity.current
+    val displayScale = (widthPx / 375f).coerceAtLeast(0.01f)
+
+    stickers
+        .filter { it.type == "frame" }
+        .sortedBy { it.zIndex ?: 0 }
+        .forEach { sticker ->
+            val xPx = (sticker.position.x * widthPx).toFloat()
+            val yPx = (sticker.position.y * heightPx).toFloat()
+            val frameWidthPx = with(density) { 200.dp.toPx() }
+            val frameHeightPx = with(density) { 240.dp.toPx() }
+            val exclusionId = "sticker.$storyId.${sticker.stickerId.orEmpty()}"
+
+            InteractiveFrameSticker(
+                storyId = "$storyId.${sticker.stickerId.orEmpty()}",
+                imageContent = sticker.content,
+                caption = sticker.caption,
+                frameStyle = StoryPolaroidFrameStyle.fromRawOrDefault(sticker.frameStyle),
+                contentScale = sticker.contentScale?.toFloat() ?: 1f,
+                contentOffsetX = sticker.contentOffsetX?.toFloat() ?: 0f,
+                contentOffsetY = sticker.contentOffsetY?.toFloat() ?: 0f,
+                onPauseStory = onPauseStory,
+                onResumeStory = onResumeStory,
+                modifier = Modifier
+                    .zIndex((sticker.zIndex ?: 0).toFloat())
+                    .size(width = 200.dp, height = 240.dp)
+                    .offset {
+                        IntOffset(
+                            (xPx - frameWidthPx / 2f).roundToInt(),
+                            (yPx - frameHeightPx / 2f).roundToInt(),
+                        )
+                    }
+                    .graphicsLayer {
+                        scaleX = sticker.scale.toFloat() * displayScale
+                        scaleY = sticker.scale.toFloat() * displayScale
+                        rotationZ = Math.toDegrees(sticker.rotation).toFloat()
+                    }
+                    .storyDeckInteractionExclusion(
+                        id = exclusionId,
+                        gate = gestureGate,
+                        enabled = reportsDeckInteractionExclusion,
+                    ),
+            )
+        }
 }
 
 /** Equivalente Compose de `InteractiveFrameSticker`. */
@@ -213,7 +454,11 @@ fun InteractiveFrameSticker(
     LaunchedEffect(accelerometer, isEditing, storyId) {
         if (!isEditing && accelerometer == null && revealProgress < 1f) {
             delay(1_500)
-            revealProgress = 1f
+            // ≡ withAnimation(.linear(duration: 3.3)) { revealProgress = 1.0 }
+            val anim = Animatable(revealProgress)
+            anim.animateTo(1f, tween(durationMillis = 3_300, easing = LinearEasing)) {
+                revealProgress = value
+            }
             markAsRevealed()
         }
     }
@@ -238,7 +483,8 @@ fun InteractiveFrameSticker(
                 override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
             }
             listenerRef.set(listener)
-            sensorManager.registerListener(listener, accelerometer, SensorManager.SENSOR_DELAY_GAME)
+            // ≡ accelerometerUpdateInterval = 0.1
+            sensorManager.registerListener(listener, accelerometer, SensorManager.SENSOR_DELAY_UI)
             onDispose {
                 sensorManager.unregisterListener(listener)
                 listenerRef.compareAndSet(listener, null)
@@ -272,6 +518,7 @@ fun StoryRevealStickerOverlay(
     gestureGate: StoryDeckGestureGate? = null,
     onPauseStory: () -> Unit,
     onResumeStory: () -> Unit,
+    reportsDeckInteractionExclusion: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val sticker = stickers.firstOrNull { it.type == "reveal" } ?: return
@@ -285,6 +532,7 @@ fun StoryRevealStickerOverlay(
         revealPrimaryColor = sticker.revealPrimaryColor,
         revealSecondaryColor = sticker.revealSecondaryColor,
         revealEffectColor = sticker.revealEffectColor,
+        reportsDeckInteractionExclusion = reportsDeckInteractionExclusion,
         modifier = modifier,
     )
 }
@@ -304,6 +552,7 @@ fun InteractiveRevealSticker(
     revealPrimaryColor: String? = null,
     revealSecondaryColor: String? = null,
     revealEffectColor: String? = null,
+    reportsDeckInteractionExclusion: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -311,7 +560,8 @@ fun InteractiveRevealSticker(
         context.getSharedPreferences("moments_story_stickers", Context.MODE_PRIVATE)
     }
     val persistenceKey = remember(storyId) { "reveal_revealed_$storyId" }
-    val suppressionSourceId = remember(storyId) { "reveal.scratch.$storyId" }
+    val deckExclusionZoneId = remember(storyId) { "reveal.scratch.$storyId" }
+    val suppressionSourceId = deckExclusionZoneId
     val points = remember(storyId) { mutableStateListOf<Offset>() }
     val scratchedCells = remember(storyId) { mutableStateListOf<Int>() }
     var isRevealed by remember(storyId) { mutableStateOf(false) }
@@ -320,12 +570,18 @@ fun InteractiveRevealSticker(
     var showHint by remember(storyId) { mutableStateOf(false) }
     var canvasSize by remember(storyId) { mutableStateOf(IntOffset.Zero) }
     val density = LocalDensity.current
-    val hintPulse = rememberInfiniteTransition(label = "revealHint").animateFloat(
-        initialValue = 0.985f,
-        targetValue = 1.03f,
-        animationSpec = infiniteRepeatable(tween(720), RepeatMode.Reverse),
+    val reduceMotion = MotionPolicy.reduceMotion
+    // ≡ animateHint pulse (.easeInOut 0.72 repeatForever); reduceMotion → extremo “on”
+    val hintPulseRaw by rememberInfiniteTransition(label = "revealHint").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            tween(720, easing = FastOutSlowInEasing),
+            RepeatMode.Reverse,
+        ),
         label = "revealHintPulse",
     )
+    val hintT = if (reduceMotion || !showHint) 1f else hintPulseRaw
 
     fun resumeStoryIfNeeded() {
         if (didPauseForScratch && !isRevealed) {
@@ -334,10 +590,16 @@ fun InteractiveRevealSticker(
         }
     }
 
+    fun hideHintIfNeeded() {
+        if (!showHint) return
+        showHint = false
+    }
+
     fun completeReveal() {
         if (isRevealed) return
         isScratching = false
         isRevealed = true
+        showHint = false
         didPauseForScratch = false
         gestureGate?.clearSuppression(suppressionSourceId)
         HapticManager.shared.success()
@@ -360,11 +622,10 @@ fun InteractiveRevealSticker(
 
     LaunchedEffect(storyId) {
         isRevealed = storyId.isNotEmpty() && prefs.getBoolean(persistenceKey, false)
-        if (!isRevealed) {
-            showHint = true
-            delay(3_800)
-            if (points.isEmpty() && !isRevealed) showHint = false
-        }
+        if (isRevealed) return@LaunchedEffect
+        showHint = true
+        delay(3_800)
+        if (points.isEmpty() && !isRevealed) showHint = false
     }
 
     DisposableEffect(storyId) {
@@ -380,101 +641,136 @@ fun InteractiveRevealSticker(
     AnimatedVisibility(
         visible = !isRevealed,
         exit = fadeOut(tween(600)),
-        modifier = modifier,
+        modifier = modifier
+            .clip(RoundedCornerShape(storyViewerCanvasCornerRadius))
+            .storyDeckInteractionExclusion(
+                id = deckExclusionZoneId,
+                gate = gestureGate,
+                intents = setOf(
+                    StoryGestureIntent.DECK_SWIPE,
+                    StoryGestureIntent.STORY_NAVIGATION_TAP,
+                    StoryGestureIntent.HOLD_PAUSE,
+                    StoryGestureIntent.REPLY_SWIPE,
+                    StoryGestureIntent.REVEAL_SCRATCH,
+                ),
+                suppressionScope = StoryGestureSuppressionScope.SUPPRESS_VIEWER_GESTURES,
+                horizontalInsetFraction = StoryGestureCoordinator.REVEAL_SIDE_PASSTHROUGH_FRACTION,
+                enabled = reportsDeckInteractionExclusion,
+            ),
     ) {
         val scratchWidth = with(density) { 35.dp.toPx() }
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val sideInsetDp = maxWidth * StoryGestureCoordinator.REVEAL_SIDE_PASSTHROUGH_FRACTION
-            val sideInsetPx = with(density) { sideInsetDp.toPx() }
-            Box(
-            Modifier
-                .fillMaxSize()
-                .onSizeChanged { canvasSize = IntOffset(it.width, it.height) }
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    if (points.isNotEmpty()) {
-                        val path = Path().apply {
-                            moveTo(points.first().x, points.first().y)
-                            points.drop(1).forEach { lineTo(it.x, it.y) }
-                        }
-                        drawPath(
-                            path = path,
-                            color = Color.Transparent,
-                            style = Stroke(width = scratchWidth, cap = StrokeCap.Round, join = StrokeJoin.Round),
-                            blendMode = BlendMode.Clear,
-                        )
-                    }
-                },
-        ) {
-            RevealSurfaceView(
-                type = revealType,
-                pattern = revealPattern,
-                primaryColor = revealPrimaryColor,
-                secondaryColor = revealSecondaryColor,
-                effectColor = revealEffectColor,
-                modifier = Modifier.fillMaxSize(),
-            )
-            if (showHint) {
-                Text(
-                    text = "☝  ${stringResource(R.string.reveal_viewer_hint)}",
-                    color = Color.White.copy(alpha = 0.96f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 140.dp)
-                        .graphicsLayer {
-                            scaleX = hintPulse.value
-                            scaleY = hintPulse.value
-                            alpha = 0.9f
-                        },
-                )
-            }
-        }
-            // Swift deja los bordes libres para la navegación anterior/siguiente.
+        Box(Modifier.fillMaxSize()) {
             Box(
                 Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth()
-                    .padding(horizontal = sideInsetDp)
-                    .pointerInput(storyId, isRevealed) {
-                    detectDragGestures(
-                        onDragStart = { point ->
-                            showHint = false
-                            isScratching = true
-                            gestureGate?.setSuppressionScope(
-                                StoryGestureSuppressionScope.SUPPRESS_VIEWER_GESTURES,
-                                suppressionSourceId,
-                            )
-                            if (!didPauseForScratch) {
-                                didPauseForScratch = true
-                                onPauseStory?.invoke()
+                    .fillMaxSize()
+                    .onSizeChanged { canvasSize = IntOffset(it.width, it.height) }
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        if (points.isNotEmpty()) {
+                            val path = Path().apply {
+                                moveTo(points.first().x, points.first().y)
+                                points.drop(1).forEach { lineTo(it.x, it.y) }
                             }
-                            recordPoint(Offset(point.x + sideInsetPx, point.y))
-                        },
-                        onDragEnd = {
-                            isScratching = false
-                            gestureGate?.clearSuppression(suppressionSourceId)
-                            resumeStoryIfNeeded()
-                        },
-                        onDragCancel = {
-                            isScratching = false
-                            gestureGate?.clearSuppression(suppressionSourceId)
-                            resumeStoryIfNeeded()
-                        },
-                        onDrag = { change, _ ->
-                            change.consume()
-                            recordPoint(Offset(change.position.x + sideInsetPx, change.position.y))
-                        },
+                            drawPath(
+                                path = path,
+                                color = Color.Transparent,
+                                style = Stroke(width = scratchWidth, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                                blendMode = BlendMode.Clear,
+                            )
+                        }
+                    },
+            ) {
+                RevealSurfaceView(
+                    type = revealType,
+                    pattern = revealPattern,
+                    primaryColor = revealPrimaryColor,
+                    secondaryColor = revealSecondaryColor,
+                    effectColor = revealEffectColor,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                // ≡ revealHint (momentsChromeGlass Capsule + hand.draw)
+                AnimatedVisibility(
+                    visible = showHint,
+                    enter = fadeIn(tween(180)),
+                    exit = fadeOut(tween(220)),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 140.dp),
+                ) {
+                    RevealViewerHint(progress = hintT)
+                }
+            }
+            RevealScratchPanOverlay(
+                isEnabled = !isRevealed,
+                onBegan = {
+                    hideHintIfNeeded()
+                    if (isScratching) return@RevealScratchPanOverlay
+                    isScratching = true
+                    gestureGate?.setSuppressionScope(
+                        StoryGestureSuppressionScope.SUPPRESS_VIEWER_GESTURES,
+                        suppressionSourceId,
                     )
+                    if (!didPauseForScratch) {
+                        didPauseForScratch = true
+                        onPauseStory?.invoke()
+                    }
+                },
+                onPoint = { recordPoint(it) },
+                onEnded = {
+                    if (!isScratching) return@RevealScratchPanOverlay
+                    isScratching = false
+                    gestureGate?.clearSuppression(suppressionSourceId)
+                    resumeStoryIfNeeded()
                 },
             )
         }
     }
 }
 
-/** Port del fondo y patrones estáticos de `RevealSurfaceView`. */
+/** ≡ `revealHint` iOS: icono + texto en cápsula chrome glass. */
+@Composable
+private fun RevealViewerHint(
+    progress: Float,
+    modifier: Modifier = Modifier,
+) {
+    val t = progress.coerceIn(0f, 1f)
+    val rotation = lerp(6f, -8f, t)
+    val offsetX = lerp(-5f, 6f, t)
+    val offsetY = lerp(-2f, 2f, t)
+    val scale = lerp(0.985f, 1.03f, t)
+    val alpha = lerp(0.82f, 1f, t)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+            }
+            .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = false)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.PanTool,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.96f),
+            modifier = Modifier
+                .size(13.dp)
+                .graphicsLayer { rotationZ = rotation }
+                .offset(x = offsetX.dp, y = offsetY.dp),
+        )
+        Text(
+            text = stringResource(R.string.reveal_viewer_hint),
+            color = Color.White.copy(alpha = 0.96f),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+/** Port del fondo y patrones de `RevealSurfaceView` (+ reduceMotion / tiempo real). */
 @Composable
 fun RevealSurfaceView(
     type: String?,
@@ -483,24 +779,44 @@ fun RevealSurfaceView(
     secondaryColor: String?,
     effectColor: String?,
     modifier: Modifier = Modifier,
+    effectsActive: Boolean = true,
 ) {
     val primary = Color.fromHex(primaryColor ?: "#000000")
     val secondary = Color.fromHex(secondaryColor ?: "#000000")
     val effect = when {
-        pattern == "holographic" -> primary
+        pattern == "holographic" -> Color.fromHex(primaryColor ?: "#C8C8C8")
         !effectColor.isNullOrBlank() -> Color.fromHex(effectColor)
         !secondaryColor.isNullOrBlank() && !secondaryColor.equals(primaryColor, ignoreCase = true) -> secondary
         else -> primary.revealContrastingEffectColor()
     }
+    // ≡ resolvedAccentColor(for:): effectColor ?? secondaryColor
+    val holographicAccent = Color.fromHex(effectColor ?: secondaryColor ?: "#C8C8C8")
     val resolvedPattern = pattern?.takeIf { it != "none" }
     val showLegacyDither = (pattern.isNullOrBlank() || pattern == "none") &&
         (type == null || type == "scratch" || type == "none")
-    val patternPhase = rememberInfiniteTransition(label = "revealPattern").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(8_000), RepeatMode.Restart),
-        label = "revealPatternPhase",
-    ).value
+    val reduceMotion = MotionPolicy.reduceMotion
+    val animateEffects = effectsActive && !reduceMotion
+
+    // ≡ TimelineView timeIntervalSince1970 (segundos wall-clock)
+    var timeSeconds by remember { mutableFloatStateOf((System.currentTimeMillis() / 1000.0).toFloat()) }
+    LaunchedEffect(animateEffects, resolvedPattern) {
+        if (!animateEffects) return@LaunchedEffect
+        while (true) {
+            withFrameNanos {
+                timeSeconds = (System.currentTimeMillis() / 1000.0).toFloat()
+            }
+        }
+    }
+
+    // Static: re-roll aleatorio ~24 fps como iOS TimelineView(.periodic by: 1/24)
+    var staticFrame by remember { mutableIntStateOf(0) }
+    LaunchedEffect(animateEffects, resolvedPattern) {
+        if (!animateEffects || resolvedPattern != "static") return@LaunchedEffect
+        while (true) {
+            delay(1_000L / 24L)
+            staticFrame += 1
+        }
+    }
 
     Box(modifier) {
         Canvas(Modifier.fillMaxSize()) {
@@ -509,78 +825,32 @@ fun RevealSurfaceView(
             } else {
                 drawRect(primary)
             }
-            when (resolvedPattern) {
-                "dots" -> Unit // StickerDitherPattern overlay (paridad iOS)
-                "grid" -> {
-                    val spacing = 30.dp.toPx()
-                    for (x in 0..(size.width / spacing).toInt()) drawLine(effect.copy(alpha = 0.3f), Offset(x * spacing, 0f), Offset(x * spacing, size.height), 0.5.dp.toPx())
-                    for (y in 0..(size.height / spacing).toInt()) drawLine(effect.copy(alpha = 0.3f), Offset(0f, y * spacing), Offset(size.width, y * spacing), 0.5.dp.toPx())
-                }
-            "lines" -> {
-                val spacing = 15.dp.toPx()
-                for (x in -size.height.toInt()..size.width.toInt() step spacing.toInt().coerceAtLeast(1)) {
-                    drawLine(effect.copy(alpha = 0.4f), Offset(x.toFloat(), 0f), Offset(x + size.height, size.height), 1.dp.toPx())
-                }
+
+            // reduceMotion fallbacks ≡ iOS Reveal*Pattern
+            val patternToDraw = when {
+                !animateEffects && resolvedPattern in setOf("grid", "matrix", "scanlines", "waves", "holographic") ->
+                    "lines"
+                !animateEffects && resolvedPattern == "noise" -> null
+                !animateEffects && resolvedPattern == "static" -> "staticReduced"
+                else -> resolvedPattern
             }
-            "noise" -> {
-                val count = (size.width * size.height / 1_500f).toInt().coerceIn(80, 420)
-                repeat(count) { index ->
-                    val seed = index * 0.618034f
-                    val x = ((seed * size.width + sin(patternPhase * 9f + index) * 12f) % size.width + size.width) % size.width
-                    val y = (((seed * 1.73f) * size.height + cos(patternPhase * 7f + index) * 15f) % size.height + size.height) % size.height
-                    val alpha = (0.25f + abs(sin(index + patternPhase * 12f)) * 0.42f).coerceIn(0f, 0.7f)
-                    drawCircle(effect.copy(alpha = alpha), radius = 1.2.dp.toPx() + (index % 3), center = Offset(x, y))
+
+            when (patternToDraw) {
+                "dots" -> Unit
+                "lines" -> drawRevealLines(effect)
+                "grid" -> drawRevealGrid(effect, timeSeconds.toDouble())
+                "noise" -> drawRevealNoise(effect, timeSeconds.toDouble())
+                "static" -> {
+                    // fuerza invalidación por frame
+                    @Suppress("UNUSED_EXPRESSION")
+                    staticFrame
+                    drawRevealStatic(effect, timeSeconds.toDouble())
                 }
+                "staticReduced" -> drawRect(Color.Black.copy(alpha = 0.08f))
+                "scanlines" -> drawRevealScanlines(effect, timeSeconds.toDouble())
+                "waves" -> drawRevealWaves(effect, timeSeconds.toDouble())
+                "matrix" -> drawRevealMatrix(effect, timeSeconds.toDouble())
             }
-            "static" -> {
-                val count = (size.width * size.height / 1_200f).toInt().coerceIn(100, 500)
-                repeat(count) { index ->
-                    val x = ((sin(index * 12.9898f + patternPhase * 42f) * 43_758.547f) % 1f).let { if (it < 0) it + 1f else it } * size.width
-                    val y = ((sin(index * 78.233f + patternPhase * 31f) * 12_345.679f) % 1f).let { if (it < 0) it + 1f else it } * size.height
-                    val tone = when (index % 3) { 0 -> Color.White; 1 -> Color.Gray; else -> Color.Black }
-                    drawRect(tone.copy(alpha = 0.18f + (index % 5) * 0.1f), topLeft = Offset(x, y), size = androidx.compose.ui.geometry.Size(2.dp.toPx(), 1.dp.toPx()))
-                }
-            }
-            "scanlines" -> {
-                val spacing = 8.dp.toPx()
-                val offset = (patternPhase * spacing).coerceAtMost(spacing)
-                var y = -spacing
-                while (y < size.height + spacing) {
-                    drawRect(effect.copy(alpha = 0.3f), topLeft = Offset(0f, y + offset), size = androidx.compose.ui.geometry.Size(size.width, 2.5.dp.toPx()))
-                    y += spacing
-                }
-                drawRect(effect.copy(alpha = 0.05f), topLeft = Offset(0f, (patternPhase * (size.height + 400f)) - 200f), size = androidx.compose.ui.geometry.Size(size.width, 60.dp.toPx()))
-            }
-            "waves" -> {
-                val spacing = 30.dp.toPx()
-                for (y in -40.dp.toPx().toInt()..(size.height + 40.dp.toPx()).toInt() step spacing.toInt()) {
-                    val wave = Path().apply {
-                        moveTo(0f, y.toFloat())
-                        var x = 0f
-                        while (x <= size.width + 20.dp.toPx()) {
-                            lineTo(x, y + sin(x / 20.dp.toPx() + patternPhase * 16f) * 8.dp.toPx())
-                            x += 10.dp.toPx()
-                        }
-                    }
-                    drawPath(wave, effect.copy(alpha = 0.4f), style = Stroke(width = 2.5.dp.toPx()))
-                }
-            }
-            "matrix" -> {
-                val columns = (size.width / 20.dp.toPx()).toInt()
-                repeat(columns) { column ->
-                    val x = column * 20.dp.toPx() + 10.dp.toPx()
-                    val speed = (sin(column * 0.5f) + 2f) * 80f
-                    val head = ((patternPhase * 8_000f * speed / 1_000f) % (size.height + 200f)) - 100f
-                    repeat(12) { segment ->
-                        val y = head - segment * 15.dp.toPx()
-                        if (y in 0f..size.height) {
-                            drawRect(effect.copy(alpha = (1f - segment / 12f) * 0.6f), topLeft = Offset(x - 4.dp.toPx(), y), size = androidx.compose.ui.geometry.Size(8.dp.toPx(), 12.dp.toPx()))
-                            if (segment == 0) drawRect(Color.White.copy(alpha = 0.4f), topLeft = Offset(x - 4.dp.toPx(), y), size = androidx.compose.ui.geometry.Size(8.dp.toPx(), 12.dp.toPx()))
-                        }
-                    }
-                }
-            }
-        }
         }
         if (resolvedPattern == "dots" || showLegacyDither) {
             StickerDitherPattern(
@@ -588,13 +858,195 @@ fun RevealSurfaceView(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        if (resolvedPattern == "holographic") {
+        if (resolvedPattern == "holographic" && animateEffects) {
             RevealHolographicPattern(
                 color = effect,
-                accentColor = secondary,
+                accentColor = holographicAccent,
                 modifier = Modifier.fillMaxSize(),
             )
         }
+    }
+}
+
+/** ≡ RevealLinesPattern */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRevealLines(color: Color) {
+    val spacing = 15.dp.toPx()
+    val step = spacing.toInt().coerceAtLeast(1)
+    for (x in -size.height.toInt()..size.width.toInt() step step) {
+        drawLine(
+            color.copy(alpha = 0.4f),
+            Offset(x.toFloat(), 0f),
+            Offset(x + size.height, size.height),
+            1.dp.toPx(),
+        )
+    }
+}
+
+/** ≡ RevealGridPattern con tiempo real */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRevealGrid(color: Color, time: Double) {
+    val spacing = 30.dp.toPx()
+    var x = 0f
+    while (x < size.width) {
+        drawLine(color.copy(alpha = 0.3f), Offset(x, 0f), Offset(x, size.height), 0.5.dp.toPx())
+        x += spacing
+    }
+    var y = 0f
+    while (y < size.height) {
+        drawLine(color.copy(alpha = 0.3f), Offset(0f, y), Offset(size.width, y), 0.5.dp.toPx())
+        y += spacing
+    }
+    val h = size.height.coerceAtLeast(1f)
+    val scanY = ((time * 60.0) % h.toDouble()).toFloat()
+    drawRect(color.copy(alpha = 0.6f), topLeft = Offset(0f, scanY), size = Size(size.width, 2.dp.toPx()))
+    var gx = 0f
+    while (gx < size.width + spacing) {
+        var gy = 0f
+        while (gy < size.height + spacing) {
+            drawCircle(color.copy(alpha = 0.5f), radius = 1.dp.toPx(), center = Offset(gx, gy))
+            gy += spacing
+        }
+        gx += spacing
+    }
+}
+
+/** ≡ RevealNoisePattern + SeededRandom(seed: 42) */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRevealNoise(color: Color, time: Double) {
+    val rng = SeededRandom(42)
+    val particleCount = MotionPolicy.revealParticleCount(size.width, size.height)
+    for (index in 0 until particleCount) {
+        val baseX = rng.next().toFloat() * size.width
+        val baseY = rng.next().toFloat() * size.height
+        val speedX = rng.next() * 3.5 + 1.5
+        val speedY = rng.next() * 4.0 + 2.0
+        val driftPhase = rng.next() * Math.PI * 2
+        val offsetX = sin(time * 0.25 * speedX + driftPhase) * 12.0
+        val offsetY = cos(time * 0.18 * speedY + driftPhase) * 15.0
+        var x = ((baseX + offsetX) % size.width).toFloat()
+        var y = ((baseY + offsetY) % size.height).toFloat()
+        if (x < 0f) x += size.width
+        if (y < 0f) y += size.height
+        val dotSize = (rng.next() * 2.2 + 1.0).toFloat()
+        val shimmer = 0.4 + sin(time * 0.85 * speedX + driftPhase) * 0.4
+        val opacity = ((0.35 + rng.next() * 0.45) * shimmer).toFloat().coerceIn(0f, 1f)
+        val tone = if (index % 7 == 0) color.copy(alpha = opacity * 0.65f) else color.copy(alpha = opacity)
+        drawCircle(tone, radius = dotSize / 2f, center = Offset(x, y))
+    }
+    val area = maxOf(size.width * size.height, 1f)
+    val microCount = minOf(maxOf((area / 150).toInt(), 40), 250)
+    repeat(microCount) {
+        var mx = ((rng.next().toFloat() * size.width + sin(time * 0.15).toFloat()) % size.width)
+        var my = ((rng.next().toFloat() * size.height + cos(time * 0.1).toFloat()) % size.height)
+        if (mx < 0f) mx += size.width
+        if (my < 0f) my += size.height
+        drawRect(color.copy(alpha = 0.22f), topLeft = Offset(mx, my), size = Size(0.8.dp.toPx(), 0.8.dp.toPx()))
+    }
+}
+
+/** ≡ RevealStaticPattern (nieve aleatoria + rolling + viñeta) */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRevealStatic(color: Color, time: Double) {
+    val flicker = 0.96 + Math.random() * 0.08
+    drawRect(color.copy(alpha = (0.12 * flicker).toFloat()))
+    val snowCount = (size.width * size.height / 120f).toInt().coerceAtLeast(0)
+    repeat(snowCount) {
+        val dotW = (2.0 + Math.random() * 2.0).toFloat()
+        val dotH = (1.0 + Math.random()).toFloat()
+        val x = (Math.random() * size.width).toFloat()
+        val y = (Math.random() * size.height).toFloat()
+        val rand = Math.random()
+        val tone = when {
+            rand > 0.6 -> Color.Black
+            rand > 0.2 -> Color.White
+            else -> Color.Gray
+        }
+        drawRect(
+            tone.copy(alpha = (0.1 + Math.random() * 0.6).toFloat()),
+            topLeft = Offset(x, y),
+            size = Size(dotW, dotH),
+        )
+    }
+    val rollSpan = size.height + 1200f
+    val rollY = ((time * 120.0) % rollSpan.toDouble()).toFloat() - 600f
+    drawRect(Color.Black.copy(alpha = 0.2f), topLeft = Offset(0f, rollY), size = Size(size.width, 1.5.dp.toPx()))
+    drawRect(
+        Brush.radialGradient(
+            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.1f)),
+            center = Offset(size.width / 2f, size.height / 2f),
+            radius = size.width * 0.8f,
+        ),
+    )
+}
+
+/** ≡ RevealScanlinesPattern */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRevealScanlines(color: Color, time: Double) {
+    val spacing = 8.dp.toPx()
+    val offset = ((time * 20.0) % spacing.toDouble()).toFloat()
+    var y = -spacing
+    while (y < size.height + spacing) {
+        drawRect(color.copy(alpha = 0.3f), topLeft = Offset(0f, y + offset), size = Size(size.width, 2.5.dp.toPx()))
+        y += spacing
+    }
+    val interferenceY = ((time * 40.0) % (size.height + 400.0)).toFloat() - 200f
+    drawRect(color.copy(alpha = 0.05f), topLeft = Offset(0f, interferenceY), size = Size(size.width, 60.dp.toPx()))
+}
+
+/** ≡ RevealWavesPattern */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRevealWaves(color: Color, time: Double) {
+    val spacing = 30.dp.toPx()
+    var y = -40f
+    while (y < size.height + 40f) {
+        val wave = Path().apply {
+            moveTo(0f, y)
+            var x = 0f
+            while (x <= size.width + 20f) {
+                val relativeX = x / 20.0
+                val sine = sin(relativeX + time * 2.5) * 8.0
+                lineTo(x, (y + sine).toFloat())
+                x += 10f
+            }
+        }
+        drawPath(wave, color.copy(alpha = 0.4f), style = Stroke(width = 2.5.dp.toPx()))
+        y += spacing
+    }
+}
+
+/** ≡ RevealMatrixPattern */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRevealMatrix(color: Color, time: Double) {
+    val columns = (size.width / 20f).toInt()
+    for (i in 0 until columns) {
+        val x = i * 20f + 10f
+        val speed = (sin(i * 0.5) + 2.0) * 80.0
+        val yOffset = ((time * speed) % (size.height + 200.0)).toFloat() - 100f
+        for (segment in 0 until 12) {
+            val segmentY = yOffset - segment * 15f
+            if (segmentY > 0f && segmentY < size.height) {
+                val opacity = (1.0 - segment / 12.0).toFloat()
+                drawRect(
+                    color.copy(alpha = opacity * 0.6f),
+                    topLeft = Offset(x - 4f, segmentY),
+                    size = Size(8f, 12f),
+                )
+                if (segment == 0) {
+                    drawRect(
+                        Color.White.copy(alpha = 0.4f),
+                        topLeft = Offset(x - 4f, segmentY),
+                        size = Size(8f, 12f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Port de `SeededRandom` en StoryInteractiveStickers.swift. */
+private class SeededRandom(seed: Int) {
+    private var state: ULong = abs(seed).toULong()
+
+    fun next(): Double {
+        state += 0x9E3779B97F4A7C15uL
+        var z = state
+        z = (z xor (z shr 30)) * 0xBF58476D1CE4E5B9uL
+        z = (z xor (z shr 27)) * 0x94D049BB133111EBuL
+        return (z xor (z shr 31)).toDouble() / ULong.MAX_VALUE.toDouble()
     }
 }
 
@@ -605,6 +1057,10 @@ private fun RevealHolographicPattern(
     accentColor: Color,
     modifier: Modifier = Modifier,
 ) {
+    if (MotionPolicy.reduceMotion) {
+        Canvas(modifier) { drawRevealLines(color) }
+        return
+    }
     val context = LocalContext.current
     val sensorManager = remember(context) {
         context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -613,12 +1069,14 @@ private fun RevealHolographicPattern(
     var pitch by remember { mutableFloatStateOf(0f) }
     var roll by remember { mutableFloatStateOf(0f) }
     var rotationRate by remember { mutableFloatStateOf(0f) }
-    val phase = rememberInfiniteTransition(label = "holographicPattern").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(10_000), RepeatMode.Restart),
-        label = "holographicPhase",
-    ).value
+    var timeSeconds by remember { mutableFloatStateOf((System.currentTimeMillis() / 1000.0).toFloat()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos {
+                timeSeconds = (System.currentTimeMillis() / 1000.0).toFloat()
+            }
+        }
+    }
 
     DisposableEffect(rotationVector) {
         if (rotationVector == null) return@DisposableEffect onDispose { }
@@ -653,15 +1111,19 @@ private fun RevealHolographicPattern(
         val cols = (size.width / cell).toInt() + 2
         val rows = (size.height / cell).toInt() + 2
         val tiltHue = roll / Math.PI.toFloat() * 0.4f + pitch / (Math.PI.toFloat() / 2f) * 0.2f
+        val waveT = timeSeconds * 0.4f
         repeat(cols) { column ->
             repeat(rows) { row ->
-                var hue = (column.toFloat() / cols + row.toFloat() / rows * 0.5f + tiltHue + phase + accentColor.red * 0.3f) % 1f
+                val posX = column.toFloat() / cols
+                val posY = row.toFloat() / rows
+                var hue = (posX + posY * 0.5f + tiltHue + accentColor.red * 0.3f) % 1f
                 if (hue < 0f) hue += 1f
-                val saturation = (0.5f + 0.4f * sin(column * 0.7f + row * 0.5f + phase * 6.28f)).coerceIn(0f, 1f)
+                val saturation = (0.5f + 0.4f * sin(posX * Math.PI.toFloat() * 3f + posY * Math.PI.toFloat() * 2f + waveT))
+                    .coerceIn(0f, 1f)
                 drawRect(
                     Color(android.graphics.Color.HSVToColor(floatArrayOf(hue * 360f, saturation, 0.95f))).copy(alpha = 0.5f),
                     topLeft = Offset(column * cell, row * cell),
-                    size = androidx.compose.ui.geometry.Size(cell + 1f, cell + 1f),
+                    size = Size(cell + 1f, cell + 1f),
                 )
             }
         }

@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,8 +70,14 @@ import com.moments.android.views.explore.exploresections.ExploreErrorStateView
 import com.moments.android.views.explore.exploresections.ExploreLoadingStateView
 import com.moments.android.views.explore.exploresections.ExploreResultsSection
 import com.moments.android.views.explore.exploresections.ExploreSuggestionsSection
+import com.moments.android.views.feed.core.FeedProfileSheetRoute
 import com.moments.android.views.feed.maps.DiscoverMapView
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.profile.core.sections.MomentZoomDestination
+import com.moments.android.views.profile.core.sections.MomentZoomDetailDestination
+import com.moments.android.views.profile.core.sections.MomentZoomOpener
+import com.moments.android.views.profile.core.sections.MomentZoomPresentationKind
+import com.moments.android.views.profile.userprofile.UserProfileView
 import com.moments.android.views.shared.AppErrorBanner
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.story.StoryRingAvatarView
@@ -79,7 +86,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Port de `ExploreView.swift`.
- * Zoom / profile navigation destination: stubs honestos (Dialog detail + no-op profile route).
+ * Profile → `UserProfileView`; momento → `MomentZoomDetailDestination` (explorer / single).
  */
 @Composable
 fun ExploreView(
@@ -98,7 +105,35 @@ fun ExploreView(
     var showPrivateProfileAlert by remember { mutableStateOf(false) }
     var showSuggestedUsers by remember { mutableStateOf(false) }
     var showDiscoverMap by remember { mutableStateOf(false) }
-    var detailMoment by remember { mutableStateOf<Moment?>(null) }
+    var selectedProfileRoute by remember { mutableStateOf<FeedProfileSheetRoute?>(null) }
+    var zoomDestination by remember { mutableStateOf<MomentZoomDestination?>(null) }
+
+    fun openProfile(userId: String) {
+        val trimmed = userId.trim()
+        if (trimmed.isEmpty()) return
+        selectedProfileRoute = FeedProfileSheetRoute(trimmed)
+        // iOS: checkCanViewContent con resultado ignorado (solo prefetch/cache)
+        scope.launch { viewModel.canViewContent(trimmed) }
+    }
+
+    fun openMomentZoom(
+        moment: Moment,
+        index: Int,
+        sourceMoments: List<Moment>,
+        presentation: MomentZoomPresentationKind,
+        zoomIDPrefix: String,
+    ) {
+        val resolvedIndex = sourceMoments.indexOfFirst { it.id == moment.id }
+            .takeIf { it >= 0 } ?: index
+        MomentZoomOpener.open(
+            moment = moment,
+            moments = sourceMoments,
+            initialIndex = resolvedIndex,
+            presentation = presentation,
+            setDestination = { zoomDestination = it },
+            zoomIDPrefix = zoomIDPrefix,
+        )
+    }
 
     LaunchedEffect(Unit) {
         val q = initialSearchQuery?.trim().orEmpty()
@@ -165,6 +200,7 @@ fun ExploreView(
                     },
                     onDelete = { viewModel.deleteSearch(it) },
                     onClearAll = { viewModel.clearAllSearches() },
+                    onProfileTap = { openProfile(it) },
                 )
             }
 
@@ -196,12 +232,7 @@ fun ExploreView(
                                     currentUserInterests = viewModel.currentUserInterests,
                                     onFollowUser = viewModel::followUser,
                                     onUserTap = { user ->
-                                        scope.launch {
-                                            // Profile navigation = lote Profile (stub honesto)
-                                            if (!viewModel.canViewContent(user.id)) {
-                                                showPrivateProfileAlert = true
-                                            }
-                                        }
+                                        openProfile(user.id)
                                     },
                                     onShowMore = { showSuggestedUsers = true },
                                     modifier = Modifier.padding(horizontal = 2.dp),
@@ -213,11 +244,16 @@ fun ExploreView(
                                 if (viewModel.moments.isNotEmpty()) {
                                     ExploreMomentsGrid(
                                         moments = viewModel.moments,
-                                        onMomentTap = { moment, _, _ ->
+                                        onMomentTap = { moment, index, source ->
                                             scope.launch {
                                                 if (viewModel.canViewContent(moment.authorId)) {
-                                                    detailMoment = moment
-                                                    HapticManager.shared.lightImpact(view)
+                                                    openMomentZoom(
+                                                        moment = moment,
+                                                        index = index,
+                                                        sourceMoments = source,
+                                                        presentation = MomentZoomPresentationKind.Explorer,
+                                                        zoomIDPrefix = "explore",
+                                                    )
                                                 } else {
                                                     showPrivateProfileAlert = true
                                                 }
@@ -236,17 +272,18 @@ fun ExploreView(
                                     onFollowUser = viewModel::followUser,
                                     onUserTap = { user ->
                                         viewModel.saveSearchRecord(user.username, "user", user.id)
-                                        scope.launch {
-                                            if (!viewModel.canViewContent(user.id)) {
-                                                showPrivateProfileAlert = true
-                                            }
-                                        }
+                                        openProfile(user.id)
                                     },
-                                    onMomentTap = { moment, _, _ ->
+                                    onMomentTap = { moment, index, source ->
                                         scope.launch {
                                             if (viewModel.canViewContent(moment.authorId)) {
-                                                detailMoment = moment
-                                                HapticManager.shared.lightImpact(view)
+                                                openMomentZoom(
+                                                    moment = moment,
+                                                    index = index,
+                                                    sourceMoments = source,
+                                                    presentation = MomentZoomPresentationKind.Single,
+                                                    zoomIDPrefix = "explore-search",
+                                                )
                                             } else {
                                                 showPrivateProfileAlert = true
                                             }
@@ -301,7 +338,6 @@ fun ExploreView(
         ) {
             SuggestedUsersView(
                 onNavigateBack = { showSuggestedUsers = false },
-                onSelectUser = { showSuggestedUsers = false },
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
@@ -322,18 +358,32 @@ fun ExploreView(
         }
     }
 
-    // ≡ MomentZoomDetailDestination stub (fullscreen dialog hasta zoom nav)
-    detailMoment?.let { moment ->
+    // ≡ userProfileNavigationDestination
+    selectedProfileRoute?.let { route ->
         Dialog(
-            onDismissRequest = { detailMoment = null },
+            onDismissRequest = { selectedProfileRoute = null },
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
-            val gridMoments = if (searchText.isBlank()) viewModel.moments else viewModel.filteredMoments
-            val moments = gridMoments.ifEmpty { listOf(moment) }
-            ExploreMomentDetailView(
-                moments = moments,
-                initialIndex = moments.indexOfFirst { it.id == moment.id }.coerceAtLeast(0),
-                onNavigateBack = { detailMoment = null },
+            Surface(Modifier.fillMaxSize()) {
+                UserProfileView(
+                    userId = route.userId,
+                    onDismiss = { selectedProfileRoute = null },
+                )
+            }
+        }
+    }
+
+    // ≡ MomentZoomDetailDestination
+    zoomDestination?.let { destination ->
+        val pool = if (searchText.isBlank()) viewModel.moments else viewModel.filteredMoments
+        Dialog(
+            onDismissRequest = { zoomDestination = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            MomentZoomDetailDestination(
+                destination = destination,
+                moments = MomentZoomOpener.resolvedMoments(destination, pool),
+                onDismiss = { zoomDestination = null },
             )
         }
     }
@@ -427,6 +477,7 @@ private fun ExploreRecentSearchSuggestions(
     onSelect: (CachedSearch) -> Unit,
     onDelete: (CachedSearch) -> Unit,
     onClearAll: () -> Unit,
+    onProfileTap: (String) -> Unit,
 ) {
     val colors = rememberAdaptiveColors()
     Column(
@@ -462,6 +513,7 @@ private fun ExploreRecentSearchSuggestions(
                 typeIcon = searchTypeIcon(search.type),
                 onSelect = { onSelect(search) },
                 onDelete = { onDelete(search) },
+                onProfileTap = onProfileTap,
             )
         }
     }
@@ -475,6 +527,7 @@ private fun ExploreRecentSearchRow(
     typeIcon: ImageVector,
     onSelect: () -> Unit,
     onDelete: () -> Unit,
+    onProfileTap: (String) -> Unit,
 ) {
     val colors = rememberAdaptiveColors()
     Row(
@@ -496,6 +549,7 @@ private fun ExploreRecentSearchRow(
                     userId = search.targetId,
                     size = 32.dp,
                     lineWidth = 2.dp,
+                    onTap = { onProfileTap(search.targetId) },
                 )
             } else {
                 Box(

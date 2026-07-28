@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_moment_title">Share moment</string>
+    <string name="share_moment_from">From %1$s</string>
+    <string name="share_send_to">Send to...</string>
+    <string name="share_moment_by">Moment by %1$s</string>
+    <string name="share_select_contacts">Select contacts</string>
+    <string name="share_send_to_count">Send to %d</string>
+    <string name="share_add_to_story">Add to Story</string>
+    <string name="share_preparing">Preparing...</string>
+    <string name="share_moment_unavailable">This moment is not available</string>
+    <string name="share_no_permission">You don\'t have permission to view this content</string>
+    <string name="share_video">Video</string>
+    <string name="share_moment">Moment</string>
+    <string name="share_view_moment">View moment</string>
+    <string name="share_cancel">Cancel</string>
+    <string name="share_favorites">Favorites</string>
+    <string name="share_recents">Recents</string>
+    <string name="share_search_placeholder">Search contacts...</string>
+    <string name="share_search_no_results">No contacts found</string>
+    <string name="share_search_global_results">Other users</string>
+    <string name="share_empty_title">No conversations yet</string>
+    <string name="share_empty_subtitle">Connect with people to share moments</string>
+    <string name="share_favorites_empty">No favorites yet</string>
+    <string name="context_menu_copy_link">Copy link</string>
+    <string name="context_menu_copy_link_subtitle">Share outside the app</string>
+    <string name="creator_story_subtitle">Share moments that disappear</string>
+    <string name="errors_moment_image_unavailable">Could not load the moment image.</string>
+    <string name="errors_sticker_generation_failed">Could not generate the sticker.</string>
+    <string name="share_story_title">Share story</string>
+    <string name="share_story_by">Story by %1$s</string>
+    <string name="share_story_unavailable">This story isn\'t available</string>
+    <string name="share_story_denied_expired">This story has expired.</string>
+    <string name="share_story_denied_not_found">This story was removed or no longer exists.</string>
+    <string name="share_story_denied_blocked_title">Story unavailable</string>
+    <string name="share_story_denied_blocked">You can\'t view this story because one of you has blocked the other.</string>
+    <string name="share_story_denied_private_title">Private account</string>
+    <string name="share_story_denied_private">Follow this person to see their stories.</string>
+    <string name="share_story_denied_restricted">You don\'t have permission to view this story.</string>
+</resources>

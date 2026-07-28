@@ -818,7 +818,8 @@ class FeedViewModel {
     }
 
     fun trackFeedUsage() {
-        // Analytics hook — mirror iOS no-op-safe call site.
+        // ≡ iOS: `_ = UserDefaults.standard.selectedFeedType`
+        appContext?.let { FeedTypePreferences.load(it) }
     }
 
     /** Port de `filterStoriesForVisibility` iOS. */
@@ -959,10 +960,51 @@ class FeedViewModel {
         },
     )
 
+    /**
+     * Paridad iOS `ModernPostCardView.mediaItems`:
+     * visibleMediaItems → si vacío y legacy (`mediaItems == null`) → imagePath/videoUrl → placeholder.
+     */
     private fun Moment.toFeedMoment(): FeedMoment {
-        val media = visibleMediaItems.map { item ->
+        val visible = visibleMediaItems
+        val resolved: List<com.moments.android.models.MediaItem> = when {
+            visible.isNotEmpty() -> visible
+            !shouldUseLegacyMediaFallback -> listOf(
+                com.moments.android.models.MediaItem(
+                    type = com.moments.android.models.MediaItem.MediaType.IMAGE,
+                    url = "",
+                ),
+            )
+            else -> buildList {
+                imagePath?.takeIf { it.isNotBlank() }?.let {
+                    add(
+                        com.moments.android.models.MediaItem(
+                            type = com.moments.android.models.MediaItem.MediaType.IMAGE,
+                            url = it,
+                        ),
+                    )
+                }
+                videoUrl?.takeIf { it.isNotBlank() }?.let {
+                    add(
+                        com.moments.android.models.MediaItem(
+                            type = com.moments.android.models.MediaItem.MediaType.VIDEO,
+                            url = it,
+                            thumbnailUrl = thumbnailUrl,
+                        ),
+                    )
+                }
+                if (isEmpty()) {
+                    add(
+                        com.moments.android.models.MediaItem(
+                            type = com.moments.android.models.MediaItem.MediaType.IMAGE,
+                            url = "",
+                        ),
+                    )
+                }
+            }
+        }
+        val media = resolved.mapIndexed { index, item ->
             com.moments.android.services.content.FeedMediaItem(
-                id = item.id,
+                id = item.id.ifBlank { "$index" },
                 type = item.type.raw,
                 url = item.url,
                 thumbnailUrl = item.thumbnailUrl,
@@ -993,6 +1035,9 @@ class FeedViewModel {
             customListId = customListId,
             isArchived = isArchived,
             locationCoordinate = locationCoordinate,
+            thumbnailUrl = thumbnailUrl,
+            imagePath = imagePath,
+            videoDuration = videoDuration,
         )
     }
 

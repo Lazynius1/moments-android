@@ -76,17 +76,48 @@ import coil.compose.AsyncImage
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
 import com.moments.android.extensions.InterestEmojiHelper
+import com.moments.android.services.auth.AuthService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-private const val TOTAL_STEPS = 5
+/**
+ * ≡ iOS `OnboardingContext`. En social (Google) el correo y la contraseña ya los
+ * aporta el proveedor, así que esos dos pasos se omiten: 3 pasos en vez de 5,
+ * igual que `ProfileOnboardingView(context: .apple)` en iOS.
+ */
+enum class OnboardingUiContext { EMAIL, SOCIAL }
+
+private enum class OnboardingStepKind { USERNAME, EMAIL, PASSWORD, INTERESTS, PREVIEW }
+
+private fun stepsFor(context: OnboardingUiContext): List<OnboardingStepKind> = when (context) {
+    OnboardingUiContext.EMAIL -> listOf(
+        OnboardingStepKind.USERNAME,
+        OnboardingStepKind.EMAIL,
+        OnboardingStepKind.PASSWORD,
+        OnboardingStepKind.INTERESTS,
+        OnboardingStepKind.PREVIEW,
+    )
+    OnboardingUiContext.SOCIAL -> listOf(
+        OnboardingStepKind.USERNAME,
+        OnboardingStepKind.INTERESTS,
+        OnboardingStepKind.PREVIEW,
+    )
+}
+
 private val usernameRegex = Regex("^[a-zA-Z0-9_.]{3,20}$")
 
 @Composable
-fun OnboardingScreen(onBack: () -> Unit, onAuthenticated: () -> Unit) {
+fun OnboardingScreen(
+    onBack: () -> Unit,
+    onAuthenticated: () -> Unit,
+    uiContext: OnboardingUiContext = OnboardingUiContext.EMAIL,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    val steps = remember(uiContext) { stepsFor(uiContext) }
+    val totalSteps = steps.size
 
     var step by remember { mutableIntStateOf(1) }
     var username by remember { mutableStateOf("") }
@@ -95,6 +126,8 @@ fun OnboardingScreen(onBack: () -> Unit, onAuthenticated: () -> Unit) {
     var showPassword by remember { mutableStateOf(false) }
     var usernameError by remember { mutableStateOf<String?>(null) }
     var usernameChecking by remember { mutableStateOf(false) }
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var emailChecking by remember { mutableStateOf(false) }
     var usernameSuggestions by remember { mutableStateOf<List<String>>(emptyList()) }
     var selectedInterests by remember { mutableStateOf<List<String>>(emptyList()) }
     var photoUri by remember { mutableStateOf<Uri?>(null) }
@@ -105,6 +138,7 @@ fun OnboardingScreen(onBack: () -> Unit, onAuthenticated: () -> Unit) {
 
     val usernameFormatError = stringResource(R.string.register_err_username_format)
     val usernameUnavailableError = stringResource(R.string.register_err_username_unavailable)
+    val emailUnavailableError = stringResource(R.string.register_err_email_unavailable)
     val usernameTakenMessage = stringResource(R.string.register_username_taken)
     val accountErrorMessage = stringResource(R.string.register_account_error)
 
@@ -133,16 +167,34 @@ fun OnboardingScreen(onBack: () -> Unit, onAuthenticated: () -> Unit) {
         }
     }
 
-    val canProceed = when (step) {
-        1 -> username.length >= 3 && usernameError == null && !usernameChecking
-        2 -> isValidEmail(email.trim())
-        3 -> password.length >= 8
-        4 -> selectedInterests.size >= INTERESTS_MIN
-        else -> privacyAccepted
+    // Disponibilidad del correo en su propio paso: si ya hay cuenta con ese email se
+    // avisa aquí, en vez de dejar que el alta falle al final tras rellenarlo todo.
+    LaunchedEffect(email, uiContext) {
+        if (uiContext != OnboardingUiContext.EMAIL) return@LaunchedEffect
+        val value = email.trim()
+        if (value.isEmpty() || !isValidEmail(value)) {
+            emailError = null; emailChecking = false
+            return@LaunchedEffect
+        }
+        emailError = null; emailChecking = true
+        delay(400)
+        val taken = isEmailAlreadyRegistered(value)
+        emailChecking = false
+        emailError = if (taken) emailUnavailableError else null
+    }
+
+    val currentKind = steps.getOrElse(step - 1) { OnboardingStepKind.PREVIEW }
+
+    val canProceed = when (currentKind) {
+        OnboardingStepKind.USERNAME -> username.length >= 3 && usernameError == null && !usernameChecking
+        OnboardingStepKind.EMAIL -> isValidEmail(email.trim()) && emailError == null && !emailChecking
+        OnboardingStepKind.PASSWORD -> password.length >= 8
+        OnboardingStepKind.INTERESTS -> selectedInterests.size >= INTERESTS_MIN
+        OnboardingStepKind.PREVIEW -> privacyAccepted
     }
 
     fun goNext() {
-        if (step < TOTAL_STEPS) {
+        if (step < totalSteps) {
             step += 1
         } else {
             isCreating = true
@@ -150,14 +202,44 @@ fun OnboardingScreen(onBack: () -> Unit, onAuthenticated: () -> Unit) {
             scope.launch {
                 val start = System.currentTimeMillis()
                 try {
-                    completeEmailRegistration(context, username, email, password, selectedInterests, photoUri)
+                    when (uiContext) {
+                        // ≡ iOS `authService.register(...)`. Antes se usaba un
+                        // `completeEmailRegistration` propio de la UI que se saltaba
+                        // AuthService: sin el guard de registro (`registrationState` /
+                        // `authProcessingEnabled`) y sin la reanudación automática cuando
+                        // el correo ya existe con un alta a medias.
+                        OnboardingUiContext.EMAIL -> AuthService.register(
+                            username = username,
+                            email = email.trim(),
+                            password = password,
+                            interests = selectedInterests,
+                            privacyPolicyAccepted = privacyAccepted,
+                            profileImage = bitmapFrom(context, photoUri),
+                        )
+                        // El usuario de Firebase Auth ya existe (Google); aquí solo falta
+                        // crear el perfil en Firestore. ≡ iOS completeSocialRegistration.
+                        OnboardingUiContext.SOCIAL ->
+                            completeSocialRegistrationFromUi(context, username, selectedInterests, photoUri)
+                    }
                     // Duración mínima para que se vea la animación de "creando perfil" (como iOS).
                     val elapsed = System.currentTimeMillis() - start
                     if (elapsed < 2500) delay(2500 - elapsed)
+                    AuthService.completeRegistration() // ≡ checkAndFinalizeRegistration
                     onAuthenticated()
                 } catch (e: UsernameTakenException) {
                     isCreating = false; errorMessage = usernameTakenMessage
+                } catch (e: AuthService.AuthServiceException) {
+                    // La cuenta ya estaba completa: `register` ya dejó la sesión hidratada,
+                    // así que se entra a la app en vez de mostrar un error (≡ iOS `dismiss()`).
+                    if (e.code == AuthService.RegistrationRecoveryCode.ACCOUNT_ALREADY_COMPLETE) {
+                        onAuthenticated()
+                    } else {
+                        android.util.Log.e("MomentsOnboarding", "Registro falló (context=$uiContext)", e)
+                        isCreating = false
+                        errorMessage = e.message?.takeIf { it.isNotBlank() } ?: accountErrorMessage
+                    }
                 } catch (e: Exception) {
+                    android.util.Log.e("MomentsOnboarding", "Registro falló (context=$uiContext)", e)
                     isCreating = false; errorMessage = accountErrorMessage
                 }
             }
@@ -170,19 +252,19 @@ fun OnboardingScreen(onBack: () -> Unit, onAuthenticated: () -> Unit) {
 
     Box(Modifier.fillMaxSize().background(com.moments.android.views.shared.Surface)) {
         Column(Modifier.fillMaxSize()) {
-            OnboardingTopBar(step = step, onBack = ::goBack, onCancel = onBack)
+            OnboardingTopBar(step = step, totalSteps = totalSteps, onBack = ::goBack, onCancel = onBack)
 
             Column(
                 Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Spacer(Modifier.height(8.dp))
-                OnboardingStepHeader(step = step)
+                OnboardingStepHeader(kind = currentKind, showsLogo = step == 1)
                 Spacer(Modifier.height(28.dp))
 
                 Column(Modifier.widthIn(max = 400.dp).fillMaxWidth()) {
-                    when (step) {
-                        1 -> UsernameStep(
+                    when (currentKind) {
+                        OnboardingStepKind.USERNAME -> UsernameStep(
                             username = username,
                             onUsernameChange = { username = it.filter { c -> c.isLetterOrDigit() || c == '_' || c == '.' } },
                             checking = usernameChecking,
@@ -190,9 +272,14 @@ fun OnboardingScreen(onBack: () -> Unit, onAuthenticated: () -> Unit) {
                             suggestions = usernameSuggestions,
                             onPickSuggestion = { username = it; usernameError = null; usernameSuggestions = emptyList() },
                         )
-                        2 -> EmailStep(email = email, onEmailChange = { email = it })
-                        3 -> PasswordStep(password = password, onPasswordChange = { password = it }, showPassword = showPassword, onToggle = { showPassword = !showPassword })
-                        4 -> InterestsStep(
+                        OnboardingStepKind.EMAIL -> EmailStep(
+                            email = email,
+                            onEmailChange = { email = it },
+                            checking = emailChecking,
+                            error = emailError,
+                        )
+                        OnboardingStepKind.PASSWORD -> PasswordStep(password = password, onPasswordChange = { password = it }, showPassword = showPassword, onToggle = { showPassword = !showPassword })
+                        OnboardingStepKind.INTERESTS -> InterestsStep(
                             photoUri = photoUri,
                             onPickPhoto = { photoUri = it },
                             selected = selectedInterests,
@@ -204,10 +291,10 @@ fun OnboardingScreen(onBack: () -> Unit, onAuthenticated: () -> Unit) {
                                 }
                             },
                         )
-                        else -> PreviewStep(
+                        OnboardingStepKind.PREVIEW -> PreviewStep(
                             photoUri = photoUri,
                             username = username,
-                            email = email,
+                            email = email.ifBlank { socialAccountEmail() },
                             interests = selectedInterests,
                             privacyAccepted = privacyAccepted,
                             onPrivacyChange = { privacyAccepted = it },
@@ -221,7 +308,7 @@ fun OnboardingScreen(onBack: () -> Unit, onAuthenticated: () -> Unit) {
 
             Box(Modifier.fillMaxWidth().padding(horizontal = 28.dp).padding(top = 8.dp, bottom = 14.dp).imePadding()) {
                 AuthPrimaryButton(
-                    text = if (step < TOTAL_STEPS) stringResource(R.string.register_action_continue) else stringResource(R.string.register_action_create),
+                    text = if (step < totalSteps) stringResource(R.string.register_action_continue) else stringResource(R.string.register_action_create),
                     isLoading = isCreating,
                     isEnabled = canProceed,
                     modifier = Modifier.widthIn(max = 400.dp),
@@ -251,12 +338,64 @@ fun OnboardingScreen(onBack: () -> Unit, onAuthenticated: () -> Unit) {
 
 private fun suggestionsFor(base: String): List<String> = listOf("${base}${(10..99).random()}", "${base}_", "${base}${(2020..2026).random()}").distinct().take(3)
 
+/** Email de la cuenta social ya autenticada, para mostrarlo en el paso de repaso. */
+private fun socialAccountEmail(): String =
+    com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email.orEmpty()
+
+/**
+ * Crea el perfil en Firestore para un usuario que YA está autenticado con un
+ * proveedor social (Google). Comprueba antes que el username siga libre, igual
+ * que hace [completeEmailRegistration] con el registro por correo.
+ */
+private suspend fun completeSocialRegistrationFromUi(
+    context: android.content.Context,
+    username: String,
+    interests: List<String>,
+    photoUri: Uri?,
+) {
+    val usernameLower = username.lowercase()
+    val taken = FirebaseFirestore.getInstance()
+        .collection("usernames").document(usernameLower).get().await().exists()
+    if (taken) throw UsernameTakenException()
+
+    AuthService.completeSocialRegistration(
+        username = usernameLower,
+        interests = interests,
+        profileImage = bitmapFrom(context, photoUri),
+    )
+}
+
+private fun bitmapFrom(context: android.content.Context, uri: Uri?): android.graphics.Bitmap? =
+    uri?.let {
+        runCatching {
+            context.contentResolver.openInputStream(it)?.use { stream ->
+                android.graphics.BitmapFactory.decodeStream(stream)
+            }
+        }.getOrNull()
+    }
+
+/**
+ * ¿Hay ya una cuenta con este correo? Se consulta el índice `usernames`, donde el
+ * alta guarda el email junto al userId. Sirve para avisar en el propio paso del
+ * correo en vez de dejar que falle al final, al pulsar "crear cuenta".
+ */
+private suspend fun isEmailAlreadyRegistered(email: String): Boolean = runCatching {
+    FirebaseFirestore.getInstance()
+        .collection("usernames")
+        .whereEqualTo("email", email.trim())
+        .limit(1)
+        .get()
+        .await()
+        .isEmpty
+        .not()
+}.getOrDefault(false)
+
 private fun isValidEmail(email: String): Boolean =
     Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}$").matches(email)
 
 // MARK: - Top bar (back/close + progress dots + cancel)
 @Composable
-private fun OnboardingTopBar(step: Int, onBack: () -> Unit, onCancel: () -> Unit) {
+private fun OnboardingTopBar(step: Int, totalSteps: Int, onBack: () -> Unit, onCancel: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 10.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -270,7 +409,7 @@ private fun OnboardingTopBar(step: Int, onBack: () -> Unit, onCancel: () -> Unit
             )
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            ProgressDots(step = step)
+            ProgressDots(step = step, totalSteps = totalSteps)
         }
         if (step > 1) {
             IconButton(onClick = onCancel, modifier = Modifier.size(36.dp).background(AuthColors.subtle(0.06f), CircleShape)) {
@@ -283,7 +422,7 @@ private fun OnboardingTopBar(step: Int, onBack: () -> Unit, onCancel: () -> Unit
 }
 
 @Composable
-private fun ProgressDots(step: Int) {
+private fun ProgressDots(step: Int, totalSteps: Int) {
     Row(
         Modifier
             .background(AuthColors.subtle(0.06f), RoundedCornerShape(50))
@@ -291,7 +430,7 @@ private fun ProgressDots(step: Int) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        for (i in 1..TOTAL_STEPS) {
+        for (i in 1..totalSteps) {
             val width by animateDpAsState(if (i == step) 18.dp else 6.dp, label = "dotWidth")
             Box(
                 Modifier
@@ -304,16 +443,16 @@ private fun ProgressDots(step: Int) {
 
 // MARK: - Header (logo en paso 1 + título + subtítulo)
 @Composable
-private fun OnboardingStepHeader(step: Int) {
-    val (titleRes, subtitleRes) = when (step) {
-        1 -> R.string.onboarding_title_username to R.string.onboarding_subtitle_username
-        2 -> R.string.onboarding_title_email to R.string.onboarding_subtitle_email
-        3 -> R.string.onboarding_title_password to R.string.onboarding_subtitle_password
-        4 -> R.string.onboarding_title_interests to R.string.onboarding_subtitle_interests
-        else -> R.string.onboarding_title_preview to R.string.onboarding_subtitle_preview
+private fun OnboardingStepHeader(kind: OnboardingStepKind, showsLogo: Boolean) {
+    val (titleRes, subtitleRes) = when (kind) {
+        OnboardingStepKind.USERNAME -> R.string.onboarding_title_username to R.string.onboarding_subtitle_username
+        OnboardingStepKind.EMAIL -> R.string.onboarding_title_email to R.string.onboarding_subtitle_email
+        OnboardingStepKind.PASSWORD -> R.string.onboarding_title_password to R.string.onboarding_subtitle_password
+        OnboardingStepKind.INTERESTS -> R.string.onboarding_title_interests to R.string.onboarding_subtitle_interests
+        OnboardingStepKind.PREVIEW -> R.string.onboarding_title_preview to R.string.onboarding_subtitle_preview
     }
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (step == 1) 18.dp else 0.dp)) {
-        if (step == 1) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (showsLogo) 18.dp else 0.dp)) {
+        if (showsLogo) {
             androidx.compose.foundation.Image(
                 painter = painterResource(R.drawable.login_logo),
                 contentDescription = null,
@@ -436,19 +575,31 @@ private fun UsernameStep(
 
 // MARK: - Step 2: email
 @Composable
-private fun EmailStep(email: String, onEmailChange: (String) -> Unit) {
+private fun EmailStep(
+    email: String,
+    onEmailChange: (String) -> Unit,
+    checking: Boolean,
+    error: String?,
+) {
     val validation = when {
         email.trim().isEmpty() -> FieldValidation.Idle
+        checking -> FieldValidation.Checking
+        error != null -> FieldValidation.Invalid
         isValidEmail(email.trim()) -> FieldValidation.Valid
         else -> FieldValidation.Invalid
     }
-    BigQuestionField(
-        value = email,
-        onValueChange = onEmailChange,
-        placeholder = stringResource(R.string.register_email_ph),
-        keyboardType = KeyboardType.Email,
-        validation = validation,
-    )
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        BigQuestionField(
+            value = email,
+            onValueChange = onEmailChange,
+            placeholder = stringResource(R.string.register_email_ph),
+            keyboardType = KeyboardType.Email,
+            validation = validation,
+        )
+        if (error != null) {
+            Text(error, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color(0xFFE5484D).copy(alpha = 0.85f))
+        }
+    }
 }
 
 // MARK: - Step 3: password + strength

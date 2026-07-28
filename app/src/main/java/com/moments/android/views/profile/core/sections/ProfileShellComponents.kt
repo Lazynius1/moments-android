@@ -12,11 +12,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -28,16 +33,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.models.Moment
@@ -61,15 +62,11 @@ enum class ProfileConnectionsRoute(val titleRes: Int) {
     MUTUALS(R.string.profile_header_mutuals),
 }
 
-/** Port de `ModernBackgroundView`; el theme Firestore conserva su base de color. */
+/** Canvas neutro del perfil Android: colores planos, sin material iOS. */
 @Composable
 fun ModernBackgroundView(profileImagePath: String?, scrollOffset: Float, profileTheme: String? = null, modifier: Modifier = Modifier) {
     val dark = androidx.compose.foundation.isSystemInDarkTheme()
-    val base = if (dark) listOf(Color(0xFF0B1215), Color(0xFF121B20)) else listOf(Color(0xFFFAF9F6), Color(0xFFEAF0F2))
-    Box(modifier.fillMaxSize().background(Brush.verticalGradient(base))) {
-        if (!profileImagePath.isNullOrBlank()) AsyncImage(profileImagePath, null, Modifier.fillMaxSize().graphicsLayer { translationY = scrollOffset * .2f }.blur(30.dp), contentScale = ContentScale.Crop, alpha = if (dark) .15f else .08f)
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(if (dark) listOf(Color.Black.copy(.3f), Color.Black.copy(.7f)) else listOf(Color.White.copy(.2f), Color.White.copy(.6f)))))
-    }
+    Box(modifier.fillMaxSize().background(if (dark) Color(0xFF0B1215) else Color(0xFFFAF9F6)))
 }
 
 /** Orquestador de contenido equivalente al shell SwiftUI; ownership de navegación queda en el caller Android. */
@@ -104,7 +101,24 @@ fun ModernProfileContentView(
 
             ModernBackgroundView(viewModel.userProfile?.profileImagePath, 0f, viewModel.userProfile?.selectedProfileTheme)
             Column(Modifier.fillMaxSize()) {
-                ModernProfileHeader(viewModel, storyViewModel, 0f, onEditProfile, onShowStory, onShowProfileImage, onEditProfileNote, Modifier.padding(top = 4.dp, bottom = 4.dp))
+                // ≡ Swift `safeAreaTop + ProfileHeaderCollapseMetrics.topContentInset`.
+                // El fondo ocupa la status bar; identidad y avatar arrancan bajo el chrome.
+                Spacer(
+                    Modifier.height(
+                        WindowInsets.statusBars.asPaddingValues().calculateTopPadding() +
+                            ProfileHeaderCollapseMetrics.topContentInset,
+                    ),
+                )
+                ModernProfileHeader(
+                    viewModel,
+                    storyViewModel,
+                    0f,
+                    onEditProfile,
+                    onShowStory,
+                    onShowProfileImage,
+                    onEditProfileNote,
+                    Modifier.padding(top = ProfileHeaderCollapseMetrics.headerTopPadding, bottom = 4.dp),
+                )
                 ProfileOverviewCard(
                     viewModel,
                     viewModel.userProfile?.interests.orEmpty(),

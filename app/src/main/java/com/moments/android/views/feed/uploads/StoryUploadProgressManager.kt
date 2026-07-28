@@ -1,15 +1,20 @@
 package com.moments.android.views.feed.uploads
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
-/** Port de `StoryUploadProgressManager.swift` + estado de subidas del feed. */
+/**
+ * Port 1:1 de `StoryUploadProgressManager.swift`.
+ * Solo `isUploading` + `progress` + start/update/finish/cancel.
+ */
 object StoryUploadProgressManager {
     var isUploading by mutableStateOf(false)
-    var progress by mutableStateOf(0.0)
-    var activeUploads by mutableStateOf<List<UploadProgressItem>>(emptyList())
+        private set
+    var progress by mutableDoubleStateOf(0.0)
+        private set
 
     fun startUpload() {
         isUploading = true
@@ -17,14 +22,7 @@ object StoryUploadProgressManager {
     }
 
     fun updateProgress(value: Double) {
-        progress = value.coerceIn(0.0, 1.0)
-        activeUploads = activeUploads.map {
-            if (it.kind == UploadKind.Story && it.status == UploadStatus.Uploading) {
-                it.copy(progress = progress)
-            } else {
-                it
-            }
-        }
+        progress = value
     }
 
     fun finishUpload() {
@@ -35,52 +33,26 @@ object StoryUploadProgressManager {
     fun cancelUpload() {
         isUploading = false
         progress = 0.0
-        activeUploads = emptyList()
-    }
-
-    fun trackStoryUpload(
-        id: String = java.util.UUID.randomUUID().toString(),
-        initialProgress: Double = 0.0,
-        status: UploadStatus = UploadStatus.Uploading,
-    ) {
-        startUpload()
-        activeUploads = activeUploads + UploadProgressItem(
-            id = id,
-            kind = UploadKind.Story,
-            progress = initialProgress,
-            status = status,
-        )
-    }
-
-    fun updateStatus(id: String, status: UploadStatus, progress: Double? = null) {
-        activeUploads = activeUploads.map {
-            if (it.id != id) it
-            else it.copy(
-                status = status,
-                progress = progress ?: it.progress,
-            )
-        }
-        if (status == UploadStatus.Uploading || status == UploadStatus.Initializing) {
-            isUploading = true
-        }
-    }
-
-    fun complete(id: String) {
-        finishUpload()
-        activeUploads = activeUploads.map {
-            if (it.id == id) it.copy(progress = 1.0, status = UploadStatus.Completed) else it
-        }
-    }
-
-    fun remove(id: String) {
-        activeUploads = activeUploads.filter { it.id != id }
-        if (activeUploads.isEmpty()) cancelUpload()
     }
 }
 
-enum class UploadKind { Moment, Story }
+// ---------------------------------------------------------------------------
+// Tipos compartidos (iOS: `UploadStatus` vive en BackgroundMomentUploadService.swift).
+// UploadProgressItem / MomentUploadTracker: helpers Android para filas de progreso;
+// no existen en StoryUploadProgressManager.swift.
+// ---------------------------------------------------------------------------
 
-enum class UploadStatus { Initializing, Uploading, Processing, Completed, Failed, Moderated }
+/** ≡ iOS `UploadStatus` (BackgroundMomentUploadService.swift). */
+enum class UploadStatus {
+    Initializing,
+    Uploading,
+    Processing,
+    Completed,
+    Failed,
+    Moderated,
+}
+
+enum class UploadKind { Moment, Story }
 
 data class UploadProgressItem(
     val id: String,
@@ -92,6 +64,7 @@ data class UploadProgressItem(
     val thumbnailUrl: String? = null,
 )
 
+/** Tracker Android para filas de momento (no existe en iOS como tipo aparte). */
 object MomentUploadTracker {
     private val _items = mutableStateListOf<UploadProgressItem>()
     val items: List<UploadProgressItem> get() = _items

@@ -11,7 +11,7 @@ sealed class MomentDetailContext {
     data class Single(val moment: FeedMoment) : MomentDetailContext()
 
     data class ProfileCarousel(
-        val moments: List<FeedMoment>,
+        val moments: List<Moment>,
         val initialIndex: Int,
         val initialMomentId: String? = null,
         val topContentInsetDp: Float = 0f,

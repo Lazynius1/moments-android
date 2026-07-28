@@ -53,6 +53,7 @@ suspend fun completeEmailRegistration(
         }.await()
         user.sendEmailVerification()
     } catch (error: Exception) {
+        android.util.Log.e("MomentsOnboarding", "Fallo creando perfil en Firestore (uid=${user.uid})", error)
         runCatching { user.delete().await() }
         throw ProfileCreationException()
     }

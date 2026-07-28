@@ -3,7 +3,9 @@ package com.moments.android.views.shared.momentdetail
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.moments.android.views.feed.maps.LocationMomentDetailView
+import com.moments.android.views.profile.momentsview.ModernMomentDetailView
 
 /**
  * Port 1:1 de `MomentDetailContainerView.swift`.
@@ -22,19 +24,18 @@ fun MomentDetailContainerView(
             modifier = modifier.fillMaxSize(),
         )
         is MomentDetailContext.ProfileCarousel -> {
-            // ModernMomentDetailView aún no portado — stub honesto con el primer/índice inicial.
-            val index = context.initialIndex.coerceIn(0, (context.moments.size - 1).coerceAtLeast(0))
-            val moment = context.moments.getOrNull(index)
-            if (moment != null) {
-                SingleMomentDetailView(
-                    moment = moment,
-                    onDismiss = {
-                        context.onDismiss()
-                        onDismiss()
-                    },
-                    modifier = modifier.fillMaxSize(),
-                )
-            }
+            ModernMomentDetailView(
+                moments = context.moments,
+                onDismiss = {
+                    context.onDismiss()
+                    onDismiss()
+                },
+                initialIndex = context.initialIndex,
+                initialMomentId = context.initialMomentId,
+                topContentInset = context.topContentInsetDp.dp,
+                restrictPlaybackToInitialIndex = context.restrictPlaybackToInitialIndex,
+                modifier = modifier.fillMaxSize(),
+            )
         }
         is MomentDetailContext.Map -> LocationMomentDetailView(
             moments = context.moments,

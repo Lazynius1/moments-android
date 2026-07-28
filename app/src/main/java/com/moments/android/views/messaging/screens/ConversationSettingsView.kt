@@ -24,6 +24,8 @@ import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,12 +35,19 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +55,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -68,10 +78,16 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import com.moments.android.R
 import com.moments.android.MomentsApplication
+import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.models.OnlineStatus
+import com.moments.android.services.messaging.OnlineStatusService
+import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageType
+import com.moments.android.views.messaging.core.PresenceDisplay
 import com.moments.android.services.messaging.ChatCacheStore
+import com.moments.android.services.messaging.ChatMediaDownloadPolicy
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.messaging.VanishMessageTimer
 import com.moments.android.services.firestore.FirestoreService
@@ -80,14 +96,27 @@ import com.moments.android.services.messaging.MessageCatchUpService
 import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.services.ChatService
+import com.moments.android.views.messaging.services.ChatVideoPosterGenerator
+import com.moments.android.views.messaging.services.ConversationBuzzPreferenceEvents
+import com.moments.android.views.messaging.services.ConversationForwardingPreferenceEvents
+import com.moments.android.views.messaging.services.ConversationMuteEvents
 import com.moments.android.views.messaging.services.ChatEncryptedMediaResolver
+import com.moments.android.views.messaging.services.resolveVideoThumbnail
 import com.moments.android.views.messaging.services.setVanishMode
 import com.moments.android.views.messaging.services.sendChatNotice
 import com.moments.android.views.messaging.services.updateChatNotice
-import com.moments.android.views.feed.video.FeedVideoPage
+import com.moments.android.views.messaging.components.ClusterGalleryPresentation
+import com.moments.android.views.messaging.components.ClusterGalleryScope
+import com.moments.android.views.messaging.components.ClusterGalleryTab
+import com.moments.android.views.messaging.components.ClusterGalleryView
+import com.moments.android.views.messaging.components.LinkPreviewCard
+import com.moments.android.utilities.HapticManager
 import com.moments.android.views.shared.ChatPreviewPrivacy
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 /** Port de `Views/Messaging/Screens/ConversationSettingsView.swift`. */
 enum class SharedContentTab { MEDIA, LINKS }
@@ -137,6 +166,24 @@ class ConversationSettingsViewModel(
     var typingIndicatorEnabled by mutableStateOf(true)
     var messagePreviewEnabled by mutableStateOf(true)
     var buzzEnabled by mutableStateOf(true)
+    /** ≡ iOS `conversationCreatedDate`. */
+    var conversationCreatedDate by mutableStateOf("")
+        private set
+    /** ≡ iOS `showSharedGallery` / `sharedGalleryInitialTab`. */
+    var showSharedGallery by mutableStateOf(false)
+    var sharedGalleryInitialTab by mutableStateOf(ClusterGalleryTab.MEDIA)
+        private set
+    var downloadProgress by mutableStateOf<Map<String, Double>>(emptyMap())
+        private set
+    private val downloadingMediaIds = mutableSetOf<String>()
+    private val hydratingMediaIds = mutableSetOf<String>()
+    private val refreshingMetadataIds = mutableSetOf<String>()
+    private val firestoreService = FirestoreService()
+
+    fun openSharedGallery(tab: ClusterGalleryTab = ClusterGalleryTab.MEDIA) {
+        sharedGalleryInitialTab = tab
+        showSharedGallery = true
+    }
 
     fun loadConversationData(value: Conversation, context: android.content.Context? = null) {
         conversation = value
@@ -144,26 +191,81 @@ class ConversationSettingsViewModel(
         vanishTimer = VanishMessageTimer.fromStored(value.vanishMessageTimer)
         notificationsEnabled = !value.isMuted(currentUserId)
         conversationMediaBytes = value.id?.let(ChatCacheStore::bytes) ?: 0L
+        conversationCreatedDate = MomentsFormat.smartDate(value.timestamp, MomentsFormat.DateContext.MEDIUM_DATE)
         value.id?.let { conversationId ->
             val prefsCtx = context ?: MomentsApplication.instance
             if (prefsCtx != null) {
                 messagePreviewEnabled = ChatPreviewPrivacy.isUserPreviewEnabled(prefsCtx, conversationId)
                 val local = prefsCtx.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE)
-                readReceiptsEnabled = local.getBoolean("read_receipts_$conversationId", true)
-                forwardingEnabled = local.getBoolean("forwarding_$conversationId", true)
-                typingIndicatorEnabled = local.getBoolean("typing_$conversationId", true)
-                buzzEnabled = local.getBoolean("buzz_$conversationId", true)
+                fun boolPref(iosKey: String, androidLegacy: String, default: Boolean): Boolean = when {
+                    local.contains(iosKey) -> local.getBoolean(iosKey, default)
+                    local.contains(androidLegacy) -> local.getBoolean(androidLegacy, default)
+                    else -> default
+                }
+                readReceiptsEnabled = boolPref("chat_read_receipts_enabled_$conversationId", "read_receipts_$conversationId", true)
+                forwardingEnabled = boolPref("chat_forwarding_enabled_$conversationId", "forwarding_$conversationId", true)
+                typingIndicatorEnabled = boolPref("chat_typing_indicator_enabled_$conversationId", "typing_$conversationId", true)
+                buzzEnabled = boolPref("chat_buzz_enabled_$conversationId", "buzz_$conversationId", true)
             }
             processMessages(LocalPersistenceService.loadMessagesFast(conversationId))
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                 MessageCatchUpService.sync(conversationId)
                 val refreshed = LocalPersistenceService.loadMessagesFast(conversationId)
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { processMessages(refreshed) }
+                withContext(Dispatchers.Main) { processMessages(refreshed) }
             }
+            loadPrivacySettings(prefsCtx)
         }
         value.otherParticipantId.takeIf { it.isNotBlank() }?.let { userId ->
             UserCacheService.refreshUser(userId) { user ->
                 liveOtherParticipantUsername = user?.username?.trim().orEmpty()
+            }
+        }
+    }
+
+    /** ≡ iOS `loadPrivacySettings` — mute + prefs desde Firestore, con fallback local ya cargado. */
+    private fun loadPrivacySettings(context: android.content.Context?) {
+        val conversationId = conversation?.id ?: return
+        if (currentUserId.isBlank()) return
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            val globalEnabled = runCatching {
+                firestoreService.fetchUsersAsync(listOf(currentUserId)).firstOrNull()?.showReadReceipts
+            }.getOrNull() ?: true
+            val convData = runCatching {
+                FirebaseFirestore.getInstance().collection("conversations").document(conversationId).get().await().data
+            }.getOrNull()
+            withContext(Dispatchers.Main) {
+                if (convData != null) {
+                    @Suppress("UNCHECKED_CAST")
+                    val mutedByUserIds = convData["mutedByUserIds"] as? List<String> ?: emptyList()
+                    val legacyIsMuted = convData["isMuted"] as? Boolean ?: false
+                    val legacyMutedBy = convData["mutedBy"] as? String
+                    val isMutedForCurrentUser =
+                        currentUserId in mutedByUserIds || (legacyIsMuted && legacyMutedBy == currentUserId)
+                    notificationsEnabled = !isMutedForCurrentUser
+
+                    @Suppress("UNCHECKED_CAST")
+                    val receiptPrefs = convData["readReceiptPreferences"] as? Map<String, Boolean>
+                    readReceiptsEnabled = receiptPrefs?.get(currentUserId) ?: globalEnabled
+
+                    @Suppress("UNCHECKED_CAST")
+                    val forwardingPrefs = convData["forwardingPreferences"] as? Map<String, Boolean>
+                    forwardingPrefs?.get(currentUserId)?.let { preferred ->
+                        forwardingEnabled = preferred
+                        context?.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE)
+                            ?.edit()?.putBoolean("chat_forwarding_enabled_$conversationId", preferred)?.apply()
+                    }
+
+                    @Suppress("UNCHECKED_CAST")
+                    val buzzPrefs = convData["buzzPreferences"] as? Map<String, Boolean>
+                    buzzPrefs?.get(currentUserId)?.let { preferred ->
+                        buzzEnabled = preferred
+                        context?.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE)
+                            ?.edit()?.putBoolean("chat_buzz_enabled_$conversationId", preferred)?.apply()
+                    }
+                } else {
+                    notificationsEnabled = true
+                    readReceiptsEnabled = globalEnabled
+                }
             }
         }
     }
@@ -211,10 +313,13 @@ class ConversationSettingsViewModel(
     fun toggleNotifications() {
         val id = conversation?.id ?: return
         notificationsEnabled = !notificationsEnabled
+        val isMuted = !notificationsEnabled
         FirebaseFirestore.getInstance().collection("conversations").document(id).update(
             "mutedByUserIds",
             if (notificationsEnabled) FieldValue.arrayRemove(currentUserId) else FieldValue.arrayUnion(currentUserId),
-        )
+        ).addOnSuccessListener {
+            ConversationMuteEvents.emit(id, isMuted)
+        }
     }
 
     fun updateVanish(active: Boolean, timer: VanishMessageTimer) {
@@ -255,9 +360,12 @@ class ConversationSettingsViewModel(
 
     fun persistPreferences(context: android.content.Context) {
         val id = conversation?.id ?: return
-        // Vista previa: misma clave que ChatPreviewPrivacy / NSE iOS App Group
         ChatPreviewPrivacy.setUserPreviewEnabled(context, id, messagePreviewEnabled)
         context.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("chat_read_receipts_enabled_$id", readReceiptsEnabled)
+            .putBoolean("chat_forwarding_enabled_$id", forwardingEnabled)
+            .putBoolean("chat_typing_indicator_enabled_$id", typingIndicatorEnabled)
+            .putBoolean("chat_buzz_enabled_$id", buzzEnabled)
             .putBoolean("read_receipts_$id", readReceiptsEnabled)
             .putBoolean("forwarding_$id", forwardingEnabled)
             .putBoolean("typing_$id", typingIndicatorEnabled)
@@ -272,6 +380,59 @@ class ConversationSettingsViewModel(
         )
     }
 
+    /** ≡ iOS `toggleReadReceipts`. */
+    fun toggleReadReceipts(context: android.content.Context) {
+        val id = conversation?.id ?: return
+        if (currentUserId.isBlank()) return
+        context.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("chat_read_receipts_enabled_$id", readReceiptsEnabled)
+            .putBoolean("read_receipts_$id", readReceiptsEnabled)
+            .apply()
+        FirebaseFirestore.getInstance().collection("conversations").document(id)
+            .update("readReceiptPreferences.$currentUserId", readReceiptsEnabled)
+    }
+
+    /** ≡ iOS `toggleForwarding`. */
+    fun toggleForwarding(context: android.content.Context) {
+        val id = conversation?.id ?: return
+        if (currentUserId.isBlank()) return
+        context.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("chat_forwarding_enabled_$id", forwardingEnabled)
+            .putBoolean("forwarding_$id", forwardingEnabled)
+            .apply()
+        FirebaseFirestore.getInstance().collection("conversations").document(id)
+            .update("forwardingPreferences.$currentUserId", forwardingEnabled)
+        ConversationForwardingPreferenceEvents.emit(id, currentUserId, forwardingEnabled)
+    }
+
+    /** ≡ iOS `toggleTypingIndicator`. */
+    fun toggleTypingIndicator(context: android.content.Context) {
+        val id = conversation?.id ?: return
+        context.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("chat_typing_indicator_enabled_$id", typingIndicatorEnabled)
+            .putBoolean("typing_$id", typingIndicatorEnabled)
+            .apply()
+    }
+
+    /** ≡ iOS `toggleMessagePreview`. */
+    fun toggleMessagePreview(context: android.content.Context) {
+        val id = conversation?.id ?: return
+        ChatPreviewPrivacy.setUserPreviewEnabled(context, id, messagePreviewEnabled)
+    }
+
+    /** ≡ iOS `toggleBuzzNotifications`. */
+    fun toggleBuzzNotifications(context: android.content.Context) {
+        val id = conversation?.id ?: return
+        if (currentUserId.isBlank()) return
+        context.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("chat_buzz_enabled_$id", buzzEnabled)
+            .putBoolean("buzz_$id", buzzEnabled)
+            .apply()
+        FirebaseFirestore.getInstance().collection("conversations").document(id)
+            .update("buzzPreferences.$currentUserId", buzzEnabled)
+        ConversationBuzzPreferenceEvents.emit(id, currentUserId, buzzEnabled)
+    }
+
     fun sendReplyToMedia(media: SharedMedia, text: String) {
         val id = conversation?.id ?: return
         val outgoing = text.trim()
@@ -283,18 +444,231 @@ class ConversationSettingsViewModel(
 
     fun openMediaForViewing(media: SharedMedia, onResolved: (SharedMedia) -> Unit) {
         val source = media.sourceMessage
-        if (source?.mediaObjectPath.isNullOrBlank() || source?.mediaEncryption == null) {
+        if (source == null) {
             onResolved(media)
             return
         }
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            val resolved = ChatEncryptedMediaResolver.resolveForMessage(source, forceDownload = true)
-            val updated = resolved?.mediaUrl?.let {
-                media.copy(originalUrl = it, thumbnailUrl = resolved.thumbnailUrl ?: media.thumbnailUrl)
-            } ?: media
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                sharedMedia = sharedMedia.map { if (it.id == updated.id) updated else it }
-                onResolved(updated)
+        openMessageMediaForViewing(source, onResolved)
+    }
+
+    /** ≡ iOS `openMediaForViewing(_ message:)`. */
+    fun openMessageMediaForViewing(message: EnhancedMessage, onResolved: (SharedMedia) -> Unit) {
+        if (!message.needsDownloadForPlayback) {
+            makeSharedMedia(message)?.let(onResolved)
+            return
+        }
+        if (message.id in downloadingMediaIds) return
+        downloadingMediaIds += message.id
+        setDownloadProgress(message.id, 0.03)
+        prepareMediaForViewing(message, forceDownload = true) { updated ->
+            downloadingMediaIds -= message.id
+            clearDownloadProgress(message.id)
+            makeSharedMedia(updated)?.let(onResolved)
+        }
+    }
+
+    /** ≡ iOS `hydrateMediaIfNeeded(for:)`. */
+    fun hydrateMediaIfNeeded(message: EnhancedMessage) {
+        if (message.isMediaAwaitingManualDownload) {
+            hydrateThumbnailPreviewIfNeeded(message)
+            return
+        }
+        if (!ChatMediaDownloadPolicy.shouldDownloadAutomatically()) return
+        if (message.type == MessageType.VIDEO) {
+            hydrateVideoThumbnailIfNeeded(message)
+            return
+        }
+        if (!message.isMediaPendingResolution) {
+            if (message.type == MessageType.IMAGE &&
+                message.mediaUrl == null &&
+                (message.mediaObjectPath == null || message.mediaEncryption == null)
+            ) {
+                refreshMediaMetadataIfNeeded(message)
+            }
+            return
+        }
+        if (message.id in hydratingMediaIds) return
+        hydratingMediaIds += message.id
+        setDownloadProgress(message.id, 0.03)
+        prepareMediaForViewing(message, forceDownload = false) {
+            hydratingMediaIds -= message.id
+            clearDownloadProgress(message.id)
+        }
+    }
+
+    fun isDownloadingMedia(messageId: String): Boolean =
+        messageId in downloadingMediaIds || messageId in hydratingMediaIds
+
+    fun sharedMediaFrom(message: EnhancedMessage): SharedMedia? = makeSharedMedia(message)
+
+    fun sharedMediaItemsForOverlay(selecting: EnhancedMessage): List<SharedMedia> {
+        val items = sharedGalleryMessages.mapNotNull(::makeSharedMedia)
+        val selected = makeSharedMedia(selecting) ?: return items
+        return if (items.any { it.id == selected.id }) items else items + selected
+    }
+
+    private fun updateGalleryMessage(updated: EnhancedMessage) {
+        val index = sharedGalleryMessages.indexOfFirst { it.id == updated.id }
+        if (index < 0) return
+        sharedGalleryMessages = sharedGalleryMessages.toMutableList().also { it[index] = updated }
+        makeSharedMedia(updated)?.let { media ->
+            sharedMedia = sharedMedia.map { if (it.id == media.id) media else it }.let { list ->
+                if (list.any { it.id == media.id }) list else list + media
+            }
+        }
+    }
+
+    private fun setDownloadProgress(messageId: String, progress: Double) {
+        downloadProgress = downloadProgress + (messageId to progress)
+    }
+
+    private fun clearDownloadProgress(messageId: String) {
+        downloadProgress = downloadProgress - messageId
+    }
+
+    /** ≡ iOS `refreshMediaMetadataIfNeeded`. */
+    private fun refreshMediaMetadataIfNeeded(message: EnhancedMessage) {
+        if (message.type != MessageType.IMAGE && message.type != MessageType.VIDEO) return
+        val conversationId = conversation?.id?.takeIf { it.isNotBlank() } ?: return
+        val missingMain = message.mediaObjectPath == null || message.mediaEncryption == null
+        val needsThumb = message.type == MessageType.VIDEO && message.needsVideoThumbnailForDisplay
+        val missingThumbMeta = message.thumbnailObjectPath == null || message.thumbnailEncryption == null
+        when {
+            message.type == MessageType.IMAGE && !missingMain -> return
+            !missingMain && !(needsThumb && missingThumbMeta) -> {
+                if (needsThumb) hydrateVideoThumbnailIfNeeded(message)
+                return
+            }
+        }
+        if (!refreshingMetadataIds.add(message.id)) return
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            val fresh = ChatService.fetchMessage(conversationId, message.id).getOrNull()
+            withContext(Dispatchers.Main) {
+                refreshingMetadataIds -= message.id
+                if (fresh == null) return@withContext
+                updateGalleryMessage(fresh)
+                if (fresh.type == MessageType.VIDEO) hydrateVideoThumbnailIfNeeded(fresh)
+                else hydrateMediaIfNeeded(fresh)
+            }
+        }
+    }
+
+    /** ≡ iOS `hydrateVideoThumbnailIfNeeded`. */
+    private fun hydrateVideoThumbnailIfNeeded(message: EnhancedMessage) {
+        if (message.type != MessageType.VIDEO || !message.needsVideoThumbnailForDisplay) return
+        if (!ChatMediaDownloadPolicy.shouldDownloadAutomatically()) return
+
+        if (message.thumbnailObjectPath != null && message.thumbnailEncryption != null) {
+            val thumbnailKey = "thumb_${message.id}"
+            if (thumbnailKey in hydratingMediaIds) return
+            hydratingMediaIds += thumbnailKey
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                val resolvedThumb = ChatService.resolveVideoThumbnail(message, forceDownload = false)
+                withContext(Dispatchers.Main) {
+                    hydratingMediaIds -= thumbnailKey
+                    if (resolvedThumb.isNullOrBlank()) return@withContext
+                    val updated = (sharedGalleryMessages.firstOrNull { it.id == message.id } ?: message)
+                        .copy(thumbnailUrl = resolvedThumb)
+                    updateGalleryMessage(updated)
+                }
+            }
+            return
+        }
+
+        if (!message.mediaUrl.isNullOrBlank()) {
+            generateVideoPosterIfPossible(message)
+            return
+        }
+
+        if (message.mediaObjectPath != null && message.mediaEncryption != null) {
+            if (message.id in hydratingMediaIds) return
+            hydratingMediaIds += message.id
+            setDownloadProgress(message.id, 0.03)
+            prepareMediaForViewing(message, forceDownload = false) { updated ->
+                hydratingMediaIds -= message.id
+                clearDownloadProgress(message.id)
+                generateVideoPosterIfPossible(updated)
+            }
+            return
+        }
+
+        refreshMediaMetadataIfNeeded(message)
+    }
+
+    /** ≡ iOS `hydrateThumbnailPreviewIfNeeded`. */
+    private fun hydrateThumbnailPreviewIfNeeded(message: EnhancedMessage) {
+        if (message.thumbnailObjectPath == null || message.thumbnailEncryption == null) return
+        if (!message.thumbnailUrl.isNullOrBlank() && !message.hasMissingLocalThumbnail) return
+        val previewKey = "thumb_preview_${message.id}"
+        if (previewKey in hydratingMediaIds) return
+        hydratingMediaIds += previewKey
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            val thumbnail = ChatService.resolveVideoThumbnail(message, forceDownload = false)
+            withContext(Dispatchers.Main) {
+                hydratingMediaIds -= previewKey
+                if (thumbnail == null) return@withContext
+                val updated = (sharedGalleryMessages.firstOrNull { it.id == message.id } ?: message)
+                    .copy(thumbnailUrl = thumbnail)
+                updateGalleryMessage(updated)
+            }
+        }
+    }
+
+    /** ≡ iOS `generateVideoPosterIfPossible`. */
+    private fun generateVideoPosterIfPossible(message: EnhancedMessage) {
+        if (!message.needsVideoThumbnailForDisplay) return
+        val mediaUrl = message.mediaUrl ?: return
+        val posterKey = "poster_${message.id}"
+        if (posterKey in hydratingMediaIds) return
+        hydratingMediaIds += posterKey
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            val poster = ChatVideoPosterGenerator.poster(mediaUrl, message.id)
+            withContext(Dispatchers.Main) {
+                hydratingMediaIds -= posterKey
+                if (poster.isNullOrBlank()) return@withContext
+                val updated = (sharedGalleryMessages.firstOrNull { it.id == message.id } ?: message)
+                    .copy(thumbnailUrl = poster)
+                updateGalleryMessage(updated)
+            }
+        }
+    }
+
+    /** ≡ iOS `prepareMediaForViewing`. */
+    private fun prepareMediaForViewing(
+        message: EnhancedMessage,
+        forceDownload: Boolean,
+        completion: (EnhancedMessage) -> Unit,
+    ) {
+        if (message.hasLocalMediaReadyForViewer && !message.hasMissingLocalMedia) {
+            completion(message)
+            return
+        }
+        if (message.mediaObjectPath == null || message.mediaEncryption == null) {
+            completion(message)
+            return
+        }
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val resolved = ChatEncryptedMediaResolver.resolveForMessage(message, forceDownload = forceDownload)
+                withContext(Dispatchers.Main) {
+                    if (resolved?.mediaUrl == null) {
+                        completion(message)
+                        return@withContext
+                    }
+                    val updated = (sharedGalleryMessages.firstOrNull { it.id == message.id } ?: message).copy(
+                        mediaUrl = resolved.mediaUrl,
+                        thumbnailUrl = resolved.thumbnailUrl ?: message.thumbnailUrl,
+                    )
+                    updateGalleryMessage(updated)
+                    conversation?.id?.let { conversationId ->
+                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                            LocalPersistenceService.saveMessagesInBackground(listOf(updated), conversationId, sync = false)
+                        }
+                    }
+                    completion(updated)
+                }
+            } finally {
+                withContext(Dispatchers.Main) { clearDownloadProgress(message.id) }
             }
         }
     }
@@ -363,25 +737,127 @@ fun ConversationSettingsView(
     var showMenu by remember { mutableStateOf(false) }
     var showPreferences by remember { mutableStateOf(false) }
     var showVanish by remember { mutableStateOf(false) }
+    var showBlockConfirm by remember { mutableStateOf(false) }
+    var showReport by remember { mutableStateOf(false) }
     var selectedMedia by remember { mutableStateOf<SharedMedia?>(null) }
+    var pendingJumpMessageId by remember { mutableStateOf<String?>(null) }
+    var clearConversationConfirm by remember { mutableStateOf(false) }
     LaunchedEffect(conversation.id) { model.loadConversationData(conversation, context) }
 
-    Column(modifier.fillMaxSize().background(colors.chatBackground.first())) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }
-            Text(stringResource(R.string.conversation_settings_title), modifier = Modifier.weight(1f), color = colors.primary, fontWeight = FontWeight.SemiBold)
-            IconButton(onClick = { showMenu = !showMenu }) { Icon(Icons.Default.MoreVert, null, tint = colors.primary) }
-        }
-        if (showMenu) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.End) {
-                Text(stringResource(R.string.conversation_settings_block), color = MaterialTheme.colorScheme.error, modifier = Modifier.clickable { model.blockOtherParticipant(onBack) }.padding(10.dp))
-                Text(stringResource(R.string.conversation_settings_report), color = MaterialTheme.colorScheme.error, modifier = Modifier.clickable { onReport(conversation.otherParticipantId) }.padding(10.dp))
+    Box(modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().background(colors.chatBackground.first()).statusBarsPadding()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }
+                Text(stringResource(R.string.conversation_settings_title), modifier = Modifier.weight(1f), color = colors.primary, fontWeight = FontWeight.SemiBold)
+                IconButton(onClick = { showMenu = !showMenu }) { Icon(Icons.Default.MoreVert, null, tint = colors.primary) }
+            }
+            if (showMenu) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.End) {
+                    Text(
+                        stringResource(R.string.conversation_settings_block),
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.clickable { showMenu = false; showBlockConfirm = true }.padding(10.dp),
+                    )
+                    Text(
+                        stringResource(R.string.conversation_settings_report),
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.clickable {
+                            showMenu = false
+                            showReport = true
+                            onReport(conversation.otherParticipantId)
+                        }.padding(10.dp),
+                    )
+                }
+            }
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                ConversationSettingsHeader(
+                    conversation = conversation,
+                    liveUsername = model.liveOtherParticipantUsername,
+                    colors = colors,
+                    notificationsEnabled = model.notificationsEnabled,
+                    onProfile = onProfile,
+                    onSearch = onSearchRequested,
+                    onToggleMute = { model.toggleNotifications() },
+                )
+                SettingsRows(
+                    model = model,
+                    colors = colors,
+                    onStarred = { showStarred = true },
+                    onVanish = { showVanish = true },
+                    onPreferences = { showPreferences = true },
+                    onOpenGallery = {
+                        HapticManager.shared.lightImpact()
+                        model.openSharedGallery(ClusterGalleryTab.MEDIA)
+                    },
+                    onClearMedia = { clearMediaConfirm = true },
+                )
+                SharedContentTabs(tab, { tab = it }, model, colors, onOpenMedia = { model.openMediaForViewing(it) { resolved -> selectedMedia = resolved } })
+                SettingsFooter(model, colors)
             }
         }
-        ConversationSettingsHeader(conversation, model.liveOtherParticipantUsername, colors, model.notificationsEnabled, onProfile, onSearchRequested) { model.toggleNotifications() }
-        SettingsRows(model, colors, onStarred = { showStarred = true }, onVanish = { showVanish = true }, onPreferences = { showPreferences = true }, onClearMedia = { clearMediaConfirm = true })
-        SharedContentTabs(tab, { tab = it }, model, colors, onOpenMedia = { model.openMediaForViewing(it) { resolved -> selectedMedia = resolved } })
+
+        // Preferences / Vanish = push full-screen (≡ navigationDestination iOS)
+        if (showPreferences) {
+            ConversationChatPreferencesView(
+                model = model,
+                onDismiss = { showPreferences = false },
+                onRequestClearConversation = { clearConversationConfirm = true },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        if (showVanish) {
+            ConversationVanishModeView(model, onDismiss = { showVanish = false }, modifier = Modifier.fillMaxSize())
+        }
+        // ≡ navigationDestination(showSharedGallery) → ClusterGalleryView
+        if (model.showSharedGallery) {
+            ClusterGalleryView(
+                messages = model.sharedGalleryMessages.filterNot { it.isDeleted },
+                currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
+                scope = ClusterGalleryScope.CONVERSATION_SHARED,
+                presentation = ClusterGalleryPresentation.PUSHED,
+                initialTab = model.sharedGalleryInitialTab,
+                onClose = { model.showSharedGallery = false },
+                onOpenMedia = { message ->
+                    model.openMessageMediaForViewing(message) { resolved -> selectedMedia = resolved }
+                },
+                onHydrateMedia = model::hydrateMediaIfNeeded,
+                isDownloadingMedia = model::isDownloadingMedia,
+                downloadProgress = { model.downloadProgress[it] },
+                onDeleteForMe = { messages -> messages.forEach(model::deleteForMe) },
+                onDeleteForEveryone = { messages -> messages.forEach(model::deleteForEveryone) },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        selectedMedia?.let { media ->
+            ConversationFullScreenMediaView(
+                media = media,
+                mediaItems = media.sourceMessage?.let(model::sharedMediaItemsForOverlay).orEmpty().ifEmpty { listOf(media) },
+                currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
+                otherParticipantName = model.liveOtherParticipantUsername.ifBlank {
+                    conversation.otherParticipantUsername.orEmpty()
+                },
+                onClose = { selectedMedia = null },
+                onSendReply = { item, text, completion ->
+                    model.sendReplyToMedia(item, text)
+                    completion(Result.success(Unit))
+                },
+            )
+        }
     }
+
+    fun consumePendingStarredJump() {
+        pendingJumpMessageId?.let { id ->
+            pendingJumpMessageId = null
+            onJumpToMessage(id)
+            onBack()
+        }
+    }
+
     if (clearMediaConfirm) AlertDialog(
         onDismissRequest = { clearMediaConfirm = false },
         title = { Text(stringResource(R.string.conversation_settings_clear_media)) },
@@ -389,24 +865,160 @@ fun ConversationSettingsView(
         confirmButton = { Text(stringResource(R.string.conversation_settings_clear_media), modifier = Modifier.clickable { model.clearConversationMedia(); clearMediaConfirm = false }.padding(16.dp)) },
         dismissButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable { clearMediaConfirm = false }.padding(16.dp)) },
     )
-    if (showStarred) ConversationStarredMessagesSheet(model.starredMessages, onDismiss = { showStarred = false }, onSelect = { showStarred = false; onJumpToMessage(it) })
-    if (showPreferences) ConversationChatPreferencesView(model, onDismiss = { showPreferences = false })
-    if (showVanish) ConversationVanishModeView(model, onDismiss = { showVanish = false })
-    selectedMedia?.let { media -> ConversationSettingsMediaViewer(media, onDismiss = { selectedMedia = null }, onSendReply = model::sendReplyToMedia) }
+    if (showBlockConfirm) AlertDialog(
+        onDismissRequest = { showBlockConfirm = false },
+        title = { Text(stringResource(R.string.conversation_settings_block)) },
+        confirmButton = {
+            Text(
+                stringResource(R.string.conversation_settings_block),
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.clickable {
+                    showBlockConfirm = false
+                    model.blockOtherParticipant(onBack)
+                }.padding(16.dp),
+            )
+        },
+        dismissButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable { showBlockConfirm = false }.padding(16.dp)) },
+    )
+    // ≡ confirmationDialog clearConversation (prefs)
+    if (clearConversationConfirm) AlertDialog(
+        onDismissRequest = { clearConversationConfirm = false },
+        title = { Text(stringResource(R.string.conversation_settings_clear_conversation)) },
+        confirmButton = {
+            Text(
+                stringResource(R.string.conversation_settings_clear_conversation),
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.clickable {
+                    clearConversationConfirm = false
+                    HapticManager.shared.mediumImpact()
+                    model.clearConversation {
+                        showPreferences = false
+                        onBack()
+                    }
+                }.padding(16.dp),
+            )
+        },
+        dismissButton = {
+            Text(
+                stringResource(R.string.common_cancel),
+                modifier = Modifier.clickable { clearConversationConfirm = false }.padding(16.dp),
+            )
+        },
+    )
+    // ≡ .sheet starred medium+large
+    if (showStarred) {
+        com.moments.android.views.shared.MomentsModalSheet(
+            onDismissRequest = {
+                showStarred = false
+                consumePendingStarredJump()
+            },
+            largeOnly = false,
+        ) {
+            ConversationStarredMessagesSheet(
+                messages = model.starredMessages,
+                currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
+                otherParticipantName = model.liveOtherParticipantUsername.ifBlank {
+                    conversation.otherParticipantUsername.orEmpty()
+                },
+                colors = colors,
+                onDismiss = { showStarred = false },
+                onSelect = { id ->
+                    // iOS: solo encola el id; el jump+pop va en onDismiss del sheet
+                    pendingJumpMessageId = id
+                    showStarred = false
+                },
+            )
+        }
+    }
+    if (showReport) {
+        com.moments.android.reportes.ReportBottomSheet(
+            target = com.moments.android.reportes.ReportTarget.UserTarget(
+                userId = conversation.otherParticipantId,
+                username = model.liveOtherParticipantUsername.ifBlank { conversation.otherParticipantUsername },
+            ),
+            onDismiss = { showReport = false },
+        )
+    }
 }
 
 @Composable
-private fun ConversationSettingsHeader(conversation: Conversation, liveUsername: String, colors: AdaptiveColors, notificationsEnabled: Boolean, onProfile: (String) -> Unit, onSearch: () -> Unit, onToggleMute: () -> Unit) {
+private fun ConversationSettingsHeader(
+    conversation: Conversation,
+    liveUsername: String,
+    colors: AdaptiveColors,
+    notificationsEnabled: Boolean,
+    onProfile: (String) -> Unit,
+    onSearch: () -> Unit,
+    onToggleMute: () -> Unit,
+) {
+    var presence by remember { mutableStateOf<PresenceDisplay?>(null) }
+    DisposableEffect(conversation.otherParticipantId) {
+        val stop = OnlineStatusService.shared.observeUserStatus(conversation.otherParticipantId) { status, lastSeen ->
+            presence = OnlineStatusService.shared.presenceDisplay(status, lastSeen)
+        }
+        onDispose { stop() }
+    }
     Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        AsyncImage(conversation.otherParticipantProfileImagePath, null, Modifier.size(92.dp).clip(CircleShape).background(colors.secondary.copy(.16f)), contentScale = ContentScale.Crop)
-        Text(liveUsername.ifBlank { conversation.otherParticipantUsername.orEmpty() }, color = colors.primary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
+        val avatar = conversation.otherParticipantProfileImagePath
+        if (!avatar.isNullOrBlank()) {
+            AsyncImage(avatar, null, Modifier.size(92.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+        } else {
+            Box(
+                Modifier
+                    .size(92.dp)
+                    .clip(CircleShape)
+                    .momentsChromeGlass(CircleShape, interactive = false),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Person, null, tint = colors.primary, modifier = Modifier.size(34.dp))
+            }
+        }
+        Text(
+            liveUsername.ifBlank { conversation.otherParticipantUsername.orEmpty() },
+            color = colors.primary,
+            fontWeight = FontWeight.Bold,
+            fontSize = 24.sp,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        presence?.let { p ->
+            Row(
+                Modifier.padding(top = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(presenceStatusColor(p.status)))
+                Text(p.statusText, color = colors.secondary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                p.supplementalText?.let { Text("• $it", color = colors.tertiary, fontSize = 13.sp) }
+            }
+        }
         Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(34.dp)) {
-            HeaderAction(Icons.Default.Person, R.string.conversation_settings_profile) { onProfile(conversation.otherParticipantId) }
-            HeaderAction(Icons.Default.Search, R.string.conversation_settings_search, onSearch)
-            HeaderAction(if (notificationsEnabled) Icons.Default.MoreVert else Icons.Default.MoreVert, if (notificationsEnabled) R.string.conversation_settings_mute else R.string.conversation_settings_unmute, onToggleMute)
+            HeaderAction(Icons.Default.Person, R.string.conversation_settings_profile) {
+                HapticManager.shared.lightImpact()
+                onProfile(conversation.otherParticipantId)
+            }
+            HeaderAction(Icons.Default.Search, R.string.conversation_settings_search) {
+                HapticManager.shared.lightImpact()
+                onSearch()
+            }
+            HeaderAction(
+                if (notificationsEnabled) Icons.Default.Notifications else Icons.Default.NotificationsOff,
+                if (notificationsEnabled) R.string.conversation_settings_mute else R.string.conversation_settings_unmute,
+            ) {
+                HapticManager.shared.lightImpact()
+                onToggleMute()
+            }
         }
     }
 }
+
+private fun presenceStatusColor(status: OnlineStatus): androidx.compose.ui.graphics.Color =
+    when (status) {
+        OnlineStatus.ONLINE -> androidx.compose.ui.graphics.Color(0xFF34C759)
+        OnlineStatus.AWAY -> androidx.compose.ui.graphics.Color(0xFFFFCC00)
+        OnlineStatus.BUSY -> androidx.compose.ui.graphics.Color(0xFFFF3B30)
+        OnlineStatus.OFFLINE -> androidx.compose.ui.graphics.Color(0xFF8E8E93)
+        OnlineStatus.INVISIBLE -> androidx.compose.ui.graphics.Color(0xFF8E8E93)
+    }
 
 @Composable
 private fun HeaderAction(icon: androidx.compose.ui.graphics.vector.ImageVector, title: Int, action: () -> Unit) {
@@ -417,48 +1029,147 @@ private fun HeaderAction(icon: androidx.compose.ui.graphics.vector.ImageVector, 
 }
 
 @Composable
-private fun SettingsRows(model: ConversationSettingsViewModel, colors: AdaptiveColors, onStarred: () -> Unit, onVanish: () -> Unit, onPreferences: () -> Unit, onClearMedia: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+private fun SettingsRows(
+    model: ConversationSettingsViewModel,
+    colors: AdaptiveColors,
+    onStarred: () -> Unit,
+    onVanish: () -> Unit,
+    onPreferences: () -> Unit,
+    onOpenGallery: () -> Unit,
+    onClearMedia: () -> Unit,
+) {
+    val context = LocalContext.current
     Column(Modifier.padding(horizontal = 16.dp)) {
         SettingsRow(Icons.Default.Star, R.string.conversation_settings_starred, model.starredMessages.size.takeIf { it > 0 }?.toString() ?: stringResource(R.string.conversation_settings_starred_none), colors, onStarred)
-        SettingsRow(Icons.Default.Timer, R.string.conversation_settings_vanish, if (model.vanishModeActive) stringResource(R.string.conversation_settings_yes) else stringResource(R.string.conversation_settings_no), colors, onVanish)
-        SettingsRow(Icons.Default.MoreVert, R.string.conversation_settings_preferences, null, colors, onPreferences)
-        SettingsRow(Icons.Default.Folder, R.string.conversation_settings_storage, Formatter.formatFileSize(context, model.conversationMediaBytes), colors, {})
-        if (model.conversationMediaBytes > 0) SettingsRow(Icons.Default.Delete, R.string.conversation_settings_clear_media, null, colors, onClearMedia, destructive = true)
-        Text(stringResource(R.string.conversation_settings_preferences_desc), color = colors.tertiary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 12.dp))
+        SettingsRow(
+            Icons.Default.Timer,
+            R.string.conversation_settings_vanish,
+            when {
+                !model.vanishModeActive -> stringResource(R.string.conversation_settings_no)
+                model.vanishTimer == VanishMessageTimer.ONCE_SEEN -> stringResource(R.string.conversation_settings_once_seen)
+                model.vanishTimer == VanishMessageTimer.HOURS_24 -> stringResource(R.string.conversation_settings_24_hours)
+                model.vanishTimer == VanishMessageTimer.DAYS_7 -> stringResource(R.string.conversation_settings_7_days)
+                else -> stringResource(R.string.conversation_settings_yes)
+            },
+            colors,
+            onVanish,
+        )
+        SettingsRow(
+            Icons.Default.Tune,
+            R.string.conversation_settings_preferences,
+            detail = null,
+            subtitle = stringResource(R.string.conversation_settings_preferences_desc),
+            colors = colors,
+            action = onPreferences,
+        )
+        SettingsRow(
+            Icons.Default.Folder,
+            R.string.conversation_settings_storage,
+            Formatter.formatFileSize(context, model.conversationMediaBytes),
+            colors,
+            onOpenGallery,
+        )
+        if (model.conversationMediaBytes > 0) {
+            SettingsRow(Icons.Default.Delete, R.string.conversation_settings_clear_media, null, colors, onClearMedia, destructive = true)
+        }
     }
 }
 
 @Composable
-private fun SettingsRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: Int, detail: String?, colors: AdaptiveColors, action: () -> Unit, destructive: Boolean = false) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = action).padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = if (destructive) MaterialTheme.colorScheme.error else colors.secondary)
-        Text(stringResource(title), color = if (destructive) MaterialTheme.colorScheme.error else colors.primary, modifier = Modifier.padding(start = 14.dp).weight(1f))
-        detail?.let { Text(it, color = colors.tertiary) }
-        if (!destructive) Icon(Icons.Default.ChevronRight, null, tint = colors.tertiary, modifier = Modifier.padding(start = 8.dp))
+private fun SettingsRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: Int,
+    detail: String?,
+    colors: AdaptiveColors,
+    action: () -> Unit,
+    destructive: Boolean = false,
+    subtitle: String? = null,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = action)
+            .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            icon,
+            null,
+            tint = if (destructive) MaterialTheme.colorScheme.error else colors.secondary,
+            modifier = Modifier.size(24.dp),
+        )
+        Column(Modifier.padding(start = 14.dp).weight(1f)) {
+            Text(
+                stringResource(title),
+                color = if (destructive) MaterialTheme.colorScheme.error else colors.primary,
+                fontWeight = FontWeight.Medium,
+                fontSize = 16.sp,
+            )
+            subtitle?.let {
+                Text(
+                    it,
+                    color = colors.tertiary,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+        detail?.let {
+            Text(
+                it,
+                color = colors.tertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+        if (!destructive) {
+            Icon(
+                Icons.Default.ChevronRight,
+                null,
+                tint = colors.tertiary,
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
     }
 }
 
 @Composable
-private fun ColumnScope.SharedContentTabs(tab: SharedContentTab, onTab: (SharedContentTab) -> Unit, model: ConversationSettingsViewModel, colors: AdaptiveColors, onOpenMedia: (SharedMedia) -> Unit) {
+private fun SharedContentTabs(tab: SharedContentTab, onTab: (SharedContentTab) -> Unit, model: ConversationSettingsViewModel, colors: AdaptiveColors, onOpenMedia: (SharedMedia) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TabButton(R.string.conversation_settings_media, tab == SharedContentTab.MEDIA) { onTab(SharedContentTab.MEDIA) }
         TabButton(R.string.conversation_settings_links, tab == SharedContentTab.LINKS) { onTab(SharedContentTab.LINKS) }
     }
     if (tab == SharedContentTab.MEDIA) {
         if (model.sharedMedia.isEmpty()) EmptyContent(Icons.Default.Folder, R.string.conversation_settings_media_empty, colors)
-        else LazyVerticalGrid(GridCells.Fixed(3), Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            gridItems(model.sharedMedia, key = { it.id }) { media -> AsyncImage(media.thumbnailUrl, null, Modifier.fillMaxWidth().height(118.dp).clip(RoundedCornerShape(2.dp)).clickable { onOpenMedia(media) }, contentScale = ContentScale.Crop) }
+        else {
+            val rows = model.sharedMedia.chunked(3)
+            Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                rows.forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        row.forEach { media ->
+                            SharedMediaThumbnail(
+                                media = media,
+                                fillsGrid = true,
+                                onTap = { onOpenMedia(media) },
+                                modifier = Modifier.weight(1f).height(118.dp),
+                            )
+                        }
+                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
         }
     } else {
         val links = model.sharedLinks()
         if (links.isEmpty()) EmptyContent(Icons.Default.Link, R.string.conversation_settings_links_empty, colors)
         else {
-            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-            LazyRow(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                lazyItems(links, key = { it.id }) { message ->
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                links.forEach { message ->
                     val url = Regex("https?://\\S+", RegexOption.IGNORE_CASE).find(message.content.orEmpty())?.value
-                    Text(message.content.orEmpty(), color = colors.primary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(220.dp).clip(RoundedCornerShape(12.dp)).background(colors.secondary.copy(.10f)).clickable(enabled = url != null) { url?.let(uriHandler::openUri) }.padding(12.dp))
+                    if (url != null) {
+                        LinkPreviewCard(url = url, outgoing = false, embedded = true)
+                    }
                 }
             }
         }
@@ -469,87 +1180,308 @@ private fun ColumnScope.SharedContentTabs(tab: SharedContentTab, onTab: (SharedC
 
 @Composable private fun EmptyContent(icon: androidx.compose.ui.graphics.vector.ImageVector, text: Int, colors: AdaptiveColors) = Column(Modifier.fillMaxWidth().padding(36.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, tint = colors.tertiary, modifier = Modifier.size(30.dp)); Text(stringResource(text), color = colors.tertiary, modifier = Modifier.padding(top = 10.dp)) }
 
-@Composable private fun ConversationStarredMessagesSheet(messages: List<EnhancedMessage>, onDismiss: () -> Unit, onSelect: (String) -> Unit) { AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.conversation_settings_starred)) }, text = { Column { messages.forEach { message -> Text(message.content ?: message.type.raw, modifier = Modifier.fillMaxWidth().clickable { onSelect(message.id) }.padding(vertical = 10.dp)) } } }, confirmButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable(onClick = onDismiss).padding(16.dp)) }) }
-
 @Composable
-private fun ConversationSettingsMediaViewer(media: SharedMedia, onDismiss: () -> Unit, onSendReply: (SharedMedia, String) -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var reply by remember(media.id) { mutableStateOf("") }
-    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
-        when (media.type) {
-            SharedMedia.Type.IMAGE -> AsyncImage(media.originalUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-            SharedMedia.Type.VIDEO -> FeedVideoPage(media.originalUrl, media.thumbnailUrl, "conversation-media-${media.id}", Modifier.fillMaxSize(), showMute = true)
-        }
-        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.align(Alignment.TopStart).padding(20.dp).size(32.dp).clickable(onClick = onDismiss))
-        if (media.allowsSaving) Icon(Icons.Default.Download, stringResource(R.string.conversation_settings_save_media), tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.align(Alignment.TopEnd).padding(20.dp).size(30.dp).clickable { saveConversationMedia(context, media) })
-        Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(28.dp)).background(androidx.compose.ui.graphics.Color.Black.copy(.42f)), verticalAlignment = Alignment.CenterVertically) {
-            TextField(reply, { reply = it }, placeholder = { Text(stringResource(R.string.conversation_settings_reply)) }, modifier = Modifier.weight(1f))
-            Text(stringResource(R.string.conversation_settings_send), color = androidx.compose.ui.graphics.Color.White, modifier = Modifier.clickable(enabled = reply.isNotBlank()) { onSendReply(media, reply); reply = "" }.padding(14.dp))
-        }
-    }
-}
-
-private fun saveConversationMedia(context: android.content.Context, media: SharedMedia) {
-    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-        val mime = if (media.type == SharedMedia.Type.VIDEO) "video/mp4" else "image/jpeg"
-        val collection = if (media.type == SharedMedia.Type.VIDEO) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        runCatching {
-            val values = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, "moments_${media.id}")
-                put(MediaStore.MediaColumns.MIME_TYPE, mime)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/Moments")
-            }
-            val destination = context.contentResolver.insert(collection, values) ?: return@runCatching
-            val sourceUri = Uri.parse(media.originalUrl)
-            val source = if (sourceUri.scheme == "content" || sourceUri.scheme == "file") context.contentResolver.openInputStream(sourceUri) else java.net.URL(media.originalUrl).openStream()
-            source.use { input -> context.contentResolver.openOutputStream(destination)?.use { output -> input?.copyTo(output) } }
-        }
-    }
-}
-
-@Composable
-private fun ConversationChatPreferencesView(model: ConversationSettingsViewModel, onDismiss: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.conversation_settings_preferences)) },
-        text = {
-            Column {
-                PreferenceSwitch(R.string.conversation_settings_buzz, model.buzzEnabled) { model.buzzEnabled = it; model.persistPreferences(context) }
-                PreferenceSwitch(R.string.conversation_settings_preview, model.messagePreviewEnabled) { model.messagePreviewEnabled = it; model.persistPreferences(context) }
-                PreferenceSwitch(R.string.conversation_settings_read_receipts, model.readReceiptsEnabled) { model.readReceiptsEnabled = it; model.persistPreferences(context) }
-                PreferenceSwitch(R.string.conversation_settings_typing, model.typingIndicatorEnabled) { model.typingIndicatorEnabled = it; model.persistPreferences(context) }
-                PreferenceSwitch(R.string.conversation_settings_forwarding, model.forwardingEnabled) { model.forwardingEnabled = it; model.persistPreferences(context) }
-                Text(stringResource(R.string.conversation_settings_clear_conversation), color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth().clickable { model.clearConversation(onDismiss) }.padding(vertical = 14.dp))
-            }
-        },
-        confirmButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable(onClick = onDismiss).padding(16.dp)) },
+private fun SettingsFooter(model: ConversationSettingsViewModel, colors: AdaptiveColors) {
+    val sent = stringResource(R.string.conversation_settings_messages_sent)
+    val received = stringResource(R.string.conversation_settings_messages_received)
+    val createdLabel = stringResource(R.string.conversation_settings_created)
+    val messagesLabel = stringResource(R.string.conversation_settings_messages)
+    Text(
+        "$createdLabel: ${model.conversationCreatedDate}  •  $messagesLabel: ${model.totalMessages} (${model.sentMessagesCount} $sent, ${model.receivedMessagesCount} $received)",
+        color = colors.tertiary,
+        fontSize = 12.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 20.dp),
     )
 }
 
 @Composable
-private fun PreferenceSwitch(title: Int, checked: Boolean, onChecked: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(title), modifier = Modifier.weight(1f))
-        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onChecked)
+private fun ConversationStarredMessagesSheet(
+    messages: List<EnhancedMessage>,
+    currentUserId: String,
+    otherParticipantName: String,
+    colors: AdaptiveColors,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(
+            stringResource(R.string.conversation_settings_starred),
+            color = colors.primary,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(bottom = 12.dp),
+        )
+        if (messages.isEmpty()) {
+            Text(stringResource(R.string.conversation_settings_starred_none), color = colors.tertiary)
+        } else {
+            LazyColumn {
+                items(messages, key = { it.id }) { message ->
+                    StarredMessageRow(
+                        message = message,
+                        currentUserId = currentUserId,
+                        otherParticipantName = otherParticipantName,
+                        colors = colors,
+                        context = context,
+                        onTap = { onSelect(message.id) },
+                    )
+                }
+            }
+        }
+        Text(
+            stringResource(R.string.common_cancel),
+            modifier = Modifier
+                .align(Alignment.End)
+                .clickable(onClick = onDismiss)
+                .padding(16.dp),
+            color = colors.accent,
+        )
     }
 }
 
 @Composable
-private fun ConversationVanishModeView(model: ConversationSettingsViewModel, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.conversation_settings_vanish)) },
-        text = {
-            Column {
-                VanishOption(R.string.conversation_settings_no, !model.vanishModeActive) { model.updateVanish(false, model.vanishTimer); onDismiss() }
-                VanishOption(R.string.conversation_settings_once_seen, model.vanishModeActive && model.vanishTimer == VanishMessageTimer.ONCE_SEEN) { model.updateVanish(true, VanishMessageTimer.ONCE_SEEN); onDismiss() }
-                VanishOption(R.string.conversation_settings_24_hours, model.vanishModeActive && model.vanishTimer == VanishMessageTimer.HOURS_24) { model.updateVanish(true, VanishMessageTimer.HOURS_24); onDismiss() }
-                VanishOption(R.string.conversation_settings_7_days, model.vanishModeActive && model.vanishTimer == VanishMessageTimer.DAYS_7) { model.updateVanish(true, VanishMessageTimer.DAYS_7); onDismiss() }
+private fun StarredMessageRow(
+    message: EnhancedMessage,
+    currentUserId: String,
+    otherParticipantName: String,
+    colors: AdaptiveColors,
+    context: android.content.Context,
+    onTap: () -> Unit,
+) {
+    val you = stringResource(R.string.chat_reply_you)
+    val sender = if (message.senderId == currentUserId) you else otherParticipantName
+    val preview = starredPreviewText(message, context)
+    val relative = remember(message.id, message.timestamp) {
+        MomentsFormat.relativeTime(message.timestamp)
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onTap)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        StarredMessageIcon(message, colors)
+        Column(Modifier.padding(start = 12.dp).weight(1f)) {
+            Row {
+                Text(sender, color = colors.primary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Text(relative, color = colors.tertiary, fontSize = 12.sp)
             }
-        },
-        confirmButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable(onClick = onDismiss).padding(16.dp)) },
+            Text(
+                preview,
+                color = colors.secondary,
+                fontSize = 14.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StarredMessageIcon(message: EnhancedMessage, colors: AdaptiveColors) {
+    val thumb = message.thumbnailUrl ?: message.mediaUrl
+    when (message.type) {
+        MessageType.IMAGE, MessageType.VIEW_ONCE_IMAGE -> {
+            if (!thumb.isNullOrBlank()) {
+                AsyncImage(thumb, null, Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)), contentScale = ContentScale.Crop)
+            } else {
+                StarredIconBadge(Icons.Default.Person, colors)
+            }
+        }
+        MessageType.VIDEO, MessageType.VIEW_ONCE_VIDEO -> {
+            Box(Modifier.size(40.dp)) {
+                if (!thumb.isNullOrBlank()) {
+                    AsyncImage(thumb, null, Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)), contentScale = ContentScale.Crop)
+                } else {
+                    StarredIconBadge(Icons.Default.PlayArrow, colors)
+                }
+                Icon(
+                    Icons.Default.PlayArrow,
+                    null,
+                    tint = androidx.compose.ui.graphics.Color.White,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(4.dp).size(12.dp),
+                )
+            }
+        }
+        else -> StarredIconBadge(Icons.Default.Star, colors)
+    }
+}
+
+@Composable
+private fun StarredIconBadge(icon: androidx.compose.ui.graphics.vector.ImageVector, colors: AdaptiveColors) {
+    Box(
+        Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colors.secondary.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, null, tint = colors.secondary, modifier = Modifier.size(18.dp))
+    }
+}
+
+private fun starredPreviewText(message: EnhancedMessage, context: android.content.Context): String {
+    if (message.isDeleted) return context.getString(R.string.messaging_message_deleted)
+    if (message.type == MessageType.TEXT) {
+        val content = message.content?.trim().orEmpty()
+        return content.ifEmpty { message.type.displayName(context) }
+    }
+    return message.type.displayName(context)
+}
+
+@Composable
+private fun ConversationChatPreferencesView(
+    model: ConversationSettingsViewModel,
+    onDismiss: () -> Unit,
+    onRequestClearConversation: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val colors = rememberAdaptiveColors()
+    Column(modifier.background(colors.chatBackground.first()).fillMaxSize().statusBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }
+            Text(stringResource(R.string.conversation_settings_preferences), color = colors.primary, fontWeight = FontWeight.SemiBold)
+        }
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            Text(
+                stringResource(R.string.conversation_settings_group_notifications),
+                color = colors.secondary,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+            )
+            PreferenceToggleRow(
+                title = R.string.conversation_settings_buzz,
+                description = R.string.conversation_settings_buzz_desc,
+                checked = model.buzzEnabled,
+                colors = colors,
+            ) {
+                model.buzzEnabled = it
+                model.toggleBuzzNotifications(context)
+            }
+            PreferenceDivider(colors)
+            PreferenceToggleRow(
+                title = R.string.conversation_settings_preview,
+                description = R.string.conversation_settings_preview_desc,
+                checked = model.messagePreviewEnabled,
+                colors = colors,
+            ) {
+                model.messagePreviewEnabled = it
+                model.toggleMessagePreview(context)
+            }
+
+            Text(
+                stringResource(R.string.conversation_settings_group_privacy),
+                color = colors.secondary,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 28.dp, bottom = 8.dp),
+            )
+            PreferenceToggleRow(
+                title = R.string.conversation_settings_read_receipts,
+                description = R.string.conversation_settings_read_receipts_desc,
+                checked = model.readReceiptsEnabled,
+                colors = colors,
+            ) {
+                model.readReceiptsEnabled = it
+                model.toggleReadReceipts(context)
+            }
+            PreferenceDivider(colors)
+            PreferenceToggleRow(
+                title = R.string.conversation_settings_typing,
+                description = R.string.conversation_settings_typing_desc,
+                checked = model.typingIndicatorEnabled,
+                colors = colors,
+            ) {
+                model.typingIndicatorEnabled = it
+                model.toggleTypingIndicator(context)
+            }
+            PreferenceDivider(colors)
+            PreferenceToggleRow(
+                title = R.string.conversation_settings_forwarding,
+                description = R.string.conversation_settings_forwarding_desc,
+                checked = model.forwardingEnabled,
+                colors = colors,
+            ) {
+                model.forwardingEnabled = it
+                model.toggleForwarding(context)
+            }
+            Text(
+                stringResource(R.string.conversation_settings_clear_conversation),
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onRequestClearConversation).padding(vertical = 14.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PreferenceDivider(colors: AdaptiveColors) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(0.5.dp)
+            .background(colors.tertiary.copy(alpha = if (colors.isDark) 0.16f else 0.12f)),
     )
+}
+
+@Composable
+private fun PreferenceToggleRow(
+    title: Int,
+    description: Int,
+    checked: Boolean,
+    colors: AdaptiveColors,
+    onChecked: (Boolean) -> Unit,
+) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(stringResource(title), color = colors.primary, fontWeight = FontWeight.Medium, fontSize = 15.sp)
+            Text(
+                stringResource(description),
+                color = colors.tertiary,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        androidx.compose.material3.Switch(
+            checked = checked,
+            onCheckedChange = {
+                HapticManager.shared.lightImpact()
+                onChecked(it)
+            },
+        )
+    }
+}
+
+@Composable
+private fun ConversationVanishModeView(
+    model: ConversationSettingsViewModel,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = rememberAdaptiveColors()
+    Column(modifier.background(colors.chatBackground.first()).fillMaxSize().statusBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }
+            Text(stringResource(R.string.conversation_settings_vanish), color = colors.primary, fontWeight = FontWeight.SemiBold)
+        }
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            Text(
+                stringResource(R.string.conversation_settings_vanish_desc),
+                color = colors.tertiary,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+            VanishOption(R.string.conversation_settings_no, !model.vanishModeActive) { model.updateVanish(false, model.vanishTimer); onDismiss() }
+            VanishOption(R.string.conversation_settings_once_seen, model.vanishModeActive && model.vanishTimer == VanishMessageTimer.ONCE_SEEN) { model.updateVanish(true, VanishMessageTimer.ONCE_SEEN); onDismiss() }
+            VanishOption(R.string.conversation_settings_24_hours, model.vanishModeActive && model.vanishTimer == VanishMessageTimer.HOURS_24) { model.updateVanish(true, VanishMessageTimer.HOURS_24); onDismiss() }
+            VanishOption(R.string.conversation_settings_7_days, model.vanishModeActive && model.vanishTimer == VanishMessageTimer.DAYS_7) { model.updateVanish(true, VanishMessageTimer.DAYS_7); onDismiss() }
+        }
+    }
 }
 
 @Composable private fun VanishOption(title: Int, selected: Boolean, onClick: () -> Unit) = Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) { Text(stringResource(title), modifier = Modifier.weight(1f)); androidx.compose.material3.RadioButton(selected, onClick) }

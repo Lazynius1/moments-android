@@ -3,6 +3,7 @@ package com.moments.android.services.incognito
 import android.content.Context
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
+import com.moments.android.extensions.optStringOrNull
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.utilities.HapticManager
 import kotlinx.coroutines.CoroutineScope
@@ -251,7 +252,7 @@ object IncognitoModeService {
         val stateJson = json.getJSONObject("state")
         return BackendResponse(
             success = json.optBoolean("success", false),
-            reason = json.optString("reason").takeIf { it.isNotEmpty() },
+            reason = json.optStringOrNull("reason"),
             state = RemoteState(
                 remainingSeconds = stateJson.optInt("remainingSeconds", 0),
                 isActive = stateJson.optBoolean("isActive", false),

@@ -126,14 +126,8 @@ suspend fun ChatService.sendSharedStoryMessage(
         "storyId" to storyId,
         "storyAuthor" to author,
         "storyAuthorId" to story.authorId,
-        "storyPreviewUrl" to storyPreviewUrl(
-            story.backgroundFrameURL,
-            story.backgroundBlurredFrameURL,
-            story.mediaItem.url,
-        ),
-        "storyMediaType" to storyMediaTypeString(
-            story.mediaItem.type == com.moments.android.models.MediaItem.MediaType.VIDEO,
-        ),
+        "storyPreviewUrl" to storyPreviewUrl(story),
+        "storyMediaType" to storyMediaTypeString(story),
         "storyExpiration" to (story.expirationDate.time / 1000.0).toString(),
         "storyTimestamp" to (story.timestamp.time / 1000.0).toString(),
     )

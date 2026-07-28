@@ -228,18 +228,18 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] ChatMessageInteractionModifiers.swift → views/messaging/components/ChatMessageInteractionModifiers.kt (pan horizontal, reply swipe, indicador, reveal timestamp y long press)
 - [~] ChatMessageListView.swift → views/messaging/components/ChatMessageListView.kt (LazyColumn, transacciones, ancla prepend, scroll serializado, navegación, top/prefetch y estado viewport)
 - [~] ChatMessageOptionsMenu.swift → views/messaging/components/ChatMessageOptionsMenu.kt (selección, chrome, reacciones y menú de acciones condicionado)
-- [~] ChatMessageSupportViews.swift → views/messaging/components/ChatMessageSupportViews.kt (reply bars/previews, quotes, reaction chips, star y status)
-- [~] ChatRecoveryViews.swift → `views/messaging/components/ChatRecoveryViews.kt` (**REESCRITO desde el Swift 2026-07-25**: gate real conectado a `ChatAccessCoordinator`, alta de PIN con confirmación y salto de foco, restauración con intentos + bloqueo con cuenta atrás, ajustes con forzar-restauración, celdas de dígitos, paleta y backdrop. **Antes estaba roto**: todos los botones —enviar PIN, cancelar, cerrar, forzar— mostraban el texto "Reply", y NO llamaba a la cripto, así que el PIN no restauraba nada. Ahora el gate envuelve el chat desde `MessagingView`)
+- [~] ChatMessageSupportViews.swift → views/messaging/components/ChatMessageSupportViews.kt (reply/quote/reactions/star/timestamp/status; cutout destinationOut no portado)
+- [~] ChatRecoveryViews.swift → `views/messaging/components/ChatRecoveryViews.kt` (gate/create/restore/settings+PIN+lockout; material→sólido; change PIN MomentsModalSheet)
 - [~] ChatSearchNavigationBar.swift → views/messaging/components/ChatSearchNavigationBar.kt
-- [~] ChatSpeechBubbleViews.swift → views/messaging/components/ChatSpeechBubbleViews.kt (grupos, forma, spoilers, reply y avatar gutter)
+- [~] ChatSpeechBubbleViews.swift → views/messaging/components/ChatSpeechBubbleViews.kt (shape/group+spoilers/links+search locals+avatar gutter; markdown inline no portado)
 - [~] ChatStickerMessageBubble.swift → views/messaging/components/ChatStickerMessageBubble.kt (sticker inline, resolución cifrada y progreso)
-- [~] ChatVanishModeViews.swift → views/messaging/components/ChatVanishModeViews.kt (pull, avisos, timer e indicadores)
-- [~] ConversationContextMenu.swift → views/messaging/components/ConversationContextMenu.kt (selección, overlay, acciones y highlight)
+- [~] ChatVanishModeViews.swift → views/messaging/components/ChatVanishModeViews.kt (metrics/overlay/notices/timer MomentsModalSheet+inbox; liquidGlass→sólido)
+- [~] ConversationContextMenu.swift → views/messaging/components/ConversationContextMenu.kt (overlay cutout+chrome glass+acciones+highlight; pin.slash≈PushPin)
 - [~] MediaProgressRing.swift → views/messaging/components/MediaProgressRing.kt (anillo, gradiente, progreso y porcentaje)
 - [~] MessageTypeIconView.swift → views/messaging/components/MessageTypeIconView.kt (assets custom y fallback por tipo)
-- [~] MessagingComposerAndStatusViews.swift → views/messaging/components/MessagingComposerAndStatusViews.kt (composer y selector de presencia)
-- [~] ViewOnceMessageBubble.swift → views/messaging/components/ViewOnceMessageBubble.kt (unread, replay, abierto y enviado)
-- [~] VoiceNotes.swift → views/messaging/components/VoiceNotes.kt (grabación, composición, trim, waveform y reproducción)
+- [~] MessagingComposerAndStatusViews.swift → views/messaging/components/MessagingComposerAndStatusViews.kt (composer gradient+send; status MomentsModalSheet)
+- [~] ViewOnceMessageBubble.swift → views/messaging/components/ViewOnceMessageBubble.kt (pill unread/replay/opened/sent; zoom matchedTransition no portado)
+- [~] VoiceNotes.swift → views/messaging/components/VoiceNotes.kt (recorder/compose/trim+bubble scrub/speed/shape; proximidad no portada)
 - [~] VoiceRecordingGestureViews.swift → views/messaging/components/VoiceRecordingGestureViews.kt (hold, lock, cancel y aura reactiva)
 **`Messaging/Core`**
 - [~] ChatViewModel.swift → `views/messaging/core/ChatViewModel.kt` (estado/cache/realtime, paginación, media, envío/acciones, lectura, vanish, búsqueda y borrador. **Añadido 2026-07-25**: estado y listener de **zumbidos** (`buzzEvents`/`latestBuzzEvent`) — `listenToBuzzEvents` existía en el servicio pero **no lo llamaba nadie**, así que los zumbidos recibidos nunca llegaban; ahora con corte por `lastDeletedAt`, respeto a la preferencia del receptor y liberación del listener al pausar. **Falta**: `isLoadingOlderHistory` declarado pero sin consumir)
@@ -379,12 +379,12 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] ProfileGridPreviewEditorView.swift
 - [~] ProfileHeaderSection.swift
 - [~] ProfileHeaderSkeletonView.swift
-- [~] ProfileMomentZoomNavigation.swift
+- [~] ProfileMomentZoomNavigation.swift → `views/profile/core/sections/ProfileMomentZoomNavigation.kt` (profileMomentZoomSource usa SharedTransition si el host provee LocalMomentsSharedTransitionScope)
 - [~] ProfileMomentsSection.swift
 - [~] ProfileSavedSection.swift
 - [~] ProfileSharedComponents.swift
 - [~] ProfileShellComponents.swift
-- [~] UserProfileZoomNavigation.swift
+- [~] UserProfileZoomNavigation.swift → `views/profile/core/sections/UserProfileZoomNavigation.kt` (SharedTransitionLayout + sharedElement/sharedBounds; host overlay no Dialog)
 **`Profile/Core`**
 - [~] SharedActivityDetailView.swift
 - [~] SharedActivityView.swift
@@ -488,34 +488,35 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] ModernCommentsView.swift → `views/comments/ModernCommentsView.kt` (+ `CommentMuteFilters.kt`, `CommentMentionDraft.kt`, `EnhancedModernCommentRow.kt`) — listener, mute filters, menciones, skeletons, StoryRing, like/reply/edit/delete, moderación; cableado en FeedPresentation + SingleMomentDetail
 **`story`**
 - [~] QuestionResponsesView.swift → `views/story/QuestionResponsesView.kt` (tarjeta, listado Firestore de respuestas y creator con `questionResponse`)
-- [~] StoriesView.swift → `views/story/StoriesView.kt` (MVP ring + viewer; ads/chains omitidos)
+- [~] StoriesView.swift → `views/story/StoriesView.kt` (Deck Pass + handleStoryDeleted; ads/chains parcial)
 - [~] StoryChainView.swift → `views/story/StoryChainView.kt` (carga/stats, selección inicial, grid, apertura y validación de límite antes de continuar; `StoryChainItemView` legacy no se usa por el grid Swift actual)
-- [~] StoryDeckGestureGate.swift → `views/story/StoryDeckGestureGate.kt` (scopes + regiones; cableado al Reveal/deck; otros stickers pending)
+- [x] StoryDeckGestureGate.swift → `views/story/StoryDeckGestureGate.kt` (scopes+regiones+legacy.sticker; Local≡Environment; cableado StoriesView)
 - [~] StoryInteractiveStickers.swift → `views/story/StoryInteractiveStickers.kt` (Polaroid frame: base64, posición/escala/rotación, shake-to-reveal y persistencia; Reveal scratch 65 % + persistencia + todos los patrones, incluido holographic con tilt; pulido de efectos y coordinación de gestos pendiente)
-- [~] StoryModels.swift → `views/story/StoryModels.kt` (StoryReaction/latestPerUser, StoryViewer Firestore, StoryRing; badges ya en `views/components/VerifiedBadge.kt`)
-- [~] StoryPlaybackCoordinator.swift → `views/story/StoryPlaybackCoordinator.kt` (estado/progreso/pausa/timer imagen + cache de stories; preload Coil y cableado vídeo pending)
-- [~] StoryRepository.swift → `views/story/StoryRepository.kt` (StoryReplyData + lecturas + reactions/viewers/view transaction + soft/permanent delete/restore; decode backend es `BackendFeedService` existente)
-- [~] StoryRingAvatarView.swift → `views/story/StoryRingAvatarView.kt`
-- [~] StorySegmentedRing.swift → `views/story/StorySegmentedRing.kt` (anillo único/segmentado, gaps de 15º, estado visto, audiencias best friends/mutuals y tema)
+- [x] StoryModels.swift → `views/story/StoryModels.kt` (StoryReaction/latestPerUser, StoryViewer Firestore, StoryRing; badges ya en `views/components/VerifiedBadge.kt`)
+- [x] StoryPlaybackCoordinator.swift → `views/story/StoryPlaybackCoordinator.kt` (progress+timer+preload Coil/Video+memory trim; cableado StoryViewerScreen)
+- [x] StoryRepository.swift → `views/story/StoryRepository.kt` (StoryReplyData + lecturas + reactions/viewers/view transaction + soft/permanent delete/restore; decode backend es `BackendFeedService` existente)
+- [x] StoryRingAvatarView.swift → `views/story/StoryRingAvatarView.kt`
+- [x] StorySegmentedRing.swift → `views/story/StorySegmentedRing.kt` (anillo único/segmentado, gaps de 15º, estado visto, audiencias best friends/mutuals y tema)
 **`story/StoryStickers`**
 - [~] StoryStickerEffects.swift → `views/story/StoryStickers/StoryStickerEffects.kt` (clima animado, corazones flotantes y vídeo en loop; consumidores del viewer/sticker renderer pendientes)
 - [~] StoryStickerViews.swift → `views/story/StoryStickers/StoryStickerViews.kt` (chunks 1–5: poll, slider, renderer, preguntas y tap-cycling de location/mention/hashtag; quiz/audio y tarjetas específicas pendientes)
 **`story`**
-- [~] StoryViewModel.swift → `views/story/StoryViewModel.kt` (carga + privacy + markSeen)
+- [x] StoryViewModel.swift → `views/story/StoryViewModel.kt` (ring+privacy+replies/vanish/ephemeral+reactions+preload; strings 8 locales)
 **`story/StoryViewer`**
 - [~] StoryDeckInteractionLayout.swift → `views/story/storyviewer/StoryDeckInteractionLayout.kt` (zonas Compose; overlays específicos de slider pending)
-- [~] StoryGestureCoordinator.swift → `views/story/storyviewer/StoryGestureCoordinator.kt` (contrato y arbitraje base; gate cableado al deck; regiones de otros stickers pending)
+- [x] StoryGestureCoordinator.swift → `views/story/storyviewer/StoryGestureCoordinator.kt` (intents+scopes+chrome+deck/hold/drag/tap; fix deck Elvis)
 - [~] StoryLiveTextOverlayView.swift → `views/story/storyviewer/StoryLiveTextOverlayView.kt` (posición normalizada, estilo básico y replay de motion)
 - [~] StoryMediaOverlayRendererView.swift → `views/story/storyviewer/StoryMediaOverlayRendererView.kt` (dibujo, texto live y stickers consolidados; Reveal queda en su overlay de scratch)
 - [~] StoryQuickActionsMenu.swift → `views/story/storyviewer/StoryQuickActionsMenu.kt` (menú propio/ajeno y callbacks de acción)
-- [~] StoryReplyViews.swift → `views/story/storyviewer/StoryReplyViews.kt` (chunks 1–2: previews/efímeras y burbuja con payload explícito; falta incorporar `storyReplyData` al contrato persistido de `EnhancedMessage` y gating backend)
-- [~] StoryUserDeckPager.swift → `views/story/storyviewer/StoryUserDeckPager.kt` (pager deck-pass y gate; `StoriesView` aún usa el swipe simplificado hasta la integración fina)
-- [~] StoryViewerBottomComponents.swift → `views/story/storyviewer/StoryViewerBottomComponents.kt` (barra propia, reacciones, notice y touch areas)
+- [~] StoryReplyViews.swift → `views/story/storyviewer/StoryReplyViews.kt` (777↔761; bubble+threaded+gated thumbnail+ephemeral cards+fullscreen; wire `otherParticipantId` en DM; falta solo helpers `.glassmorphic`/`.storyGlassmorphic` usados en Overlay/ads)
+- [~] StoryUserDeckPager.swift → `views/story/storyviewer/StoryUserDeckPager.kt` (Deck Pass 1:1 bandas/flick/rubber; cableado en StoriesView)
+- [~] StoryViewerBottomComponents.swift → `views/story/storyviewer/StoryViewerBottomComponents.kt` (470↔413; OwnBar+AudienceIcon+strip+nav)
 - [~] StoryViewerLayers.swift → `views/story/storyviewer/StoryViewerLayers.kt` (progress chrome, capa flotante y pool/generador de reacciones)
 - [~] StoryViewerLayoutHelpers.swift → `views/story/storyviewer/StoryViewerLayoutHelpers.kt` (metadata, ratio, content rect y escala/posición de stickers)
 - [~] StoryViewerMedia.swift → `views/story/storyviewer/StoryViewerMedia.kt` (sesión de audio, player, ready/progreso/final y loop)
-- [~] StoryViewerOverlay.swift → `views/story/storyviewer/StoryViewerOverlay.kt` (progreso por audiencia, acciones/confirmación y actividad de viewers/reacciones/audiencia)
-- [~] StoryViewerScreen.swift → `views/story/storyviewer/StoryViewerScreen.kt` (MVP gestos/timer)
+- [~] StoryViewerOverlay.swift → `views/story/storyviewer/StoryViewerOverlay.kt` (1067↔839; ViewersSheet+audience+search+ModalBottomSheet; reaction timeAgo+divider/stroke)
+- [~] StoryViewerScreen.swift → `views/story/storyviewer/StoryViewerScreen.kt` (1646; progress audiencia; nav teclado/gate; pinch snap; ephemeral pause; highlight pill)
+- [~] StoryViewerLayers.swift → `views/story/storyviewer/StoryViewerLayers.kt` (StorySegmentProgressChrome→GlassmorphicProgressBar + audience)
 **`story`**
 - [~] archived stories.swift → `views/story/ArchivedStories.kt` (carga, grid/calendario/map fallback, visor por día y estadísticas; pulido visual/mapa nativo pendiente)
 

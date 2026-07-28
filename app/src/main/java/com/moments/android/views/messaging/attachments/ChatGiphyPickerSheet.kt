@@ -20,14 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -42,15 +35,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.components.AnimatedGIFView
 import com.moments.android.views.creator.components.GiphyGif
+import com.moments.android.views.messaging.components.ChatAttachmentSearchField
+import com.moments.android.views.messaging.components.ChatAttachmentSheetMetrics
 import com.moments.android.views.messaging.models.ChatStickerAsset
 import com.moments.android.views.messaging.services.ChatGiphyService
 import kotlinx.coroutines.Job
@@ -183,7 +176,7 @@ fun ChatGiphyPickerContent(
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
-            contentPadding = PaddingValues(top = SEARCH_OVERLAY_HEIGHT, bottom = 12.dp),
+            contentPadding = PaddingValues(top = ChatAttachmentSheetMetrics.searchOverlayHeight, bottom = 12.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
             if (showsPinnedRecents) {
@@ -228,12 +221,16 @@ fun ChatGiphyPickerContent(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp),
                         ) {
                             row.forEach { gif ->
+                                val isLast = gif.id == results.lastOrNull()?.id
                                 ChatGiphyStickerCell(
                                     gif = gif,
                                     modifier = Modifier.weight(1f),
                                     onSelect = onSelect,
-                                    onReachEnd = {
-                                        if (gif.id == results.lastOrNull()?.id) fetchPage(nextOffset, append = true)
+                                    // ≡ iOS onAppear solo del último ítem
+                                    onReachEnd = if (isLast) {
+                                        { fetchPage(nextOffset, append = true) }
+                                    } else {
+                                        null
                                     },
                                 )
                             }
@@ -248,12 +245,15 @@ fun ChatGiphyPickerContent(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp),
                         ) {
                             row.forEach { gif ->
+                                val isLast = gif.id == results.lastOrNull()?.id
                                 ChatGiphyGifCell(
                                     gif = gif,
                                     modifier = Modifier.weight(1f),
                                     onSelect = onSelect,
-                                    onReachEnd = {
-                                        if (gif.id == results.lastOrNull()?.id) fetchPage(nextOffset, append = true)
+                                    onReachEnd = if (isLast) {
+                                        { fetchPage(nextOffset, append = true) }
+                                    } else {
+                                        null
                                     },
                                 )
                             }
@@ -270,12 +270,10 @@ fun ChatGiphyPickerContent(
                 }
             }
         }
-        ChatGiphySearchField(
-            value = searchText,
-            placeholder = stringResource(kind.searchPlaceholderRes),
-            primaryText = primaryText,
-            secondaryText = secondaryText,
-            onValueChange = ::scheduleSearch,
+        ChatAttachmentSearchField(
+            placeholderRes = kind.searchPlaceholderRes,
+            text = searchText,
+            onTextChange = ::scheduleSearch,
             onClear = { scheduleSearch("") },
             modifier = Modifier.align(Alignment.TopCenter),
         )
@@ -322,9 +320,11 @@ private fun ChatGiphyStickerCell(
     gif: GiphyGif,
     modifier: Modifier,
     onSelect: (GiphyGif) -> Unit,
-    onReachEnd: () -> Unit,
+    onReachEnd: (() -> Unit)?,
 ) {
-    androidx.compose.runtime.LaunchedEffect(gif.id) { onReachEnd() }
+    if (onReachEnd != null) {
+        androidx.compose.runtime.LaunchedEffect(gif.id) { onReachEnd() }
+    }
     AnimatedGIFView(
         url = gif.images.fixedHeight.url,
         modifier = modifier
@@ -342,9 +342,11 @@ private fun ChatGiphyGifCell(
     gif: GiphyGif,
     modifier: Modifier,
     onSelect: (GiphyGif) -> Unit,
-    onReachEnd: () -> Unit,
+    onReachEnd: (() -> Unit)?,
 ) {
-    androidx.compose.runtime.LaunchedEffect(gif.id) { onReachEnd() }
+    if (onReachEnd != null) {
+        androidx.compose.runtime.LaunchedEffect(gif.id) { onReachEnd() }
+    }
     AnimatedGIFView(
         url = gif.images.fixedHeight.url,
         modifier = modifier
@@ -367,50 +369,6 @@ private fun ChatGiphyStateMessage(@StringRes textRes: Int, secondaryText: Color)
     )
 }
 
-@Composable
-private fun ChatGiphySearchField(
-    value: String,
-    placeholder: String,
-    primaryText: Color,
-    secondaryText: Color,
-    onValueChange: (String) -> Unit,
-    onClear: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (primaryText == Color.White) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-    ) {
-        Icon(Icons.Default.Search, contentDescription = null, tint = secondaryText, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(8.dp))
-        Box(Modifier.weight(1f)) {
-            if (value.isEmpty()) Text(placeholder, color = secondaryText, fontSize = 16.sp)
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                singleLine = true,
-                textStyle = TextStyle(color = primaryText, fontSize = 16.sp),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = {}),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (value.isNotEmpty()) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = stringResource(R.string.common_close),
-                tint = secondaryText.copy(alpha = 0.85f),
-                modifier = Modifier.size(20.dp).clickable(onClick = onClear),
-            )
-        }
-    }
-}
-
 private const val PAGE_SIZE = 24
 private const val MAX_RECENT_STICKERS = 8
 private const val STICKER_COLUMNS = 4
@@ -418,4 +376,3 @@ private const val GIF_COLUMNS = 2
 private const val SEARCH_DEBOUNCE_MILLIS = 350L
 private val GRID_SPACING = 6.dp
 private val STICKER_INSET = 8.dp
-private val SEARCH_OVERLAY_HEIGHT = 60.dp

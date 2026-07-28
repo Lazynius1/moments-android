@@ -6,7 +6,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
-import com.moments.android.models.MapVisibilityPolicy
+import com.moments.android.views.feed.maps.MapVisibilityPolicy
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Moment
 import com.moments.android.models.MomentGridPreviewSettings

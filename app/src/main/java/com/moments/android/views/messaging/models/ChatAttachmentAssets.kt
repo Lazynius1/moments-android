@@ -1,6 +1,7 @@
 package com.moments.android.views.messaging.models
 
 import android.content.Context
+import com.moments.android.extensions.optStringOrNull
 import com.moments.android.views.creator.components.GiphyGif
 import org.json.JSONArray
 import org.json.JSONObject
@@ -131,8 +132,8 @@ data class ChatLocationPayload(
             ChatLocationPayload(
                 lat = objectValue.getDouble("lat"),
                 lng = objectValue.getDouble("lng"),
-                name = objectValue.optString("name").takeIf { it.isNotBlank() },
-                address = objectValue.optString("address").takeIf { it.isNotBlank() },
+                name = objectValue.optStringOrNull("name"),
+                address = objectValue.optStringOrNull("address"),
             )
         }.getOrNull()
     }

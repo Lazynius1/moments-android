@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.views.feed.FeedInk
-import com.moments.android.views.feed.FeedTeal
+import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.feed.maps.MapDiscoverContentFilter
 
 enum class MapHeaderCloseStyle {
@@ -52,8 +52,9 @@ fun MapHeaderSection(
     val primary = if (isDark) Color.White else FeedInk
     val tertiary = primary.copy(alpha = 0.55f)
 
+    // iOS: el pill toma su tamaño natural, no fuerza el ancho completo.
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier,
         verticalAlignment = Alignment.Top,
     ) {
         Row(
@@ -113,6 +114,7 @@ fun MapFilterChipsSection(
     modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
+    val colors = rememberAdaptiveColors()
     val primary = if (isDark) Color.White else FeedInk
 
     Row(
@@ -129,7 +131,8 @@ fun MapFilterChipsSection(
                 modifier = Modifier
                     .momentsChromeGlass(CircleShape, interactive = !selectedChip)
                     .background(
-                        if (selectedChip) FeedTeal else Color.Transparent,
+                        // iOS: Capsule().fill(adaptiveColors.accent) cuando está activo
+                        if (selectedChip) colors.accent else Color.Transparent,
                         CircleShape,
                     )
                     .clickable { onSelect(filter) }

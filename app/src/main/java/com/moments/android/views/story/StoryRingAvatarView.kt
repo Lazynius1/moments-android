@@ -1,9 +1,9 @@
 package com.moments.android.views.story
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -15,7 +15,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
@@ -24,16 +31,19 @@ import com.moments.android.services.social.StoryRingCacheService
 import com.moments.android.services.social.StoryRingResolverService
 import com.moments.android.services.social.StoryRingSnapshot
 import com.moments.android.utilities.momentsPressIcon
-import com.moments.android.views.feed.core.sections.FeedStoryRingAvatar
 
 /**
- * Port 1:1 de `StoryRingLayout` + `StoryRingAvatarView` (Views/story/StoryRingAvatarView.swift).
+ * Port de `StoryRingLayout` + `StoryRingAvatarView` (`Views/story/StoryRingAvatarView.swift`).
  */
 object StoryRingLayout {
     val feedHeaderAvatarSize = 50.dp
     val feedHeaderLineWidth = 3.dp
+    /** Espacio visible entre la foto y el aro (transparente). */
     val ringGap = 1.5.dp
-    /** Ancho de celda del skeleton del tray (feed header). */
+    /**
+     * Ancho de celda del tray (iOS hardcodea 64 en `StoryRingItem` del feed).
+     * No está en el enum Swift; helper compartido para skeleton/tray.
+     */
     val skeletonCellWidth = 64.dp
 
     fun defaultLineWidth(avatarSize: Dp): Dp {
@@ -53,8 +63,11 @@ object StoryRingLayout {
 }
 
 /**
- * Port 1:1 de `StoryRingAvatarView` (StoryRingAvatarView.swift).
- * Resuelve el snapshot vía `StoryRingResolverService` (como iOS).
+ * Port 1:1 de `StoryRingAvatarView`.
+ * Resuelve snapshot vía `StoryRingResolverService` (como iOS).
+ *
+ * Zoom: iOS aplica `.userProfileZoomSource(namespace:)` (no-op si namespace nil).
+ * En Compose el stub actual siempre clippea; no se aplica aquí hasta haber Namespace real.
  */
 @Composable
 fun StoryRingAvatarView(
@@ -74,6 +87,7 @@ fun StoryRingAvatarView(
     val viewerId = FirebaseAuth.getInstance().currentUser?.uid
     val resolvedIsOwnStory = isOwnStory ?: (viewerId != null && viewerId == userId)
     val resolvedLineWidth = lineWidth ?: StoryRingLayout.defaultLineWidth(size)
+    val ringStrokeDiameter = StoryRingLayout.ringStrokeDiameter(size, resolvedLineWidth)
     val outerSize = StoryRingLayout.outerFrameSize(size, resolvedLineWidth)
 
     var snapshot by remember(userId) {
@@ -88,55 +102,94 @@ fun StoryRingAvatarView(
         )
     }
 
-    LaunchedEffect(userId, viewerId, refreshTrigger, allowOwnStories) {
+    // iOS: onAppear / onChange(userId) → resolveSnapshot() sin force
+    LaunchedEffect(userId, viewerId, allowOwnStories) {
         snapshot = resolveSnapshot(
             userId = userId,
             viewerId = viewerId,
             allowOwnStories = allowOwnStories,
-            forceRefresh = refreshTrigger > 0,
+            forceRefresh = false,
+        )
+    }
+    // iOS: onChange(refreshTrigger) → resolveSnapshot(forceRefresh: true)
+    var skipFirstRefreshTrigger by remember { mutableStateOf(true) }
+    LaunchedEffect(refreshTrigger) {
+        if (skipFirstRefreshTrigger) {
+            skipFirstRefreshTrigger = false
+            return@LaunchedEffect
+        }
+        snapshot = resolveSnapshot(
+            userId = userId,
+            viewerId = viewerId,
+            allowOwnStories = allowOwnStories,
+            forceRefresh = true,
         )
     }
 
     val interaction = remember { MutableInteractionSource() }
-    val contentModifier = modifier
-        .size(outerSize)
-        .then(
-            if (onTap != null) {
-                Modifier
-                    .momentsPressIcon()
-                    .clickable(
-                        interactionSource = interaction,
-                        indication = null,
-                        onClick = { onTap(snapshot.hasStory) },
-                    )
-            } else {
-                Modifier
-            },
-        )
+    var frameModifier = modifier.size(outerSize)
+    if (onTap != null) {
+        frameModifier = frameModifier
+            .momentsPressIcon()
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = { onTap(snapshot.hasStory) },
+            )
+    }
 
-    Box(contentModifier, contentAlignment = Alignment.Center) {
-        FeedStoryRingAvatar(
-            avatarSize = size,
-            lineWidth = resolvedLineWidth,
-            imageUrl = null,
+    Box(frameModifier, contentAlignment = Alignment.Center) {
+        // iOS: StorySegmentedRing.mask(StoryRingLayout.ringGapMask)
+        StorySegmentedRing(
+            storyCount = snapshot.storyCount,
             hasStory = snapshot.hasStory,
             hasUnseenStory = snapshot.hasUnseenStory,
-            storyCount = snapshot.storyCount,
-            viewedStatuses = snapshot.storyViewedStatus,
+            storyViewedStatus = snapshot.storyViewedStatus,
             storyAudiences = snapshot.storyAudiences,
             isOwnStory = resolvedIsOwnStory,
+            ringSize = ringStrokeDiameter,
+            lineWidth = resolvedLineWidth,
             hapticsEnabled = hapticsEnabled,
-            placeholder = {
-                AsyncProfileImageView(
-                    userId = userId,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape),
-                )
-            },
+            modifier = Modifier.storyRingGapMask(avatarSize = size),
+        )
+
+        AsyncProfileImageView(
+            userId = userId,
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .then(
+                    if (showBaseStroke) {
+                        Modifier.border(baseStrokeWidth, baseStrokeColor, CircleShape)
+                    } else {
+                        Modifier
+                    },
+                ),
         )
     }
 }
+
+/** ≡ iOS `StoryRingLayout.ringGapMask` / `StoryRingGapCutoutMask` (even-odd cutout). */
+private fun Modifier.storyRingGapMask(avatarSize: Dp): Modifier =
+    drawWithCache {
+        val innerDiameter = (avatarSize + StoryRingLayout.ringGap * 2).toPx()
+        val path = Path().apply {
+            addOval(
+                Rect(
+                    offset = Offset(
+                        (size.width - innerDiameter) / 2f,
+                        (size.height - innerDiameter) / 2f,
+                    ),
+                    size = Size(innerDiameter, innerDiameter),
+                ),
+            )
+        }
+        onDrawWithContent {
+            clipPath(path, ClipOp.Difference) {
+                this@onDrawWithContent.drawContent()
+            }
+        }
+    }
 
 private suspend fun resolveSnapshot(
     userId: String,

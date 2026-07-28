@@ -3,12 +3,13 @@ package com.moments.android.views.messaging.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,16 +18,18 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,10 +42,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -54,16 +67,18 @@ import com.moments.android.models.ChatRecoveryAttemptState
 import com.moments.android.services.messaging.EncryptionService
 import com.moments.android.services.messaging.MessageIngestService
 import com.moments.android.views.messaging.services.ChatAccessCoordinator
+import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Date
-
+import kotlin.math.ceil
+import kotlin.math.max
 /**
  * Port de `ChatRecoveryViews.swift` — puerta de acceso cripto al chat: alta de PIN de recuperación,
- * restauración de identidad en un dispositivo nuevo (con intentos y bloqueo temporal) y ajustes.
+ * restauración de identidad (intentos + bloqueo) y ajustes.
  *
- * Reescrito desde el Swift: la versión anterior era un esbozo que además etiquetaba todos los
- * botones con "Reply" y no llamaba a la cripto, así que el PIN nunca restauraba nada.
+ * Fondo: sólido AdaptiveColors / alpha (sin ultraThinMaterial iOS). Sheet de cambio de PIN →
+ * [MomentsModalSheet] (≡ `.sheet` iOS).
  */
 
 private data class ChatRecoveryPalette(val isDark: Boolean) {
@@ -71,7 +86,7 @@ private data class ChatRecoveryPalette(val isDark: Boolean) {
     val body = if (isDark) Color.White.copy(alpha = 0.74f) else Color.Black.copy(alpha = 0.62f)
     val secondary = if (isDark) Color.White.copy(alpha = 0.56f) else Color.Black.copy(alpha = 0.46f)
     val mutedAction = if (isDark) Color.White.copy(alpha = 0.72f) else Color.Black.copy(alpha = 0.64f)
-    val error = if (isDark) Color(0xFFFF8787) else Color(0xFFBA2B2B)
+    val error = if (isDark) Color(1f, 0.53f, 0.53f) else Color(0.73f, 0.17f, 0.17f)
     val digitText = if (isDark) Color.White else Color.Black.copy(alpha = 0.86f)
     val digitFillFilled = if (isDark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.08f)
     val digitFillEmpty = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.04f)
@@ -86,10 +101,9 @@ fun filteredPIN(text: String, length: Int = PIN_LENGTH): String = text.filter(Ch
 
 fun isValidPIN(pin: String, length: Int = PIN_LENGTH): Boolean = pin.length == length && pin.all(Char::isDigit)
 
-/**
- * Port de `ChatRecoveryGateView`: envuelve el contenido del chat y sólo lo muestra cuando el acceso
- * cripto está resuelto. Resuelve el estado con [ChatAccessCoordinator] al entrar, como el `.task` de iOS.
- */
+enum class PinFieldKind { PRIMARY, CONFIRMATION }
+
+/** Port de `ChatRecoveryGateView`. */
 @Composable
 fun ChatRecoveryGateView(
     onCancel: (() -> Unit)? = null,
@@ -101,7 +115,9 @@ fun ChatRecoveryGateView(
 
     LaunchedEffect(refreshToken) { ChatAccessCoordinator.ensureAccess() }
 
-    val reloadState: () -> Unit = { scope.launch { ChatAccessCoordinator.refreshAccess() }; Unit }
+    val reloadState: () -> Unit = {
+        scope.launch { ChatAccessCoordinator.refreshAccess() }
+    }
 
     when (val state = accessState) {
         ChatAccessState.Available -> content()
@@ -111,23 +127,30 @@ fun ChatRecoveryGateView(
             title = stringResource(R.string.chat_recovery_unavailable_title),
             message = state.reason,
             primaryTitle = stringResource(R.string.chat_recovery_action_retry),
-            primaryAction = { refreshToken++; reloadState() },
+            primaryAction = {
+                refreshToken++
+                reloadState()
+            },
             secondaryTitle = onCancel?.let { stringResource(R.string.chat_recovery_action_close) },
             secondaryAction = onCancel,
         )
         null -> Box(
-            Modifier.fillMaxSize().then(ChatRecoveryBackdropModifier()),
+            Modifier.fillMaxSize().background(chatRecoveryBackdropBrush()),
             contentAlignment = Alignment.Center,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                CircularProgressIndicator()
-                Text(stringResource(R.string.chat_recovery_loading), color = ChatRecoveryPalette(isSystemInDarkTheme()).body)
+            val palette = ChatRecoveryPalette(isSystemInDarkTheme())
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                CircularProgressIndicator(color = palette.title)
+                Text(stringResource(R.string.chat_recovery_loading), color = palette.body, fontSize = 14.sp)
             }
         }
     }
 }
 
-/** Port de `CreateChatPINView`: alta (o cambio) del PIN de recuperación. */
+/** Port de `CreateChatPINView`. */
 @Composable
 fun CreateChatPINView(
     isChangeFlow: Boolean = false,
@@ -145,9 +168,11 @@ fun CreateChatPINView(
     val invalidLength = stringResource(R.string.chat_recovery_error_invalid_length)
     val mismatch = stringResource(R.string.chat_recovery_error_mismatch)
 
-    // Como iOS: al completar el primer PIN, el foco salta a la confirmación.
+    LaunchedEffect(Unit) { activeField = PinFieldKind.PRIMARY }
     LaunchedEffect(pin) {
-        if (pin.length == PIN_LENGTH && activeField == PinFieldKind.PRIMARY) activeField = PinFieldKind.CONFIRMATION
+        if (pin.length == PIN_LENGTH && activeField == PinFieldKind.PRIMARY) {
+            activeField = PinFieldKind.CONFIRMATION
+        }
     }
 
     ChatRecoveryFormContainer(
@@ -163,7 +188,7 @@ fun CreateChatPINView(
                 onValueChange = { pin = filteredPIN(it) },
                 kind = PinFieldKind.PRIMARY,
                 activeField = activeField,
-                onFocus = { activeField = PinFieldKind.PRIMARY },
+                onActivate = { activeField = PinFieldKind.PRIMARY },
                 palette = palette,
             )
             ChatRecoveryPINField(
@@ -173,7 +198,7 @@ fun CreateChatPINView(
                 onValueChange = { confirmPin = filteredPIN(it) },
                 kind = PinFieldKind.CONFIRMATION,
                 activeField = activeField,
-                onFocus = { activeField = PinFieldKind.CONFIRMATION },
+                onActivate = { activeField = PinFieldKind.CONFIRMATION },
                 palette = palette,
             )
         },
@@ -188,7 +213,6 @@ fun CreateChatPINView(
                     else -> stringResource(R.string.chat_recovery_action_save_pin)
                 },
                 enabled = !isSubmitting,
-                palette = palette,
             ) {
                 val trimmed = pin.trim()
                 val trimmedConfirm = confirmPin.trim()
@@ -202,27 +226,34 @@ fun CreateChatPINView(
                             val result = runCatching { EncryptionService.createRecoveryBundle(trimmed) }
                             isSubmitting = false
                             result
-                                .onSuccess { pin = ""; confirmPin = ""; onSuccess() }
+                                .onSuccess {
+                                    pin = ""
+                                    confirmPin = ""
+                                    onSuccess()
+                                }
                                 .onFailure { errorMessage = it.message }
                         }
                     }
                 }
             }
-            onCancel?.let {
+            onCancel?.let { cancel ->
                 Text(
                     stringResource(R.string.chat_recovery_action_not_now),
                     color = palette.mutedAction,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().clickable(onClick = it).padding(vertical = 6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = cancel)
+                        .padding(vertical = 6.dp),
                 )
             }
         },
     )
 }
 
-/** Port de `RestoreChatPINView`: restaura la identidad en un dispositivo nuevo, con bloqueo por intentos. */
+/** Port de `RestoreChatPINView`. */
 @Composable
 fun RestoreChatPINView(
     onSuccess: () -> Unit,
@@ -235,21 +266,25 @@ fun RestoreChatPINView(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var attemptState by remember { mutableStateOf(ChatRecoveryAttemptState()) }
     var currentTime by remember { mutableStateOf(Date()) }
+    var activeField by remember { mutableStateOf(PinFieldKind.PRIMARY) }
 
     val enterPin = stringResource(R.string.chat_recovery_error_enter_recovery_pin)
 
-    fun refreshAttemptState() { attemptState = EncryptionService.chatRecoveryAttemptState() }
+    fun refreshAttemptState() {
+        attemptState = EncryptionService.chatRecoveryAttemptState()
+    }
 
-    LaunchedEffect(Unit) { refreshAttemptState() }
-
-    // Equivalente al Timer de 1s de iOS: refresca la cuenta atrás del bloqueo.
-    LaunchedEffect(attemptState.lockedUntil) {
+    LaunchedEffect(Unit) {
+        activeField = PinFieldKind.PRIMARY
+        currentTime = Date()
+        refreshAttemptState()
         while (true) {
             delay(1_000)
             currentTime = Date()
-            if (!attemptState.isLocked) break
+            val lockedUntil = attemptState.lockedUntil ?: continue
+            val remaining = (lockedUntil.time - currentTime.time) / 1000.0
+            if (remaining <= 0) refreshAttemptState()
         }
-        refreshAttemptState()
     }
 
     val countdownRemaining: Double? = attemptState.lockedUntil
@@ -266,15 +301,21 @@ fun RestoreChatPINView(
                 value = pin,
                 onValueChange = { pin = filteredPIN(it) },
                 kind = PinFieldKind.PRIMARY,
-                activeField = PinFieldKind.PRIMARY,
-                onFocus = {},
+                activeField = activeField,
+                onActivate = { activeField = PinFieldKind.PRIMARY },
                 palette = palette,
             )
             val visibleMessage = countdownRemaining
                 ?.let { stringResource(R.string.chat_recovery_error_locked_timer, formattedLockoutDuration(it)) }
                 ?: errorMessage
             visibleMessage?.let {
-                Text(it, color = palette.error, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
+                Text(
+                    it,
+                    color = palette.error,
+                    fontSize = 13.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         },
         footer = {
@@ -288,7 +329,6 @@ fun RestoreChatPINView(
                     else -> stringResource(R.string.chat_recovery_action_restore_chats)
                 },
                 enabled = !isSubmitting && !attemptState.isLocked,
-                palette = palette,
             ) {
                 refreshAttemptState()
                 if (attemptState.isLocked) return@ChatRecoveryPrimaryButton
@@ -304,9 +344,7 @@ fun RestoreChatPINView(
                         refreshAttemptState()
                         result
                             .onSuccess {
-                                // Los mensajes cacheados mientras la identidad era otra se
-                                // guardaron en cifrado; hay que tirarlos para que se rebajen
-                                // y se descifren con la identidad ya restaurada.
+                                // Cache cifrado con identidad anterior → reset para re-bajar/descifrar.
                                 MessageIngestService.resetAfterIdentityRestore()
                                 pin = ""
                                 onSuccess()
@@ -315,21 +353,27 @@ fun RestoreChatPINView(
                     }
                 }
             }
-            onCancel?.let {
+            onCancel?.let { cancel ->
                 Text(
                     stringResource(R.string.chat_recovery_action_close),
                     color = palette.mutedAction,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().clickable(onClick = it).padding(vertical = 6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = cancel)
+                        .padding(vertical = 6.dp),
                 )
             }
         },
     )
 }
 
-/** Port de `ChatRecoverySettingsView`: cambiar PIN y forzar restauración en este dispositivo. */
+/**
+ * Port de `ChatRecoverySettingsView`.
+ * Cambio de PIN: iOS `.sheet` → [MomentsModalSheet] (no sustituye la pantalla entera).
+ */
 @Composable
 fun ChatRecoverySettingsView(
     onClose: () -> Unit,
@@ -343,29 +387,33 @@ fun ChatRecoverySettingsView(
     val updated = stringResource(R.string.chat_recovery_settings_updated)
     val localKeyRemoved = stringResource(R.string.chat_recovery_settings_local_key_removed)
 
-    if (showChangePin) {
-        CreateChatPINView(
-            isChangeFlow = true,
-            onSuccess = { statusMessage = updated; showChangePin = false },
-            onCancel = { showChangePin = false },
-        )
-        return
-    }
-
-    Column(modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
         Text(
             stringResource(R.string.chat_recovery_settings_title),
             color = palette.title,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold,
         )
-        Text(stringResource(R.string.chat_recovery_settings_description), color = palette.secondary, fontSize = 14.sp)
+        Text(
+            stringResource(R.string.chat_recovery_settings_description),
+            color = palette.secondary,
+            fontSize = 14.sp,
+        )
 
         Text(
             stringResource(R.string.chat_recovery_settings_change_pin),
             color = palette.title,
             fontSize = 15.sp,
-            modifier = Modifier.fillMaxWidth().clickable { showChangePin = true }.padding(vertical = 10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showChangePin = true }
+                .padding(vertical = 10.dp),
         )
 
         Text(
@@ -401,12 +449,33 @@ fun ChatRecoverySettingsView(
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onClose).padding(vertical = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClose)
+                .padding(vertical = 8.dp),
         )
+    }
+
+    if (showChangePin) {
+        MomentsModalSheet(
+            onDismissRequest = { showChangePin = false },
+            largeOnly = true,
+            containerColor = Color.Transparent,
+            showDragHandle = false,
+        ) {
+            CreateChatPINView(
+                isChangeFlow = true,
+                onSuccess = {
+                    statusMessage = updated
+                    showChangePin = false
+                },
+                onCancel = { showChangePin = false },
+            )
+        }
     }
 }
 
-/** Port de `ChatRecoveryStatusView`. */
+/** Port de `ChatRecoveryStatusView` (tarjeta propia, no FormContainer). */
 @Composable
 fun ChatRecoveryStatusView(
     title: String,
@@ -416,15 +485,52 @@ fun ChatRecoveryStatusView(
     secondaryTitle: String? = null,
     secondaryAction: (() -> Unit)? = null,
 ) {
-    val palette = ChatRecoveryPalette(isSystemInDarkTheme())
-    ChatRecoveryFormContainer(
-        title = title,
-        subtitle = message,
-        form = {
-            Icon(Icons.Filled.Lock, null, tint = palette.title, modifier = Modifier.size(30.dp))
-        },
-        footer = {
-            ChatRecoveryPrimaryButton(primaryTitle, enabled = true, palette = palette, onClick = primaryAction)
+    val isDark = isSystemInDarkTheme()
+    val palette = ChatRecoveryPalette(isDark)
+    // iOS: siempre black.opacity(0.55) + material → fill sólido.
+    val cardFill = Color.Black.copy(alpha = 0.55f)
+    val cardStroke = Color.White.copy(alpha = 0.18f)
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(chatRecoveryBackdropBrush()),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Column(
+            Modifier
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .widthIn(max = 560.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(32.dp))
+                .background(cardFill)
+                .border(1.dp, cardStroke, RoundedCornerShape(32.dp))
+                .navigationBarsPadding()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Box(
+                Modifier
+                    .width(42.dp)
+                    .height(5.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.65f)),
+            )
+            Text(
+                title,
+                color = palette.title,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                message,
+                color = palette.body,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+            )
+            ChatRecoveryPrimaryButton(title = primaryTitle, enabled = true, onClick = primaryAction)
             if (secondaryTitle != null && secondaryAction != null) {
                 Text(
                     secondaryTitle,
@@ -432,14 +538,17 @@ fun ChatRecoveryStatusView(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().clickable(onClick = secondaryAction).padding(vertical = 6.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = secondaryAction)
+                        .padding(vertical = 4.dp),
                 )
             }
-        },
-    )
+        }
+    }
 }
 
-/** Port de `ChatRecoveryFormContainer`: tarjeta inferior con grabber sobre el backdrop. */
+/** Port de `ChatRecoveryFormContainer`. Material iOS → fill sólido (base fill iOS). */
 @Composable
 private fun ChatRecoveryFormContainer(
     title: String,
@@ -449,40 +558,103 @@ private fun ChatRecoveryFormContainer(
 ) {
     val isDark = isSystemInDarkTheme()
     val palette = ChatRecoveryPalette(isDark)
-    val cardFill = if (isDark) Color(0xFF101112) else Color.White
+    // ≡ iOS cardBaseFill (sin ultraThinMaterial).
+    val cardFill = if (isDark) Color.Black.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.82f)
     val cardStroke = if (isDark) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.72f)
+    val cardShadow = if (isDark) Color.Black.copy(alpha = 0.28f) else Color.Black.copy(alpha = 0.14f)
     val grabber = if (isDark) Color.White.copy(alpha = 0.65f) else Color.Black.copy(alpha = 0.14f)
+    val lockGradient = Brush.verticalGradient(
+        if (isDark) {
+            listOf(Color.White.copy(alpha = 0.96f), Color.White.copy(alpha = 0.68f))
+        } else {
+            listOf(Color.Black.copy(alpha = 0.82f), Color.Black.copy(alpha = 0.52f))
+        },
+    )
 
     Box(
-        Modifier.fillMaxSize().then(ChatRecoveryBackdropModifier()),
+        Modifier
+            .fillMaxSize()
+            .background(chatRecoveryBackdropBrush()),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Column(
             Modifier
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .widthIn(max = 560.dp)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                .shadow(24.dp, RoundedCornerShape(32.dp), ambientColor = cardShadow, spotColor = cardShadow)
+                .clip(RoundedCornerShape(32.dp))
                 .background(cardFill)
-                .border(1.dp, cardStroke, RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                .border(1.dp, cardStroke, RoundedCornerShape(32.dp))
                 .navigationBarsPadding()
                 .imePadding()
-                .padding(horizontal = 24.dp, vertical = 12.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 26.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Box(Modifier.width(42.dp).height(5.dp).clip(CircleShape).background(grabber))
-            Spacer(Modifier.height(2.dp))
-            Text(title, color = palette.title, fontSize = 20.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-            Text(subtitle, color = palette.body, fontSize = 14.sp, textAlign = TextAlign.Center)
-            form()
-            footer()
-            Spacer(Modifier.height(6.dp))
+            Box(
+                Modifier
+                    .padding(top = 12.dp)
+                    .width(42.dp)
+                    .height(5.dp)
+                    .clip(CircleShape)
+                    .background(grabber),
+            )
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 22.dp)
+                    .padding(top = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(22.dp),
+            ) {
+                Column(
+                    Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    // ≡ iOS lock.fill + LinearGradient
+                    Icon(
+                        Icons.Filled.Lock,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(30.dp)
+                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                            .drawWithCache {
+                                onDrawWithContent {
+                                    drawContent()
+                                    drawRect(brush = lockGradient, blendMode = BlendMode.SrcIn)
+                                }
+                            },
+                    )
+                    Text(
+                        title,
+                        color = palette.title,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        subtitle,
+                        color = palette.body,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    form()
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    footer()
+                }
+            }
         }
     }
 }
 
-/** Port de `ChatRecoveryPINField` + `ChatRecoveryDigitCell`: 6 celdas sobre un campo invisible. */
-enum class PinFieldKind { PRIMARY, CONFIRMATION }
-
+/** Port de `ChatRecoveryPINField` + `ChatRecoveryDigitCell`. */
 @Composable
 private fun ChatRecoveryPINField(
     title: String,
@@ -491,104 +663,137 @@ private fun ChatRecoveryPINField(
     onValueChange: (String) -> Unit,
     kind: PinFieldKind,
     activeField: PinFieldKind,
-    onFocus: () -> Unit,
+    onActivate: () -> Unit,
     palette: ChatRecoveryPalette,
 ) {
     val focusRequester = remember { FocusRequester() }
     val isActive = activeField == kind
 
-    LaunchedEffect(isActive) { if (isActive) runCatching { focusRequester.requestFocus() } }
+    LaunchedEffect(isActive) {
+        if (isActive) runCatching { focusRequester.requestFocus() }
+    }
 
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(title, color = palette.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+    Column(
+        Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, color = palette.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, color = palette.secondary, fontSize = 12.sp)
+        }
 
-        Box {
-            // Campo real (transparente) que recibe teclado; las celdas son la representación visual.
-            TextField(
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .clickable {
+                    onActivate()
+                    runCatching { focusRequester.requestFocus() }
+                },
+        ) {
+            BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp)
-                    .alpha(0f)
+                    .size(1.dp)
+                    .alpha(0.01f)
                     .focusRequester(focusRequester),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 singleLine = true,
-                colors = TextFieldDefaults.colors(),
+                textStyle = TextStyle(color = Color.Transparent),
+                cursorBrush = SolidColor(Color.Transparent),
             )
             Row(
-                Modifier.fillMaxWidth().height(54.dp).clickable { onFocus(); runCatching { focusRequester.requestFocus() } },
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 repeat(PIN_LENGTH) { index ->
                     val filled = index < value.length
                     val focused = isActive && index == value.length
                     Box(
+                        // ≡ iOS ChatRecoveryDigitCell 48×60
                         Modifier
-                            .weight(1f)
-                            .height(50.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .width(48.dp)
+                            .height(60.dp)
+                            .clip(RoundedCornerShape(16.dp))
                             .background(if (filled) palette.digitFillFilled else palette.digitFillEmpty)
                             .border(
-                                width = if (focused) 1.5.dp else 1.dp,
+                                width = if (focused) 2.dp else 1.dp,
                                 color = when {
                                     focused -> palette.digitBorderFocused
                                     filled -> palette.digitBorderFilled
                                     else -> palette.digitBorderEmpty
                                 },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(16.dp),
                             ),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (filled) {
-                            Text("•", color = palette.digitText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                "*",
+                                color = palette.digitText,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 3.dp),
+                            )
                         }
                     }
                 }
             }
         }
-
-        Text(subtitle, color = palette.secondary, fontSize = 12.sp)
     }
 }
 
-/** Port de `ChatRecoveryPrimaryButtonStyle`. */
+/** Port de `ChatRecoveryPrimaryButtonStyle` (siempre blanco → texto oscuro; press 0.99). */
 @Composable
 private fun ChatRecoveryPrimaryButton(
     title: String,
     enabled: Boolean,
-    palette: ChatRecoveryPalette,
     onClick: () -> Unit,
 ) {
-    val isDark = isSystemInDarkTheme()
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val fill = Brush.linearGradient(
+        if (pressed) {
+            listOf(Color.White.copy(alpha = 0.78f), Color.White.copy(alpha = 0.58f))
+        } else {
+            listOf(Color.White.copy(alpha = 0.92f), Color.White.copy(alpha = 0.72f))
+        },
+    )
     Box(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (isDark) Color.White else Color.Black)
+            .scale(if (pressed) 0.99f else 1f)
+            .clip(RoundedCornerShape(14.dp))
+            .background(fill)
             .alpha(if (enabled) 1f else 0.5f)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+            )
             .padding(vertical = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             title,
-            color = if (isDark) Color.Black else Color.White,
+            color = Color.Black.copy(alpha = 0.88f),
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
         )
     }
 }
 
-/** Port de `ChatRecoveryBackdrop`. */
 @Composable
-private fun ChatRecoveryBackdropModifier(): Modifier {
-    val isDark = isSystemInDarkTheme()
-    return Modifier.background(if (isDark) Color.Black.copy(alpha = 0.62f) else Color.Black.copy(alpha = 0.35f))
+private fun chatRecoveryBackdropBrush(): Brush {
+    // ≡ iOS LinearGradient 0.38→0.2 (ultraThinMaterial omitido).
+    return Brush.verticalGradient(
+        listOf(Color.Black.copy(alpha = 0.38f), Color.Black.copy(alpha = 0.2f)),
+    )
 }
 
 private fun formattedLockoutDuration(seconds: Double): String {
-    val total = kotlin.math.max(1, kotlin.math.ceil(seconds).toInt())
+    val total = max(1, ceil(seconds).toInt())
     return "${total / 60}:${(total % 60).toString().padStart(2, '0')}"
 }

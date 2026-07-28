@@ -84,7 +84,13 @@ class PermissionPrimerGate(val kind: Kind) {
         } else {
             emptyArray()
         }
-        Kind.PHOTOS, Kind.PHOTOS_SAVE -> if (Build.VERSION.SDK_INT >= 33) {
+        // ≡ iOS PHPhotoLibrary readWrite: imágenes + vídeo en un solo grant.
+        Kind.PHOTOS -> if (Build.VERSION.SDK_INT >= 33) {
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+        } else {
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+        Kind.PHOTOS_SAVE -> if (Build.VERSION.SDK_INT >= 33) {
             arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
         } else {
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)

@@ -9,19 +9,12 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,12 +24,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
-import com.moments.android.R
 import com.moments.android.notifications.screens.NotificationSummaryPopup
 import com.moments.android.notifications.services.NotificationBadgeService
 import com.moments.android.services.content.FeedMoment
@@ -73,22 +63,24 @@ fun FeedOverlaysSection(
     val unreadNotifications by NotificationBadgeService.unreadNotificationsCount.collectAsState()
     val unreadMessages by NotificationBadgeService.unreadMessagesCount.collectAsState()
     val isDark = isSystemInDarkTheme()
-    val mediaCorner = FeedMomentCardLayout.mediaCornerRadius
+    val peekShape = FeedMomentCardLayout.continuousRoundedRectShape
+    // iOS ultraThinMaterial → surface (Android sin material blur nativo equivalente)
+    val peekBackdrop = rememberAdaptiveColors().surfaceBackground
 
     Box(modifier.fillMaxSize()) {
+        // iOS: allowsHitTesting(false). Compose 1.11: sin clickable/pointerInput → no elegible
+        // para hit-test; el gesto de long-press sigue en el card debajo.
         AnimatedVisibility(
             visible = isPeeking && peekImageUrl != null,
             enter = fadeIn(spring(dampingRatio = 0.85f)),
             exit = fadeOut(),
-            // iOS: .allowsHitTesting(false) — el overlay de peek no captura gestos
             modifier = Modifier.zIndex(998f),
         ) {
             ScreenshotProtectedView(isProtected = peekIsProtected, fillsContainer = true) {
                 BoxWithConstraints(
                     Modifier
                         .fillMaxSize()
-                        // Android: surface opaca (sin ultraThinMaterial / transparencia)
-                        .background(rememberAdaptiveColors().surfaceBackground),
+                        .background(peekBackdrop),
                     contentAlignment = Alignment.Center,
                 ) {
                     val w = maxWidth - 32.dp
@@ -102,21 +94,27 @@ fun FeedOverlaysSection(
                             .height(h)
                             .shadow(
                                 20.dp,
-                                RoundedCornerShape(mediaCorner),
+                                peekShape,
                                 ambientColor = Color.Black.copy(alpha = 0.4f),
                                 spotColor = Color.Black.copy(alpha = 0.4f),
                             )
-                            .clip(RoundedCornerShape(mediaCorner)),
+                            .clip(peekShape),
                     )
                 }
             }
         }
 
-        // Paridad iOS: ModernContextMenuOverlay(moment:isPresented:onEdit:onDelete:onReport:)
-        if (showContextMenu && selectedMoment != null) {
-            Box(Modifier.fillMaxSize().zIndex(1000f)) {
+        // iOS: transition move(bottom)+opacity, spring 0.4 / 0.8, zIndex 1000
+        AnimatedVisibility(
+            visible = showContextMenu && selectedMoment != null,
+            enter = slideInVertically(spring(dampingRatio = 0.8f)) { it } + fadeIn(),
+            exit = slideOutVertically(spring(dampingRatio = 0.8f)) { it } + fadeOut(),
+            modifier = Modifier.zIndex(1000f),
+        ) {
+            val moment = selectedMoment
+            if (moment != null) {
                 ModernContextMenuOverlay(
-                    moment = selectedMoment,
+                    moment = moment,
                     isPresented = true,
                     onPresentedChange = { presented ->
                         if (!presented) onDismissContextMenu()
@@ -128,17 +126,27 @@ fun FeedOverlaysSection(
             }
         }
 
-        if (showShareSheet && selectedMoment != null) {
-            Box(Modifier.fillMaxSize().zIndex(1001f), contentAlignment = Alignment.BottomCenter) {
-                ModernShareBottomSheet(
-                    moment = selectedMoment,
-                    onDismiss = onDismissShare,
-                    onSendMessage = onDismissShare,
-                    onAddToStory = onDismissShare,
-                )
+        // iOS: transition move(bottom)+opacity, zIndex 1001
+        AnimatedVisibility(
+            visible = showShareSheet && selectedMoment != null,
+            enter = slideInVertically(spring(dampingRatio = 0.8f)) { it } + fadeIn(),
+            exit = slideOutVertically(spring(dampingRatio = 0.8f)) { it } + fadeOut(),
+            modifier = Modifier.zIndex(1001f),
+        ) {
+            val moment = selectedMoment
+            if (moment != null) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+                    ModernShareBottomSheet(
+                        moment = moment,
+                        onDismiss = onDismissShare,
+                        onSendMessage = onDismissShare,
+                        onAddToStory = onDismissShare,
+                    )
+                }
             }
         }
 
+        // iOS: VStack { NotificationSummaryPopup; Spacer } zIndex 2000
         Box(Modifier.fillMaxSize().zIndex(2000f), contentAlignment = Alignment.TopCenter) {
             NotificationSummaryPopup(
                 isPresented = showNotificationSummary,
@@ -149,7 +157,7 @@ fun FeedOverlaysSection(
             )
         }
 
-        // Paridad iOS: EchoInvitationView(echoId:onDismiss:onAccept:)
+        // iOS: opacity + scale(0.98), zIndex 2100
         AnimatedVisibility(
             visible = pendingEchoInvitationRoute != null,
             enter = fadeIn() + scaleIn(initialScale = 0.98f),
@@ -166,27 +174,4 @@ fun FeedOverlaysSection(
             }
         }
     }
-}
-
-@Composable
-private fun OverlayMenuRow(
-    label: String,
-    onClick: () -> Unit,
-    isDark: Boolean,
-    destructive: Boolean = false,
-) {
-    Text(
-        label,
-        color = when {
-            destructive -> Color.Red
-            isDark -> Color.White
-            else -> Color.Black
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f))
-            .clickable(onClick = onClick)
-            .padding(14.dp),
-    )
 }

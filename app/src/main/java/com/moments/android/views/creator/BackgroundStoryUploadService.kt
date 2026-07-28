@@ -133,11 +133,11 @@ object BackgroundStoryUploadService {
     @Volatile private var appContext: Context? = null
 
     /** ≡ iOS `@Published var uploadingStory`. */
-    @Volatile var uploadingStory: UploadingStory? = null
+    var uploadingStory by mutableStateOf<UploadingStory?>(null)
         private set
 
     /** ≡ iOS `@Published var isProcessing`. */
-    @Volatile var isProcessing: Boolean = false
+    var isProcessing by mutableStateOf(false)
         private set
 
     fun initialize(context: Context) {
@@ -211,11 +211,7 @@ object BackgroundStoryUploadService {
         story.uploadProgress = 0.0
         uploadingStory = story
         isProcessing = true
-        StoryUploadProgressManager.trackStoryUpload(
-            id = story.tempId,
-            initialProgress = 0.0,
-            status = UploadStatus.Initializing,
-        )
+        StoryUploadProgressManager.startUpload()
         startLiveActivity()
         return story
     }
@@ -234,7 +230,8 @@ object BackgroundStoryUploadService {
         uploadingStory.status = UploadStatus.Uploading
         uploadingStory.uploadProgress = 0.0
         uploadingStory.thumbnailBitmap = finalRenderedImage
-        StoryUploadProgressManager.updateStatus(uploadingStory.tempId, UploadStatus.Uploading, 0.0)
+        StoryUploadProgressManager.startUpload()
+        StoryUploadProgressManager.updateProgress(0.0)
         this.uploadingStory = uploadingStory
         isProcessing = true
 
@@ -394,7 +391,7 @@ object BackgroundStoryUploadService {
                 prepareMedia()
             } catch (t: Throwable) {
                 markStoryAsFailed(story, t.message ?: "prepare failed")
-                StoryUploadProgressManager.remove(story.tempId)
+                StoryUploadProgressManager.cancelUpload()
                 onPrepareFailed?.invoke(t)
                 return@launch
             }
@@ -412,7 +409,7 @@ object BackgroundStoryUploadService {
     fun retryUpload(actionId: String) {
         LocalPersistenceService.updateActionStatus(actionId, CachedAction.ActionStatus.PENDING)
         val action = LocalPersistenceService.loadAction(actionId) ?: return
-        StoryUploadProgressManager.trackStoryUpload(id = actionId, status = UploadStatus.Uploading)
+        StoryUploadProgressManager.startUpload()
         uploadingStory?.takeIf { it.tempId == actionId }?.let {
             it.status = UploadStatus.Uploading
             it.uploadProgress = 0.0
@@ -427,7 +424,7 @@ object BackgroundStoryUploadService {
         inFlightActionIds.remove(actionId)
         LocalPersistenceService.loadAction(actionId)?.let(::deleteActionFiles)
         LocalPersistenceService.deleteAction(actionId)
-        StoryUploadProgressManager.remove(actionId)
+        StoryUploadProgressManager.cancelUpload()
         if (uploadingStory?.tempId == actionId) {
             uploadingStory = null
             isProcessing = false
@@ -639,7 +636,7 @@ object BackgroundStoryUploadService {
 
         // ≡ iOS PASO 4: completed
         updateProgress(action.id, 1.0, UploadStatus.Completed)
-        StoryUploadProgressManager.complete(action.id)
+        StoryUploadProgressManager.finishUpload()
 
         // ≡ iOS PASO 5: moderación silenciosa (background)
         uploadScope.launch {
@@ -794,7 +791,7 @@ object BackgroundStoryUploadService {
         }
 
         updateProgress(action.id, 1.0, UploadStatus.Completed)
-        StoryUploadProgressManager.complete(action.id)
+        StoryUploadProgressManager.finishUpload()
         delay(1_000)
         finishSuccess(action)
     }
@@ -1458,7 +1455,7 @@ object BackgroundStoryUploadService {
 
     private fun updateProgress(actionId: String, progress: Double, status: UploadStatus) {
         val clamped = progress.coerceIn(0.0, 1.0)
-        StoryUploadProgressManager.updateStatus(actionId, status, clamped)
+        StoryUploadProgressManager.updateProgress(clamped)
         uploadingStory?.takeIf { it.tempId == actionId }?.let { story ->
             story.uploadProgress = clamped
             story.status = status
@@ -1472,7 +1469,7 @@ object BackgroundStoryUploadService {
             CachedAction.ActionStatus.FAILED,
             error = message,
         )
-        StoryUploadProgressManager.updateStatus(actionId, UploadStatus.Failed, progress = 0.0)
+        StoryUploadProgressManager.cancelUpload()
         uploadingStory?.takeIf { it.tempId == actionId }?.let { story ->
             story.status = UploadStatus.Failed
             story.errorMessage = message
@@ -1485,7 +1482,7 @@ object BackgroundStoryUploadService {
     private fun finishSuccess(action: CachedAction) {
         deleteActionFiles(action)
         LocalPersistenceService.deleteAction(action.id)
-        StoryUploadProgressManager.remove(action.id)
+        StoryUploadProgressManager.finishUpload()
         uploadingStory?.takeIf { it.tempId == action.id }?.let { story ->
             story.status = UploadStatus.Completed
             story.uploadProgress = 1.0

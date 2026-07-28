@@ -94,6 +94,42 @@ data class FollowerRecord(val id: String, val userId: String, val timestamp: Dat
     }
 }
 
+/** Ratio ancho/alto resuelto desde aspectRatio ("w:h") o la resolución de vídeo ("WxH"). */
+fun resolveAspectRatioValue(aspectRatio: String?, videoResolution: String?): Float? {
+    aspectRatio?.trim()?.takeIf { it.isNotEmpty() }?.let { normalized ->
+        val parts = normalized.split(":")
+        if (parts.size == 2) {
+            val w = parts[0].toDoubleOrNull()
+            val h = parts[1].toDoubleOrNull()
+            if (w != null && h != null && h > 0) {
+                val r = (w / h).toFloat()
+                if (r.isFinite() && r > 0) return r
+            }
+        }
+        // ≡ CreatorMedia.AspectRatio(from:).value (CreatorView.swift)
+        val canonical = when (normalized) {
+            "1:1" -> 1f
+            "4:5" -> 0.8f
+            "16:9" -> 16f / 9f
+            "9:16" -> 9f / 16f
+            else -> 1f // default .square
+        }
+        if (canonical.isFinite() && canonical > 0) return canonical
+    }
+    videoResolution?.let { res ->
+        val idx = res.indexOf('x')
+        if (idx > 0) {
+            val w = res.substring(0, idx).toDoubleOrNull()
+            val h = res.substring(idx + 1).toDoubleOrNull()
+            if (w != null && h != null && h > 0) {
+                val r = (w / h).toFloat()
+                if (r.isFinite() && r > 0) return r
+            }
+        }
+    }
+    return null
+}
+
 // MARK: - PhotoTag (etiqueta espacial sobre una imagen)
 data class PhotoTag(
     val id: String = UUID.randomUUID().toString(),
@@ -179,40 +215,7 @@ data class MediaItem(
 
     /** Ratio ancho/alto resuelto desde aspectRatio ("w:h") o la resolución de vídeo ("WxH"). */
     val resolvedAspectRatioValue: Float?
-        get() {
-            aspectRatio?.trim()?.takeIf { it.isNotEmpty() }?.let { normalized ->
-                val parts = normalized.split(":")
-                if (parts.size == 2) {
-                    val w = parts[0].toDoubleOrNull()
-                    val h = parts[1].toDoubleOrNull()
-                    if (w != null && h != null && h > 0) {
-                        val r = (w / h).toFloat()
-                        if (r.isFinite() && r > 0) return r
-                    }
-                }
-                // ≡ CreatorMedia.AspectRatio(from:).value (CreatorView.swift)
-                val canonical = when (normalized) {
-                    "1:1" -> 1f
-                    "4:5" -> 0.8f
-                    "16:9" -> 16f / 9f
-                    "9:16" -> 9f / 16f
-                    else -> 1f // default .square
-                }
-                if (canonical.isFinite() && canonical > 0) return canonical
-            }
-            videoResolution?.let { res ->
-                val idx = res.indexOf('x')
-                if (idx > 0) {
-                    val w = res.substring(0, idx).toDoubleOrNull()
-                    val h = res.substring(idx + 1).toDoubleOrNull()
-                    if (w != null && h != null && h > 0) {
-                        val r = (w / h).toFloat()
-                        if (r.isFinite() && r > 0) return r
-                    }
-                }
-            }
-            return null
-        }
+        get() = resolveAspectRatioValue(aspectRatio, videoResolution)
 
     companion object {
         fun from(data: Map<String, Any?>): MediaItem = MediaItem(
@@ -288,6 +291,10 @@ data class Moment(
     val hideLikeCounts: Boolean = false,
     val allowSharing: Boolean = true,
 ) {
+    /** Ratio ancho/alto resuelto desde aspectRatio ("w:h") o la resolución de vídeo ("WxH"). */
+    val resolvedAspectRatioValue: Float?
+        get() = resolveAspectRatioValue(aspectRatio, videoResolution)
+
     data class LocationCoordinate(val latitude: Double, val longitude: Double) {
         companion object {
             fun from(data: Map<String, Any?>?): LocationCoordinate? {
@@ -718,7 +725,7 @@ data class StickerData(
                 Triple(decodedIsAnimated, decodedGifURL, data["videoURL"] as? String)
             }
             return StickerData(
-                stickerId = data["stickerId"] as? String,
+                stickerId = data["stickerId"] as? String ?: data["id"] as? String,
                 type = type,
                 content = content,
                 position = position,
@@ -1585,28 +1592,6 @@ data class MomentGridPreviewSettings(
     }
 
     val isDefault: Boolean
-        get() = scale == 1.0 && offsetX == 0.0 && offsetY == 0.0 &&
+        get() = kotlin.math.abs(scale - 1.0) < 0.001 && kotlin.math.abs(offsetX) < 0.001 && kotlin.math.abs(offsetY) < 0.001 &&
             fitMode == FitMode.FILL
-}
-
-// MARK: - MapVisibilityPolicy (MapDiscoverSupport.swift)
-object MapVisibilityPolicy {
-    fun resolvedVisibility(hasLocation: Boolean, audience: String?): String {
-        if (!hasLocation) return "hidden"
-        return if (audience == "onlyMe") "hidden" else "public"
-    }
-
-    data class StoryMapLocation(
-        val name: String,
-        val latitude: Double,
-        val longitude: Double,
-    )
-
-    fun storyMapLocation(stickers: List<StickerData>?): StoryMapLocation? =
-        stickers?.firstNotNullOfOrNull { sticker ->
-            if (sticker.type != "location") return@firstNotNullOfOrNull null
-            val latitude = sticker.latitude ?: return@firstNotNullOfOrNull null
-            val longitude = sticker.longitude ?: return@firstNotNullOfOrNull null
-            StoryMapLocation(sticker.location?.trim().orEmpty(), latitude, longitude)
-        }
 }
