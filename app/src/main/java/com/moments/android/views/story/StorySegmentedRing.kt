@@ -12,20 +12,30 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.moments.android.views.feed.StoryRingColors
-import com.moments.android.views.feed.StoryRingViewed
+import com.moments.android.utilities.HapticManager
 import kotlin.math.min
 
 /**
- * Port de `StorySegmentedRing` (Views/story/StorySegmentedRing.swift).
+ * Port 1:1 de `StorySegmentedRing` + `StorySegment`
+ * (`Views/story/StorySegmentedRing.swift`).
  *
- * Mantiene un segmento por historia, dejando 15º entre segmentos. Las historias
- * vistas de otros usuarios se muestran en gris; best friends y mutuals conservan
- * su color propio mientras no estén vistas.
+ * ≡ iOS `Color.blue` / `.purple` / `.pink` (system).
  */
+private val StoryRingLitColors = listOf(
+    Color(0xFF007AFF), // systemBlue
+    Color(0xFFAF52DE), // systemPurple
+    Color(0xFFFF2D55), // systemPink
+)
+
+/** ≡ `StorySegmentedRing.triggerHaptic()` (UIImpactFeedbackGenerator .medium). */
+fun triggerStorySegmentedRingHaptic() {
+    HapticManager.shared.mediumImpact()
+}
+
 @Composable
 fun StorySegmentedRing(
     storyCount: Int,
@@ -36,32 +46,48 @@ fun StorySegmentedRing(
     isOwnStory: Boolean,
     ringSize: Dp = 50.dp,
     lineWidth: Dp = 2.5.dp,
+    /** Reservado como en iOS (el View no lo usa; el haptic es estático). */
     @Suppress("UNUSED_PARAMETER") hapticsEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
+    // ≡ iOS `colorScheme` (Environment)
     val isDark = isSystemInDarkTheme()
     val gapAngle = 15.0
     // Swift: .padding(lineWidth / 2 + 1)
     val ringPadding = lineWidth / 2 + 1.dp
     val outerSize = ringSize + lineWidth + 2.dp
 
-    val unseenBrush = remember { Brush.linearGradient(StoryRingColors) }
-    val viewedBrush = remember(isDark) {
-        if (isDark) {
-            Brush.linearGradient(
-                listOf(Color.Gray.copy(alpha = 0.58f), Color.Gray.copy(alpha = 0.82f)),
-            )
-        } else {
-            Brush.linearGradient(
-                listOf(Color.Gray.copy(alpha = 0.76f), Color.Gray.copy(alpha = 0.94f)),
-            )
-        }
+    val litBrush = remember {
+        Brush.linearGradient(
+            colors = StoryRingLitColors,
+            start = Offset.Zero,
+            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
+        )
+    }
+    val viewedGrayBrush = remember(isDark) {
+        Brush.linearGradient(
+            colors = if (isDark) {
+                listOf(Color.Gray.copy(alpha = 0.58f), Color.Gray.copy(alpha = 0.82f))
+            } else {
+                listOf(Color.Gray.copy(alpha = 0.76f), Color.Gray.copy(alpha = 0.94f))
+            },
+            start = Offset.Zero,
+            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
+        )
     }
     val bestFriendsBrush = remember {
-        Brush.linearGradient(listOf(Color(0xFF24C26A), Color(0xFF5BE584)))
+        Brush.linearGradient(
+            colors = listOf(Color(0xFF24C26A), Color(0xFF5BE584)),
+            start = Offset.Zero,
+            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
+        )
     }
     val mutualsBrush = remember {
-        Brush.linearGradient(listOf(Color(0xFF00B4D8), Color(0xFF4CC9F0)))
+        Brush.linearGradient(
+            colors = listOf(Color(0xFF00B4D8), Color(0xFF4CC9F0)),
+            start = Offset.Zero,
+            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
+        )
     }
 
     fun normalizedAudience(raw: String?): String =
@@ -70,30 +96,46 @@ fun StorySegmentedRing(
             ?.replace("-", "")
             .orEmpty()
 
-    fun audienceBrush(index: Int): Brush? {
+    fun audienceStyle(index: Int): AudienceStyle? {
         if (index !in storyAudiences.indices) return null
         return when (normalizedAudience(storyAudiences[index])) {
-            "bestfriends", "bestfriend" -> bestFriendsBrush
-            "mutuals", "mutual" -> mutualsBrush
+            "bestfriends", "bestfriend" -> AudienceStyle.BestFriends
+            "mutuals", "mutual" -> AudienceStyle.Mutuals
             else -> null
         }
     }
 
-    fun segmentBrush(index: Int): Brush {
-        val wasViewed = storyViewedStatus.getOrElse(index) { false }
-        if (!isOwnStory && wasViewed) return viewedBrush
-        audienceBrush(index)?.let { return it }
-        return if (isOwnStory || !wasViewed) unseenBrush else viewedBrush
+    fun audienceGradient(style: AudienceStyle): Brush = when (style) {
+        AudienceStyle.BestFriends -> bestFriendsBrush
+        AudienceStyle.Mutuals -> mutualsBrush
     }
 
-    fun singleBrush(): Brush {
+    // ≡ segmentGradient(for:)
+    fun segmentGradient(index: Int): Brush {
+        val wasViewed = if (index < storyViewedStatus.size) storyViewedStatus[index] else false
+        // Externos: vista → gris siempre (incluye bestfriends/mutuals)
+        if (!isOwnStory && wasViewed) return viewedGrayBrush
+        // PRIORIDAD: audiencia cuando NO vista
+        audienceStyle(index)?.let { return audienceGradient(it) }
+        return if (isOwnStory) {
+            litBrush
+        } else if (wasViewed) {
+            viewedGrayBrush
+        } else {
+            litBrush
+        }
+    }
+
+    // ≡ storyRingGradient (1 historia)
+    fun storyRingGradient(): Brush {
         val wasViewed = !hasUnseenStory
-        if (!isOwnStory && wasViewed) return viewedBrush
-        audienceBrush(0)?.let { return it }
+        if (!isOwnStory && wasViewed) return viewedGrayBrush
+        audienceStyle(0)?.let { return audienceGradient(it) }
         return when {
-            isOwnStory || hasUnseenStory -> unseenBrush
-            hasStory -> viewedBrush
-            else -> Brush.linearGradient(StoryRingViewed)
+            isOwnStory -> litBrush
+            hasUnseenStory -> litBrush
+            hasStory -> viewedGrayBrush
+            else -> Brush.linearGradient(listOf(Color.Transparent))
         }
     }
 
@@ -102,49 +144,65 @@ fun StorySegmentedRing(
             .size(outerSize)
             .padding(ringPadding),
     ) {
-        if (!hasStory || storyCount <= 0) return@Canvas
-
         val stroke = Stroke(width = lineWidth.toPx(), cap = StrokeCap.Round)
         val diameter = size.minDimension
         val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
         val arcSize = Size(diameter, diameter)
 
-        if (storyCount == 1) {
-            StorySegment(
-                brush = singleBrush(),
-                startAngle = -90f,
-                sweepAngle = 360f,
-                topLeft = topLeft,
-                arcSize = arcSize,
-                stroke = stroke,
-            )
-        } else {
-            val segmentAngleTotal = 360.0 / storyCount
-            val segmentAngleUseful = segmentAngleTotal - gapAngle
-            val segmentFraction = segmentAngleUseful / 360.0
-
-            repeat(storyCount) { index ->
-                val startFraction = index * segmentAngleTotal / 360.0
-                val endFraction = min(startFraction + segmentFraction, 1.0)
-                val sweepAngle = ((endFraction - startFraction) * 360.0).toFloat()
-                if (sweepAngle <= 0f) return@repeat
-
-                StorySegment(
-                    brush = segmentBrush(index),
-                    // Swift rotates the ZStack -90º after trimming its circles.
-                    startAngle = (startFraction * 360.0 - 90.0).toFloat(),
-                    sweepAngle = sweepAngle,
+        if (hasStory && storyCount > 0) {
+            if (storyCount == 1) {
+                // Círculo completo sin gaps; −90º ≡ rotationEffect del ZStack
+                drawStorySegment(
+                    brush = storyRingGradient(),
+                    startAngle = -90f,
+                    sweepAngle = 360f,
                     topLeft = topLeft,
                     arcSize = arcSize,
                     stroke = stroke,
                 )
+            } else {
+                val segmentAngleTotal = 360.0 / storyCount.toDouble()
+                val segmentAngleUseful = segmentAngleTotal - gapAngle
+                val segmentFraction = segmentAngleUseful / 360.0
+
+                repeat(storyCount) { index ->
+                    val startFraction = index * segmentAngleTotal / 360.0
+                    val endFraction = min(startFraction + segmentFraction, 1.0)
+                    val sweepAngle = ((endFraction - startFraction) * 360.0).toFloat()
+                    if (sweepAngle <= 0f) return@repeat
+
+                    drawStorySegment(
+                        brush = segmentGradient(index),
+                        // Swift: trim + rotationEffect(-90)
+                        startAngle = (startFraction * 360.0 - 90.0).toFloat(),
+                        sweepAngle = sweepAngle,
+                        topLeft = topLeft,
+                        arcSize = arcSize,
+                        stroke = stroke,
+                    )
+                }
             }
+        } else {
+            // SIN HISTORIAS: anillo transparente (mantiene layout)
+            drawStorySegment(
+                brush = Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
+                startAngle = -90f,
+                sweepAngle = 360f,
+                topLeft = topLeft,
+                arcSize = arcSize,
+                stroke = Stroke(width = 1.dp.toPx(), cap = StrokeCap.Round),
+            )
         }
     }
 }
 
-/** Equivalente del `StorySegment` interno de Swift. */
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.StorySegment(
+private enum class AudienceStyle {
+    BestFriends,
+    Mutuals,
+}
+
+/** ≡ `StorySegment` (trim + stroke). */
+private fun DrawScope.drawStorySegment(
     brush: Brush,
     startAngle: Float,
     sweepAngle: Float,

@@ -78,6 +78,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -192,12 +193,13 @@ fun AudienceSelectionView(
             targetState = flowDestination,
             transitionSpec = {
                 val springSpec = spring<Float>(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)
+                val offsetSpringSpec = spring<IntOffset>(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)
                 if (navigatingForward) {
-                    (slideInHorizontally(springSpec) { it } + fadeIn(springSpec)) togetherWith
-                        (slideOutHorizontally(springSpec) { -it / 3 } + fadeOut(springSpec))
+                    (slideInHorizontally(offsetSpringSpec) { it } + fadeIn(springSpec)) togetherWith
+                        (slideOutHorizontally(offsetSpringSpec) { -it / 3 } + fadeOut(springSpec))
                 } else {
-                    (slideInHorizontally(springSpec) { -it } + fadeIn(springSpec)) togetherWith
-                        (slideOutHorizontally(springSpec) { it / 3 } + fadeOut(springSpec))
+                    (slideInHorizontally(offsetSpringSpec) { -it } + fadeIn(springSpec)) togetherWith
+                        (slideOutHorizontally(offsetSpringSpec) { it / 3 } + fadeOut(springSpec))
                 }
             },
             label = "audienceSelectionFlow",

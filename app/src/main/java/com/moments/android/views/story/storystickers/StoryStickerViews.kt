@@ -1,7 +1,8 @@
 package com.moments.android.views.story.storystickers
 
+import android.content.Intent
+import android.os.Build
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,20 +16,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FilterNone
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -36,27 +40,73 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import coil.request.ImageRequest
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.models.StickerData
+import com.moments.android.utilities.MomentsFormat
+import com.moments.android.views.components.InteractiveAudioStickerView
+import com.moments.android.views.components.StickerCountdownCardView
+import com.moments.android.views.components.StickerEmojiSliderCardView
 import com.moments.android.views.components.StickerHashtagCardView
+import com.moments.android.views.components.StickerLinkCardView
 import com.moments.android.views.components.StickerLocationCardView
 import com.moments.android.views.components.StickerMentionCardView
-import com.moments.android.views.components.InteractiveAudioStickerView
-import com.moments.android.views.story.StoryDeckGestureGate
+import com.moments.android.views.components.StickerTimeCardView
+import com.moments.android.views.components.emojiSliderHasPrompt
+import com.moments.android.views.components.emojiSliderRenderingSize
+import com.moments.android.views.components.emojiSliderTrackFrame
+import com.moments.android.views.components.emojiSliderTrackMetrics
+import com.moments.android.views.components.normalizedStickerURL
+import com.moments.android.views.components.stickerHostLabel
+import com.moments.android.views.explore.ExploreView
+import com.moments.android.views.feed.maps.LocationMapView
+import com.moments.android.views.feed.moments.FeedMomentCardLayout
+import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.story.InteractiveQuizSticker
+import com.moments.android.views.story.QuestionResponseStoryStickerCardView
 import com.moments.android.views.story.QuestionResponsesView
+import com.moments.android.views.story.StoryDeckGestureGate
+import com.moments.android.views.story.storyviewer.LocalStoryStickerHitTesting
 import com.moments.android.views.story.storyviewer.StoryGestureSuppressionScope
+import com.moments.android.views.story.storyviewer.StoryViewerLayoutHelpers
+import com.moments.android.views.story.storyviewer.emojiSliderVotePan
+import com.moments.android.views.story.storyviewer.storyDeckInteractionExclusion
+import com.moments.android.views.components.AnimatedMomentsCardStickerHeaderSurface
+import com.moments.android.views.components.AnimatedMomentsCardStickerSurface
+import com.moments.android.views.components.momentsStickerInk
+import com.moments.android.views.components.momentsStickerInverseInk
+import com.moments.android.views.components.momentsStickerSurface
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.Date
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 /** Port de `InteractivePollData`. */
@@ -105,14 +155,18 @@ private object StoryPollVoteStore {
         stickerId: String,
         viewerId: String,
         option: Int,
-    ) {
-        votes(userId, storyId, stickerId).document(viewerId).set(
+    ): Boolean {
+        val reference = votes(userId, storyId, stickerId).document(viewerId)
+        // ≡ iOS handlePollVote: si ya existe, no reescribe
+        if (reference.get().await().exists()) return false
+        reference.set(
             mapOf(
                 "userId" to viewerId,
                 "option" to option,
                 "timestamp" to FieldValue.serverTimestamp(),
             ),
         ).await()
+        return true
     }
 }
 
@@ -135,6 +189,12 @@ fun InteractivePollSticker(
     val scope = rememberCoroutineScope()
     var voteState by remember(storyId, stickerId, viewerId) { mutableStateOf(PollVoteState()) }
     val isPreview = storyId.isBlank() || storyId == "preview" || userId == "preview"
+    val isDark = isSystemInDarkTheme()
+    val isLight = styleVariant % 6 == 0
+    val ink = if (isLight) momentsStickerInk(isDark) else Color.White
+    val headerInk = if (isLight) momentsStickerInverseInk(isDark) else Color.White
+    val title = pollData.getOrNull(0).takeUnless { it.isNullOrBlank() } ?: "Ask a question"
+
     LaunchedEffect(storyId, userId, stickerId, viewerId) {
         if (!isPreview) {
             voteState = runCatching {
@@ -143,79 +203,98 @@ fun InteractivePollSticker(
         }
     }
 
-    val isLight = styleVariant % 6 == 0
-    val ink = if (isLight) Color(0xFF161616) else Color.White
-    val surface = if (isLight) Color(0xFFF8F8FA) else Color(0xFF101114)
-    val header = if (isLight) Color(0xFF161616) else Color(0xFF2B6CFF)
-    val title = pollData.getOrNull(0).takeUnless { it.isNullOrBlank() } ?: "Ask a question"
-
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    Box(
         modifier = modifier
             .width(300.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(surface)
-            .padding(bottom = 14.dp),
+            .clip(RoundedCornerShape(24.dp)),
     ) {
-        if (isEditingInline) {
-            OutlinedTextField(
-                value = pollData.getOrNull(0).orEmpty(),
-                onValueChange = { onPollDataChange(pollData.replaceAt(0, it)) },
-                placeholder = { Text("Ask a question") },
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    color = if (isLight) Color.White else Color.White,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    fontSize = 18.sp,
-                ),
-                modifier = Modifier.fillMaxWidth().background(header).padding(horizontal = 18.dp),
-            )
-        } else {
-            Text(
-                text = title,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                fontSize = 18.sp,
-                maxLines = 3,
-                modifier = Modifier.fillMaxWidth().background(header).padding(horizontal = 18.dp, vertical = 16.dp),
-            )
-        }
-
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 14.dp),
-        ) {
-            repeat(2) { index ->
-                val optionIndex = index + 1
+        AnimatedMomentsCardStickerSurface(
+            styleVariant = styleVariant,
+            isDark = isDark,
+            modifier = Modifier.matchParentSize(),
+        )
+        Column(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth()) {
+                AnimatedMomentsCardStickerHeaderSurface(
+                    styleVariant = styleVariant,
+                    isDark = isDark,
+                    modifier = Modifier.matchParentSize(),
+                )
                 if (isEditingInline) {
                     OutlinedTextField(
-                        value = pollData.getOrNull(optionIndex).orEmpty(),
-                        onValueChange = { onPollDataChange(pollData.replaceAt(optionIndex, it)) },
-                        placeholder = { Text("Option ${index + 1}") },
-                        modifier = Modifier.fillMaxWidth(),
+                        value = pollData.getOrNull(0).orEmpty(),
+                        onValueChange = { onPollDataChange(pollData.replaceAt(0, it)) },
+                        placeholder = { Text("Ask a question") },
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            color = headerInk,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            fontSize = 18.sp,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 8.dp),
                     )
                 } else {
-                    val text = pollData.getOrNull(optionIndex).takeUnless { it.isNullOrBlank() }
-                        ?: if (index == 0) "Yes" else "No"
-                    InteractivePollOptionButton(
-                        text = text,
-                        percentage = voteState.percentage(index),
-                        isSelected = voteState.selectedOption == index,
-                        hasVoted = voteState.hasVoted,
-                        lightStyle = isLight,
-                        onTap = {
-                            if (voteState.hasVoted || viewerId == null || isPreview) return@InteractivePollOptionButton
-                            voteState = voteState.copy(selectedOption = index)
-                            scope.launch {
-                                val submitted = runCatching {
-                                    StoryPollVoteStore.submit(userId, storyId, stickerId, viewerId, index)
-                                    StoryPollVoteStore.load(userId, storyId, stickerId, viewerId)
-                                }.getOrNull()
-                                if (submitted != null) voteState = submitted
-                            }
-                        },
+                    Text(
+                        text = title,
+                        color = headerInk,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        fontSize = 18.sp,
+                        maxLines = 3,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 16.dp),
                     )
+                }
+            }
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            ) {
+                repeat(2) { index ->
+                    val optionIndex = index + 1
+                    if (isEditingInline) {
+                        OutlinedTextField(
+                            value = pollData.getOrNull(optionIndex).orEmpty(),
+                            onValueChange = { onPollDataChange(pollData.replaceAt(optionIndex, it)) },
+                            placeholder = { Text("Option ${index + 1}") },
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                color = if (isLight) ink.copy(alpha = 0.9f) else Color.White,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                fontSize = 15.sp,
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    if (isLight) ink.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.18f),
+                                ),
+                        )
+                    } else {
+                        val text = pollData.getOrNull(optionIndex).takeUnless { it.isNullOrBlank() }
+                            ?: if (index == 0) "Yes" else "No"
+                        InteractivePollOptionButton(
+                            text = text,
+                            percentage = voteState.percentage(index),
+                            isSelected = voteState.selectedOption == index,
+                            hasVoted = voteState.hasVoted,
+                            styleVariant = styleVariant,
+                            onTap = {
+                                if (voteState.hasVoted || viewerId == null || isPreview) return@InteractivePollOptionButton
+                                voteState = voteState.copy(selectedOption = index)
+                                scope.launch {
+                                    runCatching {
+                                        StoryPollVoteStore.submit(userId, storyId, stickerId, viewerId, index)
+                                        StoryPollVoteStore.load(userId, storyId, stickerId, viewerId)
+                                    }.getOrNull()?.let { voteState = it }
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -229,40 +308,68 @@ private fun InteractivePollOptionButton(
     percentage: Float,
     isSelected: Boolean,
     hasVoted: Boolean,
-    lightStyle: Boolean,
+    styleVariant: Int,
     onTap: () -> Unit,
 ) {
-    val ink = if (lightStyle) Color(0xFF161616) else Color.White
-    val surface = if (lightStyle) Color(0xFFF8F8FA) else Color.Black
-    val animatedPercent by animateFloatAsState(percentage / 100f, animationSpec = spring(), label = "pollPercent")
+    val isDark = isSystemInDarkTheme()
+    val isLight = styleVariant % 6 == 0
+    val ink = if (isLight) momentsStickerInk(isDark) else Color.White
+    val surface = if (isLight) momentsStickerSurface(isDark) else Color.Black
+    val animatedPercent by animateFloatAsState(
+        targetValue = percentage / 100f,
+        animationSpec = tween(500, easing = FastOutSlowInEasing),
+        label = "pollPercent",
+    )
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(52.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(if (isSelected) ink.copy(alpha = 0.92f) else if (lightStyle) ink.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.18f))
-            .clickable(enabled = !hasVoted, onClick = onTap),
+            .background(
+                if (isSelected) ink.copy(alpha = 0.92f)
+                else if (isLight) ink.copy(alpha = 0.08f)
+                else Color.White.copy(alpha = 0.18f),
+            )
+            .clickable(enabled = !hasVoted && LocalStoryStickerHitTesting.current, onClick = onTap),
     ) {
         if (hasVoted) {
             Box(
                 Modifier
                     .fillMaxWidth(animatedPercent.coerceIn(0f, 1f))
                     .height(52.dp)
-                    .background(if (isSelected) ink.copy(alpha = 0.92f) else if (lightStyle) ink.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.28f)),
+                    .background(
+                        if (isSelected) ink.copy(alpha = 0.92f)
+                        else if (isLight) ink.copy(alpha = 0.16f)
+                        else Color.White.copy(alpha = 0.28f),
+                    ),
             )
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         ) {
-            Text(text, color = if (isSelected) surface else if (lightStyle) ink.copy(alpha = 0.9f) else Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(
+                text,
+                color = if (isSelected) surface else if (isLight) ink.copy(alpha = 0.9f) else Color.White,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
             Spacer(Modifier.weight(1f))
-            if (hasVoted) Text("${percentage.toInt()}%", color = if (isSelected) surface else if (lightStyle) ink.copy(alpha = 0.72f) else Color.White.copy(alpha = 0.72f), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            if (hasVoted) {
+                Text(
+                    "${percentage.toInt()}%",
+                    color = if (isSelected) surface
+                    else if (isLight) ink.copy(alpha = 0.72f)
+                    else Color.White.copy(alpha = 0.72f),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                )
+            }
         }
     }
 }
 
-/** Port funcional de `InteractivePollOverlay` y `PollVoteView` para uso modal. */
+/** Dead code iOS (sin call sites). Alias al sticker inline por compat. */
 @Composable
 fun InteractivePollOverlay(
     pollData: List<String>,
@@ -345,8 +452,7 @@ private object EmojiSliderVoteStore {
 
 /**
  * Port de `InteractiveEmojiSliderSticker`.
- * Mientras se arrastra, bloquea la navegación del deck mediante el mismo gate
- * compartido con el resto de stickers interactivos.
+ * Card nativa + pan overlay (≡ `EmojiSliderVotePanOverlay`); bloquea gestos del deck al arrastrar.
  */
 @Composable
 fun InteractiveEmojiSliderSticker(
@@ -360,85 +466,93 @@ fun InteractiveEmojiSliderSticker(
     modifier: Modifier = Modifier,
 ) {
     val viewerId = FirebaseAuth.getInstance().currentUser?.uid
+    val allowsHitTesting = LocalStoryStickerHitTesting.current
     val isAuthor = viewerId == userId
     val scope = rememberCoroutineScope()
     var state by remember(storyId, stickerId, viewerId) { mutableStateOf(EmojiSliderVoteState()) }
     var dragValue by remember(storyId, stickerId) { mutableStateOf<Float?>(null) }
     var interacting by remember(storyId, stickerId) { mutableStateOf(false) }
     val isPreview = userId == "preview" || storyId.isBlank() || storyId == "preview"
-    val canVote = !isAuthor && state.submittedValue == null && viewerId != null && !isPreview
+    val canVote = allowsHitTesting && !isAuthor && state.submittedValue == null && viewerId != null && !isPreview
     val displayValue = dragValue ?: state.submittedValue ?: if (isAuthor && state.totalVotes > 0) state.averageValue else 0.5f
+    val displayAverage = if (!isAuthor && state.submittedValue != null && state.totalVotes > 0) {
+        state.averageValue.toDouble()
+    } else {
+        null
+    }
     val source = "emojiSlider.$storyId.$stickerId"
+    val size = emojiSliderRenderingSize(prompt)
+    val showsPrompt = emojiSliderHasPrompt(prompt)
+    val totalW = size.width.value
+    val totalH = size.height.value
+    val metrics = emojiSliderTrackMetrics(totalW)
+    val trackFrame = emojiSliderTrackFrame(totalW, totalH, showsPrompt)
 
     LaunchedEffect(storyId, userId, stickerId, viewerId) {
         if (!isPreview) {
             state = runCatching { EmojiSliderVoteStore.load(userId, storyId, stickerId, viewerId) }.getOrDefault(state)
         }
     }
-    androidx.compose.runtime.DisposableEffect(source) {
+    DisposableEffect(source) {
         onDispose { gestureGate?.clearSuppression(source) }
     }
 
-    val isLight = styleVariant % 6 == 0
-    val ink = if (isLight) Color(0xFF161616) else Color.White
-    val surface = if (isLight) Color(0xFFF8F8FA) else Color(0xFF141519)
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    fun endInteraction() {
+        interacting = false
+        gestureGate?.clearSuppression(source)
+    }
+
+    Box(
         modifier = modifier
-            .width(280.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(surface)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-    ) {
-        if (prompt.isNotBlank()) {
-            Text(prompt, color = ink, fontWeight = FontWeight.Bold, fontSize = 16.sp, textAlign = TextAlign.Center, maxLines = 2)
-        }
-        Text(emoji.ifBlank { "😍" }, fontSize = (28f + displayValue * 14f).sp)
-        Slider(
-            value = displayValue.coerceIn(0f, 1f),
-            onValueChange = { value ->
-                if (!canVote) return@Slider
-                if (!interacting) {
-                    interacting = true
-                    gestureGate?.setSuppressionScope(StoryGestureSuppressionScope.SUPPRESS_VIEWER_GESTURES, source)
-                }
-                dragValue = value
-            },
-            onValueChangeFinished = {
-                val value = dragValue ?: return@Slider
-                dragValue = null
-                if (interacting) {
-                    interacting = false
-                    gestureGate?.clearSuppression(source)
-                }
-                if (viewerId != null && canVote) {
-                    scope.launch {
-                        runCatching {
-                            EmojiSliderVoteStore.submitIfAbsent(userId, storyId, stickerId, viewerId, value)
-                            EmojiSliderVoteStore.load(userId, storyId, stickerId, viewerId)
-                        }.getOrNull()?.let { state = it }
+            .size(size.width, size.height)
+            .emojiSliderVotePan(
+                enabled = canVote,
+                trackFrame = trackFrame,
+                trackLeadingDp = metrics.leading,
+                trackWidthDp = metrics.width,
+                onBegan = {
+                    if (!interacting) {
+                        interacting = true
+                        gestureGate?.setSuppressionScope(
+                            StoryGestureSuppressionScope.SUPPRESS_VIEWER_GESTURES,
+                            source,
+                        )
                     }
-                }
-            },
-            enabled = canVote,
-            colors = SliderDefaults.colors(
-                thumbColor = ink,
-                activeTrackColor = ink.copy(alpha = 0.55f),
-                inactiveTrackColor = ink.copy(alpha = 0.16f),
+                },
+                onChanged = { dragValue = it },
+                onEnded = { value ->
+                    endInteraction()
+                    dragValue = null
+                    if (viewerId != null) {
+                        scope.launch {
+                            runCatching {
+                                EmojiSliderVoteStore.submitIfAbsent(userId, storyId, stickerId, viewerId, value)
+                                EmojiSliderVoteStore.load(userId, storyId, stickerId, viewerId)
+                            }.getOrNull()?.let { state = it }
+                        }
+                    }
+                },
+                onCancelled = {
+                    endInteraction()
+                    dragValue = null
+                },
             ),
-            modifier = Modifier.fillMaxWidth(),
+    ) {
+        StickerEmojiSliderCardView(
+            prompt = prompt,
+            emoji = emoji.ifBlank { "😍" },
+            value = displayValue.toDouble(),
+            averageValue = displayAverage,
+            styleVariant = styleVariant,
+            modifier = Modifier.fillMaxSize(),
         )
-        if (!isAuthor && state.submittedValue != null && state.totalVotes > 0) {
-            Text("Average ${(state.averageValue * 100).toInt()}%", color = ink.copy(alpha = 0.62f), fontSize = 12.sp)
-        }
     }
 }
 
 /**
  * Port del renderer central `StoryStickerView`.
- * Frame y reveal siguen en `StoryInteractiveStickers.kt`, que conserva sus
- * interacciones físicas específicas; este renderer no los vuelve a dibujar.
+ * Frame y reveal siguen en `StoryInteractiveStickers.kt`; el quiz también
+ * (`InteractiveQuizSticker`) se renderiza desde aquí.
  */
 @Composable
 fun StoryStickerRendererLayer(
@@ -446,46 +560,122 @@ fun StoryStickerRendererLayer(
     userId: String,
     stickers: List<StickerData>,
     gestureGate: StoryDeckGestureGate? = null,
+    reportsDeckInteractionExclusion: Boolean = true,
     onPauseStory: () -> Unit = {},
     onResumeStory: () -> Unit = {},
     onMentionTap: (String) -> Unit = {},
     onMomentTap: (momentId: String, authorId: String) -> Unit = { _, _ -> },
+    /** Si se pasa, no hay Box fillMaxSize intermedio → zIndex interleave con texto. */
+    containerWidthPx: Float? = null,
+    containerHeightPx: Float? = null,
     modifier: Modifier = Modifier,
 ) {
-    BoxWithConstraints(modifier) {
-        val widthPx = constraints.maxWidth.toFloat()
-        val heightPx = constraints.maxHeight.toFloat()
-        stickers
-            .filterNot { it.type == "frame" || it.type == "reveal" }
-            .sortedBy { it.zIndex ?: 0 }
-            .forEach { sticker ->
-                Box(
-                    Modifier
-                        .graphicsLayer {
-                            scaleX = sticker.scale.toFloat()
-                            scaleY = sticker.scale.toFloat()
-                            rotationZ = Math.toDegrees(sticker.rotation).toFloat()
-                        }
-                        .offset {
-                            androidx.compose.ui.unit.IntOffset(
-                                (sticker.position.x * widthPx).roundToInt(),
-                                (sticker.position.y * heightPx).roundToInt(),
-                            )
-                        },
-                ) {
-                    StoryStickerView(
-                        sticker = sticker,
-                        storyId = storyId,
-                        userId = userId,
-                        gestureGate = gestureGate,
-                        onPauseStory = onPauseStory,
-                        onResumeStory = onResumeStory,
-                        onMentionTap = onMentionTap,
-                        onMomentTap = onMomentTap,
-                    )
-                }
-            }
+    if (containerWidthPx != null && containerHeightPx != null) {
+        StoryStickerRendererContent(
+            storyId = storyId,
+            userId = userId,
+            stickers = stickers,
+            widthPx = containerWidthPx,
+            heightPx = containerHeightPx,
+            gestureGate = gestureGate,
+            reportsDeckInteractionExclusion = reportsDeckInteractionExclusion,
+            onPauseStory = onPauseStory,
+            onResumeStory = onResumeStory,
+            onMentionTap = onMentionTap,
+            onMomentTap = onMomentTap,
+        )
+    } else {
+        BoxWithConstraints(modifier) {
+            StoryStickerRendererContent(
+                storyId = storyId,
+                userId = userId,
+                stickers = stickers,
+                widthPx = constraints.maxWidth.toFloat(),
+                heightPx = constraints.maxHeight.toFloat(),
+                gestureGate = gestureGate,
+                reportsDeckInteractionExclusion = reportsDeckInteractionExclusion,
+                onPauseStory = onPauseStory,
+                onResumeStory = onResumeStory,
+                onMentionTap = onMentionTap,
+                onMomentTap = onMomentTap,
+            )
+        }
     }
+}
+
+@Composable
+private fun StoryStickerRendererContent(
+    storyId: String,
+    userId: String,
+    stickers: List<StickerData>,
+    widthPx: Float,
+    heightPx: Float,
+    gestureGate: StoryDeckGestureGate?,
+    reportsDeckInteractionExclusion: Boolean,
+    onPauseStory: () -> Unit,
+    onResumeStory: () -> Unit,
+    onMentionTap: (String) -> Unit,
+    onMomentTap: (momentId: String, authorId: String) -> Unit,
+) {
+    stickers
+        .filterNot { it.type == "frame" || it.type == "reveal" }
+        .sortedBy { it.zIndex ?: 0 }
+        .forEach { sticker ->
+            // ≡ iOS StoryMediaOverlayRendererView.stickerForDisplay + .position (centro)
+            val (centerX, centerY) = StoryViewerLayoutHelpers.stickerDisplayPosition(
+                sticker.position,
+                widthPx,
+                heightPx,
+            )
+            val displayScale = StoryViewerLayoutHelpers.stickerDisplayScale(sticker.scale, widthPx)
+            var contentWidthPx by remember(sticker.stickerId, sticker.content) { mutableFloatStateOf(0f) }
+            var contentHeightPx by remember(sticker.stickerId, sticker.content) { mutableFloatStateOf(0f) }
+            val exclusionId = "sticker.$storyId.${sticker.stickerId.orEmpty()}"
+            Box(
+                Modifier
+                    .zIndex((sticker.zIndex ?: 0).toFloat())
+                    .onSizeChanged {
+                        contentWidthPx = it.width.toFloat()
+                        contentHeightPx = it.height.toFloat()
+                    }
+                    .offset {
+                        IntOffset(
+                            (centerX - contentWidthPx / 2f).roundToInt(),
+                            (centerY - contentHeightPx / 2f).roundToInt(),
+                        )
+                    }
+                    .graphicsLayer {
+                        scaleX = displayScale
+                        scaleY = displayScale
+                        rotationZ = Math.toDegrees(sticker.rotation).toFloat()
+                        transformOrigin = TransformOrigin.Center
+                    }
+                    .storyDeckInteractionExclusion(
+                        id = exclusionId,
+                        gate = gestureGate,
+                        enabled = reportsDeckInteractionExclusion && sticker.needsInteractionRegion(),
+                    ),
+            ) {
+                StoryStickerView(
+                    sticker = sticker,
+                    storyId = storyId,
+                    userId = userId,
+                    gestureGate = gestureGate,
+                    onPauseStory = onPauseStory,
+                    onResumeStory = onResumeStory,
+                    onMentionTap = onMentionTap,
+                    onMomentTap = onMomentTap,
+                )
+            }
+        }
+}
+
+/** ≡ iOS `StoryStickerView.needsInteractionRegion`. */
+private fun StickerData.needsInteractionRegion(): Boolean = when (type) {
+    "poll", "question", "questionResponse", "quiz", "emojiSlider",
+    "mention", "link", "location", "shareMoment", "hashtag",
+    -> true
+    else -> false
 }
 
 /** Contraparte Compose de la rama `interactiveStickerBody` de Swift. */
@@ -501,17 +691,44 @@ fun StoryStickerView(
     onMomentTap: (momentId: String, authorId: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
-    when (sticker.type) {
-        "poll" -> InteractivePollSticker(
+    val context = LocalContext.current
+    val allowsHit = LocalStoryStickerHitTesting.current
+    val gatedMentionTap: (String) -> Unit = { id -> if (allowsHit) onMentionTap(id) }
+    when {
+        sticker.type == "shareMoment" -> StorySharedMomentSticker(
+            sticker = sticker,
+            onClick = {
+                if (!allowsHit) return@StorySharedMomentSticker
+                sticker.momentId?.let { moment ->
+                    sticker.userId?.let { author -> onMomentTap(moment, author) }
+                }
+            },
+            modifier = modifier,
+        )
+        sticker.isAnimated && !sticker.videoURL.isNullOrBlank() -> StoryAnimatedVideoSticker(
+            sticker = sticker,
+            onClick = {
+                if (!allowsHit) return@StoryAnimatedVideoSticker
+                sticker.momentId?.let { moment ->
+                    sticker.userId?.let { author -> onMomentTap(moment, author) }
+                }
+            },
+            modifier = modifier,
+        )
+        sticker.isAnimated && !sticker.gifURL.isNullOrBlank() -> StoryGifSticker(
+            gifURL = sticker.gifURL,
+            modifier = modifier,
+        )
+        sticker.type == "poll" -> InteractivePollSticker(
             pollData = sticker.pollOptions?.let { listOf(sticker.questionText.orEmpty()) + it }
                 ?: listOf(sticker.content, "", ""),
             storyId = storyId,
             userId = userId,
             stickerId = sticker.stickerId.orEmpty(),
             styleVariant = sticker.styleVariant ?: 0,
-            modifier = modifier,
+            modifier = modifier.width(300.dp).height(172.dp),
         )
-        "emojiSlider" -> InteractiveEmojiSliderSticker(
+        sticker.type == "emojiSlider" -> InteractiveEmojiSliderSticker(
             prompt = sticker.sliderPrompt.orEmpty(),
             emoji = sticker.sliderEmoji.orEmpty(),
             storyId = storyId,
@@ -521,12 +738,12 @@ fun StoryStickerView(
             gestureGate = gestureGate,
             modifier = modifier,
         )
-        "weather" -> AnimatedWeatherSticker(
+        sticker.type == "weather" -> AnimatedWeatherSticker(
             weatherSymbol = sticker.weatherSymbol.orEmpty(),
             temperature = sticker.questionText ?: sticker.content,
-            modifier = modifier,
+            modifier = modifier.width(140.dp).height(50.dp),
         )
-        "question" -> InteractiveQuestionSticker(
+        sticker.type == "question" -> InteractiveQuestionSticker(
             questionText = sticker.questionText ?: sticker.content,
             storyId = storyId,
             userId = userId,
@@ -534,44 +751,92 @@ fun StoryStickerView(
             styleVariant = sticker.styleVariant ?: 0,
             onPauseStory = onPauseStory,
             onResumeStory = onResumeStory,
+            onOpenProfile = gatedMentionTap,
+            modifier = modifier.width(300.dp).height(132.dp),
+        )
+        sticker.type == "questionResponse" -> QuestionResponseStoryStickerCardView(
+            questionText = sticker.questionText ?: sticker.content,
+            styleVariant = sticker.styleVariant ?: 0,
             modifier = modifier,
         )
-        "mention" -> InteractiveMentionSticker(
+        sticker.type == "mention" -> InteractiveMentionSticker(
             username = sticker.username ?: sticker.content,
             styleVariant = sticker.styleVariant ?: 0,
-            onTap = { sticker.userId?.let(onMentionTap) },
+            onTap = { if (allowsHit) sticker.userId?.let(onMentionTap) },
             modifier = modifier,
         )
-        "hashtag" -> InteractiveHashtagSticker(
+        sticker.type == "hashtag" -> InteractiveHashtagSticker(
             hashtag = sticker.hashtag ?: sticker.content.removePrefix("#"),
             styleVariant = sticker.styleVariant ?: 0,
-            onPauseStory = onPauseStory,
-            onResumeStory = onResumeStory,
+            onPauseStory = if (allowsHit) onPauseStory else ({}),
+            onResumeStory = if (allowsHit) onResumeStory else ({}),
             modifier = modifier,
         )
-        "location" -> InteractiveLocationSticker(
+        sticker.type == "location" -> InteractiveLocationSticker(
             locationName = sticker.location ?: sticker.content,
+            latitude = sticker.latitude,
+            longitude = sticker.longitude,
             styleVariant = sticker.styleVariant ?: 0,
-            onPauseStory = onPauseStory,
-            onResumeStory = onResumeStory,
+            onPauseStory = if (allowsHit) onPauseStory else ({}),
+            onResumeStory = if (allowsHit) onResumeStory else ({}),
             modifier = modifier,
         )
-        "link" -> StoryStickerLabel(
-            text = sticker.linkTitle?.takeIf { it.isNotBlank() } ?: sticker.linkURL.orEmpty(),
-            accent = Color(0xFF0A84FF),
-            modifier = modifier,
+        sticker.type == "quiz" -> {
+            val question = sticker.quizQuestion
+            val options = sticker.quizOptions
+            if (question != null && !options.isNullOrEmpty()) {
+                InteractiveQuizSticker(
+                    storyId = storyId,
+                    userId = userId,
+                    stickerId = sticker.stickerId.orEmpty(),
+                    question = question,
+                    options = options,
+                    correctIndex = sticker.quizCorrectIndex ?: 0,
+                    styleVariant = sticker.styleVariant ?: 0,
+                    modifier = modifier.width(300.dp),
+                )
+            }
+        }
+        sticker.type == "link" -> {
+            val linkURL = sticker.linkURL.orEmpty()
+            val title = sticker.linkTitle?.takeIf { it.isNotBlank() }
+                ?: stickerHostLabel(linkURL)
+            Box(
+                modifier = modifier.clickable(enabled = allowsHit) {
+                    normalizedStickerURL(linkURL)?.let { uri ->
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        }
+                    }
+                },
+            ) {
+                StickerLinkCardView(
+                    title = title,
+                    styleVariant = sticker.styleVariant ?: 0,
+                )
+            }
+        }
+        sticker.type == "countdown" -> {
+            val title = sticker.countdownTitle?.takeIf { it.isNotBlank() } ?: sticker.content
+            val target = sticker.countdownTargetAtMs
+            if (target != null) {
+                StickerCountdownCardView(
+                    title = title,
+                    targetAtMs = target,
+                    styleVariant = sticker.styleVariant ?: 0,
+                    modifier = modifier,
+                )
+            }
+        }
+        sticker.type == "time" -> StickerTimeCardView(
+            timeText = sticker.questionText?.takeIf { it.isNotBlank() }
+                ?: MomentsFormat.smartDate(Date(), MomentsFormat.DateContext.TIME_ONLY),
+            dateText = sticker.caption?.takeIf { it.isNotBlank() }
+                ?: MomentsFormat.smartDate(Date(), MomentsFormat.DateContext.NUMERIC_DATE),
+            styleVariant = sticker.styleVariant ?: 0,
+            modifier = modifier.width(164.dp).height(56.dp),
         )
-        "countdown" -> StoryStickerLabel(
-            text = sticker.countdownTitle?.takeIf { it.isNotBlank() } ?: sticker.content,
-            accent = Color(0xFFFF9500),
-            modifier = modifier,
-        )
-        "time" -> StoryStickerLabel(
-            text = sticker.questionText?.takeIf { it.isNotBlank() } ?: sticker.content,
-            accent = Color(0xFF1C1C1E),
-            modifier = modifier,
-        )
-        "audio" -> {
+        sticker.type == "audio" -> {
             val url = sticker.audioURL
             if (!url.isNullOrBlank()) {
                 InteractiveAudioStickerView(
@@ -581,59 +846,192 @@ fun StoryStickerView(
                 )
             }
         }
-        "shareMoment" -> StorySharedMomentSticker(
-            sticker = sticker,
-            onClick = { sticker.momentId?.let { moment -> sticker.userId?.let { author -> onMomentTap(moment, author) } } },
-            modifier = modifier,
-        )
         else -> StoryStaticSticker(sticker, modifier)
     }
 }
 
 @Composable
-private fun StoryStickerLabel(text: String, accent: Color, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        color = Color.White,
-        fontWeight = FontWeight.Bold,
-        fontSize = 15.sp,
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(accent.copy(alpha = 0.9f))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-    )
-}
-
-@Composable
 private fun StorySharedMomentSticker(sticker: StickerData, onClick: () -> Unit, modifier: Modifier) {
+    val corner = FeedMomentCardLayout.mediaCornerRadius
     Box(
         modifier
             .width(220.dp)
-            .height(150.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color.Black.copy(alpha = 0.45f))
-            .clickable(onClick = onClick),
+            .height(280.dp)
+            .clip(RoundedCornerShape(corner))
+            .clickable(enabled = LocalStoryStickerHitTesting.current, onClick = onClick),
     ) {
-        val url = sticker.gifURL ?: sticker.content
-        if (url.isNotBlank()) {
-            AsyncImage(url, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        val baseUrl = sticker.gifURL ?: sticker.content.takeIf { it.startsWith("http") }
+        if (!baseUrl.isNullOrBlank()) {
+            AsyncImage(baseUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } else {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
         }
-        sticker.username?.let { username ->
-            Text("@$username", color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(10.dp))
+        sticker.videoURL?.takeIf { it.isNotBlank() }?.let { url ->
+            StickerVideoPlayer(url, Modifier.fillMaxSize())
         }
+
+        // Header ≡ ultraThinMaterial mask iOS
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent),
+                    ),
+                )
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val profileUid = sticker.userId
+                if (!profileUid.isNullOrBlank()) {
+                    AsyncProfileImageView(
+                        userId = profileUid,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape),
+                    )
+                } else {
+                    Icon(
+                        Icons.Filled.Person,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(34.dp),
+                    )
+                }
+                Text(
+                    text = sticker.username ?: "User",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.weight(1f))
+            }
+        }
+
+        if ((sticker.mediaCount ?: 0) > 1) {
+            Icon(
+                Icons.Filled.FilterNone,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 52.dp, end = 12.dp)
+                    .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                    .padding(6.dp)
+                    .size(14.dp),
+            )
+        }
+
         sticker.caption?.takeIf { it.isNotBlank() }?.let { caption ->
-            Text(caption, color = Color.White, fontSize = 12.sp, modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp))
+            Text(
+                text = caption,
+                color = Color.White,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 10.dp)
+                    .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(50))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
         }
     }
 }
 
+/** Rama iOS `isAnimated` + videoURL (no shareMoment). */
+@Composable
+private fun StoryAnimatedVideoSticker(
+    sticker: StickerData,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
+    val corner = FeedMomentCardLayout.mediaCornerRadius
+    Box(
+        modifier
+            .width(220.dp)
+            .height(280.dp)
+            .clip(RoundedCornerShape(corner))
+            .clickable(enabled = LocalStoryStickerHitTesting.current, onClick = onClick),
+    ) {
+        val baseUrl = sticker.gifURL ?: sticker.content.takeIf { it.startsWith("http") }
+        if (!baseUrl.isNullOrBlank()) {
+            AsyncImage(baseUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        }
+        sticker.videoURL?.let { StickerVideoPlayer(it, Modifier.fillMaxSize()) }
+        sticker.username?.let { username ->
+            Text(
+                username,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(10.dp),
+            )
+        }
+        sticker.caption?.takeIf { it.isNotBlank() }?.let { caption ->
+            Text(
+                caption,
+                color = Color.White,
+                fontSize = 9.sp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 10.dp)
+                    .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(50))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        }
+    }
+}
+
+/** Rama iOS `AnimatedStickerView` (GIF). */
+@Composable
+private fun StoryGifSticker(gifURL: String, modifier: Modifier) {
+    val context = LocalContext.current
+    val request = ImageRequest.Builder(context)
+        .data(gifURL)
+        .crossfade(false)
+        .decoderFactory(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                ImageDecoderDecoder.Factory()
+            } else {
+                GifDecoder.Factory()
+            },
+        )
+        .build()
+    SubcomposeAsyncImage(
+        model = request,
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = modifier.size(160.dp),
+        loading = { Box(Modifier.fillMaxSize()) },
+        error = { Box(Modifier.fillMaxSize()) },
+        success = { SubcomposeAsyncImageContent(modifier = Modifier.fillMaxSize()) },
+    )
+}
+
 @Composable
 private fun StoryStaticSticker(sticker: StickerData, modifier: Modifier) {
-    val url = sticker.videoURL ?: sticker.gifURL
+    val corner = FeedMomentCardLayout.mediaCornerRadius
+    val shaped = modifier.clip(RoundedCornerShape(corner))
     when {
-        sticker.isAnimated && sticker.videoURL != null -> StickerVideoPlayer(sticker.videoURL, modifier)
-        !url.isNullOrBlank() -> AsyncImage(url, null, modifier, contentScale = ContentScale.Fit)
-        sticker.content.isNotBlank() -> Text(sticker.content, fontSize = 32.sp, modifier = modifier)
+        !sticker.videoURL.isNullOrBlank() -> StickerVideoPlayer(sticker.videoURL, shaped)
+        !sticker.gifURL.isNullOrBlank() -> StoryGifSticker(sticker.gifURL, shaped)
+        sticker.content.startsWith("http") -> AsyncImage(
+            sticker.content,
+            null,
+            shaped,
+            contentScale = ContentScale.Fit,
+        )
+        sticker.content.isNotBlank() -> Text(sticker.content, fontSize = 32.sp, modifier = shaped)
     }
 }
 
@@ -680,7 +1078,6 @@ private object StoryQuestionResponseStore {
 
 /** Port de `InteractiveQuestionSticker`; la lista de respuestas vive en su archivo Swift propio. */
 @Composable
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun InteractiveQuestionSticker(
     questionText: String,
     storyId: String,
@@ -691,6 +1088,7 @@ fun InteractiveQuestionSticker(
     onQuestionChange: (String) -> Unit = {},
     onPauseStory: () -> Unit = {},
     onResumeStory: () -> Unit = {},
+    onOpenProfile: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val viewerId = FirebaseAuth.getInstance().currentUser?.uid
@@ -700,10 +1098,10 @@ fun InteractiveQuestionSticker(
     var state by remember(storyId, stickerId, viewerId) { mutableStateOf(QuestionResponseState()) }
     var showInput by remember { mutableStateOf(false) }
     var showResponses by remember { mutableStateOf(false) }
+    val isDark = isSystemInDarkTheme()
     val isLight = styleVariant % 6 == 0
-    val ink = if (isLight) Color(0xFF161616) else Color.White
-    val surface = if (isLight) Color(0xFFF8F8FA) else Color(0xFF141519)
-    val header = if (isLight) Color(0xFF161616) else Color(0xFF2B6CFF)
+    val ink = if (isLight) momentsStickerInk(isDark) else Color.White
+    val headerInk = if (isLight) momentsStickerInverseInk(isDark) else Color.White
 
     LaunchedEffect(storyId, userId, stickerId, viewerId) {
         if (!preview) state = runCatching {
@@ -718,46 +1116,75 @@ fun InteractiveQuestionSticker(
         else -> "Tap to answer"
     }
     val actionModifier = if (!isEditingInline) {
-        modifier.clickable(enabled = isAuthor || !state.hasResponded) {
+        modifier.clickable(enabled = LocalStoryStickerHitTesting.current && (isAuthor || !state.hasResponded)) {
             if (isAuthor) showResponses = true else showInput = true
             onPauseStory()
         }
     } else modifier
 
-    Column(
-        verticalArrangement = Arrangement.spacedBy(0.dp),
+    Box(
         modifier = actionModifier
             .width(300.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(surface),
+            .clip(RoundedCornerShape(24.dp)),
     ) {
-        if (isEditingInline) {
-            OutlinedTextField(
-                value = questionText,
-                onValueChange = onQuestionChange,
-                placeholder = { Text("Ask a question") },
-                textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, fontSize = 18.sp),
-                modifier = Modifier.fillMaxWidth().background(header).padding(horizontal = 18.dp),
-            )
-        } else {
+        AnimatedMomentsCardStickerSurface(
+            styleVariant = styleVariant,
+            isDark = isDark,
+            modifier = Modifier.matchParentSize(),
+        )
+        Column(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth()) {
+                AnimatedMomentsCardStickerHeaderSurface(
+                    styleVariant = styleVariant,
+                    isDark = isDark,
+                    modifier = Modifier.matchParentSize(),
+                )
+                if (isEditingInline) {
+                    OutlinedTextField(
+                        value = questionText,
+                        onValueChange = onQuestionChange,
+                        placeholder = { Text("Ask a question") },
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            color = headerInk,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            fontSize = 18.sp,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                    )
+                } else {
+                    Text(
+                        text = questionText.ifBlank { "Ask a question" },
+                        color = headerInk,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 3,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                    )
+                }
+            }
+            // ≡ iOS Capsule subtitle
             Text(
-                text = questionText.ifBlank { "Ask a question" },
-                color = Color.White,
+                subtitle,
+                color = if (isLight) ink.copy(alpha = 0.72f) else Color.White,
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
+                fontSize = 15.sp,
                 textAlign = TextAlign.Center,
-                maxLines = 3,
-                modifier = Modifier.fillMaxWidth().background(header).padding(horizontal = 20.dp, vertical = 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(
+                        if (isLight) ink.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.18f),
+                    )
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
             )
         }
-        Text(
-            subtitle,
-            color = ink.copy(alpha = 0.72f),
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
-        )
     }
 
     if (showInput) {
@@ -778,10 +1205,13 @@ fun InteractiveQuestionSticker(
         )
     }
     if (showResponses) {
-        ModalBottomSheet(onDismissRequest = {
-            showResponses = false
-            onResumeStory()
-        }) {
+        MomentsModalSheet(
+            onDismissRequest = {
+                showResponses = false
+                onResumeStory()
+            },
+            largeOnly = false,
+        ) {
             QuestionResponsesView(
                 questionText = questionText,
                 storyId = storyId,
@@ -791,6 +1221,13 @@ fun InteractiveQuestionSticker(
                     showResponses = false
                     onResumeStory()
                 },
+                onOpenProfile = { profileUserId ->
+                    if (profileUserId.isBlank()) return@QuestionResponsesView
+                    // Cerrar sheet para que el perfil del viewer quede visible (≡ navigation destination iOS)
+                    showResponses = false
+                    onOpenProfile(profileUserId)
+                },
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
@@ -798,7 +1235,6 @@ fun InteractiveQuestionSticker(
 
 /** Port Compose de `QuestionResponseInputView`. */
 @Composable
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun QuestionResponseInputView(
     questionText: String,
     storyId: String,
@@ -811,7 +1247,8 @@ fun QuestionResponseInputView(
     val scope = rememberCoroutineScope()
     var responseText by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // ≡ iOS `.presentationDetents([.medium, .large])`
+    MomentsModalSheet(onDismissRequest = onDismiss, largeOnly = false) {
         Column(
             verticalArrangement = Arrangement.spacedBy(18.dp),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp).padding(bottom = 28.dp),
@@ -851,11 +1288,12 @@ fun QuestionResponseInputView(
     }
 }
 
-/** Port de `InteractiveLocationSticker`; el mapa se presenta dentro del viewer. */
+/** Port de `InteractiveLocationSticker`; fullScreen ≡ `LocationMapView`. */
 @Composable
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun InteractiveLocationSticker(
     locationName: String,
+    latitude: Double? = null,
+    longitude: Double? = null,
     styleVariant: Int,
     onPauseStory: () -> Unit,
     onResumeStory: () -> Unit,
@@ -863,7 +1301,7 @@ fun InteractiveLocationSticker(
 ) {
     var showingMap by remember { mutableStateOf(false) }
     Box(
-        modifier = modifier.clickable {
+        modifier = modifier.clickable(enabled = LocalStoryStickerHitTesting.current) {
             showingMap = true
             onPauseStory()
         },
@@ -874,14 +1312,23 @@ fun InteractiveLocationSticker(
         )
     }
     if (showingMap) {
-        ModalBottomSheet(onDismissRequest = {
-            showingMap = false
-            onResumeStory()
-        }) {
-            Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(locationName, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("Location preview")
-            }
+        Dialog(
+            onDismissRequest = {
+                showingMap = false
+                onResumeStory()
+            },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            LocationMapView(
+                locationName = locationName,
+                latitude = latitude,
+                longitude = longitude,
+                onDismiss = {
+                    showingMap = false
+                    onResumeStory()
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
@@ -894,7 +1341,7 @@ fun InteractiveMentionSticker(
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier.clickable(onClick = onTap)) {
+    Box(modifier = modifier.clickable(enabled = LocalStoryStickerHitTesting.current, onClick = onTap)) {
         StickerMentionCardView(
             username = username,
             styleVariant = styleVariant,
@@ -902,9 +1349,8 @@ fun InteractiveMentionSticker(
     }
 }
 
-/** Port de `InteractiveHashtagSticker`; pausa mientras presenta la exploración. */
+/** Port de `InteractiveHashtagSticker`; fullScreen ≡ `ExploreView(initialSearchQuery:)`. */
 @Composable
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun InteractiveHashtagSticker(
     hashtag: String,
     styleVariant: Int,
@@ -914,7 +1360,7 @@ fun InteractiveHashtagSticker(
 ) {
     var showingExplore by remember { mutableStateOf(false) }
     Box(
-        modifier = modifier.clickable {
+        modifier = modifier.clickable(enabled = LocalStoryStickerHitTesting.current) {
             showingExplore = true
             onPauseStory()
         },
@@ -925,14 +1371,22 @@ fun InteractiveHashtagSticker(
         )
     }
     if (showingExplore) {
-        ModalBottomSheet(onDismissRequest = {
-            showingExplore = false
-            onResumeStory()
-        }) {
-            Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("#${hashtag}", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("Explore hashtag")
-            }
+        Dialog(
+            onDismissRequest = {
+                showingExplore = false
+                onResumeStory()
+            },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            ExploreView(
+                initialSearchQuery = "#$hashtag",
+                isDismissable = true,
+                onDismiss = {
+                    showingExplore = false
+                    onResumeStory()
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }

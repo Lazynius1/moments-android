@@ -1,8 +1,19 @@
 package com.moments.android.views.feed.moments
 
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 /** Port de `MomentCarouselLayoutRules.swift`. */
 enum class MomentCarouselPresentationMode {
@@ -83,6 +94,7 @@ object MomentCarouselIndicatorStyle {
     fun activeColor(index: Int): Color = palette[index % palette.size]
 }
 
+/** Port de `FeedMomentCardLayout` (MomentCarouselLayoutRules.swift). */
 object FeedMomentCardLayout {
     val listHorizontalPadding = 4.dp
     val headerHorizontalPadding = 8.dp
@@ -95,7 +107,49 @@ object FeedMomentCardLayout {
     /** iOS `FeedMomentCardLayout.continuousRoundedRect` (style .continuous ≈ default Compose). */
     val continuousRoundedRectShape = RoundedCornerShape(mediaCornerRadius)
 
+    /** iOS `scaledMediaCornerRadius(_:)`. */
+    fun scaledMediaCornerRadius(scale: Float): Dp = mediaCornerRadius * scale
+
     /** iOS `mediaContentWidth` = screenWidth - listHorizontalPadding * 2. */
     fun mediaContentWidth(screenWidthDp: Float): Float =
         maxOf(screenWidthDp - listHorizontalPadding.value * 2f, 1f)
+
+    @Composable
+    fun mediaContentWidth(): Float {
+        val w = LocalConfiguration.current.screenWidthDp.toFloat()
+        return mediaContentWidth(w)
+    }
+}
+
+/** Port de `MomentCarouselPageIndicators` (MomentCarouselLayoutRules.swift). */
+@Composable
+fun MomentCarouselPageIndicators(
+    count: Int,
+    currentIndex: Int,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(MomentCarouselIndicatorStyle.spacing),
+    ) {
+        repeat(count) { index ->
+            val active = index == currentIndex
+            Box(
+                Modifier
+                    .size(
+                        width = MomentCarouselIndicatorStyle.dotWidth,
+                        height = MomentCarouselIndicatorStyle.dotHeight,
+                    )
+                    .scale(if (active) MomentCarouselIndicatorStyle.activeScale else 1f)
+                    .clip(RoundedCornerShape(50))
+                    .background(
+                        if (active) {
+                            MomentCarouselIndicatorStyle.activeColor(index)
+                        } else {
+                            MomentCarouselIndicatorStyle.inactiveColor
+                        },
+                    ),
+            )
+        }
+    }
 }

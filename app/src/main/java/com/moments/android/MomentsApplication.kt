@@ -31,6 +31,7 @@ import com.moments.android.services.persistence.StorySeenStateService
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.storage.VideoCompressionService
+import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.services.video.ReelPrebufferService
 import com.moments.android.services.video.SharedVideoPlayerPool
 import com.moments.android.utilities.EmojiUsageStore
@@ -44,6 +45,8 @@ import com.moments.android.notifications.services.NotificationBadgeService
 import com.moments.android.notifications.services.NotificationService
 import com.moments.android.services.security.MomentsAppCheckProviderFactory
 import com.google.firebase.appcheck.FirebaseAppCheck
+import com.mapbox.common.MapboxOptions
+import com.moments.android.views.feed.maps.FeedMaps
 
 /**
  * Application process entry — pares con [MomentsApp] Compose.
@@ -60,6 +63,10 @@ class MomentsApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        // Mapbox: token público desde local.properties → BuildConfig (antes de cualquier MapView).
+        if (FeedMaps.hasMapboxToken()) {
+            MapboxOptions.accessToken = BuildConfig.MAPBOX_ACCESS_TOKEN
+        }
         // iOS: AppCheck.setAppCheckProviderFactory antes de FirebaseApp.configure().
         FirebaseAppCheck.getInstance().installAppCheckProviderFactory(MomentsAppCheckProviderFactory)
         NetworkMonitor.initialize(this)
@@ -102,6 +109,7 @@ class MomentsApplication : Application() {
         BackgroundStoryUploadService.initialize(this)
         LiveLocationSharingService.initialize(this)
         SharedVideoPlayerPool.initialize(this)
+        GlobalVideoManager.initialize(this)
         ReelPrebufferService.initialize(this)
         IncognitoModeService.initialize(this)
         ChatCommunicationIntentDonor.initialize(this)

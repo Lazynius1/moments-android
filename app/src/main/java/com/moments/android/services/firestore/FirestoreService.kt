@@ -7,6 +7,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import com.moments.android.models.AccountHistoryEventType
@@ -21,10 +22,11 @@ import com.moments.android.models.Moment
 import com.moments.android.models.ReactionPayload
 import com.moments.android.models.cache.CachedAction
 import com.moments.android.models.encode
+import com.moments.android.models.NotificationType
 import com.moments.android.notifications.services.NotificationService
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.ContentAudience
-import com.moments.android.models.NotificationType
+import com.moments.android.views.feed.reactions.ReactionType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -701,6 +703,69 @@ class FirestoreService(
                 "timestamp" to FieldValue.serverTimestamp(),
             )).await()
         }
+    }
+
+    /** Port de `removeReaction` (reacciones.swift) — borra `reactions/{userId}`. */
+    suspend fun removeReaction(momentId: String, reaction: String, userId: String, authorId: String) {
+        val reactionRef = db.collection("users").document(authorId)
+            .collection("moments").document(momentId)
+            .collection("reactions").document(userId)
+        reactionRef.delete().await()
+        if (userId != authorId) {
+            NotificationService.removeNotification(
+                NotificationType.REACTION, userId, authorId,
+                momentId = momentId, reaction = reaction,
+            )
+        }
+    }
+
+    /** Port de `fetchReactions` — mapa reactionType → userIds. */
+    suspend fun fetchReactions(momentId: String, authorId: String): Map<String, List<String>> {
+        val snapshot = db.collection("users").document(authorId)
+            .collection("moments").document(momentId)
+            .collection("reactions")
+            .get()
+            .await()
+        return aggregateReactions(snapshot.documents)
+    }
+
+    /** Port de `listenToReactions` — listener tiempo real. */
+    fun listenToReactions(
+        momentId: String,
+        authorId: String,
+        onUpdate: (Map<String, List<String>>) -> Unit,
+    ): ListenerRegistration {
+        return db.collection("users").document(authorId)
+            .collection("moments").document(momentId)
+            .collection("reactions")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                onUpdate(aggregateReactions(snapshot?.documents.orEmpty()))
+            }
+    }
+
+    /** Port de `checkUserReaction`. */
+    suspend fun checkUserReaction(momentId: String, authorId: String, userId: String): ReactionType? {
+        val snap = db.collection("users").document(authorId)
+            .collection("moments").document(momentId)
+            .collection("reactions").document(userId)
+            .get()
+            .await()
+        val raw = snap.data?.get("reactionType") as? String ?: return null
+        return ReactionType.fromRaw(raw)
+    }
+
+    private fun aggregateReactions(
+        documents: List<DocumentSnapshot>,
+    ): Map<String, List<String>> {
+        val reactions = mutableMapOf<String, MutableList<String>>()
+        for (document in documents) {
+            val data = document.data ?: continue
+            val reactionType = data["reactionType"] as? String ?: continue
+            val uid = data["userId"] as? String ?: continue
+            reactions.getOrPut(reactionType) { mutableListOf() }.add(uid)
+        }
+        return reactions
     }
 
     suspend fun fetchRecentMomentCounts(authorIds: List<String>, since: Date): Map<String, Int> =

@@ -38,6 +38,25 @@ class GlassmorphicChatSearchController(
     val currentSearchMatchId: String?
         get() = searchMatchIds.getOrNull(currentSearchMatchIndex).takeIf { isSearchVisible }
     val activeSearchHighlightTerm: String get() = if (isSearchVisible) searchQuery.trim() else ""
+    val trimmedSearchQuery: String get() = searchQuery.trim()
+
+    /** ≡ `canSearchGoUp` iOS. */
+    val canSearchGoUp: Boolean
+        get() = searchMatchIds.isNotEmpty() && currentSearchMatchIndex > 0
+
+    /** ≡ `canSearchGoDown` iOS. */
+    val canSearchGoDown: Boolean
+        get() {
+            if (!isSearchVisible || trimmedSearchQuery.isEmpty()) return false
+            if (searchMatchIds.isNotEmpty()) {
+                val isLastMatch = currentSearchMatchIndex >= searchMatchIds.lastIndex
+                if (isLastMatch) {
+                    return !scrollController.isPinnedToBottom || scrollController.distanceFromBottom() > 16
+                }
+                return true
+            }
+            return !scrollController.isPinnedToBottom || scrollController.distanceFromBottom() > 16
+        }
 
     fun toggleChatSearch() {
         isSearchVisible = !isSearchVisible
@@ -48,6 +67,16 @@ class GlassmorphicChatSearchController(
         currentSearchMatchIndex = 0
         pendingSearchTargetId = null
         isSearchFieldFocused = isSearchVisible
+    }
+
+    /** ≡ `clearSearchQueryKeepingMode` — limpia el texto sin salir del modo búsqueda. */
+    fun clearSearchQueryKeepingMode() {
+        searchQuery = ""
+        viewModel.clearSearch()
+        searchMatchIds = emptyList()
+        currentSearchMatchIndex = 0
+        pendingSearchTargetId = null
+        isSearchFieldFocused = true
     }
 
     fun updateSearchQuery(value: String) {
@@ -69,7 +98,7 @@ class GlassmorphicChatSearchController(
     }
 
     fun syncSearchMatchesFromViewModel() {
-        if (searchQuery.trim().isEmpty()) {
+        if (trimmedSearchQuery.isEmpty()) {
             searchMatchIds = emptyList()
             currentSearchMatchIndex = 0
             return

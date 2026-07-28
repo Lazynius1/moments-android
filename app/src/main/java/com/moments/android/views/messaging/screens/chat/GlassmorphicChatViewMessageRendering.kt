@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,14 +26,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
+import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.feed.AdaptiveColors
-import com.moments.android.views.messaging.components.ChatBottomWallpaperEdgeFade
 import com.moments.android.views.messaging.components.ChatBuzzTimelineEventRow
 import com.moments.android.views.messaging.components.ChatBuzzToast
 import com.moments.android.views.messaging.components.ChatConversationIntroRow
@@ -40,10 +43,13 @@ import com.moments.android.views.messaging.components.ChatHistoryStartHeader
 import com.moments.android.views.messaging.components.ChatMessageContextMenuOverlay
 import com.moments.android.views.messaging.components.ChatMessageMenuCallbacks
 import com.moments.android.views.messaging.components.ChatRequestDisclaimerRow
+import com.moments.android.views.messaging.components.ChatTimestampRevealState
 import com.moments.android.views.messaging.components.GlassmorphicReplyBar
 import com.moments.android.views.messaging.components.GlassmorphicTypingIndicator
 import com.moments.android.views.messaging.components.ChatGlassmorphicBackground
 import com.moments.android.views.messaging.components.PendingRequestMessageRow
+import com.moments.android.views.messaging.components.chatMenuDimmedUnlessSelected
+import com.moments.android.views.messaging.components.chatMenuDimmedWhenOpen
 import com.moments.android.views.messaging.core.ChatRenderRow
 import com.moments.android.views.messaging.core.EnhancedChatViewModel
 
@@ -58,6 +64,8 @@ data class ChatMessageRenderingCallbacks(
     val onCopy: (EnhancedMessage) -> Unit = {},
     val onForward: (EnhancedMessage) -> Unit = {},
     val onMoreReactions: (EnhancedMessage) -> Unit = {},
+    val onToggleStar: (EnhancedMessage) -> Unit = {},
+    val starredMessageIds: Set<String> = emptySet(),
 )
 
 @Composable
@@ -70,22 +78,25 @@ fun GlassmorphicChatRenderRow(
     messagePresentation: ChatMessagePresentationState,
     callbacks: ChatMessageRenderingCallbacks,
     quickReactionEmoji: String,
+    timestampRevealState: ChatTimestampRevealState = remember { ChatTimestampRevealState() },
     modifier: Modifier = Modifier,
 ) {
     val menuOpen = messagePresentation.menuSelection != null
-    val dim = if (menuOpen && row !is ChatRenderRow.Message) .42f else 1f
+    val selectedRowId = messagePresentation.menuSelection?.rowId
     when (row) {
-        is ChatRenderRow.ConversationIntro -> ChatConversationIntroRow(row.context, otherParticipantName, otherParticipantId, adaptiveColors, modifier.padding(horizontal = 18.dp, vertical = 8.dp))
-        is ChatRenderRow.RequestDisclaimer -> ChatRequestDisclaimerRow(requestDisclaimerForRendering(row.context), adaptiveColors, modifier.padding(horizontal = 18.dp, vertical = 6.dp))
-        is ChatRenderRow.PendingRequestMessage -> PendingRequestMessageRow(row.message, adaptiveColors, modifier.padding(horizontal = 14.dp, vertical = 4.dp))
-        is ChatRenderRow.Header -> GlassmorphicDateHeader(row.date, modifier.padding(vertical = 10.dp))
-        is ChatRenderRow.Message -> Column(modifier) {
+        is ChatRenderRow.ConversationIntro -> ChatConversationIntroRow(row.context, otherParticipantName, otherParticipantId, adaptiveColors, modifier.chatMenuDimmedWhenOpen(menuOpen).padding(horizontal = 18.dp, vertical = 8.dp))
+        is ChatRenderRow.RequestDisclaimer -> ChatRequestDisclaimerRow(requestDisclaimerForRendering(row.context), adaptiveColors, modifier.chatMenuDimmedWhenOpen(menuOpen).padding(horizontal = 18.dp, vertical = 6.dp))
+        is ChatRenderRow.PendingRequestMessage -> PendingRequestMessageRow(row.message, adaptiveColors, modifier.chatMenuDimmedWhenOpen(menuOpen).padding(horizontal = 14.dp, vertical = 4.dp))
+        is ChatRenderRow.Header -> GlassmorphicDateHeader(row.date, modifier.chatMenuDimmedWhenOpen(menuOpen).padding(vertical = 10.dp))
+        is ChatRenderRow.Message -> Column(
+            modifier.chatMenuDimmedUnlessSelected(selectedRowId == row.id, menuOpen),
+        ) {
             callbacks.onUnreadDivider(row)
-            GlassmorphicChatMessageItem(row.item, viewModel.messages.value, viewModel, messagePresentation, callbacks.renderer, quickReactionEmoji)
+            GlassmorphicChatMessageItem(row.item, viewModel.messages.value, viewModel, messagePresentation, callbacks.renderer, quickReactionEmoji, timestampRevealState)
         }
-        is ChatRenderRow.Buzz -> ChatBuzzTimelineEventRow(callbacks.buzzText(row.event), row.event.senderId == viewModel.currentUserId, modifier)
-        ChatRenderRow.Typing -> GlassmorphicTypingIndicator(reduceMotion = false, modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp))
-        ChatRenderRow.HistoryStart -> ChatHistoryStartHeader(adaptiveColors, modifier)
+        is ChatRenderRow.Buzz -> ChatBuzzTimelineEventRow(callbacks.buzzText(row.event), row.event.senderId == viewModel.currentUserId, modifier.chatMenuDimmedWhenOpen(menuOpen))
+        ChatRenderRow.Typing -> GlassmorphicTypingIndicator(reduceMotion = MotionPolicy.reduceMotion, modifier = modifier.chatMenuDimmedWhenOpen(menuOpen).fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp))
+        ChatRenderRow.HistoryStart -> ChatHistoryStartHeader(adaptiveColors, modifier.chatMenuDimmedWhenOpen(menuOpen))
     }
 }
 
@@ -131,16 +142,25 @@ fun GlassmorphicChatRootContent(
     buzzToastText: String?,
     isSearchVisible: Boolean,
     composerHeight: androidx.compose.ui.unit.Dp,
+    onComposerHeightChange: (androidx.compose.ui.unit.Dp) -> Unit = {},
     content: @Composable () -> Unit,
     composer: @Composable () -> Unit,
     callbacks: ChatMessageRenderingCallbacks,
     modifier: Modifier = Modifier,
 ) {
+    val forwardingPreferences by viewModel.forwardingPreferences.collectAsState()
+    val density = LocalDensity.current
     Box(modifier.fillMaxSize().background(adaptiveColors.chatBackground.first())) {
         ChatGlassmorphicBackground(adaptiveColors, Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize()) { content() }
-        ChatBottomWallpaperEdgeFade(adaptiveColors.chatBackground.first(), composerHeight, modifier = Modifier.align(Alignment.BottomCenter))
-        Box(Modifier.align(Alignment.BottomCenter)) {
+        // Android: sin ChatBottomWallpaperEdgeFade (iOS lo necesita por el chrome; aquí tapa mensajes).
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .onSizeChanged { size ->
+                    onComposerHeightChange(with(density) { size.height.toDp() })
+                },
+        ) {
             if (!isSearchVisible) composer()
         }
         buzzToastText?.let { text ->
@@ -149,6 +169,8 @@ fun GlassmorphicChatRootContent(
         ChatMessageContextMenuOverlay(
             selection = messagePresentation.menuSelection,
             currentUserId = viewModel.currentUserId,
+            forwardingPreferences = forwardingPreferences,
+            starredMessageIds = callbacks.starredMessageIds,
             callbacks = ChatMessageMenuCallbacks(
                 onDeleteForEveryone = viewModel::deleteMessageForEveryone,
                 onDeleteForMe = viewModel::deleteMessageForMe,
@@ -156,7 +178,10 @@ fun GlassmorphicChatRootContent(
                 onReply = callbacks.renderer.onReply,
                 onCopy = callbacks.onCopy,
                 onForward = callbacks.onForward,
-                onToggleStar = viewModel::toggleStar,
+                onToggleStar = { message ->
+                    viewModel.toggleStar(message)
+                    callbacks.onToggleStar(message)
+                },
                 onReaction = { message, emoji -> viewModel.addReaction(message, emoji) },
                 onMoreReactions = callbacks.onMoreReactions,
             ),

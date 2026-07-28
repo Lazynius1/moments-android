@@ -16,6 +16,8 @@ import com.moments.android.views.messaging.services.ChatBuzzEvent
 import com.moments.android.views.messaging.services.ChatBuzzProcessedStore
 import com.moments.android.views.messaging.services.ChatDraftEvent
 import com.moments.android.views.messaging.services.ChatDraftEvents
+import com.moments.android.views.messaging.services.ConversationBuzzPreferenceEvents
+import com.moments.android.views.messaging.services.ConversationForwardingPreferenceEvents
 import com.moments.android.views.messaging.services.listenToBuzzEvents
 import com.moments.android.views.messaging.services.removeBuzzListener
 import com.moments.android.views.messaging.services.sendBuzz
@@ -95,6 +97,15 @@ open class EnhancedChatViewModel(
     private val _canLoadMore = MutableStateFlow(true); val canLoadMore = _canLoadMore.asStateFlow()
     private val _historyLoadNotice = MutableStateFlow(HistoryLoadNotice.HIDDEN); val historyLoadNotice = _historyLoadNotice.asStateFlow()
     private val _error = MutableStateFlow<String?>(null); val error = _error.asStateFlow()
+
+    /** ≡ `viewModel.error = …` en iOS. */
+    fun reportError(message: String?) {
+        _error.value = message
+    }
+
+    fun clearError() {
+        _error.value = null
+    }
     private val _isTyping = MutableStateFlow(false); val isTyping = _isTyping.asStateFlow()
     private val _typingIndicatorEnabled = MutableStateFlow(true); val typingIndicatorEnabled = _typingIndicatorEnabled.asStateFlow()
     private val _forwardingPreferences = MutableStateFlow(conversation.forwardingPreferences.orEmpty())
@@ -165,8 +176,25 @@ open class EnhancedChatViewModel(
             }
         }
         setupIngestListener()
+        setupConversationPreferenceListener()
         refreshTypingIndicatorPreference()
         refreshForwardingPreference()
+    }
+
+    /** ≡ `setupConversationPreferenceListener` — forwarding/buzz en vivo desde ConversationSettings. */
+    private fun setupConversationPreferenceListener() {
+        scope.launch {
+            ConversationForwardingPreferenceEvents.events.collect { event ->
+                if (event.conversationId != conversationId) return@collect
+                _forwardingPreferences.value = _forwardingPreferences.value + (event.userId to event.allowsForwarding)
+            }
+        }
+        scope.launch {
+            ConversationBuzzPreferenceEvents.events.collect { event ->
+                if (event.conversationId != conversationId) return@collect
+                _buzzPreferences.value = _buzzPreferences.value + (event.userId to event.allowsBuzz)
+            }
+        }
     }
 
     /** ≡ `setupIngestListener` — merge local-first cuando hay ingest. */
@@ -313,6 +341,20 @@ open class EnhancedChatViewModel(
             else -> return
         }
         _forwardingPreferences.value = _forwardingPreferences.value + (currentUserId to stored)
+    }
+
+    /** ≡ carga local de buzzPreferences del usuario actual. */
+    fun refreshBuzzPreference() {
+        if (conversationId.isBlank()) return
+        val prefs = chatSettingsPrefs() ?: return
+        val androidKey = "buzz_$conversationId"
+        val iosKey = "chat_buzz_enabled_$conversationId"
+        val stored = when {
+            prefs.contains(androidKey) -> prefs.getBoolean(androidKey, true)
+            prefs.contains(iosKey) -> prefs.getBoolean(iosKey, true)
+            else -> return
+        }
+        _buzzPreferences.value = _buzzPreferences.value + (currentUserId to stored)
     }
 
     private fun typingIndicatorPreferenceKey(conversationId: String) =

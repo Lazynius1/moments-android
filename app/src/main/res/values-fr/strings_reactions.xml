@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feed_reaction_accessibility_default">Réagir, %1$d réactions</string>
+    <string name="feed_reaction_accessibility_selected">Votre réaction %1$s, %2$d réactions</string>
+    <string name="feed_reaction_accessibility_hint">Appuyez deux fois pour réagir. Appui long pour plus de réactions.</string>
+    <string name="reactions_title">Réactions</string>
+    <string name="reactions_loading">Chargement des réactions...</string>
+    <string name="reactions_empty_title">Aucune réaction</string>
+    <string name="reactions_empty_subtitle">Soyez le premier à réagir à ce moment</string>
+    <string name="reactions_search_no_results_title">Aucun résultat trouvé</string>
+    <string name="reactions_search_no_results_subtitle">Essayez d\'autres termes de recherche</string>
+    <string name="reactions_type_count">%d types de réaction</string>
+    <string name="reactions_type_count_single">%d type de réaction</string>
+    <string name="reactions_people_count">%d personnes</string>
+    <string name="reactions_people_count_single">%d personne</string>
+    <string name="reactions_more">Et %d de plus...</string>
+    <string name="reactions_user_reacted">A réagi avec %1$s</string>
+    <string name="reactions_search_placeholder">Rechercher des utilisateurs...</string>
+</resources>

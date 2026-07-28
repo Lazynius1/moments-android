@@ -1,6 +1,7 @@
 package com.moments.android.views.nova.tools
 
 import com.google.firebase.ai.type.Schema
+import com.moments.android.extensions.optStringOrNull
 import com.moments.android.views.nova.ai.NovaAIService
 import com.moments.android.views.nova.ai.NovaPromptCatalog
 import org.json.JSONObject
@@ -21,6 +22,6 @@ object NovaMomentDraftParser {
         ))
         val payload = JSONObject(NovaAIService.generateJson(prompt, schema))
         if (!payload.optBoolean("should_publish", false)) return null
-        return Draft(payload.optString("content"), payload.optString("audience", "everyone"), payload.optString("target_username").takeIf { it.isNotEmpty() }, payload.optString("custom_list_name").takeIf { it.isNotEmpty() })
+        return Draft(payload.optString("content"), payload.optString("audience", "everyone"), payload.optStringOrNull("target_username"), payload.optStringOrNull("custom_list_name"))
     }
 }

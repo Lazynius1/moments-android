@@ -32,6 +32,8 @@ object ProfileHeaderCollapseMetrics {
     /** iOS: topChromePadding + chromeHeight + 12 */
     val feedStyleDetailTopInset = topChromePadding + chromeHeight + 12.dp
     const val feedDetailChromeBlurFadeTail = 48f
+    /** ≡ iOS `locationChromeBlurFadeTail`. */
+    const val locationChromeBlurFadeTail = feedDetailChromeBlurFadeTail
     const val detailScrollFadeLead = 64f
 
     fun detailScrollChromeBlurProgress(contentMinY: Float, initialContentMinY: Float): Float {

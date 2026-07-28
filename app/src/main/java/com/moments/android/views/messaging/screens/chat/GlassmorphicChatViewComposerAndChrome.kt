@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -33,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -58,9 +61,15 @@ import com.moments.android.views.messaging.components.GlassmorphicClusterRow
 import com.moments.android.views.messaging.components.GlassmorphicInputBar
 import com.moments.android.views.messaging.components.GlassmorphicMessageRow
 import com.moments.android.views.messaging.components.ChatBubbleAnchorMetrics
+import com.moments.android.views.messaging.components.ChatTimestampRevealState
+import com.moments.android.views.messaging.components.clusterAggregateStatus
+import com.moments.android.views.messaging.components.VoiceRecordingDraft
+import com.moments.android.views.messaging.components.VoiceRecordingFinishAction
+import com.moments.android.views.messaging.components.VoiceRecordingGestureState
 import com.moments.android.views.messaging.core.EnhancedChatViewModel
 import com.moments.android.views.messaging.core.MessageItem
 import com.moments.android.views.messaging.services.ChatSessionEngine
+import com.moments.android.views.messaging.screens.SharedMedia
 import java.util.Date
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -72,25 +81,13 @@ import kotlinx.coroutines.launch
  * pertenecen a navegación, requests y hojas se exponen como contratos: este chrome conserva
  * exactamente las transiciones de estado sin inventar una segunda pantalla de chat.
  */
-data class SharedMedia(
-    val id: String,
-    val type: MediaType,
-    val thumbnailUrl: String,
-    val originalUrl: String,
-    val senderId: String,
-    val timestamp: Date,
-    val sourceMessage: EnhancedMessage? = null,
-    val allowsSaving: Boolean = true,
-) {
-    enum class MediaType { IMAGE, VIDEO }
-}
 
 fun sharedMediaFrom(message: EnhancedMessage): SharedMedia? {
     val mediaUrl = message.mediaUrl ?: return null
     if (message.type !in setOf(MessageType.IMAGE, MessageType.VIDEO, MessageType.EPHEMERAL)) return null
     return SharedMedia(
         id = message.id,
-        type = if (message.type == MessageType.VIDEO) SharedMedia.MediaType.VIDEO else SharedMedia.MediaType.IMAGE,
+        type = if (message.type == MessageType.VIDEO) SharedMedia.Type.VIDEO else SharedMedia.Type.IMAGE,
         thumbnailUrl = message.thumbnailUrl ?: mediaUrl,
         originalUrl = mediaUrl,
         senderId = message.senderId,
@@ -107,8 +104,20 @@ fun sharedMediaItemsForOverlay(messages: List<EnhancedMessage>, selecting: Enhan
     return if (items.any { it.id == selected.id }) items else items + selected
 }
 
+/** ≡ iOS `sendReplyToSharedMedia`. */
+fun sendReplyToSharedMedia(
+    viewModel: EnhancedChatViewModel,
+    media: SharedMedia,
+    text: String,
+    completion: (Result<Unit>) -> Unit,
+) {
+    val trimmed = text.trim()
+    if (trimmed.isEmpty()) return
+    viewModel.sendTextMessage(trimmed, replyTo = media.id)
+    completion(Result.success(Unit))
+}
+
 data class PendingMessageRequestOperations(
-    val isLoading: Boolean = false,
     val send: (receiverId: String, text: String, completion: (Result<Unit>) -> Unit) -> Unit = { _, _, completion -> completion(Result.failure(UnsupportedOperationException())) },
     val accept: (requestId: String, completion: (Result<AcceptMessageRequestResult>) -> Unit) -> Unit = { _, completion -> completion(Result.failure(UnsupportedOperationException())) },
     val cancel: (requestId: String, completion: (Result<Unit>) -> Unit) -> Unit = { _, completion -> completion(Result.failure(UnsupportedOperationException())) },
@@ -124,17 +133,21 @@ class ChatComposerAndChromeController(
     private val onAccepted: (String) -> Unit = {},
     private val onDismissed: () -> Unit = {},
     private val onError: (Throwable) -> Unit = {},
+    /** ≡ iOS `viewModel.currentUserId` para orientar el bubble del request. */
+    var currentUserId: String = "",
 ) {
     var pendingChatContext by mutableStateOf(pendingChatContext)
         private set
 
+    /** ≡ iOS `pendingMessageRequestService.isLoading`. */
+    var isRequestLoading by mutableStateOf(false)
+
     val isPendingChat: Boolean get() = pendingChatContext != null
     val pendingChatCanType: Boolean get() = pendingChatContext?.status == PendingChatContext.Status.OUTGOING_REQUEST_DRAFT
-    val isRequestLoading: Boolean get() = requestOperations.isLoading
     val pendingChatTimelineMessage: PendingChatTimelineMessage?
         get() {
             val context = pendingChatContext ?: return null
-            context.request?.let { return PendingChatTimelineMessage.from(it, it.senderId) }
+            context.request?.let { return PendingChatTimelineMessage.from(it, currentUserId) }
             val text = context.initialText?.trim().orEmpty()
             return text.takeIf { it.isNotEmpty() }?.let { PendingChatTimelineMessage.outgoingText(it, context.otherUserId) }
         }
@@ -143,7 +156,11 @@ class ChatComposerAndChromeController(
         pendingChatContext = context
     }
 
-    fun sendPendingMessageRequest(text: String, onTextChanged: (String) -> Unit) {
+    fun sendPendingMessageRequest(
+        text: String,
+        onTextChanged: (String) -> Unit,
+        onDidSend: () -> Unit = {},
+    ) {
         val context = pendingChatContext ?: return
         val trimmed = text.trim()
         if (trimmed.isEmpty() || context.status != PendingChatContext.Status.OUTGOING_REQUEST_DRAFT) return
@@ -152,11 +169,13 @@ class ChatComposerAndChromeController(
                 pendingChatContext = context.copy(status = PendingChatContext.Status.OUTGOING_REQUEST_SENT, initialText = trimmed)
                 onTextChanged("")
                 onDraftCleared()
+                onDidSend()
             }.onFailure { error ->
                 // iOS treats the duplicate-request response as an already sent request.
                 if (error.message?.contains("409") == true) {
                     pendingChatContext = context.copy(status = PendingChatContext.Status.OUTGOING_REQUEST_SENT, initialText = null)
                     onTextChanged("")
+                    onDidSend()
                 } else onError(error)
             }
         }
@@ -230,33 +249,49 @@ fun ChatComposerChrome(
     vanishModeActive: Boolean,
     isRecordingVoice: Boolean,
     isVoiceRecordingLocked: Boolean,
-    recordingSeconds: Long,
+    recordingSeconds: Double,
+    recordingInteractionId: String? = null,
+    voiceRecordingDraft: VoiceRecordingDraft? = null,
+    isPreparingVoiceRecordingPreview: Boolean = false,
+    voiceGestureState: VoiceRecordingGestureState,
     editingMessage: EnhancedMessage? = null,
     replyingTo: EnhancedMessage? = null,
     onEditingFinished: () -> Unit = {},
     onReplyingFinished: () -> Unit = {},
     onUnblock: () -> Unit = {},
+    isAttachmentMenuOpen: Boolean = false,
     onOpenAttachments: () -> Unit = {},
-    onStartVoiceRecording: () -> Unit = {},
-    onFinishVoiceRecording: (Boolean) -> Unit = {},
+    onAttachmentPlusAnchorBoundsChanged: (androidx.compose.ui.unit.IntRect) -> Unit = {},
+    onVoiceButtonAnchorBoundsChanged: (androidx.compose.ui.unit.IntRect) -> Unit = {},
+    onStartVoiceRecording: (String, Boolean) -> Unit = { _, _ -> },
+    onFinishVoiceRecording: (String, VoiceRecordingFinishAction) -> Unit = { _, _ -> },
+    onVoiceRecordingTrimChanged: (ClosedFloatingPointRange<Double>) -> Unit = {},
+    onLockChanged: (Boolean) -> Unit = {},
     onReport: () -> Unit = {},
     onReplyAfterAcceptance: (String, String) -> Unit = { _, _ -> },
+    /** ≡ iOS `isTextFieldFocused = false` tras enviar request. */
+    onPendingRequestSent: () -> Unit = {},
     viewModel: EnhancedChatViewModel,
     modifier: Modifier = Modifier,
 ) {
     val context = controller.pendingChatContext
+    // Aire sobre gesture/nav: insets sistema + margen Moments (Telegram deja el panel con padding).
+    val safeModifier = modifier
+        .navigationBarsPadding()
+        .imePadding()
+        .padding(bottom = 10.dp)
     when {
-        isOtherParticipantBlockedByCurrentUser -> BlockedByMeChatInputBar(onUnblock, modifier)
-        isOtherParticipantUnavailable -> UnavailableChatInputBar(modifier)
+        isOtherParticipantBlockedByCurrentUser -> BlockedByMeChatInputBar(onUnblock, safeModifier)
+        isOtherParticipantUnavailable -> UnavailableChatInputBar(safeModifier)
         context?.status == PendingChatContext.Status.OUTGOING_REQUEST_SENT -> PendingRequestSentInputBar(
             onCancel = { controller.cancelPendingMessageRequest(messageText, onMessageTextChange) },
-            modifier = modifier,
+            modifier = safeModifier,
         )
         context?.status == PendingChatContext.Status.OUTGOING_REQUEST_BLOCKED -> RequestsClosedInputBar(
             displayName = context.otherUsername.ifBlank { otherParticipantDisplayName },
-            modifier = modifier,
+            modifier = safeModifier,
         )
-        else -> Column(modifier) {
+        else -> Column(safeModifier) {
             if (context?.status == PendingChatContext.Status.INCOMING_REQUEST_PENDING) {
                 IncomingRequestActionBar(
                     isLoading = controller.isRequestLoading,
@@ -269,19 +304,40 @@ fun ChatComposerChrome(
             if (controller.pendingChatCanType && context != null) {
                 ChatRequestInviteNotice(context.otherUsername, context.otherUsername, com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()))
             }
+            // ≡ iOS `replyBarSection` encima del input
+            ChatReplyAndEditingBar(
+                replyingTo = replyingTo,
+                editingMessage = editingMessage,
+                otherParticipantName = otherParticipantDisplayName,
+                adaptiveColors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()),
+                onReplyCancelled = onReplyingFinished,
+                onEditingCancelled = {
+                    onEditingFinished()
+                    onMessageTextChange("")
+                },
+            )
             GlassmorphicInputBar(
                 text = messageText,
                 onTextChange = onMessageTextChange,
                 isRecordingVoice = isRecordingVoice,
                 isVoiceRecordingLocked = isVoiceRecordingLocked,
                 recordingSeconds = recordingSeconds,
+                recordingInteractionId = recordingInteractionId,
+                voiceRecordingDraft = voiceRecordingDraft,
+                isPreparingVoiceRecordingPreview = isPreparingVoiceRecordingPreview,
+                voiceGestureState = voiceGestureState,
                 isVanishModeActive = vanishModeActive,
                 allowsAttachments = !controller.isPendingChat,
+                isAttachmentMenuOpen = isAttachmentMenuOpen,
                 onSend = {
                     val outgoing = messageText.trim()
                     if (outgoing.isEmpty()) return@GlassmorphicInputBar
                     when {
-                        controller.pendingChatCanType -> controller.sendPendingMessageRequest(outgoing, onMessageTextChange)
+                        controller.pendingChatCanType -> controller.sendPendingMessageRequest(
+                            outgoing,
+                            onMessageTextChange,
+                            onDidSend = onPendingRequestSent,
+                        )
                         context?.status == PendingChatContext.Status.INCOMING_REQUEST_PENDING -> controller.acceptPendingMessageRequest(outgoing, onMessageTextChange, onReplyAfterAcceptance)
                         editingMessage != null -> {
                             viewModel.editMessage(editingMessage, outgoing)
@@ -296,8 +352,12 @@ fun ChatComposerChrome(
                     }
                 },
                 onOpenAttachments = onOpenAttachments,
+                onAttachmentPlusAnchorBoundsChanged = onAttachmentPlusAnchorBoundsChanged,
+                onVoiceButtonAnchorBoundsChanged = onVoiceButtonAnchorBoundsChanged,
                 onStartVoiceRecording = onStartVoiceRecording,
                 onFinishVoiceRecording = onFinishVoiceRecording,
+                onVoiceRecordingTrimChanged = onVoiceRecordingTrimChanged,
+                onLockChanged = onLockChanged,
             )
         }
     }
@@ -404,6 +464,10 @@ data class ChatMessageRendererCallbacks(
     val shouldShowAvatar: (EnhancedMessage, List<EnhancedMessage>) -> Boolean = { _, _ -> false },
     val groupPosition: (EnhancedMessage, List<EnhancedMessage>) -> com.moments.android.views.messaging.components.ChatMessageGroupPosition = { _, _ -> com.moments.android.views.messaging.components.ChatMessageGroupPosition.SINGLE },
     val onReply: (EnhancedMessage) -> Unit = {},
+    /** ≡ iOS cluster `onReply: { messages in clusterForReply = messages }`. */
+    val onClusterReply: (List<EnhancedMessage>) -> Unit = { cluster ->
+        cluster.lastOrNull()?.let(onReply)
+    },
     val onAvatarTap: () -> Unit = {},
     val onReplyTap: (String) -> Unit = {},
     val onOpenMedia: (EnhancedMessage) -> Unit = {},
@@ -422,9 +486,21 @@ data class ChatMessageRendererCallbacks(
 class ChatMessagePresentationState {
     var menuSelection by mutableStateOf<ChatMessageMenuSelection?>(null)
     var flashingMessageIds by mutableStateOf(emptySet<String>())
+    /** ≡ iOS `chatListController.frameInWindow(forRowId:)`. */
+    var rowFrameProvider: ((String) -> Rect?)? = null
 
     fun presentMessageOptions(message: EnhancedMessage, rowId: String, currentUserId: String, cluster: List<EnhancedMessage>? = null) {
-        menuSelection = ChatMessageMenuSelection(rowId, message, isOutgoing = message.senderId == currentUserId, clusterMessages = cluster)
+        val frame = rowFrameProvider?.invoke(rowId) ?: Rect.Zero
+        // ≡ iOS guard anchorFrame.width > 0, height > 0
+        if (frame.width <= 0f || frame.height <= 0f) return
+        menuSelection = ChatMessageMenuSelection(
+            rowId = rowId,
+            message = message,
+            anchorFrame = frame,
+            anchorCornerRadius = ChatBubbleAnchorMetrics.cornerRadiusFor(message),
+            isOutgoing = message.senderId == currentUserId,
+            clusterMessages = cluster,
+        )
     }
 
     fun clearMessageOptions() { menuSelection = null }
@@ -434,6 +510,13 @@ class ChatMessagePresentationState {
     fun isMessageItemHighlighted(item: MessageItem): Boolean = when (item) {
         is MessageItem.Single -> isBubbleFlashing(item.message.id)
         is MessageItem.MediaCluster -> item.messages.any { isBubbleFlashing(it.id) }
+    }
+
+    /** ≡ iOS `pulseBubbleHighlight`. */
+    suspend fun pulseBubbleHighlight(messageId: String, durationMs: Long = ChatBubbleAnchorMetrics.highlightDurationMillis) {
+        beginBubbleFlash(messageId)
+        delay(durationMs)
+        endBubbleFlash(messageId)
     }
 }
 
@@ -456,6 +539,7 @@ fun GlassmorphicChatMessageItem(
     presentationState: ChatMessagePresentationState,
     callbacks: ChatMessageRendererCallbacks,
     quickReactionEmoji: String,
+    timestampRevealState: ChatTimestampRevealState = remember { ChatTimestampRevealState() },
     modifier: Modifier = Modifier,
 ) {
     val rowId = "row:message:${item.id}"
@@ -473,7 +557,13 @@ fun GlassmorphicChatMessageItem(
         is MessageItem.Single -> {
             val message = live(item.message)
             if (message.type == MessageType.CHAT_NOTICE) {
-                ChatNoticeTimelineRow(message.content.orEmpty(), message.senderId, viewModel.currentUserId, callbacks.otherParticipantName, callbacks.onChangeVanishTimer, callbacks.onTurnOnVanish, modifier)
+                // Avisos sin `content` (o con un token no reconocido) no pintan texto pero
+                // `ChatDisappearingNoticeRow` seguía reservando su padding/altura — dejaba
+                // huecos vacíos en el timeline. Si no hay nada que mostrar, no se compone
+                // la fila (0×0), en vez de reservar espacio para un aviso en blanco.
+                if (!message.content.isNullOrBlank()) {
+                    ChatNoticeTimelineRow(message.content.orEmpty(), message.senderId, viewModel.currentUserId, callbacks.otherParticipantName, callbacks.onChangeVanishTimer, callbacks.onTurnOnVanish, modifier)
+                }
             } else {
                 GlassmorphicMessageRow(
                     message = message,
@@ -491,6 +581,8 @@ fun GlassmorphicChatMessageItem(
                     downloadProgress = viewModel.downloadProgress.value[message.id],
                     isDownloadingMedia = viewModel.isDownloadingMedia(message.id),
                     showSeenLabel = shouldShowSeenLabel(message.id, message.status, messages, viewModel.currentUserId),
+                    isStarred = message.isStarred(viewModel.currentUserId) || viewModel.isStarred(message.id),
+                    timestampRevealState = timestampRevealState,
                     callbacks = ChatMessageBubbleCallbacks(
                         onReply = { callbacks.onReply(message) },
                         onReaction = { emoji -> viewModel.addReaction(message, emoji); pulse(message.id) },
@@ -509,6 +601,9 @@ fun GlassmorphicChatMessageItem(
                             callbacks.onLongPress(message, rowId, null)
                         },
                         onViewOnceOpen = callbacks.onViewOnceOpen,
+                        onRetryFailed = { failed ->
+                            if (viewModel.canRetryMessage(failed)) viewModel.retryFailedMessage(failed)
+                        },
                     ),
                     modifier = modifier.pointerInput(message.id) {
                         detectTapGestures(onDoubleTap = {
@@ -522,12 +617,35 @@ fun GlassmorphicChatMessageItem(
         }
         is MessageItem.MediaCluster -> {
             val cluster = item.messages.map(live)
+            // ≡ iOS liveCluster.last as anchor for seen/reply chrome
+            val anchor = cluster.lastOrNull()
             GlassmorphicClusterRow(
                 messages = cluster,
-                isCurrentUser = cluster.firstOrNull()?.senderId == viewModel.currentUserId,
+                isCurrentUser = anchor?.senderId == viewModel.currentUserId,
                 uploadProgress = viewModel.uploadProgress.value,
                 onOpenCluster = callbacks.onOpenCluster,
                 onHydrateMedia = callbacks.onHydrateMedia,
+                showAvatar = anchor?.let { callbacks.shouldShowAvatar(it, messages) } == true,
+                otherUserId = callbacks.otherParticipantId,
+                isOtherParticipantUnavailable = callbacks.isOtherParticipantUnavailable,
+                otherParticipantName = callbacks.otherParticipantName,
+                repliedMessage = anchor?.replyTo?.let(viewModel.messagesById::get),
+                onAvatarTap = callbacks.onAvatarTap,
+                onReply = { callbacks.onClusterReply(cluster) },
+                onReplyTap = callbacks.onReplyTap,
+                displayReactions = { id -> if (menuSelected) null else viewModel.displayReactions(id) },
+                onReaction = { message, emoji ->
+                    viewModel.addReaction(message, emoji)
+                    pulse(message.id)
+                },
+                showSeenLabel = anchor?.let { shouldShowSeenLabel(it.id, clusterAggregateStatus(cluster), messages, viewModel.currentUserId) } == true,
+                isStarred = anchor?.let { it.isStarred(viewModel.currentUserId) || viewModel.isStarred(it.id) } == true,
+                isMenuSelected = menuSelected,
+                isBubbleFlashing = presentationState.isMessageItemHighlighted(item),
+                onLongPress = { message ->
+                    presentationState.presentMessageOptions(message, rowId, viewModel.currentUserId, cluster.takeIf { it.size > 1 })
+                    callbacks.onLongPress(message, rowId, cluster.takeIf { it.size > 1 })
+                },
                 modifier = modifier.combinedClickable(
                     onClick = {},
                     onLongClick = {

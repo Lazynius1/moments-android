@@ -547,8 +547,7 @@ fun UserProfileView(
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
             StoriesView(
-                startAtUserId = userId,
-                ringNavigationUserIds = listOf(userId),
+                startWithUserId = userId,
                 onDismiss = { showingStories = false },
             )
         }

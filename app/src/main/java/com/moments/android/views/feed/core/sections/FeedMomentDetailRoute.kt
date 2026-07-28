@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
@@ -23,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -105,7 +107,14 @@ fun LoadingMomentView(modifier: Modifier = Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            CircularProgressIndicator(color = FeedTeal)
+            // iOS: ProgressView scaleEffect(1.5) + tint 00A896
+            CircularProgressIndicator(
+                color = FeedTeal,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = 1.5f
+                    scaleY = 1.5f
+                },
+            )
             Text(
                 text = stringResource(R.string.feed_loading_moment),
                 color = Color.White,
@@ -138,7 +147,8 @@ fun ErrorMomentView(
                 Icons.Filled.Warning,
                 contentDescription = null,
                 tint = Color.Red,
-                modifier = Modifier.padding(bottom = 4.dp),
+                // iOS: system font size 50
+                modifier = Modifier.size(50.dp),
             )
             Text(
                 text = message,

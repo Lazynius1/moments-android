@@ -1,22 +1,31 @@
 package com.moments.android.views.messaging.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -34,6 +43,7 @@ fun Modifier.chatBuzzShakeEffect(progress: Float, amplitude: Dp): Modifier = gra
     val amplitudePx = amplitude.toPx()
     translationX = sin(clampedProgress * Math.PI.toFloat() * 20f) * amplitudePx * remaining
     translationY = cos(clampedProgress * Math.PI.toFloat() * 14f) * amplitudePx * .38f * remaining
+    // iOS `rotated(by:)` usa radianes; Compose `rotationZ` usa grados.
     rotationZ = (sin(clampedProgress * Math.PI.toFloat() * 16f) * .022f * remaining * 180f / Math.PI.toFloat())
 }
 
@@ -42,7 +52,7 @@ fun ChatBuzzToast(
     text: String,
     modifier: Modifier = Modifier,
 ) {
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val isDark = isSystemInDarkTheme()
     val contentColor = if (isDark) Color.White else Color.Black
     val shape = RoundedCornerShape(50)
     Row(
@@ -79,14 +89,15 @@ fun ChatBuzzTimelineEventRow(
     isOutgoing: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val isDark = isSystemInDarkTheme()
     val contentColor = if (isDark) Color.White else Color.Black
     val shape = RoundedCornerShape(50)
+    // ≡ Color.orange sistema ≈ FF9500
     val strokeColors = listOf(
-            Color.Red.copy(alpha = if (isDark) .4f else .25f),
-            Color(0xFFFF9500).copy(alpha = if (isDark) .2f else .08f),
-            Color.Transparent,
-        ).let { if (isOutgoing) it else it.reversed() }
+        Color.Red.copy(alpha = if (isDark) .4f else .25f),
+        Color(0xFFFF9500).copy(alpha = if (isDark) .2f else .08f),
+        Color.Transparent,
+    ).let { if (isOutgoing) it else it.reversed() }
     val stroke = Brush.horizontalGradient(strokeColors)
     Row(
         modifier = modifier
@@ -108,11 +119,8 @@ fun ChatBuzzTimelineEventRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AttachmentIconView(
-                icon = AttachmentIcon.BUZZ,
-                size = AttachmentIconMetrics.buzzTimelineEvent,
-                tintColor = Color.Red,
-            )
+            // ≡ .foregroundStyle(LinearGradient red → orange)
+            ChatBuzzGradientIcon(size = AttachmentIconMetrics.buzzTimelineEvent)
             androidx.compose.material3.Text(
                 text = text,
                 color = contentColor,
@@ -124,7 +132,28 @@ fun ChatBuzzTimelineEventRow(
     }
 }
 
+@Composable
+private fun ChatBuzzGradientIcon(size: Dp) {
+    val brush = Brush.linearGradient(listOf(Color.Red, Color(0xFFFF9500)))
+    Image(
+        painter = painterResource(AttachmentIcon.BUZZ.drawableRes),
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        colorFilter = ColorFilter.tint(Color.White),
+        modifier = Modifier
+            .size(size)
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithCache {
+                onDrawWithContent {
+                    drawContent()
+                    drawRect(brush = brush, blendMode = BlendMode.SrcIn)
+                }
+            },
+    )
+}
+
 /** Private Compose shape matching `ChatBuzzWaveShape`'s five Bézier segments. */
+@Suppress("unused") // Espejo iOS; sin call sites aún (igual que Swift).
 private object ChatBuzzWaveShape : Shape {
     override fun createOutline(size: androidx.compose.ui.geometry.Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val middleY = size.height / 2f

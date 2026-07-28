@@ -1,5 +1,9 @@
 package com.moments.android.services.performance
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 /**
  * Port de `FeedVisibilityCoordinator.swift`.
  * Elige un único vídeo activo en el feed según la fracción visible de cada post.
@@ -9,9 +13,15 @@ package com.moments.android.services.performance
 object FeedVisibilityCoordinator {
     private const val PLAY_THRESHOLD = 0.55f
 
-    @Volatile
-    var activeVideoMomentId: String? = null
-        private set
+    private val _activeVideoMomentId = MutableStateFlow<String?>(null)
+    /** Observable para Compose (`ModernVideoPlayer` onChange). */
+    val activeVideoMomentIdFlow: StateFlow<String?> = _activeVideoMomentId.asStateFlow()
+
+    var activeVideoMomentId: String?
+        get() = _activeVideoMomentId.value
+        private set(value) {
+            _activeVideoMomentId.value = value
+        }
 
     private val visibilityByMomentId = mutableMapOf<String, Float>()
     private val lock = Any()

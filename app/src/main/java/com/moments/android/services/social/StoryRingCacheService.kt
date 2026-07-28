@@ -107,7 +107,7 @@ object StoryRingResolverService {
         privacyService: PrivacyService,
         db: FirebaseFirestore,
     ): StoryRingSnapshot {
-        val documents = try {
+        val documents = runCatching {
             // iOS: expirationDate > now, order by timestamp ascending.
             db.collection("users").document(authorId).collection("stories")
                 .whereGreaterThan("expirationDate", Timestamp.now())
@@ -115,7 +115,7 @@ object StoryRingResolverService {
                 .get()
                 .await()
                 .documents
-        } catch (_: Exception) {
+        }.recoverCatching {
             // Fallback sin índice: filtrar/ordenar en cliente.
             db.collection("users").document(authorId).collection("stories")
                 .whereGreaterThan("expirationDate", Timestamp.now())
@@ -123,7 +123,7 @@ object StoryRingResolverService {
                 .await()
                 .documents
                 .sortedBy { (it.get("timestamp") as? Timestamp)?.toDate()?.time ?: 0L }
-        }
+        }.getOrNull() ?: return cacheAndReturn(viewerId, authorId, emptySnapshot)
 
         if (documents.isEmpty()) {
             return cacheAndReturn(viewerId, authorId, emptySnapshot)

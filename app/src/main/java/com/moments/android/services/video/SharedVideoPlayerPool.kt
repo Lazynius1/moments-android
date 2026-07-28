@@ -90,6 +90,21 @@ object SharedVideoPlayerPool {
         }
     }
 
+    /** Port de pausar todos los AVPlayer del pool (GlobalVideoManager.pauseAllVideos). */
+    fun pauseAll() {
+        ensureInitialized()
+        synchronized(lock) {
+            slots.forEach { it.player.pause() }
+        }
+    }
+
+    fun setAllVolumes(volume: Float) {
+        ensureInitialized()
+        synchronized(lock) {
+            slots.forEach { it.player.volume = volume }
+        }
+    }
+
     private fun evictSlot(index: Int) {
         val player = slots[index].player
         player.pause()

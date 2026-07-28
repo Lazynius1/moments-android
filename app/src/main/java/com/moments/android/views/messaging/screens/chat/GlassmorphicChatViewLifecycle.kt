@@ -5,6 +5,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.google.firebase.auth.FirebaseAuth
+import com.moments.android.models.OnlineStatus
+import com.moments.android.services.messaging.OnlineStatusService
+import com.moments.android.services.social.StoryRingResolverService
+import com.moments.android.services.social.StoryRingSnapshot
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.services.cache.UserCacheService
@@ -14,6 +18,7 @@ import com.moments.android.services.firestore.checkPublicProfileAvailability
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.views.messaging.components.ChatMessageGroupPosition
 import com.moments.android.views.messaging.core.EnhancedChatViewModel
+import com.moments.android.views.messaging.core.PresenceDisplay
 import java.util.Date
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,14 +56,15 @@ class GlassmorphicChatLifecycleController(
     private val firestoreService: FirestoreService = FirestoreService(),
     private val cameraOperations: ChatCameraCaptureOperations = ChatCameraCaptureOperations(),
     private val viewOnceOperations: ChatViewOnceSessionOperations = ChatViewOnceSessionOperations(),
-    private val onObserveOnlineStatus: (String, (String?, Date?) -> Unit) -> (() -> Unit)? = { _, _ -> null },
+    private val onlineStatusService: OnlineStatusService = OnlineStatusService.shared,
+    private val onObserveOnlineStatus: ((String, (OnlineStatus, Date?) -> Unit) -> (() -> Unit))? = null,
     private val onStoriesDisabled: () -> Unit = {},
     private val onStoriesRefresh: () -> Unit = {},
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var removeStatusObserver: (() -> Unit)? = null
 
-    var otherUserStatus by mutableStateOf<String?>(null)
+    var otherUserStatus by mutableStateOf<OnlineStatus?>(null)
         private set
     var otherUserLastSeen by mutableStateOf<Date?>(null)
         private set
@@ -74,14 +80,57 @@ class GlassmorphicChatLifecycleController(
         private set
     var viewOnceViewerPresentation by mutableStateOf<ViewOnceViewerPresentation?>(null)
         private set
+    var storyRing by mutableStateOf(
+        StoryRingSnapshot(
+            hasStory = false,
+            hasUnseenStory = false,
+            storyCount = 0,
+            storyViewedStatus = emptyList(),
+            storyAudiences = emptyList(),
+        ),
+    )
+        private set
+
+    val hasStory: Boolean get() = storyRing.hasStory
+    val presenceDisplay: PresenceDisplay?
+        get() {
+            val status = otherUserStatus ?: return null
+            return onlineStatusService.presenceDisplay(status, otherUserLastSeen)
+        }
 
     fun setupOnlineStatusObserver() {
         removeStatusObserver?.invoke()
         val otherUserId = viewModel.conversation.otherParticipantId
         if (otherUserId.isBlank()) return
-        removeStatusObserver = onObserveOnlineStatus(otherUserId) { status, lastSeen ->
+        val observe = onObserveOnlineStatus ?: onlineStatusService::observeUserStatus
+        removeStatusObserver = observe(otherUserId) { status, lastSeen ->
             otherUserStatus = status
             otherUserLastSeen = lastSeen
+        }
+    }
+
+    /** ≡ `checkUserStories()` en ComposerAndChrome. */
+    fun checkUserStories() {
+        val authorId = viewModel.conversation.otherParticipantId.trim()
+        val viewerId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        val empty = StoryRingSnapshot(
+            hasStory = false,
+            hasUnseenStory = false,
+            storyCount = 0,
+            storyViewedStatus = emptyList(),
+            storyAudiences = emptyList(),
+        )
+        if (authorId.isEmpty() || viewerId.isEmpty()) {
+            storyRing = empty
+            return
+        }
+        scope.launch {
+            val snapshot = runCatching {
+                StoryRingResolverService.resolve(viewerId = viewerId, authorId = authorId)
+            }.getOrElse { empty }
+            if (viewModel.conversation.otherParticipantId.trim() == authorId) {
+                storyRing = snapshot
+            }
         }
     }
 
@@ -113,9 +162,13 @@ class GlassmorphicChatLifecycleController(
         shouldShowCamera = false
     }
 
+    // ≡ iOS: delay 0.35s para no competir con el dismiss del visor view-once
     fun openCameraForReply(messageId: String) {
         pendingCameraReplyToMessageId = messageId
-        shouldShowCamera = true
+        scope.launch {
+            kotlinx.coroutines.delay(350)
+            shouldShowCamera = true
+        }
     }
 
     fun openCamera() {

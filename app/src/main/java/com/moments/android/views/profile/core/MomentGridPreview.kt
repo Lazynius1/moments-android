@@ -6,9 +6,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.layout
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import com.moments.android.models.Moment
 import com.moments.android.models.MomentGridPreviewSettings
@@ -26,8 +26,35 @@ val Moment.gridPreviewSettings: MomentGridPreviewSettings
 val Moment.canAdjustGridPreview: Boolean get() = previewImageURLString != null
 
 @Composable
-fun GridPreviewThumbnailFrame(size: Dp, settings: MomentGridPreviewSettings, content: @Composable () -> Unit) {
-    Box(Modifier.size(size).clipToBounds().then(if (settings.fitMode == MomentGridPreviewSettings.FitMode.FIT) Modifier.background(if (settings.background == MomentGridPreviewSettings.Background.BLACK) Color.Black else Color.White) else Modifier)) {
-        Box(Modifier.matchParentSize().scale(settings.scale.toFloat()).layout { measurable, constraints -> val placeable = measurable.measure(constraints); layout(placeable.width, placeable.height) { placeable.placeRelative((settings.offsetX * size.toPx()).toInt(), (settings.offsetY * size.toPx()).toInt()) } }) { content() }
+fun GridPreviewThumbnailFrame(
+    size: Dp,
+    settings: MomentGridPreviewSettings,
+    content: @Composable (ContentScale) -> Unit,
+) {
+    val contentScale = if (settings.fitMode == MomentGridPreviewSettings.FitMode.FIT) {
+        ContentScale.Fit
+    } else {
+        ContentScale.Crop
+    }
+    val background = if (settings.background == MomentGridPreviewSettings.Background.BLACK) Color.Black else Color.White
+
+    Box(
+        Modifier
+            .size(size)
+            .clipToBounds()
+            .then(if (settings.fitMode == MomentGridPreviewSettings.FitMode.FIT) Modifier.background(background) else Modifier),
+    ) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    scaleX = settings.scale.toFloat()
+                    scaleY = settings.scale.toFloat()
+                    translationX = settings.offsetX.toFloat() * size.toPx()
+                    translationY = settings.offsetY.toFloat() * size.toPx()
+                },
+        ) {
+            content(contentScale)
+        }
     }
 }

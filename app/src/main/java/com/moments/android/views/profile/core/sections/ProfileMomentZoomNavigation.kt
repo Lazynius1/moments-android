@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import com.moments.android.models.HighlightedStory
 import com.moments.android.models.Moment
 import com.moments.android.utilities.HapticManager
@@ -16,6 +17,8 @@ import com.moments.android.views.explore.ExploreMomentDetailView
 import com.moments.android.views.explore.toExploreFeedMoment
 import com.moments.android.views.feed.maps.LocationMomentDetailView
 import com.moments.android.views.profile.momentsview.ModernMomentDetailView
+import com.moments.android.views.shared.LocalMomentsSharedAnimatedVisibilityScope
+import com.moments.android.views.shared.LocalMomentsSharedTransitionScope
 import com.moments.android.views.shared.momentdetail.SingleMomentDetailView
 
 /** Port de `ProfileMomentZoomNavigation.swift`. */
@@ -61,14 +64,44 @@ object ProfileMomentZoomNavigation {
 typealias MomentZoomNavigation = ProfileMomentZoomNavigation
 
 /**
- * Android no dispone del `matchedTransitionSource` de iOS 18 en Compose estable.
- * Conserva el recorte de la fuente y el id de destino para el coordinador de transición.
+ * ≡ `matchedTransitionSource` iOS — sharedBounds Compose cuando hay
+ * [com.moments.android.views.shared.LocalMomentsSharedTransitionScope]; si no, solo clip.
  */
-fun Modifier.profileMomentZoomSource(sourceID: String?, cornerRadius: androidx.compose.ui.unit.Dp = 4.dp): Modifier =
-    if (sourceID == null) this else clip(RoundedCornerShape(cornerRadius))
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.profileMomentZoomSource(
+    sourceID: String?,
+    cornerRadius: androidx.compose.ui.unit.Dp = 4.dp,
+): Modifier {
+    if (sourceID.isNullOrBlank()) return this
+    val clipped = this.clip(RoundedCornerShape(cornerRadius))
+    val sharedScope = LocalMomentsSharedTransitionScope.current
+    val animatedScope = LocalMomentsSharedAnimatedVisibilityScope.current
+    if (sharedScope == null) return clipped
+    val state = with(sharedScope) { rememberSharedContentState(key = sourceID) }
+    return if (animatedScope != null) {
+        with(sharedScope) {
+            clipped.sharedBounds(
+                sharedContentState = state,
+                animatedVisibilityScope = animatedScope,
+            )
+        }
+    } else {
+        with(sharedScope) {
+            clipped.sharedElementWithCallerManagedVisibility(
+                sharedContentState = state,
+                visible = true,
+            )
+        }
+    }
+}
 
-fun Modifier.highlightZoomSource(sourceID: String?, size: androidx.compose.ui.unit.Dp = 64.dp): Modifier =
-    if (sourceID == null) this else clip(RoundedCornerShape(size / 2))
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.highlightZoomSource(
+    sourceID: String?,
+    size: androidx.compose.ui.unit.Dp = 64.dp,
+): Modifier = profileMomentZoomSource(sourceID = sourceID, cornerRadius = size / 2)
 
 @Composable
 fun ProfileMomentZoomDetailDestination(
@@ -89,6 +122,8 @@ fun ProfileMomentZoomDetailDestination(
         onDismiss = onDismiss,
         initialIndex = destination.initialIndex,
         initialMomentId = destination.initialMomentId ?: selected.id,
+        restrictPlaybackToInitialIndex = destination.restrictPlaybackToInitialIndex,
+        openCommentsOnAppear = destination.openCommentsOnAppear,
         modifier = modifier.fillMaxSize(),
     )
 }
@@ -115,6 +150,7 @@ fun MomentZoomDetailDestination(
                     onDismiss = onDismiss,
                     initialIndex = destination.initialIndex,
                     initialMomentId = selected.id,
+                    restrictPlaybackToInitialIndex = destination.restrictPlaybackToInitialIndex,
                     modifier = modifier.fillMaxSize(),
                 )
             }

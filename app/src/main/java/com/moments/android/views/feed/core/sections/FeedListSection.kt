@@ -27,6 +27,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.moments.android.ad.SmartNativeAdView
@@ -40,6 +41,7 @@ import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.feed.controls.FeedType
 import com.moments.android.views.feed.core.FeedViewModel
 import com.moments.android.views.feed.core.ModernEmptyFeedView
+import com.moments.android.views.messaging.components.momentsScrollEdgeChrome
 import com.moments.android.views.shared.ScreenshotProtectedView
 import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.max
@@ -63,17 +65,25 @@ fun FeedListSection(
     onPeek: ((imageUrl: String, ratio: Float, isPressing: Boolean) -> Unit)? = null,
     onContextMenu: (FeedMoment) -> Unit = {},
     onAuthorAvatarTap: ((authorId: String, hasStory: Boolean) -> Unit)? = null,
+    // iOS feedHeaderHeight / feedSelectorHeight (no hardcode 88/35)
+    feedHeaderHeight: Dp = 88.dp,
+    feedSelectorHeight: Dp = 35.dp,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val rowSpacing = max(15f, configuration.screenHeightDp * 0.02f).dp
-    // iOS: availableHeight = screen - headerHeight - selectorHeight - tabbar - 60 (fijos)
-    val availableHeightPx = remember(configuration.screenHeightDp, density) {
+    // iOS: availableHeight = screen - headerHeight - selectorHeight - tabbar - 60
+    val availableHeightPx = remember(
+        configuration.screenHeightDp,
+        density,
+        feedHeaderHeight,
+        feedSelectorHeight,
+    ) {
         val screenPx = with(density) { configuration.screenHeightDp.dp.toPx() }
-        val headerPx = with(density) { 88.dp.toPx() }
-        val selectorPx = with(density) { 35.dp.toPx() }
+        val headerPx = with(density) { feedHeaderHeight.toPx() }
+        val selectorPx = with(density) { feedSelectorHeight.toPx() }
         val tabbarPx = with(density) { 50.dp.toPx() }
         val extraPx = with(density) { 60.dp.toPx() }
         (screenPx - headerPx - selectorPx - tabbarPx - extraPx).coerceAtLeast(200f)
@@ -193,7 +203,8 @@ fun FeedListSection(
         val end = minOf(next + 8, viewModel.moments.size)
         val upcoming = viewModel.moments.subList(next, end)
         val imageUrls = upcoming.mapNotNull { m ->
-            m.visibleMediaItems.firstOrNull()?.url?.takeIf { it.isNotBlank() }
+            // iOS: moment.mediaItems?.first?.url
+            m.mediaItems.firstOrNull()?.url?.takeIf { it.isNotBlank() }
         }
         if (imageUrls.isNotEmpty()) ImagePrefetchManager.prefetch(imageUrls)
         val videoUrls = viewModel.videoPreloadUrls(upcoming, maxMoments = 4)
@@ -215,7 +226,10 @@ fun FeedListSection(
                 state = listState,
                 contentPadding = contentTopPadding,
                 verticalArrangement = Arrangement.spacedBy(rowSpacing),
-                modifier = Modifier.fillMaxSize(),
+                // iOS .momentsScrollEdgeChrome()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .momentsScrollEdgeChrome(),
             ) {
                 if (viewModel.isLoading && viewModel.moments.isEmpty()) {
                     items(4) { FeedPostSkeletonView() }
@@ -242,6 +256,8 @@ fun FeedListSection(
                                     onOpenComments = { onOpenComments(moment) },
                                     onShare = { onShare(moment) },
                                     onContextMenu = onContextMenu,
+                                    // iOS onTagTap: onOpenUserProfile
+                                    onTagTap = onOpenUserProfile,
                                     onPeek = { url, ratio, pressing ->
                                         onPeek?.invoke(url, ratio, pressing)
                                     },

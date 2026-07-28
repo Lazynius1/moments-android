@@ -45,6 +45,10 @@ class GlassmorphicChatVoiceController(
     var isPreparingPreview by mutableStateOf(false)
         private set
 
+    fun setVoiceRecordingLocked(locked: Boolean) {
+        isLocked = locked
+    }
+
     fun startVoiceRecording(activity: Activity, newInteractionId: String, startsLocked: Boolean) {
         interactionId?.takeIf { it != newInteractionId }?.let { finishVoiceRecording(it, VoiceRecordingFinishAction.CANCEL) }
         draft = null

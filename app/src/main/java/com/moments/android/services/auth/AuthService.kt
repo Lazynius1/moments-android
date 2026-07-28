@@ -13,6 +13,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Source
+import com.moments.android.extensions.optStringOrNull
 import com.moments.android.R
 import com.moments.android.models.AppUser
 import com.moments.android.services.firestore.FirestoreService
@@ -1376,7 +1377,7 @@ object AuthService {
                 connection.errorStream?.bufferedReader()?.readText()
             }.getOrNull().orEmpty()
             val message = runCatching {
-                JSONObject(body).optString("error").takeIf { it.isNotEmpty() }
+                JSONObject(body).optStringOrNull("error")
             }.getOrNull() ?: "Could not delete account"
             error(message)
         }

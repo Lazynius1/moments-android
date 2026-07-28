@@ -1,10 +1,7 @@
 package com.moments.android.views.explore
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,143 +9,305 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
+import com.moments.android.R
+import com.moments.android.extensions.ChromeIconDescription
+import com.moments.android.extensions.MomentsGlassButtonPreset
+import com.moments.android.extensions.ProfileChromeIconButton
+import com.moments.android.extensions.ProfileGlassPillTrack
+import com.moments.android.extensions.timeAgoDisplay
 import com.moments.android.models.Moment
+import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.privacy.FollowButtonState
+import com.moments.android.services.privacy.FollowStateStore
+import com.moments.android.services.privacy.PrivacyService
+import com.moments.android.views.components.ModernFollowButton
+import com.moments.android.views.components.VerifiedBadgeView
+import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.story.StoryRingAvatarView
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 /**
- * Mirror 1:1 de `ModernExploreDetailHeader.swift` (263 líneas en iOS).
+ * Port de `ModernExploreDetailHeader.swift`.
+ * Glass capsule con back, autor, ubicación y seguir.
  */
 @Composable
 fun ModernExploreDetailHeader(
     moment: Moment?,
-    onDismiss: () -> Unit = {},
-    onAvatarTap: (String) -> Unit = {},
-    onLocationTap: ((String) -> Unit)? = null
+    topInset: Dp = 0.dp,
+    onDismiss: () -> Unit,
+    onAvatarTap: (userId: String, hasStory: Boolean) -> Unit,
+    onLocationTap: ((location: String, coordinate: Moment.LocationCoordinate?) -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
-    val isDark = isSystemInDarkTheme()
-    val textColor = if (isDark) Color.White else Color.Black
-    val secondaryColor = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.6f)
-
-    var liveUsername by remember { mutableStateOf(moment?.username ?: "") }
-    var isFollowing by remember { mutableStateOf(false) }
-
+    val colors = rememberAdaptiveColors()
+    val scope = rememberCoroutineScope()
+    val firestore = remember { FirestoreService() }
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-    val isSelf = moment?.authorId == currentUserId
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.Black.copy(alpha = 0.5f))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(
-            onClick = onDismiss,
-            modifier = Modifier.size(36.dp)
+    var liveUsername by remember(moment?.authorId) { mutableStateOf("") }
+    var followButtonState by remember(moment?.authorId) { mutableStateOf(FollowButtonState.CAN_FOLLOW) }
+    var isFollowLoading by remember { mutableStateOf(false) }
+    var showingUnfollowConfirmation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(moment?.authorId) {
+        liveUsername = ""
+        FollowStateStore.state(moment?.authorId.orEmpty())?.let { followButtonState = it }
+        liveUsername = resolveAuthorUsername(moment)
+        followButtonState = refreshFollowState(moment, currentUserId)
+    }
+
+    Column(modifier.fillMaxWidth()) {
+        Spacer(Modifier.height(topInset))
+        ProfileGlassPillTrack(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp),
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = Color.White
-            )
-        }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        if (moment != null) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .clickable { onAvatarTap(moment.authorId) }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                AsyncImage(
-                    model = moment.profileImagePath,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(Color.Gray.copy(alpha = 0.3f))
-                )
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = liveUsername.ifEmpty { moment.username },
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onAvatarTap(moment.authorId) }
+                ProfileChromeIconButton(
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    onClick = onDismiss,
+                    foregroundColor = colors.primary,
+                    preset = MomentsGlassButtonPreset.NAVIGATION_BACK,
+                    standaloneGlass = false,
+                    contentDescriptionKey = ChromeIconDescription.BACK,
                 )
 
-                if (!moment.location.isNullOrEmpty()) {
+                val m = moment
+                if (m != null) {
+                    val authorId = m.authorId.trim()
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { onLocationTap?.invoke(moment.location!!) }
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f),
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(12.dp)
+                        StoryRingAvatarView(
+                            userId = authorId,
+                            size = 36.dp,
+                            lineWidth = 2.2.dp,
+                            showBaseStroke = true,
+                            baseStrokeColor = Color.White.copy(alpha = 0.15f),
+                            baseStrokeWidth = 0.5.dp,
+                            onTap = { hasStory ->
+                                if (authorId.isNotEmpty()) onAvatarTap(authorId, hasStory)
+                            },
                         )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Text(
-                            text = moment.location!!,
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 11.sp
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Row(
+                                    Modifier.clickable {
+                                        if (authorId.isNotEmpty()) onAvatarTap(authorId, false)
+                                    },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(
+                                        displayUsername(liveUsername, m),
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 15.sp,
+                                        color = colors.primary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    VerifiedBadgeView(userId = authorId, size = 13.dp)
+                                }
+                                Text(
+                                    "·",
+                                    fontSize = 10.sp,
+                                    color = colors.secondary.copy(alpha = 0.7f),
+                                )
+                                Text(
+                                    m.timestamp.timeAgoDisplay(),
+                                    fontSize = 10.sp,
+                                    color = colors.secondary.copy(alpha = 0.7f),
+                                )
+                            }
+                            val location = m.location?.trim().orEmpty()
+                            if (location.isNotEmpty() && onLocationTap != null) {
+                                Row(
+                                    Modifier.clickable {
+                                        onLocationTap(location, m.locationCoordinate)
+                                    },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Filled.LocationOn,
+                                        contentDescription = null,
+                                        tint = colors.secondary.copy(alpha = 0.85f),
+                                        modifier = Modifier.size(9.dp),
+                                    )
+                                    Text(
+                                        location,
+                                        fontSize = 10.sp,
+                                        color = colors.secondary.copy(alpha = 0.85f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (m.authorId != currentUserId) {
+                        ModernFollowButton(
+                            state = followButtonState,
+                            isLoading = isFollowLoading,
+                            onClick = {
+                                if (followButtonState == FollowButtonState.FOLLOWING) {
+                                    showingUnfollowConfirmation = true
+                                } else {
+                                    scope.launch {
+                                        performFollowToggle(
+                                            firestore = firestore,
+                                            moment = m,
+                                            currentUserId = currentUserId,
+                                            previousState = followButtonState,
+                                            onState = { followButtonState = it },
+                                            onLoading = { isFollowLoading = it },
+                                        )
+                                    }
+                                }
+                            },
                         )
                     }
-                }
-            }
-
-            if (!isSelf && !moment.authorId.isEmpty()) {
-                Button(
-                    onClick = { isFollowing = !isFollowing },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isFollowing) Color.White.copy(alpha = 0.2f) else Color(0xFF007AFF)
-                    ),
-                    modifier = Modifier.height(32.dp)
-                ) {
-                    Text(
-                        text = if (isFollowing) "Siguiendo" else "Seguir",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
                 }
             }
         }
+    }
+
+    if (showingUnfollowConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showingUnfollowConfirmation = false },
+            title = { Text(stringResource(R.string.user_profile_unfollow_confirm_title)) },
+            text = { Text(stringResource(R.string.user_profile_unfollow_confirm_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showingUnfollowConfirmation = false
+                        val m = moment ?: return@TextButton
+                        scope.launch {
+                            performFollowToggle(
+                                firestore = firestore,
+                                moment = m,
+                                currentUserId = currentUserId,
+                                previousState = followButtonState,
+                                onState = { followButtonState = it },
+                                onLoading = { isFollowLoading = it },
+                            )
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.user_profile_unfollow_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showingUnfollowConfirmation = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+}
+
+private fun displayUsername(liveUsername: String, moment: Moment): String {
+    val fresh = liveUsername.trim()
+    return if (fresh.isEmpty()) moment.username else fresh
+}
+
+private suspend fun resolveAuthorUsername(moment: Moment?): String {
+    val authorId = moment?.authorId?.trim().orEmpty()
+    if (authorId.isEmpty()) return ""
+    val user = suspendCancellableCoroutine { cont ->
+        UserCacheService.refreshUser(authorId) { cont.resume(it) }
+    }
+    return user?.username?.trim().orEmpty()
+}
+
+private suspend fun refreshFollowState(
+    moment: Moment?,
+    currentUserId: String?,
+): FollowButtonState {
+    if (moment == null || currentUserId == null || moment.authorId == currentUserId) {
+        return FollowButtonState.CAN_FOLLOW
+    }
+    val state = PrivacyService.getFollowButtonState(currentUserId, moment.authorId)
+    FollowStateStore.setState(state, moment.authorId)
+    return state
+}
+
+private suspend fun performFollowToggle(
+    firestore: FirestoreService,
+    moment: Moment,
+    currentUserId: String?,
+    previousState: FollowButtonState,
+    onState: (FollowButtonState) -> Unit,
+    onLoading: (Boolean) -> Unit,
+) {
+    if (currentUserId == null) return
+    if (!previousState.isActionable) return
+
+    val optimistic = when (previousState) {
+        FollowButtonState.FOLLOWING -> FollowButtonState.CAN_FOLLOW
+        FollowButtonState.CAN_REQUEST_FOLLOW -> FollowButtonState.REQUEST_PENDING_CANCELLABLE
+        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> FollowButtonState.CAN_REQUEST_FOLLOW
+        FollowButtonState.CAN_FOLLOW -> FollowButtonState.FOLLOWING
+        else -> previousState
+    }
+    onState(optimistic)
+    FollowStateStore.setState(optimistic, moment.authorId)
+    onLoading(true)
+    try {
+        when (previousState) {
+            FollowButtonState.FOLLOWING ->
+                firestore.unfollowUser(currentUserId, moment.authorId)
+            FollowButtonState.REQUEST_PENDING_CANCELLABLE ->
+                firestore.cancelFollowRequest(currentUserId, moment.authorId)
+            else ->
+                firestore.followUser(currentUserId, moment.authorId)
+        }
+    } catch (_: Exception) {
+        onState(previousState)
+        FollowStateStore.setState(previousState, moment.authorId)
+    } finally {
+        onLoading(false)
     }
 }

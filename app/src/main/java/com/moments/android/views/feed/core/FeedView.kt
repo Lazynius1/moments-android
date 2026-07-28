@@ -48,8 +48,11 @@ import com.moments.android.coordinators.LegacyNavigationBridge
 import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.models.Echo
 import com.moments.android.models.MediaItem
+import com.moments.android.notifications.core.NotificationsViewModel
 import com.moments.android.notifications.screens.NotificationSummaryService
 import com.moments.android.notifications.services.NotificationBadgeService
+import com.moments.android.services.cache.ImagePrefetchManager
+import com.moments.android.services.cache.VideoPreloader
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.deleteMoment
@@ -70,6 +73,9 @@ import com.moments.android.views.feed.core.sections.FeedListSection
 import com.moments.android.views.feed.core.sections.FeedOverlaysSection
 import com.moments.android.views.feed.stories.FeedStoryRingCoordinator
 import com.moments.android.views.feed.uploads.FloatingMomentUploadOverlay
+import com.moments.android.views.messaging.core.MessagingViewModel
+import com.moments.android.views.permission.shared.PermissionPrimerGate
+import com.moments.android.views.permission.shared.PermissionPrimerGateHost
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -97,13 +103,15 @@ fun FeedView(
     val viewModel = remember {
         FeedViewModel().also { it.attachContext(context) }
     }
+    val messagingViewModel = remember { MessagingViewModel() }
+    val notificationsViewModel = remember { NotificationsViewModel() }
     val storyRingCoordinator = remember { FeedStoryRingCoordinator(appContext = context.applicationContext) }
     val firestoreService = remember { FirestoreService() }
     val uploadService = BackgroundMomentUploadService
     val networkMonitor = NetworkMonitor
     val badgeService = NotificationBadgeService
     val notificationSummaryService = NotificationSummaryService
-
+    val notificationGate = remember { PermissionPrimerGate(PermissionPrimerGate.Kind.NOTIFICATIONS) }
     val unreadNotifications by badgeService.unreadNotificationsCount.collectAsState()
     val unreadMessages by badgeService.unreadMessagesCount.collectAsState()
     val isConnected by networkMonitor.isConnectedFlow.collectAsState()
@@ -247,26 +255,16 @@ fun FeedView(
     }
 
     fun prefetchImages() {
-        // iOS: Kingfisher preload + VideoPreloader desde los primeros momentos
-        viewModel.moments.take(12).let { slice ->
-            val urls = slice.asSequence()
-                .flatMap { it.visibleMediaItems.asSequence() }
-                .map { it.url }
-                .filter { it.isNotBlank() }
-                .distinct()
-                .toList()
-            if (urls.isNotEmpty()) {
-                com.moments.android.services.cache.VideoPreloader.preloadAssets(
-                    urls.filter { url ->
-                        slice.any { m ->
-                            m.visibleMediaItems.any {
-                                it.url == url && it.type.equals("video", true)
-                            }
-                        }
-                    },
-                )
-            }
-        }
+        // ≡ iOS prefetchImages: ImagePrefetch + VideoPreloader + VideoMomentsIndex (vía VM)
+        val slice = viewModel.moments.take(12)
+        viewModel.rebuildVideoMomentsIndex()
+        val imageUrls = slice
+            .flatMap { m -> m.visibleMediaItems.map { it.url } + listOfNotNull(m.profileImagePath) }
+            .filter { it.isNotBlank() }
+            .distinct()
+        if (imageUrls.isNotEmpty()) ImagePrefetchManager.prefetch(imageUrls)
+        val videoUrls = viewModel.videoPreloadUrls(slice, maxMoments = 6)
+        if (videoUrls.isNotEmpty()) VideoPreloader.preloadAssets(videoUrls)
     }
 
     fun loadInitialData() {
@@ -282,6 +280,7 @@ fun FeedView(
             firestoreService.loadSavedMoments(userId)
             viewModel.fetchMoments(scope, userId, preferred)
             viewModel.fetchUserData(scope, userId)
+            messagingViewModel.fetchConversations(userId)
             storyRingCoordinator.loadStoryUsers(scope, userId)
             prefetchImages()
             hasLoadedInitialData = true
@@ -296,6 +295,8 @@ fun FeedView(
 
     suspend fun refreshFeed(userId: String) {
         viewModel.refreshMoments(userId)
+        notificationsViewModel.refreshNotifications()
+        messagingViewModel.fetchConversations(userId)
         storyRingCoordinator.loadStoryUsers(scope, userId, allowInstantCache = false)
         prefetchImages()
     }
@@ -350,6 +351,22 @@ fun FeedView(
         }
     }
 
+    fun requestNotificationPermissionIfNeeded() {
+        // ≡ iOS requestNotificationPermissionIfNeeded — delay 20s si .notDetermined
+        if (notificationGate.permissions().isEmpty()) return
+        val granted = notificationGate.permissions().all {
+            androidx.core.content.ContextCompat.checkSelfPermission(context, it) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        if (granted) return
+        if (didScheduleNotificationPrompt) return
+        didScheduleNotificationPrompt = true
+        scope.launch {
+            delay(20_000)
+            notificationGate.requestAccess(context) { /* FCM registration handled by MainActivity */ }
+        }
+    }
+
     // --- Lifecycle (onAppear / onDisappear) ---
 
     LaunchedEffect(Unit) {
@@ -358,6 +375,7 @@ fun FeedView(
         setupServiceConnections()
         badgeService.setupListeners()
         setupPendingEchoesListener()
+        requestNotificationPermissionIfNeeded()
         delay(1000)
         notificationSummaryService.checkShouldShowSummary(
             context = context,
@@ -539,6 +557,8 @@ fun FeedView(
                     viewModel = viewModel,
                     selectedFeedType = selectedFeedType,
                     contentTopPadding = PaddingValues(top = feedContentTopInset, bottom = 22.dp),
+                    feedHeaderHeight = headerHeightDp,
+                    feedSelectorHeight = FeedSelectorHeight,
                     onRefresh = {
                         val uid = viewModel.viewerId ?: return@FeedListSection
                         scope.launch {
@@ -634,8 +654,10 @@ fun FeedView(
                         showPendingEchoInvitation = true
                         pendingEchoInvitationRoute = FeedEchoInvitationRoute(echoId)
                     },
-                    onLoadMoreRing = {
-                        viewModel.viewerId?.let { storyRingCoordinator.loadMoreRing(scope, it) }
+                    onLoadMoreRing = { visibleIndex ->
+                        viewModel.viewerId?.let { uid ->
+                            storyRingCoordinator.loadMoreRingUsersIfNeeded(visibleIndex, uid, scope)
+                        }
                     },
                     // iOS: header en safe area; fondo ignoresSafeArea(.top).
                     // Medimos altura real → la pill se coloca justo debajo (sin statusBarsPadding extra).
@@ -722,6 +744,8 @@ fun FeedView(
                     selectedMomentForMenu = null
                 },
                 onEdit = {
+                    // iOS Overlays onEdit: editedContent = moment.content; showEditSheet = true
+                    editedContent = selectedMomentForMenu?.content.orEmpty()
                     showEditSheet = true
                     showGlobalContextMenu = false
                 },
@@ -741,13 +765,15 @@ fun FeedView(
                 onDismissNotificationSummary = { showNotificationSummary = false },
             )
 
-            // Silence unused flags until Sections/presentations wire them
+            // ≡ .permissionPrimerGate(notificationGate)
+            PermissionPrimerGateHost(gate = notificationGate)
+
+            // showStoryChain: iOS “Eliminado en Feed; centralizado en StoryModels” — estado se setea, UI fuera
             @Suppress("UNUSED_VARIABLE")
             val keepAlive = listOf(
                 showCreatorView, showReportSheet, editedContent, isDeleting,
-                peekAspectRatio, peekIsProtected, showStoryChain, selectedChainId, selectedChainTitle,
-                showPendingEchoInvitation, selectedPendingEchoId,
-                currentTimeMillis, showNotificationSummary, didScheduleNotificationPrompt,
+                showStoryChain, selectedChainId, selectedChainTitle,
+                currentTimeMillis,
             )
         }
     }

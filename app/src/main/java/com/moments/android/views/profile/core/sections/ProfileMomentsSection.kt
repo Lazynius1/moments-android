@@ -148,10 +148,10 @@ private fun ProfileThumbnailMedia(moment: Moment, size: Dp, cellWidth: Dp, cellH
 
 @Composable
 private fun ProfileThumbnailImage(url: String, moment: Moment, size: Dp, cellWidth: Dp, cellHeight: Dp, portrait: Boolean) {
-    val image: @Composable () -> Unit = {
-        AsyncImage(model = profileThumbnailUrl(url), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    val image: @Composable (ContentScale) -> Unit = { contentScale ->
+        AsyncImage(model = profileThumbnailUrl(url), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = contentScale)
     }
-    if (portrait) Box(Modifier.size(cellWidth, cellHeight)) { image() } else GridPreviewThumbnailFrame(size, moment.gridPreviewSettings, image)
+    if (portrait) Box(Modifier.size(cellWidth, cellHeight)) { image(ContentScale.Crop) } else GridPreviewThumbnailFrame(size, moment.gridPreviewSettings, image)
 }
 
 @Composable
@@ -172,11 +172,11 @@ private fun ProfileThumbnailVideo(url: String, moment: Moment, size: Dp, cellWid
         }
         loading = false
     }
-    val content: @Composable () -> Unit = {
-        thumbnail?.let { androidx.compose.foundation.Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+    val content: @Composable (ContentScale) -> Unit = { contentScale ->
+        thumbnail?.let { androidx.compose.foundation.Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = contentScale) }
             ?: ProfileMediaPlaceholder(loading, R.string.profile_thumbnail_video_uploading, R.string.profile_thumbnail_video)
     }
-    if (portrait) Box(Modifier.size(cellWidth, cellHeight)) { content() } else GridPreviewThumbnailFrame(size, moment.gridPreviewSettings, content)
+    if (portrait) Box(Modifier.size(cellWidth, cellHeight)) { content(ContentScale.Crop) } else GridPreviewThumbnailFrame(size, moment.gridPreviewSettings, content)
 }
 
 @Composable

@@ -34,6 +34,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,27 +59,55 @@ import com.moments.android.R
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-private enum class AuthScreen { Welcome, LoginForm, Register }
+private enum class AuthScreen { Welcome, LoginForm, Register, SocialOnboarding }
 
 @Composable
 fun LoginScreen(onAuthenticated: () -> Unit) {
     var screen by remember { mutableStateOf(AuthScreen.Welcome) }
+    val scope = rememberCoroutineScope()
+
+    // ≡ iOS `LoginView`: `.navigationDestination(isPresented: $authService.isRegistering)`.
+    // AuthService marca `isRegistering` cuando hay sesión de Firebase pero NO hay perfil
+    // en Firestore (login social nuevo, o reanudar un onboarding a medias al arrancar).
+    // Sin esto el usuario entraba a la app sin username ni documento de usuario.
+    val isRegistering by com.moments.android.services.auth.AuthService.isRegistering.collectAsState()
+    LaunchedEffect(isRegistering) {
+        // Solo desde las pantallas de entrada: si ya se está en el alta por correo
+        // (`Register`) no hay que secuestrarla — ese flujo crea su propio perfil y
+        // puede marcar `isRegistering` de paso.
+        if (isRegistering && (screen == AuthScreen.Welcome || screen == AuthScreen.LoginForm)) {
+            screen = AuthScreen.SocialOnboarding
+        }
+    }
 
     Box(Modifier.fillMaxSize().background(com.moments.android.views.shared.Surface).systemBarsPadding()) {
         when (screen) {
             AuthScreen.Welcome -> WelcomeScreen(
                 onCreateAccount = { screen = AuthScreen.Register },
                 onLogin = { screen = AuthScreen.LoginForm },
+                onNeedsSocialOnboarding = { screen = AuthScreen.SocialOnboarding },
                 onAuthenticated = onAuthenticated,
             )
             AuthScreen.LoginForm -> LoginFormScreen(
                 onBack = { screen = AuthScreen.Welcome },
                 onRegister = { screen = AuthScreen.Register },
+                onNeedsSocialOnboarding = { screen = AuthScreen.SocialOnboarding },
                 onAuthenticated = onAuthenticated,
             )
             AuthScreen.Register -> OnboardingScreen(
                 onBack = { screen = AuthScreen.Welcome },
                 onAuthenticated = onAuthenticated,
+                uiContext = OnboardingUiContext.EMAIL,
+            )
+            // Cancelar aquí deja una sesión de Firebase sin perfil: hay que cerrarla
+            // para no volver a caer en el estado fantasma.
+            AuthScreen.SocialOnboarding -> OnboardingScreen(
+                onBack = {
+                    com.moments.android.services.auth.AuthService.logout()
+                    screen = AuthScreen.Welcome
+                },
+                onAuthenticated = onAuthenticated,
+                uiContext = OnboardingUiContext.SOCIAL,
             )
         }
     }
@@ -117,7 +147,12 @@ private fun GoogleGlyph() {
 
 // MARK: - Welcome (equivalente a WelcomeContent) — centrado vertical con halo tras el logo
 @Composable
-private fun WelcomeScreen(onCreateAccount: () -> Unit, onLogin: () -> Unit, onAuthenticated: () -> Unit) {
+private fun WelcomeScreen(
+    onCreateAccount: () -> Unit,
+    onLogin: () -> Unit,
+    onNeedsSocialOnboarding: () -> Unit,
+    onAuthenticated: () -> Unit,
+) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var isGoogleLoading by remember { mutableStateOf(false) }
@@ -154,8 +189,9 @@ private fun WelcomeScreen(onCreateAccount: () -> Unit, onLogin: () -> Unit, onAu
                 isGoogleLoading = true
                 scope.launch {
                     try {
-                        signInWithGoogle(context)
-                        onAuthenticated()
+                        // true = ya tenía perfil completo → a la app.
+                        // false = falta perfil → onboarding social (username/intereses).
+                        if (signInWithGoogle(context)) onAuthenticated() else onNeedsSocialOnboarding()
                     } catch (error: Exception) {
                         googleError = googleErrorMessage
                     } finally {
@@ -198,7 +234,12 @@ private fun WelcomeScreen(onCreateAccount: () -> Unit, onLogin: () -> Unit, onAu
 
 // MARK: - Login (equivalente a LoginFormScreen)
 @Composable
-private fun LoginFormScreen(onBack: () -> Unit, onRegister: () -> Unit, onAuthenticated: () -> Unit) {
+private fun LoginFormScreen(
+    onBack: () -> Unit,
+    onRegister: () -> Unit,
+    onNeedsSocialOnboarding: () -> Unit,
+    onAuthenticated: () -> Unit,
+) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var identifier by remember { mutableStateOf("") }
@@ -299,8 +340,7 @@ private fun LoginFormScreen(onBack: () -> Unit, onRegister: () -> Unit, onAuthen
                     isGoogleLoading = true
                     scope.launch {
                         try {
-                            signInWithGoogle(context)
-                            onAuthenticated()
+                            if (signInWithGoogle(context)) onAuthenticated() else onNeedsSocialOnboarding()
                         } catch (error: Exception) {
                             errorMessage = googleErrorMessage
                         } finally {

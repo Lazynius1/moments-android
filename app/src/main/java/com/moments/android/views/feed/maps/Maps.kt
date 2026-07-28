@@ -2,10 +2,19 @@ package com.moments.android.views.feed.maps
 
 import com.moments.android.BuildConfig
 
-/** Port de `Maps.swift` — entry point del mapa del feed. */
+/** Port de `Maps.swift` — entry / flags del mapa del feed (Mapbox). */
 object FeedMaps {
+    private const val MAPBOX_PLACEHOLDER = "YOUR_MAPBOX_ACCESS_TOKEN"
     const val PLACEHOLDER_API_KEY = "REPLACE_WHEN_YOU_HAVE_GOOGLE_KEY"
 
+    fun hasMapboxToken(): Boolean {
+        val token = BuildConfig.MAPBOX_ACCESS_TOKEN.trim()
+        return token.isNotEmpty() &&
+            token != MAPBOX_PLACEHOLDER &&
+            token.startsWith("pk.")
+    }
+
+    /** Legacy Google key check — chat/picker aún usan Google Maps Compose. */
     fun hasGoogleMapsKey(): Boolean =
         BuildConfig.GOOGLE_MAPS_API_KEY.isNotBlank() &&
             BuildConfig.GOOGLE_MAPS_API_KEY != PLACEHOLDER_API_KEY

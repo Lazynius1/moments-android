@@ -211,7 +211,7 @@ fun AttachmentIconView(
         contentDescription = null,
         contentScale = ContentScale.Fit,
         colorFilter = tintColor.takeUnless { it == Color.Unspecified }?.let(ColorFilter::tint),
-        modifier = modifier.then(Modifier.size(size)),
+        modifier = modifier.size(size),
     )
 }
 

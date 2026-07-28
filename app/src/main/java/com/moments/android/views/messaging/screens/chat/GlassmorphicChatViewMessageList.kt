@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -14,14 +15,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moments.android.R
 import com.moments.android.views.messaging.core.PendingChatContext
 import com.moments.android.views.feed.AdaptiveColors
+import com.moments.android.views.messaging.components.ChatComposerChromeMetrics
 import com.moments.android.views.messaging.components.ChatHistoryLoadingIndicator
 import com.moments.android.views.messaging.components.ChatListRow
 import com.moments.android.views.messaging.components.ChatListUpdateTransaction
 import com.moments.android.views.messaging.components.ChatMessageListController
+import com.moments.android.views.messaging.components.LocalChatSearchActiveMessageId
+import com.moments.android.views.messaging.components.LocalChatSearchHighlightTerm
+import com.moments.android.views.messaging.components.VanishPullResult
+import com.moments.android.views.messaging.components.chatRenderRowVisualSignature
 import com.moments.android.views.messaging.components.ChatMessageListView
 import com.moments.android.views.messaging.components.PendingRequestMessageRow
 import com.moments.android.views.messaging.components.ChatConversationIntroRow
@@ -31,6 +38,7 @@ import com.moments.android.views.messaging.core.EnhancedChatViewModel
 import com.moments.android.views.messaging.core.ChatRenderRow
 import com.moments.android.views.messaging.core.MessageItem
 import com.moments.android.views.messaging.core.PendingChatTimelineMessage
+import androidx.compose.runtime.collectAsState
 
 /** Port de `GlassmorphicChatView+MessageList.swift`.
  * El routing fino de scroll/búsqueda se recibe por callbacks y se completa en sus extensiones
@@ -42,6 +50,8 @@ data class ChatMessageListCallbacks(
     val onPrependFinished: () -> Unit = {},
     val onContentExtentChanged: (Boolean) -> Unit = {},
     val onRowsChanged: () -> Unit = {},
+    val onAtBottomChanged: (Boolean) -> Unit = {},
+    val onVanishPullReleased: (VanishPullResult) -> Unit = {},
     val renderMessage: @Composable (MessageItem) -> Unit = {},
     val renderHeader: @Composable (ChatRenderRow.Header) -> Unit = {},
     val renderBuzz: @Composable (ChatRenderRow.Buzz) -> Unit = {},
@@ -101,7 +111,14 @@ fun chatListTransaction(
     val mutation = viewModel.chatTimelineMutation.value
     return ChatListUpdateTransaction(
         kind = mutation.kind,
-        rows = rows.map { ChatListRow(id = it.id, messageIds = rowMessageIds(it), payload = it) },
+        rows = rows.map {
+            ChatListRow(
+                id = it.id,
+                messageIds = rowMessageIds(it),
+                visualSignature = chatRenderRowVisualSignature(it),
+                payload = it,
+            )
+        },
         anchorRowId = mutation.anchorMessageId?.let(messageRowId),
         reason = mutation.reason,
     )
@@ -140,52 +157,85 @@ fun GlassmorphicChatMessageList(
     fallbackName: String,
     fallbackUserId: String,
     callbacks: ChatMessageListCallbacks,
+    /** ≡ iOS `composerBottomInset` → contentInset.bottom (LazyColumn reverseLayout: contentPadding.bottom). */
+    composerChromeHeight: Dp = ChatComposerChromeMetrics.estimatedComposerChromeHeight,
+    /** ≡ iOS `isVanishGestureEnabled` */
+    isVanishGestureEnabled: Boolean = true,
+    /** ≡ iOS `.environment(\.chatSearchHighlightTerm, …)`. */
+    searchHighlightTerm: String = "",
+    /** ≡ iOS `.environment(\.chatSearchActiveMessageId, …)`. */
+    searchActiveMessageId: String? = null,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(transaction.rows.map { it.id }) { callbacks.onRowsChanged() }
-    LaunchedEffect(listController.isAtBottom) { presentation.isPinnedToBottom = listController.isAtBottom }
-    Box(modifier.fillMaxSize()) {
-        ChatMessageListView(
-            transaction = transaction,
-            controller = listController,
-            onReachedTop = callbacks.loadOlderHistory,
-            onContentExtentChanged = { exceeds ->
-                presentation.scrollContentExceedsViewport = exceeds
-                callbacks.onContentExtentChanged(exceeds)
-            },
-            onPrependFinished = callbacks.onPrependFinished,
-            onPrefetchRows = { listRows ->
-                prefetchMediaForRows(listRows.mapNotNull { it.payload as? ChatRenderRow }, viewModel)
-            },
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-            rowContent = { listRow ->
-                when (val row = listRow.payload as? ChatRenderRow) {
-                    is ChatRenderRow.ConversationIntro -> ChatConversationIntroRow(row.context, fallbackName, fallbackUserId, adaptiveColors)
-                    is ChatRenderRow.RequestDisclaimer -> ChatRequestDisclaimerRow(requestDisclaimerRes(row.context), adaptiveColors, Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
-                    is ChatRenderRow.PendingRequestMessage -> PendingRequestMessageRow(row.message, adaptiveColors, Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
-                    is ChatRenderRow.HistoryStart -> ChatHistoryStartHeader(adaptiveColors)
-                    is ChatRenderRow.Message -> callbacks.renderMessage(row.item)
-                    is ChatRenderRow.Header -> callbacks.renderHeader(row)
-                    is ChatRenderRow.Buzz -> callbacks.renderBuzz(row)
-                    ChatRenderRow.Typing -> callbacks.renderTyping()
-                    null -> Unit
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
-        )
-        AnimatedVisibility(
-            presentation.shouldShowHistoryLoadNotice(viewModel),
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
-        ) {
-            ChatHistoryLoadingIndicator(
-                adaptiveColors = adaptiveColors,
-                textRes = presentation.historyNoticeTextRes(viewModel),
-                showsProgress = false,
-                retryTextRes = if (presentation.shouldShowRetry(viewModel)) R.string.messaging_retry else null,
-                onTap = if (presentation.shouldShowRetry(viewModel)) {
-                    { viewModel.clearHistoryLoadNotice(); callbacks.retryHistoryLoad() }
-                } else null,
+    LaunchedEffect(listController.isAtBottom) {
+        presentation.isPinnedToBottom = listController.isAtBottom
+        callbacks.onAtBottomChanged(listController.isAtBottom)
+    }
+    val vanishModeActive by viewModel.vanishModeActive.collectAsState()
+    val listBottomInset = ChatComposerChromeMetrics.listBottomInset(composerChromeHeight)
+    CompositionLocalProvider(
+        LocalChatSearchHighlightTerm provides searchHighlightTerm,
+        LocalChatSearchActiveMessageId provides searchActiveMessageId,
+    ) {
+        Box(modifier.fillMaxSize()) {
+            ChatMessageListView(
+                transaction = transaction,
+                controller = listController,
+                onReachedTop = callbacks.loadOlderHistory,
+                onContentExtentChanged = { exceeds ->
+                    presentation.scrollContentExceedsViewport = exceeds
+                    callbacks.onContentExtentChanged(exceeds)
+                },
+                onPrependFinished = callbacks.onPrependFinished,
+                onPrefetchRows = { listRows ->
+                    prefetchMediaForRows(listRows.mapNotNull { it.payload as? ChatRenderRow }, viewModel)
+                },
+                isVanishGestureEnabled = isVanishGestureEnabled,
+                isVanishModeActive = vanishModeActive,
+                composerBottomInset = listBottomInset,
+                onVanishPullReleased = callbacks.onVanishPullReleased,
+                // La lista comparte el Box con el composer: debe reservar su altura
+                // real para que el último mensaje quede inmediatamente por encima,
+                // nunca debajo de él.
+                //
+                // Compose `reverseLayout`: beforeContentPadding = bottomPadding.
+                // El inset del composer va en `bottom` (borde visual inferior).
+                contentPadding = PaddingValues(
+                    start = 8.dp,
+                    end = 8.dp,
+                    top = ChatComposerChromeMetrics.messageListGap,
+                    bottom = listBottomInset,
+                ),
+                rowContent = { listRow ->
+                    when (val row = listRow.payload as? ChatRenderRow) {
+                        is ChatRenderRow.ConversationIntro -> ChatConversationIntroRow(row.context, fallbackName, fallbackUserId, adaptiveColors)
+                        is ChatRenderRow.RequestDisclaimer -> ChatRequestDisclaimerRow(requestDisclaimerRes(row.context), adaptiveColors, Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                        is ChatRenderRow.PendingRequestMessage -> PendingRequestMessageRow(row.message, adaptiveColors, Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+                        is ChatRenderRow.HistoryStart -> ChatHistoryStartHeader(adaptiveColors)
+                        is ChatRenderRow.Message -> callbacks.renderMessage(row.item)
+                        is ChatRenderRow.Header -> callbacks.renderHeader(row)
+                        is ChatRenderRow.Buzz -> callbacks.renderBuzz(row)
+                        ChatRenderRow.Typing -> callbacks.renderTyping()
+                        null -> Unit
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
             )
+            AnimatedVisibility(
+                presentation.shouldShowHistoryLoadNotice(viewModel),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
+            ) {
+                ChatHistoryLoadingIndicator(
+                    adaptiveColors = adaptiveColors,
+                    textRes = presentation.historyNoticeTextRes(viewModel),
+                    showsProgress = false,
+                    retryTextRes = if (presentation.shouldShowRetry(viewModel)) R.string.messaging_retry else null,
+                    onTap = if (presentation.shouldShowRetry(viewModel)) {
+                        { viewModel.clearHistoryLoadNotice(); callbacks.retryHistoryLoad() }
+                    } else null,
+                )
+            }
         }
     }
 }

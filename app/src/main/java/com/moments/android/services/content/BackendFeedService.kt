@@ -3,6 +3,7 @@ package com.moments.android.services.content
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.moments.android.extensions.optStringOrNull
 import com.moments.android.models.HighlightedStory
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Moment
@@ -36,7 +37,29 @@ data class FeedMediaItem(
     val isHiddenByModeration: Boolean = false,
     val tags: List<com.moments.android.models.PhotoTag>? = null,
     val videoDuration: Double? = null,
-)
+) {
+    /** Paridad iOS `MediaItem.resolvedAspectRatioValue` (sin videoResolution en FeedMediaItem). */
+    val resolvedAspectRatioValue: Float?
+        get() {
+            val normalized = aspectRatio?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            val parts = normalized.split(":")
+            if (parts.size == 2) {
+                val w = parts[0].toFloatOrNull()
+                val h = parts[1].toFloatOrNull()
+                if (w != null && h != null && h > 0f) {
+                    val r = w / h
+                    if (r.isFinite() && r > 0f) return r
+                }
+            }
+            return when (normalized) {
+                "1:1" -> 1f
+                "4:5" -> 0.8f
+                "16:9" -> 16f / 9f
+                "9:16" -> 9f / 16f
+                else -> normalized.toFloatOrNull()?.takeIf { it.isFinite() && it > 0f }
+            }
+        }
+}
 
 data class FeedMoment(
     val id: String,
@@ -64,6 +87,12 @@ data class FeedMoment(
     val isArchived: Boolean? = null,
     /** Paridad iOS `Moment.locationCoordinate` → mapa. */
     val locationCoordinate: Moment.LocationCoordinate? = null,
+    /** Paridad iOS `Moment.thumbnailUrl` — póster de vídeo. */
+    val thumbnailUrl: String? = null,
+    /** Paridad iOS `Moment.imagePath` — póster / legacy. */
+    val imagePath: String? = null,
+    /** Paridad iOS `Moment.videoDuration` — LiveVideoTimeLabel fallback. */
+    val videoDuration: Double? = null,
 ) {
     /** Paridad iOS `Moment.visibleMediaItems`. */
     val visibleMediaItems: List<FeedMediaItem>
@@ -540,7 +569,7 @@ private fun JSONObject.toFeedMoment(): FeedMoment {
     val structuredMedia = optJSONArray("mediaItems")?.let { items ->
         (0 until items.length()).mapNotNull { index ->
             items.optJSONObject(index)?.let { item ->
-                item.optString("url").takeIf { it.isNotBlank() }?.let { url ->
+                item.optStringOrNull("url")?.let { url ->
                     FeedMediaItem(
                         id = item.optString("id", "$index-$url"),
                         type = item.optString("type", "image"),
@@ -591,6 +620,9 @@ private fun JSONObject.toFeedMoment(): FeedMoment {
         customListId = stringOrNull("customListId"),
         isArchived = if (has("isArchived")) optBoolean("isArchived") else null,
         locationCoordinate = locationCoordinate,
+        thumbnailUrl = stringOrNull("thumbnailUrl"),
+        imagePath = stringOrNull("imageUrl") ?: stringOrNull("imagePath"),
+        videoDuration = optDoubleOrNull("videoDuration"),
     )
 }
 
@@ -777,54 +809,10 @@ private fun JSONObject.toBackendStoryDocument(): BackendStoryDocument = BackendS
     videoUrl = stringOrNull("videoUrl"),
 )
 
-fun BackendStoryDocument.toStory(): Story? {
-    val media = mediaItem?.let {
-        val type = MediaItem.MediaType.entries.firstOrNull { e -> e.raw == it.type }
-            ?: MediaItem.MediaType.IMAGE
-        MediaItem(type = type, url = it.url)
-    } ?: imagePath?.takeIf { it.isNotBlank() }?.let { MediaItem(type = MediaItem.MediaType.IMAGE, url = it) }
-        ?: videoUrl?.takeIf { it.isNotBlank() }?.let { MediaItem(type = MediaItem.MediaType.VIDEO, url = it) }
-        ?: return null
-    val textPosition = if (textPositionX != null && textPositionY != null) {
-        Point(textPositionX, textPositionY)
-    } else null
-    return Story(
-        id = id,
-        authorId = authorId,
-        duration = duration ?: 0.0,
-        expirationHours = expirationHours ?: if (chainId != null) 48 else 24,
-        expirationDate = Date((expirationDate ?: 0.0).toLong()),
-        mediaItem = media,
-        profileImagePath = profileImagePath,
-        timestamp = Date((timestamp ?: 0.0).toLong()),
-        username = username ?: "",
-        audience = audience,
-        customListId = customListId,
-        text = text,
-        textPosition = textPosition,
-        textStyle = textStyle,
-        textPositionNormX = textPositionNormX,
-        textPositionNormY = textPositionNormY,
-        textColorHex = textColorHex,
-        textFontSize = textFontSize,
-        textAlignment = textAlignment,
-        textBackgroundFill = textBackgroundFill,
-        textStroke = textStroke,
-        textVisualEffect = textVisualEffect,
-        textMotion = textMotion,
-        forcesAllCaps = forcesAllCaps,
-        textLayerOrder = textLayerOrder,
-        textOverlayLive = textOverlayLive,
-        textOverlays = textOverlays,
-        stickers = stickers,
-        aspectRatio = aspectRatio,
-        backgroundFrameURL = backgroundFrameURL,
-        backgroundBlurredFrameURL = backgroundBlurredFrameURL,
-        chainId = chainId,
-        chainPosition = chainPosition,
-        chainTitle = chainTitle,
-    )
-}
+/** ≡ `StoryRepository.decodeBackendStory` — fuente de verdad en StoryRepository. */
+fun BackendStoryDocument.toStory(): Story? =
+    com.moments.android.views.story.StoryRepository.decodeBackendStory(this)
+
 
 private fun JSONArray.toStringList(): List<String> =
     (0 until length()).mapNotNull { optString(it).takeIf { s -> s.isNotBlank() } }

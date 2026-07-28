@@ -62,12 +62,12 @@ val AdaptiveColors.accentColorRed: Color
 val AdaptiveColors.receivedAccentColor: Color
     get() = if (isDark) Color.White.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.2f)
 
-val AdaptiveColors.chatBackground: List<Color>
-    get() = List(3) { if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6) }
+// chatBackground vive en AdaptiveColors (mismo hex 3×); no duplicar extensión.
 
 val AdaptiveColors.messagingBackground: List<Color>
     get() = if (isDark) {
-        listOf(userAccentColor.copy(alpha = 0.3f), Color.Blue.copy(alpha = 0.2f), Color(0xFF0B1215))
+        // ≡ Color.blue iOS ≈ system/accent 007AFF (no Material Color.Blue)
+        listOf(userAccentColor.copy(alpha = 0.3f), Color(0xFF007AFF).copy(alpha = 0.2f), Color(0xFF0B1215))
     } else {
         listOf(userAccentColor.copy(alpha = 0.1f), Color(0xFFFAF9F6), Color(0xFFFAF9F6))
     }

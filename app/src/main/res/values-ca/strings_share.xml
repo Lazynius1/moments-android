@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_moment_title">Compartir moment</string>
+    <string name="share_moment_from">De %1$s</string>
+    <string name="share_send_to">Enviar a...</string>
+    <string name="share_moment_by">Moment de %1$s</string>
+    <string name="share_select_contacts">Seleccionar contactes</string>
+    <string name="share_send_to_count">Enviar a %d</string>
+    <string name="share_add_to_story">Afegir a la història</string>
+    <string name="share_preparing">Preparant...</string>
+    <string name="share_moment_unavailable">Aquest moment no està disponible</string>
+    <string name="share_no_permission">No tens permís per veure aquest contingut</string>
+    <string name="share_video">Vídeo</string>
+    <string name="share_moment">Moment</string>
+    <string name="share_view_moment">Veure moment</string>
+    <string name="share_cancel">Cancel·lar</string>
+    <string name="share_favorites">Preferits</string>
+    <string name="share_recents">Recents</string>
+    <string name="share_search_placeholder">Cercar contactes...</string>
+    <string name="share_search_no_results">No s\'han trobat contactes</string>
+    <string name="share_search_global_results">Altres usuaris</string>
+    <string name="share_empty_title">Encara no hi ha converses</string>
+    <string name="share_empty_subtitle">Connecta amb persones per compartir moments</string>
+    <string name="share_favorites_empty">Encara no hi ha preferits</string>
+    <string name="context_menu_copy_link">Copiar enllaç</string>
+    <string name="context_menu_copy_link_subtitle">Compartir fora de l\'app</string>
+    <string name="creator_story_subtitle">Comparteix moments que desapareixen</string>
+    <string name="errors_moment_image_unavailable">No s\'ha pogut carregar la imatge del moment.</string>
+    <string name="errors_sticker_generation_failed">No s\'ha pogut generar l\'sticker.</string>
+    <string name="share_story_title">Compartir història</string>
+    <string name="share_story_by">Història de %1$s</string>
+    <string name="share_story_unavailable">Aquesta història no està disponible</string>
+    <string name="share_story_denied_expired">Aquesta història ha caducat.</string>
+    <string name="share_story_denied_not_found">Aquesta història s\'ha eliminat o ja no existeix.</string>
+    <string name="share_story_denied_blocked_title">Història no disponible</string>
+    <string name="share_story_denied_blocked">No pots veure aquesta història perquè hi ha un bloqueig entre vosaltres.</string>
+    <string name="share_story_denied_private_title">Compte privat</string>
+    <string name="share_story_denied_private">Segueix aquesta persona per veure les seves històries.</string>
+    <string name="share_story_denied_restricted">No tens permís per veure aquesta història.</string>
+</resources>

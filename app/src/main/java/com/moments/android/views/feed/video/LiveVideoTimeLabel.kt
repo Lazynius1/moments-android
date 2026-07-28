@@ -6,21 +6,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.moments.android.services.video.SharedVideoPlayerPool
+import com.moments.android.services.video.GlobalVideoManager
 
 /** Port de `LiveVideoTimeLabel.DisplayMode`. */
 enum class LiveVideoTimeDisplayMode {
+    /** Fondo propio (RoundedRectangle negro semitransparente). */
     Standalone,
+    /** Sin fondo; el padre gestiona el contenedor. */
     Inline,
 }
 
@@ -29,6 +29,8 @@ enum class LiveVideoTimeDisplayMode {
  * - Sin arrancar: duración total `"0:18"`.
  * - Reproduciendo: `"0:12 / 0:18"`.
  * - Sin duración ni tiempo: no renderiza.
+ *
+ * Fuente de tiempo: `GlobalVideoManager.livePlaybackSeconds[consumerId]` (como iOS).
  */
 @Composable
 fun LiveVideoTimeLabel(
@@ -37,16 +39,16 @@ fun LiveVideoTimeLabel(
     displayMode: LiveVideoTimeDisplayMode = LiveVideoTimeDisplayMode.Standalone,
     modifier: Modifier = Modifier,
 ) {
-    var currentSeconds by remember(consumerId) { mutableDoubleStateOf(0.0) }
+    val liveMap by GlobalVideoManager.livePlaybackSeconds.collectAsState()
+    val currentSeconds = liveMap[consumerId] ?: 0.0
 
+    // Bridge: iOS `VideoPlayerManager` publica vía `setPlaybackPosition` → livePlaybackSeconds.
+    // Hasta portar ese tick, capturamos del pool y escribimos en el manager (misma API).
     DisposableEffect(consumerId) {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         val runnable = object : Runnable {
             override fun run() {
-                runCatching {
-                    val player = SharedVideoPlayerPool.player(consumerId)
-                    currentSeconds = player.currentPosition / 1000.0
-                }
+                GlobalVideoManager.capturePlaybackPosition(consumerId)
                 handler.postDelayed(this, 200L)
             }
         }
@@ -57,18 +59,19 @@ fun LiveVideoTimeLabel(
     val hasStarted = currentSeconds > 0.05
     val text = when {
         hasStarted && totalDuration != null && totalDuration > 0 ->
-            "${formatSeconds(currentSeconds)} / ${formatSeconds(totalDuration)}"
-        totalDuration != null && totalDuration > 0 -> formatSeconds(totalDuration)
+            "${formatLiveVideoSeconds(currentSeconds)} / ${formatLiveVideoSeconds(totalDuration)}"
+        totalDuration != null && totalDuration > 0 -> formatLiveVideoSeconds(totalDuration)
         else -> null
     } ?: return
 
-    val base = Modifier.then(modifier)
+    // iOS SwiftUI: .padding → .background (fondo envuelve el padding).
+    // Compose: .background → .padding (mismo resultado visual).
     val styled = if (displayMode == LiveVideoTimeDisplayMode.Standalone) {
-        base
+        modifier
             .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
             .padding(horizontal = 6.dp, vertical = 3.dp)
     } else {
-        base
+        modifier
     }
 
     Text(
@@ -76,30 +79,14 @@ fun LiveVideoTimeLabel(
         color = Color.White,
         fontSize = 11.sp,
         fontWeight = FontWeight.SemiBold,
-        fontFamily = FontFamily.Monospace,
+        fontFamily = FontFamily.SansSerif,
+        style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
         modifier = styled,
     )
 }
 
-/** API legacy (solo segundos totales). */
-@Composable
-fun LiveVideoTimeLabel(
-    seconds: Double,
-    modifier: Modifier = Modifier,
-) {
-    if (seconds <= 0) return
-    Text(
-        text = formatSeconds(seconds),
-        color = Color.White.copy(alpha = 0.9f),
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        modifier = modifier
-            .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 6.dp, vertical = 3.dp),
-    )
-}
-
-private fun formatSeconds(seconds: Double): String {
+/** ≡ iOS `formatted(_ seconds:)`. */
+private fun formatLiveVideoSeconds(seconds: Double): String {
     val s = seconds.toInt().coerceAtLeast(0)
     val m = s / 60
     val r = s % 60

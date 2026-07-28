@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feed_reaction_accessibility_default">React, %1$d reactions</string>
+    <string name="feed_reaction_accessibility_selected">Your reaction %1$s, %2$d reactions</string>
+    <string name="feed_reaction_accessibility_hint">Double tap to react. Long press for more reactions.</string>
+    <string name="reactions_title">Reactions</string>
+    <string name="reactions_loading">Loading reactions...</string>
+    <string name="reactions_empty_title">No reactions</string>
+    <string name="reactions_empty_subtitle">Be the first to react to this moment</string>
+    <string name="reactions_search_no_results_title">No results found</string>
+    <string name="reactions_search_no_results_subtitle">Try different search terms</string>
+    <string name="reactions_type_count">%d reaction types</string>
+    <string name="reactions_type_count_single">%d reaction type</string>
+    <string name="reactions_people_count">%d people</string>
+    <string name="reactions_people_count_single">%d person</string>
+    <string name="reactions_more">And %d more...</string>
+    <string name="reactions_user_reacted">Reacted with %1$s</string>
+    <string name="reactions_search_placeholder">Search users...</string>
+</resources>

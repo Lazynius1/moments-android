@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feed_reaction_accessibility_default">Reaccionar, %1$d reaccions</string>
+    <string name="feed_reaction_accessibility_selected">La teva reacció %1$s, %2$d reaccions</string>
+    <string name="feed_reaction_accessibility_hint">Toca dues vegades per reaccionar. Mantén premut per a més reaccions.</string>
+    <string name="reactions_title">Reaccions</string>
+    <string name="reactions_loading">Carregant reaccions...</string>
+    <string name="reactions_empty_title">No hi ha reaccions</string>
+    <string name="reactions_empty_subtitle">Sigues el primer a reaccionar a aquest moment</string>
+    <string name="reactions_search_no_results_title">No s\'han trobat resultats</string>
+    <string name="reactions_search_no_results_subtitle">Prova amb altres termes de cerca</string>
+    <string name="reactions_type_count">%d tipus de reacció</string>
+    <string name="reactions_type_count_single">%d tipus de reacció</string>
+    <string name="reactions_people_count">%d persones</string>
+    <string name="reactions_people_count_single">%d persona</string>
+    <string name="reactions_more">I %d més...</string>
+    <string name="reactions_user_reacted">Ha reaccionat amb %1$s</string>
+    <string name="reactions_search_placeholder">Cercar usuaris...</string>
+</resources>

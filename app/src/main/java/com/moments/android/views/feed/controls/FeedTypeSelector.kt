@@ -31,7 +31,7 @@ import com.moments.android.utilities.momentsPress
 
 /**
  * Port 1:1 de `FeedTypeSelector.swift` → `FloatingGlassFeedToggle`.
- * Capsule glass (momentsChromeGlass) + pill seleccionado teal→purple.
+ * Capsule glass wrap-content (no full-width) + pill seleccionado teal→purple.
  */
 @Composable
 fun FloatingGlassFeedToggle(
@@ -41,7 +41,7 @@ fun FloatingGlassFeedToggle(
 ) {
     val capsule = RoundedCornerShape(percent = 50)
 
-    // iOS: .padding(4).background { Capsule ultraThinMaterial + stroke + shadow }
+    // iOS: HStack wrap-content + .padding(4) + Capsule glass
     Row(
         modifier
             .shadow(
@@ -122,6 +122,7 @@ private fun FeedTypeButton(
                 indication = null,
                 onClick = onClick,
             )
+            // iOS: .padding(.horizontal, 12).padding(.vertical, 6)
             .padding(horizontal = 12.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {

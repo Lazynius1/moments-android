@@ -400,7 +400,7 @@ fun TabBarScreen(
                 onDismissRequest = { showMessagesOverlay = false },
                 properties = DialogProperties(usePlatformDefaultWidth = false),
             ) {
-                Surface(Modifier.fillMaxSize()) {
+                Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
                     MessagingView(onDismiss = { showMessagesOverlay = false })
                 }
             }
@@ -429,8 +429,11 @@ private fun TabContent(
         AppTab.EXPLORE -> ExploreView(
             contentPadding = padding,
         )
-        // Como en iOS: la pestaña propia monta `ProfileView`, no la vista de visitante.
-        AppTab.PROFILE -> ProfileView(modifier = Modifier.padding(padding))
+        // El perfil pinta bajo la status bar (≡ `ignoresSafeArea` Swift); solo conserva
+        // el espacio inferior que reserva el dock de Android.
+        AppTab.PROFILE -> ProfileView(
+            modifier = Modifier.padding(bottom = padding.calculateBottomPadding()),
+        )
     }
 }
 

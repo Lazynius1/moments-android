@@ -26,6 +26,50 @@ object ChatDraftEvents {
     }
 }
 
+/** ≡ `NSNotification.Name("ConversationMuteStateChanged")`. */
+data class ConversationMuteStateChanged(
+    val conversationId: String,
+    val isMuted: Boolean,
+)
+
+object ConversationMuteEvents {
+    private val _events = MutableSharedFlow<ConversationMuteStateChanged>(extraBufferCapacity = 16)
+    val events: SharedFlow<ConversationMuteStateChanged> = _events.asSharedFlow()
+    fun emit(conversationId: String, isMuted: Boolean) {
+        _events.tryEmit(ConversationMuteStateChanged(conversationId, isMuted))
+    }
+}
+
+/** ≡ `NSNotification.Name("ConversationForwardingPreferenceChanged")`. */
+data class ConversationForwardingPreferenceChanged(
+    val conversationId: String,
+    val userId: String,
+    val allowsForwarding: Boolean,
+)
+
+object ConversationForwardingPreferenceEvents {
+    private val _events = MutableSharedFlow<ConversationForwardingPreferenceChanged>(extraBufferCapacity = 16)
+    val events: SharedFlow<ConversationForwardingPreferenceChanged> = _events.asSharedFlow()
+    fun emit(conversationId: String, userId: String, allowsForwarding: Boolean) {
+        _events.tryEmit(ConversationForwardingPreferenceChanged(conversationId, userId, allowsForwarding))
+    }
+}
+
+/** ≡ `NSNotification.Name("ConversationBuzzPreferenceChanged")`. */
+data class ConversationBuzzPreferenceChanged(
+    val conversationId: String,
+    val userId: String,
+    val allowsBuzz: Boolean,
+)
+
+object ConversationBuzzPreferenceEvents {
+    private val _events = MutableSharedFlow<ConversationBuzzPreferenceChanged>(extraBufferCapacity = 16)
+    val events: SharedFlow<ConversationBuzzPreferenceChanged> = _events.asSharedFlow()
+    fun emit(conversationId: String, userId: String, allowsBuzz: Boolean) {
+        _events.tryEmit(ConversationBuzzPreferenceChanged(conversationId, userId, allowsBuzz))
+    }
+}
+
 object ChatDraftStore {
     private const val PREFS = "chat_drafts"
     private const val KEY_PREFIX = "chatDraft"

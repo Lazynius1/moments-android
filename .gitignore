@@ -20,3 +20,6 @@ local.properties
 # Local agent skills/config (not part of the app)
 .claude/
 .cursor/
+
+# Capturas y ficheros de trabajo locales
+.tmp/

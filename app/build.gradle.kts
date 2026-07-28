@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -26,6 +28,26 @@ android {
         buildConfigField("String", "SC_CAMERA_KIT_API_TOKEN", "\"\"")
         buildConfigField("String", "SC_CAMERA_KIT_CLIENT_ID", "\"\"")
         buildConfigField("String", "SC_CAMERA_KIT_LENS_GROUP_ID", "\"6249bcf5-6bb2-4845-9021-0a6c5464963f\"")
+
+        // Secrets desde local.properties (gitignored).
+        val localProps = Properties().apply {
+            val f = rootProject.file("local.properties")
+            if (f.exists()) f.inputStream().use { load(it) }
+        }
+
+        // Mapbox public token — MAPBOX_ACCESS_TOKEN=pk.…
+        val mapboxToken = localProps.getProperty("MAPBOX_ACCESS_TOKEN")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() && it != "YOUR_MAPBOX_ACCESS_TOKEN" }
+            ?: "YOUR_MAPBOX_ACCESS_TOKEN"
+        buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"${mapboxToken.replace("\"", "\\\"")}\"")
+
+        // OpenWeather Current API 2.5 — OPENWEATHER_API_KEY=…
+        val openWeatherKey = localProps.getProperty("OPENWEATHER_API_KEY")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() && it != "YOUR_OPENWEATHER_API_KEY" }
+            ?: "YOUR_OPENWEATHER_API_KEY"
+        buildConfigField("String", "OPENWEATHER_API_KEY", "\"${openWeatherKey.replace("\"", "\\\"")}\"")
     }
 
     buildFeatures {
@@ -95,6 +117,8 @@ dependencies {
     implementation(libs.user.messaging.platform)
     implementation(libs.google.maps.compose)
     implementation(libs.google.places)
+    implementation(libs.mapbox.maps)
+    implementation(libs.mapbox.maps.compose)
     implementation(libs.kotlinx.serialization.json)
     debugImplementation(libs.androidx.ui.tooling)
 }

@@ -145,3 +145,22 @@ fun Double.formattedRemainingTime(context: Context): String {
         else -> context.getString(R.string.story_chains_time_expired)
     }
 }
+
+/** ≡ `StoryChainLimitError.errorDescription` en Swift. */
+fun StoryChainLimitError.localizedMessage(context: Context): String = when (this) {
+    StoryChainLimitError.MaxPartsReached ->
+        context.getString(R.string.story_chains_error_max_parts, StoryChainLimits.MAX_PARTS)
+    StoryChainLimitError.ChainExpired ->
+        context.getString(R.string.story_chains_error_expired)
+    StoryChainLimitError.TooSoonBetweenParts ->
+        context.getString(
+            R.string.story_chains_error_too_soon,
+            (StoryChainLimits.MIN_TIME_BETWEEN_PARTS_MS / 60_000L).toInt(),
+        )
+    StoryChainLimitError.ChainNotFound ->
+        context.getString(R.string.story_chains_error_not_found)
+    StoryChainLimitError.UserNotAuthorized ->
+        context.getString(R.string.story_chains_error_user_not_authorized)
+    StoryChainLimitError.InvalidChainData ->
+        context.getString(R.string.story_chains_error_invalid_data)
+}

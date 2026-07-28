@@ -10,6 +10,7 @@ import com.moments.android.services.firestore.StoryAuthorSummary
 import com.moments.android.services.firestore.fetchActiveStoriesForUsers
 import com.moments.android.services.firestore.fetchStorySummariesForUsers
 import com.moments.android.services.firestore.prefetchStoriesForUser
+import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.social.StoryRingCacheService
@@ -29,7 +30,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
-/** Port de `FeedStoryRingCoordinator.swift`. */
+/**
+ * Port de `FeedStoryRingCoordinator.swift`.
+ * evaluateVisibleStoriesForRing / checkUserStories → [StoryRingResolverService].
+ */
 class FeedStoryRingCoordinator(
     private val firestoreService: FirestoreService = FirestoreService(),
     private val appContext: Context? = null,
@@ -65,11 +69,6 @@ class FeedStoryRingCoordinator(
         cachedStories.clear()
         cachedUnseenStories.clear()
         cachedStoriesTimestampMs = System.currentTimeMillis()
-        storyUsers = emptyList()
-        ringNextCursor = null
-        isLoadingStories = true
-        isLoadingMoreRing = false
-        StoryTrayService.invalidate()
     }
 
     fun prefetchTopStoryUsers(excluding: String?, scope: CoroutineScope) {
@@ -119,31 +118,37 @@ class FeedStoryRingCoordinator(
     private suspend fun reloadStoryUsers(userId: String, allowInstantCache: Boolean) {
         isLoadingStories = true
 
+        // ≡ iOS: pintar cache/skeleton y seguir a red (no return temprano).
         if (allowInstantCache) {
             StoryTrayService.cachedTray(userId)?.let { cachedTray ->
                 applyTray(cachedTray, currentUserId = userId, append = false)
                 ringNextCursor = cachedTray.nextCursor
                 isLoadingStories = false
-                return
-            }
-            val skeleton = loadCachedStoryUsers(userId)
-            if (skeleton.isNotEmpty()) {
-                storyUsers = skeleton
+            } ?: run {
+                val skeleton = loadCachedStoryUsers(userId)
+                if (skeleton.isNotEmpty()) {
+                    storyUsers = skeleton
+                }
             }
         }
 
-        runCatching {
-            StoryTrayService.fetchStoryRingPage(limit = ringPageSize, cursor = null)
-        }.onSuccess { tray ->
-            if (tray != null) {
-                applyTray(tray, currentUserId = userId, append = false)
-                ringNextCursor = tray.nextCursor
-            } else {
-                loadLegacyRing(userId, allowInstantCache)
-            }
-        }.onFailure {
-            loadLegacyRing(userId, allowInstantCache)
+        if (!NetworkMonitor.isConnected) {
+            isLoadingStories = false
+            return
         }
+
+        val tray = runCatching {
+            StoryTrayService.fetchStoryRingPage(limit = ringPageSize, cursor = null)
+        }.getOrNull()
+
+        if (tray != null) {
+            applyTray(tray, currentUserId = userId, append = false)
+            ringNextCursor = tray.nextCursor
+            isLoadingStories = false
+            return
+        }
+
+        loadLegacyRing(userId, allowInstantCache)
         isLoadingStories = false
     }
 
@@ -172,8 +177,6 @@ class FeedStoryRingCoordinator(
         if (finalUsers.firstOrNull()?.userId != currentUserId) {
             finalUsers.removeAll { it.userId == currentUserId }
             finalUsers.add(0, emptyCurrentUserEntry(currentUserId, usernames[currentUserId]))
-        } else {
-            finalUsers[0] = finalUsers[0].copy(hasUnseenStory = false)
         }
 
         storyUsers = if (append) {

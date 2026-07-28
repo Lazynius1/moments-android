@@ -5,8 +5,10 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.InfiniteRepeatableSpec
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,8 +43,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -50,6 +56,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -68,7 +75,7 @@ import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.components.VerifiedBadge
 import java.util.Calendar
 import java.util.Date
-
+import kotlinx.coroutines.delay
 /** Port de `Views/Messaging/Components/ChatChromeViews.swift`. */
 object ChatComposerChromeMetrics {
     val panelHomeGap = 16.dp
@@ -79,7 +86,9 @@ object ChatComposerChromeMetrics {
     val estimatedComposerChromeHeight = 68.dp
 
     fun listBottomInset(composerChromeHeight: Dp): Dp =
-        maxOf(composerChromeHeight, estimatedComposerChromeHeight) + messageListGap
+        // Una vez medido, el composer real manda. Forzar el mínimo estimado deja
+        // un hueco de ~80dp bajo el último mensaje en teléfonos compactos.
+        composerChromeHeight + messageListGap
 
     fun floatingControlBottomInset(composerChromeHeight: Dp): Dp =
         maxOf(composerChromeHeight, estimatedComposerChromeHeight) + 20.dp
@@ -358,11 +367,54 @@ fun GlassmorphicAvatar(userId: String, modifier: Modifier = Modifier) {
 @Composable
 fun GlassmorphicTypingIndicator(reduceMotion: Boolean, modifier: Modifier = Modifier) {
     val colors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme())
+    // ≡ reduceMotion: puntos estáticos 0.85, sin pulso infinito
+    if (reduceMotion) {
+        Row(
+            modifier = modifier
+                .clip(RoundedCornerShape(20.dp))
+                .glassmorphicChat()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            repeat(3) {
+                Box(
+                    Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(colors.typingIndicatorColor.copy(alpha = .85f)),
+                )
+            }
+        }
+        return
+    }
     val transition = rememberInfiniteTransition(label = "chatTyping")
-    Row(modifier = modifier.clip(RoundedCornerShape(20.dp)).glassmorphicChat().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .glassmorphicChat()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         repeat(3) { index ->
-            val amount by transition.animateFloat(0.45f, 1f, infiniteRepeatable(tween(600, delayMillis = index * 200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "typing$index")
-            Box(Modifier.size(8.dp).clip(CircleShape).background(colors.typingIndicatorColor.copy(alpha = if (reduceMotion) .85f else amount)).then(if (reduceMotion) Modifier else Modifier))
+            val amount by transition.animateFloat(
+                initialValue = 0.45f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    tween(600, delayMillis = index * 200, easing = FastOutSlowInEasing),
+                    RepeatMode.Reverse,
+                ),
+                label = "typing$index",
+            )
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(colors.typingIndicatorColor.copy(alpha = amount))
+                    .graphicsLayer {
+                        scaleX = amount
+                        scaleY = amount
+                    },
+            )
         }
     }
 }
@@ -371,14 +423,97 @@ fun GlassmorphicTypingIndicator(reduceMotion: Boolean, modifier: Modifier = Modi
 fun MessagingActionToast(text: String, modifier: Modifier = Modifier) {
     val isDark = isSystemInDarkTheme()
     val shape = RoundedCornerShape(14.dp)
-    Text(text, color = if (isDark) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = modifier.fillMaxWidth().clip(shape).momentsChromeGlass(shape, interactive = false).shadow(18.dp, shape, ambientColor = Color.Black.copy(alpha = if (isDark) .22f else .12f), spotColor = Color.Black.copy(alpha = if (isDark) .22f else .12f)).padding(horizontal = 18.dp, vertical = 14.dp))
+    Text(
+        text,
+        color = if (isDark) Color.White else Color.Black,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .momentsChromeGlass(shape, interactive = false)
+            .shadow(
+                18.dp,
+                shape,
+                ambientColor = Color.Black.copy(alpha = if (isDark) .22f else .12f),
+                spotColor = Color.Black.copy(alpha = if (isDark) .22f else .12f),
+            )
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+    )
 }
 
 @Composable
-fun ChatScrollDownButton(pendingCount: Int, accentColor: Color, badgeTextColor: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.size(46.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(40.dp).clip(CircleShape).momentsChromeGlass(CircleShape, interactive = true), contentAlignment = Alignment.Center) { Icon(Icons.Default.KeyboardArrowDown, stringResource(R.string.chat_scroll_to_bottom_accessibility), tint = accentColor, modifier = Modifier.size(17.dp)) }
-        if (pendingCount > 0) Text(if (pendingCount > 99) stringResource(R.string.chat_scroll_badge_max) else pendingCount.toString(), color = badgeTextColor, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.TopEnd).clip(RoundedCornerShape(50)).background(accentColor).padding(horizontal = 5.dp).height(18.dp))
+fun ChatScrollDownButton(
+    pendingCount: Int,
+    accentColor: Color,
+    badgeTextColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    reduceMotion: Boolean = false,
+) {
+    val isDark = isSystemInDarkTheme()
+    var didAppear by remember { mutableStateOf(reduceMotion) }
+    LaunchedEffect(Unit) {
+        if (reduceMotion) {
+            didAppear = true
+            return@LaunchedEffect
+        }
+        didAppear = false
+        delay(16)
+        didAppear = true
+    }
+    val appear by animateFloatAsState(
+        targetValue = if (didAppear) 1f else 0f,
+        animationSpec = if (reduceMotion) tween(0) else spring(dampingRatio = 0.72f, stiffness = 400f),
+        label = "scrollDownAppear",
+    )
+    Box(
+        modifier = modifier
+            .size(46.dp)
+            .graphicsLayer {
+                val scale = 0.9f + 0.1f * appear
+                scaleX = scale
+                scaleY = scale
+                alpha = appear
+            }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(40.dp)
+                .shadow(
+                    6.dp,
+                    CircleShape,
+                    ambientColor = Color.Black.copy(alpha = if (isDark) .22f else .12f),
+                    spotColor = Color.Black.copy(alpha = if (isDark) .22f else .12f),
+                )
+                .clip(CircleShape)
+                .momentsChromeGlass(CircleShape, interactive = true),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                stringResource(R.string.chat_scroll_to_bottom_accessibility),
+                tint = accentColor,
+                modifier = Modifier.size(17.dp),
+            )
+        }
+        if (pendingCount > 0) {
+            Text(
+                if (pendingCount > 99) stringResource(R.string.chat_scroll_badge_max) else pendingCount.toString(),
+                color = badgeTextColor,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 6.dp, y = (-4).dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(accentColor)
+                    .padding(horizontal = 5.dp)
+                    .height(18.dp),
+            )
+        }
     }
 }
 

@@ -64,5 +64,8 @@ fun Moment.toExploreFeedMoment(): FeedMoment {
         customListId = customListId,
         isArchived = isArchived,
         locationCoordinate = locationCoordinate,
+        thumbnailUrl = thumbnailUrl,
+        imagePath = imagePath,
+        videoDuration = videoDuration,
     )
 }

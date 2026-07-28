@@ -186,7 +186,9 @@ class GlassmorphicChatScrollController(
     fun handleComposerHeightChange(height: Dp) {
         val previous = lastComposerHeight
         lastComposerHeight = height
-        if (!hasCompletedInitialScroll || !isPinnedToBottom || previous == null || kotlin.math.abs(height.value - previous.value) <= .5f) return
+        // El primer tamaño real llega después del scroll inicial: si lo ignoramos,
+        // la lista queda anclada con la estimación y el último mensaje bajo el composer.
+        if (!hasCompletedInitialScroll || !isPinnedToBottom || (previous != null && kotlin.math.abs(height.value - previous.value) <= .5f)) return
         composerSnapJob?.cancel()
         composerSnapJob = scope.launch { delay(50L); scheduleListBottomSnap(ListBottomSnapReason.COMPOSER_RESIZED) }
     }

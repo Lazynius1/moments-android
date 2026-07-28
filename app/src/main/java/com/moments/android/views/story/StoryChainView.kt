@@ -16,16 +16,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
@@ -44,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -53,28 +53,38 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.coordinators.CoordinatorNavigationEvent
+import com.moments.android.coordinators.NavigationEventBus
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Story
+import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.social.ChainStats
+import com.moments.android.services.social.StoryChainLimitError
 import com.moments.android.services.social.StoryChainLimits
 import com.moments.android.services.social.StoryChainLimitsService
 import com.moments.android.services.social.formattedRemainingTime
-import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.social.localizedMessage
+import com.moments.android.utilities.momentsEmptyStateAppear
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-/** Port de `StoryChainView.swift`: rejilla de la cadena, stats y continuación. */
+/**
+ * Port de `StoryChainView.swift`.
+ * Presentar con [com.moments.android.views.shared.MomentsModalSheet] (≡ `.sheet` iOS).
+ */
 @Composable
 fun StoryChainView(
     chainId: String,
     chainTitle: String,
     canContinueChain: Boolean,
     onDismiss: () -> Unit,
-    onOpenStory: (List<Story>, Int) -> Unit,
-    onContinueChain: (String, String, Int) -> Unit,
+    onContinueChain: (String, String, Int) -> Unit = { _, _, _ -> },
     initialStoryId: String? = null,
     initialChainPosition: Int? = null,
     modifier: Modifier = Modifier,
@@ -90,13 +100,21 @@ fun StoryChainView(
     var selectedIndex by remember(chainId) { mutableIntStateOf(0) }
     var didApplyInitialSelection by remember(chainId) { mutableStateOf(false) }
     var chainStats by remember(chainId) { mutableStateOf(ChainStats(0, 0.0, false)) }
-    var limitAlertMessage by remember { mutableStateOf<String?>(null) }
+    var showLimitAlert by remember { mutableStateOf(false) }
+    var limitAlertMessage by remember { mutableStateOf("") }
+    // ≡ showStoriesViewer + fullScreenCover StoriesView(chainStories:)
+    var showStoriesViewer by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(chainId) {
         isLoading = true
         stories = loadChainStories(chainId)
         isLoading = false
+    }
+
+    // ≡ loadChainStats on header appear (cuando ya hay contenido)
+    LaunchedEffect(chainId, stories.isNotEmpty()) {
+        if (stories.isEmpty() && isLoading) return@LaunchedEffect
         chainStats = runCatching { StoryChainLimitsService.getChainStats(chainId) }
             .getOrDefault(ChainStats(stories.size, 0.0, false))
     }
@@ -106,7 +124,8 @@ fun StoryChainView(
         val resolved = when {
             initialStoryId != null && stories.indexOfFirst { it.id == initialStoryId } >= 0 ->
                 stories.indexOfFirst { it.id == initialStoryId }
-            initialChainPosition != null && stories.indexOfFirst { it.chainPosition == initialChainPosition } >= 0 ->
+            initialChainPosition != null &&
+                stories.indexOfFirst { it.chainPosition == initialChainPosition } >= 0 ->
                 stories.indexOfFirst { it.chainPosition == initialChainPosition }
             else -> 0
         }
@@ -130,7 +149,10 @@ fun StoryChainView(
 
             stories.isEmpty() -> {
                 Column(
-                    Modifier.fillMaxSize().padding(horizontal = 28.dp),
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 28.dp)
+                        .momentsEmptyStateAppear(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -180,7 +202,7 @@ fun StoryChainView(
                                 isDark = isDark,
                                 onTap = {
                                     selectedIndex = index
-                                    onOpenStory(stories, index)
+                                    showStoriesViewer = true
                                 },
                             )
                         }
@@ -188,30 +210,51 @@ fun StoryChainView(
                 }
 
                 if (canContinueChain) {
+                    val capsuleFg = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+                    val capsuleBg = if (isDark) Color(0xFFFAF9F6) else Color(0xFF0B1215)
                     Row(
                         Modifier
                             .align(Alignment.BottomCenter)
                             .padding(horizontal = 20.dp, vertical = 22.dp)
-                            .background(if (isDark) Color(0xFFFAF9F6) else Color(0xFF0B1215), RoundedCornerShape(50))
+                            .shadow(
+                                elevation = 12.dp,
+                                shape = RoundedCornerShape(50),
+                                ambientColor = Color.Black.copy(if (isDark) 0.22f else 0.10f),
+                                spotColor = Color.Black.copy(if (isDark) 0.22f else 0.10f),
+                            )
+                            .background(capsuleBg, RoundedCornerShape(50))
                             .clickable {
                                 val userId = FirebaseAuth.getInstance().currentUser?.uid
                                 if (userId == null) {
                                     limitAlertMessage = context.getString(R.string.story_chains_error_user_not_authorized)
-                                } else {
-                                    limitAlertMessage = null
-                                    scope.launch {
-                                        runCatching { StoryChainLimitsService.canContinueChain(chainId, userId) }
-                                            .onSuccess {
-                                                onDismiss()
-                                                onContinueChain(chainId, chainTitle, stories.size + 1)
-                                            }
-                                            .onFailure { error ->
-                                                limitAlertMessage = context.getString(
+                                    showLimitAlert = true
+                                    return@clickable
+                                }
+                                scope.launch {
+                                    runCatching { StoryChainLimitsService.canContinueChain(chainId, userId) }
+                                        .onSuccess {
+                                            val nextPosition = stories.size + 1
+                                            onDismiss()
+                                            // ≡ NotificationCenter "ContinueStoryChain" (CreatorView escucha)
+                                            NavigationEventBus.emit(
+                                                CoordinatorNavigationEvent.ContinueStoryChain(
+                                                    chainId,
+                                                    chainTitle,
+                                                    nextPosition,
+                                                ),
+                                            )
+                                            onContinueChain(chainId, chainTitle, nextPosition)
+                                        }
+                                        .onFailure { error ->
+                                            limitAlertMessage = when (error) {
+                                                is StoryChainLimitError -> error.localizedMessage(context)
+                                                else -> context.getString(
                                                     R.string.story_chains_error_validation,
                                                     error.localizedMessage ?: error.toString(),
                                                 )
                                             }
-                                    }
+                                            showLimitAlert = true
+                                        }
                                 }
                             }
                             .padding(horizontal = 24.dp, vertical = 15.dp),
@@ -219,14 +262,14 @@ fun StoryChainView(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Icon(
-                            Icons.Filled.Add,
+                            Icons.Filled.AddCircle,
                             contentDescription = null,
-                            tint = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6),
+                            tint = capsuleFg,
                             modifier = Modifier.size(17.dp),
                         )
                         Text(
                             stringResource(R.string.story_chains_continue_story),
-                            color = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6),
+                            color = capsuleFg,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -236,17 +279,32 @@ fun StoryChainView(
         }
     }
 
-    limitAlertMessage?.let { message ->
+    if (showLimitAlert) {
         AlertDialog(
-            onDismissRequest = { limitAlertMessage = null },
+            onDismissRequest = { showLimitAlert = false },
             title = { Text(stringResource(R.string.story_chains_chain_limit)) },
-            text = { Text(message) },
+            text = { Text(limitAlertMessage) },
             confirmButton = {
-                TextButton(onClick = { limitAlertMessage = null }) {
+                TextButton(onClick = { showLimitAlert = false }) {
                     Text(stringResource(R.string.story_chains_ok))
                 }
             },
         )
+    }
+
+    // ≡ .fullScreenCover StoriesView(chainStories:startAtIndex:)
+    if (showStoriesViewer && stories.isNotEmpty()) {
+        Dialog(
+            onDismissRequest = { showStoriesViewer = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            StoriesView(
+                explicitStories = stories,
+                startAtIndex = selectedIndex,
+                highlightTitle = chainTitle,
+                onDismiss = { showStoriesViewer = false },
+            )
+        }
     }
 }
 
@@ -264,7 +322,6 @@ private fun ChainHeader(
     Column(
         Modifier
             .fillMaxWidth()
-            .statusBarsPadding()
             .padding(horizontal = 20.dp)
             .padding(top = 14.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -288,8 +345,9 @@ private fun ChainHeader(
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val chipTint = if (isDark) Color.White.copy(alpha = 0.86f) else Color.Black.copy(alpha = 0.76f)
+            // ≡ infoChip icon: "link"
             InfoChip(
-                icon = Icons.Filled.Add,
+                icon = Icons.Filled.Link,
                 text = stringResource(R.string.story_chains_parts, stats.partCount, StoryChainLimits.MAX_PARTS),
                 tint = chipTint,
                 isDark = isDark,
@@ -315,7 +373,8 @@ private fun ChainHeader(
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 repeat(storyCount) { index ->
                     val brush = if (index <= selectedIndex) {
-                        Brush.horizontalGradient(listOf(Color(0xFF007AFF), Color(0xFFAF52DE), Color(0xFFFF2D55)))
+                        // ≡ Color.blue, .purple, .pink
+                        Brush.horizontalGradient(listOf(Color.Blue, Color(0xFF9C27B0), Color(0xFFFF4081)))
                     } else {
                         Brush.horizontalGradient(
                             listOf(
@@ -336,8 +395,8 @@ private fun CloseChip(tint: Color, onDismiss: () -> Unit) {
     Box(
         Modifier
             .size(38.dp)
+            .momentsChromeGlass(CircleShape, interactive = true)
             .clip(CircleShape)
-            .background(tint.copy(alpha = 0.08f))
             .clickable(onClick = onDismiss),
         contentAlignment = Alignment.Center,
     ) {
@@ -350,12 +409,12 @@ private fun InfoChip(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     text: String,
     tint: Color,
-    isDark: Boolean,
+    @Suppress("UNUSED_PARAMETER") isDark: Boolean,
 ) {
     Row(
         Modifier
+            .momentsChromeGlass(RoundedCornerShape(50), interactive = false)
             .clip(RoundedCornerShape(50))
-            .background(if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f))
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -431,7 +490,13 @@ private fun StoryChainGridItemView(
                     .padding(horizontal = 8.dp, vertical = 5.dp),
             )
 
-            Box(Modifier.size(30.dp).clip(CircleShape), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .border(0.7.dp, Color.White.copy(alpha = 0.32f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
                 if (!story.profileImagePath.isNullOrEmpty()) {
                     AsyncImage(
                         model = story.profileImagePath,
@@ -479,4 +544,3 @@ private suspend fun loadChainStories(chainId: String): List<Story> = runCatching
         Story.from(doc.id, doc.data as? Map<String, Any?> ?: return@mapNotNull null)
     }
 }.getOrDefault(emptyList())
-

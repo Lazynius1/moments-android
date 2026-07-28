@@ -5,6 +5,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.moments.android.extensions.optStringOrNull
 import com.moments.android.MomentsApplication
 import com.moments.android.R
 import com.moments.android.views.messaging.core.AcceptMessageRequestResult
@@ -146,7 +147,8 @@ class MessageRequestService(
                 // (`updateExistingRequest` existe en iOS pero no se llama desde el send path.)
                 val existing = checkExistingRequest(currentUser.uid, receiverId)
                 if (existing != null) {
-                    error(localized(R.string.chat_request_error_already_pending))
+                    // Prefijo 409: el composer trata el duplicado como request ya enviado (≡ iOS).
+                    error("409: ${localized(R.string.chat_request_error_already_pending)}")
                 }
                 createNewRequest(
                     senderId = currentUser.uid,
@@ -206,16 +208,16 @@ class MessageRequestService(
                     ?.readBytes()?.decodeToString().orEmpty()
                 if (code != 200) {
                     val errorCode = runCatching {
-                        JSONObject(body).optString("errorCode").takeIf { it.isNotEmpty() }
+                        JSONObject(body).optStringOrNull("errorCode")
                     }.getOrNull()?.let(AcceptRequestServerErrorCode::from)
                     throw IllegalStateException(localizedAcceptRequestError(errorCode, code))
                 }
                 val json = runCatching { JSONObject(body) }.getOrElse {
                     error(localized(R.string.messaging_error_service_unavailable))
                 }
-                val conversationId = json.optString("conversationId").takeIf { it.isNotEmpty() }
+                val conversationId = json.optStringOrNull("conversationId")
                     ?: error(localized(R.string.messaging_error_service_unavailable))
-                val messageId = json.optString("messageId").takeIf { it.isNotEmpty() }
+                val messageId = json.optStringOrNull("messageId")
                     ?: error(localized(R.string.messaging_error_service_unavailable))
                 AcceptMessageRequestResult(conversationId = conversationId, messageId = messageId)
             }.onSuccess { result ->

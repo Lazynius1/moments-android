@@ -84,6 +84,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import com.moments.android.views.creator.creatoruikit.creatorMomentsCaptureRect
+import com.moments.android.views.creator.creatoruikit.creatorNormalizedUp
 import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
 import kotlin.math.roundToInt
 import androidx.compose.foundation.rememberScrollState
@@ -418,6 +419,8 @@ fun StoryEditingView(
         quizCorrectIndex = data.quizCorrectIndex,
         sliderEmoji = data.sliderEmoji,
         sliderPrompt = data.sliderPrompt,
+        // shareMoment / image stickers: content es JPEG Base64 (≡ StickerData.from(StickerItem))
+        image = decodeStickerContentBitmap(data.type, data.content),
         frameStyle = data.frameStyle,
         contentScale = data.contentScale,
         contentOffsetX = data.contentOffsetX,
@@ -968,7 +971,9 @@ fun StoryEditingView(
                     }
                 }.getOrNull()
             } else {
-                context.contentResolver.openInputStream(current.uri)?.use(BitmapFactory::decodeStream)
+                context.contentResolver.openInputStream(current.uri)
+                    ?.use(BitmapFactory::decodeStream)
+                    ?.creatorNormalizedUp(context, current.uri)
             }
         }
     }
@@ -1272,7 +1277,7 @@ fun StoryEditingView(
                 capturedStickers.sortedBy { it.zIndex }.map { draft ->
                     val stickerBitmap = when {
                         draft.type == "emoji" && draft.content.isNotBlank() -> renderEmojiStickerBitmap(draft.content)
-                        draft.type == "selfie" || draft.type == "frame" -> draft.image
+                        draft.type == "selfie" || draft.type == "frame" || draft.type == "shareMoment" -> draft.image
                         else -> null
                     }
                     val localName = if (stickerBitmap != null) {
@@ -2882,6 +2887,18 @@ private fun StoryStickerChip(
         return
     }
 
+    if (sticker.type == "shareMoment" && sticker.image != null) {
+        Image(
+            bitmap = sticker.image.asImageBitmap(),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = modifier
+                .width(160.dp)
+                .clip(RoundedCornerShape(12.dp)),
+        )
+        return
+    }
+
     when (sticker.type) {
         "emoji" -> {
             // La escala se aplica una sola vez por StickerOverlayView, igual que `scaleEffect`
@@ -3566,6 +3583,19 @@ private fun renderChatImageJpeg(
     composed.recycle()
     if (mediaBmp != null && mediaBmp !== filteredImage) mediaBmp.recycle()
     return bytes
+}
+
+/** Decodifica JPEG/PNG Base64 de [StickerData.content] para tipos imagen (shareMoment, etc.). */
+private fun decodeStickerContentBitmap(type: String, content: String): Bitmap? {
+    if (content.isBlank() || content.startsWith("http") || content.startsWith("sticker_")) return null
+    val imageTypes = setOf(
+        "shareMoment", "generic", "sticker", "selfie", "frame", "questionResponse",
+    )
+    if (type !in imageTypes) return null
+    return runCatching {
+        val bytes = android.util.Base64.decode(content, android.util.Base64.DEFAULT)
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    }.getOrNull()
 }
 
 private fun saveBitmapToGallery(context: android.content.Context, bitmap: Bitmap): Boolean {

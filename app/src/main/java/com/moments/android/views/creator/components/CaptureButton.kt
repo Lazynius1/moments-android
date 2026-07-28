@@ -4,15 +4,15 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,9 +25,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.moments.android.extensions.MomentsChromeGlass
-import com.moments.android.extensions.momentsChromeGlass
-import kotlinx.coroutines.delay
 
 /**
  * Port de `CaptureButton.swift`: tap = foto; long-press ≥0.5s = vídeo.
@@ -43,52 +40,44 @@ fun CaptureButton(
 ) {
     var isPressed by remember { mutableStateOf(false) }
     var longPressArmed by remember { mutableStateOf(false) }
+    val latestIsRecording by rememberUpdatedState(isRecording)
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 1.05f else 1f,
         animationSpec = tween(150),
         label = "captureScale",
     )
 
-    LaunchedEffect(isPressed) {
-        if (!isPressed) {
-            longPressArmed = false
-            return@LaunchedEffect
-        }
-        longPressArmed = false
-        delay(500)
-        if (isPressed) {
-            longPressArmed = true
-            onLongPressStart()
-        }
-    }
-
     Box(
         modifier
             .scale(scale)
             .size(88.dp)
-            .momentsChromeGlass(
-                shape = CircleShape,
-                interactive = true,
-                tintOpacity = if (isRecording) 0.55f else MomentsChromeGlass.defaultTintOpacity,
-                tint = if (isRecording) Color.Red else null,
+            // El shutter es un control de cámara, no chrome: anillo limpio, sin glass.
+            .background(
+                if (isRecording) Color(0xFFD92626) else Color.Transparent,
+                CircleShape,
             )
-            .border(1.5.dp, Color.White.copy(0.22f), CircleShape)
-            .pointerInput(isRecording) {
-                detectDragGestures(
-                    onDragStart = { isPressed = true },
-                    onDrag = { change, _ -> change.consume() },
-                    onDragCancel = {
+            .border(2.dp, Color.White.copy(0.78f), CircleShape)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        isPressed = true
+                        tryAwaitRelease()
                         isPressed = false
-                        if (isRecording || longPressArmed) onLongPressEnd()
+                        if (longPressArmed) {
+                            longPressArmed = false
+                            onLongPressEnd()
+                        }
                     },
-                    onDragEnd = {
-                        val wasLong = isRecording || longPressArmed
-                        isPressed = false
-                        if (wasLong) {
+                    onTap = {
+                        if (latestIsRecording) {
                             onLongPressEnd()
                         } else {
                             onTap()
                         }
+                    },
+                    onLongPress = {
+                        longPressArmed = true
+                        onLongPressStart()
                     },
                 )
             },

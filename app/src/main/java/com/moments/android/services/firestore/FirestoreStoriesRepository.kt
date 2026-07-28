@@ -7,7 +7,7 @@ import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.moments.android.models.HighlightedStory
-import com.moments.android.models.MapVisibilityPolicy
+import com.moments.android.views.feed.maps.MapVisibilityPolicy
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Point
 import com.moments.android.models.StickerData

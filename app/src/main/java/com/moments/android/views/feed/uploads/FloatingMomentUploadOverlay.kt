@@ -2,6 +2,7 @@ package com.moments.android.views.feed.uploads
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -16,6 +17,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,6 +42,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,16 +55,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -72,7 +77,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
-import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.BackgroundMomentUploadService
 import com.moments.android.views.creator.UploadingMoment
@@ -80,6 +84,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val OrbSize = 58.dp
 private val PanelWidth = 238.dp
@@ -87,7 +92,7 @@ private val PanelHeight = 72.dp
 
 /**
  * Port de `FloatingMomentUploadOverlay.swift`.
- * Fuente: `BackgroundMomentUploadService.uploadingMoments` (no MomentUploadTracker).
+ * Fuente: `BackgroundMomentUploadService.uploadingMoments`.
  */
 @Composable
 fun FloatingMomentUploadOverlay(
@@ -102,6 +107,7 @@ fun FloatingMomentUploadOverlay(
     var activeMoment by remember { mutableStateOf<UploadingMoment?>(null) }
     var isExpanded by remember { mutableStateOf(false) }
 
+    // ≡ iOS onAppear + onChange(uploadingMoments.count)
     LaunchedEffect(moments.size, moments.firstOrNull()?.tempId) {
         val first = moments.firstOrNull()
         if (first != null) {
@@ -118,15 +124,17 @@ fun FloatingMomentUploadOverlay(
     }
 
     Box(
-        modifier
-            .fillMaxSize()
-            .then(if (isVisible) Modifier else Modifier),
+        modifier.fillMaxSize(),
         contentAlignment = Alignment.TopEnd,
     ) {
         AnimatedVisibility(
             visible = isVisible && activeMoment != null,
-            enter = slideInVertically { -it / 3 } + fadeIn() + scaleIn(initialScale = 0.92f),
-            exit = slideOutVertically { -it / 4 } + fadeOut() + scaleOut(targetScale = 0.92f),
+            enter = slideInVertically { -it / 3 } + fadeIn(
+                animationSpec = spring(dampingRatio = 0.78f, stiffness = 380f),
+            ) + scaleIn(initialScale = 0.92f, animationSpec = spring(dampingRatio = 0.78f, stiffness = 380f)),
+            exit = slideOutVertically { -it / 4 } + fadeOut(
+                animationSpec = spring(dampingRatio = 0.84f, stiffness = 380f),
+            ) + scaleOut(targetScale = 0.92f, animationSpec = spring(dampingRatio = 0.84f, stiffness = 380f)),
             modifier = Modifier.padding(top = topInset.dp, end = 16.dp),
         ) {
             val moment = activeMoment ?: return@AnimatedVisibility
@@ -135,14 +143,15 @@ fun FloatingMomentUploadOverlay(
                 extraUploadsCount = max(0, moments.size - 1),
                 isExpanded = isExpanded,
                 isDark = isDark,
-                onToggleExpanded = {
+                onToggleFromOrb = {
                     if (moment.status == UploadStatus.Completed || moment.status == UploadStatus.Moderated) return@UploadCluster
                     HapticManager.shared.lightImpact()
-                    if (!MotionPolicy.reduceMotion) {
-                        isExpanded = !isExpanded
-                    } else {
-                        isExpanded = !isExpanded
-                    }
+                    isExpanded = !isExpanded
+                },
+                onToggleFromPanel = {
+                    if (moment.status == UploadStatus.Completed || moment.status == UploadStatus.Moderated) return@UploadCluster
+                    HapticManager.shared.selection()
+                    isExpanded = !isExpanded
                 },
                 onRetry = {
                     HapticManager.shared.mediumImpact()
@@ -165,13 +174,13 @@ private fun UploadCluster(
     extraUploadsCount: Int,
     isExpanded: Boolean,
     isDark: Boolean,
-    onToggleExpanded: () -> Unit,
+    onToggleFromOrb: () -> Unit,
+    onToggleFromPanel: () -> Unit,
     onRetry: () -> Unit,
     onCancel: () -> Unit,
     onForceExpand: () -> Unit,
     onCollapse: () -> Unit,
 ) {
-    // Observables del momento (Compose lee properties con by)
     val status = moment.status
     val progress = moment.uploadProgress
     val content = moment.content
@@ -184,6 +193,7 @@ private fun UploadCluster(
     var showsCompletionIcon by remember(moment.tempId) { mutableStateOf(false) }
     var completionAnimationScheduled by remember(moment.tempId) { mutableStateOf(false) }
     var completionPulse by remember(moment.tempId) { mutableStateOf(false) }
+    var lastHandledStatus by remember(moment.tempId) { mutableStateOf<UploadStatus?>(null) }
 
     val arrowOffset = remember(moment.tempId) { Animatable(0f) }
     val arrowOpacity = remember(moment.tempId) { Animatable(1f) }
@@ -193,47 +203,91 @@ private fun UploadCluster(
     val rippleScale = remember(moment.tempId) { Animatable(0.2f) }
     val rippleOpacity = remember(moment.tempId) { Animatable(0f) }
 
-    fun resetAnimationStates() {
+    suspend fun resetAnimationStates() {
+        arrowOffset.snapTo(0f)
+        arrowOpacity.snapTo(1f)
+        checkmarkScale.snapTo(0f)
+        checkmarkRotation.snapTo(-15f)
+        checkmarkOpacity.snapTo(0f)
+        rippleScale.snapTo(0.2f)
+        rippleOpacity.snapTo(0f)
         showsCompletionIcon = false
         completionAnimationScheduled = false
         completionPulse = false
     }
 
-    LaunchedEffect(progress, status, moment.tempId) {
-        val target = min(1.0, max(0.0, progress))
-        if (status == UploadStatus.Completed || status == UploadStatus.Moderated) {
-            if (!completionAnimationScheduled) {
+    // ≡ iOS handleStatusChange — solo al cambiar status
+    LaunchedEffect(status, moment.tempId) {
+        if (lastHandledStatus == status) return@LaunchedEffect
+        lastHandledStatus = status
+
+        when (status) {
+            UploadStatus.Initializing -> resetAnimationStates()
+            UploadStatus.Completed, UploadStatus.Moderated -> {
+                if (completionAnimationScheduled) return@LaunchedEffect
                 completionAnimationScheduled = true
                 HapticManager.shared.notification(HapticManager.NotificationType.SUCCESS)
-                renderedProgress = 1.0
+
+                // Progress → 1.0 en paralelo con rocket + ripple
+                val progressStart = renderedProgress
+                launch {
+                    val anim = Animatable(0f)
+                    anim.animateTo(1f, tween(650, easing = LinearEasing)) {
+                        renderedProgress = progressStart + (1.0 - progressStart) * value.toDouble()
+                    }
+                    renderedProgress = 1.0
+                }
+
+                // 1. Rocket launch + 2. ripple (iOS en paralelo)
                 arrowOffset.snapTo(0f)
                 arrowOpacity.snapTo(1f)
-                arrowOffset.animateTo(-35f, tween(350, easing = LinearEasing))
-                arrowOpacity.animateTo(0f, tween(350, easing = LinearEasing))
                 rippleScale.snapTo(0.2f)
                 rippleOpacity.snapTo(0.8f)
-                rippleScale.animateTo(1.6f, tween(550, easing = LinearEasing))
-                rippleOpacity.animateTo(0f, tween(550, easing = LinearEasing))
+                launch {
+                    arrowOffset.animateTo(-35f, tween(350, easing = FastOutSlowInEasing))
+                }
+                launch {
+                    arrowOpacity.animateTo(0f, tween(350, easing = FastOutSlowInEasing))
+                }
+                launch {
+                    rippleScale.animateTo(1.6f, tween(550, easing = FastOutSlowInEasing))
+                }
+                launch {
+                    rippleOpacity.animateTo(0f, tween(550, easing = FastOutSlowInEasing))
+                }
+
                 delay(300)
                 showsCompletionIcon = true
                 checkmarkScale.snapTo(0f)
                 checkmarkRotation.snapTo(-15f)
                 checkmarkOpacity.snapTo(0f)
-                checkmarkScale.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f))
-                checkmarkRotation.animateTo(0f, spring(dampingRatio = 0.5f, stiffness = 400f))
-                checkmarkOpacity.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f))
+                launch { checkmarkScale.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f)) }
+                launch { checkmarkRotation.animateTo(0f, spring(dampingRatio = 0.5f, stiffness = 400f)) }
+                launch { checkmarkOpacity.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 400f)) }
                 completionPulse = true
                 onCollapse()
                 delay(250)
                 completionPulse = false
             }
+            UploadStatus.Failed -> {
+                HapticManager.shared.notification(HapticManager.NotificationType.ERROR)
+                onForceExpand()
+                resetAnimationStates()
+            }
+            UploadStatus.Uploading, UploadStatus.Processing -> resetAnimationStates()
+        }
+    }
+
+    // ≡ iOS syncRenderedProgress
+    LaunchedEffect(progress, status, moment.tempId) {
+        if (status == UploadStatus.Completed || status == UploadStatus.Moderated) {
+            if (!completionAnimationScheduled) {
+                // handleStatusChange lo cubre el effect de status
+                return@LaunchedEffect
+            }
             return@LaunchedEffect
         }
-        if (status == UploadStatus.Failed) {
-            HapticManager.shared.notification(HapticManager.NotificationType.ERROR)
-            onForceExpand()
-            resetAnimationStates()
-        }
+        val target = min(1.0, max(0.0, progress))
         val delta = abs(target - renderedProgress)
         val durationMs = (min(0.55, max(0.14, delta * 1.1)) * 1000).toInt()
         val start = renderedProgress
@@ -243,12 +297,14 @@ private fun UploadCluster(
         }
     }
 
+    // ≡ iOS updateArrowAnimation bob + aura
     val infinite = rememberInfiniteTransition(label = "uploadOrbBob")
+    val auraActive = status == UploadStatus.Uploading || status == UploadStatus.Processing
     val arrowBob by infinite.animateFloat(
         initialValue = 0f,
-        targetValue = if (status == UploadStatus.Uploading || status == UploadStatus.Processing) -3f else 0f,
+        targetValue = if (auraActive) -3f else 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
+            animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "arrowBob",
@@ -257,15 +313,15 @@ private fun UploadCluster(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = LinearEasing),
+            animation = tween(1600, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "aura",
     )
-    val auraActive = status == UploadStatus.Uploading || status == UploadStatus.Processing
     val auraOffset = if (auraActive) 10f + (auraProgress * -28f) else 0f
     val auraOpacity = if (auraActive) 0.6f * (1f - auraProgress) else 0f
     val auraScale = if (auraActive) 0.8f + auraProgress * 0.5f else 1f
+    val auraBlur = if (auraActive) 1f + auraProgress * 2f else 0f
 
     val colors = OverlayColors(isDark)
     val gradient = progressBrush(status, renderedProgress)
@@ -274,10 +330,19 @@ private fun UploadCluster(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
+        // ≡ iOS liquidGlassStretch (stretch desde trailing + blur dissolve)
         AnimatedVisibility(
             visible = isExpanded,
-            enter = fadeIn() + scaleIn(initialScale = 0.85f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)),
-            exit = fadeOut() + scaleOut(targetScale = 0.85f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)),
+            enter = fadeIn(tween(220)) + scaleIn(
+                initialScale = 0.0f,
+                transformOrigin = TransformOrigin(1f, 0.5f),
+                animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
+            ),
+            exit = fadeOut(tween(160)) + scaleOut(
+                targetScale = 0.0f,
+                transformOrigin = TransformOrigin(1f, 0.5f),
+                animationSpec = spring(dampingRatio = 0.84f, stiffness = 380f),
+            ),
         ) {
             ExpandedPanel(
                 content = content,
@@ -289,7 +354,7 @@ private fun UploadCluster(
                 renderedProgress = renderedProgress,
                 colors = colors,
                 gradient = gradient,
-                onToggle = onToggleExpanded,
+                onToggle = onToggleFromPanel,
                 onRetry = onRetry,
                 onCancel = onCancel,
             )
@@ -311,11 +376,12 @@ private fun UploadCluster(
             checkmarkOpacity = checkmarkOpacity.value,
             rippleScale = rippleScale.value,
             rippleOpacity = rippleOpacity.value,
-                auraOffset = auraOffset,
-                auraOpacity = auraOpacity,
-                auraScale = auraScale,
-                onToggle = onToggleExpanded,
-            )
+            auraOffset = auraOffset,
+            auraOpacity = auraOpacity,
+            auraScale = auraScale,
+            auraBlur = auraBlur,
+            onToggle = onToggleFromOrb,
+        )
     }
 }
 
@@ -339,6 +405,7 @@ private fun CompactOrb(
     auraOffset: Float,
     auraOpacity: Float,
     auraScale: Float,
+    auraBlur: Float,
     onToggle: () -> Unit,
 ) {
     Box(contentAlignment = Alignment.TopEnd) {
@@ -373,7 +440,6 @@ private fun CompactOrb(
                     style = Stroke(width = stroke, cap = StrokeCap.Round),
                 )
             }
-            // Ripple
             Box(
                 Modifier
                     .size(OrbSize)
@@ -394,6 +460,7 @@ private fun CompactOrb(
                 auraOffset = auraOffset,
                 auraOpacity = auraOpacity,
                 auraScale = auraScale,
+                auraBlur = auraBlur,
             )
         }
         if (extraUploadsCount > 0) {
@@ -425,6 +492,7 @@ private fun OrbIcon(
     auraOffset: Float,
     auraOpacity: Float,
     auraScale: Float,
+    auraBlur: Float,
 ) {
     when (status) {
         UploadStatus.Initializing -> Icon(
@@ -474,7 +542,7 @@ private fun OrbIcon(
                         .offset(y = auraOffset.dp)
                         .scale(auraScale)
                         .alpha(auraOpacity)
-                        .graphicsLayer { this.alpha = auraOpacity },
+                        .then(if (auraBlur > 0f) Modifier.blur(auraBlur.dp) else Modifier),
                 )
                 Icon(
                     Icons.Filled.KeyboardArrowUp,
@@ -512,7 +580,12 @@ private fun ExpandedPanel(
         Modifier
             .width(PanelWidth)
             .height(PanelHeight)
-            .shadow(16.dp, RoundedCornerShape(26.dp), ambientColor = colors.shadow.copy(alpha = 0.8f), spotColor = colors.shadow.copy(alpha = 0.8f))
+            .shadow(
+                16.dp,
+                RoundedCornerShape(26.dp),
+                ambientColor = colors.shadow.copy(alpha = 0.8f),
+                spotColor = colors.shadow.copy(alpha = 0.8f),
+            )
             .momentsChromeGlass(RoundedCornerShape(26.dp), interactive = true)
             .border(0.75.dp, colors.border, RoundedCornerShape(26.dp))
             .clickable(onClick = onToggle)
@@ -562,14 +635,19 @@ private fun ThumbnailView(
             contentAlignment = Alignment.Center,
         ) {
             if (thumb != null) {
-                androidx.compose.foundation.Image(
+                Image(
                     bitmap = thumb.asImageBitmap(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                Text("▢", color = colors.iconMuted, fontSize = 14.sp)
+                Icon(
+                    Icons.Outlined.Image,
+                    contentDescription = null,
+                    tint = colors.iconMuted,
+                    modifier = Modifier.size(14.dp),
+                )
             }
         }
         if (mediaCount > 1) {
@@ -601,12 +679,12 @@ private fun ProgressCapsule(
                 .height(6.dp),
         ) {
             val h = size.height
-            drawRoundRect(color = colors.track, cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2, h / 2))
+            drawRoundRect(color = colors.track, cornerRadius = CornerRadius(h / 2, h / 2))
             val w = max(18f, size.width * min(1f, renderedProgress.toFloat()))
             drawRoundRect(
                 brush = gradient,
                 size = Size(w, h),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2, h / 2),
+                cornerRadius = CornerRadius(h / 2, h / 2),
             )
         }
         Row(Modifier.fillMaxWidth()) {
