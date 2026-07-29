@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LoginActivityView — iOS Localizable loginActivity.* -->
+<resources>
+    <string name="login_activity_navigation_title">Login Activity</string>
+    <string name="login_activity_description">Check when and from where you\'ve logged into your account</string>
+    <string name="login_activity_current_session">Current Session</string>
+    <string name="login_activity_no_current_session">No current session has been recorded on this device yet.</string>
+    <string name="login_activity_other_sessions">Other active sessions</string>
+    <string name="login_activity_logout_all">Logout all sessions</string>
+    <string name="login_activity_no_other_sessions">No other active sessions</string>
+    <string name="login_activity_logout_all_title">Logout all sessions</string>
+    <string name="login_activity_logout_all_message">This will log you out of all devices. You\'ll need to log in again.</string>
+    <string name="login_activity_logout_all_confirm">Logout all</string>
+    <string name="login_activity_logout_session">Log out</string>
+    <string name="login_activity_logout_session_title">Log out</string>
+    <string name="login_activity_logout_session_message">This will log out %1$s. That device will need to sign in again.</string>
+    <string name="login_activity_logout_session_current_message">This will log you out on this device. You\'ll need to sign in again.</string>
+    <string name="login_activity_logout_session_confirm">Log out</string>
+    <string name="login_activity_logout_session_error">Couldn\'t log out that session: %1$s</string>
+    <string name="login_activity_logout_success_single_message">That session was closed successfully.</string>
+    <string name="login_activity_cancel">Cancel</string>
+    <string name="login_activity_error_title">Error</string>
+    <string name="login_activity_ok">OK</string>
+    <string name="login_activity_logout_success_title">Sessions closed</string>
+    <string name="login_activity_logout_success_message">All active sessions have been closed successfully.</string>
+    <string name="login_activity_active_session">Active Session</string>
+    <string name="login_activity_current">CURRENT</string>
+    <string name="login_activity_loading">Loading session information...</string>
+    <string name="login_activity_session_alert_new_device">New device detected</string>
+    <string name="login_activity_session_alert_location_change">Location change detected</string>
+    <string name="login_activity_session_location">Location</string>
+    <string name="login_activity_location_unavailable">Location unavailable</string>
+    <string name="login_activity_ip_unavailable">IP unavailable</string>
+    <string name="login_activity_error_not_authenticated">User not authenticated</string>
+    <string name="login_activity_load_error_prefix">Error loading sessions: </string>
+    <string name="login_activity_refresh_error_prefix">Error refreshing sessions: </string>
+    <string name="login_activity_logout_all_error_prefix">Error closing sessions: </string>
+</resources>

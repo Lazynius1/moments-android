@@ -63,22 +63,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
-import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.components.ChatQuickReactionsBar
 import com.moments.android.views.messaging.components.NormalVideoPlayerView
 import com.moments.android.views.messaging.core.MessageType
+import com.moments.android.views.shared.MomentsVideoGravity
 import com.moments.android.views.shared.MomentsVideoPlaybackTimeline
+import com.moments.android.views.shared.MomentsVideoPlayer
 import com.moments.android.views.shared.ScreenshotProtectedView
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -416,47 +412,25 @@ private fun ConversationFullScreenVideoPage(
     onExpand: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     var isPaused by remember(videoUrl) { mutableStateOf(false) }
     var isMuted by remember(videoUrl) { mutableStateOf(false) }
-    var currentMs by remember(videoUrl) { mutableLongStateOf(0L) }
-    var durationMs by remember(videoUrl) { mutableLongStateOf(0L) }
-    val player = remember(videoUrl) {
-        ExoPlayer.Builder(context).build().apply {
-            repeatMode = Player.REPEAT_MODE_ONE
-            setMediaItem(MediaItem.fromUri(videoUrl))
-            prepare()
-            playWhenReady = true
-        }
-    }
-
-    DisposableEffect(videoUrl) {
-        GlobalVideoManager.pauseAllVideos()
-        onDispose { player.release() }
-    }
-    LaunchedEffect(isActive, isPaused) {
-        player.playWhenReady = isActive && !isPaused
-    }
-    LaunchedEffect(isMuted) {
-        player.volume = if (isMuted) 0f else 1f
-    }
-    LaunchedEffect(player, isActive) {
-        while (isActive) {
-            if (!isPaused) currentMs = player.currentPosition.coerceAtLeast(0L)
-            durationMs = player.duration.coerceAtLeast(0L)
-            delay(100)
-        }
-    }
+    var currentTime by remember(videoUrl) { mutableStateOf(0.0) }
+    var duration by remember(videoUrl) { mutableStateOf(0.0) }
+    var externalSeekTime by remember(videoUrl) { mutableStateOf<Double?>(null) }
+    val effectivePaused = !isActive || isPaused
 
     Box(modifier) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    useController = false
-                    this.player = player
-                }
-            },
-            update = { it.player = player },
+        MomentsVideoPlayer(
+            url = videoUrl,
+            isLooping = true,
+            isPaused = effectivePaused,
+            isMuted = isMuted,
+            prioritizeSmoothPlayback = true,
+            videoGravity = MomentsVideoGravity.RESIZE_ASPECT_FILL,
+            onDurationReceived = { duration = maxOf(it, 0.0) },
+            onProgressUpdate = { if (!effectivePaused) currentTime = maxOf(it, 0.0) },
+            externalSeekTime = externalSeekTime,
+            onExternalSeekConsumed = { externalSeekTime = null },
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -527,13 +501,12 @@ private fun ConversationFullScreenVideoPage(
         }
 
         MomentsVideoPlaybackTimeline(
-            currentTime = currentMs / 1000.0,
-            duration = durationMs / 1000.0,
+            currentTime = currentTime,
+            duration = duration,
             horizontalPadding = 18.dp,
             onSeek = { target ->
-                val ms = (target * 1000).toLong()
-                player.seekTo(ms)
-                currentMs = ms
+                currentTime = target
+                externalSeekTime = target
             },
             modifier = Modifier
                 .align(Alignment.BottomCenter)

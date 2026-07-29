@@ -80,6 +80,7 @@ import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchUserByUsername
 import com.moments.android.views.explore.ExploreView
 import com.moments.android.views.feed.core.FeedView
+import com.moments.android.views.shared.OfflineBannerOverlay
 import com.moments.android.views.creator.CreatorView
 import com.moments.android.views.components.InAppBannerView
 import com.moments.android.views.messaging.screens.MessagingView
@@ -214,6 +215,7 @@ fun TabBarScreen(
                 is CoordinatorNavigationEvent.NavigateToStoryChain,
                 is CoordinatorNavigationEvent.NavigateToNotifications,
                 is CoordinatorNavigationEvent.ShowStories,
+                is CoordinatorNavigationEvent.ShowStoriesStartingAt,
                 is CoordinatorNavigationEvent.NavigateToUserProfileInFeed,
                 -> selectedTab = AppTab.toIndex(AppTab.HOME)
                 is CoordinatorNavigationEvent.NavigateToFollowRequests,
@@ -311,6 +313,8 @@ fun TabBarScreen(
         }
 
         InAppBannerView(Modifier.align(Alignment.TopCenter))
+
+        OfflineBannerOverlay(Modifier.align(Alignment.TopCenter))
 
         echoInvitationRoute?.let { echoId ->
             EchoInvitationPlaceholder(

@@ -18,12 +18,12 @@ Usar como guía para portar **trozo a trozo** al `.kt` equivalente.
 
 | Estado | Significado | Archivos |
 |--------|-------------|--------:|
-| `[ ]` | Pendiente — sin paridad cerrada | 26 |
-| `[~]` | En curso — `.kt` existe, falta comparar/cerrar vs Swift | 191 |
-| `[x]` | Cerrado — revisado 1:1 contra Swift | 357 |
-| 🚫 | Fuera de alcance Android | 13 |
-| **En alcance** | excl. 🚫 (+ `[N/A]`) | 574 |
-| **Progreso paridad** | `[x]` / en alcance | 357 / 574 (62.2%) |
+| `[ ]` | Pendiente — sin paridad cerrada | 13 |
+| `[~]` | En curso — `.kt` existe, falta comparar/cerrar vs Swift | 159 |
+| `[x]` | Cerrado — revisado 1:1 contra Swift | 406 |
+| 🚫 | Fuera de alcance Android | 14 |
+| **En alcance** | excl. 🚫 (+ `[N/A]`) | 573 |
+| **Progreso paridad** | `[x]` / en alcance | 406 / 573 (70.9%) |
 
 ### Cerrados — líneas iOS vs Android
 
@@ -170,6 +170,38 @@ Usar como guía para portar **trozo a trozo** al `.kt` equivalente.
 | `ConversationContextMenu` | 279 | 355 | +76 | cutout Clear+chrome+layout+MomentRowButton.menu; pin.slash≈slash overlay; systemBars insets; row highlight 0.96 |
 | `ChatVanishModeViews` | 620 | 762 | +142 | metrics/overlay/notices/timer MomentsModalSheet+inbox; Δ liquidGlass→sólido; medium-only≈medium+large |
 | `SplashScreen` | 103 | 84 | −19 | canvas 0B1215/FAF9F6+logo dark/light+shadow AuthColors; reduceMotion; Δ MinimalSplash no en flujo |
+| `SocialConnectionsView` | 791 | 747 | −44 | tabs+search/sort+Visits/Users/Common+pull+floating chips; Profile shell wire; stalker overlay |
+| `SocialConnectionUserRow` | 452 | 486 | +34 | metrics+compact follow+mutual cutout+press+ellipsis menu+remove stroke |
+| `ActivityCollapsibleFilterScroll` | 201 | 137 | −64 | header fade+floating reveal on scroll-up+PullToRefreshBox |
+| `UserListView` | 666 | 674 | +8 | empty states iOS keys+SuggestedUserRow Explore+glass search+ModernProfile row flame/press |
+| `HighlightComponents` | 439 | 422 | −17 | grid 9:16+date badge+select ring+editor chrome+cover picker rail |
+| `HighlightCreateFlowView` | 148 | 196 | +48 | toolbar cancel/next/back/ellipsis delete+save check/plus |
+| `HighlightCreateFlowViewModel` | 256 | 210 | −46 | archive page 24+edit seed+save/delete; defaultTitle localized |
+| `HighlightNameCoverStep` | 101 | 150 | +49 | cover 118+editCover+focus; MomentsModalSheet cover picker |
+| `HighlightPresentationCoordinator` | 90 | 79 | −11 | sheet/viewer mutex+delay MapSheetPresentationDelay |
+| `HighlightSelectStoriesStep` | 33 | 41 | +8 | archiveEmpty+pagination on last appear |
+| `HighlightViewer` | 135 | 165 | +30 | load+privacy filter+drag dismiss>120; StoriesView |
+| `ProfileHighlightsView` | 372 | 365 | −7 | rail create/load skeleton+context menu edit/delete+viewer/create sheets |
+| `UserProfileSharedViews` | 339 | 361 | +22 | StatItem+blur bg+preview+expandable+image viewer+refresh; Flow→ProfileFlowLayout |
+| `UserProfileStateViews` | 665 | 613 | −52 | empty/blocked/private/offline; swipe>100 dismiss; msg vía host |
+| `UserProfileView` | 688 | 629 | −59 | estados+sheets+SocialConnections; openMessage→chat/pending; zoom |
+| `UserProfileZoomNavigation` | 58 | 129 | +71 | SharedTransition sharedBounds; Host overlay; Story+Feed; **todos los zoom source/dest → post-paridad** |
+| `ProfileMomentZoomNavigation` | 422 | 342 | −80 | models+source/dest sharedBounds; surfaces; Saved stub; destinations |
+| `ProfileHeaderSkeletonView` | 93 | 111 | +18 | header+grid skeleton; metrics 3col; shimmer+a11y |
+| `ProfileBentoLayout` | 239 | 160 | −79 | assigner+planner; BentoGrid vía planFrames Dp |
+| `ProfileMomentsSection` | 539 | 438 | −101 | metrics bentoHeight Dp; thumbnail chrome; carousel/play/audience |
+| `ProfileSavedSection` | 541 | 586 | +45 | filters+grid+recent; zoom; ScreenshotProtected; media/video |
+| `ProfileSharedComponents` | 672 | 520 | −152 | error/bio/flow/note; sticky chrome canvas; collapse metrics |
+| `ProfileHeaderSection` | 592 | 547 | −45 | StickyChrome+note+ExpandableBio; zoom settings/edit; hasActiveStory; badges 🚫 |
+| `ProfileShellComponents` | 588 | 521 | −67 | scroll+collapse tabsMinY; sticky+floating tabs; PTR; ScreenshotProtected; themes 🚫 |
+| `ProfileView` | 637 | 616 | −21 | sheets+hero menu+edit/delete; ShowProfileVisits; stories own; temas 🚫 |
+| `ProfileGridHeroTransition` | 1229 | 1102 | −127 | peek flying+menu glass; frames+lifted; zoom handoff; expand/retract latentes ≡ Swift |
+| `ProfileGridMomentMenu` | 452 | 397 | −55 | hero card+video/badge; visitor rail fijo+glass; avatar authorId; háptica long-press |
+| `ProfileGridPreviewEditorView` | 520 | 633 | +113 | crop+pan/pinch; fill/fit+fondo; sheet large desde menú owner |
+| `ContextMenu` | 1413 | 1060 | −353 | metrics+ModernShareSheet+AddToStory+StoriesView discoveries; share text+URL |
+| `ProfileViewModel` | 857 | 566 | −291 | performRefresh; removeFollower FS; note maxLength; pin/archive/delete; FollowStateStore |
+| `IncognitoModeSheet` | 347 | 422 | +75 | ring+CTA glass+onboarding; detents medium/large; Live Activity 🚫 |
+| `IncognitoGlobalOverlay` | 214 | 216 | +2 | edge aura+pill glass+expand pause; host MomentsApp |
 | `GlassmorphicChatView+ComposerAndChrome` | 1006 | 718 | −288 | plus/buzz/shake+media FS+report+cluster reply/gallery; Δ≈UIKit scroll |
 | `ChatMessageForwardSheet` | 28 | 151 | +123 | wrapper+picker local (ShareRecipientsPicker = Feed) |
 | `MessageTypeIconView` | 38 | 54 | +16 | AttachmentIcon + fallback Material |
@@ -316,6 +348,7 @@ Trabajo de plataforma **después** de cerrar el inventario `[x]`. No bloquea par
 | **Creator fondos blur** | decisión | Mismo criterio en CreatorScreens: **Android sin blur de imagen/material de fondo**. LocationPicker = AdaptiveColors sólido; MediaEditing = negro sólido (iOS sí blur). |
 | **iOS `.sheet` → ModalBottomSheet** | decisión | Paridad de presentación: SwiftUI `.sheet` / detents → Android `ModalBottomSheet` (`MomentsModalSheet`). No full-screen replace. |
 | **Material 3 Foundations** | referencia (ajustes finos) | Arquitectura / cimientos UI Android: [m3.material.io/foundations](https://m3.material.io/foundations). Usar en pulido post-paridad; durante el port sigue ganando iOS. Regla: `.cursor/rules/android-material3-foundations.mdc`. |
+| **Zoom SharedTransition** | `[ ]` aplazado | Al final: auditar **todos** los zoom source/destination de iOS (perfil, momento, highlight, view-once, etc. — `*ZoomSource` / `*ZoomDestination` / `matchedTransitionSource` / `.navigationTransition(.zoom)` y variantes) y cablear el equivalente Android (`MomentsSharedTransitionLayout` + `sharedBounds` / hosts). Hoy: API base + algunos hosts; faltan call sites y orígenes. |
 
 ### Por tamaño
 
@@ -778,105 +811,105 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 148 | `Moments/Moments/Views/Permission/tracking/TrackingPermissionView.swift` | `views/permission/tracking/TrackingPermissionView.kt` | [~] |
 | 106 | `Moments/Moments/Views/Permissions/CameraAccessBoundary.swift` | `views/permissions/CameraAccessBoundary.kt` | [x] 106↔160 · primer/denied prefs; mic+cam→Settings; ON_RESUME |
 | 111 | `Moments/Moments/Views/Permissions/CameraPermissionGate.swift` | `views/permissions/CameraPermissionGate.kt` | [~] |
-| 78 | `Moments/Moments/Views/Profile/Core/MomentGridPreview.swift` | `views/profile/core/MomentGridPreview.kt` | [~] |
-| 637 | `Moments/Moments/Views/Profile/Core/ProfileView.swift` | `views/profile/core/ProfileView.kt` | [~] |
-| 857 | `Moments/Moments/Views/Profile/Core/ProfileViewModel.swift` | `views/profile/core/ProfileViewModel.kt` | [~] |
-| 239 | `Moments/Moments/Views/Profile/Core/Sections/ProfileBentoLayout.swift` | `views/profile/core/sections/ProfileBentoLayout.kt` | [~] |
-| 1229 ⚠️ | `Moments/Moments/Views/Profile/Core/Sections/ProfileGridHeroTransition.swift` | `views/profile/core/sections/ProfileGridHeroTransition.kt` | [~] |
-| 452 | `Moments/Moments/Views/Profile/Core/Sections/ProfileGridMomentMenu.swift` | `views/profile/core/sections/ProfileGridMomentMenu.kt` | [~] |
-| 520 | `Moments/Moments/Views/Profile/Core/Sections/ProfileGridPreviewEditorView.swift` | `views/profile/core/sections/ProfileGridPreviewEditorView.kt` | [~] |
-| 592 | `Moments/Moments/Views/Profile/Core/Sections/ProfileHeaderSection.swift` | `views/profile/core/sections/ProfileHeaderSection.kt` | [~] |
-| 93 | `Moments/Moments/Views/Profile/Core/Sections/ProfileHeaderSkeletonView.swift` | `views/profile/core/sections/ProfileHeaderSkeletonView.kt` | [~] |
-| 422 | `Moments/Moments/Views/Profile/Core/Sections/ProfileMomentZoomNavigation.swift` | `views/profile/core/sections/ProfileMomentZoomNavigation.kt` | [~] |
-| 539 | `Moments/Moments/Views/Profile/Core/Sections/ProfileMomentsSection.swift` | `views/profile/core/sections/ProfileMomentsSection.kt` | [~] |
-| 541 | `Moments/Moments/Views/Profile/Core/Sections/ProfileSavedSection.swift` | `views/profile/core/sections/ProfileSavedSection.kt` | [~] |
-| 672 | `Moments/Moments/Views/Profile/Core/Sections/ProfileSharedComponents.swift` | `views/profile/core/sections/ProfileSharedComponents.kt` | [~] |
-| 588 | `Moments/Moments/Views/Profile/Core/Sections/ProfileShellComponents.swift` | `views/profile/core/sections/ProfileShellComponents.kt` | [~] |
-| 58 | `Moments/Moments/Views/Profile/Core/Sections/UserProfileZoomNavigation.swift` | `views/profile/core/sections/UserProfileZoomNavigation.kt` | [~] 58↔123 · SharedTransition host+source/dest (Compose sharedElement/sharedBounds) |
-| 1566 ⚠️ | `Moments/Moments/Views/Profile/Core/SharedActivityDetailView.swift` | `views/profile/core/SharedActivityDetailView.kt` | [~] |
-| 474 | `Moments/Moments/Views/Profile/Core/SharedActivityView.swift` | `views/profile/core/SharedActivityView.kt` | [~] |
-| 452 | `Moments/Moments/Views/Profile/Core/SocialConnectionUserRow.swift` | `views/profile/core/SocialConnectionUserRow.kt` | [~] |
-| 791 | `Moments/Moments/Views/Profile/Core/SocialConnectionsView.swift` | `views/profile/core/SocialConnectionsView.kt` | [~] |
-| 666 | `Moments/Moments/Views/Profile/Core/UserListView.swift` | `views/profile/core/UserListView.kt` | [~] |
-| 808 | `Moments/Moments/Views/Profile/Editor/PhotoCropEditorView.swift` | `views/profile/editor/PhotoCropEditorView.kt` | [~] |
-| 1743 ⚠️ | `Moments/Moments/Views/Profile/Editor/ProfileEditor.swift` | `views/profile/editor/ProfileEditor.kt` | [~] |
-| 285 | `Moments/Moments/Views/Profile/Editor/Sections/ProfileEditorPickerViews.swift` | `views/profile/editor/sections/ProfileEditorPickerViews.kt` | [~] |
-| 439 | `Moments/Moments/Views/Profile/Highlights/HighlightComponents.swift` | `views/profile/highlights/HighlightComponents.kt` | [~] |
-| 148 | `Moments/Moments/Views/Profile/Highlights/HighlightCreateFlowView.swift` | `views/profile/highlights/HighlightCreateFlowView.kt` | [ ] |
-| 256 | `Moments/Moments/Views/Profile/Highlights/HighlightCreateFlowViewModel.swift` | `views/profile/highlights/HighlightCreateFlowViewModel.kt` | [ ] |
-| 101 | `Moments/Moments/Views/Profile/Highlights/HighlightNameCoverStep.swift` | `views/profile/highlights/HighlightNameCoverStep.kt` | [ ] |
-| 90 | `Moments/Moments/Views/Profile/Highlights/HighlightPresentationCoordinator.swift` | `views/profile/highlights/HighlightPresentationCoordinator.kt` | [ ] |
-| 33 | `Moments/Moments/Views/Profile/Highlights/HighlightSelectStoriesStep.swift` | `views/profile/highlights/HighlightSelectStoriesStep.kt` | [ ] |
-| 135 | `Moments/Moments/Views/Profile/Highlights/HighlightViewer.swift` | `views/profile/highlights/HighlightViewer.kt` | [ ] |
-| 372 | `Moments/Moments/Views/Profile/Highlights/ProfileHighlightsView.swift` | `views/profile/highlights/ProfileHighlightsView.kt` | [ ] |
-| 214 | `Moments/Moments/Views/Profile/Incognito/IncognitoGlobalOverlay.swift` | `views/profile/incognito/IncognitoGlobalOverlay.kt` | [ ] |
-| 347 | `Moments/Moments/Views/Profile/Incognito/IncognitoModeSheet.swift` | `views/profile/incognito/IncognitoModeSheet.kt` | [ ] |
-| 1413 ⚠️ | `Moments/Moments/Views/Profile/MomentsView/ContextMenu.swift` | `views/profile/momentsview/ContextMenu.kt` | [~] |
-| 622 | `Moments/Moments/Views/Profile/MomentsView/EditMomentView.swift` | `views/profile/momentsview/EditMomentView.kt` | [~] |
-| 611 | `Moments/Moments/Views/Profile/MomentsView/ModernMomentDetailView.swift` | `views/profile/momentsview/ModernMomentDetailView.kt` | [ ] |
+| 78 | `Moments/Moments/Views/Profile/Core/MomentGridPreview.swift` | `views/profile/core/MomentGridPreview.kt` | [x] 78↔93 · settings+frame; ZStack center FIT; DEFAULT |
+| 637 | `Moments/Moments/Views/Profile/Core/ProfileView.swift` | `views/profile/core/ProfileView.kt` | [x] 637↔616 · sheets+hero menu+edit/delete; ShowProfileVisits; stories own; temas 🚫 |
+| 857 | `Moments/Moments/Views/Profile/Core/ProfileViewModel.swift` | `views/profile/core/ProfileViewModel.kt` | [x] 857↔566 · performRefresh; removeFollower FS; note maxLength; pin/archive/delete |
+| 239 | `Moments/Moments/Views/Profile/Core/Sections/ProfileBentoLayout.swift` | `views/profile/core/sections/ProfileBentoLayout.kt` | [x] 239↔160 · assigner; BentoGrid planFrames Dp |
+| 1229 ⚠️ | `Moments/Moments/Views/Profile/Core/Sections/ProfileGridHeroTransition.swift` | `views/profile/core/sections/ProfileGridHeroTransition.kt` | [x] 1229↔1102 · peek flying+menu; frames+lifted; zoom handoff |
+| 452 | `Moments/Moments/Views/Profile/Core/Sections/ProfileGridMomentMenu.swift` | `views/profile/core/sections/ProfileGridMomentMenu.kt` | [x] 452↔397 · hero+video/badge; visitor rail fijo+glass; avatar authorId |
+| 520 | `Moments/Moments/Views/Profile/Core/Sections/ProfileGridPreviewEditorView.swift` | `views/profile/core/sections/ProfileGridPreviewEditorView.kt` | [x] 520↔633 · crop+pan/pinch; fill/fit+fondo; sheet large |
+| 592 | `Moments/Moments/Views/Profile/Core/Sections/ProfileHeaderSection.swift` | `views/profile/core/sections/ProfileHeaderSection.kt` | [x] 592↔547 · StickyChrome+note+ExpandableBio; zoom settings/edit; hasActiveStory; badges 🚫 |
+| 93 | `Moments/Moments/Views/Profile/Core/Sections/ProfileHeaderSkeletonView.swift` | `views/profile/core/sections/ProfileHeaderSkeletonView.kt` | [x] 93↔111 · header+grid skeleton; 3col metrics; shimmer+a11y |
+| 422 | `Moments/Moments/Views/Profile/Core/Sections/ProfileMomentZoomNavigation.swift` | `views/profile/core/sections/ProfileMomentZoomNavigation.kt` | [x] 422↔342 · sharedBounds source/dest; surfaces; Saved→stub; Highlight/MomentZoomOpener |
+| 539 | `Moments/Moments/Views/Profile/Core/Sections/ProfileMomentsSection.swift` | `views/profile/core/sections/ProfileMomentsSection.kt` | [x] 539↔438 · bentoHeight/planFrames Dp; carousel+ChatVideoPlay+ActivityGridAudience; hero frames → post-paridad |
+| 541 | `Moments/Moments/Views/Profile/Core/Sections/ProfileSavedSection.swift` | `views/profile/core/sections/ProfileSavedSection.kt` | [x] 541↔586 · filters+grid+recent; zoom source; ScreenshotProtected; media/video/text |
+| 672 | `Moments/Moments/Views/Profile/Core/Sections/ProfileSharedComponents.swift` | `views/profile/core/sections/ProfileSharedComponents.kt` | [x] 672↔520 · error/bio/flow/note; sticky chrome canvas (sin blur); collapse metrics; report minY |
+| 588 | `Moments/Moments/Views/Profile/Core/Sections/ProfileShellComponents.swift` | `views/profile/core/sections/ProfileShellComponents.kt` | [x] 588↔521 · scroll+collapse tabsMinY; sticky+floating tabs; PTR; ScreenshotProtected; themes 🚫 |
+| 58 | `Moments/Moments/Views/Profile/Core/Sections/UserProfileZoomNavigation.swift` | `views/profile/core/sections/UserProfileZoomNavigation.kt` | [x] 58↔129 · SharedTransition sharedBounds; Host≡navDestination; Story+Feed |
+| 1566 ⚠️ | `Moments/Moments/Views/Profile/Core/SharedActivityDetailView.swift` | `views/profile/core/SharedActivityDetailView.kt` | [x] 1566↔1440 · VM CF pages+batch delete; ActivityCollapsibleFilterScroll+floating chips; tabs/filters/select/grid/comments |
+| 474 | `Moments/Moments/Views/Profile/Core/SharedActivityView.swift` | `views/profile/core/SharedActivityView.kt` | [x] 474↔576 · hero cutout+chrome glass btns; timeline; AttachmentIcon/AnimatedReaction modules; PTR; Detail nav |
+| 452 | `Moments/Moments/Views/Profile/Core/SocialConnectionUserRow.swift` | `views/profile/core/SocialConnectionUserRow.kt` | [x] 452↔486 · metrics+compact follow+mutual cutout+press+ellipsis menu+remove stroke |
+| 791 | `Moments/Moments/Views/Profile/Core/SocialConnectionsView.swift` | `views/profile/core/SocialConnectionsView.kt` | [x] 791↔747 · tabs+search/sort+Visits/Users/Common+pull+floating chips; Profile shell wire; stalker overlay |
+| 666 | `Moments/Moments/Views/Profile/Core/UserListView.swift` | `views/profile/core/UserListView.kt` | [x] 666↔674 · empty states iOS keys+SuggestedUserRow Explore+glass search+ModernProfile row flame/press |
+| 808 | `Moments/Moments/Views/Profile/Editor/PhotoCropEditorView.swift` | `views/profile/editor/PhotoCropEditorView.kt` | [x] 808↔796 · square crop+blur bg+circle mask+grid on drag; albums MediaStore; export 400; EXIF normalize |
+| 1743 ⚠️ | `Moments/Moments/Views/Profile/Editor/ProfileEditor.swift` | `views/profile/editor/ProfileEditor.kt` | [x] 1743↔1234 · ModernEditProfile tabs+glass+load FS+photo library/camera/delete sheets; InterestPicker; Grid→LibraryCrop entry |
+| 285 | `Moments/Moments/Views/Profile/Editor/Sections/ProfileEditorPickerViews.swift` | `views/profile/editor/sections/ProfileEditorPickerViews.kt` | [x] 285↔418 · AlbumPicker thumbs+drag; LibraryCropEntry PermissionPrimer+recent→PhotoCrop; denied/settings |
+| 439 | `Moments/Moments/Views/Profile/Highlights/HighlightComponents.swift` | `views/profile/highlights/HighlightComponents.kt` | [x] 439↔422 · grid 9:16+date badge+select ring+editor chrome+cover picker rail |
+| 148 | `Moments/Moments/Views/Profile/Highlights/HighlightCreateFlowView.swift` | `views/profile/highlights/HighlightCreateFlowView.kt` | [x] 148↔196 · toolbar cancel/next/back/ellipsis delete+save check/plus |
+| 256 | `Moments/Moments/Views/Profile/Highlights/HighlightCreateFlowViewModel.swift` | `views/profile/highlights/HighlightCreateFlowViewModel.kt` | [x] 256↔210 · archive page 24+edit seed+save/delete; defaultTitle localized |
+| 101 | `Moments/Moments/Views/Profile/Highlights/HighlightNameCoverStep.swift` | `views/profile/highlights/HighlightNameCoverStep.kt` | [x] 101↔150 · cover 118+editCover+focus; MomentsModalSheet cover picker |
+| 90 | `Moments/Moments/Views/Profile/Highlights/HighlightPresentationCoordinator.swift` | `views/profile/highlights/HighlightPresentationCoordinator.kt` | [x] 90↔79 · sheet/viewer mutex+delay MapSheetPresentationDelay |
+| 33 | `Moments/Moments/Views/Profile/Highlights/HighlightSelectStoriesStep.swift` | `views/profile/highlights/HighlightSelectStoriesStep.kt` | [x] 33↔41 · archiveEmpty+pagination on last appear |
+| 135 | `Moments/Moments/Views/Profile/Highlights/HighlightViewer.swift` | `views/profile/highlights/HighlightViewer.kt` | [x] 135↔165 · load+privacy filter+drag dismiss>120; StoriesView |
+| 372 | `Moments/Moments/Views/Profile/Highlights/ProfileHighlightsView.swift` | `views/profile/highlights/ProfileHighlightsView.kt` | [x] 372↔365 · rail create/load skeleton+context menu edit/delete+viewer/create sheets |
+| 214 | `Moments/Moments/Views/Profile/Incognito/IncognitoGlobalOverlay.swift` | `views/profile/incognito/IncognitoGlobalOverlay.kt` | [x] 214↔216 · edge aura+pill glass+expand pause; host MomentsApp |
+| 347 | `Moments/Moments/Views/Profile/Incognito/IncognitoModeSheet.swift` | `views/profile/incognito/IncognitoModeSheet.kt` | [x] 347↔422 · ring+CTA glass+onboarding; detents medium/large; Live Activity 🚫 |
+| 1413 ⚠️ | `Moments/Moments/Views/Profile/MomentsView/ContextMenu.swift` | `views/profile/momentsview/ContextMenu.kt` | [x] 1413↔1060 · metrics+ModernShareSheet+AddToStory+StoriesView discoveries |
+| 622 | `Moments/Moments/Views/Profile/MomentsView/EditMomentView.swift` | `views/profile/momentsview/EditMomentView.kt` | [x] 622↔697 · Audience/Location/PhotoTag sheets + mediaItems save |
+| 611 | `Moments/Moments/Views/Profile/MomentsView/ModernMomentDetailView.swift` | `views/profile/momentsview/ModernMomentDetailView.kt` | [x] 611↔686 · ModernShareBottomSheet + StoriesView(startWithUserId) |
 | 933 | `Moments/Moments/Views/Profile/Theme/EnhancedProfileBackground.swift` | — | 🚫 |
 | 925 | `Moments/Moments/Views/Profile/Theme/ProfileTheme.swift` | — | 🚫 |
 | 146 | `Moments/Moments/Views/Profile/Theme/ProfileThemeDemo.swift` | — | 🚫 |
 | 274 | `Moments/Moments/Views/Profile/Theme/ProfileThemeSelector.swift` | — | 🚫 |
-| 244 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileAvatarBadges.swift` | `views/profile/userprofile/sections/UserProfileAvatarBadges.kt` | [~] |
-| 321 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileHeaderSection.swift` | `views/profile/userprofile/sections/UserProfileHeaderSection.kt` | [~] |
-| 394 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileMomentsSection.swift` | `views/profile/userprofile/sections/UserProfileMomentsSection.kt` | [~] |
-| 351 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileOverviewSection.swift` | `views/profile/userprofile/sections/UserProfileOverviewSection.kt` | [~] |
-| 320 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfilePublicProfileView.swift` | `views/profile/userprofile/sections/UserProfilePublicProfileView.kt` | [~] |
-| 363 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileRelationshipViews.swift` | `views/profile/userprofile/sections/UserProfileRelationshipViews.kt` | [~] |
-| 339 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileSharedViews.swift` | `views/profile/userprofile/sections/UserProfileSharedViews.kt` | [~] |
-| 665 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileStateViews.swift` | `views/profile/userprofile/sections/UserProfileStateViews.kt` | [~] |
-| 688 | `Moments/Moments/Views/Profile/UserProfile/UserProfileView.swift` | `views/profile/userprofile/UserProfileView.kt` | [~] |
-| 1071 ⚠️ | `Moments/Moments/Views/Profile/UserProfile/UserProfileViewModel.swift` | `views/profile/userprofile/UserProfileViewModel.kt` | [~] |
-| 430 | `Moments/Moments/Views/Settings/AccountHistoryActivityView.swift` | `views/settings/AccountHistoryActivityView.kt` | [~] |
-| 859 | `Moments/Moments/Views/Settings/AccountManagement.swift` | `views/settings/AccountManagement.kt` | [~] |
-| 201 | `Moments/Moments/Views/Settings/ActivityCollapsibleFilterScroll.swift` | — | [ ] |
-| 184 | `Moments/Moments/Views/Settings/BlockedUsersView.swift` | `views/settings/BlockedUsersView.kt` | [~] |
-| 343 | `Moments/Moments/Views/Settings/ChatStorageSettingsView.swift` | `views/settings/ChatStorageSettingsView.kt` | [~] |
-| 853 | `Moments/Moments/Views/Settings/ContentVisibilityView.swift` | `views/settings/ContentVisibilityView.kt` | [~] |
-| 168 | `Moments/Moments/Views/Settings/DailyLimitView.swift` | `views/settings/DailyLimitView.kt` | [~] |
-| 788 | `Moments/Moments/Views/Settings/DataExportView.swift` | `views/settings/DataExportView.kt` | [~] |
-| 606 | `Moments/Moments/Views/Settings/LoginActivityView.swift` | `views/settings/LoginActivityView.kt` | [~] |
-| 629 | `Moments/Moments/Views/Settings/MuteSettingsView.swift` | `views/settings/MuteSettingsView.kt` | [~] |
-| 421 | `Moments/Moments/Views/Settings/PasswordChangeView.swift` | `views/settings/PasswordChangeView.kt` | [~] |
-| 166 | `Moments/Moments/Views/Settings/QRCode.swift` | `views/settings/QRCode.kt` | [~] |
-| 190 | `Moments/Moments/Views/Settings/RestModeView.swift` | `views/settings/RestModeView.kt` | [~] |
-| 383 | `Moments/Moments/Views/Settings/SavedMoments/SavedMomentsViewModel.swift` | `views/settings/savedmoments/SavedMomentsViewModel.kt` | [~] |
-| 1595 ⚠️ | `Moments/Moments/Views/Settings/SavedMomentsView.swift` | `views/settings/SavedMomentsView.kt` | [~] |
-| 270 | `Moments/Moments/Views/Settings/SearchHistoryActivityView.swift` | `views/settings/SearchHistoryActivityView.kt` | [~] |
-| 349 | `Moments/Moments/Views/Settings/SetPasswordView.swift` | `views/settings/SetPasswordView.kt` | [~] |
-| 121 | `Moments/Moments/Views/Settings/SettingsNavigationComponents.swift` | `views/settings/SettingsNavigationComponents.kt` | [~] |
-| 252 | `Moments/Moments/Views/Settings/SettingsSections/NotificationSettingsView.swift` | `views/settings/settingssections/NotificationSettingsView.kt` | [~] |
-| 67 | `Moments/Moments/Views/Settings/SettingsSections/OnlineStatusSection.swift` | `views/settings/settingssections/OnlineStatusSection.kt` | [~] |
-| 352 | `Moments/Moments/Views/Settings/SettingsSections/PersonalInfoSettingsViews.swift` | `views/settings/settingssections/PersonalInfoSettingsViews.kt` | [~] |
-| 1579 ⚠️ | `Moments/Moments/Views/Settings/SettingsSections/SettingsSections.swift` | — | [~] |
-| 332 | `Moments/Moments/Views/Settings/SettingsView.swift` | `views/settings/SettingsView.kt` | [~] |
-| 97 | `Moments/Moments/Views/Settings/SettingsViewModel.swift` | `views/settings/SettingsViewModel.kt` | [~] |
-| 99 | `Moments/Moments/Views/Settings/TimeSpentCardView.swift` | `views/settings/TimeSpentCardView.kt` | [~] |
-| 95 | `Moments/Moments/Views/Settings/TimeSpentDetailsView.swift` | `views/settings/TimeSpentDetailsView.kt` | [~] |
-| 116 | `Moments/Moments/Views/Settings/UserActivityBackendModels.swift` | `views/settings/UserActivityBackendModels.kt` | [~] |
-| 183 | `Moments/Moments/Views/Settings/UserActivityCache.swift` | `views/settings/UserActivityCache.kt` | [~] |
-| 220 | `Moments/Moments/Views/Settings/UserActivityComponents.swift` | `views/settings/UserActivityComponents.kt` | [~] |
-| 2199 ⚠️ | `Moments/Moments/Views/Settings/UserActivityDetailView.swift` | `views/settings/UserActivityDetailView.kt` | [~] |
-| 1224 ⚠️ | `Moments/Moments/Views/Settings/UserActivityDetailViewModel.swift` | `views/settings/UserActivityDetailViewModel.kt` | [~] |
-| 98 | `Moments/Moments/Views/Settings/UserActivityModels.swift` | `views/settings/UserActivityModels.kt` | [~] |
-| 1178 ⚠️ | `Moments/Moments/Views/Settings/UserActivityRows.swift` | `views/settings/UserActivityRows.kt` | [~] |
-| 119 | `Moments/Moments/Views/Settings/UserActivitySummaryViewModel.swift` | `views/settings/UserActivitySummaryViewModel.kt` | [~] |
-| 327 | `Moments/Moments/Views/Settings/UserActivityTypes.swift` | `views/settings/UserActivityTypes.kt` | [~] |
-| 266 | `Moments/Moments/Views/Settings/UserActivityView.swift` | `views/settings/UserActivityView.kt` | [~] |
-| 33 | `Moments/Moments/Views/Shared/AppErrorBanner.swift` | `views/shared/AppErrorBanner.kt` | [ ] |
-| 10 | `Moments/Moments/Views/Shared/BlurView.swift` | — | [ ] |
-| 34 | `Moments/Moments/Views/Shared/MomentDetail/MomentDetailContainerView.swift` | `views/shared/momentdetail/MomentDetailContainerView.kt` | [~] |
-| 21 | `Moments/Moments/Views/Shared/MomentDetail/MomentDetailContext.swift` | `views/shared/momentdetail/MomentDetailContext.kt` | [~] |
-| 412 | `Moments/Moments/Views/Shared/MomentDetail/SingleMomentDetailView.swift` | `views/shared/momentdetail/SingleMomentDetailView.kt` | [~] |
-| 100 | `Moments/Moments/Views/Shared/MomentsVideoPlaybackTimeline.swift` | `views/shared/MomentsVideoPlaybackTimeline.kt` | [ ] |
-| 331 | `Moments/Moments/Views/Shared/MomentsVideoPlayer.swift` | — | [ ] |
-| 214 | `Moments/Moments/Views/Shared/OfflineBannerModifier.swift` | — | [ ] |
-| 74 | `Moments/Moments/Views/Shared/PhotoTagOverlayView.swift` | `views/shared/PhotoTagOverlayView.kt` | [ ] |
-| 175 | `Moments/Moments/Views/Shared/ScreenshotProtectedView.swift` | `views/shared/ScreenshotProtectedView.kt` | [~] |
-| 227 | `Moments/Moments/Views/comments/CommentMentionSearchOverlay.swift` | `views/comments/CommentMentionSearchOverlay.kt` | [~] |
+| 244 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileAvatarBadges.swift` | `views/profile/userprofile/sections/UserProfileAvatarBadges.kt` | [x] 244↔57 · ring+longPress; chapas Plus/Support 🚫; refresh en SharedViews |
+| 321 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileHeaderSection.swift` | `views/profile/userprofile/sections/UserProfileHeaderSection.kt` | [x] 321↔352 · StickyChrome+note+ShareLink URL+QR; badges 🚫; msg vía host |
+| 394 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileMomentsSection.swift` | `views/profile/userprofile/sections/UserProfileMomentsSection.kt` | [x] 394↔64 · delega ModernMomentThumbnail sin audience; bento heights + press scale |
+| 351 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileOverviewSection.swift` | `views/profile/userprofile/sections/UserProfileOverviewSection.kt` | [x] 351↔390 · stats+intereses; shared via Firestore onAppear; UserProfileColors |
+| 320 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfilePublicProfileView.swift` | `views/profile/userprofile/sections/UserProfilePublicProfileView.kt` | [x] 320↔268 · sticky+floating tabs+momentRefresh; grids/highlights |
+| 363 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileRelationshipViews.swift` | `views/profile/userprofile/sections/UserProfileRelationshipViews.kt` | [x] 363↔440 · chip+sheet BF/mute/listas/unfollow; icons SF; MomentsModalSheet host |
+| 339 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileSharedViews.swift` | `views/profile/userprofile/sections/UserProfileSharedViews.kt` | [x] 339↔361 · StatItem+blur+preview+expandable+viewer+refresh; UserFlowLayout→ProfileFlowLayout |
+| 665 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileStateViews.swift` | `views/profile/userprofile/sections/UserProfileStateViews.kt` | [x] 665↔613 · estados; swipe>100 blocked dismiss; onOpenMessage host |
+| 688 | `Moments/Moments/Views/Profile/UserProfile/UserProfileView.swift` | `views/profile/userprofile/UserProfileView.kt` | [x] 688↔629 · root+sheets+SocialConnections; startConversation→chat/pending; temas 🚫 |
+| 1071 ⚠️ | `Moments/Moments/Views/Profile/UserProfile/UserProfileViewModel.swift` | `views/profile/userprofile/UserProfileViewModel.kt` | [x] 1071↔723 · listener FollowStateStore; errores unavailable/network; mute get+update; BF vía PrivacyService |
+| 430 | `Moments/Moments/Views/Settings/AccountHistoryActivityView.swift` | `views/settings/AccountHistoryActivityView.kt` | [x] 430↔~640 · filters+custom date+PTR+join synth+timeline |
+| 859 | `Moments/Moments/Views/Settings/AccountManagement.swift` | `views/settings/AccountManagement.kt` | [x] 859↔~980 · Advanced+DeleteVerification; Apple→Google |
+| 201 | `Moments/Moments/Views/Settings/ActivityCollapsibleFilterScroll.swift` | `views/settings/ActivityCollapsibleFilterScroll.kt` | [x] 201↔137 · header fade+floating reveal on scroll-up+PullToRefreshBox |
+| 184 | `Moments/Moments/Views/Settings/BlockedUsersView.swift` | `views/settings/BlockedUsersView.kt` | [x] 184↔~260 · list+unblock glass+PTR+error; SettingsSubsectionWrapper |
+| 343 | `Moments/Moments/Views/Settings/ChatStorageSettingsView.swift` | `views/settings/ChatStorageSettingsView.kt` | [x] 343↔~520 · real ChatCacheStore+prefs+per-convo+clear |
+| 853 | `Moments/Moments/Views/Settings/ContentVisibilityView.swift` | `views/settings/ContentVisibilityView.kt` | [x] |
+| 168 | `Moments/Moments/Views/Settings/DailyLimitView.swift` | `views/settings/DailyLimitView.kt` | [x] |
+| 788 | `Moments/Moments/Views/Settings/DataExportView.swift` | `views/settings/DataExportView.kt` | [x] |
+| 606 | `Moments/Moments/Views/Settings/LoginActivityView.swift` | `views/settings/LoginActivityView.kt` | [x] |
+| 629 | `Moments/Moments/Views/Settings/MuteSettingsView.swift` | `views/settings/MuteSettingsView.kt` | [x] |
+| 421 | `Moments/Moments/Views/Settings/PasswordChangeView.swift` | `views/settings/PasswordChangeView.kt` | [x] |
+| 166 | `Moments/Moments/Views/Settings/QRCode.swift` | `views/settings/QRCode.kt` | [x] 166↔~290 · QR real glowsy:// + share/save + photos gate |
+| 190 | `Moments/Moments/Views/Settings/RestModeView.swift` | `views/settings/RestModeView.kt` | [x] |
+| 383 | `Moments/Moments/Views/Settings/SavedMoments/SavedMomentsViewModel.swift` | `views/settings/savedmoments/SavedMomentsViewModel.kt` | [x] |
+| 1595 ⚠️ | `Moments/Moments/Views/Settings/SavedMoments/SavedMomentsView.swift` | `views/settings/savedmoments/SavedMomentsView.kt` + `ModernSavedMomentsDetailView.kt` | [x] |
+| 270 | `Moments/Moments/Views/Settings/SearchHistoryActivityView.swift` | `views/settings/SearchHistoryActivityView.kt` | [x] |
+| 349 | `Moments/Moments/Views/Settings/SetPasswordView.swift` | `views/settings/SetPasswordView.kt` | [x] |
+| 121 | `Moments/Moments/Views/Settings/SettingsNavigationComponents.swift` | `views/settings/SettingsNavigationComponents.kt` | [x] 121↔142 · back chrome+nav bar+subsection bg/wrapper+chrome modifier |
+| 252 | `Moments/Moments/Views/Settings/SettingsSections/NotificationSettingsView.swift` | `views/settings/settingssections/NotificationSettingsView.kt` | [x] 252↔~420 · schedule+types+advanced+save toast |
+| 67 | `Moments/Moments/Views/Settings/SettingsSections/OnlineStatusSection.swift` | `views/settings/settingssections/OnlineStatusSection.kt` | [x] 67↔~160 · menu allCases + setGlobalStatus + strings |
+| 352 | `Moments/Moments/Views/Settings/SettingsSections/PersonalInfoSettingsViews.swift` | `views/settings/settingssections/PersonalInfoSettingsViews.kt` | [x] 352↔~480 · main+username cooldown+availability+cache |
+| 1579 ⚠️ | `Moments/Moments/Views/Settings/SettingsSections/SettingsSections.swift` | `views/settings/sections/*` | [x] 1579↔~1600 · form+sections; Google link/unlink (≡Apple); Passkey 🚫 |
+| 332 | `Moments/Moments/Views/Settings/SettingsView.swift` | `views/settings/SettingsView.kt` + `sections/SettingsFormView.kt` | [x] 332↔~370 · shell+form real (SettingsSections) |
+| 97 | `Moments/Moments/Views/Settings/SettingsViewModel.swift` | `views/settings/SettingsViewModel.kt` | [x] 97↔151 · fetch+privacy+receipts+policy+hours+prefs; settingsToggleCases |
+| 99 | `Moments/Moments/Views/Settings/TimeSpentCardView.swift` | `views/settings/TimeSpentCardView.kt` | [x] |
+| 95 | `Moments/Moments/Views/Settings/TimeSpentDetailsView.swift` | `views/settings/TimeSpentDetailsView.kt` | [x] |
+| 116 | `Moments/Moments/Views/Settings/UserActivityBackendModels.swift` | `views/settings/UserActivityBackendModels.kt` | [x] |
+| 183 | `Moments/Moments/Views/Settings/UserActivityCache.swift` | `views/settings/UserActivityCache.kt` | [x] |
+| 220 | `Moments/Moments/Views/Settings/UserActivityComponents.swift` | `views/settings/UserActivityComponents.kt` | [x] |
+| 2199 ⚠️ | `Moments/Moments/Views/Settings/UserActivityDetailView.swift` | `views/settings/UserActivityDetailView.kt` | [x] |
+| 1224 ⚠️ | `Moments/Moments/Views/Settings/UserActivityDetailViewModel.swift` | `views/settings/UserActivityDetailViewModel.kt` | [x] |
+| 98 | `Moments/Moments/Views/Settings/UserActivityModels.swift` | `views/settings/UserActivityModels.kt` | [x] |
+| 1178 ⚠️ | `Moments/Moments/Views/Settings/UserActivityRows.swift` | `views/settings/UserActivityRows.kt` | [x] |
+| 119 | `Moments/Moments/Views/Settings/UserActivitySummaryViewModel.swift` | `views/settings/UserActivitySummaryViewModel.kt` | [x] |
+| 327 | `Moments/Moments/Views/Settings/UserActivityTypes.swift` | `views/settings/UserActivityTypes.kt` | [x] |
+| 266 | `Moments/Moments/Views/Settings/UserActivityView.swift` | `views/settings/UserActivityView.kt` | [x] |
+| 33 | `Moments/Moments/Views/Shared/AppErrorBanner.swift` | `views/shared/AppErrorBanner.kt` | [x] 33↔75 · chrome glass+retry; Feed usa shared (quitado dup rojo) |
+| 10 | `Moments/Moments/Views/Shared/BlurView.swift` | — | 🚫 UIKit `UIViewRepresentable`; call sites → fill / `momentsChromeGlass` |
+| 34 | `Moments/Moments/Views/Shared/MomentDetail/MomentDetailContainerView.swift` | `views/shared/momentdetail/MomentDetailContainerView.kt` | [x] 34↔52 · single/carousel/map → Single/Modern/Location |
+| 21 | `Moments/Moments/Views/Shared/MomentDetail/MomentDetailContext.swift` | `views/shared/momentdetail/MomentDetailContext.kt` | [x] 21↔30 · Single/ProfileCarousel/Map |
+| 412 | `Moments/Moments/Views/Shared/MomentDetail/SingleMomentDetailView.swift` | `views/shared/momentdetail/SingleMomentDetailView.kt` | [x] 412↔484 · chrome blur+Stories startWithUserId+video+velocity dismiss |
+| 100 | `Moments/Moments/Views/Shared/MomentsVideoPlaybackTimeline.swift` | `views/shared/MomentsVideoPlaybackTimeline.kt` | [x] 100↔160 · scrub+knob+formatTime |
+| 331 | `Moments/Moments/Views/Shared/MomentsVideoPlayer.swift` | `views/shared/MomentsVideoPlayer.kt` | [x] 331↔255 · Exo+Preloader+stall+gravity; NormalVideo/FullScreen cableados |
+| 214 | `Moments/Moments/Views/Shared/OfflineBannerModifier.swift` | `views/shared/OfflineBannerModifier.kt` | [x] 214↔208 · Collapsible+orb; TabBar+UserProfile overlay |
+| 74 | `Moments/Moments/Views/Shared/PhotoTagOverlayView.swift` | `views/shared/PhotoTagOverlayView.kt` | [x] 74↔134 · position+triangle+spring |
+| 175 | `Moments/Moments/Views/Shared/ScreenshotProtectedView.swift` | `views/shared/ScreenshotProtectedView.kt` | [x] 175↔~120 · FLAG_SECURE refcount; cornerRadius+updateToken; fillsContainer |
+| 227 | `Moments/Moments/Views/comments/CommentMentionSearchOverlay.swift` | `views/comments/CommentMentionSearchOverlay.kt` | [~] chrome glass header/cancel/+ + stroke panel |
 | 429 | `Moments/Moments/Views/comments/CommentsView.swift` | — | [ ] |
-| 1900 ⚠️ | `Moments/Moments/Views/comments/ModernCommentsView.swift` | `views/comments/ModernCommentsView.kt` | [~] |
+| 1900 ⚠️ | `Moments/Moments/Views/comments/ModernCommentsView.swift` | `views/comments/ModernCommentsView.kt` | [~] P1: floating composer, edit UI, sort icons, diacritic mentions, chrome overlay; pendiente QA |
 | 503 | `Moments/Moments/Views/story/QuestionResponsesView.swift` | `views/story/QuestionResponsesView.kt` | [x] sheet medium/large; chrome glass; list+detalle+creator; avatar→perfil |
 | 1018 ⚠️ | `Moments/Moments/Views/story/StoriesView.swift` | `views/story/StoriesView.kt` | [x] 1018↔~1050 · NavigateToChainStory+loadChain; pauseAllVideos; ring vacío→following; unseen/error; updateUserIds c/ad |
 | 635 | `Moments/Moments/Views/story/StoryChainView.swift` | `views/story/StoryChainView.kt` | [x] sheet+grid+stats+continue≡ContinueStoryChain; errores tipados; chrome; ItemView legacy N/A |
@@ -1634,105 +1667,105 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 148 | `Moments/Moments/Views/Permission/tracking/TrackingPermissionView.swift` | [~] |
 | 106 | `Moments/Moments/Views/Permissions/CameraAccessBoundary.swift` | [x] 106↔160 · primer/denied prefs; mic+cam→Settings; ON_RESUME |
 | 111 | `Moments/Moments/Views/Permissions/CameraPermissionGate.swift` | [~] |
-| 78 | `Moments/Moments/Views/Profile/Core/MomentGridPreview.swift` | [~] |
-| 637 | `Moments/Moments/Views/Profile/Core/ProfileView.swift` | [~] |
-| 857 | `Moments/Moments/Views/Profile/Core/ProfileViewModel.swift` | [~] |
-| 239 | `Moments/Moments/Views/Profile/Core/Sections/ProfileBentoLayout.swift` | [~] |
-| 1229 ⚠️ | `Moments/Moments/Views/Profile/Core/Sections/ProfileGridHeroTransition.swift` | [~] |
-| 452 | `Moments/Moments/Views/Profile/Core/Sections/ProfileGridMomentMenu.swift` | [~] |
-| 520 | `Moments/Moments/Views/Profile/Core/Sections/ProfileGridPreviewEditorView.swift` | [~] |
-| 592 | `Moments/Moments/Views/Profile/Core/Sections/ProfileHeaderSection.swift` | [~] |
-| 93 | `Moments/Moments/Views/Profile/Core/Sections/ProfileHeaderSkeletonView.swift` | [~] |
-| 422 | `Moments/Moments/Views/Profile/Core/Sections/ProfileMomentZoomNavigation.swift` | [~] |
-| 539 | `Moments/Moments/Views/Profile/Core/Sections/ProfileMomentsSection.swift` | [~] |
-| 541 | `Moments/Moments/Views/Profile/Core/Sections/ProfileSavedSection.swift` | [~] |
-| 672 | `Moments/Moments/Views/Profile/Core/Sections/ProfileSharedComponents.swift` | [~] |
-| 588 | `Moments/Moments/Views/Profile/Core/Sections/ProfileShellComponents.swift` | [~] |
-| 58 | `Moments/Moments/Views/Profile/Core/Sections/UserProfileZoomNavigation.swift` | [~] 58↔123 |
-| 1566 ⚠️ | `Moments/Moments/Views/Profile/Core/SharedActivityDetailView.swift` | [~] |
-| 474 | `Moments/Moments/Views/Profile/Core/SharedActivityView.swift` | [~] |
-| 452 | `Moments/Moments/Views/Profile/Core/SocialConnectionUserRow.swift` | [~] |
-| 791 | `Moments/Moments/Views/Profile/Core/SocialConnectionsView.swift` | [~] |
-| 666 | `Moments/Moments/Views/Profile/Core/UserListView.swift` | [~] |
-| 808 | `Moments/Moments/Views/Profile/Editor/PhotoCropEditorView.swift` | [~] |
-| 1743 ⚠️ | `Moments/Moments/Views/Profile/Editor/ProfileEditor.swift` | [~] |
-| 285 | `Moments/Moments/Views/Profile/Editor/Sections/ProfileEditorPickerViews.swift` | [~] |
-| 439 | `Moments/Moments/Views/Profile/Highlights/HighlightComponents.swift` | [~] |
-| 148 | `Moments/Moments/Views/Profile/Highlights/HighlightCreateFlowView.swift` | [ ] |
-| 256 | `Moments/Moments/Views/Profile/Highlights/HighlightCreateFlowViewModel.swift` | [ ] |
-| 101 | `Moments/Moments/Views/Profile/Highlights/HighlightNameCoverStep.swift` | [ ] |
-| 90 | `Moments/Moments/Views/Profile/Highlights/HighlightPresentationCoordinator.swift` | [ ] |
-| 33 | `Moments/Moments/Views/Profile/Highlights/HighlightSelectStoriesStep.swift` | [ ] |
-| 135 | `Moments/Moments/Views/Profile/Highlights/HighlightViewer.swift` | [ ] |
-| 372 | `Moments/Moments/Views/Profile/Highlights/ProfileHighlightsView.swift` | [ ] |
-| 214 | `Moments/Moments/Views/Profile/Incognito/IncognitoGlobalOverlay.swift` | [ ] |
-| 347 | `Moments/Moments/Views/Profile/Incognito/IncognitoModeSheet.swift` | [ ] |
-| 1413 ⚠️ | `Moments/Moments/Views/Profile/MomentsView/ContextMenu.swift` | [~] |
-| 622 | `Moments/Moments/Views/Profile/MomentsView/EditMomentView.swift` | [~] |
-| 611 | `Moments/Moments/Views/Profile/MomentsView/ModernMomentDetailView.swift` | [ ] |
+| 78 | `Moments/Moments/Views/Profile/Core/MomentGridPreview.swift` | [x] 78↔93 |
+| 637 | `Moments/Moments/Views/Profile/Core/ProfileView.swift` | [x] 637↔616 |
+| 857 | `Moments/Moments/Views/Profile/Core/ProfileViewModel.swift` | [x] 857↔566 |
+| 239 | `Moments/Moments/Views/Profile/Core/Sections/ProfileBentoLayout.swift` | [x] 239↔160 |
+| 1229 ⚠️ | `Moments/Moments/Views/Profile/Core/Sections/ProfileGridHeroTransition.swift` | [x] 1229↔1102 |
+| 452 | `Moments/Moments/Views/Profile/Core/Sections/ProfileGridMomentMenu.swift` | [x] 452↔397 |
+| 520 | `Moments/Moments/Views/Profile/Core/Sections/ProfileGridPreviewEditorView.swift` | [x] 520↔633 |
+| 592 | `Moments/Moments/Views/Profile/Core/Sections/ProfileHeaderSection.swift` | [x] 592↔547 |
+| 93 | `Moments/Moments/Views/Profile/Core/Sections/ProfileHeaderSkeletonView.swift` | [x] 93↔111 |
+| 422 | `Moments/Moments/Views/Profile/Core/Sections/ProfileMomentZoomNavigation.swift` | [x] 422↔342 |
+| 539 | `Moments/Moments/Views/Profile/Core/Sections/ProfileMomentsSection.swift` | [x] 539↔438 |
+| 541 | `Moments/Moments/Views/Profile/Core/Sections/ProfileSavedSection.swift` | [x] 541↔586 |
+| 672 | `Moments/Moments/Views/Profile/Core/Sections/ProfileSharedComponents.swift` | [x] 672↔520 |
+| 588 | `Moments/Moments/Views/Profile/Core/Sections/ProfileShellComponents.swift` | [x] 588↔521 |
+| 58 | `Moments/Moments/Views/Profile/Core/Sections/UserProfileZoomNavigation.swift` | [x] 58↔129 |
+| 1566 ⚠️ | `Moments/Moments/Views/Profile/Core/SharedActivityDetailView.swift` | [x] 1566↔1440 |
+| 474 | `Moments/Moments/Views/Profile/Core/SharedActivityView.swift` | [x] 474↔576 |
+| 452 | `Moments/Moments/Views/Profile/Core/SocialConnectionUserRow.swift` | [x] 452↔486 |
+| 791 | `Moments/Moments/Views/Profile/Core/SocialConnectionsView.swift` | [x] 791↔747 |
+| 666 | `Moments/Moments/Views/Profile/Core/UserListView.swift` | [x] 666↔674 |
+| 808 | `Moments/Moments/Views/Profile/Editor/PhotoCropEditorView.swift` | [x] 808↔796 |
+| 1743 ⚠️ | `Moments/Moments/Views/Profile/Editor/ProfileEditor.swift` | [x] 1743↔1234 |
+| 285 | `Moments/Moments/Views/Profile/Editor/Sections/ProfileEditorPickerViews.swift` | [x] 285↔418 |
+| 439 | `Moments/Moments/Views/Profile/Highlights/HighlightComponents.swift` | [x] 439↔422 |
+| 148 | `Moments/Moments/Views/Profile/Highlights/HighlightCreateFlowView.swift` | [x] 148↔196 |
+| 256 | `Moments/Moments/Views/Profile/Highlights/HighlightCreateFlowViewModel.swift` | [x] 256↔210 |
+| 101 | `Moments/Moments/Views/Profile/Highlights/HighlightNameCoverStep.swift` | [x] 101↔150 |
+| 90 | `Moments/Moments/Views/Profile/Highlights/HighlightPresentationCoordinator.swift` | [x] 90↔79 |
+| 33 | `Moments/Moments/Views/Profile/Highlights/HighlightSelectStoriesStep.swift` | [x] 33↔41 |
+| 135 | `Moments/Moments/Views/Profile/Highlights/HighlightViewer.swift` | [x] 135↔165 |
+| 372 | `Moments/Moments/Views/Profile/Highlights/ProfileHighlightsView.swift` | [x] 372↔365 |
+| 214 | `Moments/Moments/Views/Profile/Incognito/IncognitoGlobalOverlay.swift` | [x] 214↔216 |
+| 347 | `Moments/Moments/Views/Profile/Incognito/IncognitoModeSheet.swift` | [x] 347↔422 |
+| 1413 ⚠️ | `Moments/Moments/Views/Profile/MomentsView/ContextMenu.swift` | [x] 1413↔1060 |
+| 622 | `Moments/Moments/Views/Profile/MomentsView/EditMomentView.swift` | [x] 622↔697 |
+| 611 | `Moments/Moments/Views/Profile/MomentsView/ModernMomentDetailView.swift` | [x] 611↔686 |
 | 933 | `Moments/Moments/Views/Profile/Theme/EnhancedProfileBackground.swift` | 🚫 |
 | 925 | `Moments/Moments/Views/Profile/Theme/ProfileTheme.swift` | 🚫 |
 | 146 | `Moments/Moments/Views/Profile/Theme/ProfileThemeDemo.swift` | 🚫 |
 | 274 | `Moments/Moments/Views/Profile/Theme/ProfileThemeSelector.swift` | 🚫 |
-| 244 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileAvatarBadges.swift` | [~] |
-| 321 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileHeaderSection.swift` | [~] |
-| 394 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileMomentsSection.swift` | [~] |
-| 351 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileOverviewSection.swift` | [~] |
-| 320 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfilePublicProfileView.swift` | [~] |
-| 363 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileRelationshipViews.swift` | [~] |
-| 339 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileSharedViews.swift` | [~] |
-| 665 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileStateViews.swift` | [~] |
-| 688 | `Moments/Moments/Views/Profile/UserProfile/UserProfileView.swift` | [~] |
-| 1071 ⚠️ | `Moments/Moments/Views/Profile/UserProfile/UserProfileViewModel.swift` | [~] |
-| 430 | `Moments/Moments/Views/Settings/AccountHistoryActivityView.swift` | [~] |
-| 859 | `Moments/Moments/Views/Settings/AccountManagement.swift` | [~] |
-| 201 | `Moments/Moments/Views/Settings/ActivityCollapsibleFilterScroll.swift` | [ ] |
-| 184 | `Moments/Moments/Views/Settings/BlockedUsersView.swift` | [~] |
-| 343 | `Moments/Moments/Views/Settings/ChatStorageSettingsView.swift` | [~] |
-| 853 | `Moments/Moments/Views/Settings/ContentVisibilityView.swift` | [~] |
-| 168 | `Moments/Moments/Views/Settings/DailyLimitView.swift` | [~] |
-| 788 | `Moments/Moments/Views/Settings/DataExportView.swift` | [~] |
-| 606 | `Moments/Moments/Views/Settings/LoginActivityView.swift` | [~] |
-| 629 | `Moments/Moments/Views/Settings/MuteSettingsView.swift` | [~] |
-| 421 | `Moments/Moments/Views/Settings/PasswordChangeView.swift` | [~] |
-| 166 | `Moments/Moments/Views/Settings/QRCode.swift` | [~] |
-| 190 | `Moments/Moments/Views/Settings/RestModeView.swift` | [~] |
-| 383 | `Moments/Moments/Views/Settings/SavedMoments/SavedMomentsViewModel.swift` | [~] |
-| 1595 ⚠️ | `Moments/Moments/Views/Settings/SavedMomentsView.swift` | [~] |
-| 270 | `Moments/Moments/Views/Settings/SearchHistoryActivityView.swift` | [~] |
-| 349 | `Moments/Moments/Views/Settings/SetPasswordView.swift` | [~] |
-| 121 | `Moments/Moments/Views/Settings/SettingsNavigationComponents.swift` | [~] |
-| 252 | `Moments/Moments/Views/Settings/SettingsSections/NotificationSettingsView.swift` | [~] |
-| 67 | `Moments/Moments/Views/Settings/SettingsSections/OnlineStatusSection.swift` | [~] |
-| 352 | `Moments/Moments/Views/Settings/SettingsSections/PersonalInfoSettingsViews.swift` | [~] |
-| 1579 ⚠️ | `Moments/Moments/Views/Settings/SettingsSections/SettingsSections.swift` | [~] |
-| 332 | `Moments/Moments/Views/Settings/SettingsView.swift` | [~] |
-| 97 | `Moments/Moments/Views/Settings/SettingsViewModel.swift` | [~] |
-| 99 | `Moments/Moments/Views/Settings/TimeSpentCardView.swift` | [~] |
-| 95 | `Moments/Moments/Views/Settings/TimeSpentDetailsView.swift` | [~] |
-| 116 | `Moments/Moments/Views/Settings/UserActivityBackendModels.swift` | [~] |
-| 183 | `Moments/Moments/Views/Settings/UserActivityCache.swift` | [~] |
-| 220 | `Moments/Moments/Views/Settings/UserActivityComponents.swift` | [~] |
-| 2199 ⚠️ | `Moments/Moments/Views/Settings/UserActivityDetailView.swift` | [~] |
-| 1224 ⚠️ | `Moments/Moments/Views/Settings/UserActivityDetailViewModel.swift` | [~] |
-| 98 | `Moments/Moments/Views/Settings/UserActivityModels.swift` | [~] |
-| 1178 ⚠️ | `Moments/Moments/Views/Settings/UserActivityRows.swift` | [~] |
-| 119 | `Moments/Moments/Views/Settings/UserActivitySummaryViewModel.swift` | [~] |
-| 327 | `Moments/Moments/Views/Settings/UserActivityTypes.swift` | [~] |
-| 266 | `Moments/Moments/Views/Settings/UserActivityView.swift` | [~] |
-| 33 | `Moments/Moments/Views/Shared/AppErrorBanner.swift` | [ ] |
-| 10 | `Moments/Moments/Views/Shared/BlurView.swift` | [ ] |
-| 34 | `Moments/Moments/Views/Shared/MomentDetail/MomentDetailContainerView.swift` | [~] |
-| 21 | `Moments/Moments/Views/Shared/MomentDetail/MomentDetailContext.swift` | [~] |
-| 412 | `Moments/Moments/Views/Shared/MomentDetail/SingleMomentDetailView.swift` | [~] |
-| 100 | `Moments/Moments/Views/Shared/MomentsVideoPlaybackTimeline.swift` | [ ] |
-| 331 | `Moments/Moments/Views/Shared/MomentsVideoPlayer.swift` | [ ] |
-| 214 | `Moments/Moments/Views/Shared/OfflineBannerModifier.swift` | [ ] |
-| 74 | `Moments/Moments/Views/Shared/PhotoTagOverlayView.swift` | [ ] |
-| 175 | `Moments/Moments/Views/Shared/ScreenshotProtectedView.swift` | [~] |
-| 227 | `Moments/Moments/Views/comments/CommentMentionSearchOverlay.swift` | [~] |
+| 244 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileAvatarBadges.swift` | [x] 244↔57 |
+| 321 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileHeaderSection.swift` | [x] 321↔352 |
+| 394 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileMomentsSection.swift` | [x] 394↔64 |
+| 351 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileOverviewSection.swift` | [x] 351↔390 |
+| 320 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfilePublicProfileView.swift` | [x] 320↔268 |
+| 363 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileRelationshipViews.swift` | [x] 363↔440 |
+| 339 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileSharedViews.swift` | [x] 339↔361 |
+| 665 | `Moments/Moments/Views/Profile/UserProfile/Sections/UserProfileStateViews.swift` | [x] 665↔613 |
+| 688 | `Moments/Moments/Views/Profile/UserProfile/UserProfileView.swift` | [x] 688↔629 |
+| 1071 ⚠️ | `Moments/Moments/Views/Profile/UserProfile/UserProfileViewModel.swift` | [x] 1071↔723 |
+| 430 | `Moments/Moments/Views/Settings/AccountHistoryActivityView.swift` | [x] |
+| 859 | `Moments/Moments/Views/Settings/AccountManagement.swift` | [x] |
+| 201 | `Moments/Moments/Views/Settings/ActivityCollapsibleFilterScroll.swift` | [x] 201↔137 |
+| 184 | `Moments/Moments/Views/Settings/BlockedUsersView.swift` | [x] |
+| 343 | `Moments/Moments/Views/Settings/ChatStorageSettingsView.swift` | [x] |
+| 853 | `Moments/Moments/Views/Settings/ContentVisibilityView.swift` | [x] |
+| 168 | `Moments/Moments/Views/Settings/DailyLimitView.swift` | [x] |
+| 788 | `Moments/Moments/Views/Settings/DataExportView.swift` | [x] |
+| 606 | `Moments/Moments/Views/Settings/LoginActivityView.swift` | [x] |
+| 629 | `Moments/Moments/Views/Settings/MuteSettingsView.swift` | [x] |
+| 421 | `Moments/Moments/Views/Settings/PasswordChangeView.swift` | [x] |
+| 166 | `Moments/Moments/Views/Settings/QRCode.swift` | [x] |
+| 190 | `Moments/Moments/Views/Settings/RestModeView.swift` | [x] |
+| 383 | `Moments/Moments/Views/Settings/SavedMoments/SavedMomentsViewModel.swift` | [x] |
+| 1595 ⚠️ | `Moments/Moments/Views/Settings/SavedMoments/SavedMomentsView.swift` | [x] |
+| 270 | `Moments/Moments/Views/Settings/SearchHistoryActivityView.swift` | [x] |
+| 349 | `Moments/Moments/Views/Settings/SetPasswordView.swift` | [x] |
+| 121 | `Moments/Moments/Views/Settings/SettingsNavigationComponents.swift` | [x] 121↔142 |
+| 252 | `Moments/Moments/Views/Settings/SettingsSections/NotificationSettingsView.swift` | [x] |
+| 67 | `Moments/Moments/Views/Settings/SettingsSections/OnlineStatusSection.swift` | [x] |
+| 352 | `Moments/Moments/Views/Settings/SettingsSections/PersonalInfoSettingsViews.swift` | [x] |
+| 1579 ⚠️ | `Moments/Moments/Views/Settings/SettingsSections/SettingsSections.swift` | [x] 1579↔~1600 |
+| 332 | `Moments/Moments/Views/Settings/SettingsView.swift` | [x] 332↔~370 · shell+form real |
+| 97 | `Moments/Moments/Views/Settings/SettingsViewModel.swift` | [x] 97↔151 |
+| 99 | `Moments/Moments/Views/Settings/TimeSpentCardView.swift` | [x] |
+| 95 | `Moments/Moments/Views/Settings/TimeSpentDetailsView.swift` | [x] |
+| 116 | `Moments/Moments/Views/Settings/UserActivityBackendModels.swift` | [x] |
+| 183 | `Moments/Moments/Views/Settings/UserActivityCache.swift` | [x] |
+| 220 | `Moments/Moments/Views/Settings/UserActivityComponents.swift` | [x] |
+| 2199 ⚠️ | `Moments/Moments/Views/Settings/UserActivityDetailView.swift` | [x] |
+| 1224 ⚠️ | `Moments/Moments/Views/Settings/UserActivityDetailViewModel.swift` | [x] |
+| 98 | `Moments/Moments/Views/Settings/UserActivityModels.swift` | [x] |
+| 1178 ⚠️ | `Moments/Moments/Views/Settings/UserActivityRows.swift` | [x] |
+| 119 | `Moments/Moments/Views/Settings/UserActivitySummaryViewModel.swift` | [x] |
+| 327 | `Moments/Moments/Views/Settings/UserActivityTypes.swift` | [x] |
+| 266 | `Moments/Moments/Views/Settings/UserActivityView.swift` | [x] |
+| 33 | `Moments/Moments/Views/Shared/AppErrorBanner.swift` | [x] |
+| 10 | `Moments/Moments/Views/Shared/BlurView.swift` | 🚫 |
+| 34 | `Moments/Moments/Views/Shared/MomentDetail/MomentDetailContainerView.swift` | [x] |
+| 21 | `Moments/Moments/Views/Shared/MomentDetail/MomentDetailContext.swift` | [x] |
+| 412 | `Moments/Moments/Views/Shared/MomentDetail/SingleMomentDetailView.swift` | [x] |
+| 100 | `Moments/Moments/Views/Shared/MomentsVideoPlaybackTimeline.swift` | [x] 100↔160 |
+| 331 | `Moments/Moments/Views/Shared/MomentsVideoPlayer.swift` | [x] 331↔255 |
+| 214 | `Moments/Moments/Views/Shared/OfflineBannerModifier.swift` | [x] 214↔208 |
+| 74 | `Moments/Moments/Views/Shared/PhotoTagOverlayView.swift` | [x] 74↔134 |
+| 175 | `Moments/Moments/Views/Shared/ScreenshotProtectedView.swift` | [x] |
+| 227 | `Moments/Moments/Views/comments/CommentMentionSearchOverlay.swift` | [~] chrome glass |
 | 429 | `Moments/Moments/Views/comments/CommentsView.swift` | [ ] |
-| 1900 ⚠️ | `Moments/Moments/Views/comments/ModernCommentsView.swift` | [~] |
+| 1900 ⚠️ | `Moments/Moments/Views/comments/ModernCommentsView.swift` | [~] P1 cerrados; pendiente QA |
 | 503 | `Moments/Moments/Views/story/QuestionResponsesView.swift` | [x] |
 | 1018 ⚠️ | `Moments/Moments/Views/story/StoriesView.swift` | [x] · NavigateToChainStory+loadChain; pauseAllVideos; ring/following |
 | 635 | `Moments/Moments/Views/story/StoryChainView.swift` | [x] |

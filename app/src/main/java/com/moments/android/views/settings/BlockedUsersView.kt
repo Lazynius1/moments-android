@@ -1,6 +1,7 @@
 package com.moments.android.views.settings
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,24 +12,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.FrontHand
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,51 +33,101 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
+import com.moments.android.R
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchUser
+import com.moments.android.utilities.MomentsPressDefaults
+import com.moments.android.utilities.momentsPress
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Mirror 1:1 de `BlockedUsersView.swift`.
+ * Port de `BlockedUsersView.swift` + `BlockedUsersViewModel`.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BlockedUsersView(
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
 ) {
     val isDark = isSystemInDarkTheme()
-    val backgroundColor = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
-    val textColor = if (isDark) Color.White else Color.Black
-    val secondaryColor = if (isDark) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.5f)
-
+    val primary = SettingsProfileColors.accent(isDark)
+    val secondary = primary.copy(alpha = 0.5f)
     val scope = rememberCoroutineScope()
     val firestoreService = remember { FirestoreService() }
-    var isLoading by remember { mutableStateOf(true) }
-    var blockedUsers by remember { mutableStateOf<List<AppUser>>(emptyList()) }
 
-    fun loadBlockedUsers() {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        isLoading = true
+    var hasFetched by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var blockedUsers by remember { mutableStateOf<List<AppUser>>(emptyList()) }
+    var showError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val notAuthenticated = stringResource(R.string.blocked_users_not_authenticated)
+    val fetchProfileError = stringResource(R.string.blocked_users_error_fetch_profile)
+    val fetchUsersError = stringResource(R.string.blocked_users_error_fetch_users)
+    val unblockError = stringResource(R.string.blocked_users_error_unblock)
+
+    fun showError(message: String) {
+        errorMessage = message
+        showError = true
+    }
+
+    fun fetchBlockedUsers(fromRefresh: Boolean = false) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid == null) {
+            showError(notAuthenticated)
+            isLoading = false
+            isRefreshing = false
+            return
+        }
+        if (fromRefresh) isRefreshing = true else isLoading = true
         scope.launch {
             try {
                 val user = firestoreService.fetchUser(uid)
                 val blockedIds = user.blockedUsers
-                if (blockedIds.isEmpty()) {
-                    blockedUsers = emptyList()
+                blockedUsers = if (blockedIds.isEmpty()) {
+                    emptyList()
                 } else {
-                    blockedUsers = firestoreService.fetchUsers(blockedIds)
+                    try {
+                        firestoreService.fetchUsers(blockedIds)
+                    } catch (e: Exception) {
+                        showError("$fetchUsersError: ${e.localizedMessage}")
+                        emptyList()
+                    }
                 }
-            } catch (_: Exception) {
-                blockedUsers = emptyList()
+            } catch (e: Exception) {
+                showError("$fetchProfileError: ${e.localizedMessage}")
+            } finally {
+                isLoading = false
+                if (fromRefresh) {
+                    delay(400)
+                    isRefreshing = false
+                }
+            }
+        }
+    }
+
+    fun unblockUser(userId: String) {
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+        if (currentUid == null) {
+            showError(notAuthenticated)
+            return
+        }
+        isLoading = true
+        scope.launch {
+            try {
+                firestoreService.unblockUser(currentUserId = currentUid, targetUserId = userId)
+                blockedUsers = blockedUsers.filterNot { it.id == userId }
+            } catch (e: Exception) {
+                showError("$unblockError: ${e.localizedMessage}")
             } finally {
                 isLoading = false
             }
@@ -90,125 +135,141 @@ fun BlockedUsersView(
     }
 
     LaunchedEffect(Unit) {
-        loadBlockedUsers()
+        if (!hasFetched) {
+            hasFetched = true
+            fetchBlockedUsers()
+        }
     }
 
-    Scaffold(
-        containerColor = backgroundColor,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Cuentas bloqueadas",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = textColor
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = textColor
+    SettingsSubsectionWrapper(
+        title = stringResource(R.string.blocked_users_title),
+        onNavigateBack = onNavigateBack,
+    ) {
+        Box(Modifier.fillMaxSize().padding(top = 8.dp)) {
+            when {
+                isLoading && blockedUsers.isEmpty() && !isRefreshing -> {
+                    Column(
+                        Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        CircularProgressIndicator(color = primary)
+                        Spacer(Modifier.size(12.dp))
+                        Text(
+                            stringResource(R.string.common_searching),
+                            fontSize = 16.sp,
+                            color = secondary,
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = backgroundColor)
-            )
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            if (isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = textColor)
                 }
-            } else if (blockedUsers.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Block,
-                        contentDescription = null,
-                        tint = secondaryColor,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.size(12.dp))
-                    Text(
-                        text = "No tienes ninguna cuenta bloqueada",
-                        fontSize = 16.sp,
-                        color = secondaryColor
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(blockedUsers, key = { it.id }) { user ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(textColor.copy(alpha = 0.05f))
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                blockedUsers.isEmpty() && !isLoading -> {
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
                         ) {
-                            AsyncImage(
-                                model = user.profileImagePath,
-                                contentDescription = "Avatar",
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(textColor.copy(alpha = 0.1f))
-                            )
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
+                        Icon(
+                            Icons.Filled.FrontHand,
+                            contentDescription = null,
+                            tint = secondary,
+                            modifier = Modifier.size(44.dp),
+                        )
+                        Spacer(Modifier.size(12.dp))
+                        Text(
+                            stringResource(R.string.blocked_users_empty),
+                            fontSize = 16.sp,
+                            color = secondary,
+                        )
+                    }
+                }
+                else -> {
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { fetchBlockedUsers(fromRefresh = true) },
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        LazyColumn(
+                            Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp)
+                                .padding(bottom = 20.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            item {
                                 Text(
-                                    text = user.username,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = textColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "@${user.username}",
-                                    fontSize = 13.sp,
-                                    color = secondaryColor
+                                    stringResource(
+                                        R.string.settings_sections_blocked_accounts_subtitle,
+                                        blockedUsers.size,
+                                    ),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = secondary,
+                                    modifier = Modifier
+                                        .padding(horizontal = 16.dp)
+                                        .padding(top = 8.dp, bottom = 2.dp),
                                 )
                             }
-
-                            Button(
-                                onClick = {
-                                    val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: return@Button
-                                    scope.launch {
-                                        firestoreService.unblockUser(currentUserId = currentUid, targetUserId = user.id)
-                                        loadBlockedUsers()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = textColor.copy(alpha = 0.1f),
-                                    contentColor = textColor
-                                ),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text("Desbloquear", fontSize = 13.sp)
+                            items(blockedUsers, key = { it.id }) { user ->
+                                BlockedUserRow(
+                                    username = user.username,
+                                    primary = primary,
+                                    onUnblock = { unblockUser(user.id) },
+                                )
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    if (showError) {
+        AlertDialog(
+            onDismissRequest = { showError = false },
+            title = { Text(stringResource(R.string.blocked_users_error_title)) },
+            text = {
+                Text(errorMessage ?: stringResource(R.string.blocked_users_unknown_error))
+            },
+            confirmButton = {
+                TextButton(onClick = { showError = false }) {
+                    Text(stringResource(R.string.blocked_users_ok))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun BlockedUserRow(
+    username: String,
+    primary: Color,
+    onUnblock: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            username,
+            fontSize = 15.sp,
+            color = primary,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            stringResource(R.string.blocked_users_unblock),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = primary,
+            modifier = Modifier
+                .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                .momentsPress(interaction, MomentsPressDefaults.momentsPressSubtle)
+                .clickable(interactionSource = interaction, indication = null, onClick = onUnblock)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        )
     }
 }

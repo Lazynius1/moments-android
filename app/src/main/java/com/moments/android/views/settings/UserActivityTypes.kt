@@ -5,11 +5,14 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Comment
+import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.automirrored.outlined.Comment
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
@@ -23,7 +26,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SentimentSatisfiedAlt
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +44,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
+import com.moments.android.models.MediaItem
 import com.moments.android.models.Moment
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.feed.reactions.ReactionType
@@ -47,7 +52,7 @@ import com.moments.android.views.messaging.components.AttachmentIcon
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
-/** Port de `UserActivityTypes.swift`. */
+/** Port 1:1 de `UserActivityTypes.swift` (327 líneas). */
 enum class RecentlyDeletedContentKind { MOMENTS, STORIES }
 
 enum class ArchivedContentKind { MOMENTS, STORIES }
@@ -237,7 +242,7 @@ enum class ReactionsDateFilter(val rawValue: String, @StringRes val titleRes: In
 }
 
 val Moment.hasVideoMedia: Boolean
-    get() = videoUrl != null || mediaItems?.firstOrNull()?.type?.raw == "video"
+    get() = videoUrl != null || mediaItems?.firstOrNull()?.type == MediaItem.MediaType.VIDEO
 
 val Moment.parsedAspectRatioValue: Double?
     get() {
@@ -265,7 +270,8 @@ val Moment.isReelCandidate: Boolean
  */
 @Composable
 fun AnimatedReactionIcon(modifier: Modifier = Modifier) {
-    val reactions = remember { ReactionType.entries.map { it.icon } }
+    // ≡ ReactionType.allCases.map(\.icon)
+    val reactions = remember { ReactionType.allCases.map { it.icon } }
     var currentIndex by remember { mutableIntStateOf(0) }
     var visible by remember { mutableStateOf(true) }
 
@@ -309,16 +315,21 @@ fun AnimatedReactionIcon(modifier: Modifier = Modifier) {
 }
 
 /**
- * Ciclo de burbujas de comentario cada 1 s. iOS alterna 6 SF Symbols de burbuja; Material no
- * tiene las variantes izquierda/derecha/relleno, así que se rota entre los tres equivalentes
- * disponibles manteniendo el mismo ritmo y la misma animación.
+ * Ciclo de burbujas cada 1 s ≡ iOS `AnimatedCommentIcon` (6 SF Symbols).
+ * Material: outline/fill de Comment/Chat + MoreHoriz (paridad de ritmo/animación).
  */
 @Composable
 fun AnimatedCommentIcon(modifier: Modifier = Modifier) {
+    val isDark = isSystemInDarkTheme()
+    val tint = if (isDark) Color.White else Color.Black
+    // Orden aproximado a bubble.right / .fill / .left / .fill / ellipsis / .fill
     val bubbles = remember {
         listOf(
+            Icons.AutoMirrored.Outlined.Comment,
             Icons.AutoMirrored.Filled.Comment,
+            Icons.AutoMirrored.Outlined.Chat,
             Icons.AutoMirrored.Filled.Chat,
+            Icons.Outlined.MoreHoriz,
             Icons.Filled.MoreHoriz,
         )
     }
@@ -351,10 +362,10 @@ fun AnimatedCommentIcon(modifier: Modifier = Modifier) {
     }
 
     Box(modifier.size(36.dp), contentAlignment = Alignment.Center) {
-        androidx.compose.material3.Icon(
+        Icon(
             imageVector = bubbles[currentIndex],
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurface,
+            tint = tint,
             modifier = Modifier
                 .size(20.dp)
                 .graphicsLayer {

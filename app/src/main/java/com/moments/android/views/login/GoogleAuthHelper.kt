@@ -20,6 +20,23 @@ private const val GOOGLE_WEB_CLIENT_ID =
  */
 suspend fun signInWithGoogle(context: Context): Boolean {
     AuthService.initialize(context.applicationContext)
+    val idToken = obtainGoogleIdToken(context)
+    return AuthService.signInWithGoogle(idToken)
+}
+
+/** ≡ Sign in with Apple para vincular — obtiene idToken y llama [AuthService.linkWithGoogle]. */
+suspend fun linkGoogleAccount(context: Context) {
+    AuthService.initialize(context.applicationContext)
+    AuthService.linkWithGoogle(obtainGoogleIdToken(context))
+}
+
+/** ≡ reauthenticateWithApple — Credential Manager + [AuthService.reauthenticateWithGoogle]. */
+suspend fun reauthenticateWithGoogle(context: Context) {
+    AuthService.initialize(context.applicationContext)
+    AuthService.reauthenticateWithGoogle(obtainGoogleIdToken(context))
+}
+
+private suspend fun obtainGoogleIdToken(context: Context): String {
     val credentialManager = CredentialManager.create(context)
     val googleIdOption = GetGoogleIdOption.Builder()
         .setFilterByAuthorizedAccounts(false)
@@ -32,6 +49,5 @@ suspend fun signInWithGoogle(context: Context): Boolean {
     check(credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
         "Credencial de Google inválida"
     }
-    val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-    return AuthService.signInWithGoogle(googleIdTokenCredential.idToken)
+    return GoogleIdTokenCredential.createFrom(credential.data).idToken
 }

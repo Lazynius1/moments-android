@@ -74,6 +74,8 @@ object AuthService {
 
     sealed class AccountDeletionConfirmation {
         data class Password(val password: String) : AccountDeletionConfirmation()
+        /** ≡ iOS `.appleVerified` — reauth Google ya hecha en UI. */
+        data object GoogleVerified : AccountDeletionConfirmation()
     }
 
     data class CachedAccountStatus(
@@ -168,6 +170,12 @@ object AuthService {
 
     val isPasswordLinked: Boolean get() = linkedProviderIds.contains("password")
     val isGoogleLinked: Boolean get() = linkedProviderIds.contains("google.com")
+
+    /** ≡ iOS `canUnlinkApple` — Google solo se puede desvincular si hay password. */
+    val canUnlinkGoogle: Boolean get() = isGoogleLinked && isPasswordLinked
+
+    /** ≡ iOS `isAppleOnlyAccess` — Google es el único método de acceso. */
+    val isGoogleOnlyAccess: Boolean get() = isGoogleLinked && !isPasswordLinked
 
     val backupEmailStatus: BackupEmailStatus
         get() {
@@ -549,6 +557,31 @@ object AuthService {
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         val linked = auth.currentUser?.linkWithCredential(credential)?.await()?.user
         _currentFirebaseUser.value = linked ?: auth.currentUser
+    }
+
+    /** ≡ iOS `reauthenticateWithApple` — reauth con Google idToken. */
+    suspend fun reauthenticateWithGoogle(idToken: String) {
+        val user = auth.currentUser ?: throw authError(R.string.auth_error_userNotFound)
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+        user.reauthenticate(credential).await()
+        _currentFirebaseUser.value = auth.currentUser
+    }
+
+    /**
+     * ≡ iOS `unlinkFromApple`.
+     * Requiere [canUnlinkGoogle] (password vinculado); si no, error `noAlternative`.
+     */
+    suspend fun unlinkFromGoogle() {
+        val user = auth.currentUser ?: throw authError(R.string.auth_error_userNotFound)
+        if (!canUnlinkGoogle) {
+            throw authError(R.string.settings_security_google_error_no_alternative)
+        }
+        try {
+            val updated = user.unlink(GoogleAuthProvider.PROVIDER_ID).await().user
+            _currentFirebaseUser.value = updated ?: auth.currentUser
+        } catch (e: Exception) {
+            throw mapAuthError(e)
+        }
     }
 
     suspend fun completeGoogleRegistration(
@@ -1346,6 +1379,10 @@ object AuthService {
                 val email = user.email ?: error("No email")
                 val credential = EmailAuthProvider.getCredential(email, confirmation.password)
                 user.reauthenticate(credential).await()
+            }
+            AccountDeletionConfirmation.GoogleVerified -> {
+                // Reauth Google ya hecha en UI (≡ iOS appleVerified).
+                if (!isGoogleLinked) error("Google not linked")
             }
         }
         requestBackendAccountDeletion(user)

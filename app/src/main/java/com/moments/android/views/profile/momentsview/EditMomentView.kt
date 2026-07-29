@@ -1,5 +1,6 @@
 package com.moments.android.views.profile.momentsview
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -7,11 +8,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,17 +24,17 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,24 +49,38 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
+import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.models.MediaItem
+import com.moments.android.models.PhotoTag
+import com.moments.android.services.content.FeedMediaItem
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchCustomListDetails
 import com.moments.android.services.firestore.getCustomAudience
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.utilities.MomentMentionResolver
+import com.moments.android.views.components.AudienceIconMetrics
+import com.moments.android.views.components.AudienceIconView
+import com.moments.android.views.creator.CreatorAspectRatio
+import com.moments.android.views.creator.CreatorMedia
+import com.moments.android.views.creator.PhotoTagSelectionView
+import com.moments.android.views.creator.audienceselector.AudienceSelectionView
+import com.moments.android.views.creator.audienceselector.contentAudienceDescription
+import com.moments.android.views.creator.creatorscreens.LocationPickerView
 import com.moments.android.views.feed.core.EditMomentPayload
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.launch
 
 /**
  * Port de `EditMomentView.swift`.
- * Audience/location/tags: pickers simples / honestos (AudienceSelectionView,
- * LocationPickerView, PhotoTagSelectionView aún no portados).
+ * Sheets: AudienceSelectionView / LocationPickerView / EditMomentPhotoTagSheet
+ * vía MomentsModalSheet (iOS `.sheet` + detents).
  */
 @Composable
 fun EditMomentView(
@@ -89,32 +102,45 @@ fun EditMomentView(
     var selectedListName by remember { mutableStateOf<String?>(null) }
     var customSelectedUsers by remember { mutableStateOf<List<String>>(emptyList()) }
     var initialCustomSelectedUsers by remember { mutableStateOf<List<String>>(emptyList()) }
-    var taggedUsers by remember { mutableStateOf<List<String>>(emptyList()) }
+    var taggedUsers by remember { mutableStateOf(moment.taggedUsers) }
+    var editedMediaItems by remember(moment.id) {
+        mutableStateOf(moment.mediaItems.map { it.toMediaItem() })
+    }
     var locationName by remember { mutableStateOf(moment.location.orEmpty()) }
-    var locationLat by remember { mutableStateOf(moment.locationCoordinate?.latitude) }
-    var locationLng by remember { mutableStateOf(moment.locationCoordinate?.longitude) }
+    var selectedLocation by remember {
+        mutableStateOf(moment.locationCoordinate)
+    }
     var isSaving by remember { mutableStateOf(false) }
     var showingAudiencePicker by remember { mutableStateOf(false) }
-    var showingLocationEditor by remember { mutableStateOf(false) }
-    var showingTagsPending by remember { mutableStateOf(false) }
+    var showingLocationPicker by remember { mutableStateOf(false) }
+    var showingTagPicker by remember { mutableStateOf(false) }
 
-    val isAudienceLocked = false // FeedMoment aún no expone isModerationHidden
+    val isAudienceLocked = moment.isModerationHidden
     val normalizedLocation = locationName.trim()
     val normalizedMomentLocation = moment.location.orEmpty().trim()
+    val initialTaggedUsers = remember(moment.id) { moment.taggedUsers }
+    val normalizedPhotoTags = remember(editedMediaItems) {
+        editedMediaItems.firstOrNull { it.type == MediaItem.MediaType.IMAGE }?.tags.orEmpty()
+    }
+    val normalizedMomentPhotoTags = remember(moment.id) {
+        moment.mediaItems.firstOrNull { it.type == "image" }?.tags.orEmpty()
+    }
 
     val hasChanges = remember(
         editedContent, selectedAudience, selectedListId, customSelectedUsers,
-        initialCustomSelectedUsers, taggedUsers, normalizedLocation, locationLat, locationLng,
+        initialCustomSelectedUsers, taggedUsers, initialTaggedUsers, normalizedLocation,
+        selectedLocation, normalizedPhotoTags, normalizedMomentPhotoTags,
     ) {
         editedContent != moment.content ||
             selectedAudience.raw != (moment.audience ?: ContentAudience.EVERYONE.raw) ||
             selectedListId != moment.customListId ||
             (selectedAudience == ContentAudience.CUSTOM &&
                 customSelectedUsers.toSet() != initialCustomSelectedUsers.toSet()) ||
-            taggedUsers.isNotEmpty() ||
+            taggedUsers.toSet() != initialTaggedUsers.toSet() ||
+            !photoTagsEqual(normalizedPhotoTags, normalizedMomentPhotoTags) ||
             normalizedLocation != normalizedMomentLocation ||
-            locationLat != moment.locationCoordinate?.latitude ||
-            locationLng != moment.locationCoordinate?.longitude
+            selectedLocation?.latitude != moment.locationCoordinate?.latitude ||
+            selectedLocation?.longitude != moment.locationCoordinate?.longitude
     }
 
     LaunchedEffect(selectedAudience, selectedListId) {
@@ -145,19 +171,19 @@ fun EditMomentView(
     val audienceCustomList = stringResource(R.string.audience_custom_list)
     val audienceOnlyMe = stringResource(R.string.audience_only_me)
     val audienceLocked = stringResource(R.string.edit_moment_audience_locked)
-    val tagsCountFmt = stringResource(R.string.edit_moment_tags_count, customSelectedUsers.size)
+    val peopleCountFmt = stringResource(R.string.audience_people_count, customSelectedUsers.size)
 
     val audienceLabel = when (selectedAudience) {
         ContentAudience.CUSTOM_LIST -> selectedListName ?: audienceCustomList
         ContentAudience.CUSTOM ->
-            if (customSelectedUsers.isEmpty()) audienceCustom else tagsCountFmt
+            if (customSelectedUsers.isEmpty()) audienceCustom else peopleCountFmt
         ContentAudience.EVERYONE -> audienceEveryone
         ContentAudience.MUTUALS -> audienceMutuals
         ContentAudience.BEST_FRIENDS -> audienceBestFriends
         ContentAudience.ONLY_ME -> audienceOnlyMe
     }
     val audienceSubtitle =
-        if (isAudienceLocked) audienceLocked else audienceLabel
+        if (isAudienceLocked) audienceLocked else contentAudienceDescription(selectedAudience)
 
     val bg = if (isDark) {
         Brush.linearGradient(listOf(Color(0xFF071118), Color(0xFF0F1822), Color(0xFF121A25)))
@@ -211,9 +237,9 @@ fun EditMomentView(
                                 taggedUsers = taggedUsers,
                                 mentionedUsers = mentions,
                                 locationName = normalizedLocation,
-                                locationLatitude = locationLat,
-                                locationLongitude = locationLng,
-                                mediaItems = null,
+                                locationLatitude = selectedLocation?.latitude,
+                                locationLongitude = selectedLocation?.longitude,
+                                mediaItems = editedMediaItems,
                             )
                             onSave(payload)
                             isSaving = false
@@ -283,7 +309,11 @@ fun EditMomentView(
                         subtitle = audienceSubtitle,
                         locked = isAudienceLocked,
                         leading = {
-                            Text("👁", fontSize = 16.sp)
+                            AudienceIconView(
+                                audience = selectedAudience,
+                                size = AudienceIconMetrics.row,
+                                isDark = isDark,
+                            )
                         },
                         onClick = { if (!isAudienceLocked) showingAudiencePicker = true },
                         primary = primary,
@@ -295,7 +325,7 @@ fun EditMomentView(
                         } else {
                             locationName
                         },
-                        subtitle = if (locationLat == null) {
+                        subtitle = if (selectedLocation == null) {
                             stringResource(R.string.edit_moment_location_subtitle_empty)
                         } else {
                             stringResource(R.string.edit_moment_location_subtitle_set)
@@ -303,7 +333,7 @@ fun EditMomentView(
                         leading = {
                             Icon(Icons.Filled.LocationOn, null, Modifier.size(20.dp), tint = primary)
                         },
-                        onClick = { showingLocationEditor = true },
+                        onClick = { showingLocationPicker = true },
                         primary = primary,
                     )
                     DetailRow(
@@ -317,7 +347,7 @@ fun EditMomentView(
                         leading = {
                             Icon(Icons.Filled.PersonAdd, null, Modifier.size(20.dp), tint = primary)
                         },
-                        onClick = { showingTagsPending = true },
+                        onClick = { showingTagPicker = true },
                         primary = primary,
                     )
                 }
@@ -369,102 +399,225 @@ fun EditMomentView(
     }
 
     if (showingAudiencePicker) {
-        AlertDialog(
+        MomentsModalSheet(
             onDismissRequest = { showingAudiencePicker = false },
-            title = { Text(stringResource(R.string.audience_title)) },
-            text = {
-                Column {
-                    listOf(
-                        ContentAudience.EVERYONE to R.string.audience_everyone,
-                        ContentAudience.MUTUALS to R.string.audience_mutuals,
-                        ContentAudience.BEST_FRIENDS to R.string.audience_best_friends,
-                        ContentAudience.CUSTOM to R.string.audience_custom,
-                        ContentAudience.ONLY_ME to R.string.audience_only_me,
-                    ).forEach { (aud, labelRes) ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedAudience = aud
-                                    showingAudiencePicker = false
-                                }
-                                .padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(
-                                selected = selectedAudience == aud,
-                                onClick = {
-                                    selectedAudience = aud
-                                    showingAudiencePicker = false
-                                },
-                            )
-                            Text(stringResource(labelRes), Modifier.padding(start = 8.dp))
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showingAudiencePicker = false }) {
-                    Text(stringResource(R.string.edit_moment_cancel))
-                }
-            },
-        )
+            largeOnly = false,
+        ) {
+            AudienceSelectionView(
+                selectedAudience = selectedAudience,
+                selectedListId = selectedListId,
+                selectedListName = selectedListName,
+                customSelectedUsers = customSelectedUsers,
+                onSelectedAudienceChange = { selectedAudience = it },
+                onSelectedListIdChange = { selectedListId = it },
+                onSelectedListNameChange = { selectedListName = it },
+                onCustomSelectedUsersChange = { customSelectedUsers = it },
+                onDismiss = { showingAudiencePicker = false },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+        }
     }
 
-    if (showingLocationEditor) {
-        var draft by remember { mutableStateOf(locationName) }
-        AlertDialog(
-            onDismissRequest = { showingLocationEditor = false },
-            title = { Text(stringResource(R.string.edit_moment_location_title)) },
-            text = {
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(stringResource(R.string.edit_moment_location_add)) },
-                    singleLine = true,
+    if (showingLocationPicker) {
+        MomentsModalSheet(onDismissRequest = { showingLocationPicker = false }) {
+            LocationPickerView(
+                selectedLocation = selectedLocation,
+                locationName = locationName,
+                onSelectedLocationChange = { selectedLocation = it },
+                onLocationNameChange = { locationName = it },
+                onDismiss = { showingLocationPicker = false },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+        }
+    }
+
+    if (showingTagPicker) {
+        MomentsModalSheet(onDismissRequest = { showingTagPicker = false }) {
+            EditMomentPhotoTagSheet(
+                moment = moment,
+                mediaItems = editedMediaItems,
+                onMediaItemsChange = { editedMediaItems = it },
+                taggedUsers = taggedUsers,
+                onTaggedUsersChange = { taggedUsers = it },
+                onDismiss = { showingTagPicker = false },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+            )
+        }
+    }
+}
+
+/**
+ * Port de `EditMomentPhotoTagSheet` (EditMomentView.swift).
+ * Android: CreatorMedia usa Uri (Coil carga la imagen); iOS precarga UIImage con Kingfisher.
+ */
+@Composable
+private fun EditMomentPhotoTagSheet(
+    moment: FeedMoment,
+    mediaItems: List<MediaItem>,
+    onMediaItemsChange: (List<MediaItem>) -> Unit,
+    taggedUsers: List<String>,
+    onTaggedUsersChange: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isDark = isSystemInDarkTheme()
+    val primary = if (isDark) Color.White else Color.Black
+    val secondary = primary.copy(if (isDark) 0.78f else 0.66f)
+
+    val editableImage = remember(mediaItems, moment.id) {
+        mediaItems.firstOrNull {
+            it.type == MediaItem.MediaType.IMAGE && it.url.trim().isNotEmpty()
+        } ?: moment.mediaItems.firstOrNull {
+            it.type == "image" && it.url.trim().isNotEmpty()
+        }?.toMediaItem()
+    }
+
+    val preservedLegacyTaggedUsers = remember(moment.id) {
+        val spatial = moment.mediaItems.flatMap { it.tags.orEmpty() }.map { it.userId }.toSet()
+        moment.taggedUsers.filterNot { it in spatial }
+    }
+
+    var creatorMedia by remember(editableImage?.id) {
+        mutableStateOf<CreatorMedia?>(null)
+    }
+    var loadFailed by remember(editableImage?.id) { mutableStateOf(false) }
+
+    LaunchedEffect(editableImage?.id) {
+        val item = editableImage
+        if (item == null) {
+            loadFailed = true
+            creatorMedia = null
+            return@LaunchedEffect
+        }
+        val ratio = item.resolvedAspectRatioValue?.takeIf { it > 0f } ?: 0.8f
+        val aspect = CreatorAspectRatio.fromRatio(ratio)
+        creatorMedia = CreatorMedia(
+            id = item.id,
+            uri = Uri.parse(item.url),
+            isVideo = false,
+            thumbnailUri = item.thumbnailUrl?.takeIf { it.isNotBlank() }?.let(Uri::parse),
+            aspectRatio = aspect,
+            recommendedAspectRatio = aspect,
+            hasEdits = false,
+            tags = item.tags.orEmpty(),
+        )
+        loadFailed = false
+    }
+
+    fun syncBackIfNeeded() {
+        val media = creatorMedia ?: return
+        val index = mediaItems.indexOfFirst { it.id == media.id }
+        if (index < 0) return
+        val current = mediaItems[index]
+        val updated = mediaItems.toMutableList().also {
+            it[index] = current.copy(tags = media.tags)
+        }
+        onMediaItemsChange(updated)
+        val spatial = updated.flatMap { it.tags.orEmpty() }.map { it.userId }
+        onTaggedUsersChange((spatial + preservedLegacyTaggedUsers).toSet().toList())
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { syncBackIfNeeded() }
+    }
+
+    Box(modifier.fillMaxSize()) {
+        val media = creatorMedia
+        when {
+            media != null -> {
+                PhotoTagSelectionView(
+                    mediaItem = media,
+                    onMediaItemChange = { creatorMedia = it },
+                    onDismiss = {
+                        syncBackIfNeeded()
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxSize(),
                 )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        locationName = draft.trim()
-                        if (locationName.isEmpty()) {
-                            locationLat = null
-                            locationLng = null
-                        }
-                        showingLocationEditor = false
-                    },
+            }
+            loadFailed || editableImage == null -> {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
-                    Text(stringResource(R.string.edit_moment_save))
+                    Icon(
+                        if (loadFailed) Icons.Filled.Warning else Icons.Filled.Photo,
+                        null,
+                        Modifier.size(28.dp),
+                        tint = primary.copy(if (isDark) 0.7f else 0.55f),
+                    )
+                    Text(
+                        stringResource(R.string.edit_moment_tags_unavailable),
+                        Modifier.padding(top = 14.dp),
+                        color = primary,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 15.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        stringResource(R.string.common_ok),
+                        Modifier
+                            .padding(top = 14.dp)
+                            .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
+                            .clickable(onClick = onDismiss)
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        color = primary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.sp,
+                    )
                 }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        locationName = ""
-                        locationLat = null
-                        locationLng = null
-                        showingLocationEditor = false
-                    },
+            }
+            else -> {
+                Column(
+                    Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
-                    Text(stringResource(R.string.edit_moment_location_add))
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        color = primary,
+                        strokeWidth = 2.dp,
+                    )
+                    Text(
+                        stringResource(R.string.edit_moment_tags_loading),
+                        Modifier.padding(top = 14.dp),
+                        color = secondary,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 15.sp,
+                    )
                 }
-            },
-        )
+            }
+        }
     }
+}
 
-    if (showingTagsPending) {
-        AlertDialog(
-            onDismissRequest = { showingTagsPending = false },
-            title = { Text(stringResource(R.string.edit_moment_tags_title)) },
-            text = { Text(stringResource(R.string.edit_moment_tags_pending)) },
-            confirmButton = {
-                TextButton(onClick = { showingTagsPending = false }) {
-                    Text(stringResource(R.string.common_close))
-                }
-            },
-        )
+private fun FeedMediaItem.toMediaItem(): MediaItem = MediaItem(
+    id = id,
+    type = MediaItem.MediaType.from(type),
+    url = url,
+    aspectRatio = aspectRatio,
+    thumbnailUrl = thumbnailUrl,
+    videoDuration = videoDuration,
+    tags = tags,
+)
+
+private fun photoTagsEqual(a: List<PhotoTag>, b: List<PhotoTag>): Boolean {
+    if (a.size != b.size) return false
+    return a.zip(b).all { (lhs, rhs) ->
+        lhs.id == rhs.id &&
+            lhs.userId == rhs.userId &&
+            lhs.username == rhs.username &&
+            lhs.x == rhs.x &&
+            lhs.y == rhs.y
     }
 }
 

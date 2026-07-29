@@ -52,7 +52,7 @@ data class ActivityCategorySummary(
     val thumbnails: List<ThumbInfo>,
 )
 
-/** Port de `ActivityInteractionDetailViewModel` (`UserActivityDetailViewModel.swift`). */
+/** Port 1:1 de `ActivityInteractionDetailViewModel` (`UserActivityDetailViewModel.swift`, 1224 líneas). */
 class ActivityInteractionDetailViewModel(
     private val category: ActivityInteractionCategory,
     private val recentlyDeletedKind: RecentlyDeletedContentKind = RecentlyDeletedContentKind.MOMENTS,
@@ -333,7 +333,7 @@ class ActivityInteractionDetailViewModel(
                     val mapped = page.first.mapNotNull { item ->
                         val moment = item.moment ?: return@mapNotNull null
                         if (moment.isArchived == true) return@mapNotNull null
-                        val timestamp = item.taggedAt?.let { Date(it.toLong()) } ?: moment.timestamp
+                        val timestamp = item.taggedAt?.let { backendEpochMsToDate(it) } ?: moment.timestamp
                         val authorId = item.authorId ?: moment.authorId
                         val momentId = item.momentId ?: moment.id
                         if (authorId.isEmpty() || momentId.isNullOrEmpty()) return@mapNotNull null
@@ -498,29 +498,34 @@ class ActivityInteractionDetailViewModel(
     }
 
     private fun loadEchoes(userId: String) {
-        com.moments.android.services.social.EchoService.fetchEchoHistory(userId) { echoes ->
-            events = echoes.mapNotNull { echo: Echo ->
-                val id = echo.id ?: return@mapNotNull null
-                val locationName = echo.locationName
-                    ?: string(R.string.user_activity_echo_unknown_location)
-                val thumbnailUrl = echo.moments.lastOrNull()?.thumbnailUrl
-                    ?: echo.moments.lastOrNull()?.mediaUrl
+        viewModelScope.launch {
+            // ≡ iOS fetchEchoHistory one-shot vía callback; aquí Once evita listener huérfano en reload.
+            runCatching { com.moments.android.services.social.EchoService.fetchEchoHistoryOnce(userId) }
+                .onSuccess { echoes ->
+                    events = echoes.mapNotNull { echo: Echo ->
+                        val id = echo.id ?: return@mapNotNull null
+                        val locationName = echo.locationName
+                            ?: string(R.string.user_activity_echo_unknown_location)
+                        val thumbnailUrl = echo.moments.lastOrNull()?.thumbnailUrl
+                            ?: echo.moments.lastOrNull()?.mediaUrl
 
-                ActivityEventItem(
-                    id = id,
-                    title = locationName,
-                    subtitle = "",
-                    timestamp = echo.createdAt,
-                    icon = "waveform.and.mic",
-                    kind = "echo",
-                    sourceId = id,
-                    thumbnailUrl = thumbnailUrl,
-                    echoStatusRaw = echo.status.raw,
-                    echoParticipantsCount = echo.participants.size,
-                    echoExpiresAt = echo.expiresAt,
-                )
-            }.sortedByDescending { it.timestamp }
-            isLoading = false
+                        ActivityEventItem(
+                            id = id,
+                            title = locationName,
+                            subtitle = "",
+                            timestamp = echo.createdAt,
+                            icon = "waveform.and.mic",
+                            kind = "echo",
+                            sourceId = id,
+                            thumbnailUrl = thumbnailUrl,
+                            echoStatusRaw = echo.status.raw,
+                            echoParticipantsCount = echo.participants.size,
+                            echoExpiresAt = echo.expiresAt,
+                        )
+                    }.sortedByDescending { it.timestamp }
+                    isLoading = false
+                }
+                .onFailure { isLoading = false }
         }
     }
 
@@ -611,7 +616,7 @@ class ActivityInteractionDetailViewModel(
     }
 
     private fun BackendStickerReplyItem.toEventItem(): ActivityEventItem? {
-        val time = timestamp?.let { Date(it.toLong()) } ?: Date()
+        val time = timestamp?.let { backendEpochMsToDate(it) } ?: Date()
         val actorName = actorUsername?.trim().orEmpty()
         val displayName = actorName.ifEmpty { string(R.string.user_activity_stickers_actor_fallback) }
         val targetName = targetUsername?.takeIf { it.isNotEmpty() }
@@ -698,7 +703,7 @@ class ActivityInteractionDetailViewModel(
             val resolvedAuthorId = item.authorId ?: moment.authorId
             val resolvedMomentId = (item.momentId ?: moment.id)?.takeIf { it.isNotEmpty() }
                 ?: return@mapNotNull null
-            val reactedAt = item.reactedAt?.let { Date(it.toLong()) } ?: moment.timestamp
+            val reactedAt = item.reactedAt?.let { backendEpochMsToDate(it) } ?: moment.timestamp
 
             ActivityReactionItem(
                 id = "${resolvedAuthorId}_$resolvedMomentId",
@@ -735,8 +740,8 @@ class ActivityInteractionDetailViewModel(
                 ?: return@mapNotNull null
 
             val commentText = item.comment?.content?.trim().orEmpty()
-            val commentedAt = item.commentedAt?.let { Date(it.toLong()) }
-                ?: item.comment?.timestamp?.let { Date(it.toLong()) }
+            val commentedAt = item.commentedAt?.let { backendEpochMsToDate(it) }
+                ?: item.comment?.timestamp?.let { backendEpochMsToDate(it) }
                 ?: moment.timestamp
 
             ActivityCommentItem(
@@ -818,4 +823,10 @@ class ActivityInteractionDetailViewModel(
                 )
             }
     }.getOrDefault(emptyList())
+
+    /**
+     * ≡ iOS `Date(timeIntervalSince1970: value / 1000)` — el backend manda epoch en ms.
+     * Java [Date] también usa ms, así que no hay que dividir.
+     */
+    private fun backendEpochMsToDate(value: Double): Date = Date(value.toLong())
 }

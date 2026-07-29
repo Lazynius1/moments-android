@@ -20,6 +20,7 @@ userMessagingPlatform = "4.0.0"
 mapsCompose = "8.4.0"
 places = "5.3.0"
 kotlinxSerializationJson = "1.11.0"
+zxing = "3.5.3"
 mapboxMaps = "11.27.0"
 
 [libraries]
@@ -69,6 +70,7 @@ google-places = { module = "com.google.android.libraries.places:places", version
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 mapbox-maps = { module = "com.mapbox.maps:android-ndk27", version.ref = "mapboxMaps" }
 mapbox-maps-compose = { module = "com.mapbox.extension:maps-compose-ndk27", version.ref = "mapboxMaps" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

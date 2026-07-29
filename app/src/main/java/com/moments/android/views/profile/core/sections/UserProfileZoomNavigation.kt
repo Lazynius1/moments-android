@@ -23,7 +23,12 @@ import com.moments.android.views.shared.LocalMomentsSharedTransitionScope
 import com.moments.android.views.shared.MomentsSharedTransitionLayout
 import com.moments.android.views.shared.ProvideMomentsSharedAnimatedVisibilityScope
 
-/** Port de `UserProfileZoomNavigation.swift`. */
+/**
+ * Port de `UserProfileZoomNavigation.swift`.
+ *
+ * iOS: `matchedTransitionSource` + `.navigationTransition(.zoom)` + `Namespace.ID`.
+ * Android: Compose `SharedTransitionLayout` / `sharedBounds` vía [MomentsSharedTransitionLayout].
+ */
 object UserProfileZoomNavigation {
     fun sourceID(userId: String): String = "user-profile-$userId"
 }
@@ -33,7 +38,8 @@ fun userProfileZoomDestinationSourceID(userId: String): String = UserProfileZoom
 
 /**
  * ≡ `userProfileZoomSource` iOS (`matchedTransitionSource`).
- * Shared element vía Compose; sin [LocalMomentsSharedTransitionScope] solo aplica clip.
+ * Pareja con [userProfileZoomDestination] vía `sharedBounds` (no Dialog).
+ * Sin [LocalMomentsSharedTransitionScope] solo aplica clip.
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable

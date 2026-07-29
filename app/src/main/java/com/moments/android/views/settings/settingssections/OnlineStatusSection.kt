@@ -3,6 +3,7 @@ package com.moments.android.views.settings.settingssections
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,9 +12,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -28,113 +34,126 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.moments.android.R
 import com.moments.android.models.OnlineStatus
 import com.moments.android.services.messaging.OnlineStatusService
 
 /**
- * Mirror 1:1 de `OnlineStatusSection.swift`.
+ * Port de `OnlineStatusSection.swift`.
  */
 @Composable
 fun OnlineStatusSection(
-    onlineStatusService: OnlineStatusService = OnlineStatusService.shared
+    onlineStatusService: OnlineStatusService = OnlineStatusService.shared,
 ) {
     val isDark = isSystemInDarkTheme()
     val textColor = if (isDark) Color.White else Color.Black
-    val secondaryColor = if (isDark) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.5f)
-
     val currentStatus by onlineStatusService.currentUserStatus.collectAsState()
     var menuExpanded by remember { mutableStateOf(false) }
 
-    val statusLabel = when (currentStatus) {
-        OnlineStatus.ONLINE -> "En línea"
-        OnlineStatus.AWAY -> "Ausente"
-        OnlineStatus.BUSY -> "Ocupado"
-        OnlineStatus.INVISIBLE -> "Invisible"
-        OnlineStatus.OFFLINE -> "Desconectado"
-    }
-
-    val statusColor = when (currentStatus) {
-        OnlineStatus.ONLINE -> Color(0xFF34C759)
-        OnlineStatus.AWAY -> Color(0xFFFF9500)
-        OnlineStatus.BUSY -> Color(0xFFFF3B30)
-        OnlineStatus.INVISIBLE, OnlineStatus.OFFLINE -> Color(0xFF8E8E93)
-    }
+    val statusLabel = stringResource(currentStatus.displayNameRes())
+    val statusColor = Color(currentStatus.colorArgb)
 
     Row(
-        modifier = Modifier
+        Modifier
             .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 11.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
+        Icon(
+            imageVector = currentStatus.materialIcon(),
+            contentDescription = null,
+            tint = statusColor,
             modifier = Modifier
-                .size(12.dp)
-                .clip(CircleShape)
-                .background(statusColor)
+                .width(28.dp)
+                .size(19.dp),
         )
-
-        Spacer(modifier = Modifier.width(14.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(
-                text = "Estado de presencia",
+                stringResource(R.string.settings_online_status_title),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
-                color = textColor
+                color = textColor,
             )
             Text(
-                text = "Estado actual: $statusLabel",
+                stringResource(R.string.settings_online_status_current, statusLabel),
                 fontSize = 12.sp,
-                color = secondaryColor
+                color = Color.Gray,
             )
         }
 
         Box {
             Row(
-                modifier = Modifier
-                    .clip(CircleShape)
+                Modifier
+                    .clip(RoundedCornerShape(50))
                     .background(textColor.copy(alpha = 0.08f))
                     .clickable { menuExpanded = true }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = statusLabel,
+                    stringResource(R.string.settings_online_status_select),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
-                    color = textColor
+                    color = textColor,
                 )
                 Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "Expand",
+                    Icons.Filled.UnfoldMore,
+                    contentDescription = null,
                     tint = textColor,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(10.dp),
                 )
             }
 
             DropdownMenu(
                 expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false }
+                onDismissRequest = { menuExpanded = false },
             ) {
-                val options = listOf(
-                    OnlineStatus.ONLINE to "En línea",
-                    OnlineStatus.AWAY to "Ausente",
-                    OnlineStatus.BUSY to "Ocupado",
-                    OnlineStatus.INVISIBLE to "Invisible"
-                )
-                options.forEach { (status, label) ->
+                OnlineStatus.entries.forEach { status ->
                     DropdownMenuItem(
-                        text = { Text(label) },
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(
+                                    status.materialIcon(),
+                                    contentDescription = null,
+                                    tint = Color(status.colorArgb),
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Text(stringResource(status.displayNameRes()))
+                            }
+                        },
                         onClick = {
-                            onlineStatusService.setStatus(status)
+                            onlineStatusService.setGlobalStatus(status)
                             menuExpanded = false
-                        }
+                        },
                     )
                 }
             }
         }
     }
+}
+
+private fun OnlineStatus.displayNameRes(): Int = when (this) {
+    OnlineStatus.ONLINE -> R.string.online_status_online
+    OnlineStatus.AWAY -> R.string.online_status_away
+    OnlineStatus.BUSY -> R.string.online_status_busy
+    OnlineStatus.OFFLINE -> R.string.online_status_offline
+    OnlineStatus.INVISIBLE -> R.string.online_status_invisible
+}
+
+private fun OnlineStatus.materialIcon(): ImageVector = when (this) {
+    OnlineStatus.ONLINE -> Icons.Filled.Circle
+    OnlineStatus.AWAY -> Icons.Filled.NightsStay
+    OnlineStatus.BUSY -> Icons.Filled.Error
+    OnlineStatus.OFFLINE -> Icons.Filled.RadioButtonUnchecked
+    OnlineStatus.INVISIBLE -> Icons.Filled.VisibilityOff
 }

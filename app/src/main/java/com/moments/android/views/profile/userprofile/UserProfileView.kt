@@ -28,15 +28,16 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PersonPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.Moment
@@ -59,14 +61,23 @@ import com.moments.android.reportes.ReportBottomSheet
 import com.moments.android.reportes.ReportTarget
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.messaging.components.ChatRecoveryGateView
+import com.moments.android.views.messaging.core.Conversation
+import com.moments.android.views.messaging.core.MessagingViewModel
+import com.moments.android.views.messaging.core.PendingChatContext
+import com.moments.android.views.messaging.core.PendingChatContextFactory
+import com.moments.android.views.messaging.screens.chat.GlassmorphicChatView
 import com.moments.android.views.profile.core.SocialConnectionTab
 import com.moments.android.views.profile.core.SocialConnectionsRoute
 import com.moments.android.views.profile.core.SocialConnectionsScreen
-import com.moments.android.views.profile.core.sections.MomentZoomDestination
-import com.moments.android.views.profile.core.sections.MomentZoomDetailDestination
-import com.moments.android.views.profile.core.sections.MomentZoomOpener
-import com.moments.android.views.profile.core.sections.MomentZoomPresentationKind
+import com.moments.android.views.profile.core.sections.LocalProfileGridHeroCoordinator
+import com.moments.android.views.profile.core.sections.ProfileGridHeroDetailLayer
+import com.moments.android.views.profile.core.sections.ProfileGridHeroMenuKind
+import com.moments.android.views.profile.core.sections.ProfileGridHeroTransitionCoordinator
 import com.moments.android.views.profile.core.sections.ProfileHeaderSkeletonView
+import com.moments.android.views.profile.core.sections.ProfileMomentZoomDetailDestination
+import com.moments.android.views.profile.core.sections.ProfileMomentZoomDestination
+import com.moments.android.views.profile.core.sections.ProfileMomentZoomFeedKind
 import com.moments.android.views.profile.core.sections.ProfileMomentsGridSkeletonView
 import com.moments.android.views.profile.userprofile.sections.ProfileImageViewer
 import com.moments.android.views.profile.userprofile.sections.UserModernBackgroundView
@@ -77,25 +88,19 @@ import com.moments.android.views.profile.userprofile.sections.UserModernPublicPr
 import com.moments.android.views.profile.userprofile.sections.UserModernUnavailableProfileView
 import com.moments.android.views.profile.userprofile.sections.UserRelationshipManagementSheet
 import com.moments.android.views.settings.QRCodeView
+import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.OfflineBannerOverlay
 import com.moments.android.views.story.StoriesView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
- * Port de `UserProfileView.swift` — raíz del perfil de otro usuario: enruta entre los estados
- * (cargando / bloqueado por mí / no disponible / sin conexión / privado / público) y aloja las
- * hojas y diálogos (gestión de relación, confirmación de dejar de seguir, foto de perfil, historias,
- * QR, reporte).
+ * Port de `UserProfileView.swift` — raíz del perfil de otro usuario: enruta estados
+ * (cargando / bloqueado / no disponible / offline / privado / público) y hojas (relación,
+ * unfollow, foto, historias, QR, reporte, zoom, chat).
  *
- * Puentes conscientes respecto a iOS (documentados también en PORT_FILES.md):
- * - **Mensajería**: no existe `MessagingViewModel.startConversation` en Kotlin todavía, así que
- *   `onOpenMessage` de las secciones queda sin destino hasta que aterrice ese flujo.
- * - **Conexiones sociales**: `SocialConnectionsScreen` de Kotlin exige `ProfileViewModel` (perfil
- *   propio) y no acepta `UserProfileViewModel`; cablearlo exigiría modificar ese archivo, así que
- *   la ruta queda pendiente en vez de forzar una firma inventada.
- * - **Fondo**: iOS usa `EnhancedProfileBackground` con `ProfileTheme`; los temas de perfil están
- *   descartados en el proyecto, así que se usa `UserModernBackgroundView` (foto desenfocada).
- * - El coordinador `ProfileGridHeroTransitionCoordinator` se sustituye por el zoom ya portado
- *   (`MomentZoomOpener` + `MomentZoomDetailDestination`), que es la infraestructura equivalente.
+ * Puentes: fondo `UserModernBackgroundView` (temas 🚫).
+ * Hero grid ≡ iOS: [ProfileGridHeroTransitionCoordinator] + menú `.visitor`.
  */
 
 /** Port de `UserProfileColors` (UserProfileView.swift). */
@@ -293,6 +298,9 @@ fun UserProfileView(
     modifier: Modifier = Modifier,
 ) {
     val viewModel = remember(userId) { UserProfileViewModel(userId) }
+    val messagingViewModel = remember { MessagingViewModel() }
+    val heroCoordinator = remember { ProfileGridHeroTransitionCoordinator() }
+    val scope = rememberCoroutineScope()
     val insets = WindowInsets.systemBars.asPaddingValues()
     val safeAreaTop = insets.calculateTopPadding()
     val safeAreaBottom = insets.calculateBottomPadding()
@@ -304,9 +312,32 @@ fun UserProfileView(
     var showProfileImageFullscreen by remember { mutableStateOf(false) }
     var showingQrCode by remember { mutableStateOf(false) }
     var showingReport by remember { mutableStateOf(false) }
-    var momentZoomDestination by remember { mutableStateOf<MomentZoomDestination?>(null) }
+    var momentZoomDestination by remember { mutableStateOf<ProfileMomentZoomDestination?>(null) }
     var socialConnectionsRoute by remember { mutableStateOf<SocialConnectionsRoute?>(null) }
     var openedProfileId by remember { mutableStateOf<String?>(null) }
+    var targetConversation by remember { mutableStateOf<Conversation?>(null) }
+    var pendingChatContext by remember { mutableStateOf<PendingChatContext?>(null) }
+
+    val zoomFeedKind = if (selectedTab == UserProfileTabType.TAGGED) {
+        ProfileMomentZoomFeedKind.USER_PROFILE_TAGGED
+    } else {
+        ProfileMomentZoomFeedKind.USER_PROFILE_MOMENTS
+    }
+    val zoomMoments = if (selectedTab == UserProfileTabType.TAGGED) {
+        viewModel.taggedMoments
+    } else {
+        viewModel.moments
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { heroCoordinator.resetToIdle() }
+    }
+
+    LaunchedEffect(heroCoordinator) {
+        // ≡ iOS onAppear: openZoomDetail / clearZoomNavigation
+        heroCoordinator.openZoomDetail = { momentZoomDestination = it }
+        heroCoordinator.clearZoomNavigation = { momentZoomDestination = null }
+    }
 
     LaunchedEffect(userId) {
         viewModel.fetchProfile()
@@ -329,103 +360,137 @@ fun UserProfileView(
         }
     }
 
-    Box(modifier.fillMaxSize()) {
-        UserModernBackgroundView(
-            profileImagePath = viewModel.userProfile?.profileImagePath,
-            scrollOffset = 0f,
-        )
-
-        when {
-            viewModel.isLoading -> {
-                Column(Modifier.fillMaxSize().padding(top = safeAreaTop + 12.dp)) {
-                    ProfileHeaderSkeletonView()
-                    ProfileMomentsGridSkeletonView(Modifier.padding(top = 20.dp))
+    // Port de `openMessageFlow()` (HeaderSection / StateViews): conversación existente → chat;
+    // si `requiresMessageRequest` → `PendingChatContextFactory.outgoing` → chat en modo solicitud.
+    val openMessageFlow: () -> Unit = openMessage@{
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return@openMessage
+        val targetUser = viewModel.userProfile ?: return@openMessage
+        messagingViewModel.startConversation(targetUser, currentUserId) { conversation ->
+            if (conversation != null) {
+                targetConversation = conversation
+            } else if (messagingViewModel.requiresMessageRequest) {
+                scope.launch {
+                    pendingChatContext = PendingChatContextFactory.outgoing(
+                        user = targetUser,
+                        currentUserId = currentUserId,
+                        followersCountOverride = viewModel.followers.size,
+                        momentsCountOverride = viewModel.moments.size,
+                    )
                 }
-            }
-
-            viewModel.isBlockedByCurrentUser -> {
-                UserModernBlockedByMeProfileView(
-                    userProfile = viewModel.userProfile,
-                    safeAreaTop = safeAreaTop,
-                    safeAreaBottom = safeAreaBottom,
-                    onUnblock = { viewModel.unblockUser(userId) },
-                    onDismiss = onDismiss,
-                )
-            }
-
-            viewModel.isProfileUnavailable -> {
-                UserModernUnavailableProfileView(
-                    safeAreaTop = safeAreaTop,
-                    safeAreaBottom = safeAreaBottom,
-                    onDismiss = onDismiss,
-                )
-            }
-
-            viewModel.isOffline && viewModel.userProfile == null -> {
-                // Sin caché y sin red: honesto sobre el motivo, en vez de "privado"/"no disponible".
-                UserModernOfflineProfileView(
-                    safeAreaTop = safeAreaTop,
-                    safeAreaBottom = safeAreaBottom,
-                    onRetry = { viewModel.fetchProfile() },
-                    onDismiss = onDismiss,
-                )
-            }
-
-            !viewModel.canViewContent -> {
-                UserModernPrivateProfileView(
-                    userProfile = viewModel.userProfile,
-                    userId = userId,
-                    followButtonState = viewModel.followButtonState,
-                    safeAreaTop = safeAreaTop,
-                    safeAreaBottom = safeAreaBottom,
-                    onFollowAction = handleFollowAction,
-                    onDismiss = onDismiss,
-                    onOpenStories = { showingStories = true },
-                    onOpenMessage = { },
-                )
-            }
-
-            else -> {
-                UserModernPublicProfileView(
-                    viewModel = viewModel,
-                    selectedTab = selectedTab,
-                    onSelectTab = { selectedTab = it },
-                    safeAreaBottom = safeAreaBottom,
-                    onFollowAction = handleFollowAction,
-                    onDismiss = onDismiss,
-                    onOpenStories = { showingStories = true },
-                    onOpenMessage = { },
-                    onShowProfileImageFullscreen = { showProfileImageFullscreen = true },
-                    onShowQrCode = { showingQrCode = true },
-                    onShowReport = { showingReport = true },
-                    onOpenSocial = { tab -> socialConnectionsRoute = SocialConnectionsRoute(initialTab = tab) },
-                    onOpenMoment = { moments, index ->
-                        moments.getOrNull(index)?.let { moment ->
-                            MomentZoomOpener.open(
-                                moment = moment,
-                                moments = moments,
-                                initialIndex = index,
-                                presentation = MomentZoomPresentationKind.Single,
-                                setDestination = { momentZoomDestination = it },
-                            )
-                        }
-                    },
-                    onMomentLongPress = { _, _ -> },
-                )
             }
         }
     }
 
+    CompositionLocalProvider(LocalProfileGridHeroCoordinator provides heroCoordinator) {
+        Box(modifier.fillMaxSize()) {
+            UserModernBackgroundView(
+                profileImagePath = viewModel.userProfile?.profileImagePath,
+                scrollOffset = 0f,
+            )
+
+            when {
+                viewModel.isLoading -> {
+                    Column(Modifier.fillMaxSize().padding(top = safeAreaTop + 12.dp)) {
+                        ProfileHeaderSkeletonView()
+                        ProfileMomentsGridSkeletonView(Modifier.padding(top = 20.dp))
+                    }
+                }
+
+                viewModel.isBlockedByCurrentUser -> {
+                    UserModernBlockedByMeProfileView(
+                        userProfile = viewModel.userProfile,
+                        safeAreaTop = safeAreaTop,
+                        safeAreaBottom = safeAreaBottom,
+                        onUnblock = { viewModel.unblockUser(userId) },
+                        onDismiss = onDismiss,
+                    )
+                }
+
+                viewModel.isProfileUnavailable -> {
+                    UserModernUnavailableProfileView(
+                        safeAreaTop = safeAreaTop,
+                        safeAreaBottom = safeAreaBottom,
+                        onDismiss = onDismiss,
+                    )
+                }
+
+                viewModel.isOffline && viewModel.userProfile == null -> {
+                    // Sin caché y sin red: honesto sobre el motivo, en vez de "privado"/"no disponible".
+                    UserModernOfflineProfileView(
+                        safeAreaTop = safeAreaTop,
+                        safeAreaBottom = safeAreaBottom,
+                        onRetry = { viewModel.fetchProfile() },
+                        onDismiss = onDismiss,
+                    )
+                }
+
+                !viewModel.canViewContent -> {
+                    UserModernPrivateProfileView(
+                        userProfile = viewModel.userProfile,
+                        userId = userId,
+                        followButtonState = viewModel.followButtonState,
+                        safeAreaTop = safeAreaTop,
+                        safeAreaBottom = safeAreaBottom,
+                        onFollowAction = handleFollowAction,
+                        onDismiss = onDismiss,
+                        onOpenStories = { showingStories = true },
+                        onOpenMessage = openMessageFlow,
+                    )
+                }
+
+                else -> {
+                    UserModernPublicProfileView(
+                        viewModel = viewModel,
+                        selectedTab = selectedTab,
+                        onSelectTab = { selectedTab = it },
+                        safeAreaBottom = safeAreaBottom,
+                        onFollowAction = handleFollowAction,
+                        onDismiss = onDismiss,
+                        onOpenStories = { showingStories = true },
+                        onOpenMessage = openMessageFlow,
+                        onShowProfileImageFullscreen = { showProfileImageFullscreen = true },
+                        onShowQrCode = { showingQrCode = true },
+                        onShowReport = { showingReport = true },
+                        onOpenSocial = { tab -> socialConnectionsRoute = SocialConnectionsRoute(initialTab = tab) },
+                        onOpenMoment = { moments, index ->
+                            // ≡ iOS heroCoordinator.openDirectDetail
+                            heroCoordinator.openDirectDetail(moments, index, zoomFeedKind)
+                        },
+                        onMomentLongPress = { moment, index ->
+                            // ≡ iOS openVisitorGridMenu → openMenu(kind: .visitor)
+                            heroCoordinator.openMenu(moment, index, ProfileGridHeroMenuKind.VISITOR)
+                        },
+                    )
+                }
+            }
+
+            // ≡ ProfileGridHeroDetailLayer (flying hero + menú visitor)
+            ProfileGridHeroDetailLayer(
+                coordinator = heroCoordinator,
+                moments = zoomMoments,
+                zoomFeedKind = zoomFeedKind,
+            )
+
+            // ≡ iOS `.offlineBannerOverlay()`
+            OfflineBannerOverlay(Modifier.align(Alignment.TopCenter))
+        }
+    }
+
     momentZoomDestination?.let { destination ->
-        val pool: List<Moment> = if (selectedTab == UserProfileTabType.TAGGED) viewModel.taggedMoments else viewModel.moments
         Dialog(
-            onDismissRequest = { momentZoomDestination = null },
+            onDismissRequest = {
+                momentZoomDestination = null
+                heroCoordinator.clearZoomNavigation?.invoke()
+            },
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
-            MomentZoomDetailDestination(
+            ProfileMomentZoomDetailDestination(
                 destination = destination,
-                moments = MomentZoomOpener.resolvedMoments(destination, pool),
-                onDismiss = { momentZoomDestination = null },
+                moments = zoomMoments,
+                onDismiss = {
+                    momentZoomDestination = null
+                    heroCoordinator.dismissDetail()
+                },
             )
         }
     }
@@ -453,6 +518,7 @@ fun UserProfileView(
                 visitTimestamps = emptyMap(),
                 listViewModel = viewModel,
                 connectionVisibility = viewModel.visibleConnectionTypes,
+                viewerInterests = viewModel.viewerProfile?.interests.orEmpty(),
                 onDismiss = { socialConnectionsRoute = null },
                 onOpenProfile = { openedProfileId = it },
                 onOpenStories = { },
@@ -473,13 +539,14 @@ fun UserProfileView(
     }
 
     if (showingRelationshipSheet) {
-        ModalBottomSheet(
+        MomentsModalSheet(
             onDismissRequest = { showingRelationshipSheet = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+            largeOnly = false,
         ) {
             UserRelationshipManagementSheet(
                 username = viewModel.userProfile?.username ?: stringResource(R.string.user_profile_user),
                 profileImagePath = viewModel.userProfile?.profileImagePath,
+                userId = viewModel.userId,
                 isBestFriend = viewModel.isInBestFriends,
                 isMuted = viewModel.isMutedByCurrentUser,
                 isMutual = viewModel.isMutualRelationship,
@@ -567,5 +634,37 @@ fun UserProfileView(
             target = ReportTarget.UserTarget(userId = userId, username = viewModel.userProfile?.username),
             onDismiss = { showingReport = false },
         )
+    }
+
+    // Port de `.navigationDestination(isPresented: $navigateToChat)`.
+    targetConversation?.let { conversation ->
+        Dialog(
+            onDismissRequest = { targetConversation = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            ChatRecoveryGateView(onCancel = { targetConversation = null }) {
+                GlassmorphicChatView(
+                    conversation = conversation,
+                    onBack = { targetConversation = null },
+                )
+            }
+        }
+    }
+
+    // Port de `.navigationDestination(item: $pendingChatContext)`.
+    pendingChatContext?.let { context ->
+        val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        Dialog(
+            onDismissRequest = { pendingChatContext = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            GlassmorphicChatView(
+                conversation = context.syntheticConversation(uid),
+                pendingChatContext = context,
+                onBack = { pendingChatContext = null },
+                onPendingChatAccepted = { pendingChatContext = null },
+                onPendingChatDismissed = { pendingChatContext = null },
+            )
+        }
     }
 }

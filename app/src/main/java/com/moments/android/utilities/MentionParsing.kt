@@ -60,8 +60,13 @@ object MentionParsing {
     fun detectActiveToken(text: String): MentionDraftToken? {
         if (text.isEmpty()) return null
 
-        val tokenStart = text.lastIndexOfAny(charArrayOf(' ', '\n', '\t')).let { idx ->
-            if (idx < 0) 0 else idx + 1
+        // ≡ iOS `lastIndex(where: { $0.isWhitespace })` (Unicode whitespace)
+        var tokenStart = 0
+        for (i in text.indices.reversed()) {
+            if (text[i].isWhitespace()) {
+                tokenStart = i + 1
+                break
+            }
         }
         val token = text.substring(tokenStart)
         if (!token.startsWith("@") || token.length <= 1) return null

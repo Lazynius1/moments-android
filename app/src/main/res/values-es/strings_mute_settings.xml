@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MuteSettingsView — iOS Localizable muteSettings.* (es) -->
+<resources>
+    <string name="mute_settings_navigation_title">Silenciar</string>
+    <string name="mute_settings_loading">Cargando configuración...</string>
+    <string name="mute_settings_muted_accounts_title">Cuentas silenciadas</string>
+    <string name="mute_settings_muted_accounts_description">No verás publicaciones ni historias de estas cuentas</string>
+    <string name="mute_settings_no_muted_users">No has silenciado a nadie</string>
+    <string name="mute_settings_muted_words_title">Palabras y frases silenciadas</string>
+    <string name="mute_settings_muted_words_description">No verás contenido que contenga estas palabras</string>
+    <string name="mute_settings_no_muted_words">No has silenciado palabras</string>
+    <string name="mute_settings_configuration_title">Configuración de silenciado</string>
+    <string name="mute_settings_notifications_title">Silenciar notificaciones</string>
+    <string name="mute_settings_notifications_description">No recibir notificaciones de cuentas silenciadas</string>
+    <string name="mute_settings_hide_from_search_title">Ocultar de búsquedas</string>
+    <string name="mute_settings_hide_from_search_description">Las cuentas silenciadas no aparecerán en búsquedas</string>
+    <string name="mute_settings_additional_options">Opciones adicionales</string>
+    <string name="mute_settings_no_users_found">No se encontraron usuarios</string>
+    <string name="mute_settings_add_word_title">Añadir palabra o frase</string>
+    <string name="mute_settings_add_word_description">No verás contenido que contenga esta palabra o frase</string>
+    <string name="mute_settings_add">Añadir</string>
+    <string name="mute_settings_activate">Activar</string>
+    <string name="mute_settings_cancel">Cancelar</string>
+    <string name="mute_settings_remove">Quitar</string>
+    <string name="mute_settings_mute_user_title">Silenciar Usuario</string>
+    <string name="mute_settings_muted_word_title">Palabra Silenciada</string>
+    <string name="mute_settings_searching">Buscando...</string>
+    <string name="mute_settings_text_field_placeholder">Escribe una palabra o frase...</string>
+    <string name="mute_settings_alert_activate_user_title">¿Activar usuario?</string>
+    <string name="mute_settings_alert_activate_user_message">Volverás a ver el contenido de %1$s</string>
+    <string name="mute_settings_alert_remove_word_title">¿Quitar palabra silenciada?</string>
+    <string name="mute_settings_alert_remove_word_message">Volverás a ver contenido que contenga \'%1$s\'</string>
+    <string name="mute_settings_search_placeholder">Buscar usuarios...</string>
+</resources>

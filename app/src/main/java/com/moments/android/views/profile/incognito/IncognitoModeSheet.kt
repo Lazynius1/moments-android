@@ -62,12 +62,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.moments.android.R
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.incognito.IncognitoModeService
 import com.moments.android.services.incognito.IncognitoModeService.LastErrorState
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.feed.rememberAdaptiveColors
+import androidx.compose.ui.unit.sp
 
 private const val ONBOARDING_PREFS = "incognito_prefs"
 private const val ONBOARDING_SEEN_KEY = "incognito_has_seen_inline_onboarding"
@@ -221,12 +223,12 @@ fun IncognitoModeSheet(modifier: Modifier = Modifier) {
                 }
             }
 
-            // Acción principal
+            // Acción principal ≡ momentsChromeGlass Capsule iOS
             Row(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(50))
-                    .background(colors.primary.copy(alpha = if (primaryActionEnabled) 0.08f else 0.04f))
+                    .momentsChromeGlass(RoundedCornerShape(50), interactive = primaryActionEnabled)
                     .clickable(enabled = primaryActionEnabled) {
                         when {
                             isActive -> IncognitoModeService.pause()
@@ -361,7 +363,7 @@ fun IncognitoModeSheet(modifier: Modifier = Modifier) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(50))
-                            .background(colors.primary.copy(alpha = 0.08f))
+                            .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
                             .clickable {
                                 prefs.edit().putBoolean(ONBOARDING_SEEN_KEY, true).apply()
                                 hasSeenOnboarding = true

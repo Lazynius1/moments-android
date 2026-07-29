@@ -102,9 +102,17 @@ fun LoginScreen(onAuthenticated: () -> Unit) {
             // Cancelar aquí deja una sesión de Firebase sin perfil: hay que cerrarla
             // para no volver a caer en el estado fantasma.
             AuthScreen.SocialOnboarding -> OnboardingScreen(
+                // ≡ iOS `cancelOnboardingRegistration(deleteIncompleteAccount: true)`:
+                // cerrar sesión a secas dejaría la cuenta de Firebase Auth sin perfil,
+                // que es justo el estado fantasma que este flujo evita. Aquí se borra.
                 onBack = {
-                    com.moments.android.services.auth.AuthService.logout()
-                    screen = AuthScreen.Welcome
+                    scope.launch {
+                        runCatching {
+                            com.moments.android.services.auth.AuthService
+                                .cancelOnboardingRegistration(deleteIncompleteAccount = true)
+                        }
+                        screen = AuthScreen.Welcome
+                    }
                 },
                 onAuthenticated = onAuthenticated,
                 uiContext = OnboardingUiContext.SOCIAL,

@@ -93,6 +93,10 @@ data class FeedMoment(
     val imagePath: String? = null,
     /** Paridad iOS `Moment.videoDuration` — LiveVideoTimeLabel fallback. */
     val videoDuration: Double? = null,
+    /** Paridad iOS `Moment.taggedUsers` — EditMomentView. */
+    val taggedUsers: List<String> = emptyList(),
+    /** Paridad iOS `Moment.isModerationHidden` — lock audiencia. */
+    val isModerationHidden: Boolean = false,
 ) {
     /** Paridad iOS `Moment.visibleMediaItems`. */
     val visibleMediaItems: List<FeedMediaItem>

@@ -2,6 +2,7 @@ package com.moments.android.views.comments
 
 import com.moments.android.models.AppUser
 import com.moments.android.models.CommentMentionEntity
+import com.moments.android.services.persistence.SearchNormalization
 import com.moments.android.utilities.MentionDraftToken
 import com.moments.android.utilities.MentionParsing
 
@@ -42,7 +43,7 @@ internal object CommentMentionDraft {
         for (mention in mentions) {
             if (mention.userId in seen) continue
             val needle = "@${mention.username}"
-            val idx = text.indexOf(needle, ignoreCase = true)
+            val idx = SearchNormalization.indexOfDiacriticInsensitive(text, needle)
             if (idx < 0) continue
             seen.add(mention.userId)
             out += CommentMentionEntity(
@@ -53,5 +54,25 @@ internal object CommentMentionDraft {
             )
         }
         return out
+    }
+
+    /**
+     * ≡ iOS `mentionRanges(in:)` — entities con diacríticos, fallback regex `@(\w+)`.
+     * (No usa lookbehind de emails; es el matcher de comentarios, no el global de captions.)
+     */
+    fun mentionRanges(
+        text: String,
+        mentions: List<CommentMentionEntity>,
+    ): List<Triple<Int, Int, String?>> {
+        if (mentions.isNotEmpty()) {
+            return mentions.mapNotNull { mention ->
+                val needle = "@${mention.username}"
+                val idx = SearchNormalization.indexOfDiacriticInsensitive(text, needle)
+                if (idx < 0) null else Triple(idx, idx + needle.length, mention.userId)
+            }.sortedBy { it.first }
+        }
+        return Regex("""@(\w+)""").findAll(text).map { match ->
+            Triple(match.range.first, match.range.last + 1, null as String?)
+        }.toList()
     }
 }

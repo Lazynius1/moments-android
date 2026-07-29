@@ -7,8 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.tasks.await
-import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.moments.android.MomentsApplication
 import com.moments.android.models.AppUser
 import com.moments.android.models.CustomAudienceList
@@ -37,15 +36,16 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import java.io.IOException
+import java.util.Date
 
 /**
  * Port de `UserProfileViewModel.swift` — perfil de otro usuario visto desde Feed/Explore.
  *
  * Traducción de patrones: `DispatchGroup` → `coroutineScope { async {} }`; callbacks de servicio →
- * `suspend fun`. Puentes conscientes respecto a iOS: (1) sin el observer de `NotificationCenter`
- * (FollowStateStore no expone flujo aquí; se reconcilia en cada acción); (2) las hápticas son de la
- * capa de UI, no del VM; (3) `checkIfBestFriend`/`canUserViewMomentEnhanced` se cubren con
- * primitivas ya existentes (bestFriends del viewer / `fetchMomentsWithVisibility`).
+ * `suspend fun`. Hápticas en la capa de UI (no en el VM). Fallback de moments =
+ * `fetchMomentsWithVisibility` (≡ `filterMomentsForAudience` en iOS).
  */
 class UserProfileViewModel(
     val userId: String,
@@ -95,6 +95,7 @@ class UserProfileViewModel(
     private var targetVisibleFollowerIds: Set<String> = emptySet()
     private var lastSuggestionsSignature: String? = null
     private val recentUnfollows = mutableSetOf<String>()
+    private val lastUnfollowTime = mutableMapOf<String, Date>()
 
     private val currentUserId: String? get() = FirebaseAuth.getInstance().currentUser?.uid
     private val db get() = firestoreService.db
@@ -104,6 +105,27 @@ class UserProfileViewModel(
 
     private val prefs
         get() = MomentsApplication.instance?.getSharedPreferences("user_profile_vm", Context.MODE_PRIVATE)
+
+    // ≡ NotificationCenter observer de FollowStateStore.didChangeNotification (iOS).
+    private val followStateListener: (String, FollowButtonState) -> Unit = { changedUserId, state ->
+        // Sin `return@` aquí: una lambda asignada a una propiedad no tiene etiqueta
+        // implícita (solo la tienen las que se pasan a una función).
+        if (changedUserId == userId) {
+            viewModelScope.launch {
+                followButtonState = state
+                isFollowing = state == FollowButtonState.FOLLOWING
+            }
+        }
+    }
+
+    init {
+        FollowStateStore.addListener(followStateListener)
+    }
+
+    override fun onCleared() {
+        FollowStateStore.removeListener(followStateListener)
+        super.onCleared()
+    }
 
     // MARK: - Carga principal
 
@@ -161,12 +183,37 @@ class UserProfileViewModel(
                     refreshMutedUserIds()
                     checkContentVisibility(current)
                 }
-                .onFailure {
-                    // Sin red: mantener lo cacheado, no marcar como privado/no disponible.
-                    isOffline = true
+                .onFailure { error ->
+                    when {
+                        isUnavailableProfileError(error) -> {
+                            userProfile = null
+                            canViewContent = false
+                            isProfileUnavailable = true
+                        }
+                        isNetworkError(error) -> {
+                            // Sin red: mantener lo cacheado, no marcar como privado/no disponible.
+                            isOffline = true
+                        }
+                    }
                     isLoading = false
                 }
         }
+    }
+
+    /** ≡ `isUnavailableProfileError` — doc ausente (`Document not found`). */
+    private fun isUnavailableProfileError(error: Throwable): Boolean {
+        val message = error.message.orEmpty()
+        return message == "Document not found" || message.contains("User not found")
+    }
+
+    /** ≡ `isNetworkError` — URL/IO o Firestore UNAVAILABLE / DEADLINE_EXCEEDED. */
+    private fun isNetworkError(error: Throwable): Boolean {
+        if (error is IOException || error.cause is IOException) return true
+        val firestore = error as? FirebaseFirestoreException
+            ?: error.cause as? FirebaseFirestoreException
+            ?: return false
+        return firestore.code == FirebaseFirestoreException.Code.UNAVAILABLE ||
+            firestore.code == FirebaseFirestoreException.Code.DEADLINE_EXCEEDED
     }
 
     // MARK: - Refresh
@@ -177,18 +224,24 @@ class UserProfileViewModel(
         isRefreshing = true
         viewModelScope.launch {
             delay(500) // deja a Firestore procesar cambios recientes
-            coroutineScope {
-                val profileJob = async { runCatching { firestoreService.fetchUser(userId) }.getOrNull() }
-                checkConnectionsVisibility(current)
-                fetchConnectionsDirect()
-                val momentsJob = async { fetchMoments() }
-                val taggedJob = async { fetchTaggedMoments() }
-                profileJob.await()?.let { userProfile = it }
-                momentsJob.await()
-                taggedJob.await()
-            }
-            isRefreshing = false
+            performRefresh(current)
         }
+    }
+
+    /** ≡ `performRefresh` — perfil + permisos + conexiones + moments + tagged en paralelo. */
+    private suspend fun performRefresh(current: String) {
+        coroutineScope {
+            val profileJob = async { runCatching { firestoreService.fetchUser(userId) }.getOrNull() }
+            checkConnectionsVisibility(current)
+            val connectionsJob = async { fetchConnectionsDirect() }
+            val momentsJob = async { fetchMoments() }
+            val taggedJob = async { fetchTaggedMoments() }
+            profileJob.await()?.let { userProfile = it }
+            connectionsJob.await()
+            momentsJob.await()
+            taggedJob.await()
+        }
+        isRefreshing = false
     }
 
     // MARK: - Visibilidad
@@ -390,7 +443,7 @@ class UserProfileViewModel(
         if (current == userId) return
         viewModelScope.launch {
             isInBestFriends = runCatching {
-                bestFriendsService.fetchBestFriends(current).any { it.id == userId }
+                PrivacyService.checkIfBestFriend(current, userId)
             }.getOrDefault(false)
 
             isMutedByCurrentUser = runCatching { firestoreService.fetchMutedUserIds(current).contains(userId) }
@@ -455,9 +508,17 @@ class UserProfileViewModel(
         val shouldMute = !isMutedByCurrentUser
         viewModelScope.launch {
             val ok = runCatching {
-                val field = if (shouldMute) FieldValue.arrayUnion(userId) else FieldValue.arrayRemove(userId)
+                val snap = db.collection("users").document(current).get().await()
+                @Suppress("UNCHECKED_CAST")
+                val muteSettings = (snap.data?.get("muteSettings") as? Map<String, Any?>)?.toMutableMap()
+                    ?: mutableMapOf()
+                @Suppress("UNCHECKED_CAST")
+                val mutedUsers = ((muteSettings["mutedUsers"] as? List<*>)?.mapNotNull { it as? String }
+                    ?.filter { it.isNotEmpty() } ?: emptyList()).toMutableSet()
+                if (shouldMute) mutedUsers.add(userId) else mutedUsers.remove(userId)
+                muteSettings["mutedUsers"] = mutedUsers.toList()
                 db.collection("users").document(current)
-                    .update("muteSettings.mutedUsers", field).await()
+                    .update("muteSettings", muteSettings).await()
             }.isSuccess
             isUpdatingMute = false
             if (ok) isMutedByCurrentUser = shouldMute
@@ -481,6 +542,7 @@ class UserProfileViewModel(
     override fun followUser(targetId: String) {
         val current = currentUserId ?: return
         recentUnfollows.remove(targetId)
+        lastUnfollowTime.remove(targetId)
         viewModelScope.launch {
             if (targetId == userId) {
                 val profile = userProfile
@@ -553,9 +615,11 @@ class UserProfileViewModel(
     override fun unfollowUser(targetId: String) {
         val current = currentUserId ?: return
         recentUnfollows.add(targetId)
+        lastUnfollowTime[targetId] = Date()
         viewModelScope.launch {
             if (!runCatching { firestoreService.unfollowUser(current, targetId) }.isSuccess) {
                 recentUnfollows.remove(targetId)
+                lastUnfollowTime.remove(targetId)
                 return@launch
             }
             val nextState = if (targetId == userId) {
@@ -578,7 +642,8 @@ class UserProfileViewModel(
     }
 
     override fun relationshipState(targetId: String): FollowButtonState {
-        // Versión no-suspend para pintar: usa lo conocido (following/mutuals) sin ir a red.
+        FollowStateStore.state(targetId)?.let { return it }
+
         val current = currentUserId
         if (current == targetId) return FollowButtonState.OWN_PROFILE
         if (following.any { it.id == targetId } || mutuals.any { it.id == targetId }) return FollowButtonState.FOLLOWING

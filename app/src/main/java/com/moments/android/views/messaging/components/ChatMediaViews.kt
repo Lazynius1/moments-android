@@ -27,11 +27,8 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,7 +41,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -54,20 +50,14 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
-import com.moments.android.services.video.GlobalVideoManager
+import com.moments.android.views.shared.MomentsVideoGravity
 import com.moments.android.views.shared.MomentsVideoPlaybackTimeline
+import com.moments.android.views.shared.MomentsVideoPlayer
 import kotlin.math.max
 import kotlin.math.roundToInt
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 
 /**
  * Port de `Views/Messaging/Components/ChatMediaViews.swift`.
@@ -354,41 +344,12 @@ fun NormalVideoPlayerView(
     modifier: Modifier = Modifier,
     @Suppress("UNUSED_PARAMETER") thumbnailUrl: String? = null,
 ) {
-    val context = LocalContext.current
     var isPaused by remember { mutableStateOf(false) }
     var isMuted by remember { mutableStateOf(false) }
-    var currentMs by remember { mutableLongStateOf(0L) }
-    var durationMs by remember { mutableLongStateOf(0L) }
+    var currentTime by remember { mutableStateOf(0.0) }
+    var duration by remember { mutableStateOf(0.0) }
+    var externalSeekTime by remember { mutableStateOf<Double?>(null) }
     var dragOffsetPx by remember { mutableFloatStateOf(0f) }
-    val player = remember(videoUrl) {
-        ExoPlayer.Builder(context).build().apply {
-            repeatMode = Player.REPEAT_MODE_ONE
-            videoUrl?.takeIf { it.isNotBlank() }?.let {
-                setMediaItem(MediaItem.fromUri(it))
-                prepare()
-                playWhenReady = true
-            }
-        }
-    }
-
-    DisposableEffect(player) {
-        GlobalVideoManager.pauseAllVideos()
-        onDispose { player.release() }
-    }
-
-    LaunchedEffect(isPaused) {
-        player.playWhenReady = !isPaused
-    }
-    LaunchedEffect(isMuted) {
-        player.volume = if (isMuted) 0f else 1f
-    }
-    LaunchedEffect(player) {
-        while (isActive) {
-            if (!isPaused) currentMs = player.currentPosition.coerceAtLeast(0L)
-            durationMs = player.duration.coerceAtLeast(0L)
-            delay(100)
-        }
-    }
 
     Box(
         modifier
@@ -419,16 +380,22 @@ fun NormalVideoPlayerView(
                 )
             },
     ) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    useController = false
-                    this.player = player
-                }
-            },
-            update = { it.player = player },
-            modifier = Modifier.fillMaxSize(),
-        )
+        if (!videoUrl.isNullOrBlank()) {
+            MomentsVideoPlayer(
+                url = videoUrl,
+                isLooping = true,
+                isPaused = isPaused,
+                isMuted = isMuted,
+                prioritizeSmoothPlayback = true,
+                videoGravity = MomentsVideoGravity.RESIZE_ASPECT_FILL,
+                onDurationReceived = { duration = maxOf(it, 0.0) },
+                onProgressUpdate = { if (!isPaused) currentTime = maxOf(it, 0.0) },
+                onVideoFinished = {},
+                externalSeekTime = externalSeekTime,
+                onExternalSeekConsumed = { externalSeekTime = null },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         Column(Modifier.fillMaxSize().padding(horizontal = 30.dp)) {
             Row(
                 Modifier.fillMaxWidth().padding(top = 20.dp),
@@ -478,13 +445,12 @@ fun NormalVideoPlayerView(
             }
             Spacer(Modifier.weight(1f))
             MomentsVideoPlaybackTimeline(
-                currentTime = currentMs / 1000.0,
-                duration = durationMs / 1000.0,
+                currentTime = currentTime,
+                duration = duration,
                 horizontalPadding = 0.dp,
                 onSeek = { target ->
-                    val ms = (target * 1000).toLong()
-                    player.seekTo(ms)
-                    currentMs = ms
+                    currentTime = target
+                    externalSeekTime = target
                 },
                 modifier = Modifier.padding(bottom = 26.dp),
             )

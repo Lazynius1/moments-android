@@ -3,6 +3,7 @@ package com.moments.android.views.profile.userprofile.sections
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.moments.android.models.Moment
 import com.moments.android.views.profile.core.sections.ModernMomentThumbnail
 import com.moments.android.views.profile.core.sections.ProfileBentoTileAssigner
@@ -12,12 +13,12 @@ import com.moments.android.views.profile.core.sections.ProfileMomentsGridMetrics
 /**
  * Port de `UserProfileMomentsSection.swift`.
  *
- * `UserModernMomentThumbnail` de iOS es funcionalmente idéntico a `ModernMomentThumbnail` (ya portado
- * para el perfil propio): misma maquinaria de media/crop/chrome/gestos. Para respetar la regla de
- * NO reinventar infraestructura, aquí se delega en él fijando el estilo de visitante (sin badge de
- * audiencia). Se conserva la firma con `zoomNamespace`/`onTap`/`onLongPress`/`descriptor` de la struct
- * de iOS. Los helpers de altura de grid (`calculateBentoGridHeight`/`calculateTaggedGridHeight`)
- * ganan un parámetro `availableWidth` porque en Android la altura del bento depende del ancho de celda.
+ * `UserModernMomentThumbnail` en iOS es la variante visitante de `ModernMomentThumbnail`
+ * (perfil propio): misma media/crop/chrome/gestos, **sin** badge de audiencia. No se duplica
+ * la maquinaria; se delega con `showsAudienceBadge = false`.
+ *
+ * Helpers de altura: iOS usa `defaultAvailableWidth` (≈393) si no hay ancho; aquí el default
+ * es el mismo fallback.
  */
 @Composable
 fun UserModernMomentThumbnail(
@@ -44,14 +45,20 @@ fun UserModernMomentThumbnail(
     )
 }
 
-/** Port de `calculateBentoGridHeight(moments:)`. */
-fun calculateBentoGridHeight(moments: List<Moment>, availableWidth: Dp): Dp {
+/** Port de `calculateBentoGridHeight(moments:)` — `ProfileBentoTileAssigner.assign`. */
+fun calculateBentoGridHeight(
+    moments: List<Moment>,
+    availableWidth: Dp = ProfileMomentsGridMetrics.defaultAvailableWidth,
+): Dp {
     val descriptors = ProfileBentoTileAssigner.assign(moments)
     return ProfileMomentsGridMetrics.bentoHeight(descriptors.map { it.layoutKind }, availableWidth)
 }
 
-/** Port de `calculateTaggedGridHeight(moments:)`. */
-fun calculateTaggedGridHeight(moments: List<Moment>, availableWidth: Dp): Dp {
+/** Port de `calculateTaggedGridHeight(moments:)` — `ProfileBentoTileAssigner.simple`. */
+fun calculateTaggedGridHeight(
+    moments: List<Moment>,
+    availableWidth: Dp = ProfileMomentsGridMetrics.defaultAvailableWidth,
+): Dp {
     val descriptors = ProfileBentoTileAssigner.simple(moments)
     return ProfileMomentsGridMetrics.bentoHeight(descriptors.map { it.layoutKind }, availableWidth)
 }

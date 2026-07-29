@@ -36,8 +36,8 @@ import com.moments.android.views.feed.core.sections.FeedMomentDetailRoute
 import com.moments.android.views.feed.maps.LocationMapView
 import com.moments.android.views.explore.ExploreView
 import com.moments.android.views.messaging.screens.MessagingView
+import com.moments.android.views.profile.core.sections.UserProfileZoomNavigationHost
 import com.moments.android.views.profile.momentsview.EditMomentView
-import com.moments.android.views.profile.userprofile.UserProfileView
 import com.moments.android.views.story.StoriesView
 
 /**
@@ -45,8 +45,7 @@ import com.moments.android.views.story.StoriesView
  *
  * Presenta las destinations del feed encima del [content] (paridad sheets /
  * navigationDestination / fullScreenCover / alert de iOS).
- * Explore + EditMoment + Comments + EchoHistory + Stories + Messaging + Profile sheet reales.
- * Placeholders residuales: ninguno del contrato FeedPresentations.
+ * Perfil: [UserProfileZoomNavigationHost] (SharedTransition, no Dialog).
  */
 @Composable
 fun FeedPresentations(
@@ -101,7 +100,13 @@ fun FeedPresentations(
         if (selectedProfileRoute == null) onSelectedUserIdChange("")
     }
 
-    Box(Modifier.fillMaxSize()) {
+    // ≡ userProfileNavigationDestination(item:namespace:) — SharedTransition in-tree
+    UserProfileZoomNavigationHost(
+        profileRoute = selectedProfileRoute,
+        onProfileRouteChange = onSelectedProfileRouteChange,
+        modifier = Modifier.fillMaxSize(),
+    ) { _ ->
+        Box(Modifier.fillMaxSize()) {
         content()
 
         // navigationDestination → NotificationsView
@@ -301,21 +306,6 @@ fun FeedPresentations(
             )
         }
 
-        // userProfileNavigationDestination
-        selectedProfileRoute?.let { route ->
-            Dialog(
-                onDismissRequest = { onSelectedProfileRouteChange(null) },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
-            ) {
-                Surface(Modifier.fillMaxSize()) {
-                    UserProfileView(
-                        userId = route.userId,
-                        onDismiss = { onSelectedProfileRouteChange(null) },
-                    )
-                }
-            }
-        }
-
         // sheet → EchoHistoryView (paridad iOS)
         if (showEchoHistory) {
             Dialog(
@@ -328,6 +318,7 @@ fun FeedPresentations(
             }
         }
     }
+    } // UserProfileZoomNavigationHost
 }
 
 /** Payload espejo de `EditMomentPayload` iOS (EditMomentView.swift). */

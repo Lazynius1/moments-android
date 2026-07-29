@@ -609,6 +609,8 @@
     <string name="audience_custom">Personnalisé</string>
     <string name="audience_custom_list">Liste personnalisée</string>
     <string name="audience_only_me">Moi uniquement</string>
+    <string name="edit_moment_tags_loading">Chargement de l\'image…</string>
+    <string name="edit_moment_tags_unavailable">Impossible d\'ouvrir l\'éditeur d\'identifications.</string>
     <string name="edit_moment_tags_pending">Sélecteur de tags pas encore disponible</string>
 
 
@@ -717,6 +719,9 @@
     <string name="profile_header_notifications">Notifications</string>
     <string name="profile_header_more">Plus d’options</string>
     <string name="profile_header_qr">QR</string>
+    <string name="user_profile_send_message">Envoyer le message</string>
+    <string name="user_profile_interests">Centres d\'intérêt</string>
+    <string name="qr_code_share">Partager le code QR</string>
     <string name="profile_header_incognito">Mode navigation privée</string>
     <string name="profile_header_settings">Réglages</string>
     <string name="profile_header_edit">Modifier le profil</string>
@@ -1264,6 +1269,19 @@
     <string name="social_connections_suggested">Suggested for you</string>
     <string name="user_list_no_results_description">Essayez une autre recherche.</string>
     <string name="user_list_frequent_visits">Visites fréquentes</string>
+
+    <string name="user_list_empty_hidden_followers_title">Abonnés masqués</string>
+    <string name="user_list_empty_hidden_followers_description">Cet utilisateur a choisi de masquer sa liste d\'abonnés.</string>
+    <string name="user_list_empty_hidden_following_title">Abonnements masqués</string>
+    <string name="user_list_empty_hidden_following_description">Cet utilisateur a choisi de masquer ses abonnements.</string>
+    <string name="user_list_empty_visitor_followers_title">Aucun abonné</string>
+    <string name="user_list_empty_visitor_followers_description">Cet utilisateur n\'a pas encore d\'abonnés.</string>
+    <string name="user_list_empty_visitor_following_title">Ne suit personne</string>
+    <string name="user_list_empty_visitor_following_description">Cet utilisateur ne suit encore personne.</string>
+    <string name="user_list_empty_visitor_mutuals_title">Aucune connexion commune</string>
+    <string name="user_list_empty_visitor_mutuals_description">Vous n\'avez pas encore de connexions communes avec cet utilisateur.</string>
+    <string name="user_list_empty_title">Aucun %1$s</string>
+    <string name="user_list_empty_description">Quand vous aurez des %1$s, ils apparaîtront ici</string>
     <string name="profile_crop_move_scale">Déplacer et redimensionner</string>
     <string name="profile_editor_select_album">Choisir un album</string>
     <string name="profile_editor_album_count">%1$d photos</string>

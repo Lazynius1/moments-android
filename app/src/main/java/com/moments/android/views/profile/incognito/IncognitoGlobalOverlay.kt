@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.moments.android.R
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.incognito.IncognitoModeService
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.legacyPoppinsSize
@@ -117,13 +118,13 @@ fun IncognitoGlobalOverlay(modifier: Modifier = Modifier) {
                 .padding(top = 38.dp, start = 16.dp, end = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Píldora compacta
+            // Píldora compacta ≡ momentsChromeGlass Capsule iOS
             Row(
                 Modifier
                     .width(108.dp)
                     .height(40.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(colors.surfaceBackground.copy(alpha = 0.92f))
+                    .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
                     .clickable {
                         HapticManager.shared.selection()
                         isExpanded = !isExpanded
@@ -177,7 +178,7 @@ fun IncognitoGlobalOverlay(modifier: Modifier = Modifier) {
                         Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(50))
-                            .background(colors.primary.copy(alpha = if (isSyncing) 0.04f else 0.08f))
+                            .momentsChromeGlass(RoundedCornerShape(50), interactive = !isSyncing)
                             .clickable(enabled = !isSyncing) {
                                 HapticManager.shared.mediumImpact()
                                 IncognitoModeService.pause()

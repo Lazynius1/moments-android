@@ -1,11 +1,15 @@
 package com.moments.android.views.profile.highlights
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -17,14 +21,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
@@ -39,8 +46,10 @@ import com.moments.android.views.story.StoriesView
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
-/** Port de `HighlightViewer`: resuelve las historias del destacado y las reproduce. */
+/** Port de `HighlightViewer`: resuelve historias, drag-to-dismiss y StoriesView. */
 @Composable
 fun HighlightViewer(
     highlight: HighlightedStory,
@@ -49,8 +58,10 @@ fun HighlightViewer(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
     var stories by remember(highlight.id) { mutableStateOf<List<Story>>(emptyList()) }
     var isLoading by remember(highlight.id) { mutableStateOf(true) }
+    val dragOffset = remember { Animatable(0f) }
 
     LaunchedEffect(highlight.id) {
         isLoading = true
@@ -58,51 +69,81 @@ fun HighlightViewer(
         isLoading = false
     }
 
-    Box(modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-        when {
-            isLoading -> Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                CircularProgressIndicator(color = Color.White)
-                Text(
-                    stringResource(R.string.highlighted_stories_loading),
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = with(density) { legacyPoppinsSize(context, 15).toSp() },
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onVerticalDrag = { _, dragAmount ->
+                        if (dragAmount > 0 || dragOffset.value > 0) {
+                            scope.launch {
+                                dragOffset.snapTo((dragOffset.value + dragAmount).coerceAtLeast(0f))
+                            }
+                        }
+                    },
+                    onDragEnd = {
+                        scope.launch {
+                            if (dragOffset.value > 120f) {
+                                onDismiss()
+                            } else {
+                                dragOffset.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = 400f))
+                            }
+                        }
+                    },
+                )
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .offset { IntOffset(0, dragOffset.value.roundToInt()) },
+            contentAlignment = Alignment.Center,
+        ) {
+            when {
+                isLoading -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                    Text(
+                        stringResource(R.string.highlighted_stories_loading),
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = with(density) { legacyPoppinsSize(context, 15).toSp() },
+                    )
+                }
+                stories.isEmpty() -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.PhotoLibrary,
+                        null,
+                        tint = Color.White.copy(alpha = 0.35f),
+                        modifier = Modifier.size(56.dp),
+                    )
+                    Text(
+                        stringResource(R.string.stories_no_stories_available),
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = with(density) { legacyPoppinsSize(context, 16).toSp() },
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        stringResource(R.string.common_close),
+                        color = ProfileColors.accent,
+                        fontSize = with(density) { legacyPoppinsSize(context, 15).toSp() },
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable(onClick = onDismiss),
+                    )
+                }
+                else -> StoriesView(
+                    onDismiss = onDismiss,
+                    explicitStories = stories,
+                    startAtIndex = 0,
+                    highlightTitle = highlight.title,
                 )
             }
-
-            stories.isEmpty() -> Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                Icon(
-                    Icons.Filled.PhotoLibrary,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.35f),
-                    modifier = Modifier.size(56.dp),
-                )
-                Text(
-                    stringResource(R.string.stories_no_stories_available),
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = with(density) { legacyPoppinsSize(context, 16).toSp() },
-                    fontWeight = FontWeight.Medium,
-                )
-                Text(
-                    stringResource(R.string.common_close),
-                    color = ProfileColors.accent,
-                    fontSize = with(density) { legacyPoppinsSize(context, 15).toSp() },
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickable(onClick = onDismiss),
-                )
-            }
-
-            else -> StoriesView(
-                onDismiss = onDismiss,
-                explicitStories = stories,
-                startAtIndex = 0,
-                highlightTitle = highlight.title,
-            )
         }
     }
 }
@@ -120,6 +161,5 @@ private suspend fun loadHighlightStories(highlight: HighlightedStory): List<Stor
             async { story.id.takeIf { PrivacyService.canUserViewStoryEnhanced(story, viewerId) } }
         }.awaitAll().filterNotNull().toSet()
     }
-    // Se conserva el orden original, como el `stories.filter` de iOS.
     return all.filter { it.id in visibleIds }
 }

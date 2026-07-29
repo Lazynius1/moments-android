@@ -183,7 +183,7 @@ fun GlassmorphicReplyBar(
         ReplyBarBody(message, otherParticipantName, large = true, onCancel = onCancel, modifier = modifier)
     }
     if (message.isVanishModeMessage) {
-        ScreenshotProtectedView(isProtected = true) { content() }
+        ScreenshotProtectedView(isProtected = true, cornerRadius = 12.dp) { content() }
     } else {
         content()
     }
@@ -207,7 +207,7 @@ fun GlassmorphicReplyPreview(
         )
     }
     if (message.isVanishModeMessage) {
-        ScreenshotProtectedView(isProtected = true) { content() }
+        ScreenshotProtectedView(isProtected = true, cornerRadius = 10.dp) { content() }
     } else {
         content()
     }
@@ -263,7 +263,7 @@ fun StackedReplyQuote(
         }
     }
     if (repliedMessage.isVanishModeMessage) {
-        ScreenshotProtectedView(isProtected = true) { body() }
+        ScreenshotProtectedView(isProtected = true, cornerRadius = 13.dp) { body() }
     } else {
         body()
     }

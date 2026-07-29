@@ -55,4 +55,19 @@
     <string name="user_activity_archived_confirm_restore_message">¿Quieres restaurar el contenido archivado seleccionado?</string>
     <string name="user_activity_archived_processing_restore">Restaurando archivados</string>
     <string name="user_activity_archived_success_restore">Contenido archivado restaurado</string>
+    <string name="user_activity_archived_processing_button">Restaurando…</string>
+    <string name="user_activity_select_all">Seleccionar todo</string>
+    <string name="user_activity_echoes_count">%d Echoes</string>
+    <string name="user_activity_echoes_active_count">%d activos</string>
+    <string name="user_activity_empty_reactions_subtitle">Las interacciones y reacciones que dejes en otros momentos aparecerán aquí.</string>
+    <string name="user_activity_empty_comments_subtitle">Tus conversaciones, respuestas a comentarios y reseñas se mostrarán en este espacio.</string>
+    <string name="user_activity_empty_tags_subtitle">Cuando amigos te mencionen o etiqueten en sus momentos, aparecerán aquí.</string>
+    <string name="user_activity_empty_stickers_subtitle">Consulta las preguntas interactivas y respuestas a encuestas a las que hayas respondido.</string>
+    <string name="user_activity_empty_archived_subtitle">Tus momentos privados archivados se guardan aquí fuera de la vista pública.</string>
+    <string name="user_activity_empty_recently_deleted_subtitle">Lo que elimines se guarda aquí 30 días antes del borrado permanente.</string>
+    <string name="user_activity_empty_echoes_subtitle">Los Echoes te conectan con amigos mutuos cercanos. ¡Captura un momento para empezar!</string>
+    <string name="user_activity_empty_followers_subtitle">Sigue solicitudes recientes, amigos mutuos y conexiones de perfil.</string>
+    <string name="user_activity_empty_visits_subtitle">Mira a amigos y seguidores que visitaron tu perfil recientemente.</string>
+    <string name="user_activity_empty_moments_subtitle">Tus publicaciones de la cuadrícula y capturas diarias aparecerán aquí.</string>
+    <string name="user_activity_empty_reels_subtitle">Tus reels de vídeo inmersivos y clips cortos se guardarán en esta pestaña.</string>
 </resources>

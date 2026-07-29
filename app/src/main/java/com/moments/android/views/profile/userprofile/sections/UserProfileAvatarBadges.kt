@@ -13,9 +13,17 @@ import com.moments.android.models.AppUser
 import com.moments.android.views.story.StoryRingAvatarView
 
 /**
- * Port de `UserModernAvatarWithBadges`: anillo de historia + pulsación larga a foto completa.
- * Los badges de soporte, la corona Plus y el indicador de supporter no se portan:
- * badges/Plus/temas de perfil no se usan en el proyecto.
+ * Port de `UserProfileAvatarBadges.swift`.
+ *
+ * Core portado: `UserModernAvatarWithBadges` (StoryRing + tap historia/foto + long-press a fullscreen).
+ *
+ * Omitido a propósito (checklist 🚫 chapas / suscripciones — no comprar ni mostrar):
+ * - badge principal en esquina (`primaryBadge`)
+ * - corona Plus en esquina / `UserPlusBadgeInline` / `UserSupportBadgeInline`
+ * - `UserProfileBadgesView`, `UserSupporterLevelIndicator` (ya oculto en iOS)
+ *
+ * `UserModernRefreshIndicator` vive en `UserProfileSharedViews.kt` (mismo composable que iOS
+ * define al final de este archivo Swift).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

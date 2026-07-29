@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="user_activity_recent_searches_title">Historial de búsquedas</string>
+    <string name="user_activity_recent_searches_empty">No hay búsquedas recientes</string>
+    <string name="user_activity_recent_searches_clear_all">Borrar todo</string>
+    <string name="explore_recent_searches_type_user">Usuario</string>
+    <string name="explore_recent_searches_type_hashtag">Hashtag</string>
+    <string name="explore_recent_searches_type_location">Ubicación</string>
+    <string name="explore_recent_searches_type_text">Búsqueda textual</string>
+</resources>

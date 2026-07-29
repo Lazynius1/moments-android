@@ -3,6 +3,7 @@ package com.moments.android.views.profile.userprofile.sections
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -61,14 +63,11 @@ import com.moments.android.views.profile.core.sections.ProfileSectionEmptyIcon
 import com.moments.android.views.profile.core.sections.ProfileSectionEmptyState
 
 /**
- * Port de `UserProfileStateViews.swift` — todos los estados no-felices del perfil visitado:
+ * Port de `UserProfileStateViews.swift` — estados no-felices del perfil visitado:
  * sin momentos, bloqueado (por mí / por él), privado, no disponible y sin conexión.
  *
- * Puentes conscientes respecto a iOS:
- * - Los `@Binding` de mensajería (`navigateToChat`, `targetConversation`, `pendingChatContext`) y el
- *   flujo `startConversation` viven en el host: aquí solo el callback `onOpenMessage`.
- * - Los insets de safe area se pasan como `Dp` igual que en iOS (el host los calcula).
- * - `HapticManager` es de la capa de UI del host, no de estas vistas.
+ * Mensajería: callbacks `onOpenMessage` (el host abre chat vía `MessagingViewModel`).
+ * `UserModernBlockedView`: swipe derecha > 100dp → dismiss (≡ DragGesture iOS).
  */
 @Composable
 fun UserModernEmptyMomentsView(modifier: Modifier = Modifier) {
@@ -90,7 +89,21 @@ fun UserModernBlockedView(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier.fillMaxSize().padding(bottom = safeAreaBottom + 20.dp),
+        modifier
+            .fillMaxSize()
+            .padding(bottom = safeAreaBottom + 20.dp)
+            // ≡ DragGesture iOS: swipe derecha > 100pt → dismiss
+            .pointerInput(onDismiss) {
+                var total = 0f
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (total > 100f) onDismiss()
+                        total = 0f
+                    },
+                    onDragCancel = { total = 0f },
+                    onHorizontalDrag = { _, amount -> total += amount },
+                )
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

@@ -60,6 +60,11 @@ import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.components.MomentHashtagText
 import com.moments.android.views.feed.rememberAdaptiveColors
 
+/**
+ * Port de `UserProfileSharedViews.swift` — StatItem, fondo blur, preview, expandable,
+ * ProfileImageViewer, refresh. `UserFlowLayout` vive como `ProfileFlowLayout`.
+ */
+
 /** Port de `StatItem`: métrica no tapeable del perfil. */
 @Composable
 fun StatItem(

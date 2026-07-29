@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LoginActivityView — iOS Localizable loginActivity.* (es) -->
+<resources>
+    <string name="login_activity_navigation_title">Actividad de Inicio</string>
+    <string name="login_activity_description">Revisa cuándo y desde dónde has iniciado sesión en tu cuenta</string>
+    <string name="login_activity_current_session">Sesión Actual</string>
+    <string name="login_activity_no_current_session">No hay una sesión actual registrada en este dispositivo todavía.</string>
+    <string name="login_activity_other_sessions">Otras sesiones activas</string>
+    <string name="login_activity_logout_all">Cerrar todas las sesiones</string>
+    <string name="login_activity_no_other_sessions">No hay otras sesiones activas</string>
+    <string name="login_activity_logout_all_title">Cerrar todas las sesiones</string>
+    <string name="login_activity_logout_all_message">Esto cerrará sesión en todos los dispositivos. Tendrás que volver a iniciar sesión.</string>
+    <string name="login_activity_logout_all_confirm">Cerrar todas</string>
+    <string name="login_activity_logout_session">Cerrar sesión</string>
+    <string name="login_activity_logout_session_title">Cerrar sesión</string>
+    <string name="login_activity_logout_session_message">Se cerrará la sesión en %1$s. Ese dispositivo tendrá que volver a iniciar sesión.</string>
+    <string name="login_activity_logout_session_current_message">Se cerrará la sesión en este dispositivo. Tendrás que volver a iniciar sesión.</string>
+    <string name="login_activity_logout_session_confirm">Cerrar sesión</string>
+    <string name="login_activity_logout_session_error">No se pudo cerrar la sesión: %1$s</string>
+    <string name="login_activity_logout_success_single_message">La sesión se ha cerrado correctamente.</string>
+    <string name="login_activity_cancel">Cancelar</string>
+    <string name="login_activity_error_title">Error</string>
+    <string name="login_activity_ok">OK</string>
+    <string name="login_activity_logout_success_title">Sesiones cerradas</string>
+    <string name="login_activity_logout_success_message">Se han cerrado todas las sesiones activas correctamente.</string>
+    <string name="login_activity_active_session">Sesión Activa</string>
+    <string name="login_activity_current">ACTUAL</string>
+    <string name="login_activity_loading">Cargando información de sesión...</string>
+    <string name="login_activity_session_alert_new_device">Nuevo dispositivo detectado</string>
+    <string name="login_activity_session_alert_location_change">Cambio de ubicación detectado</string>
+    <string name="login_activity_session_location">Ubicación</string>
+    <string name="login_activity_location_unavailable">Ubicación no disponible</string>
+    <string name="login_activity_ip_unavailable">IP no disponible</string>
+    <string name="login_activity_error_not_authenticated">Usuario no autenticado</string>
+    <string name="login_activity_load_error_prefix">Error al cargar sesiones: </string>
+    <string name="login_activity_refresh_error_prefix">Error al actualizar sesiones: </string>
+    <string name="login_activity_logout_all_error_prefix">Error al cerrar sesiones: </string>
+</resources>

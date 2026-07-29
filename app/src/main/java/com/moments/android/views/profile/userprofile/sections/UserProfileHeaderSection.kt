@@ -1,5 +1,6 @@
 package com.moments.android.views.profile.userprofile.sections
 
+import android.content.Intent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -38,9 +38,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -50,27 +51,27 @@ import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.extensions.ChromeIconDescription
 import com.moments.android.extensions.ProfileChromeControlsCluster
-import com.moments.android.extensions.ProfileChromeGlassMetrics
 import com.moments.android.extensions.ProfileChromeIconButton
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.views.components.VerifiedBadge
 import com.moments.android.views.components.VerifiedUsernameGradientView
-import com.moments.android.views.profile.core.sections.ExpandableBioView
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.profile.core.sections.ExpandableBioView
+import com.moments.android.views.profile.core.sections.ProfileAvatarNoteMetrics
+import com.moments.android.views.profile.core.sections.ProfileAvatarNoteView
+import com.moments.android.views.profile.core.sections.StickyChromeBarLayout
 import com.moments.android.views.profile.userprofile.UserProfileViewModel
+import com.moments.android.views.profile.userprofile.UserProfileColors
 
 /**
  * Port de `UserProfileHeaderSection.swift` — chrome fijado (back + username + menú) y cabecera
- * moderna (avatar + nota + username verificado + bio + web + botones seguir/mensaje) del perfil
- * de otro usuario.
+ * moderna (avatar + nota + username verificado + bio + web + botones seguir/mensaje).
  *
- * Puentes conscientes respecto a iOS:
- * - Los `@Binding` de navegación (chat, QR, report, imagen a pantalla completa, ruta de conexiones)
- *   se exponen como callbacks para que el host conserve su ownership.
- * - `UserProfileBadgesView` (badges de soporte) NO se porta: badges/Plus están descartados.
- * - El flujo de mensajería (`startConversation`) vive en la capa de host: aquí solo el callback
- *   `onOpenMessage`, como se hizo en otras secciones portadas.
+ * Puentes conscientes:
+ * - Chapas Plus/Support (`UserProfileBadgesView`) 🚫 — no comprar ni mostrar (checklist).
+ * - `startConversation` vive en el host vía `onOpenMessage`.
+ * - Share ≡ `ShareLink(https://glowsy.app/{username})`; QR es acción aparte.
  */
 @Composable
 fun ProfileVisitorPinnedTopChrome(
@@ -82,94 +83,109 @@ fun ProfileVisitorPinnedTopChrome(
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
+    val context = LocalContext.current
     var menuExpanded by remember { mutableStateOf(false) }
     val user = viewModel.userProfile
 
-    Box(modifier.fillMaxWidth().height(ProfileChromeGlassMetrics.controlSize)) {
-        ProfileChromeIconButton(
-            icon = Icons.AutoMirrored.Filled.ArrowBack,
-            onClick = onDismiss,
-            modifier = Modifier.align(Alignment.CenterStart),
-            contentDescriptionKey = ChromeIconDescription.BACK,
-        )
-
-        Row(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .alpha(collapseProgress)
-                .offset(x = (-6 * (1 - collapseProgress)).dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            Text(
-                text = user?.username ?: stringResource(R.string.profile_default_username),
-                color = colors.primary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+    StickyChromeBarLayout(
+        modifier = modifier,
+        leading = {
+            ProfileChromeIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                onClick = onDismiss,
+                contentDescriptionKey = ChromeIconDescription.BACK,
             )
-            if (user?.isVerified == true) VerifiedBadge(size = 16.dp)
-        }
-
-        ProfileChromeControlsCluster(modifier = Modifier.align(Alignment.CenterEnd)) {
-            Box {
-                ProfileChromeIconButton(
-                    icon = Icons.Filled.MoreHoriz,
-                    onClick = { menuExpanded = true },
-                    standaloneGlass = false,
-                    accessibilityLabel = stringResource(R.string.profile_header_more),
+        },
+        center = {
+            Row(
+                modifier = Modifier
+                    .alpha(collapseProgress)
+                    .offset(x = (-6 * (1 - collapseProgress)).dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Text(
+                    text = user?.username ?: stringResource(R.string.profile_default_username),
+                    color = colors.primary,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                stringResource(
-                                    if (viewModel.isMutedByCurrentUser) R.string.conversation_settings_unmute
-                                    else R.string.conversation_settings_mute,
-                                ),
+                if (user?.isVerified == true) VerifiedBadge(size = 16.dp)
+            }
+        },
+        trailing = {
+            ProfileChromeControlsCluster {
+                Box {
+                    ProfileChromeIconButton(
+                        icon = Icons.Filled.MoreHoriz,
+                        onClick = { menuExpanded = true },
+                        standaloneGlass = false,
+                        accessibilityLabel = stringResource(R.string.profile_header_more),
+                    )
+                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(
+                                        if (viewModel.isMutedByCurrentUser) {
+                                            R.string.user_profile_relationship_mute_disable
+                                        } else {
+                                            R.string.user_profile_relationship_mute_enable
+                                        },
+                                    ),
+                                )
+                            },
+                            onClick = { menuExpanded = false; viewModel.toggleMute() },
+                            leadingIcon = {
+                                Icon(
+                                    if (viewModel.isMutedByCurrentUser) Icons.Filled.VolumeUp else Icons.Filled.VolumeOff,
+                                    contentDescription = null,
+                                )
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(
+                                        if (viewModel.isBlockedByCurrentUser) R.string.user_profile_unblock_user
+                                        else R.string.conversation_settings_block,
+                                    ),
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                if (viewModel.isBlockedByCurrentUser) viewModel.unblockUser(viewModel.userId)
+                                else viewModel.blockUser(viewModel.userId)
+                            },
+                            leadingIcon = { Icon(Icons.Filled.PersonOff, contentDescription = null) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.report_action_user)) },
+                            onClick = { menuExpanded = false; onShowReport() },
+                            leadingIcon = { Icon(Icons.Filled.Flag, contentDescription = null) },
+                        )
+                        if (user != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.qr_code_share)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    shareProfileUrl(context, user.username)
+                                },
+                                leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
                             )
-                        },
-                        onClick = { menuExpanded = false; viewModel.toggleMute() },
-                        leadingIcon = {
-                            Icon(if (viewModel.isMutedByCurrentUser) Icons.Filled.VolumeUp else Icons.Filled.VolumeOff, null)
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                stringResource(
-                                    if (viewModel.isBlockedByCurrentUser) R.string.user_profile_unblock_user
-                                    else R.string.conversation_settings_block,
-                                ),
-                            )
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            if (viewModel.isBlockedByCurrentUser) viewModel.unblockUser(viewModel.userId)
-                            else viewModel.blockUser(viewModel.userId)
-                        },
-                        leadingIcon = { Icon(Icons.Filled.PersonOff, null) },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.report_action_user)) },
-                        onClick = { menuExpanded = false; onShowReport() },
-                        leadingIcon = { Icon(Icons.Filled.Flag, null) },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.creator_share)) },
-                        onClick = { menuExpanded = false; onShowQrCode() },
-                        leadingIcon = { Icon(Icons.Filled.Share, null) },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.profile_header_qr)) },
-                        onClick = { menuExpanded = false; onShowQrCode() },
-                        leadingIcon = { Icon(Icons.Filled.QrCode, null) },
-                    )
+                        }
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.profile_header_qr)) },
+                            onClick = { menuExpanded = false; onShowQrCode() },
+                            leadingIcon = { Icon(Icons.Filled.QrCode, contentDescription = null) },
+                        )
+                    }
                 }
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable
@@ -192,7 +208,7 @@ fun UserModernProfileHeader(
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.Top) {
             Column(
-                modifier = Modifier.width(112.dp),
+                modifier = Modifier.width(ProfileAvatarNoteMetrics.columnWidth),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -203,27 +219,30 @@ fun UserModernProfileHeader(
                     onOpenStories = onOpenStories,
                     onShowProfileImageFullscreen = onShowProfileImageFullscreen,
                 )
-                user?.profileNote?.takeIf { it.isNotBlank() }?.let { note ->
-                    Text(
-                        text = note,
-                        color = colors.secondary,
-                        fontSize = 11.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                ProfileAvatarNoteView(
+                    note = user?.profileNote,
+                    isEditable = false,
+                )
             }
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                VerifiedUsernameGradientView(
-                    username = user?.username ?: stringResource(R.string.profile_default_username),
-                    isVerified = user?.isVerified == true,
-                    gradient = Brush.linearGradient(listOf(Color(0xFF007AFF), Color(0xFF6B73FF))),
-                    badgeSize = 18.dp,
+                Column(
                     modifier = Modifier.alpha(1 - usernameCollapseProgress),
-                )
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    VerifiedUsernameGradientView(
+                        username = user?.username ?: stringResource(R.string.profile_default_username),
+                        isVerified = user?.isVerified == true,
+                        gradient = Brush.linearGradient(listOf(Color(0xFF007AFF), Color(0xFF6B73FF))),
+                        badgeSize = 18.dp,
+                    )
+                    // UserProfileBadgesView 🚫 (chapas Plus/Support — checklist)
+                }
 
-                ExpandableBioView(bio = user?.bio?.takeIf { it.isNotBlank() } ?: stringResource(R.string.user_profile_no_bio))
+                ExpandableBioView(
+                    bio = user?.bio?.takeIf { it.isNotBlank() }
+                        ?: stringResource(R.string.user_profile_no_bio),
+                )
 
                 user?.websiteUrl?.takeIf { it.isNotBlank() }?.let { website ->
                     val uriHandler = LocalUriHandler.current
@@ -233,10 +252,15 @@ fun UserModernProfileHeader(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Filled.Link, null, modifier = Modifier.size(13.dp), tint = UserProfileAccent)
+                        Icon(
+                            Icons.Filled.Link,
+                            contentDescription = null,
+                            modifier = Modifier.size(13.dp),
+                            tint = UserProfileColors.accent,
+                        )
                         Text(
                             website.removePrefix("https://").removePrefix("http://"),
-                            color = UserProfileAccent,
+                            color = UserProfileColors.accent,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             maxLines = 1,
@@ -245,6 +269,8 @@ fun UserModernProfileHeader(
                     }
                 }
             }
+
+            Spacer(Modifier.width(0.dp))
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -252,9 +278,9 @@ fun UserModernProfileHeader(
             val scale by animateFloatAsState(if (actionable) 1f else 0.95f, label = "followScale")
             Row(
                 modifier = Modifier
+                    .graphicsLayer { scaleX = scale; scaleY = scale }
                     .momentsChromeGlass(RoundedCornerShape(50), interactive = actionable)
                     .clickable(enabled = actionable, onClick = onFollowAction)
-                    .alpha(scale)
                     .padding(horizontal = 18.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -267,7 +293,12 @@ fun UserModernProfileHeader(
                     maxLines = 1,
                 )
                 if (viewModel.followButtonState == FollowButtonState.FOLLOWING) {
-                    Icon(Icons.Filled.KeyboardArrowDown, null, modifier = Modifier.size(10.dp), tint = colors.primary)
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(10.dp),
+                        tint = colors.primary,
+                    )
                 }
             }
 
@@ -280,10 +311,15 @@ fun UserModernProfileHeader(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(13.dp), tint = colors.primary)
+                Icon(
+                    Icons.AutoMirrored.Filled.Send,
+                    contentDescription = null,
+                    modifier = Modifier.size(13.dp),
+                    tint = colors.primary,
+                )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    stringResource(R.string.messaging_send_message),
+                    stringResource(R.string.user_profile_send_message),
                     color = colors.primary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -303,4 +339,14 @@ internal fun followButtonText(state: FollowButtonState): String = when (state) {
     FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
     FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
     FollowButtonState.REQUEST_PENDING_CANCELLABLE -> stringResource(R.string.feed_follow_cancel_request)
+}
+
+/** ≡ ShareLink de iOS: `https://glowsy.app/{username}`. */
+private fun shareProfileUrl(context: android.content.Context, username: String) {
+    val url = "https://glowsy.app/$username"
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, url)
+    }
+    context.startActivity(Intent.createChooser(intent, null))
 }

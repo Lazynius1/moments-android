@@ -609,6 +609,8 @@
     <string name="audience_custom">Benutzerdefiniert</string>
     <string name="audience_custom_list">Benutzerdefinierte Liste</string>
     <string name="audience_only_me">Nur ich</string>
+    <string name="edit_moment_tags_loading">Bild wird geladen…</string>
+    <string name="edit_moment_tags_unavailable">Tag-Editor konnte nicht geöffnet werden.</string>
     <string name="edit_moment_tags_pending">Tag-Auswahl noch nicht verfügbar</string>
 
 
@@ -717,6 +719,9 @@
     <string name="profile_header_notifications">Benachrichtigungen</string>
     <string name="profile_header_more">Mehr Optionen</string>
     <string name="profile_header_qr">QR</string>
+    <string name="user_profile_send_message">Nachricht senden</string>
+    <string name="user_profile_interests">Interessen</string>
+    <string name="qr_code_share">QR-Code teilen</string>
     <string name="profile_header_incognito">Inkognitomodus</string>
     <string name="profile_header_settings">Einstellungen</string>
     <string name="profile_header_edit">Profil bearbeiten</string>
@@ -1298,6 +1303,19 @@
     <string name="social_connections_suggested">Für dich vorgeschlagen</string>
     <string name="user_list_no_results_description">Versuche eine andere Suche.</string>
     <string name="user_list_frequent_visits">Häufige Besuche</string>
+
+    <string name="user_list_empty_hidden_followers_title">Follower ausgeblendet</string>
+    <string name="user_list_empty_hidden_followers_description">Diese Person hat ihre Follower-Liste ausgeblendet.</string>
+    <string name="user_list_empty_hidden_following_title">Gefolgte ausgeblendet</string>
+    <string name="user_list_empty_hidden_following_description">Diese Person hat ausgeblendet, wem sie folgt.</string>
+    <string name="user_list_empty_visitor_followers_title">Keine Follower</string>
+    <string name="user_list_empty_visitor_followers_description">Diese Person hat noch keine Follower.</string>
+    <string name="user_list_empty_visitor_following_title">Folgt niemandem</string>
+    <string name="user_list_empty_visitor_following_description">Diese Person folgt noch niemandem.</string>
+    <string name="user_list_empty_visitor_mutuals_title">Keine gemeinsamen Verbindungen</string>
+    <string name="user_list_empty_visitor_mutuals_description">Ihr habt noch keine gemeinsamen Verbindungen.</string>
+    <string name="user_list_empty_title">Keine %1$s</string>
+    <string name="user_list_empty_description">Sobald du %1$s hast, erscheinen sie hier</string>
     <string name="profile_crop_move_scale">Verschieben und skalieren</string>
     <string name="profile_editor_select_album">Album auswählen</string>
     <string name="profile_editor_album_count">%1$d Fotos</string>

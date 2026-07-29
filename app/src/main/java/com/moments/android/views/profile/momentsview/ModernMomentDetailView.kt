@@ -79,18 +79,22 @@ import com.moments.android.services.performance.FeedVisibilityCoordinator
 import com.moments.android.services.performance.VideoMomentsIndex
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
+import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.services.video.VideoPlaybackSelector
 import com.moments.android.views.comments.ModernCommentsSheet
 import com.moments.android.views.components.LiveUsernameContent
 import com.moments.android.views.explore.ExploreView
 import com.moments.android.views.explore.toExploreFeedMoment
+import com.moments.android.views.feed.core.StoryUserPresentationRoute
 import com.moments.android.views.feed.core.sections.ModernPostCardView
 import com.moments.android.views.feed.maps.LocationMapView
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.feed.sharing.ModernShareBottomSheet
 import com.moments.android.views.settings.hasVideoMedia
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.momentdetail.ProfileHeaderCollapseMetrics
+import com.moments.android.views.story.StoriesView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -144,6 +148,8 @@ fun ModernMomentDetailView(
     var contextMenuMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var showEditSheet by remember { mutableStateOf(false) }
     var showDeleteAlert by remember { mutableStateOf(false) }
+    var showShareSheet by remember { mutableStateOf(false) }
+    var storyRoute by remember { mutableStateOf<StoryUserPresentationRoute?>(null) }
     var commentsMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var selectedHashtag by remember { mutableStateOf("") }
     var showExploreWithHashtag by remember { mutableStateOf(false) }
@@ -188,7 +194,8 @@ fun ModernMomentDetailView(
         val normalized = userId.trim()
         if (normalized.isEmpty()) return
         if (hasStory) {
-            NavigationEventBus.emit(CoordinatorNavigationEvent.ShowStories)
+            // iOS: storyRoute = StoryUserPresentationRoute → StoriesView(startWithUserId:)
+            storyRoute = StoryUserPresentationRoute(normalized)
         } else {
             openUserProfile(normalized)
         }
@@ -221,8 +228,9 @@ fun ModernMomentDetailView(
         if (restrictPlaybackToInitialIndex && index != resolvedInitialIndex) return
         val moment = domainMoments.getOrNull(index) ?: return
         if (!moment.hasVideoMedia) return
-        val id = moment.id ?: return
-        FeedVisibilityCoordinator.pinActiveVideo(id)
+        val consumerId = GlobalVideoManager.profileVideoConsumerId(moment)
+        FeedVisibilityCoordinator.pinActiveVideo(consumerId)
+        GlobalVideoManager.playVideo(consumerId)
     }
 
     fun deleteContextMoment() {
@@ -287,6 +295,7 @@ fun ModernMomentDetailView(
 
     DisposableEffect(Unit) {
         onDispose {
+            GlobalVideoManager.pauseAllVideos()
             FeedVisibilityCoordinator.update(emptyMap())
         }
     }
@@ -376,8 +385,9 @@ fun ModernMomentDetailView(
                             },
                             onOpenComments = { commentsMoment = moment },
                             onShare = {
+                                // iOS overlay ModernShareBottomSheet (FeedView same pattern)
                                 contextMenuMoment = moment
-                                showContextMenu = true
+                                showShareSheet = true
                             },
                             onContextMenu = { tapped ->
                                 contextMenuMoment = tapped
@@ -422,6 +432,29 @@ fun ModernMomentDetailView(
                     },
                     onReport = {},
                     modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+
+        // ≡ iOS ModernShareBottomSheet overlay (zIndex encima del context menu)
+        if (showShareSheet) {
+            contextMenuMoment?.let { shareTarget ->
+                ModernShareBottomSheet(
+                    moment = shareTarget,
+                    onDismiss = { showShareSheet = false },
+                )
+            }
+        }
+
+        // ≡ iOS fullScreenCover StoriesView(startWithUserId:)
+        storyRoute?.let { route ->
+            Dialog(
+                onDismissRequest = { storyRoute = null },
+                properties = DialogProperties(usePlatformDefaultWidth = false),
+            ) {
+                StoriesView(
+                    startWithUserId = route.userId,
+                    onDismiss = { storyRoute = null },
                 )
             }
         }
@@ -552,6 +585,13 @@ fun ModernMomentDetailView(
             ModernCommentsSheet(
                 moment = moment,
                 onDismiss = { commentsMoment = null },
+                onOpenStory = { userId ->
+                    commentsMoment = null
+                    val normalized = userId.trim()
+                    if (normalized.isNotEmpty()) {
+                        storyRoute = StoryUserPresentationRoute(normalized)
+                    }
+                },
             )
         }
 

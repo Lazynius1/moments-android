@@ -1030,6 +1030,7 @@ fun StoryViewerScreen(
                 ScreenshotProtectedView(
                     isProtected = !isEveryoneStoryAudience,
                     fillsContainer = true,
+                    cornerRadius = storyViewerCanvasCornerRadius,
                 ) {
                     StoryViewerMedia(
                         story = story,

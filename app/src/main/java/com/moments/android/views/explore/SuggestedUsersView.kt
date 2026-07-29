@@ -233,9 +233,9 @@ fun SuggestedUsersView(
     }
 }
 
-/** Port de `SuggestedUserRow`. */
+/** Port de `SuggestedUserRow` (Explore + CommonConnections). */
 @Composable
-private fun SuggestedUserRow(
+internal fun SuggestedUserRow(
     user: AppUser,
     commonInterests: Int,
     buttonState: FollowButtonState,
@@ -332,7 +332,7 @@ private fun SuggestedUserRow(
 
 /** Port de `SuggestedUserFollowButton`. */
 @Composable
-private fun SuggestedUserFollowButton(
+internal fun SuggestedUserFollowButton(
     state: FollowButtonState,
     onFollow: () -> Unit,
 ) {

@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.VolumeOff
@@ -48,11 +47,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
+import com.moments.android.extensions.MomentsGlassButtonPreset
+import com.moments.android.extensions.ProfileChromeIconButton
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.CustomAudienceList
 import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
 import com.moments.android.views.creator.audienceselector.ContentAudience
+import com.moments.android.views.creator.audienceselector.listIconVector
 import com.moments.android.views.feed.rememberAdaptiveColors
 
 /** Port de `UserRelationshipChip`: chip cápsula con icono opcional. */
@@ -80,13 +82,14 @@ fun UserRelationshipChip(
  * Port de `UserRelationshipManagementSheet`: hoja de gestión de relación (mejor amigo, silenciar,
  * listas personalizadas, dejar de seguir).
  *
- * Puentes conscientes: el `confirmationDialog` de iOS → `AlertDialog` de Material 3, y el
- * `userId` que iOS recibía sin usarlo en el cuerpo se omite (el host ya lo conoce).
+ * `confirmationDialog` iOS → `AlertDialog`. `userId` se acepta por paridad de firma (iOS no lo usa
+ * en el cuerpo). Presentación del host: `MomentsModalSheet(largeOnly = false)` ≡ detents medium/large.
  */
 @Composable
 fun UserRelationshipManagementSheet(
     username: String,
     profileImagePath: String?,
+    @Suppress("UNUSED_PARAMETER") userId: String,
     isBestFriend: Boolean,
     isMuted: Boolean,
     isMutual: Boolean,
@@ -319,11 +322,10 @@ private fun RelationshipListsContent(
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
-                null,
-                tint = content,
-                modifier = Modifier.clickable(onClick = onBack).size(24.dp),
+            ProfileChromeIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                onClick = onBack,
+                preset = MomentsGlassButtonPreset.NAVIGATION_BACK,
             )
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
@@ -372,7 +374,12 @@ private fun RelationshipListsContent(
                         if (isUpdatingLists) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.AutoMirrored.Filled.List, null, tint = content, modifier = Modifier.size(17.dp))
+                            Icon(
+                                listIconVector(list.icon),
+                                contentDescription = null,
+                                tint = content,
+                                modifier = Modifier.size(17.dp),
+                            )
                         }
                     }
                 }
