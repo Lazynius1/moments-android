@@ -3,7 +3,6 @@ package com.moments.android.views.shared.momentdetail
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -43,10 +42,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
@@ -58,27 +55,29 @@ import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.deleteMoment
 import com.moments.android.services.firestore.loadSavedMoments
+import com.moments.android.services.performance.FeedVisibilityCoordinator
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
+import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.views.comments.ModernCommentsSheet
 import com.moments.android.views.explore.ExploreView
-import com.moments.android.views.feed.core.EditMomentPayload
 import com.moments.android.views.feed.core.sections.ModernPostCardView
 import com.moments.android.views.feed.maps.LocationMapView
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.profile.core.sections.ProfileStickyChromeContainer
 import com.moments.android.views.profile.momentsview.EditMomentView
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
 import com.moments.android.views.shared.ScreenshotProtectedView
+import com.moments.android.views.story.StoriesView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
- * Port por trozos de `SingleMomentDetailView.swift`.
- * Card estilo feed + chrome + context menu + peek + dismiss horizontal.
- *
- * Sheets: EditMoment + Comments + Explore reales; Stories/Profile = stubs.
+ * Port de `SingleMomentDetailView.swift`.
+ * Card estilo feed + chrome sticky blur + context menu + peek + dismiss horizontal
+ * + Stories(`startWithUserId`) / perfil / comments / edit / explore / mapa + vídeo.
  */
 @Composable
 fun SingleMomentDetailView(
@@ -94,6 +93,7 @@ fun SingleMomentDetailView(
     val density = LocalDensity.current
     val screenHeightDp = configuration.screenHeightDp
     val feedCardHeightPx = with(density) { (screenHeightDp * 0.58f).dp.toPx() }
+    val scrollState = rememberScrollState()
 
     var currentMoment by remember(moment.id) { mutableStateOf(moment) }
     var trackedMomentView by remember { mutableStateOf(false) }
@@ -101,6 +101,7 @@ fun SingleMomentDetailView(
     var dragOffsetPx by remember { mutableFloatStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
     var backgroundOpacity by remember { mutableFloatStateOf(1f) }
+    var dragVelocityPx by remember { mutableFloatStateOf(0f) }
 
     var showContextMenu by remember { mutableStateOf(false) }
     var showEditSheet by remember { mutableStateOf(false) }
@@ -112,6 +113,7 @@ fun SingleMomentDetailView(
     var selectedLocationName by remember { mutableStateOf("") }
     var selectedLocationLat by remember { mutableStateOf<Double?>(null) }
     var selectedLocationLng by remember { mutableStateOf<Double?>(null) }
+    var storyAuthorId by remember { mutableStateOf<String?>(null) }
 
     var peekImageUrl by remember { mutableStateOf<String?>(null) }
     var peekAspectRatio by remember { mutableFloatStateOf(1f) }
@@ -126,6 +128,13 @@ fun SingleMomentDetailView(
             else -> null
         }
     } ?: stringResource(R.string.tab_bar_explore)
+
+    val chromeBlurProgress = remember(scrollState.value) {
+        ProfileHeaderCollapseMetrics.detailScrollChromeBlurProgress(
+            contentMinY = -scrollState.value.toFloat(),
+            initialContentMinY = 0f,
+        )
+    }
 
     val animatedOffset by animateFloatAsState(
         targetValue = dragOffsetPx,
@@ -154,7 +163,7 @@ fun SingleMomentDetailView(
         val normalized = userId.trim()
         if (normalized.isEmpty()) return
         if (hasStory) {
-            NavigationEventBus.emit(CoordinatorNavigationEvent.ShowStories)
+            storyAuthorId = normalized
         } else {
             openUserProfile(normalized)
         }
@@ -172,6 +181,14 @@ fun SingleMomentDetailView(
         }
     }
 
+    fun activateVideoIfNeeded() {
+        val hasVideo = currentMoment.mediaItems.any { it.type.equals("video", ignoreCase = true) }
+        if (!hasVideo) return
+        val consumerId = GlobalVideoManager.profileVideoConsumerId(currentMoment)
+        FeedVisibilityCoordinator.pinActiveVideo(consumerId)
+        GlobalVideoManager.playVideo(consumerId)
+    }
+
     fun deleteMoment() {
         scope.launch {
             runCatching {
@@ -186,13 +203,15 @@ fun SingleMomentDetailView(
         if (uid != null) {
             runCatching { firestore.loadSavedMoments(uid) }
         }
-        // GlobalVideoManager.pauseAllVideos / activate — cuando exista manager global.
+        GlobalVideoManager.pauseAllVideos()
         delay(150)
+        activateVideoIfNeeded()
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            // iOS: pauseAllVideos + FeedVisibilityCoordinator.clear + feedViewModel.shutdown
+            GlobalVideoManager.pauseAllVideos()
+            FeedVisibilityCoordinator.update(emptyMap())
         }
     }
 
@@ -211,11 +230,15 @@ fun SingleMomentDetailView(
                 }
                 .pointerInput(Unit) {
                     val dismissThreshold = with(density) { 120.dp.toPx() }
+                    val velocityThreshold = with(density) { 300.dp.toPx() }
                     val opacityDenom = with(density) { 200.dp.toPx() }
                     detectHorizontalDragGestures(
-                        onDragStart = { isDragging = true },
+                        onDragStart = {
+                            isDragging = true
+                            dragVelocityPx = 0f
+                        },
                         onDragEnd = {
-                            if (dragOffsetPx > dismissThreshold) {
+                            if (dragOffsetPx > dismissThreshold || dragVelocityPx > velocityThreshold) {
                                 backgroundOpacity = 0f
                                 scope.launch {
                                     delay(200)
@@ -235,6 +258,7 @@ fun SingleMomentDetailView(
                         onHorizontalDrag = { _, dragAmount ->
                             if (dragAmount > 0 || dragOffsetPx > 0) {
                                 dragOffsetPx = (dragOffsetPx + dragAmount).coerceAtLeast(0f)
+                                dragVelocityPx = dragAmount
                                 val progress = (dragOffsetPx / opacityDenom).coerceIn(0f, 1f)
                                 backgroundOpacity = 1f - (progress * 0.4f)
                             }
@@ -245,7 +269,7 @@ fun SingleMomentDetailView(
             Column(
                 Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(horizontal = FeedMomentCardLayout.listHorizontalPadding)
                     .padding(bottom = 24.dp),
             ) {
@@ -279,9 +303,17 @@ fun SingleMomentDetailView(
                 }
             }
 
-            FeedPinnedTopChrome(
-                title = resolvedChromeTitle,
-                onDismiss = onDismiss,
+            ProfileStickyChromeContainer(
+                blurProgress = chromeBlurProgress,
+                tabsArePinned = false,
+                chrome = {
+                    FeedPinnedTopChrome(
+                        title = resolvedChromeTitle,
+                        onDismiss = onDismiss,
+                    )
+                },
+                blurFadeTail = ProfileHeaderCollapseMetrics.feedDetailChromeBlurFadeTail.dp,
+                horizontalPadding = 0.dp,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
@@ -367,7 +399,6 @@ fun SingleMomentDetailView(
             )
         }
 
-        // sheet → EditMomentView
         if (showEditSheet) {
             Dialog(
                 onDismissRequest = { showEditSheet = false },
@@ -421,10 +452,18 @@ fun SingleMomentDetailView(
             ModernCommentsSheet(
                 moment = currentMoment,
                 onDismiss = { selectedForComments = false },
+                onOpenStory = { userId ->
+                    selectedForComments = false
+                    val normalized = userId.trim()
+                    if (normalized.isNotEmpty()) storyAuthorId = normalized
+                },
+                onOpenProfile = { userId ->
+                    selectedForComments = false
+                    openUserProfile(userId)
+                },
             )
         }
 
-        // ExploreView(initialSearchQuery:)
         if (showExploreWithHashtag) {
             Dialog(
                 onDismissRequest = { showExploreWithHashtag = false },
@@ -439,48 +478,14 @@ fun SingleMomentDetailView(
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun DetailPresentationPlaceholder(
-    title: String,
-    subtitle: String? = null,
-    onDismiss: () -> Unit,
-) {
-    val isDark = isSystemInDarkTheme()
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f))
-                .clickable(onClick = onDismiss),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                Modifier
-                    .padding(32.dp)
-                    .background(
-                        if (isDark) Color(0xFF1C1C1E) else Color.White,
-                        RoundedCornerShape(16.dp),
-                    )
-                    .clickable(enabled = false) {}
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(title, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                if (!subtitle.isNullOrBlank()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(subtitle, fontSize = 14.sp, color = Color.Gray)
-                }
-                Spacer(Modifier.height(16.dp))
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.common_close))
-                }
-            }
+        // ≡ iOS `.fullScreenCover` StoriesView(startWithUserId:)
+        storyAuthorId?.let { uid ->
+            StoriesView(
+                startWithUserId = uid,
+                onDismiss = { storyAuthorId = null },
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }

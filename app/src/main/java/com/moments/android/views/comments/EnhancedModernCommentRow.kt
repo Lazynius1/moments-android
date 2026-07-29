@@ -1,26 +1,35 @@
 package com.moments.android.views.comments
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.filled.SubdirectoryArrowRight
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,7 +39,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -42,7 +54,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.models.Comment
-import com.moments.android.utilities.MomentMentionParser
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.components.VerifiedBadgeView
 import com.moments.android.views.feed.rememberAdaptiveColors
@@ -81,12 +92,12 @@ fun EnhancedModernCommentRow(
 
     val likeCount = comment.reactions["like"]?.size ?: 0
     val likedByMe = currentUid != null && comment.reactions["like"]?.contains(currentUid) == true
-    val canEdit = currentUid != null && currentUid == comment.authorId && !isMaskApplied
+    val canEdit = currentUid != null && currentUid == comment.authorId
     val canDelete = currentUid != null &&
-        (currentUid == comment.authorId || currentUid == momentAuthorId) &&
-        !isMaskApplied
+        (currentUid == comment.authorId || currentUid == momentAuthorId)
 
     var showFullContent by remember(comment.id) { mutableStateOf(false) }
+    var showContextMenu by remember { mutableStateOf(false) }
     val isLong = comment.content.length > 100
     val displayContent = if (isLong && !showFullContent && !isMaskApplied) {
         comment.content.take(100) + "..."
@@ -100,29 +111,99 @@ fun EnhancedModernCommentRow(
         2 -> 32.dp
         else -> 28.dp
     }
-    val indent = (nestingLevel.coerceAtMost(4) * 16).dp
+    val indentationWidth = (nestingLevel.coerceAtMost(4) * 16).dp
+    val shouldShowConnectorLine = nestingLevel > 0
     val mentionColor = if (isDark) Color(0xFF85C7FF) else Color(0xFF0D6BF2)
     val maxNesting = 4
 
     Column(
         modifier
             .fillMaxWidth()
-            .padding(start = indent, end = 4.dp),
+            .padding(end = 4.dp)
+            .pointerInput(isMaskApplied, canEdit, canDelete) {
+                detectTapGestures(
+                    onLongPress = {
+                        if (!isMaskApplied && (canEdit || canDelete)) showContextMenu = true
+                    },
+                )
+            },
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = if (nestingLevel == 0) 10.dp else 6.dp, vertical = if (nestingLevel == 0) 12.dp else 8.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            StoryRingAvatarView(
-                userId = comment.authorId,
-                size = avatarSize,
-                lineWidth = if (nestingLevel == 0) 2.3.dp else 2.dp,
-                onTap = { hasStory -> onAvatarTap(comment.authorId, hasStory) },
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
+        Box {
+            DropdownMenu(
+                expanded = showContextMenu,
+                onDismissRequest = { showContextMenu = false },
+            ) {
+                if (canEdit) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.comments_actions_edit)) },
+                        onClick = {
+                            showContextMenu = false
+                            onEdit(comment)
+                        },
+                    )
+                }
+                if (canDelete) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.comments_actions_delete), color = Color.Red) },
+                        onClick = {
+                            showContextMenu = false
+                            onDelete(comment)
+                        },
+                    )
+                }
+            }
+        }
+
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            // ≡ iOS connector gradient + dot
+            if (shouldShowConnectorLine) {
+                Box(
+                    Modifier
+                        .width(indentationWidth)
+                        .height(avatarSize + 24.dp),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    Box(
+                        Modifier
+                            .padding(start = indentationWidth - 10.dp)
+                            .width(2.dp)
+                            .fillMaxHeight()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0xFF007AFF).copy(0.3f), Color(0xFFAF52DE).copy(0.3f)),
+                                ),
+                            )
+                            .align(Alignment.CenterStart),
+                    )
+                    Box(
+                        Modifier
+                            .padding(start = indentationWidth - 11.dp)
+                            .offset(y = (-4).dp)
+                            .size(4.dp)
+                            .background(Color(0xFFAF52DE).copy(0.5f), CircleShape)
+                            .align(Alignment.TopStart),
+                    )
+                }
+            }
+
+            Row(
+                Modifier
+                    .weight(1f)
+                    .padding(
+                        start = if (shouldShowConnectorLine) 0.dp else indentationWidth,
+                        end = 0.dp,
+                    )
+                    .padding(horizontal = if (nestingLevel == 0) 10.dp else 6.dp, vertical = if (nestingLevel == 0) 12.dp else 8.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                StoryRingAvatarView(
+                    userId = comment.authorId,
+                    size = avatarSize,
+                    lineWidth = if (nestingLevel == 0) 2.3.dp else 2.dp,
+                    onTap = { hasStory -> onAvatarTap(comment.authorId, hasStory) },
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (nestingLevel > 0) {
                         Icon(
@@ -162,6 +243,15 @@ fun EnhancedModernCommentRow(
                         fontSize = if (nestingLevel == 0) 12.sp else 11.sp,
                         color = Color.Gray.copy(0.6f),
                     )
+                    if (comment.isPending == true) {
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            Icons.Filled.Schedule,
+                            contentDescription = null,
+                            tint = Color.Gray.copy(0.6f),
+                            modifier = Modifier.size(12.dp),
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(6.dp))
@@ -226,9 +316,9 @@ fun EnhancedModernCommentRow(
                     )
                 }
 
-                if (!isMaskApplied) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (!isMaskApplied) {
                         CommentActionChip(
                             active = likedByMe,
                             activeColor = Color.Red,
@@ -252,70 +342,84 @@ fun EnhancedModernCommentRow(
                                 Text(stringResource(R.string.modern_comments_reply), fontSize = 12.sp, color = colors.primary)
                             }
                         }
-                        if (nestedComments.isNotEmpty() && nestingLevel == 0) {
-                            CommentActionChip(
-                                active = isExpanded,
-                                activeColor = colors.primary,
-                                onClick = { if (commentId.isNotEmpty()) onToggleExpand(commentId) },
-                            ) {
-                                Icon(
-                                    if (isExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                                    null,
-                                    Modifier.size(14.dp),
-                                    tint = colors.primary,
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    if (nestedComments.size == 1) {
-                                        stringResource(R.string.modern_comments_replies_one, 1)
-                                    } else {
-                                        stringResource(R.string.modern_comments_replies_other, nestedComments.size)
-                                    },
-                                    fontSize = 12.sp,
-                                    color = colors.primary,
-                                )
-                            }
-                        }
-                        if (canEdit) {
-                            Text(
-                                stringResource(R.string.comments_actions_edit),
-                                fontSize = 12.sp,
-                                color = Color.Gray,
-                                modifier = Modifier.clickable { onEdit(comment) },
+                    }
+                    // ≡ iOS: expand visible aunque haya mute mask
+                    if (nestedComments.isNotEmpty() && nestingLevel == 0) {
+                        CommentActionChip(
+                            active = isExpanded,
+                            activeColor = colors.primary,
+                            onClick = { if (commentId.isNotEmpty()) onToggleExpand(commentId) },
+                        ) {
+                            Icon(
+                                if (isExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                                null,
+                                Modifier.size(14.dp),
+                                tint = colors.primary,
                             )
-                        }
-                        if (canDelete) {
+                            Spacer(Modifier.width(4.dp))
                             Text(
-                                stringResource(R.string.comments_actions_delete),
+                                if (nestedComments.size == 1) {
+                                    stringResource(R.string.modern_comments_replies_one, 1)
+                                } else {
+                                    stringResource(R.string.modern_comments_replies_other, nestedComments.size)
+                                },
                                 fontSize = 12.sp,
-                                color = Color.Gray,
-                                modifier = Modifier.clickable { onDelete(comment) },
+                                color = colors.primary,
                             )
                         }
                     }
                 }
             }
         }
+        }
 
         if (isExpanded && nestedComments.isNotEmpty() && nestingLevel < maxNesting) {
-            nestedComments.forEach { nested ->
-                EnhancedModernCommentRow(
-                    comment = nested,
-                    currentUid = currentUid,
-                    momentAuthorId = momentAuthorId,
-                    nestedComments = emptyList(),
-                    isExpanded = false,
-                    onToggleExpand = onToggleExpand,
-                    onLike = onLike,
-                    onReply = onReply,
-                    onEdit = onEdit,
-                    onDelete = onDelete,
-                    onAvatarTap = onAvatarTap,
-                    onMentionTap = onMentionTap,
-                    maskedCommentIds = maskedCommentIds,
-                    temporarilyRevealedCommentIds = temporarilyRevealedCommentIds,
-                    onRevealTemporarily = onRevealTemporarily,
-                    nestingLevel = nestingLevel + 1,
+            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                nestedComments.forEach { nested ->
+                    EnhancedModernCommentRow(
+                        comment = nested,
+                        currentUid = currentUid,
+                        momentAuthorId = momentAuthorId,
+                        nestedComments = emptyList(),
+                        isExpanded = false,
+                        onToggleExpand = onToggleExpand,
+                        onLike = onLike,
+                        onReply = onReply,
+                        onEdit = onEdit,
+                        onDelete = onDelete,
+                        onAvatarTap = onAvatarTap,
+                        onMentionTap = onMentionTap,
+                        maskedCommentIds = maskedCommentIds,
+                        temporarilyRevealedCommentIds = temporarilyRevealedCommentIds,
+                        onRevealTemporarily = onRevealTemporarily,
+                        nestingLevel = nestingLevel + 1,
+                    )
+                }
+            }
+        }
+
+        // ≡ iOS stub `viewMoreReplies` (acción vacía también en Swift)
+        if (nestingLevel >= maxNesting && nestedComments.isNotEmpty()) {
+            Row(
+                Modifier
+                    .padding(start = indentationWidth + 50.dp, top = 8.dp)
+                    .background(Color(0xFF007AFF).copy(0.05f), RoundedCornerShape(50))
+                    .clickable { /* iOS: navegar a hilo — stub vacío */ }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    Icons.Filled.SubdirectoryArrowRight,
+                    contentDescription = null,
+                    tint = Color(0xFFAF52DE),
+                    modifier = Modifier.size(12.dp),
+                )
+                Text(
+                    stringResource(R.string.modern_comments_view_more_replies, nestedComments.size),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFFAF52DE),
                 )
             }
         }
@@ -330,12 +434,24 @@ private fun CommentActionChip(
     content: @Composable () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
+    val shape = RoundedCornerShape(20.dp)
     Row(
         Modifier
             .background(
                 if (active) activeColor.copy(0.1f)
                 else if (isDark) Color.Black.copy(0.3f) else Color.Gray.copy(0.1f),
-                RoundedCornerShape(20.dp),
+                shape,
+            )
+            .then(
+                if (!active) {
+                    Modifier.border(
+                        0.5.dp,
+                        if (isDark) Color.White.copy(0.1f) else Color.Black.copy(0.1f),
+                        shape,
+                    )
+                } else {
+                    Modifier
+                },
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -355,19 +471,16 @@ private fun CommentMentionText(
 ) {
     val annotated = remember(text, mentions) {
         buildAnnotatedString {
-            if (mentions.isNotEmpty()) {
+            val ranges = CommentMentionDraft.mentionRanges(text, mentions)
+            if (ranges.isNotEmpty()) {
                 var cursor = 0
-                val ranges = mentions.mapNotNull { m ->
-                    val needle = "@${m.username}"
-                    val idx = text.indexOf(needle, ignoreCase = true)
-                    if (idx < 0) null else Triple(idx, idx + needle.length, m.userId)
-                }.sortedBy { it.first }
                 for ((start, end, userId) in ranges) {
                     if (cursor < start) {
                         withStyle(SpanStyle(color = baseColor)) { append(text.substring(cursor, start)) }
                     }
                     if (start in text.indices && end <= text.length) {
-                        pushStringAnnotation("mention", userId)
+                        val annotation = userId ?: text.substring(start, end)
+                        pushStringAnnotation("mention", annotation)
                         withStyle(
                             SpanStyle(
                                 color = mentionColor,
@@ -383,23 +496,7 @@ private fun CommentMentionText(
                     withStyle(SpanStyle(color = baseColor)) { append(text.substring(cursor)) }
                 }
             } else {
-                var last = 0
-                for (match in MomentMentionParser.matchesIn(text)) {
-                    if (last < match.range.first) {
-                        withStyle(SpanStyle(color = baseColor)) {
-                            append(text.substring(last, match.range.first))
-                        }
-                    }
-                    pushStringAnnotation("mention", "@${match.username}")
-                    withStyle(SpanStyle(color = mentionColor, fontWeight = FontWeight.SemiBold)) {
-                        append(text.substring(match.range))
-                    }
-                    pop()
-                    last = match.range.last + 1
-                }
-                if (last < text.length) {
-                    withStyle(SpanStyle(color = baseColor)) { append(text.substring(last)) }
-                }
+                withStyle(SpanStyle(color = baseColor)) { append(text) }
             }
         }
     }
@@ -408,9 +505,11 @@ private fun CommentMentionText(
         text = annotated,
         style = androidx.compose.ui.text.TextStyle(
             fontSize = fontSize.sp,
-            color = if (isBlurred) Color.Transparent else baseColor,
+            color = baseColor,
         ),
+        modifier = if (isBlurred) Modifier.blur(8.dp) else Modifier,
         onClick = { offset ->
+            if (isBlurred) return@ClickableText
             annotated.getStringAnnotations("mention", offset, offset)
                 .firstOrNull()
                 ?.let { onMentionTap(it.item) }

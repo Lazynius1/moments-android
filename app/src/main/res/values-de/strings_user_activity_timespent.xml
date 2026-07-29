@@ -5,8 +5,14 @@
     <string name="user_activity_time_spent_details_subtitle">Sieh, wie viel Zeit du jeden Tag in Moments verbringst. Wir nutzen diese Daten, um dir bei der Verwaltung deiner Zeit zu helfen.</string>
     <string name="user_activity_time_spent_daily_limit_title">Tägliches Limit</string>
     <string name="user_activity_time_spent_daily_limit_subtitle">Füge ein Limit für die Zeit hinzu, die du täglich verbringst.</string>
+    <string name="user_activity_time_spent_daily_limit_desc_title">Finde dein Tempo</string>
+    <string name="user_activity_time_spent_daily_limit_desc_body">Moments benachrichtigt dich, wenn du die Zeit erreicht hast, die du täglich in der App verbringen möchtest.</string>
+    <string name="user_activity_time_spent_daily_limit_toggle">Erinnerung an Tageslimit</string>
+    <string name="user_activity_time_spent_daily_limit_picker_title">Dauer des Limits</string>
     <string name="user_activity_time_spent_rest_mode_title">Ruhemodus</string>
     <string name="user_activity_time_spent_rest_mode_subtitle">Wähle die Tageszeiten, in denen Push-Benachrichtigungen stummgeschaltet werden sollen.</string>
+    <string name="user_activity_time_spent_rest_mode_desc_title">Zeit für eine Pause</string>
+    <string name="user_activity_time_spent_rest_mode_desc_body">Schalte Push-Benachrichtigungen von Moments während deiner gewählten Zeiten stumm, um Ablenkungen zu vermeiden.</string>
     <string name="user_activity_time_spent_nav_title">Bildschirmzeit</string>
     <string name="user_activity_time_spent_card_title">Zeit in Moments</string>
     <string name="user_activity_time_spent_average">Tagesdurchschnitt</string>

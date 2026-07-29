@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SearchHistoryActivityView — iOS userActivity.recentSearches.* / explore.recentSearches.type.* -->
+<resources>
+    <string name="user_activity_recent_searches_title">Recent Searches</string>
+    <string name="user_activity_recent_searches_empty">No recent searches</string>
+    <string name="user_activity_recent_searches_clear_all">Clear all</string>
+    <string name="explore_recent_searches_type_user">User</string>
+    <string name="explore_recent_searches_type_hashtag">Hashtag</string>
+    <string name="explore_recent_searches_type_location">Location</string>
+    <string name="explore_recent_searches_type_text">Text search</string>
+</resources>

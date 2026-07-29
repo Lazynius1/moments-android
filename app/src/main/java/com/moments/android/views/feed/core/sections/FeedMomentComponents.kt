@@ -74,6 +74,7 @@ import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.utilities.momentsPressIcon
+import com.moments.android.utilities.HapticManager
 import com.moments.android.views.components.CurrentUserVerifiedBadge
 import com.moments.android.views.components.MomentCaptionView
 import com.moments.android.views.components.VerifiedBadgeView
@@ -497,6 +498,9 @@ fun ModernPostCardView(
     authorHasUnseenStory: Boolean = false,
     showVerifiedBadge: Boolean = false,
     availableHeight: Float? = null,
+    /** ≡ `ModernSavedDetailMomentCard`: `isSaved: .constant(true)` + `onSave` → quitar de guardados. */
+    forceSaved: Boolean = false,
+    onForcedUnsave: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
@@ -568,11 +572,20 @@ fun ModernPostCardView(
     val debugAspectLabel = aspectRatioType.displayName
 
     // iOS: onChange savedMomentIds + loadAllPostData checkIfSaved
-    LaunchedEffect(savedIds, moment.id) {
+    // Saved detail: `isSaved: .constant(true)` — no re-sincronizar desde Firestore.
+    LaunchedEffect(savedIds, moment.id, forceSaved) {
+        if (forceSaved) {
+            isSaved = true
+            return@LaunchedEffect
+        }
         isSaved = savedIds.contains(moment.id)
     }
 
-    LaunchedEffect(moment.id, viewerId) {
+    LaunchedEffect(moment.id, viewerId, forceSaved) {
+        if (forceSaved) {
+            isSaved = true
+            return@LaunchedEffect
+        }
         val uid = viewerId ?: return@LaunchedEffect
         if (savedIds.contains(moment.id)) {
             isSaved = true
@@ -583,6 +596,11 @@ fun ModernPostCardView(
     }
 
     fun toggleSave() {
+        if (forceSaved) {
+            HapticManager.shared.mediumImpact()
+            onForcedUnsave?.invoke()
+            return
+        }
         val uid = viewerId ?: return
         if (isSaveLoading) return
         isSaved = !isSaved

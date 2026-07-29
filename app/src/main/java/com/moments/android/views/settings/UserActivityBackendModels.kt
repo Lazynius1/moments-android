@@ -7,11 +7,11 @@ import org.json.JSONObject
 import java.util.Date
 
 /**
- * Port de `UserActivityBackendModels.swift`.
+ * Port 1:1 de `UserActivityBackendModels.swift` (116 líneas).
  *
- * En iOS son `Codable` sobre la respuesta JSON de las Cloud Functions. Aquí se mantiene el
- * mismo contrato pero parseando con `org.json`, que es el idioma ya establecido en el port
- * (ver `BackendFeedService.kt`). `BackendTagsCursor` no se redeclara: ya existe allí.
+ * Contrato Cloud Functions idéntico; parseo con `org.json` (idioma del port, ver
+ * `BackendFeedService`). `BackendMoment` iOS → [Moment] Android. `BackendTagsCursor`
+ * se reutiliza del feed (mismo `{ timestamp }`).
  */
 
 data class BackendReactionsCursor(val timestamp: Double) {

@@ -5,8 +5,14 @@
     <string name="user_activity_time_spent_details_subtitle">Consulta quant temps passes a Moments cada dia. Fem servir aquestes dades per ajudar-te a gestionar el teu temps.</string>
     <string name="user_activity_time_spent_daily_limit_title">Límit diari</string>
     <string name="user_activity_time_spent_daily_limit_subtitle">Afegeix un límit per al temps que passes cada dia.</string>
+    <string name="user_activity_time_spent_daily_limit_desc_title">Estableix el teu ritme</string>
+    <string name="user_activity_time_spent_daily_limit_desc_body">Moments t\'enviarà una notificació quan superis el temps que hagis decidit passar a l\'aplicació cada dia.</string>
+    <string name="user_activity_time_spent_daily_limit_toggle">Avís de límit diari</string>
+    <string name="user_activity_time_spent_daily_limit_picker_title">Durada del límit</string>
     <string name="user_activity_time_spent_rest_mode_title">Mode Descans</string>
     <string name="user_activity_time_spent_rest_mode_subtitle">Tria les hores del dia a les què vols silenciar les notificacions push.</string>
+    <string name="user_activity_time_spent_rest_mode_desc_title">Moment de pausa</string>
+    <string name="user_activity_time_spent_rest_mode_desc_body">Silencia les notificacions push de Moments durant les hores que triïs per evitar distraccions.</string>
     <string name="user_activity_time_spent_nav_title">Temps invertit</string>
     <string name="user_activity_time_spent_card_title">Temps a Moments</string>
     <string name="user_activity_time_spent_average">Mitjana diària</string>

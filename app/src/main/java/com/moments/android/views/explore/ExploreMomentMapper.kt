@@ -67,5 +67,7 @@ fun Moment.toExploreFeedMoment(): FeedMoment {
         thumbnailUrl = thumbnailUrl,
         imagePath = imagePath,
         videoDuration = videoDuration,
+        taggedUsers = taggedUsers.orEmpty(),
+        isModerationHidden = isModerationHidden == true,
     )
 }

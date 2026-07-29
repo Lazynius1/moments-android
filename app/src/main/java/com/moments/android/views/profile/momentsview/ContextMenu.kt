@@ -27,12 +27,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -72,12 +77,19 @@ import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchHiddenLayerDiscoveriesPage
 import com.moments.android.services.firestore.fetchHiddenLayerMetrics
+import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.utilities.MomentsFormat
+import com.moments.android.views.feed.core.StoryUserPresentationRoute
+import com.moments.android.views.feed.sharing.AddToStoryView
+import com.moments.android.views.feed.sharing.ModernShareSheet
 import com.moments.android.views.feed.sharing.buildMomentShareUrl
+import com.moments.android.views.story.StoriesView
+import com.moments.android.views.story.StoryRingAvatarView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 import java.util.Date
-
 /** Paridad iOS `ContextMenuViewState`. */
 enum class ContextMenuViewState {
     Main,
@@ -121,6 +133,8 @@ fun ModernContextMenuOverlay(
     var selectedLayerDiscoveriesCursor by remember { mutableStateOf<DocumentSnapshot?>(null) }
     var isLoadingSelectedLayerDiscoveries by remember { mutableStateOf(false) }
     var canLoadMoreSelectedLayerDiscoveries by remember { mutableStateOf(false) }
+    var showAddToStory by remember { mutableStateOf(false) }
+    var storyRoute by remember { mutableStateOf<StoryUserPresentationRoute?>(null) }
     val metricsErrorDefault = stringResource(R.string.hidden_layers_metrics_error)
 
     fun dismiss() {
@@ -267,39 +281,48 @@ fun ModernContextMenuOverlay(
                             onLoadMore = { loadSelectedLayerDiscoveries(reset = false) },
                             totalLayers = hiddenLayerMetrics?.totalLayerCount ?: 0,
                             onBack = { viewState = ContextMenuViewState.HiddenLayerMetrics },
-                            onAvatarTap = { viewerId ->
-                                if (viewerId.isNotEmpty()) {
+                            onAvatarTap = { viewerId, hasStory ->
+                                if (viewerId.isEmpty()) return@HiddenLayerMetricDetailPanel
+                                if (hasStory) {
+                                    storyRoute = StoryUserPresentationRoute(viewerId)
+                                } else {
                                     NavigationEventBus.emit(
                                         CoordinatorNavigationEvent.NavigateToUserProfileInFeed(viewerId),
                                     )
                                     dismiss()
                                 }
                             },
+                            onRowTap = { viewerId ->
+                                if (viewerId.isEmpty()) return@HiddenLayerMetricDetailPanel
+                                NavigationEventBus.emit(
+                                    CoordinatorNavigationEvent.NavigateToUserProfileInFeed(viewerId),
+                                )
+                                dismiss()
+                            },
                         )
                         ContextMenuViewState.Sharing -> MainActionsPanel(
                             moment = moment,
                             onClose = { dismiss() },
                             onSendMessage = { viewState = ContextMenuViewState.Messaging },
-                            onAddToStory = { viewState = ContextMenuViewState.PreparingStory },
+                            onAddToStory = { showAddToStory = true },
                             onExternalShare = {
+                                val freshUsername = UserCacheService.getCachedUser(moment.authorId)?.username
+                                    ?: moment.username
+                                val shareText = context.getString(R.string.share_moment_by, freshUsername)
+                                val shareUrl = buildMomentShareUrl(moment)
                                 val intent = Intent(Intent.ACTION_SEND).apply {
                                     type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, buildMomentShareUrl(moment))
+                                    putExtra(Intent.EXTRA_TEXT, "$shareText\n$shareUrl")
                                 }
                                 context.startActivity(Intent.createChooser(intent, null))
                                 dismiss()
                             },
                         )
-                        ContextMenuViewState.Messaging -> {
-                            // ModernShareSheet (contactos) aún no portado — misma ruta iOS ShowMessages.
-                            LaunchedEffect(Unit) {
-                                NavigationEventBus.emit(CoordinatorNavigationEvent.ShowMessages)
-                                dismiss()
-                            }
-                            Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                            }
-                        }
+                        ContextMenuViewState.Messaging -> ModernShareSheet(
+                            moment = moment,
+                            onBack = { viewState = ContextMenuViewState.Sharing },
+                            onDismiss = { dismiss() },
+                        )
                         ContextMenuViewState.PreparingStory -> PreparingStoryPanel(
                             onCancel = { viewState = ContextMenuViewState.Sharing },
                         )
@@ -314,6 +337,30 @@ fun ModernContextMenuOverlay(
                     }
                 }
             }
+        }
+    }
+
+    // ≡ iOS fullScreenCover CreatorView + sticker
+    if (showAddToStory) {
+        AddToStoryView(
+            moment = moment,
+            onDismiss = {
+                showAddToStory = false
+                dismiss()
+            },
+        )
+    }
+
+    // ≡ iOS fullScreenCover StoriesView(startWithUserId:)
+    storyRoute?.let { route ->
+        Dialog(
+            onDismissRequest = { storyRoute = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            StoriesView(
+                startWithUserId = route.userId,
+                onDismiss = { storyRoute = null },
+            )
         }
     }
 }
@@ -440,6 +487,15 @@ private fun HiddenLayerMetricsSummaryCard(
             metrics.discoveredLayerCount,
         )
     }
+    val leadingChip = metrics?.takeIf { it.totalDiscoveries > 0 }?.let { snap ->
+        snap.topLayer?.let {
+            stringResource(R.string.hidden_layers_metrics_chip_top, it.metricsDisplayName())
+        } ?: if (snap.uniquePeopleCount > 0) {
+            stringResource(R.string.hidden_layers_metrics_chip_people, snap.uniquePeopleCount)
+        } else {
+            stringResource(R.string.hidden_layers_metrics_chip_coverage, snap.coverageRatio * 100.0)
+        }
+    }
     Column(Modifier.clickable(onClick = onClick).fillMaxWidth()) {
         HorizontalDivider(
             color = if (isDark) Color.White.copy(0.16f) else Color.Black.copy(0.08f),
@@ -450,6 +506,12 @@ private fun HiddenLayerMetricsSummaryCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Icon(
+                Icons.Filled.AutoAwesome,
+                contentDescription = null,
+                tint = Color(0xFFFFD54F).copy(alpha = if (isDark) 0.82f else 0.72f),
+                modifier = Modifier.size(24.dp),
+            )
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
                     stringResource(R.string.hidden_layers_metrics_title),
@@ -459,8 +521,51 @@ private fun HiddenLayerMetricsSummaryCard(
                 )
                 Text(summary, color = secondary, fontSize = 12.sp, maxLines = 2)
             }
-            Icon(Icons.Filled.ChevronRight, null, tint = if (isDark) Color.White.copy(0.5f) else Color.Black.copy(0.35f))
+            leadingChip?.let { chip ->
+                Text(
+                    chip,
+                    color = if (isDark) Color.White.copy(0.82f) else Color.Black.copy(0.72f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f))
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                )
+            }
+            Icon(
+                Icons.Filled.ChevronRight,
+                null,
+                tint = if (isDark) Color.White.copy(0.5f) else Color.Black.copy(0.35f),
+            )
         }
+    }
+}
+
+@Composable
+private fun ContextSubheaderView(title: String, onBack: () -> Unit) {
+    val isDark = isSystemInDarkTheme()
+    val primary = if (isDark) Color.White else Color.Black
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(top = 18.dp, bottom = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+            contentDescription = null,
+            tint = primary,
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onBack)
+                .padding(6.dp),
+        )
+        Text(title, color = primary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.weight(1f))
     }
 }
 
@@ -474,37 +579,200 @@ private fun HiddenLayerMetricsListPanel(
 ) {
     val isDark = isSystemInDarkTheme()
     val primary = if (isDark) Color.White else Color.Black
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            stringResource(R.string.hidden_layers_metrics_title),
-            color = primary,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 16.sp,
-            modifier = Modifier.clickable(onClick = onBack),
+    val secondary = if (isDark) Color.White.copy(0.72f) else Color.Black.copy(0.56f)
+    Column(Modifier.fillMaxWidth()) {
+        ContextSubheaderView(
+            title = stringResource(R.string.hidden_layers_metrics_title),
+            onBack = onBack,
         )
         when {
-            isLoading -> CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-            errorMessage != null -> Text(errorMessage, color = primary)
-            metrics == null || metrics.layers.isEmpty() ->
-                Text(stringResource(R.string.hidden_layers_metrics_empty_subtitle), color = primary.copy(0.7f))
-            else -> metrics.layers.forEach { layer ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { onSelectLayer(layer) }
-                        .padding(vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(layer.id.take(8), color = primary, fontSize = 14.sp)
-                    Text("${layer.discoverCount ?: 0}", color = primary.copy(0.7f), fontSize = 13.sp)
+            isLoading -> Column(
+                Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                Text(stringResource(R.string.hidden_layers_metrics_loading), color = secondary, fontSize = 13.sp)
+            }
+            errorMessage != null -> Text(
+                errorMessage,
+                color = secondary,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 32.dp),
+            )
+            metrics != null -> Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 24.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                InlineMetricsStrip(metrics)
+                Spacer(Modifier.height(14.dp))
+                metrics.layers.forEachIndexed { index, layer ->
+                    HiddenLayerMetricsRow(
+                        layer = layer,
+                        discoveries = metrics.recentDiscoveriesByLayer[layer.id].orEmpty(),
+                        onClick = { onSelectLayer(layer) },
+                    )
+                    if (index < metrics.layers.lastIndex) {
+                        HorizontalDivider(
+                            color = if (isDark) Color.White.copy(0.1f) else Color.Black.copy(0.08f),
+                            modifier = Modifier.padding(start = 68.dp),
+                        )
+                    }
                 }
             }
+            else -> Text(
+                stringResource(R.string.hidden_layers_metrics_empty_subtitle),
+                color = secondary,
+                modifier = Modifier.padding(20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun InlineMetricsStrip(metrics: HiddenLayerMetricsSnapshot) {
+    val isDark = isSystemInDarkTheme()
+    val primary = if (isDark) Color.White else Color.Black
+    val secondary = if (isDark) Color.White.copy(0.72f) else Color.Black.copy(0.56f)
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        InlineMetricText("${metrics.totalDiscoveries}", stringResource(R.string.hidden_layers_metrics_card_discoveries), primary, secondary)
+        BulletDot(isDark)
+        InlineMetricText("${metrics.uniquePeopleCount}", stringResource(R.string.hidden_layers_metrics_card_people), primary, secondary)
+        BulletDot(isDark)
+        InlineMetricText(
+            "${(metrics.coverageRatio * 100).toInt()}%",
+            stringResource(R.string.hidden_layers_metrics_card_coverage),
+            primary,
+            secondary,
+        )
+    }
+}
+
+@Composable
+private fun InlineMetricText(value: String, label: String, primary: Color, secondary: Color) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(value, color = primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = secondary, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun BulletDot(isDark: Boolean) {
+    Box(
+        Modifier
+            .size(3.dp)
+            .clip(CircleShape)
+            .background(if (isDark) Color.White.copy(0.25f) else Color.Black.copy(0.16f)),
+    )
+}
+
+@Composable
+private fun HiddenLayerMetricsRow(
+    layer: MomentHiddenLayer,
+    discoveries: List<HiddenLayerDiscovery>,
+    onClick: () -> Unit,
+) {
+    val isDark = isSystemInDarkTheme()
+    val primary = if (isDark) Color.White else Color.Black
+    val secondary = if (isDark) Color.White.copy(0.72f) else Color.Black.copy(0.56f)
+    val muted = if (isDark) Color.White.copy(0.55f) else Color.Black.copy(0.45f)
+    val status = layer.metricsStatusText()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HiddenLayerMetricLayerPreview(layer = layer, compact = true)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(layer.metricsDisplayName(), color = primary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                if (status != null) {
+                    Text(
+                        status,
+                        color = if (isDark) Color.White.copy(0.78f) else Color.Black.copy(0.65f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    stringResource(R.string.hidden_layers_metrics_row_discoveries, layer.discoverCount ?: 0),
+                    color = secondary,
+                    fontSize = 11.sp,
+                )
+                Text(
+                    stringResource(R.string.hidden_layers_metrics_row_people, layer.uniqueDiscovererCount ?: 0),
+                    color = secondary,
+                    fontSize = 11.sp,
+                )
+            }
+            discoveries.firstOrNull()?.let { latest ->
+                Text(
+                    stringResource(
+                        R.string.hidden_layers_metrics_row_latest,
+                        MomentsFormat.smartDate(latest.discoveredAt, MomentsFormat.DateContext.MEDIUM_DATE_TIME),
+                    ),
+                    color = muted,
+                    fontSize = 11.sp,
+                )
+            }
+        }
+        Icon(
+            Icons.Filled.ChevronRight,
+            null,
+            tint = if (isDark) Color.White.copy(0.45f) else Color.Black.copy(0.3f),
+            modifier = Modifier.size(14.dp),
+        )
+    }
+}
+
+@Composable
+private fun HiddenLayerMetricLayerPreview(layer: MomentHiddenLayer, compact: Boolean) {
+    val size = if (compact) 34.dp else 42.dp
+    val isDark = isSystemInDarkTheme()
+    Box(
+        Modifier
+            .size(size)
+            .clip(RoundedCornerShape(if (compact) 8.dp else 10.dp))
+            .background(if (isDark) Color.White.copy(0.1f) else Color.Black.copy(0.06f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        when (layer.type) {
+            MomentHiddenLayer.LayerType.IMAGE -> {
+                val url = layer.thumbnailURL ?: layer.mediaURL
+                if (!url.isNullOrBlank()) {
+                    coil.compose.AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    )
+                } else {
+                    Icon(Icons.Filled.Image, null, tint = if (isDark) Color.White else Color.Black, modifier = Modifier.size(18.dp))
+                }
+            }
+            MomentHiddenLayer.LayerType.AUDIO ->
+                Icon(Icons.Filled.GraphicEq, null, tint = if (isDark) Color.White else Color.Black, modifier = Modifier.size(18.dp))
+            MomentHiddenLayer.LayerType.TEXT ->
+                Icon(Icons.Filled.Notes, null, tint = if (isDark) Color.White else Color.Black, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -518,51 +786,129 @@ private fun HiddenLayerMetricDetailPanel(
     onLoadMore: () -> Unit,
     totalLayers: Int,
     onBack: () -> Unit,
-    onAvatarTap: (String) -> Unit,
+    onAvatarTap: (String, Boolean) -> Unit,
+    onRowTap: (String) -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
     val primary = if (isDark) Color.White else Color.Black
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(20.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            stringResource(R.string.hidden_layers_metrics_title) + " ($totalLayers)",
-            color = primary,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.clickable(onClick = onBack),
-        )
-        Text(layer?.id.orEmpty(), color = primary.copy(0.7f), fontSize = 13.sp)
-        discoveries.forEach { discovery ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onAvatarTap(discovery.viewerId) }
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AsyncProfileImageView(userId = discovery.viewerId, modifier = Modifier.size(36.dp).clip(CircleShape))
-                Text(
-                    discovery.username?.takeIf { it.isNotBlank() } ?: discovery.viewerId.take(10),
-                    color = primary,
-                    fontSize = 14.sp,
-                )
+    val secondary = if (isDark) Color.White.copy(0.72f) else Color.Black.copy(0.56f)
+    val title = layer?.metricsDisplayName() ?: stringResource(R.string.hidden_layers_metrics_detail)
+    @Suppress("UNUSED_PARAMETER")
+    val unusedTotal = totalLayers
+    Column(Modifier.fillMaxWidth()) {
+        ContextSubheaderView(title = title, onBack = onBack)
+        if (layer == null) return
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                HiddenLayerMetricLayerPreview(layer = layer, compact = false)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(layer.metricsDisplayName(), color = primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        layer.metricsStatusText()?.let { status ->
+                            Text(
+                                status,
+                                color = if (isDark) Color.White.copy(0.78f) else Color.Black.copy(0.65f),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        InlineMetricText("${layer.discoverCount ?: 0}", stringResource(R.string.hidden_layers_metrics_card_discoveries), primary, secondary)
+                        BulletDot(isDark)
+                        InlineMetricText("${layer.uniqueDiscovererCount ?: 0}", stringResource(R.string.hidden_layers_metrics_card_people), primary, secondary)
+                        BulletDot(isDark)
+                        val coverage = if ((layer.discoverCount ?: 0) > 0) 100 else 0
+                        InlineMetricText("$coverage%", stringResource(R.string.hidden_layers_metrics_card_coverage), primary, secondary)
+                    }
+                }
+            }
+            HorizontalDivider(color = if (isDark) Color.White.copy(0.1f) else Color.Black.copy(0.08f))
+            Text(stringResource(R.string.hidden_layers_metrics_latest_people), color = primary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            if (discoveries.isEmpty()) {
+                Text(stringResource(R.string.hidden_layers_metrics_latest_people_empty), color = secondary, fontSize = 12.sp)
+            } else {
+                discoveries.forEachIndexed { index, discovery ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onRowTap(discovery.viewerId) }
+                            .padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        StoryRingAvatarView(
+                            userId = discovery.viewerId,
+                            size = 32.dp,
+                            lineWidth = 2.2.dp,
+                            onTap = { hasStory -> onAvatarTap(discovery.viewerId, hasStory) },
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                discovery.username?.takeIf { it.isNotBlank() } ?: discovery.viewerId.take(10),
+                                color = primary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(MomentsFormat.smartDate(discovery.discoveredAt, MomentsFormat.DateContext.MEDIUM_DATE_TIME), color = secondary, fontSize = 11.sp)
+                        }
+                    }
+                    if (index < discoveries.lastIndex) {
+                        HorizontalDivider(
+                            color = if (isDark) Color.White.copy(0.1f) else Color.Black.copy(0.08f),
+                            modifier = Modifier.padding(start = 44.dp),
+                        )
+                    }
+                }
+                if (isLoadingMore) {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    }
+                } else if (canLoadMore) {
+                    Text(
+                        stringResource(R.string.feed_see_more),
+                        color = primary,
+                        modifier = Modifier.clickable(onClick = onLoadMore).padding(8.dp),
+                    )
+                }
             }
         }
-        if (isLoadingMore) {
-            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-        } else if (canLoadMore) {
-            Text(
-                stringResource(R.string.feed_see_more),
-                color = primary,
-                modifier = Modifier.clickable(onClick = onLoadMore).padding(8.dp),
-            )
-        }
     }
+}
+
+@Composable
+private fun MomentHiddenLayer.metricsDisplayName(): String = when (type) {
+    MomentHiddenLayer.LayerType.TEXT -> {
+        val trimmed = text?.trim().orEmpty()
+        if (trimmed.isEmpty()) stringResource(R.string.hidden_layers_metrics_layer_text) else trimmed.take(24)
+    }
+    MomentHiddenLayer.LayerType.AUDIO -> stringResource(R.string.hidden_layers_metrics_layer_audio)
+    MomentHiddenLayer.LayerType.IMAGE -> {
+        val trimmed = caption?.trim().orEmpty()
+        if (trimmed.isEmpty()) stringResource(R.string.hidden_layers_metrics_layer_image) else trimmed.take(24)
+    }
+}
+
+@Composable
+private fun MomentHiddenLayer.metricsStatusText(): String? = when {
+    moderationState == MomentHiddenLayer.ModerationState.HIDDEN ->
+        stringResource(R.string.hidden_layers_metrics_status_moderated)
+    moderationState == MomentHiddenLayer.ModerationState.PENDING ->
+        stringResource(R.string.hidden_layers_metrics_status_pending)
+    unlockMode == MomentHiddenLayer.UnlockMode.SCHEDULED && unlockAt != null && unlockAt.after(Date()) ->
+        stringResource(R.string.hidden_layers_metrics_status_scheduled, MomentsFormat.smartDate(unlockAt, MomentsFormat.DateContext.MEDIUM_DATE_TIME))
+    else -> null
 }
 
 @Composable

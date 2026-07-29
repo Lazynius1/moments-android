@@ -215,6 +215,9 @@ object LoginActivityService : LocationListener {
 
     fun currentDeviceDisplayName(): String = getCurrentDeviceInfo()
 
+    /** ≡ `UIDevice.current.identifierForVendor` / fingerprint usado en `deviceFingerprint`. */
+    fun currentDeviceId(): String = currentDeviceFingerprint()
+
     private suspend fun fetchLoginActivityDocuments(userId: String): List<DocumentSnapshot> {
         val collection = db.collection("users").document(userId).collection("loginActivity")
         return try {

@@ -20,11 +20,11 @@ import kotlinx.coroutines.withContext
 import java.util.Date
 
 /**
- * Port de `ActivitySummaryViewModel` (`UserActivitySummaryViewModel.swift`).
+ * Port 1:1 de `ActivitySummaryViewModel` (`UserActivitySummaryViewModel.swift`, 119 líneas).
  *
- * Contadores de la pantalla principal de Actividad. Como en iOS, los de reacciones/comentarios/
- * etiquetas/stickers salen de [ActivityCache] (los rellena [ActivityInteractionDetailViewModel]
- * al cargar cada categoría) y el resto se cuentan contra Firestore.
+ * Contadores de la pantalla Actividad. Cache (reacciones/comentarios/tags/stickers/papelera)
+ * + Firestore (archivados/stories/echoes/followers/visits/moments/reels).
+ * `autoRefresh` calienta DetailVMs en background (1,2s / 2s) igual que iOS.
  */
 class ActivitySummaryViewModel(
     private val firestoreService: FirestoreService = FirestoreService(),

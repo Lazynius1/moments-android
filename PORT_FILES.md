@@ -370,21 +370,21 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] CameraPermissionGate.swift
 **`Profile/Core`**
 - [~] MomentGridPreview.swift
-- [~] ProfileView.swift
-- [~] ProfileViewModel.swift
+- [x] ProfileView.swift → `views/profile/core/ProfileView.kt` (sheets+hero menu+edit/delete; ShowProfileVisits; stories own; temas 🚫)
+- [x] ProfileViewModel.swift → `views/profile/core/ProfileViewModel.kt` (performRefresh; removeFollower FS; note maxLength; pin/archive/delete; FollowStateStore)
 **`Profile/Core/Sections`**
-- [~] ProfileBentoLayout.swift
+- [x] ProfileBentoLayout.swift → `views/profile/core/sections/ProfileBentoLayout.kt` (assigner; BentoGrid vía `planFrames` Dp)
 - [~] ProfileGridHeroTransition.swift
 - [~] ProfileGridMomentMenu.swift
 - [~] ProfileGridPreviewEditorView.swift
-- [~] ProfileHeaderSection.swift
-- [~] ProfileHeaderSkeletonView.swift
-- [~] ProfileMomentZoomNavigation.swift → `views/profile/core/sections/ProfileMomentZoomNavigation.kt` (profileMomentZoomSource usa SharedTransition si el host provee LocalMomentsSharedTransitionScope)
-- [~] ProfileMomentsSection.swift
-- [~] ProfileSavedSection.swift
-- [~] ProfileSharedComponents.swift
-- [~] ProfileShellComponents.swift
-- [~] UserProfileZoomNavigation.swift → `views/profile/core/sections/UserProfileZoomNavigation.kt` (SharedTransitionLayout + sharedElement/sharedBounds; host overlay no Dialog)
+- [x] ProfileHeaderSection.swift → `views/profile/core/sections/ProfileHeaderSection.kt` (StickyChrome+ProfileAvatarNoteView+ExpandableBio; zoom `settings-view`/`edit-profile-view`; ring=`hasActiveStory`; badges 🚫)
+- [x] ProfileHeaderSkeletonView.swift → `views/profile/core/sections/ProfileHeaderSkeletonView.kt` (header+grid skeleton; metrics 3col; shimmer)
+- [x] ProfileMomentZoomNavigation.swift → `views/profile/core/sections/ProfileMomentZoomNavigation.kt` (models+Opener; `profileMomentZoomSource`/`momentZoomDestination` sharedBounds; surfaces canvas; Saved → `ModernSavedMomentsDetailView` stub hasta SavedMomentsView; call sites → post-paridad Zoom)
+- [x] ProfileMomentsSection.swift → `views/profile/core/sections/ProfileMomentsSection.kt` (bentoHeight/planFrames; ModernMomentThumbnail chrome; carousel/play/audience; hero frame reporters → post-paridad)
+- [x] ProfileSavedSection.swift → `views/profile/core/sections/ProfileSavedSection.kt` (filters+grid+recent; zoom; ScreenshotProtected; thumbnail media/video; host state)
+- [x] ProfileSharedComponents.swift → `views/profile/core/sections/ProfileSharedComponents.kt` (error/bio/flow/note; sticky chrome canvas AdaptiveColors sin blur; collapse metrics; reportIdentity/TabsMinY)
+- [x] ProfileShellComponents.swift → `views/profile/core/sections/ProfileShellComponents.kt` (scroll+collapse vía tabsMinY; sticky+floating tabs; PTR; ScreenshotProtected grids; empty tagged; themes/blur 🚫)
+- [x] UserProfileZoomNavigation.swift → `views/profile/core/sections/UserProfileZoomNavigation.kt` (`MomentsSharedTransitionLayout` + `sharedBounds`; Host overlay no Dialog; StoryViewer + FeedPresentations)
 **`Profile/Core`**
 - [~] SharedActivityDetailView.swift
 - [~] SharedActivityView.swift
@@ -406,8 +406,8 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [ ] HighlightViewer.swift
 - [ ] ProfileHighlightsView.swift
 **`Profile/Incognito`**
-- [ ] IncognitoGlobalOverlay.swift
-- [ ] IncognitoModeSheet.swift
+- [x] IncognitoGlobalOverlay.swift → `views/profile/incognito/IncognitoGlobalOverlay.kt` (edge aura+pill glass+expand pause; host MomentsApp)
+- [x] IncognitoModeSheet.swift → `views/profile/incognito/IncognitoModeSheet.kt` (ring+CTA glass+onboarding; detents medium/large; Live Activity 🚫)
 **`Profile/MomentsView`**
 - [~] ContextMenu.swift → `views/profile/momentsview/ContextMenu.kt` (`ModernContextMenuOverlay`; cableado en FeedOverlays)
 - [~] EditMomentView.swift → `views/profile/momentsview/EditMomentView.kt` (cableado desde Feed + SingleMomentDetail; AudienceSelector/LocationPicker/PhotoTag = pickers simples / stubs honestos)
@@ -418,74 +418,74 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [ ] ProfileThemeDemo.swift
 - [ ] ProfileThemeSelector.swift
 **`Profile/UserProfile/Sections`**
-- [~] UserProfileAvatarBadges.swift → `sections/UserProfileAvatarBadges.kt` (anillo de historia + long-press a foto completa; badges/Plus NO portados a propósito: sistemas descartados)
-- [~] UserProfileHeaderSection.swift → `sections/UserProfileHeaderSection.kt` (chrome fijado con back/username+verificado/menú mute-block-report-share-QR, y cabecera: avatar+nota, username en gradiente, bio expandible, web, botones seguir/mensaje. **Falta**: `UserProfileBadgesView` (descartado), ShareLink real (el item Share abre el mismo QR), y el flujo `startConversation` queda en el host vía `onOpenMessage`)
-- [~] UserProfileMomentsSection.swift → `sections/UserProfileMomentsSection.kt` (`UserModernMomentThumbnail` delega en `ModernMomentThumbnail` ya portado —misma maquinaria media/crop/chrome/gestos— fijando estilo visitante; + `calculateBentoGridHeight`/`calculateTaggedGridHeight` con parámetro `availableWidth` extra)
-- [~] UserProfileOverviewSection.swift → `sections/UserProfileOverviewSection.kt` (stats posts/seguidores/seguidos con gating de privacidad, intereses desplegables, `UserExpandableBioView`, `UserModernAvatar`, `UserModernInterestsView`. **Falta**: resaltado de intereses compartidos no se autocarga —`sharedInterests` es parámetro, iOS lo leía de Firestore en `onAppear`)
-- [~] UserProfilePublicProfileView.swift → `sections/UserProfilePublicProfileView.kt` (composición: chrome+cabecera+overview+destacadas+pills tabs+grids bento de momentos y etiquetados con ScreenshotProtectedView y zoom sourceID. **Falta**: pull-to-refresh (queda en el host, solo se pinta el indicador), sticky chrome con blur real, tab bar flotante fijada, y las rutas sheet de QR/report/conexiones salen por callback)
-- [~] UserProfileRelationshipViews.swift → `sections/UserProfileRelationshipViews.kt` (chip + hoja completa de gestión: mejor amigo, silenciar, listas personalizadas con navegación interna y diálogo de confirmación de borrado, dejar de seguir. `confirmationDialog`→`AlertDialog`)
-- [~] UserProfileSharedViews.swift → `sections/UserProfileSharedViews.kt` (StatItem, fondo desenfocado, preview de moment, contenido expandible, visor de foto, indicador de refresh)
-- [~] UserProfileStateViews.swift → `sections/UserProfileStateViews.kt` (sin momentos, bloqueado, privado con stats "--", no disponible, sin conexión, bloqueado-por-mí. **Falta**: gesto de arrastre para cerrar en `UserModernBlockedView`, y mensajería vía callback `onOpenMessage`)
+- [x] UserProfileAvatarBadges.swift → `sections/UserProfileAvatarBadges.kt` (anillo + long-press; chapas Plus/Support 🚫; refresh en SharedViews)
+- [x] UserProfileHeaderSection.swift → `sections/UserProfileHeaderSection.kt` (StickyChrome + ProfileAvatarNoteView + mute strings + ShareLink `glowsy.app/{user}` + QR aparte; badges 🚫; mensaje vía `onOpenMessage`)
+- [x] UserProfileMomentsSection.swift → `sections/UserProfileMomentsSection.kt` (`UserModernMomentThumbnail` → `ModernMomentThumbnail` sin audience badge; heights con default 393dp; press scale en shared thumbnail)
+- [x] UserProfileOverviewSection.swift → `sections/UserProfileOverviewSection.kt` (stats+intereses; `UserModernInterestsView` carga intereses del viewer desde Firestore; chips shared/border/scale; `UserProfileColors`)
+- [x] UserProfilePublicProfileView.swift → `sections/UserProfilePublicProfileView.kt` (sticky chrome+floating tabs via tabsMinY; `.momentRefresh` + tokens highlights/story; grids bento + ScreenshotProtectedView; nav por callbacks)
+- [x] UserProfileRelationshipViews.swift → `sections/UserProfileRelationshipViews.kt` (chip + sheet BF/mute/listas/unfollow; `listIconVector`; back chrome; `userId` firma; host `MomentsModalSheet` medium/large)
+- [x] UserProfileSharedViews.swift → `sections/UserProfileSharedViews.kt` (StatItem, fondo desenfocado, preview, expandable, visor foto, refresh; `UserFlowLayout` ≡ `ProfileFlowLayout`)
+- [x] UserProfileStateViews.swift → `sections/UserProfileStateViews.kt` (empty/blocked/private/unavailable/offline/blocked-by-me; swipe>100 dismiss; `onOpenMessage` host)
 **`Profile/UserProfile`**
-- [~] UserProfileView.swift → `views/profile/userprofile/UserProfileView.kt` (**port completo de la raíz**: `UserProfileColors`, `UserProfileTabType` con icono+título, `UserProfilePillTabs` con pulgar deslizante y arrastre —umbral 28% del segmento y tap directo como iOS—, `UserProfileFloatingTabBar`, y el enrutado de estados cargando/bloqueado-por-mí/no-disponible/sin-conexión/privado/público + hojas: gestión de relación, confirmación de unfollow con mensaje distinto si el perfil es privado, visor de foto, historias, QR, reporte, y zoom de moment vía `MomentZoomOpener`. `handleFollowAction` y la visita diferida 1s portados. **Puentes documentados**: (1) `onOpenMessage` sin destino — no existe `startConversation` en el `MessagingViewModel` de Kotlin; (2) ruta de conexiones sociales pendiente — `SocialConnectionsScreen` exige `ProfileViewModel`, no `UserProfileViewModel`, y cablearla obliga a tocar ese archivo; (3) fondo con `UserModernBackgroundView` en vez de `EnhancedProfileBackground` porque los temas de perfil están descartados; (4) sin `ProfileGridHeroTransitionCoordinator` — se usa el zoom ya portado, que es la infraestructura equivalente)
-- [~] UserProfileViewModel.swift → `views/profile/userprofile/UserProfileViewModel.kt` (**port completo del VM 1071→~490 líneas**: fetchProfile con caché local+visibilidad, refresh, conexiones categorizadas por privacidad, tagged, sugeridas por intereses, común, follow/unfollow/cancel/request, block/unblock, best friend, mute, custom lists, visitas+afinidad. DispatchGroup→coroutines. Puentes: sin observer NotificationCenter, hápticas a la UI, checkIfBestFriend vía bestFriends del viewer)
+- [x] UserProfileView.swift → `views/profile/userprofile/UserProfileView.kt` (estados+pill tabs+sheets; SocialConnections; `openMessageFlow` → `MessagingViewModel.startConversation` / `PendingChatContextFactory.outgoing` + `GlassmorphicChatView` + `ChatRecoveryGateView`; fondo sin temas 🚫; zoom vía `MomentZoomOpener`)
+- [x] UserProfileViewModel.swift → `views/profile/userprofile/UserProfileViewModel.kt` (listener FollowStateStore; unavailable/network; mute get+update; BF vía PrivacyService; CF moments/tagged/highlights)
 **`Settings`**
-- [~] AccountHistoryActivityView.swift → `views/settings/AccountHistoryActivityView.kt`
+- [x] AccountHistoryActivityView.swift → `views/settings/AccountHistoryActivityView.kt`
 - [~] AccountManagement.swift → `views/settings/AccountManagement.kt`
 - [~] BlockedUsersView.swift → `views/settings/BlockedUsersView.kt`
-- [~] ChatStorageSettingsView.swift → `views/settings/ChatStorageSettingsView.kt`
-- [~] ContentVisibilityView.swift → `views/settings/ContentVisibilityView.kt`
-- [~] DailyLimitView.swift → `views/settings/DailyLimitView.kt`
-- [~] DataExportView.swift → `views/settings/DataExportView.kt`
-- [~] LoginActivityView.swift → `views/settings/LoginActivityView.kt`
-- [~] MuteSettingsView.swift → `views/settings/MuteSettingsView.kt`
-- [~] PasswordChangeView.swift → `views/settings/PasswordChangeView.kt`
+- [x] ChatStorageSettingsView.swift → `views/settings/ChatStorageSettingsView.kt`
+- [x] ContentVisibilityView.swift → `views/settings/ContentVisibilityView.kt`
+- [x] DailyLimitView.swift → `views/settings/DailyLimitView.kt`
+- [x] DataExportView.swift → `views/settings/DataExportView.kt`
+- [x] LoginActivityView.swift → `views/settings/LoginActivityView.kt`
+- [x] MuteSettingsView.swift → `views/settings/MuteSettingsView.kt`
+- [x] PasswordChangeView.swift → `views/settings/PasswordChangeView.kt`
 - [~] QRCode.swift → `views/settings/QRCodeView.kt`
-- [~] RestModeView.swift → `views/settings/RestModeView.kt`
+- [x] RestModeView.swift → `views/settings/RestModeView.kt`
 **`Settings/SavedMoments`**
-- [~] SavedMomentsViewModel.swift → `views/settings/savedmoments/SavedMomentsViewModel.kt`
+- [x] SavedMomentsViewModel.swift → `views/settings/savedmoments/SavedMomentsViewModel.kt`
 **`Settings`**
-- [~] SavedMomentsView.swift → `views/settings/savedmoments/SavedMomentsView.kt`
-- [~] SearchHistoryActivityView.swift → `views/settings/SearchHistoryActivityView.kt`
-- [~] SetPasswordView.swift → `views/settings/SetPasswordView.kt`
-- [~] SettingsNavigationComponents.swift → `views/settings/SettingsNavigationComponents.kt`
+- [x] SavedMomentsView.swift → `views/settings/savedmoments/SavedMomentsView.kt` + `ModernSavedMomentsDetailView.kt`
+- [x] SearchHistoryActivityView.swift → `views/settings/SearchHistoryActivityView.kt`
+- [x] SetPasswordView.swift → `views/settings/SetPasswordView.kt`
+- [x] SettingsNavigationComponents.swift → `views/settings/SettingsNavigationComponents.kt`
 **`Settings/SettingsSections`**
 - [~] NotificationSettingsView.swift → `views/settings/settingssections/NotificationSettingsView.kt`
 - [~] OnlineStatusSection.swift → `views/settings/settingssections/OnlineStatusSection.kt`
 - [~] PersonalInfoSettingsViews.swift → `views/settings/settingssections/PersonalInfoSettingsViews.kt`
-- [~] SettingsSections.swift → `views/settings/settingssections/SettingsSections.kt`
+- [x] SettingsSections.swift → `views/settings/sections/*`
 **`Settings`**
-- [~] SettingsView.swift → `views/settings/SettingsView.kt`
-- [~] SettingsViewModel.swift → `views/settings/SettingsViewModel.kt`
-- [~] TimeSpentCardView.swift → `views/settings/TimeSpentDetailsView.kt` (TimeSpentCardView: media diaria + barras 7 días)
-- [~] TimeSpentDetailsView.swift → `views/settings/TimeSpentDetailsView.kt` (cabecera + card + filas a DailyLimit/RestMode; enganchado en UserActivityView)
-- [~] UserActivityBackendModels.swift → `views/settings/UserActivityBackendModels.kt` (contrato de las Cloud Functions con `org.json` en vez de Codable; `BackendTagsCursor` se reutiliza de `BackendFeedService`)
-- [~] UserActivityCache.swift → `views/settings/UserActivityCache.kt` (SharedPreferences con las mismas claves `activityCache_*_{uid}` que UserDefaults; sin verificar en pantalla)
-- [~] UserActivityComponents.swift → `views/settings/UserActivityComponents.kt` (fila de categoría con iconos animados + badge de contador, `StripThumbCell` con thumbnail de vídeo/blur/candado, `AuthorFilterSheet`; sin verificar en pantalla)
-- [~] UserActivityDetailView.swift → `views/settings/UserActivityDetailView.kt` (MVP: estados carga/error/vacío, grid reacciones/tags/archivados/papelera + listas comentarios/eventos + grid moments/reels, filtros orden/fecha/autor, modo selección y borrado/restauración por lotes con diálogo de confirmación y banner de éxito. **Diferido a pulido:** drag-select por arrastre, auto-scroll, rango de fechas custom (se comporta como "todo"), y la transición de zoom compartida — delegada al host vía callback `onOpenMoment` reutilizando `MomentZoomOpener`/`ProfileMomentZoomNavigation` que YA existen en el port)
-- [~] UserActivityDetailViewModel.swift → `views/settings/UserActivityDetailViewModel.kt` (11 categorías, borrado por lotes, cursores y caché-primero; `fetchNotifications` sin consumidor igual que en iOS; sin verificar en pantalla)
-- [~] UserActivityModels.swift → `views/settings/UserActivityModels.kt`
-- [~] UserActivityRows.swift → `views/settings/UserActivityRows.kt` (7 componentes: fila comentario, preview moment, fila evento con variantes echo/visita/follower, tarjetas reacción/portrait/story borrada, indicador de vídeo; helper `MomentPreviewContent` unifica la cascada de preview; sin verificar en pantalla)
-- [~] UserActivitySummaryViewModel.swift → `views/settings/UserActivitySummaryViewModel.kt` (contadores + warm-up de VMs; thumbnails vacíos como en iOS; sin verificar en pantalla)
-- [~] UserActivityTypes.swift → `views/settings/UserActivityTypes.kt` (iconos SF→Material salvo tags/echoes por asset; `AnimatedReactionIcon`/`AnimatedCommentIcon` con su animación; bubbles de comentario reducidas de 6 a 3 por falta de equivalentes Material)
-- [~] UserActivityView.swift → `views/settings/UserActivityView.kt` (pantalla raíz "Tu actividad" con las 5 secciones, contadores del SummaryVM, navegación interna por categoría; **enganchada en Settings** vía ruta `user_activity` en ProfileView. `searches`→SearchHistoryActivityView, `storiesArchive`→ArchivedStoriesView, resto→DetailView; `timeSpent`/`accountHistory` abren el detalle vacío hasta portar sus pantallas)
+- [x] SettingsView.swift → `views/settings/SettingsView.kt` + `sections/SettingsFormView.kt`
+- [x] SettingsViewModel.swift → `views/settings/SettingsViewModel.kt`
+- [x] TimeSpentCardView.swift → `views/settings/TimeSpentCardView.kt` (media diaria + barras 7 días; accent + min 4dp; refresh 60s)
+- [x] TimeSpentDetailsView.swift → `views/settings/TimeSpentDetailsView.kt` (cabecera + card + filas DailyLimit/RestMode; SettingsSubsectionWrapper + PTR 400ms)
+- [x] UserActivityBackendModels.swift → `views/settings/UserActivityBackendModels.kt` (CF contrato + org.json; BackendTagsCursor reutilizado)
+- [x] UserActivityCache.swift → `views/settings/UserActivityCache.kt` (prefs + mismas claves activityCache_*_{uid})
+- [x] UserActivityComponents.swift → `views/settings/UserActivityComponents.kt` (fila + StripThumbCell + AuthorFilterSheet title/close/accent)
+- [x] UserActivityDetailView.swift → `views/settings/UserActivityDetailView.kt` (paridad funcional: carga/error+Retry/vacío rico, grids Column chunked 3, filtros orden/fecha/autor+custom date range, `filteredEventItems`, echoes chips, `ActivityCollapsibleFilterScroll`+PTR, `MomentsModalSheet` author, selection bars, processing/success banners, drag-select+auto-scroll papelera, long-press solo ARCHIVED/RECENTLY_DELETED, presentaciones internas MomentZoom Single / Reels / ArchiveDayStories / StoriesView / EchoViewerUI / perfil, `SettingsToolbarBackButton`)
+- [x] UserActivityDetailViewModel.swift → `views/settings/UserActivityDetailViewModel.kt` (11 categorías, mutaciones batch, CF pages, cache-first; Echoes Once)
+- [x] UserActivityModels.swift → `views/settings/UserActivityModels.kt`
+- [x] UserActivityRows.swift → `views/settings/UserActivityRows.kt` (7 componentes; echo expires/chevron; contextPrefix poll/question; selección border)
+- [x] UserActivitySummaryViewModel.swift → `views/settings/UserActivitySummaryViewModel.kt` (contadores + warm-up DetailVMs; thumbs vacíos ≡ iOS)
+- [x] UserActivityTypes.swift → `views/settings/UserActivityTypes.kt` (categorías + sort/date + Moment reel helpers + iconos animados 6 burbujas)
+- [x] UserActivityView.swift → `views/settings/UserActivityView.kt` (5 secciones + PTR + Archived/RecentlyDeleted menus; TimeSpent/AccountHistory cableados)
 **`Shared`**
-- [ ] AppErrorBanner.swift
-- [ ] BlurView.swift
+- [x] AppErrorBanner.swift → `views/shared/AppErrorBanner.kt` (warning+mensaje+retry chrome glass; Feed/Explore/Highlights)
+- [🚫] BlurView.swift — UIKit `UIViewRepresentable`; call sites → fill / `momentsChromeGlass`
 **`Shared/MomentDetail`**
-- [~] MomentDetailContainerView.swift → `views/shared/momentdetail/MomentDetailContainerView.kt` (ProfileCarousel cae a Single hasta portar ModernMomentDetailView)
-- [~] MomentDetailContext.swift → `views/shared/momentdetail/MomentDetailContext.kt`
-- [~] SingleMomentDetailView.swift → `views/shared/momentdetail/SingleMomentDetailView.kt` (card/chrome/menu/peek/mapa/delete + ModernComments; Edit/Explore = placeholders)
+- [x] MomentDetailContainerView.swift → `views/shared/momentdetail/MomentDetailContainerView.kt` (Single / ModernMomentDetail / Location)
+- [x] MomentDetailContext.swift → `views/shared/momentdetail/MomentDetailContext.kt`
+- [x] SingleMomentDetailView.swift → `views/shared/momentdetail/SingleMomentDetailView.kt` (card/chrome sticky blur/menu/peek/mapa/delete/Edit/Explore/Comments; Stories startWithUserId; GlobalVideoManager; dismiss+velocity)
 **`Shared`**
-- [ ] MomentsVideoPlaybackTimeline.swift
-- [ ] MomentsVideoPlayer.swift
-- [ ] OfflineBannerModifier.swift
-- [ ] PhotoTagOverlayView.swift
-- [~] ScreenshotProtectedView.swift → `views/shared/ScreenshotProtectedView.kt`
+- [x] MomentsVideoPlaybackTimeline.swift → `views/shared/MomentsVideoPlaybackTimeline.kt`
+- [x] MomentsVideoPlayer.swift → `views/shared/MomentsVideoPlayer.kt` (Exo+Preloader+stall; NormalVideo/FullScreen)
+- [x] OfflineBannerModifier.swift → `views/shared/OfflineBannerModifier.kt` (Collapsible+orb; TabBar+UserProfile)
+- [x] PhotoTagOverlayView.swift → `views/shared/PhotoTagOverlayView.kt`
+- [x] ScreenshotProtectedView.swift → `views/shared/ScreenshotProtectedView.kt` (FLAG_SECURE con refcount por window; cornerRadius/updateToken/fillsContainer; helper `ScreenshotProtected`)
 **`comments`**
-- [~] CommentMentionSearchOverlay.swift → `views/comments/CommentMentionSearchOverlay.kt`
+- [~] CommentMentionSearchOverlay.swift → `views/comments/CommentMentionSearchOverlay.kt` — chrome glass header/cancel/+ + stroke
 - [ ] CommentsView.swift (legacy iOS; el feed usa ModernCommentsView)
-- [~] ModernCommentsView.swift → `views/comments/ModernCommentsView.kt` (+ `CommentMuteFilters.kt`, `CommentMentionDraft.kt`, `EnhancedModernCommentRow.kt`) — listener, mute filters, menciones, skeletons, StoryRing, like/reply/edit/delete, moderación; cableado en FeedPresentation + SingleMomentDetail
+- [~] ModernCommentsView.swift → comments/* — P1: floating composer, edit UI, sort icons, diacritic mentions; pendiente QA visual/funcional
 **`story`**
 - [~] QuestionResponsesView.swift → `views/story/QuestionResponsesView.kt` (tarjeta, listado Firestore de respuestas y creator con `questionResponse`)
 - [~] StoriesView.swift → `views/story/StoriesView.kt` (Deck Pass + handleStoryDeleted; ads/chains parcial)
@@ -618,7 +618,7 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] TimeSpentManager.swift → `services/activity/TimeSpentManager.kt`
 **`Auth`**
 - [~] AuthService.swift → `services/auth/AuthService.kt` (email+Google; Apple/Passkey N/A)
-- [~] LoginActivityService.swift → `services/auth/LoginActivityService.kt`
+- [x] LoginActivityService.swift → `services/auth/LoginActivityService.kt`
 - [~] OnboardingDraftStore.swift → `services/auth/OnboardingDraftStore.kt`
 - [~] PasskeyService.swift — N/A (Android: solo Google + email)
 **`Cache`**

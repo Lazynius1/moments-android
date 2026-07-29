@@ -113,6 +113,8 @@ enum class ArchiveDisplayMode { STORIES, CALENDAR, MAP }
 @Composable
 fun ArchivedStoriesView(
     onNavigateBack: () -> Unit = {},
+    /** ≡ iOS `ArchiveView(embedInNavigation:false, showsCustomDismiss:false)` — chrome lo aporta el host. */
+    showTopBar: Boolean = true,
     viewModel: ArchiveViewModel = viewModel(),
 ) {
     val isDark = isSystemInDarkTheme()
@@ -135,26 +137,28 @@ fun ArchivedStoriesView(
     Scaffold(
         containerColor = backgroundColor,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.archived_stories_header_title),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = textColor,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back),
-                            tint = textColor,
+            if (showTopBar) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = stringResource(R.string.archived_stories_header_title),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = textColor,
                         )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = backgroundColor),
-            )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.common_back),
+                                tint = textColor,
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = backgroundColor),
+                )
+            }
         },
     ) { innerPadding ->
         Box(

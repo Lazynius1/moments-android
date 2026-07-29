@@ -11,28 +11,34 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
-import com.moments.android.views.feed.core.AppErrorBanner
 import com.moments.android.views.profile.core.ProfileColors
+import com.moments.android.views.shared.AppErrorBanner
+import com.moments.android.views.shared.MomentsModalSheet
+import kotlinx.coroutines.delay
 
 /** Port de `HighlightNameCoverStep.swift`. */
 @Composable
@@ -41,6 +47,12 @@ fun HighlightNameCoverStep(viewModel: HighlightCreateFlowViewModel) {
     val coverUrl = viewModel.coverStory?.mediaItem?.thumbnailUrl
         ?: viewModel.coverStory?.mediaItem?.url
         ?: viewModel.editingHighlight?.coverImageUrl
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(350)
+        runCatching { focusRequester.requestFocus() }
+    }
 
     Column(Modifier.fillMaxSize()) {
         viewModel.errorMessage?.let { errorMessage ->
@@ -55,20 +67,31 @@ fun HighlightNameCoverStep(viewModel: HighlightCreateFlowViewModel) {
 
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
-                Modifier.size(coverSize).clip(CircleShape).clickable { viewModel.showCoverPicker = true },
+                Modifier
+                    .size(coverSize)
+                    .clip(CircleShape)
+                    .clickable { viewModel.showCoverPicker = true },
                 contentAlignment = Alignment.Center,
             ) {
-                if (coverUrl != null) {
+                if (!coverUrl.isNullOrBlank()) {
                     AsyncImage(coverUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 } else {
-                    Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = .12f)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Filled.Photo, null, tint = Color.Gray.copy(alpha = .5f), modifier = Modifier.size(30.dp))
+                    Box(
+                        Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.Photo,
+                            null,
+                            tint = Color.Gray.copy(alpha = 0.5f),
+                            modifier = Modifier.size(30.dp),
+                        )
                     }
                 }
             }
             Spacer(Modifier.height(14.dp))
             Text(
-                stringResource(R.string.highlight_edit_cover),
+                stringResource(R.string.highlighted_stories_edit_cover),
                 color = ProfileColors.accent,
                 fontWeight = FontWeight.Medium,
                 fontSize = 15.sp,
@@ -78,24 +101,50 @@ fun HighlightNameCoverStep(viewModel: HighlightCreateFlowViewModel) {
 
         Spacer(Modifier.height(40.dp))
 
-        OutlinedTextField(
+        BasicTextField(
             value = viewModel.title,
             onValueChange = { viewModel.title = it },
-            placeholder = { Text(stringResource(R.string.highlight_default_title), color = ProfileColors.textSecondary()) },
-            textStyle = androidx.compose.ui.text.TextStyle(fontWeight = FontWeight.Medium, textAlign = TextAlign.Center),
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
+            textStyle = TextStyle(
+                color = ProfileColors.textPrimary(),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+            ),
+            cursorBrush = SolidColor(ProfileColors.textPrimary()),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 48.dp)
+                .focusRequester(focusRequester),
+            decorationBox = { inner ->
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    if (viewModel.title.isEmpty()) {
+                        Text(
+                            stringResource(R.string.highlighted_stories_default_title),
+                            color = ProfileColors.textSecondary(),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                    inner()
+                }
+            },
         )
 
-        Spacer(Modifier.height(0.dp))
+        Spacer(Modifier.weight(1f))
     }
 
     if (viewModel.showCoverPicker) {
-        HighlightCoverPickerSheet(
-            stories = viewModel.selectedStories,
-            selectedCoverId = viewModel.coverStory?.id,
-            onSelect = { viewModel.coverStory = it },
-            onDismiss = { viewModel.showCoverPicker = false },
-        )
+        MomentsModalSheet(
+            onDismissRequest = { viewModel.showCoverPicker = false },
+            largeOnly = false,
+        ) {
+            HighlightCoverPickerSheet(
+                stories = viewModel.selectedStories,
+                selectedCoverId = viewModel.coverStory?.id,
+                onSelect = { viewModel.coverStory = it },
+                onDismiss = { viewModel.showCoverPicker = false },
+            )
+        }
     }
 }

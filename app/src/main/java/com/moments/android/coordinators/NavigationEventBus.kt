@@ -32,6 +32,8 @@ sealed class CoordinatorNavigationEvent {
     data object OpenNotifications : CoordinatorNavigationEvent()
     data object ShowProfileVisits : CoordinatorNavigationEvent()
     data object ShowStories : CoordinatorNavigationEvent()
+    /** Stories abiertas en un autor concreto (≡ `StoriesView(startWithUserId:)`). */
+    data class ShowStoriesStartingAt(val userId: String) : CoordinatorNavigationEvent()
     data object ScrollFeedToTop : CoordinatorNavigationEvent()
     data class NavigateToUserProfileInFeed(val userId: String) : CoordinatorNavigationEvent()
     data object ShowExploreView : CoordinatorNavigationEvent()

@@ -7,6 +7,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,10 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PersonPin
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,7 +61,9 @@ import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.models.Moment
+import com.moments.android.views.components.ActivityGridAudienceIcon
 import com.moments.android.views.creator.audienceselector.ContentAudience
+import com.moments.android.views.messaging.components.ChatVideoPlayBadge
 import com.moments.android.views.profile.core.GridPreviewThumbnailFrame
 import com.moments.android.views.profile.core.gridPreviewSettings
 import kotlinx.coroutines.Dispatchers
@@ -71,14 +74,89 @@ import kotlin.math.max
 object ProfileMomentsGridMetrics {
     const val columns = 3
     val spacing = 1.dp
+    /** ≡ iOS `defaultAvailableWidth` fallback (393pt). */
+    val defaultAvailableWidth = 393.dp
+
     fun columnWidth(availableWidth: Dp): Dp = (availableWidth - spacing * (columns - 1)) / columns
+
     fun tileWidth(kind: BentoTileKind, unitWidth: Dp): Dp = unitWidth * kind.colSpan + spacing * (kind.colSpan - 1)
+
     fun tileHeight(kind: BentoTileKind, unitWidth: Dp): Dp = unitWidth * kind.rowSpan + spacing * (kind.rowSpan - 1)
-    fun bentoHeight(tileKinds: List<BentoTileKind>, availableWidth: Dp): Dp {
+
+    /**
+     * ≡ iOS `bentoHeight`: shortest-column en Dp (no unidades enteras),
+     * con spacing solo entre tiles apilados.
+     */
+    fun bentoHeight(tileKinds: List<BentoTileKind>, availableWidth: Dp = defaultAvailableWidth): Dp {
+        if (tileKinds.isEmpty()) return 0.dp
         val unit = columnWidth(availableWidth)
-        return ProfileBentoLayoutPlanner.height(tileKinds, columns).let { rows -> if (rows == 0) 0.dp else unit * rows + spacing * (rows - 1) }
+        val spacingV = spacing.value
+        val heights = FloatArray(columns) { 0f }
+        for (kind in tileKinds) {
+            val tileH = tileHeight(kind, unit).value
+            var bestColumn = 0
+            var bestY = Float.POSITIVE_INFINITY
+            for (start in 0..(columns - kind.colSpan)) {
+                val y = (start until start + kind.colSpan).maxOf { col ->
+                    if (heights[col] > 0f) heights[col] + spacingV else 0f
+                }
+                if (y < bestY || (y == bestY && start < bestColumn)) {
+                    bestY = y
+                    bestColumn = start
+                }
+            }
+            val newBottom = bestY + tileH
+            for (col in bestColumn until bestColumn + kind.colSpan) {
+                heights[col] = newBottom
+            }
+        }
+        return heights.max().dp
+    }
+
+    /** Frames en Dp para colocar celdas (mismo algoritmo que [bentoHeight]). */
+    fun planFrames(tileKinds: List<BentoTileKind>, availableWidth: Dp): List<BentoFrame> {
+        if (tileKinds.isEmpty()) return emptyList()
+        val unit = columnWidth(availableWidth)
+        val spacingV = spacing.value
+        val heights = FloatArray(columns) { 0f }
+        return tileKinds.mapIndexed { index, kind ->
+            val tileW = tileWidth(kind, unit)
+            val tileH = tileHeight(kind, unit).value
+            var bestColumn = 0
+            var bestY = Float.POSITIVE_INFINITY
+            for (start in 0..(columns - kind.colSpan)) {
+                val y = (start until start + kind.colSpan).maxOf { col ->
+                    if (heights[col] > 0f) heights[col] + spacingV else 0f
+                }
+                if (y < bestY || (y == bestY && start < bestColumn)) {
+                    bestY = y
+                    bestColumn = start
+                }
+            }
+            val newBottom = bestY + tileH
+            for (col in bestColumn until bestColumn + kind.colSpan) {
+                heights[col] = newBottom
+            }
+            BentoFrame(
+                index = index,
+                kind = kind,
+                x = (unit.value + spacingV).dp * bestColumn,
+                y = bestY.dp,
+                width = tileW,
+                height = tileH.dp,
+            )
+        }
     }
 }
+
+data class BentoFrame(
+    val index: Int,
+    val kind: BentoTileKind,
+    val x: Dp,
+    val y: Dp,
+    val width: Dp,
+    val height: Dp,
+)
 
 /** Port de `ModernMomentThumbnail`: imagen/vídeo, crop, chrome y gestures del grid. */
 @Composable
@@ -97,31 +175,82 @@ fun ModernMomentThumbnail(
     descriptor: ProfileGridTileDescriptor = ProfileGridTileDescriptor.standard(moment),
     modifier: Modifier = Modifier,
 ) {
+    @Suppress("UNUSED_PARAMETER")
+    val unusedLists = customListNamesById
+    val coordinator = LocalProfileGridHeroCoordinator.current
     val cellWidth = ProfileMomentsGridMetrics.tileWidth(descriptor.layoutKind, size)
     val cellHeight = ProfileMomentsGridMetrics.tileHeight(descriptor.layoutKind, size)
-    var pressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (pressed) .97f else 1f, label = "profileThumbnailPress")
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, label = "profileThumbnailPress")
+    val resolvedAudience = resolvedContentAudience(moment)
+    val liftedOpacity = coordinator?.liftedGridSourceContentOpacity(moment, gridIndex) ?: 1f
+    val dark = isSystemInDarkTheme()
+    val hole = if (dark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     Box(
         modifier = modifier
             .size(cellWidth, cellHeight)
             .clip(RoundedCornerShape(4.dp))
-            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .background(hole)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                alpha = liftedOpacity
+            }
             .profileMomentZoomSource(zoomSourceID)
+            .profileGridThumbnailFrameReporter(moment, gridIndex, coordinator)
             .then(
                 if (isInteractionEnabled && (onTap != null || onLongPress != null)) {
                     Modifier.combinedClickable(
+                        interactionSource = interactionSource,
+                        indication = null,
                         onClick = { onTap?.invoke() },
                         onLongClick = { onLongPress?.invoke() },
                     )
-                } else Modifier
+                } else {
+                    Modifier
+                },
             ),
     ) {
         ProfileThumbnailMedia(moment, size, cellWidth, cellHeight, descriptor)
         if (descriptor.showsPlayCue || descriptor.showsPin || descriptor.showsScheduledCue) {
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(.12f), Color.Transparent, Color.Black.copy(if (descriptor.usesPortraitCrop) .34f else .18f)))))
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Black.copy(0.12f),
+                                Color.Transparent,
+                                Color.Black.copy(if (descriptor.usesPortraitCrop) 0.34f else 0.18f),
+                            ),
+                        ),
+                    ),
+            )
         }
-        ProfileThumbnailTopChrome(moment, descriptor, usesDiscreetAudienceIcon, showsAudienceBadge)
-        if (descriptor.showsPlayCue) ProfileThumbnailVideoChrome(moment, descriptor, Modifier.align(Alignment.BottomStart).padding(7.dp))
+        ProfileThumbnailTopChrome(
+            moment = moment,
+            descriptor = descriptor,
+            usesDiscreetAudienceIcon = usesDiscreetAudienceIcon,
+            showsAudienceBadge = showsAudienceBadge,
+            audience = resolvedAudience,
+        )
+        if (descriptor.showsPlayCue) {
+            ProfileThumbnailVideoChrome(
+                moment = moment,
+                descriptor = descriptor,
+                modifier = Modifier.align(Alignment.BottomStart),
+            )
+        }
+    }
+}
+
+private fun resolvedContentAudience(moment: Moment): ContentAudience {
+    val audience = ContentAudience.fromAudienceValue(moment.audience)
+    return if (moment.customListId != null && audience == ContentAudience.CUSTOM) {
+        ContentAudience.CUSTOM_LIST
+    } else {
+        audience
     }
 }
 
@@ -196,30 +325,95 @@ private fun ProfileThumbnailEmpty(moment: Moment, cellWidth: Dp, cellHeight: Dp)
 }
 
 @Composable
-private fun ProfileThumbnailTopChrome(moment: Moment, descriptor: ProfileGridTileDescriptor, discreetAudience: Boolean, showsAudience: Boolean) {
+private fun ProfileThumbnailTopChrome(
+    moment: Moment,
+    descriptor: ProfileGridTileDescriptor,
+    usesDiscreetAudienceIcon: Boolean,
+    showsAudienceBadge: Boolean,
+    audience: ContentAudience,
+) {
     Row(Modifier.fillMaxWidth().padding(6.dp), verticalAlignment = Alignment.Top) {
-        if (moment.isCarouselMoment) Icon(Icons.Filled.Image, null, tint = Color.White, modifier = Modifier.size(17.dp))
-        if (showsAudience && discreetAudience) {
-            val audience = ContentAudience.fromAudienceValue(moment.audience)
-            Icon(if (audience == ContentAudience.ONLY_ME) Icons.Filled.Lock else Icons.Filled.PersonPin, null, tint = Color.White, modifier = Modifier.size(16.dp).padding(start = 5.dp))
+        if (moment.isCarouselMoment) {
+            MomentCarouselIndicatorIcon(size = 17.dp)
+        }
+        if (showsAudienceBadge && usesDiscreetAudienceIcon) {
+            ActivityGridAudienceIcon(
+                audience = audience,
+                modifier = Modifier.padding(start = 5.dp),
+            )
         }
         if (descriptor.showsScheduledCue && moment.authorId == FirebaseAuth.getInstance().currentUser?.uid) {
-            Row(Modifier.padding(start = 5.dp).clip(RoundedCornerShape(50)).background(Color.Black.copy(.52f)).padding(horizontal = 7.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                Modifier
+                    .padding(start = 5.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.Black.copy(0.52f))
+                    .padding(horizontal = 7.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Icon(Icons.Filled.Schedule, null, tint = Color.White, modifier = Modifier.size(8.dp))
-                Text(moment.scheduledRemainingText(LocalContext.current), color = Color.White, fontSize = 8.sp, maxLines = 1)
+                Text(
+                    moment.scheduledRemainingText(LocalContext.current),
+                    color = Color.White,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
             }
         }
         Spacer(Modifier.weight(1f))
-        if (descriptor.showsPin) Icon(Icons.Filled.PushPin, null, tint = Color.White, modifier = Modifier.size(19.dp).clip(CircleShape).background(Color.Black.copy(.56f)).padding(5.dp))
+        if (descriptor.showsPin) {
+            Icon(
+                Icons.Filled.PushPin,
+                null,
+                tint = Color.White,
+                modifier = Modifier
+                    .size(19.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(0.56f))
+                    .padding(5.dp),
+            )
+        }
     }
 }
 
 @Composable
-private fun ProfileThumbnailVideoChrome(moment: Moment, descriptor: ProfileGridTileDescriptor, modifier: Modifier) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Filled.PlayArrow, null, tint = Color.White, modifier = Modifier.size(if (descriptor.layoutKind == BentoTileKind.UNIT) 14.dp else 18.dp))
-        if (descriptor.showsDuration && moment.videoDuration != null) Text(formatVideoDuration(moment.videoDuration), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+private fun ProfileThumbnailVideoChrome(
+    moment: Moment,
+    descriptor: ProfileGridTileDescriptor,
+    modifier: Modifier,
+) {
+    val playSize = when (descriptor.layoutKind) {
+        BentoTileKind.HERO, BentoTileKind.TALL -> 18.dp
+        BentoTileKind.UNIT -> 14.dp
     }
+    Row(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ChatVideoPlayBadge(size = playSize, padding = 8.dp)
+        if (descriptor.showsDuration && moment.videoDuration != null) {
+            Text(
+                formatVideoDuration(moment.videoDuration),
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(end = 7.dp),
+            )
+        }
+    }
+}
+
+/** Port de `MomentCarouselIndicatorIcon` — asset `CarouselPostIcon`. */
+@Composable
+fun MomentCarouselIndicatorIcon(size: Dp = 18.dp, modifier: Modifier = Modifier) {
+    androidx.compose.foundation.Image(
+        painter = painterResource(R.drawable.carousel_post_icon),
+        contentDescription = null,
+        modifier = modifier.size(size),
+    )
 }
 
 internal fun profileThumbnailUrl(path: String): String =
@@ -227,7 +421,7 @@ internal fun profileThumbnailUrl(path: String): String =
 
 @Composable
 private fun formatVideoDuration(duration: Double): String {
-    val seconds = max(duration.toInt(), 0)
+    val seconds = max(kotlin.math.round(duration).toInt(), 0)
     return stringResource(R.string.profile_thumbnail_video_duration, seconds / 60, seconds % 60)
 }
 

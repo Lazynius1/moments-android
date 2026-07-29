@@ -15,6 +15,13 @@ data class GroupedVisit(
 ) {
     val visitCount: Int get() = visits.size
     val lastVisit: Date? get() = visits.maxOfOrNull { it.timestamp }
+
+    /** Última visita en los últimos 30 minutos (`GroupedVisit.isRecent` iOS). */
+    val isRecent: Boolean
+        get() {
+            val last = lastVisit ?: return false
+            return Date().time - last.time <= 30L * 60L * 1000L
+        }
 }
 
 object VisitGrouping {

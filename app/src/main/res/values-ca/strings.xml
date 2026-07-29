@@ -609,6 +609,8 @@
     <string name="audience_custom">Personalitzat</string>
     <string name="audience_custom_list">Llista personalitzada</string>
     <string name="audience_only_me">Només jo</string>
+    <string name="edit_moment_tags_loading">S\'està carregant la imatge…</string>
+    <string name="edit_moment_tags_unavailable">No hem pogut obrir l\'editor d\'etiquetes.</string>
     <string name="edit_moment_tags_pending">Selector d\'etiquetes encara no disponible</string>
 
 
@@ -717,6 +719,9 @@
     <string name="profile_header_notifications">Notificacions</string>
     <string name="profile_header_more">Més opcions</string>
     <string name="profile_header_qr">QR</string>
+    <string name="user_profile_send_message">Enviar missatge</string>
+    <string name="user_profile_interests">Interessos</string>
+    <string name="qr_code_share">Compartir codi QR</string>
     <string name="profile_header_incognito">Mode d’incògnit</string>
     <string name="profile_header_settings">Configuració</string>
     <string name="profile_header_edit">Editar perfil</string>
@@ -1298,6 +1303,19 @@
     <string name="social_connections_suggested">Suggerit per a tu</string>
     <string name="user_list_no_results_description">Prova una altra cerca.</string>
     <string name="user_list_frequent_visits">Visites freqüents</string>
+
+    <string name="user_list_empty_hidden_followers_title">Seguidors ocults</string>
+    <string name="user_list_empty_hidden_followers_description">Aquest usuari ha triat ocultar la seva llista de seguidors.</string>
+    <string name="user_list_empty_hidden_following_title">Seguint ocult</string>
+    <string name="user_list_empty_hidden_following_description">Aquest usuari ha triat ocultar qui segueix.</string>
+    <string name="user_list_empty_visitor_followers_title">Sense seguidors</string>
+    <string name="user_list_empty_visitor_followers_description">Aquest usuari encara no té seguidors.</string>
+    <string name="user_list_empty_visitor_following_title">No segueix ningú</string>
+    <string name="user_list_empty_visitor_following_description">Aquest usuari encara no segueix ningú.</string>
+    <string name="user_list_empty_visitor_mutuals_title">Sense connexions en comú</string>
+    <string name="user_list_empty_visitor_mutuals_description">Encara no tens connexions en comú amb aquest usuari.</string>
+    <string name="user_list_empty_title">No hi ha %1$s</string>
+    <string name="user_list_empty_description">Quan tenguis %1$s, apareixeran aquí</string>
     <string name="profile_crop_move_scale">Moure i escalar</string>
     <string name="profile_editor_select_album">Seleccionar àlbum</string>
     <string name="profile_editor_album_count">%1$d fotos</string>

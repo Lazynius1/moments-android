@@ -2,24 +2,28 @@ package com.moments.android.views.profile.userprofile.sections
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,19 +32,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
+import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.extensions.InterestEmojiHelper
-import com.moments.android.views.profile.core.SocialConnectionTab
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.profile.core.SocialConnectionTab
+import com.moments.android.views.profile.userprofile.UserProfileColors
 import com.moments.android.views.profile.userprofile.UserProfileViewModel
+import com.moments.android.views.story.StoryRingAvatarView
+import kotlinx.coroutines.tasks.await
 
 /**
  * Port de `UserProfileOverviewSection.swift` — stats (posts/seguidores/seguidos según privacidad)
@@ -56,7 +69,6 @@ fun UserProfileOverviewSection(
     onSelectMoments: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = rememberAdaptiveColors()
     var showingInterests by remember { mutableStateOf(false) }
     val hasVisibleStats = viewModel.canViewContent ||
         viewModel.visibleConnectionTypes.canViewFollowers ||
@@ -85,15 +97,20 @@ fun UserProfileOverviewSection(
             ) {
                 Text(
                     stringResource(R.string.profile_header_interests),
-                    color = colors.primary,
+                    color = UserProfileColors.textPrimary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
-                Text("· ${interests.size}", color = colors.secondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    "· ${interests.size}",
+                    color = UserProfileColors.textSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                )
                 if (!showingInterests) {
                     Text(
                         interests.first(),
-                        color = colors.secondary,
+                        color = UserProfileColors.textSecondary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
@@ -101,12 +118,12 @@ fun UserProfileOverviewSection(
                         modifier = Modifier.weight(1f),
                     )
                 } else {
-                    androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.weight(1f))
                 }
                 Icon(
                     Icons.Filled.KeyboardArrowDown,
-                    null,
-                    tint = colors.secondary,
+                    contentDescription = null,
+                    tint = UserProfileColors.textSecondary,
                     modifier = Modifier.rotate(if (showingInterests) 180f else 0f),
                 )
             }
@@ -152,10 +169,18 @@ fun UserModernStatsSection(
             )
         } else {
             if (viewModel.visibleConnectionTypes.canViewFollowers) {
-                add(Stat(stringResource(R.string.profile_header_followers), viewModel.followers.size) { onOpenSocial(SocialConnectionTab.FOLLOWERS) })
+                add(
+                    Stat(stringResource(R.string.profile_header_followers), viewModel.followers.size) {
+                        onOpenSocial(SocialConnectionTab.FOLLOWERS)
+                    },
+                )
             }
             if (viewModel.visibleConnectionTypes.canViewFollowing) {
-                add(Stat(stringResource(R.string.profile_header_following), viewModel.following.size) { onOpenSocial(SocialConnectionTab.FOLLOWING) })
+                add(
+                    Stat(stringResource(R.string.profile_header_following), viewModel.following.size) {
+                        onOpenSocial(SocialConnectionTab.FOLLOWING)
+                    },
+                )
             }
         }
     }
@@ -172,11 +197,16 @@ fun UserModernStatsSection(
             ) {
                 Text(
                     MomentsFormat.count(stat.count, MomentsFormat.CountStyle.PROFILE_STAT),
-                    color = colors.primary,
+                    color = UserProfileColors.textPrimary,
                     fontSize = if (embeddedStyle) 17.sp else 18.sp,
                     fontWeight = FontWeight.Bold,
                 )
-                Text(stat.label, color = colors.secondary, fontSize = if (embeddedStyle) 10.sp else 11.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    stat.label,
+                    color = UserProfileColors.textSecondary,
+                    fontSize = if (embeddedStyle) 10.sp else 11.sp,
+                    fontWeight = FontWeight.Medium,
+                )
             }
             if (embeddedStyle && index < stats.lastIndex) {
                 Box(
@@ -184,7 +214,11 @@ fun UserModernStatsSection(
                         .width(1.dp)
                         .height(26.dp)
                         .align(Alignment.CenterVertically)
-                        .background(colors.secondary.copy(alpha = if (colors.isDark) 0.24f else 0.4f)),
+                        .background(
+                            UserProfileColors.borderColor.copy(
+                                alpha = if (colors.isDark) 0.24f else 0.4f,
+                            ),
+                        ),
                 )
             }
         }
@@ -194,27 +228,28 @@ fun UserModernStatsSection(
 /** Port de `UserExpandableBioView`: bio con recorte a 3 líneas y botón ver más/menos. */
 @Composable
 fun UserExpandableBioView(bio: String, modifier: Modifier = Modifier) {
-    val colors = rememberAdaptiveColors()
     var isExpanded by remember(bio) { mutableStateOf(false) }
     val needsExpansion = bio.length > 100 || bio.count { it == '\n' } > 2
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             text = bio,
-            color = colors.secondary,
+            color = UserProfileColors.textSecondary,
             fontSize = 14.sp,
             maxLines = if (isExpanded) Int.MAX_VALUE else 3,
             overflow = TextOverflow.Ellipsis,
         )
         if (needsExpansion) {
             Text(
-                text = stringResource(if (isExpanded) R.string.user_profile_see_less else R.string.user_profile_see_more),
-                color = UserProfileAccent,
+                text = stringResource(
+                    if (isExpanded) R.string.user_profile_see_less else R.string.user_profile_see_more,
+                ),
+                color = UserProfileColors.accent,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(UserProfileAccent.copy(alpha = 0.1f))
+                    .background(UserProfileColors.accent.copy(alpha = 0.1f))
                     .clickable { isExpanded = !isExpanded }
                     .padding(horizontal = 12.dp, vertical = 4.dp),
             )
@@ -226,16 +261,16 @@ fun UserExpandableBioView(bio: String, modifier: Modifier = Modifier) {
 @Composable
 fun UserModernAvatar(
     userId: String,
-    size: androidx.compose.ui.unit.Dp,
+    size: Dp,
     onOpenStories: () -> Unit,
     showStoryRing: Boolean = true,
     refreshTrigger: Int = 0,
     modifier: Modifier = Modifier,
 ) {
-    val isOwn = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == userId
+    val isOwn = FirebaseAuth.getInstance().currentUser?.uid == userId
     Box(modifier) {
         if (showStoryRing) {
-            com.moments.android.views.story.StoryRingAvatarView(
+            StoryRingAvatarView(
                 userId = userId,
                 size = size,
                 lineWidth = 3.dp,
@@ -244,27 +279,45 @@ fun UserModernAvatar(
                 onTap = { hasStory -> if (hasStory) onOpenStories() },
             )
         } else {
-            com.moments.android.coordinators.AsyncProfileImageView(
+            AsyncProfileImageView(
                 userId = userId,
-                modifier = Modifier.size(size).clip(androidx.compose.foundation.shape.CircleShape),
+                modifier = Modifier.size(size).clip(CircleShape),
             )
         }
     }
 }
 
-/** Port de `UserModernInterestsView`: intereses en scroll horizontal, compartidos resaltados. */
+/**
+ * Port de `UserModernInterestsView`: scroll horizontal; intereses compartidos con el viewer
+ * se resaltan. Carga `users/{currentUid}.interests` en LaunchedEffect (≡ `onAppear` iOS).
+ */
 @Composable
 fun UserModernInterestsView(
     interests: List<String>,
     showsTitle: Boolean = true,
     embeddedStyle: Boolean = false,
-    sharedInterests: List<String> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
-    val colors = rememberAdaptiveColors()
+    var currentUserInterests by remember { mutableStateOf<List<String>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@LaunchedEffect
+        currentUserInterests = runCatching {
+            @Suppress("UNCHECKED_CAST")
+            FirebaseFirestore.getInstance().collection("users").document(uid).get().await()
+                .data?.get("interests") as? List<String>
+                ?: emptyList()
+        }.getOrDefault(emptyList())
+    }
+
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (showsTitle) {
-            Text(stringResource(R.string.profile_header_interests), color = colors.primary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.user_profile_interests),
+                color = UserProfileColors.textPrimary,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
         Row(
             modifier = Modifier
@@ -274,20 +327,49 @@ fun UserModernInterestsView(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             interests.forEach { interest ->
-                val isShared = interest in sharedInterests
+                val isShared = interest in currentUserInterests
+                val chipBg = if (isShared) {
+                    Brush.linearGradient(listOf(Color(0xFF2196F3), Color(0xFF9C27B0), Color(0xFFE91E63)))
+                } else {
+                    val fill = if (embeddedStyle) {
+                        UserProfileColors.materialBackground.copy(alpha = 0.62f)
+                    } else {
+                        UserProfileColors.cardBackground
+                    }
+                    Brush.linearGradient(listOf(fill, fill))
+                }
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(
-                            if (isShared) {
-                                Brush.linearGradient(listOf(Color(0xFF2196F3), Color(0xFF9C27B0), Color(0xFFE91E63)))
-                            } else {
-                                Brush.linearGradient(
-                                    listOf(
-                                        if (embeddedStyle) (if (colors.isDark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.05f)) else if (colors.isDark) Color(0xFF182429) else Color.White,
-                                        if (embeddedStyle) (if (colors.isDark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.05f)) else if (colors.isDark) Color(0xFF182429) else Color.White,
-                                    ),
+                        .graphicsLayer {
+                            scaleX = if (isShared) 1.05f else 1f
+                            scaleY = if (isShared) 1.05f else 1f
+                        }
+                        .then(
+                            when {
+                                isShared -> Modifier.shadow(
+                                    6.dp,
+                                    RoundedCornerShape(50),
+                                    spotColor = Color.Blue.copy(alpha = 0.3f),
                                 )
+                                !embeddedStyle -> Modifier.shadow(
+                                    4.dp,
+                                    RoundedCornerShape(50),
+                                    spotColor = UserProfileColors.shadowColor,
+                                )
+                                else -> Modifier
+                            },
+                        )
+                        .clip(RoundedCornerShape(50))
+                        .background(chipBg)
+                        .then(
+                            if (embeddedStyle && !isShared) {
+                                Modifier.border(
+                                    1.dp,
+                                    UserProfileColors.borderColor.copy(alpha = 0.18f),
+                                    RoundedCornerShape(50),
+                                )
+                            } else {
+                                Modifier
                             },
                         )
                         .padding(horizontal = 16.dp, vertical = if (embeddedStyle) 9.dp else 10.dp),
@@ -297,7 +379,7 @@ fun UserModernInterestsView(
                     Text(InterestEmojiHelper.emojiFor(interest), fontSize = 16.sp)
                     Text(
                         interest,
-                        color = if (isShared) Color.White else colors.primary,
+                        color = if (isShared) Color.White else UserProfileColors.textPrimary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                     )

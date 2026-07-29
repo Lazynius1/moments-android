@@ -38,9 +38,16 @@ fun MomentsModalSheet(
     largeOnly: Boolean = false,
     containerColor: Color = rememberAdaptiveColors().surfaceBackground,
     showDragHandle: Boolean = true,
+    /** ≡ iOS `interactiveDismissDisabled` — false bloquea swipe/tap fuera. */
+    dismissEnabled: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = largeOnly)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = largeOnly,
+        confirmValueChange = { newValue ->
+            dismissEnabled || newValue != SheetValue.Hidden
+        },
+    )
     val screenH = LocalConfiguration.current.screenHeightDp.dp
     val contentHeight by animateDpAsState(
         targetValue = when {

@@ -1,6 +1,7 @@
 package com.moments.android.views.comments
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -17,12 +18,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.ArrowCircleDown
+import androidx.compose.material.icons.filled.ArrowCircleUp
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -34,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,22 +54,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.moments.android.R
 import com.moments.android.coordinators.CoordinatorNavigationEvent
 import com.moments.android.coordinators.NavigationEventBus
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.moderation.CommentsModerationService
 import com.moments.android.models.AppUser
 import com.moments.android.models.Comment
 import com.moments.android.models.CommentMentionEntity
+import com.moments.android.services.auth.AuthService
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.addComment
@@ -70,9 +86,15 @@ import com.moments.android.services.firestore.fetchUserByUsername
 import com.moments.android.services.firestore.updateComment
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
+import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MentionDraftToken
 import com.moments.android.views.components.CommentRowSkeletonList
+import com.moments.android.views.components.LiveUsernameContent
+import com.moments.android.views.components.VerifiedBadgeView
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.messaging.components.AttachmentIcon
+import com.moments.android.views.messaging.components.AttachmentIconPreset
+import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.story.StoryRingAvatarView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -91,8 +113,8 @@ private enum class MentionInputTarget { NewComment, Editing }
 fun ModernCommentsView(
     moment: FeedMoment,
     onDismiss: () -> Unit = {},
-    onOpenStory: (userId: String) -> Unit = {
-        NavigationEventBus.emit(CoordinatorNavigationEvent.ShowStories)
+    onOpenStory: (userId: String) -> Unit = { userId ->
+        NavigationEventBus.emit(CoordinatorNavigationEvent.ShowStoriesStartingAt(userId))
     },
     onOpenProfile: (userId: String) -> Unit = { userId ->
         val uid = FirebaseAuth.getInstance().currentUser?.uid
@@ -109,6 +131,7 @@ fun ModernCommentsView(
     val colors = rememberAdaptiveColors()
     val meLabel = stringResource(R.string.common_me)
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+    val authUser by AuthService.currentUser.collectAsState()
 
     var comments by remember { mutableStateOf<List<Comment>>(emptyList()) }
     var mutedUserIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -230,6 +253,18 @@ fun ModernCommentsView(
                 activeEditingCommentMention = null
             }
         }
+        HapticManager.shared.selection()
+    }
+
+    fun initializeCommentsView() {
+        scope.launch {
+            isLoading = true
+            comments = emptyList()
+            commentsListener?.remove()
+            delay(100)
+            setupMuteSettingsListener()
+            setupCommentsListener()
+        }
     }
 
     fun addComment(content: String, parentCommentId: String?, mentions: List<CommentMentionEntity>) {
@@ -239,13 +274,15 @@ fun ModernCommentsView(
         val pending = Comment(
             id = pendingId,
             authorId = uid,
-            username = meLabel,
+            username = authUser?.username?.takeIf { it.isNotBlank() } ?: meLabel,
             content = content,
             timestamp = Date(),
             parentCommentId = parentCommentId,
             mentions = mentions,
+            profileImagePath = authUser?.profileImagePath,
         ).also { it.isPending = true }
         comments = comments + pending
+        HapticManager.shared.mediumImpact()
 
         scope.launch {
             runCatching {
@@ -286,7 +323,6 @@ fun ModernCommentsView(
         val commentId = comment.id ?: return
         val uid = currentUid ?: return
         val momentId = moment.id.takeIf { it.isNotBlank() } ?: return
-        comments = comments.filterNot { it.id == commentId || it.parentCommentId == commentId }
         scope.launch {
             runCatching {
                 firestore.deleteComment(
@@ -295,6 +331,9 @@ fun ModernCommentsView(
                     userId = moment.authorId,
                     authorId = uid,
                 )
+            }.onSuccess {
+                HapticManager.shared.warning()
+                comments = comments.filterNot { it.id == commentId || it.parentCommentId == commentId }
             }
         }
     }
@@ -339,20 +378,37 @@ fun ModernCommentsView(
         }
     }
 
+    var skipNextResumeInit by remember(moment.id) { mutableStateOf(true) }
+
     LaunchedEffect(moment.id) {
-        isLoading = true
-        comments = emptyList()
-        commentsListener?.remove()
-        muteSettingsListener?.remove()
-        delay(100)
-        setupMuteSettingsListener()
-        setupCommentsListener()
+        initializeCommentsView()
+        skipNextResumeInit = true
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, moment.id) {
+        val observer = LifecycleEventObserver { _, event ->
+            // ≡ iOS didBecomeActive → re-init (no el primer resume tras open)
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (skipNextResumeInit) {
+                    skipNextResumeInit = false
+                } else {
+                    initializeCommentsView()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     DisposableEffect(Unit) {
         onDispose {
             commentsListener?.remove()
             muteSettingsListener?.remove()
+            isLoading = false
+            comments = emptyList()
+            commentsListener = null
+            muteSettingsListener = null
         }
     }
 
@@ -368,8 +424,8 @@ fun ModernCommentsView(
         if (moment.disableComments) {
             Column(Modifier.fillMaxSize()) {
                 CommentsHeader(
-                    title = stringResource(R.string.modern_comments_title),
-                    subtitle = stringResource(R.string.modern_comments_post_of, moment.username),
+                    authorId = moment.authorId,
+                    fallbackUsername = moment.username,
                     count = null,
                     isLoading = false,
                     showSortMenu = showSortMenu,
@@ -382,6 +438,11 @@ fun ModernCommentsView(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
+                    AttachmentIconView(
+                        icon = AttachmentIcon.COMMENTS,
+                        preset = AttachmentIconPreset.EMPTY_STATE_HERO,
+                        tintColor = Color.Gray.copy(alpha = 0.6f),
+                    )
                     Text(
                         stringResource(R.string.modern_comments_disabled_title),
                         fontWeight = FontWeight.SemiBold,
@@ -392,103 +453,81 @@ fun ModernCommentsView(
                         stringResource(R.string.modern_comments_disabled_description),
                         fontSize = 14.sp,
                         color = Color.Gray,
+                        textAlign = TextAlign.Center,
                     )
                 }
                 Spacer(Modifier.weight(1f))
             }
         } else {
-            // iOS: VStack { header; list (flex); input anclado abajo }
-            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
-                val headerApprox = 72.dp
-                val composerApprox = 88.dp
-                val listHeight = (maxHeight - headerApprox - composerApprox).coerceAtLeast(120.dp)
+            // ≡ iOS: VStack { header; ZStack(list + input flotante) }
+            Column(Modifier.fillMaxSize()) {
+                CommentsHeader(
+                    authorId = moment.authorId,
+                    fallbackUsername = moment.username,
+                    count = if (!isLoading && filteredComments.isNotEmpty()) filteredComments.size else null,
+                    isLoading = isLoading,
+                    showSortMenu = showSortMenu,
+                    onShowSortMenuChange = { showSortMenu = it },
+                    onSortChange = { sortOption = it },
+                )
 
-                Column(Modifier.fillMaxSize()) {
-                    CommentsHeader(
-                        title = stringResource(R.string.modern_comments_title),
-                        subtitle = stringResource(R.string.modern_comments_post_of, moment.username),
-                        count = if (!isLoading && filteredComments.isNotEmpty()) filteredComments.size else null,
-                        isLoading = isLoading,
-                        showSortMenu = showSortMenu,
-                        onShowSortMenuChange = { showSortMenu = it },
-                        onSortChange = { sortOption = it },
-                    )
-
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(listHeight),
-                    ) {
-                        when {
-                            // iOS: CommentRowSkeletonList(rows: 4).padding(.horizontal, 20).padding(.top, 8)
-                            isLoading && comments.isEmpty() -> CommentRowSkeletonList(
-                                rows = 4,
-                                modifier = Modifier
-                                    .padding(horizontal = 20.dp)
-                                    .padding(top = 8.dp),
-                            )
-                            rootComments.isEmpty() -> {
-                                Column(
-                                    Modifier.fillMaxSize().padding(horizontal = 40.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
-                                ) {
-                                    Text(
-                                        stringResource(R.string.modern_comments_empty_title),
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 18.sp,
-                                        color = colors.primary,
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                ) {
+                    when {
+                        isLoading -> CommentRowSkeletonList(
+                            rows = 4,
+                            modifier = Modifier
+                                .padding(horizontal = 20.dp)
+                                .padding(top = 8.dp),
+                        )
+                        rootComments.isEmpty() -> {
+                            ModernEmptyCommentsView(modifier = Modifier.fillMaxSize())
+                        }
+                        else -> {
+                            LazyColumn(
+                                Modifier.fillMaxSize(),
+                                // ≡ iOS `.padding(.bottom, 80)` bajo el input flotante
+                                contentPadding = PaddingValues(bottom = 80.dp, top = 8.dp, start = 8.dp, end = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                items(rootComments, key = { it.id ?: it.hashCode().toString() }) { comment ->
+                                    val id = comment.id.orEmpty()
+                                    EnhancedModernCommentRow(
+                                        comment = comment,
+                                        currentUid = currentUid,
+                                        momentAuthorId = moment.authorId,
+                                        nestedComments = nestedFor(id),
+                                        isExpanded = expandedComments.contains(id),
+                                        onToggleExpand = { commentId ->
+                                            expandedComments = if (commentId in expandedComments) {
+                                                expandedComments - commentId
+                                            } else {
+                                                expandedComments + commentId
+                                            }
+                                        },
+                                        onLike = { toggleLike(it) },
+                                        onReply = { replyToComment = it },
+                                        onEdit = {
+                                            editingCommentId = it.id
+                                            editingCommentContent = it.content
+                                            editingCommentMentions = it.mentions
+                                            activeEditingCommentMention = CommentMentionDraft.detectToken(it.content)
+                                            replyToComment = null
+                                        },
+                                        onDelete = {
+                                            commentToDelete = it
+                                            showDeleteAlert = true
+                                        },
+                                        onAvatarTap = { userId, hasStory -> handleAvatarTap(userId, hasStory) },
+                                        onMentionTap = { handleMentionTap(it) },
+                                        maskedCommentIds = mutedWordMaskedIds,
+                                        temporarilyRevealedCommentIds = temporarilyRevealedCommentIds,
+                                        onRevealTemporarily = { revealMutedCommentTemporarily(it) },
+                                        nestingLevel = 0,
                                     )
-                                    Spacer(Modifier.height(8.dp))
-                                    Text(
-                                        stringResource(R.string.modern_comments_empty_description),
-                                        fontSize = 14.sp,
-                                        color = Color.Gray,
-                                    )
-                                }
-                            }
-                            else -> {
-                                LazyColumn(
-                                    Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(bottom = 16.dp, top = 8.dp, start = 8.dp, end = 8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    items(rootComments, key = { it.id ?: it.hashCode().toString() }) { comment ->
-                                        val id = comment.id.orEmpty()
-                                        EnhancedModernCommentRow(
-                                            comment = comment,
-                                            currentUid = currentUid,
-                                            momentAuthorId = moment.authorId,
-                                            nestedComments = nestedFor(id),
-                                            isExpanded = expandedComments.contains(id),
-                                            onToggleExpand = { commentId ->
-                                                expandedComments = if (commentId in expandedComments) {
-                                                    expandedComments - commentId
-                                                } else {
-                                                    expandedComments + commentId
-                                                }
-                                            },
-                                            onLike = { toggleLike(it) },
-                                            onReply = { replyToComment = it },
-                                            onEdit = {
-                                                editingCommentId = it.id
-                                                editingCommentContent = it.content
-                                                editingCommentMentions = it.mentions
-                                                activeEditingCommentMention = CommentMentionDraft.detectToken(it.content)
-                                                replyToComment = null
-                                            },
-                                            onDelete = {
-                                                commentToDelete = it
-                                                showDeleteAlert = true
-                                            },
-                                            onAvatarTap = { userId, hasStory -> handleAvatarTap(userId, hasStory) },
-                                            onMentionTap = { handleMentionTap(it) },
-                                            maskedCommentIds = mutedWordMaskedIds,
-                                            temporarilyRevealedCommentIds = temporarilyRevealedCommentIds,
-                                            onRevealTemporarily = { revealMutedCommentTemporarily(it) },
-                                            nestingLevel = 0,
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -496,9 +535,50 @@ fun ModernCommentsView(
 
                     Column(
                         Modifier
-                            .fillMaxWidth()
-                            .background(colors.surfaceBackground),
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth(),
                     ) {
+                        // ≡ iOS: reply indicator encima del input
+                        replyToComment?.let { reply ->
+                            val preview = reply.content.take(50) + if (reply.content.length > 50) "..." else ""
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        if (isSystemInDarkTheme()) Color.White.copy(0.08f)
+                                        else Color.Black.copy(0.05f),
+                                    )
+                                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Reply,
+                                    contentDescription = null,
+                                    tint = colors.primary,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        stringResource(R.string.modern_comments_replying_to, reply.username),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = colors.primary.copy(alpha = 0.8f),
+                                    )
+                                    Text(
+                                        preview,
+                                        fontSize = 11.sp,
+                                        color = Color.Gray.copy(0.6f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                IconButton(onClick = { replyToComment = null }, modifier = Modifier.size(28.dp)) {
+                                    Icon(Icons.Filled.Close, null, tint = Color.Gray.copy(0.6f))
+                                }
+                            }
+                        }
+
                         val activeMention = activeEditingCommentMention ?: activeNewCommentMention
                         if (activeMention != null) {
                             CommentMentionSearchOverlay(
@@ -519,23 +599,6 @@ fun ModernCommentsView(
                             )
                         }
 
-                        replyToComment?.let { reply ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    stringResource(R.string.modern_comments_replying_to, reply.username),
-                                    fontSize = 13.sp,
-                                    color = Color.Gray,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                IconButton(onClick = { replyToComment = null }, modifier = Modifier.size(28.dp)) {
-                                    Icon(Icons.Filled.Close, null, tint = Color.Gray)
-                                }
-                            }
-                        }
-
                         CommentComposer(
                             text = if (editingCommentId != null) editingCommentContent else newComment,
                             onTextChange = { value ->
@@ -552,29 +615,33 @@ fun ModernCommentsView(
                                 }
                             },
                             isEditing = editingCommentId != null,
-                            enabled = true,
+                            enabled = !isLoading,
+                            replyUsername = replyToComment?.username,
                             currentUid = currentUid,
                             onAvatarTap = { hasStory ->
-                                currentUid?.let { handleAvatarTap(it, hasStory) }
+                                val uid = currentUid ?: return@CommentComposer
+                                if (hasStory) onOpenStory(uid) else onOpenProfile(uid)
                             },
                             onSend = {
                                 if (editingCommentId != null) {
                                     val id = editingCommentId ?: return@CommentComposer
-                                    if (editingCommentContent.isBlank()) return@CommentComposer
+                                    // ≡ iOS: `!editingCommentContent.isEmpty` sin trim
+                                    if (editingCommentContent.isEmpty()) return@CommentComposer
+                                    HapticManager.shared.mediumImpact()
                                     val mentions = CommentMentionDraft.sanitizedMentions(
                                         editingCommentMentions,
                                         editingCommentContent,
                                     )
-                                    updateComment(id, editingCommentContent.trim(), mentions)
+                                    updateComment(id, editingCommentContent, mentions)
                                     editingCommentId = null
                                     editingCommentContent = ""
                                     editingCommentMentions = emptyList()
                                     activeEditingCommentMention = null
                                 } else {
-                                    val text = newComment.trim()
-                                    if (text.isEmpty()) return@CommentComposer
+                                    // ≡ iOS: `!newComment.isEmpty` sin trim
+                                    if (newComment.isEmpty()) return@CommentComposer
                                     val mentions = CommentMentionDraft.sanitizedMentions(newCommentMentions, newComment)
-                                    addComment(text, replyToComment?.id, mentions)
+                                    addComment(newComment, replyToComment?.id, mentions)
                                     newComment = ""
                                     newCommentMentions = emptyList()
                                     activeNewCommentMention = null
@@ -621,8 +688,8 @@ fun ModernCommentsView(
 
 @Composable
 private fun CommentsHeader(
-    title: String,
-    subtitle: String,
+    authorId: String,
+    fallbackUsername: String,
     count: Int?,
     isLoading: Boolean,
     showSortMenu: Boolean,
@@ -630,12 +697,22 @@ private fun CommentsHeader(
     onSortChange: (CommentSortOption) -> Unit,
 ) {
     val colors = rememberAdaptiveColors()
-    Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 14.dp)) {
+    val isDark = isSystemInDarkTheme()
+    Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp)) {
         Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(title, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = colors.primary)
+                Text(
+                    stringResource(R.string.modern_comments_title),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                    color = colors.primary,
+                )
                 when {
-                    isLoading -> CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
+                    isLoading -> CircularProgressIndicator(
+                        Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = colors.primary,
+                    )
                     count != null -> {
                         Text(
                             "$count",
@@ -644,7 +721,7 @@ private fun CommentsHeader(
                             color = Color.White,
                             modifier = Modifier
                                 .background(
-                                    Brush.horizontalGradient(listOf(Color(0xFF3B82F6), Color(0xFFA855F7))),
+                                    Brush.horizontalGradient(listOf(Color(0xFF007AFF), Color(0xFFAF52DE))),
                                     RoundedCornerShape(50),
                                 )
                                 .padding(horizontal = 6.dp, vertical = 2.dp),
@@ -652,29 +729,111 @@ private fun CommentsHeader(
                     }
                 }
             }
-            Text(subtitle, fontSize = 12.sp, color = Color.Gray, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically) {
-            Box {
-                IconButton(onClick = { onShowSortMenuChange(true) }) {
-                    Icon(Icons.Filled.MoreVert, null, tint = colors.primary)
-                }
-                DropdownMenu(expanded = showSortMenu, onDismissRequest = { onShowSortMenuChange(false) }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.modern_comments_sort_newest)) },
-                        onClick = { onSortChange(CommentSortOption.Newest); onShowSortMenuChange(false) },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.modern_comments_sort_oldest)) },
-                        onClick = { onSortChange(CommentSortOption.Oldest); onShowSortMenuChange(false) },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.modern_comments_sort_most_liked)) },
-                        onClick = { onSortChange(CommentSortOption.MostLiked); onShowSortMenuChange(false) },
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                LiveUsernameContent(userId = authorId, fallbackUsername = fallbackUsername) { username ->
+                    Text(
+                        stringResource(R.string.modern_comments_post_of, username),
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
+                VerifiedBadgeView(userId = authorId, size = 10.dp)
             }
-            // iOS: dismiss vía sheet / drag indicator — sin botón Cerrar
+        }
+        Box(Modifier.align(Alignment.CenterEnd)) {
+            Box(
+                Modifier
+                    .size(32.dp)
+                    .momentsChromeGlass(CircleShape, interactive = true)
+                    .border(
+                        0.8.dp,
+                        Color.White.copy(alpha = if (isDark) 0.14f else 0.08f),
+                        CircleShape,
+                    )
+                    .clickable { onShowSortMenuChange(true) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Tune, contentDescription = null, tint = colors.primary, modifier = Modifier.size(14.dp))
+            }
+            DropdownMenu(expanded = showSortMenu, onDismissRequest = { onShowSortMenuChange(false) }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.modern_comments_sort_newest)) },
+                    leadingIcon = { Icon(Icons.Filled.ArrowCircleUp, contentDescription = null) },
+                    onClick = { onSortChange(CommentSortOption.Newest); onShowSortMenuChange(false) },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.modern_comments_sort_oldest)) },
+                    leadingIcon = { Icon(Icons.Filled.ArrowCircleDown, contentDescription = null) },
+                    onClick = { onSortChange(CommentSortOption.Oldest); onShowSortMenuChange(false) },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.modern_comments_sort_most_liked)) },
+                    leadingIcon = { Icon(Icons.Filled.Favorite, contentDescription = null) },
+                    onClick = { onSortChange(CommentSortOption.MostLiked); onShowSortMenuChange(false) },
+                )
+            }
+        }
+    }
+}
+
+/** Port de `ModernEmptyCommentsView`. */
+@Composable
+private fun ModernEmptyCommentsView(modifier: Modifier = Modifier) {
+    val colors = rememberAdaptiveColors()
+    val isDark = isSystemInDarkTheme()
+    Column(
+        modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        Box(
+            Modifier
+                .size(80.dp)
+                .background(
+                    if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f),
+                    CircleShape,
+                )
+                .border(
+                    2.dp,
+                    Brush.linearGradient(
+                        listOf(Color.White.copy(0.4f), Color.White.copy(0.2f)),
+                    ),
+                    CircleShape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Outlined.ChatBubbleOutline,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = if (isDark) 1f else 0.85f),
+                modifier = Modifier.size(40.dp),
+            )
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(R.string.modern_comments_empty_title),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 18.sp,
+                color = colors.primary,
+            )
+            Text(
+                stringResource(R.string.modern_comments_empty_description),
+                fontSize = 14.sp,
+                color = Color.Gray.copy(0.7f),
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                "💭",
+                fontSize = 24.sp,
+                modifier = Modifier.padding(top = 0.dp),
+            )
         }
     }
 }
@@ -685,6 +844,7 @@ private fun CommentComposer(
     onTextChange: (String) -> Unit,
     isEditing: Boolean,
     enabled: Boolean,
+    replyUsername: String?,
     currentUid: String?,
     onAvatarTap: (hasStory: Boolean) -> Unit,
     onSend: () -> Unit,
@@ -692,67 +852,185 @@ private fun CommentComposer(
 ) {
     val colors = rememberAdaptiveColors()
     val isDark = isSystemInDarkTheme()
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+    val canSend = enabled && text.isNotEmpty()
+    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 8.dp)) {
         if (isEditing) {
-            Text(
-                stringResource(R.string.modern_comments_editing),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = colors.primary,
-            )
-            Spacer(Modifier.height(6.dp))
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (currentUid != null && !isEditing) {
-                StoryRingAvatarView(
-                    userId = currentUid,
-                    size = 36.dp,
-                    lineWidth = 2.2.dp,
-                    showBaseStroke = true,
-                    onTap = onAvatarTap,
-                )
-                Spacer(Modifier.width(8.dp))
-            }
-            BasicTextField(
-                value = text,
-                onValueChange = onTextChange,
-                enabled = enabled,
-                cursorBrush = SolidColor(colors.primary),
-                textStyle = TextStyle(color = colors.primary, fontSize = 15.sp),
-                modifier = Modifier
-                    .weight(1f)
-                    .background(
-                        if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f),
-                        RoundedCornerShape(25.dp),
-                    )
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                decorationBox = { inner ->
-                    if (text.isEmpty()) {
+            // ≡ iOS modo edición: pencil + campo + check azul→púrpura + xmark circular
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .background(
+                            if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f),
+                            RoundedCornerShape(20.dp),
+                        )
+                        .border(1.dp, Color.White.copy(0.2f), RoundedCornerShape(20.dp))
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.Edit,
+                            contentDescription = null,
+                            tint = colors.primary,
+                            modifier = Modifier.size(12.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
                         Text(
-                            if (isEditing) {
-                                stringResource(R.string.comments_edit_placeholder)
-                            } else {
-                                stringResource(R.string.modern_comments_placeholder)
-                            },
-                            color = Color.Gray,
-                            fontSize = 15.sp,
+                            stringResource(R.string.modern_comments_editing),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.primary,
                         )
                     }
-                    inner()
-                },
-            )
-            Spacer(Modifier.width(8.dp))
-            if (isEditing) {
-                IconButton(onClick = onCancelEdit) {
-                    Icon(Icons.Filled.Close, null, tint = Color.Gray)
+                    Spacer(Modifier.height(4.dp))
+                    BasicTextField(
+                        value = text,
+                        onValueChange = onTextChange,
+                        enabled = enabled,
+                        cursorBrush = SolidColor(colors.primary),
+                        textStyle = TextStyle(color = colors.primary, fontSize = 15.sp),
+                        modifier = Modifier.fillMaxWidth(),
+                        decorationBox = { inner ->
+                            if (text.isEmpty()) {
+                                Text(
+                                    stringResource(R.string.comments_edit_placeholder),
+                                    color = Color.Gray,
+                                    fontSize = 15.sp,
+                                )
+                            }
+                            inner()
+                        },
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        Modifier
+                            .size(36.dp)
+                            .background(
+                                if (canSend) {
+                                    Brush.linearGradient(
+                                        listOf(Color(0xFF007AFF), Color(0xFFAF52DE)),
+                                    )
+                                } else {
+                                    Brush.linearGradient(
+                                        listOf(Color.Gray.copy(0.3f), Color.Gray.copy(0.3f)),
+                                    )
+                                },
+                                CircleShape,
+                            )
+                            .clickable(enabled = canSend, onClick = onSend),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (!enabled) {
+                            CircularProgressIndicator(
+                                Modifier.size(16.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = stringResource(R.string.modern_comments_send),
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                    Box(
+                        Modifier
+                            .size(36.dp)
+                            .background(
+                                if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f),
+                                CircleShape,
+                            )
+                            .clickable(enabled = enabled, onClick = onCancelEdit),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = null,
+                            tint = Color.Gray,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                 }
             }
-            IconButton(onClick = onSend, enabled = enabled && text.isNotBlank()) {
-                Icon(
-                    Icons.AutoMirrored.Filled.Send,
-                    contentDescription = stringResource(R.string.modern_comments_send),
-                    tint = if (text.isNotBlank()) Color(0xFF3B82F6) else Color.Gray,
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (currentUid != null) {
+                    StoryRingAvatarView(
+                        userId = currentUid,
+                        size = 36.dp,
+                        lineWidth = 2.2.dp,
+                        showBaseStroke = true,
+                        onTap = onAvatarTap,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+                BasicTextField(
+                    value = text,
+                    onValueChange = onTextChange,
+                    enabled = enabled,
+                    cursorBrush = SolidColor(colors.primary),
+                    textStyle = TextStyle(color = colors.primary, fontSize = 15.sp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(
+                            if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f),
+                            RoundedCornerShape(25.dp),
+                        )
+                        .border(1.dp, Color.White.copy(0.15f), RoundedCornerShape(25.dp))
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    decorationBox = { inner ->
+                        if (text.isEmpty()) {
+                            Text(
+                                if (!replyUsername.isNullOrBlank()) {
+                                    stringResource(R.string.modern_comments_reply_placeholder, replyUsername)
+                                } else {
+                                    stringResource(R.string.modern_comments_placeholder)
+                                },
+                                color = Color.Gray,
+                                fontSize = 15.sp,
+                            )
+                        }
+                        inner()
+                    },
                 )
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .background(
+                            if (canSend) {
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF007AFF), Color(0xFFAF52DE), Color(0xFFFF2D55)),
+                                )
+                            } else {
+                                Brush.linearGradient(listOf(Color.Gray.copy(0.3f), Color.Gray.copy(0.3f)))
+                            },
+                            shape = CircleShape,
+                        )
+                        .clickable(enabled = canSend, onClick = onSend),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (!enabled) {
+                        CircularProgressIndicator(
+                            Modifier.size(18.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = stringResource(R.string.modern_comments_send),
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
             }
         }
     }

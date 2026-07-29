@@ -256,44 +256,252 @@ fun StalkerCard(analysis: VisitorAnalysis, onTap: () -> Unit, modifier: Modifier
     }
 }
 
-/** Port de `GroupedVisitRow`. */
+/**
+ * Port de `VisitsViewModel` (VisitsView.swift): carga visitas + alerta de stalker.
+ * Estado observable Compose (no AndroidX ViewModel) porque iOS lo usa como `@StateObject` local.
+ */
+class VisitsViewModel {
+    var groupedVisits by mutableStateOf<List<GroupedVisit>>(emptyList())
+        private set
+    var stalkerAnalysis by mutableStateOf<List<VisitorAnalysis>>(emptyList())
+        private set
+    var isLoading by mutableStateOf(true)
+        private set
+    var showStalkerAlert by mutableStateOf(false)
+    var detectedStalker by mutableStateOf<VisitorAnalysis?>(null)
+        private set
+
+    suspend fun fetchVisits() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId == null) {
+            isLoading = false
+            return
+        }
+        isLoading = true
+        val grouped = runCatching { ProfileVisitsService.fetchGroupedVisits(userId) }.getOrDefault(emptyList())
+        groupedVisits = grouped
+        val analyses = VisitorAnalysisBuilder.analyze(grouped)
+        stalkerAnalysis = analyses
+        val superStalker = analyses.firstOrNull { it.frequencyType == VisitorFrequencyType.SUPER_STALKER }
+        if (superStalker != null) {
+            detectedStalker = superStalker
+            showStalkerAlert = true
+        }
+        isLoading = false
+    }
+}
+
+/** Port de `VisitsTabContent` embebido en SocialConnections (`usesOwnScroll: false`). */
 @Composable
-fun GroupedVisitRow(grouped: GroupedVisit, onTap: () -> Unit, modifier: Modifier = Modifier) {
+fun VisitsTabContent(
+    groupedVisits: List<GroupedVisit>,
+    isLoading: Boolean,
+    listViewModel: com.moments.android.views.profile.core.UserListViewModel,
+    searchText: String,
+    sortMode: com.moments.android.views.profile.core.SocialConnectionsSortMode =
+        com.moments.android.views.profile.core.SocialConnectionsSortMode.DEFAULT,
+    onUserTap: (String) -> Unit,
+    onAvatarTap: ((String, Boolean) -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
     val dark = isSystemInDarkTheme()
     val primary = if (dark) Color.White else Color(0xFF0B1215)
     val secondary = if (dark) Color.White.copy(alpha = 0.6f) else Color(0xFF52626A)
+    val filtered = remember(groupedVisits, searchText, sortMode) {
+        val base = if (searchText.isBlank()) {
+            groupedVisits
+        } else {
+            groupedVisits.filter {
+                it.user.username.contains(searchText, ignoreCase = true) ||
+                    (it.user.bio?.contains(searchText, ignoreCase = true) == true)
+            }
+        }
+        com.moments.android.views.profile.core.SocialConnectionsSorting.sortVisits(base, sortMode)
+    }
 
-    Row(
+    when {
+        isLoading -> Box(modifier.fillMaxWidth().height(400.dp), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = primary)
+        }
+        groupedVisits.isEmpty() -> Column(
+            modifier.fillMaxWidth().height(400.dp).padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(Icons.Filled.Visibility, null, tint = secondary, modifier = Modifier.size(48.dp))
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.visits_empty_title), color = primary, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.visits_empty_description),
+                color = secondary,
+                fontSize = 13.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+        }
+        filtered.isEmpty() -> com.moments.android.views.profile.core.SocialConnectionsNoResultsView(
+            modifier.fillMaxWidth().height(400.dp),
+        )
+        else -> Column(modifier.fillMaxWidth().padding(bottom = 40.dp)) {
+            filtered.forEach { grouped ->
+                GroupedVisitRow(
+                    grouped = grouped,
+                    listViewModel = listViewModel,
+                    onUserTap = { onUserTap(grouped.user.id) },
+                    onAvatarTap = onAvatarTap,
+                )
+            }
+        }
+    }
+}
+
+/** Port de `StalkerAlertView`. */
+@Composable
+fun StalkerAlertView(
+    stalker: VisitorAnalysis,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dark = isSystemInDarkTheme()
+    val primary = if (dark) Color.White else Color.Black
+    val secondary = if (dark) Color.Gray.copy(alpha = 0.8f) else Color.Gray.copy(alpha = 0.7f)
+    Column(
         modifier
-            .fillMaxWidth()
-            .clickable(onClick = onTap)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(20.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (dark) Color(0xFF1A2226) else Color.White)
+            .padding(30.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Box(Modifier.size(44.dp).clip(CircleShape).background(primary.copy(alpha = 0.1f))) {
-            grouped.user.profileImagePath?.takeIf { it.isNotBlank() }?.let {
+        Text(stringResource(R.string.visits_stalker_alert_title), color = primary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Box(
+            Modifier
+                .size(80.dp)
+                .clip(CircleShape)
+                .background(Color.Gray.copy(alpha = 0.3f)),
+        ) {
+            if (!stalker.profileImagePath.isNullOrBlank()) {
                 AsyncImage(
-                    model = it,
+                    model = stalker.profileImagePath,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
         }
-        Column(Modifier.weight(1f)) {
-            Text(grouped.user.username, color = primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(visitRowSubtitle(grouped), color = secondary, fontSize = 12.sp)
-        }
-        if (grouped.visitCount > 1) {
+        Text(stalker.username, color = primary, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            stringResource(R.string.visits_stalker_alert_message, stalker.visitsLast24h),
+            color = secondary,
+            fontSize = 16.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        stalker.frequencyType.messageRes?.let { res ->
             Text(
-                "×${grouped.visitCount}",
-                color = secondary,
-                fontSize = 12.sp,
+                stringResource(res),
+                color = stalker.frequencyType.color.copy(alpha = 1f),
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(stalker.frequencyType.color.copy(alpha = 0.2f))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
+        Text(
+            stringResource(R.string.common_understood),
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(Color(0xFF00A896))
+                .clickable(onClick = onDismiss)
+                .padding(horizontal = 30.dp, vertical = 12.dp),
+        )
     }
+}
+
+/** Port de `GroupedVisitRow` alineado con listas sociales. */
+@Composable
+fun GroupedVisitRow(
+    grouped: GroupedVisit,
+    onTap: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    listViewModel: com.moments.android.views.profile.core.UserListViewModel? = null,
+    onUserTap: (() -> Unit)? = null,
+    onAvatarTap: ((String, Boolean) -> Unit)? = null,
+) {
+    val dark = isSystemInDarkTheme()
+    val primary = if (dark) Color.White else Color(0xFF0B1215)
+    val secondary = if (dark) Color.White.copy(alpha = 0.55f) else Color.Black.copy(alpha = 0.55f)
+    val open = onUserTap ?: onTap
+
+    Row(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        com.moments.android.views.story.StoryRingAvatarView(
+            userId = grouped.user.id,
+            size = 56.dp,
+            lineWidth = 2.2.dp,
+            showBaseStroke = true,
+            baseStrokeColor = primary.copy(alpha = 0.14f),
+            baseStrokeWidth = 0.9.dp,
+            onTap = { hasStory ->
+                onAvatarTap?.invoke(grouped.user.id, hasStory)
+                    ?: if (!hasStory) open() else Unit
+            },
+        )
+        Column(
+            Modifier
+                .weight(1f)
+                .clickable(onClick = open),
+            verticalArrangement = Arrangement.spacedBy(1.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(grouped.user.username, color = primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (grouped.user.isVerified) {
+                    com.moments.android.views.components.VerifiedBadge(13.dp)
+                }
+                if (grouped.isRecent) {
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF00A896)))
+                }
+            }
+            Text(visitRowSubtitle(grouped), color = secondary, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        listViewModel?.let { vm ->
+            VisitsRelationshipButton(user = grouped.user, viewModel = vm)
+        }
+    }
+}
+
+/** Port de `VisitsRelationshipButton`. */
+@Composable
+private fun VisitsRelationshipButton(
+    user: AppUser,
+    viewModel: com.moments.android.views.profile.core.UserListViewModel,
+) {
+    val state = viewModel.relationshipState(user.id)
+    if (state == com.moments.android.services.privacy.FollowButtonState.OWN_PROFILE) return
+    LaunchedEffect(user.id) { viewModel.prefetchRelationshipState(user.id) }
+    com.moments.android.views.components.ModernFollowButton(
+        state = state,
+        isLoading = false,
+        onClick = {
+            when (state) {
+                com.moments.android.services.privacy.FollowButtonState.FOLLOWING -> viewModel.unfollowUser(user.id)
+                com.moments.android.services.privacy.FollowButtonState.CAN_FOLLOW,
+                com.moments.android.services.privacy.FollowButtonState.CAN_REQUEST_FOLLOW,
+                -> viewModel.followUser(user.id)
+                com.moments.android.services.privacy.FollowButtonState.REQUEST_PENDING_CANCELLABLE ->
+                    viewModel.cancelFollowRequest(user.id)
+                else -> Unit
+            }
+        },
+    )
 }
 
 /** Port de `GroupedVisit.rowSubtitle`: relativo hasta una semana, luego fecha corta. */

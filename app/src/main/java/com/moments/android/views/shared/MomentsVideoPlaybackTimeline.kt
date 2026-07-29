@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -122,6 +123,7 @@ fun MomentsVideoPlaybackTimeline(
                 Modifier
                     .offset(x = with(density) { knobOffsetPx.toDp() })
                     .size(12.dp)
+                    .shadow(6.dp, CircleShape, clip = false, ambientColor = Color.Black.copy(0.22f), spotColor = Color.Black.copy(0.22f))
                     .background(Color.White, CircleShape),
             )
         }

@@ -74,30 +74,35 @@ enum class FollowButtonState {
 
 // MARK: - Follow state store
 
+/**
+ * Port de `FollowStateStore` (PrivacyService.swift): mapa en memoria + listeners
+ * (equivale a `NotificationCenter` / `didChangeNotification` en iOS). APIs síncronas
+ * como el `NSLock` de iOS, para poder leer estado al pintar filas.
+ */
 object FollowStateStore {
-    private val lock = Mutex()
     private val statesByUserId = mutableMapOf<String, FollowButtonState>()
     private val listeners = mutableListOf<(String, FollowButtonState) -> Unit>()
 
     fun addListener(listener: (String, FollowButtonState) -> Unit) {
-        listeners.add(listener)
+        synchronized(listeners) { listeners.add(listener) }
     }
 
     fun removeListener(listener: (String, FollowButtonState) -> Unit) {
-        listeners.remove(listener)
+        synchronized(listeners) { listeners.remove(listener) }
     }
 
-    suspend fun state(userId: String): FollowButtonState? = lock.withLock {
+    fun state(userId: String): FollowButtonState? = synchronized(statesByUserId) {
         statesByUserId[userId]
     }
 
-    suspend fun setState(state: FollowButtonState, userId: String) {
-        lock.withLock { statesByUserId[userId] = state }
-        listeners.forEach { it(userId, state) }
+    fun setState(state: FollowButtonState, userId: String) {
+        synchronized(statesByUserId) { statesByUserId[userId] = state }
+        val snapshot = synchronized(listeners) { listeners.toList() }
+        snapshot.forEach { it(userId, state) }
     }
 
-    suspend fun reconciledState(authoritativeState: FollowButtonState, userId: String): FollowButtonState {
-        val cachedState = lock.withLock { statesByUserId[userId] }
+    fun reconciledState(authoritativeState: FollowButtonState, userId: String): FollowButtonState {
+        val cachedState = synchronized(statesByUserId) { statesByUserId[userId] }
         if ((cachedState == FollowButtonState.REQUEST_PENDING ||
                 cachedState == FollowButtonState.REQUEST_PENDING_CANCELLABLE) &&
             authoritativeState == FollowButtonState.CAN_REQUEST_FOLLOW

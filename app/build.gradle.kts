@@ -120,5 +120,6 @@ dependencies {
     implementation(libs.mapbox.maps)
     implementation(libs.mapbox.maps.compose)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.zxing.core)
     debugImplementation(libs.androidx.ui.tooling)
 }

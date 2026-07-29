@@ -1,63 +1,58 @@
 package com.moments.android.views.profile.userprofile.sections
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.moments.android.R
+import com.moments.android.views.components.momentRefresh
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.profile.core.SocialConnectionTab
+import com.moments.android.views.profile.core.sections.ProfileBentoTileAssigner
+import com.moments.android.views.profile.core.sections.ProfileHeaderCollapseMetrics
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomNavigation
 import com.moments.android.views.profile.core.sections.ProfileMomentsBentoGrid
 import com.moments.android.views.profile.core.sections.ProfileMomentsGridSkeletonView
 import com.moments.android.views.profile.core.sections.ProfileSectionEmptyIcon
 import com.moments.android.views.profile.core.sections.ProfileSectionEmptyState
+import com.moments.android.views.profile.core.sections.ProfileStickyChromeContainer
 import com.moments.android.views.profile.highlights.ProfileHighlightsView
+import com.moments.android.views.profile.userprofile.UserProfileFloatingTabBar
 import com.moments.android.views.profile.userprofile.UserProfilePillTabs
 import com.moments.android.views.profile.userprofile.UserProfileTabType
 import com.moments.android.views.profile.userprofile.UserProfileViewModel
 import com.moments.android.views.shared.ScreenshotProtectedView
+import kotlinx.coroutines.delay
 
 /**
- * Port de `UserProfilePublicProfileView.swift` — la composición del perfil público visitado:
- * chrome fijado, cabecera, resumen, destacadas, pestañas (momentos / etiquetados) y sus grids bento.
+ * Port de `UserModernPublicProfileView` (`UserProfilePublicProfileView.swift`).
  *
- * Puentes conscientes respecto a iOS:
- * - `PreferenceKey` + `coordinateSpace` de SwiftUI → `ScrollState.value` de Compose para calcular el
- *   progreso de colapso del username.
- * - Los `@Binding` de navegación (chat, QR, report, ruta de conexiones sociales, destino de zoom) se
- *   exponen como callbacks; el host mantiene el ownership, igual que en las otras Sections portadas.
- * - `ProfileMomentsBentoGrid` de Kotlin ya calcula su altura con `BoxWithConstraints`, así que no se
- *   usan aquí `calculateBentoGridHeight`/`calculateTaggedGridHeight` (siguen portados por paridad).
- * - El pull-to-refresh (`momentRefresh` en iOS) queda en el host: aquí solo se pinta el indicador
- *   cuando `viewModel.isRefreshing`.
+ * Sticky chrome + floating tabs vía `ProfileStickyChromeContainer` (tabsMinY con
+ * `onGloballyPositioned`, como PreferenceKey iOS). Pull-to-refresh ≡ `.momentRefresh`.
+ * Navegación (QR/report/social/chat/zoom) por callbacks del host.
  */
 @Composable
 fun UserModernPublicProfileView(
@@ -78,15 +73,18 @@ fun UserModernPublicProfileView(
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
+    val density = LocalDensity.current
     val scrollState = rememberScrollState()
-    val highlightsRefreshToken by remember { mutableIntStateOf(0) }
-    val storyRingRefreshToken by remember { mutableIntStateOf(0) }
+    var highlightsRefreshToken by remember { mutableIntStateOf(0) }
+    var storyRingRefreshToken by remember { mutableIntStateOf(0) }
+    var tabsMinY by remember { mutableFloatStateOf(Float.POSITIVE_INFINITY) }
 
-    // Equivalente a `ProfileHeaderCollapseMetrics.progress(forTabsMinY:)`: el username del chrome
-    // aparece a medida que la cabecera se desplaza fuera de pantalla.
-    val collapseProgress by remember {
-        derivedStateOf { (scrollState.value / 220f).coerceIn(0f, 1f) }
-    }
+    val collapseProgress = ProfileHeaderCollapseMetrics.progress(tabsMinY)
+    val tabsArePinned = ProfileHeaderCollapseMetrics.tabsArePinned(tabsMinY)
+    val pinnedAlpha by animateFloatAsState(
+        targetValue = if (tabsArePinned) 1f else 0f,
+        label = "pinnedTabs",
+    )
 
     LaunchedEffect(selectedTab) {
         if (selectedTab == UserProfileTabType.TAGGED &&
@@ -97,14 +95,25 @@ fun UserModernPublicProfileView(
         }
     }
 
-    Box(modifier.fillMaxSize().background(ProfileMomentZoomNavigation.canvasBackground(colors.isDark))) {
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(ProfileMomentZoomNavigation.canvasBackground(colors.isDark))
+            .momentRefresh {
+                highlightsRefreshToken += 1
+                storyRingRefreshToken += 1
+                viewModel.refreshProfile()
+                // ≡ Timer iOS: esperar a que termine `isRefreshing`.
+                while (viewModel.isRefreshing) delay(100)
+            },
+    ) {
         Column(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
                 .padding(bottom = safeAreaBottom + 120.dp),
         ) {
-            Box(Modifier.height(56.dp))
+            Box(Modifier.height(ProfileHeaderCollapseMetrics.topContentInset))
 
             UserModernProfileHeader(
                 viewModel = viewModel,
@@ -114,7 +123,9 @@ fun UserModernPublicProfileView(
                 onOpenStories = onOpenStories,
                 onShowProfileImageFullscreen = onShowProfileImageFullscreen,
                 onOpenMessage = onOpenMessage,
-                modifier = Modifier.padding(bottom = 4.dp),
+                modifier = Modifier
+                    .padding(top = ProfileHeaderCollapseMetrics.headerTopPadding)
+                    .padding(bottom = 4.dp),
             )
 
             UserProfileOverviewSection(
@@ -145,7 +156,14 @@ fun UserModernPublicProfileView(
                 UserProfilePillTabs(
                     selectedTab = selectedTab,
                     onSelectTab = onSelectTab,
-                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 4.dp),
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(bottom = 4.dp)
+                        .onGloballyPositioned { coords ->
+                            // PreferenceKey iOS usa puntos; Convertir px → dp para `tabsPinY` / `tabsFadeLead`.
+                            tabsMinY = with(density) { coords.positionInRoot().y.toDp().value }
+                        }
+                        .alpha(if (tabsArePinned) 0f else 1f),
                 )
 
                 when (selectedTab) {
@@ -154,7 +172,9 @@ fun UserModernPublicProfileView(
                             if (viewModel.isLoadingMoments) {
                                 ProfileMomentsGridSkeletonView()
                             } else {
-                                UserModernEmptyMomentsView(Modifier.fillMaxWidth().padding(horizontal = 20.dp))
+                                UserModernEmptyMomentsView(
+                                    Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                                )
                             }
                         } else {
                             ProfileMomentsBentoGrid(moments = viewModel.moments) { moment, unitWidth, index, descriptor ->
@@ -178,7 +198,10 @@ fun UserModernPublicProfileView(
                     UserProfileTabType.TAGGED -> {
                         when {
                             viewModel.isLoadingTagged -> {
-                                Box(Modifier.fillMaxWidth().height(400.dp), contentAlignment = Alignment.Center) {
+                                Box(
+                                    Modifier.fillMaxWidth().height(400.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
                                     CircularProgressIndicator(color = colors.primary)
                                 }
                             }
@@ -192,7 +215,7 @@ fun UserModernPublicProfileView(
                             else -> {
                                 ProfileMomentsBentoGrid(
                                     moments = viewModel.taggedMoments,
-                                    descriptors = com.moments.android.views.profile.core.sections.ProfileBentoTileAssigner.simple(viewModel.taggedMoments),
+                                    descriptors = ProfileBentoTileAssigner.simple(viewModel.taggedMoments),
                                 ) { moment, unitWidth, index, descriptor ->
                                     ScreenshotProtectedView(
                                         isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
@@ -215,16 +238,31 @@ fun UserModernPublicProfileView(
             }
         }
 
-        ProfileVisitorPinnedTopChrome(
-            viewModel = viewModel,
-            collapseProgress = collapseProgress,
-            onDismiss = onDismiss,
-            onShowQrCode = onShowQrCode,
-            onShowReport = onShowReport,
-            modifier = Modifier.align(Alignment.TopCenter).padding(horizontal = 12.dp, vertical = 8.dp),
+        ProfileStickyChromeContainer(
+            blurProgress = collapseProgress,
+            tabsArePinned = tabsArePinned,
+            chrome = {
+                ProfileVisitorPinnedTopChrome(
+                    viewModel = viewModel,
+                    collapseProgress = collapseProgress,
+                    onDismiss = onDismiss,
+                    onShowQrCode = onShowQrCode,
+                    onShowReport = onShowReport,
+                )
+            },
+            pinnedTabs = {
+                if (pinnedAlpha > 0.01f) {
+                    Box(Modifier.alpha(pinnedAlpha).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        UserProfileFloatingTabBar(
+                            selectedTab = selectedTab,
+                            onSelectTab = onSelectTab,
+                        )
+                    }
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding(),
         )
     }
 }
-
-// `UserProfilePillTabs` pertenece a `UserProfileView.swift` → se consume desde el paquete
-// `userprofile`, no se redefine aquí (paridad 1 archivo Swift = 1 archivo Kotlin).

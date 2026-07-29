@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -118,6 +119,8 @@ fun ProfileHighlightsView(
 
         if (highlights.isEmpty() && !isOwnProfile && !isLoading) return@Column
 
+        val showLoadingRail = isLoading && highlights.isEmpty()
+
         Row(
             Modifier
                 .horizontalScroll(rememberScrollState())
@@ -125,37 +128,41 @@ fun ProfileHighlightsView(
             horizontalArrangement = Arrangement.spacedBy(horizontalSpacing),
         ) {
             if (isOwnProfile) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 6.dp),
-                    modifier = Modifier.combinedClickable(onClick = { presentation.presentCreate() }),
-                ) {
-                    Box(
-                        Modifier
-                            .size(circleSize)
-                            .clip(CircleShape)
-                            .background(if (dark) Color(0xFF0B1215) else Color(0xFFFAF9F6))
-                            .border(1.dp, ProfileColors.textSecondary().copy(alpha = 0.5f), CircleShape),
-                        contentAlignment = Alignment.Center,
+                if (showLoadingRail) {
+                    PlusButtonPlaceholder(size = circleSize)
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 6.dp),
+                        modifier = Modifier.combinedClickable(onClick = { presentation.presentCreate() }),
                     ) {
-                        Icon(
-                            Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.highlighted_stories_new),
-                            tint = ProfileColors.accent,
-                            modifier = Modifier.size(if (isCompact) 16.dp else 20.dp),
-                        )
-                    }
-                    if (!isCompact) {
-                        Text(
-                            stringResource(R.string.highlighted_stories_new),
-                            color = ProfileColors.textSecondary(),
-                            fontSize = with(density) { legacyPoppinsSize(context, 10).toSp() },
-                        )
+                        Box(
+                            Modifier
+                                .size(circleSize)
+                                .clip(CircleShape)
+                                .background(if (dark) Color(0xFF0B1215) else Color(0xFFFAF9F6))
+                                .border(1.dp, ProfileColors.textSecondary().copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Filled.Add,
+                                contentDescription = stringResource(R.string.highlighted_stories_new),
+                                tint = ProfileColors.accent,
+                                modifier = Modifier.size(if (isCompact) 16.dp else 20.dp),
+                            )
+                        }
+                        if (!isCompact) {
+                            Text(
+                                stringResource(R.string.highlighted_stories_new),
+                                color = ProfileColors.textSecondary(),
+                                fontSize = with(density) { legacyPoppinsSize(context, 10).toSp() },
+                            )
+                        }
                     }
                 }
             }
 
-            if (isLoading && highlights.isEmpty()) {
+            if (showLoadingRail) {
                 repeat(3) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -176,51 +183,51 @@ fun ProfileHighlightsView(
                         )
                     }
                 }
-            }
-
-            highlights.forEach { highlight ->
-                var menuExpanded by remember(highlight.id) { mutableStateOf(false) }
-                Box {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 6.dp),
-                        modifier = Modifier.combinedClickable(
-                            onClick = { presentation.presentViewer(highlight) },
-                            onLongClick = { if (isOwnProfile) menuExpanded = true },
-                        ),
-                    ) {
-                        HighlightIconView(highlight = highlight, size = circleSize)
-                        Text(
-                            highlight.title,
-                            color = ProfileColors.textPrimary(),
-                            fontSize = with(density) { legacyPoppinsSize(context, if (isCompact) 9 else 11).toSp() },
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.width(if (isCompact) 60.dp else 80.dp),
-                        )
-                    }
-
-                    if (isOwnProfile) {
-                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.common_edit)) },
-                                onClick = { menuExpanded = false; presentation.presentEdit(highlight) },
-                                leadingIcon = { Icon(Icons.Filled.Edit, null) },
+            } else {
+                highlights.forEach { highlight ->
+                    var menuExpanded by remember(highlight.id) { mutableStateOf(false) }
+                    Box {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 6.dp),
+                            modifier = Modifier.combinedClickable(
+                                onClick = { presentation.presentViewer(highlight) },
+                                onLongClick = { if (isOwnProfile) menuExpanded = true },
+                            ),
+                        ) {
+                            HighlightIconView(highlight = highlight, size = circleSize)
+                            Text(
+                                highlight.title,
+                                color = ProfileColors.textPrimary(),
+                                fontSize = with(density) { legacyPoppinsSize(context, if (isCompact) 9 else 11).toSp() },
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.width(if (isCompact) 60.dp else 80.dp),
                             )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.common_delete), color = Color.Red) },
-                                onClick = {
-                                    menuExpanded = false
-                                    val id = highlight.id ?: return@DropdownMenuItem
-                                    scope.launch {
-                                        runCatching { FirestoreService().deleteHighlight(userId, id) }
-                                            .onFailure { errorMessage = it.message }
-                                        reload()
-                                    }
-                                },
-                                leadingIcon = { Icon(Icons.Filled.Delete, null, tint = Color.Red) },
-                            )
+                        }
+
+                        if (isOwnProfile) {
+                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.common_edit)) },
+                                    onClick = { menuExpanded = false; presentation.presentEdit(highlight) },
+                                    leadingIcon = { Icon(Icons.Filled.Edit, null) },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.common_delete), color = Color.Red) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        val id = highlight.id ?: return@DropdownMenuItem
+                                        scope.launch {
+                                            runCatching { FirestoreService().deleteHighlight(userId, id) }
+                                                .onFailure { errorMessage = it.message }
+                                            reload()
+                                        }
+                                    },
+                                    leadingIcon = { Icon(Icons.Filled.Delete, null, tint = Color.Red) },
+                                )
+                            }
                         }
                     }
                 }
@@ -283,6 +290,21 @@ fun HighlightIconView(
                 modifier = Modifier.size(size * 0.3f),
             )
         }
+    }
+}
+
+/** Port de `PlusButtonPlaceholder` (skeleton del botón +). */
+@Composable
+private fun PlusButtonPlaceholder(size: Dp) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(
+            Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(ProfileColors.textSecondary().copy(alpha = 0.12f))
+                .border(1.dp, ProfileColors.textSecondary().copy(alpha = 0.5f), CircleShape),
+        )
+        Spacer(Modifier.height(10.dp))
     }
 }
 

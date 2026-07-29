@@ -8,11 +8,10 @@ import org.json.JSONObject
 import java.util.Date
 
 /**
- * Port de `UserActivityCache.swift`.
+ * Port 1:1 de `UserActivityCache.swift` (183 líneas).
  *
- * iOS persiste con `UserDefaults` + `Codable`; aquí se usa `SharedPreferences` + JSON, con las
- * MISMAS claves (`activityCache_*_{userId}`) y los mismos campos del payload, para que el
- * comportamiento y el ciclo de invalidación sean idénticos.
+ * iOS: UserDefaults + Codable. Android: SharedPreferences + JSON.
+ * Mismas claves `activityCache_*_{userId}` y mismos campos de payload.
  */
 
 data class CachedReactionPayload(

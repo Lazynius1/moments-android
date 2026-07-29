@@ -2,11 +2,14 @@ package com.moments.android.views.settings
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
@@ -23,7 +27,6 @@ import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PlayCircleFilled
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,12 +56,15 @@ import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.extensions.timeAgoDisplay
 import com.moments.android.models.Moment
 import com.moments.android.services.cache.VideoThumbnailCache
+import com.moments.android.utilities.MomentsFormat
+import com.moments.android.views.components.EchoesIconGradients
 import com.moments.android.views.components.EchoesIconMetrics
 import com.moments.android.views.components.EchoesIconView
 import com.moments.android.views.components.AudienceIconView
 import com.moments.android.views.creator.audienceselector.ContentAudience
 import com.moments.android.views.feed.reactions.ReactionType
 import com.moments.android.views.messaging.components.AttachmentIcon
+import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.story.StoryRingAvatarView
@@ -66,9 +72,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Port de `UserActivityRows.swift`. Acento adaptativo local (iOS `SettingsProfileColors.accent`). */
-private val ContentColorAccentDark = Color.White
-private val ContentColorAccentLight = Color.Black
+/**
+ * Port 1:1 de `UserActivityRows.swift` (1178 líneas).
+ * Filas comentario/evento + tarjetas reacción/portrait/story + indicador vídeo.
+ */
+
+@Composable
+private fun activityPrimary(): Color =
+    if (isSystemInDarkTheme()) Color.White else Color.Black
+
+@Composable
+private fun activitySecondary(): Color = Color.Gray
 
 private fun isProtectedMoment(moment: Moment?): Boolean {
     val audience = moment?.audience?.lowercase() ?: return false
@@ -94,8 +108,8 @@ fun ActivityCommentItemRow(
     onToggleSelection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val primary = MaterialTheme.colorScheme.onSurface
-    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    val primary = activityPrimary()
+    val secondary = activitySecondary()
     val selectionColor = Color(0xFF2563EB)
 
     Row(
@@ -103,6 +117,13 @@ fun ActivityCommentItemRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(primary.copy(alpha = 0.05f))
+            .then(
+                if (isSelected) {
+                    Modifier.border(1.6.dp, selectionColor, RoundedCornerShape(12.dp))
+                } else {
+                    Modifier
+                },
+            )
             .then(if (isSelectionMode) Modifier.clickable { onToggleSelection() } else Modifier)
             .padding(10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -143,7 +164,7 @@ fun ActivityCommentItemRow(
                     )
                 }
 
-                Box(Modifier.weight(1f))
+                Spacer(Modifier.weight(1f))
 
                 StoryRingAvatarView(
                     userId = item.authorId,
@@ -261,10 +282,12 @@ private fun StandardEventRow(
     onRowTap: (() -> Unit)?,
     modifier: Modifier,
 ) {
-    val primary = MaterialTheme.colorScheme.onSurface
-    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    val primary = activityPrimary()
+    val secondary = activitySecondary()
     val hasContext = !item.targetUsername.isNullOrBlank() || !item.contextText.isNullOrEmpty()
-    val showThumbnail = !item.thumbnailUrl.isNullOrEmpty()
+    val kind = item.kind?.lowercase().orEmpty()
+    val showThumbnail = !item.thumbnailUrl.isNullOrEmpty() &&
+        kind != "visit" && kind != "follower"
 
     Row(
         modifier = modifier
@@ -299,7 +322,10 @@ private fun StandardEventRow(
                     Text("•", fontSize = 10.sp, color = secondary.copy(alpha = 0.7f))
                     val username = item.targetUsername?.takeIf { it.isNotBlank() }
                     if (username != null) {
-                        Text(eventContextPrefix(kind = item.kind), fontSize = 11.sp, color = secondary.copy(alpha = 0.85f))
+                        val prefix = eventContextPrefix(item.kind)
+                        if (prefix.isNotEmpty()) {
+                            Text(prefix, fontSize = 11.sp, color = secondary.copy(alpha = 0.85f))
+                        }
                         Text(
                             username,
                             fontSize = 11.sp,
@@ -343,9 +369,10 @@ private fun VisitFollowerEventCard(
     onOpenTargetProfile: () -> Unit,
     modifier: Modifier,
 ) {
-    val primary = MaterialTheme.colorScheme.onSurface
-    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    val primary = activityPrimary()
+    val secondary = activitySecondary()
     val kind = item.kind?.lowercase().orEmpty()
+    val isDark = isSystemInDarkTheme()
 
     Row(
         modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -381,7 +408,26 @@ private fun VisitFollowerEventCard(
                 color = primary,
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(primary.copy(alpha = 0.06f))
+                    .background(
+                        Brush.verticalGradient(
+                            if (isDark) {
+                                listOf(Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.06f))
+                            } else {
+                                listOf(Color.Black.copy(alpha = 0.08f), Color.Black.copy(alpha = 0.04f))
+                            },
+                        ),
+                    )
+                    .border(
+                        1.dp,
+                        Brush.verticalGradient(
+                            if (isDark) {
+                                listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.06f))
+                            } else {
+                                listOf(Color.Black.copy(alpha = 0.10f), Color.Black.copy(alpha = 0.04f))
+                            },
+                        ),
+                        CircleShape,
+                    )
                     .clickable { onOpenTargetProfile() }
                     .padding(horizontal = 14.dp, vertical = 6.dp),
             )
@@ -391,7 +437,9 @@ private fun VisitFollowerEventCard(
 
 @Composable
 private fun EchoEventCard(item: ActivityEventItem, modifier: Modifier) {
-    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    val primary = activityPrimary()
+    val secondary = activitySecondary()
+    val isDark = isSystemInDarkTheme()
     val statusColor = when (item.echoStatusRaw?.lowercase()) {
         "pending" -> Color(0xFFFF9500)
         "active" -> Color(0xFF34C759)
@@ -405,19 +453,39 @@ private fun EchoEventCard(item: ActivityEventItem, modifier: Modifier) {
         else -> stringResource(R.string.echo_status_expired)
     }
     val count = (item.echoParticipantsCount ?: 0).coerceAtLeast(0)
+    val expiresAt = item.echoExpiresAt
+    val expiresLabel = when {
+        expiresAt == null -> item.timestamp.timeAgoDisplay()
+        expiresAt.time <= System.currentTimeMillis() -> stringResource(R.string.echo_status_expired)
+        else -> MomentsFormat.relativeTime(expiresAt, MomentsFormat.RelativeTimeStyle.CONVERSATIONAL)
+    }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 1.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            .background(primary.copy(alpha = 0.06f))
+            .border(
+                1.dp,
+                Brush.verticalGradient(
+                    if (isDark) {
+                        listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.06f))
+                    } else {
+                        listOf(Color.Black.copy(alpha = 0.10f), Color.Black.copy(alpha = 0.04f))
+                    },
+                ),
+                RoundedCornerShape(16.dp),
+            )
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(56.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+            Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(primary.copy(alpha = 0.08f)),
             contentAlignment = Alignment.Center,
         ) {
             val thumbUrl = item.thumbnailUrl
@@ -426,13 +494,13 @@ private fun EchoEventCard(item: ActivityEventItem, modifier: Modifier) {
             } else {
                 EchoesIconView(
                     size = EchoesIconMetrics.rowThumbnail,
-                    gradient = Brush.horizontalGradient(listOf(Color(0xFFFF9500), Color(0xFFAF52DE))),
+                    gradient = EchoesIconGradients.brandHorizontal,
                 )
             }
         }
 
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(item.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(item.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val participantsText = if (count == 1) {
                     stringResource(R.string.echo_participants_singular, count)
@@ -441,17 +509,28 @@ private fun EchoEventCard(item: ActivityEventItem, modifier: Modifier) {
                 }
                 Text(participantsText, fontSize = 12.sp, color = secondary)
                 Text("•", color = secondary)
-                Text(item.timestamp.timeAgoDisplay(), fontSize = 12.sp, color = secondary)
+                Text(expiresLabel, fontSize = 12.sp, color = secondary)
             }
         }
 
-        Text(
-            text = statusText,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = statusColor,
-            modifier = Modifier.clip(CircleShape).background(statusColor.copy(alpha = 0.15f)).padding(horizontal = 8.dp, vertical = 4.dp),
-        )
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = statusText,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = statusColor,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(statusColor.copy(alpha = 0.15f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = secondary,
+                modifier = Modifier.size(12.dp),
+            )
+        }
     }
 }
 
@@ -459,6 +538,7 @@ private fun EchoEventCard(item: ActivityEventItem, modifier: Modifier) {
 private fun EventAvatar(item: ActivityEventItem) {
     val path = item.actorProfileImagePath
     val userId = item.actorId
+    val accent = SettingsProfileColors.accent(isSystemInDarkTheme())
     when {
         !path.isNullOrEmpty() -> AsyncImage(
             model = path,
@@ -471,13 +551,25 @@ private fun EventAvatar(item: ActivityEventItem) {
             modifier = Modifier.size(34.dp).clip(CircleShape),
         )
         else -> Box(
-            Modifier.size(34.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.13f)),
-        )
+            Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(accent.copy(alpha = 0.13f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (item.icon == "EchoesIcon" || item.icon == "camera.aperture") {
+                EchoesIconView(size = EchoesIconMetrics.rowAvatar, tintColor = accent)
+            }
+        }
     }
 }
 
-private fun eventContextPrefix(kind: String?): String = ""
-
+@Composable
+private fun eventContextPrefix(kind: String?): String = when (kind?.lowercase()) {
+    "poll" -> stringResource(R.string.user_activity_stickers_poll_context_prefix)
+    "question" -> stringResource(R.string.user_activity_stickers_question_context_prefix)
+    else -> ""
+}
 // MARK: - Tarjeta de reacción / tag / archivado (cuadrada)
 
 @Composable
@@ -539,7 +631,11 @@ fun ActivityReactionMomentCard(
 private fun DiscreetReactionBadge(reactionType: String) {
     Box(Modifier.padding(6.dp)) {
         if (reactionType.lowercase() == "tagged") {
-            AttachmentIconView(icon = AttachmentIcon.TAGGED, size = 14.dp, tintColor = Color.White)
+            AttachmentIconView(
+                icon = AttachmentIcon.TAGGED,
+                preset = AttachmentIconPreset.ACTIVITY_REACTION_BADGE,
+                tintColor = Color.White,
+            )
         } else {
             Text(reactionStyleIcon(reactionType), fontSize = 14.sp)
         }
@@ -652,7 +748,7 @@ fun ActivityThumbnailVideoPlayIndicator(modifier: Modifier = Modifier) {
  */
 @Composable
 private fun MomentPreviewContent(moment: Moment?, size: Dp?) {
-    val placeholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+    val placeholderColor = activityPrimary().copy(alpha = 0.08f)
     val fillModifier = if (size != null) Modifier.size(size) else Modifier.fillMaxSize()
 
     if (moment == null) {
@@ -737,11 +833,14 @@ private fun RestrictedOverlay(compact: Boolean) {
 
 @Composable
 private fun StoryPlaceholder(isVideo: Boolean) {
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier.fillMaxSize().background(activityPrimary().copy(alpha = 0.08f)),
+        contentAlignment = Alignment.Center,
+    ) {
         Icon(
             imageVector = if (isVideo) Icons.Filled.PlayCircleFilled else Icons.Filled.Photo,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = activitySecondary(),
             modifier = Modifier.size(24.dp),
         )
     }

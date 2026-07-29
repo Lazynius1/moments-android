@@ -588,6 +588,13 @@ fun LocationMomentDetailView(
             ModernCommentsSheet(
                 moment = moment,
                 onDismiss = { commentsMoment = null },
+                onOpenStory = { userId ->
+                    commentsMoment = null
+                    val normalized = userId.trim()
+                    if (normalized.isNotEmpty()) {
+                        storyRoute = StoryUserPresentationRoute(normalized)
+                    }
+                },
             )
         }
 

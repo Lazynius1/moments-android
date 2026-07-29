@@ -1,8 +1,8 @@
 package com.moments.android.views.comments
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.searchUsers
@@ -69,7 +69,6 @@ fun CommentMentionSearchOverlay(
     val scope = rememberCoroutineScope()
     val firestore = remember { FirestoreService() }
     val colors = rememberAdaptiveColors()
-    val isDark = isSystemInDarkTheme()
 
     var searchText by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<AppUser>>(emptyList()) }
@@ -105,14 +104,15 @@ fun CommentMentionSearchOverlay(
     val effectiveQuery = if (showsSearchField) searchText else query.orEmpty()
     val shouldShowResults = isSearching || effectiveQuery.isNotEmpty()
     val panelHeight = (minOf(maxOf(searchResults.size, 1), 3) * 67).dp
+    val capsuleShape = RoundedCornerShape(50)
+    val panelShape = RoundedCornerShape(24.dp)
 
     Column(modifier.fillMaxWidth(), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
         if (showsSearchField) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(50))
-                    .background(if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f))
+                    .momentsChromeGlass(capsuleShape, interactive = true)
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -136,20 +136,33 @@ fun CommentMentionSearchOverlay(
                     },
                 )
                 if (searchText.isNotEmpty()) {
-                    IconButton(onClick = { searchText = ""; searchUsers("") }, modifier = Modifier.size(30.dp)) {
-                        Icon(Icons.Filled.Close, contentDescription = null, tint = Color.Gray)
+                    Box(
+                        Modifier
+                            .size(30.dp)
+                            .clickable {
+                                searchText = ""
+                                searchUsers("")
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.Close, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
                     }
                 }
-                IconButton(onClick = onCancel, modifier = Modifier.size(30.dp)) {
-                    Icon(Icons.Filled.Close, contentDescription = null, tint = colors.primary)
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clickable(onClick = onCancel),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = null, tint = colors.primary, modifier = Modifier.size(14.dp))
                 }
             }
         } else {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(50))
-                    .background(if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.05f))
+                    .momentsChromeGlass(capsuleShape, interactive = true)
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -163,8 +176,14 @@ fun CommentMentionSearchOverlay(
                     maxLines = 1,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = onCancel, modifier = Modifier.size(30.dp)) {
-                    Icon(Icons.Filled.Close, contentDescription = null, tint = colors.primary)
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clickable(onClick = onCancel),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = null, tint = colors.primary, modifier = Modifier.size(14.dp))
                 }
             }
         }
@@ -173,8 +192,8 @@ fun CommentMentionSearchOverlay(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.04f))
+                    .momentsChromeGlass(panelShape, interactive = false)
+                    .border(1.dp, colors.primary.copy(alpha = 0.08f), panelShape)
                     .padding(vertical = 8.dp),
             ) {
                 when {
@@ -237,8 +256,7 @@ private fun CommentMentionSearchRow(user: AppUser, onClick: () -> Unit) {
             tint = colors.primary,
             modifier = Modifier
                 .size(28.dp)
-                .clip(CircleShape)
-                .background(Color.Gray.copy(0.12f))
+                .momentsChromeGlass(CircleShape, interactive = true)
                 .padding(4.dp),
         )
     }

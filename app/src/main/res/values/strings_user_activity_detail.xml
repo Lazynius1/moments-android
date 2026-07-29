@@ -55,4 +55,19 @@
     <string name="user_activity_archived_confirm_restore_message">Do you want to restore the selected archived content?</string>
     <string name="user_activity_archived_processing_restore">Restoring archived content</string>
     <string name="user_activity_archived_success_restore">Archived content restored</string>
+    <string name="user_activity_archived_processing_button">Restoring…</string>
+    <string name="user_activity_select_all">Select all</string>
+    <string name="user_activity_echoes_count">%d Echoes</string>
+    <string name="user_activity_echoes_active_count">%d active</string>
+    <string name="user_activity_empty_reactions_subtitle">Interactions and reactions you leave on other moments will appear here.</string>
+    <string name="user_activity_empty_comments_subtitle">Your conversations, comment replies, and reviews will show up in this space.</string>
+    <string name="user_activity_empty_tags_subtitle">When friends mention or tag you in their moments, they will be listed here.</string>
+    <string name="user_activity_empty_stickers_subtitle">View interactive questions and poll answers you\'ve responded to.</string>
+    <string name="user_activity_empty_archived_subtitle">Your private, archived moments are safely stored here out of public view.</string>
+    <string name="user_activity_empty_recently_deleted_subtitle">Items you delete are kept here for 30 days before permanent deletion.</string>
+    <string name="user_activity_empty_echoes_subtitle">Echoes connect you with mutual friends nearby. Capture a moment to start echoing!</string>
+    <string name="user_activity_empty_followers_subtitle">Track recent follow requests, mutual friends, and profile connections.</string>
+    <string name="user_activity_empty_visits_subtitle">See the friends and followers who checked out your profile recently.</string>
+    <string name="user_activity_empty_moments_subtitle">Your shared grid posts and daily captures will appear here.</string>
+    <string name="user_activity_empty_reels_subtitle">Your immersive video reels and short clips will be saved in this tab.</string>
 </resources>

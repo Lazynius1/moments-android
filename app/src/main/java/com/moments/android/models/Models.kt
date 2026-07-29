@@ -1591,7 +1591,15 @@ data class MomentGridPreviewSettings(
         BLACK("black"), WHITE("white");
     }
 
+    /** Paridad iOS `isDefault` — no incluye `background`. */
     val isDefault: Boolean
-        get() = kotlin.math.abs(scale - 1.0) < 0.001 && kotlin.math.abs(offsetX) < 0.001 && kotlin.math.abs(offsetY) < 0.001 &&
+        get() = kotlin.math.abs(scale - 1.0) < 0.001 &&
+            kotlin.math.abs(offsetX) < 0.001 &&
+            kotlin.math.abs(offsetY) < 0.001 &&
             fitMode == FitMode.FILL
+
+    companion object {
+        /** Paridad iOS `MomentGridPreviewSettings.default`. */
+        val DEFAULT = MomentGridPreviewSettings()
+    }
 }

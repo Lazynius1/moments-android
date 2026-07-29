@@ -218,7 +218,10 @@ fun GlassmorphicMessageRow(
                             )
                         }
                         if (message.isVanishModeMessage) {
-                            com.moments.android.views.shared.ScreenshotProtectedView(isProtected = true) {
+                            com.moments.android.views.shared.ScreenshotProtectedView(
+                                isProtected = true,
+                                cornerRadius = cornerRadius.dp,
+                            ) {
                                 bubble()
                             }
                         } else {

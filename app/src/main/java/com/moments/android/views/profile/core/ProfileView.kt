@@ -20,9 +20,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PersonPin
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -30,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,35 +51,36 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.coordinators.CoordinatorNavigationEvent
+import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.models.Moment
-import com.moments.android.models.BestFriendsView
-import com.moments.android.reportes.AppealStatusView
+import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.incognito.IncognitoModeService
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.explore.toExploreFeedMoment
+import com.moments.android.views.feed.core.EditMomentPayload
+import com.moments.android.views.profile.core.sections.LocalProfileGridHeroCoordinator
 import com.moments.android.views.profile.core.sections.ModernProfileContentView
+import com.moments.android.views.profile.core.sections.ProfileConnectionsRoute
+import com.moments.android.views.profile.core.sections.ProfileGridHeroDetailLayer
+import com.moments.android.views.profile.core.sections.ProfileGridHeroTransitionCoordinator
+import com.moments.android.views.profile.core.sections.ProfileGridPreviewEditorView
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomDestination
+import com.moments.android.views.profile.core.gridPreviewSettings
 import com.moments.android.views.profile.core.sections.ProfileSavedContentState
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomDetailDestination
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomFeedKind
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomNavigation
 import com.moments.android.views.profile.editor.ModernEditProfileView
 import com.moments.android.views.profile.incognito.IncognitoModeSheet
+import com.moments.android.views.profile.momentsview.EditMomentView
 import com.moments.android.views.profile.userprofile.sections.ProfileImageViewer
 import com.moments.android.views.settings.QRCodeView
 import com.moments.android.views.shared.MomentsModalSheet
-import com.moments.android.views.settings.BlockedUsersView
-import com.moments.android.views.settings.ChatStorageSettingsView
-import com.moments.android.views.settings.DataExportView
-import com.moments.android.views.settings.MuteSettingsView
-import com.moments.android.views.settings.PasswordChangeView
 import com.moments.android.views.settings.SettingsView
-import com.moments.android.views.settings.SettingsViewModel
-import com.moments.android.views.settings.settingssections.NotificationSettingsView
-import com.moments.android.views.settings.settingssections.PersonalInfoView
-import com.moments.android.views.login.PrivacyPolicySheet
-import com.moments.android.views.story.ArchivedStoriesView
 import com.moments.android.views.story.StoriesView
 import com.moments.android.views.story.StoryViewModel
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /** Paleta que declara `ProfileView.swift`, con equivalente adaptativo Compose. */
@@ -254,7 +259,7 @@ fun ProfileFloatingTabBar(
 /** Acciones de navegación/sheets: sustituyen bindings iOS sin crear rutas Android ficticias. */
 data class ProfileViewActions(
     val onOpenSettings: () -> Unit = {}, val onEditProfile: () -> Unit = {}, val onShowStory: () -> Unit = {},
-    val onShowProfileImage: () -> Unit = {}, val onEditProfileNote: () -> Unit = {}, val onShowNotifications: () -> Unit = {},
+    val onShowProfileImage: () -> Unit = {}, val onShowNotifications: () -> Unit = {},
     val onShowQr: () -> Unit = {}, val onShowIncognito: () -> Unit = {}, val onOpenSavedManager: () -> Unit = {},
     val onOpenMoment: (List<Moment>, Int, com.moments.android.views.profile.core.sections.ProfileMomentZoomFeedKind) -> Unit = { _, _, _ -> },
     val onRefreshSavedVisibility: (Moment, (Boolean) -> Unit) -> Unit = { _, completion -> completion(false) },
@@ -264,6 +269,9 @@ data class ProfileViewActions(
 /**
  * Root Compose equivalente a `ProfileView`: dueño del `ProfileViewModel` y, como en iOS,
  * de sus propias hojas (ajustes, editor, QR, incógnito, foto de perfil e historias).
+ *
+ * Puentes: temas de perfil 🚫; hero transition → [ProfileGridHeroDetailLayer];
+ * grid preview editor → [ProfileGridPreviewEditorView] sheet large.
  */
 @Composable
 fun ProfileView(
@@ -273,6 +281,10 @@ fun ProfileView(
 ) {
     val viewModel = remember { ProfileViewModel() }
     val storyViewModel = remember { StoryViewModel() }
+    val heroCoordinator = remember { ProfileGridHeroTransitionCoordinator() }
+    val scope = rememberCoroutineScope()
+    val firestore = remember { FirestoreService() }
+
     var profileTab by remember { mutableStateOf(ProfileTabType.MOMENTS) }
     var uid by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser?.uid) }
     val unauthenticatedMessage = stringResource(R.string.messaging_error_not_authenticated)
@@ -283,18 +295,31 @@ fun ProfileView(
     var showIncognito by remember { mutableStateOf(false) }
     var showProfileImage by remember { mutableStateOf(false) }
     var showStories by remember { mutableStateOf(false) }
-    var settingsRoute by remember { mutableStateOf<String?>(null) }
     var momentDestination by remember { mutableStateOf<ProfileMomentZoomDestination?>(null) }
+    var openConnectionsRoute by remember { mutableStateOf<ProfileConnectionsRoute?>(null) }
+    var editingMoment by remember { mutableStateOf<Moment?>(null) }
+    var pendingDeleteMoment by remember { mutableStateOf<Moment?>(null) }
+    var gridPreviewMoment by remember { mutableStateOf<Moment?>(null) }
 
     val isIncognitoActive by IncognitoModeService.isActive.collectAsState()
 
-    // ≡ Swift `addStateDidChangeListener` en `onAppear`: el perfil sigue a la sesión
-    // aunque el usuario entre/salga sin desmontar la pestaña Profile.
     DisposableEffect(Unit) {
+        IncognitoModeService.loadState()
         val auth = FirebaseAuth.getInstance()
         val listener = FirebaseAuth.AuthStateListener { uid = it.currentUser?.uid }
         auth.addAuthStateListener(listener)
-        onDispose { auth.removeAuthStateListener(listener) }
+        onDispose {
+            auth.removeAuthStateListener(listener)
+            heroCoordinator.resetToIdle()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        NavigationEventBus.events.collect { event ->
+            if (event is CoordinatorNavigationEvent.ShowProfileVisits) {
+                openConnectionsRoute = ProfileConnectionsRoute.VISITS
+            }
+        }
     }
 
     LaunchedEffect(uid) {
@@ -305,72 +330,83 @@ fun ProfileView(
             return@LaunchedEffect
         }
         viewModel.fetchProfile(currentUid)
-        viewModel.fetchTaggedMoments(currentUid)
-        storyViewModel.load(listOf(currentUid), currentUid)
+        // ≡ iOS: fetchStories(includeConnections: false) + checkActiveStories
+        storyViewModel.fetchStories(forUserId = currentUid, includeConnections = false)
     }
 
-    ModernProfileContentView(
-        viewModel = viewModel, storyViewModel = storyViewModel, selectedTab = profileTab, onSelectTab = { profileTab = it },
-        savedState = savedState, onOpenSavedManager = actions.onOpenSavedManager,
-        onOpenMoment = { moments, index, feedKind ->
-            moments.getOrNull(index)?.let { moment ->
-                momentDestination = ProfileMomentZoomDestination(
-                    zoomSourceID = ProfileMomentZoomNavigation.sourceID(moment, index),
-                    initialIndex = index,
-                    initialMomentId = moment.id,
-                    feedKind = feedKind,
-                )
-                actions.onOpenMoment(moments, index, feedKind)
+    LaunchedEffect(heroCoordinator, viewModel) {
+        heroCoordinator.onEdit = { editingMoment = it }
+        heroCoordinator.onDelete = { pendingDeleteMoment = it }
+        heroCoordinator.onArchive = { viewModel.archiveMomentLocally(it) }
+        heroCoordinator.onPin = { moment, shouldPin, replaceOldest ->
+            viewModel.handleGridPin(moment, shouldPin, replaceOldest)
+        }
+        heroCoordinator.onAdjustPreview = { moment ->
+            if (!moment.previewImageURLString.isNullOrBlank()) {
+                gridPreviewMoment = moment
             }
-        },
-        onRefreshSavedVisibility = actions.onRefreshSavedVisibility, onRemoveSaved = actions.onRemoveSaved,
-        onEditProfile = { actions.onEditProfile(); showEditProfile = true },
-        onShowStory = { actions.onShowStory(); showStories = true },
-        onShowProfileImage = { actions.onShowProfileImage(); showProfileImage = true },
-        onEditProfileNote = actions.onEditProfileNote, onShowNotifications = actions.onShowNotifications,
-        onShowQr = { actions.onShowQr(); showQr = true },
-        onShowIncognito = { actions.onShowIncognito(); showIncognito = true },
-        onShowSettings = { actions.onOpenSettings(); showSettings = true },
-        isIncognitoActive = isIncognitoActive,
-        modifier = modifier,
-    )
+        }
+        heroCoordinator.openZoomDetail = { destination ->
+            momentDestination = destination
+        }
+        heroCoordinator.clearZoomNavigation = { momentDestination = null }
+    }
 
-    if (showSettings) {
-        ProfileFullScreenSheet(onDismiss = { showSettings = false }) {
-            SettingsView(
-                onNavigateBack = { showSettings = false },
-                onNavigateToRoute = { settingsRoute = it },
+    CompositionLocalProvider(LocalProfileGridHeroCoordinator provides heroCoordinator) {
+        Box(modifier.fillMaxSize()) {
+            ModernProfileContentView(
+                viewModel = viewModel,
+                storyViewModel = storyViewModel,
+                selectedTab = profileTab,
+                onSelectTab = { profileTab = it },
+                savedState = savedState,
+                onOpenSavedManager = actions.onOpenSavedManager,
+                onOpenMoment = { moments, index, feedKind ->
+                    moments.getOrNull(index)?.let { moment ->
+                        momentDestination = ProfileMomentZoomDestination(
+                            zoomSourceID = ProfileMomentZoomNavigation.sourceID(moment, index),
+                            initialIndex = index,
+                            initialMomentId = moment.id,
+                            feedKind = feedKind,
+                        )
+                        actions.onOpenMoment(moments, index, feedKind)
+                    }
+                },
+                onRefreshSavedVisibility = actions.onRefreshSavedVisibility,
+                onRemoveSaved = actions.onRemoveSaved,
+                onEditProfile = { actions.onEditProfile(); showEditProfile = true },
+                onShowStory = { actions.onShowStory(); showStories = true },
+                onShowProfileImage = { actions.onShowProfileImage(); showProfileImage = true },
+                onShowNotifications = actions.onShowNotifications,
+                onShowQr = { actions.onShowQr(); showQr = true },
+                onShowIncognito = { actions.onShowIncognito(); showIncognito = true },
+                onShowSettings = { actions.onOpenSettings(); showSettings = true },
+                isIncognitoActive = isIncognitoActive,
+                onMomentLongPress = { moment, index, _ ->
+                    heroCoordinator.openMenu(moment, index)
+                },
+                openConnectionsRoute = openConnectionsRoute,
+                onOpenConnectionsRouteConsumed = { openConnectionsRoute = null },
+            )
+
+            // ≡ ProfileGridHeroDetailLayer (flying hero + menú owner)
+            ProfileGridHeroDetailLayer(
+                coordinator = heroCoordinator,
+                moments = when (profileTab) {
+                    ProfileTabType.TAGGED -> viewModel.taggedMoments
+                    else -> viewModel.moments
+                },
+                zoomFeedKind = when (profileTab) {
+                    ProfileTabType.TAGGED -> ProfileMomentZoomFeedKind.TAGGED_MOMENTS
+                    else -> ProfileMomentZoomFeedKind.OWN_MOMENTS
+                },
             )
         }
     }
 
-    // Destinos de Ajustes: en iOS son `navigationDestination`; aquí, hojas sobre la de ajustes.
-    settingsRoute?.let { route ->
-        val close = { settingsRoute = null }
-        ProfileFullScreenSheet(onDismiss = close) {
-            when (route) {
-                "best_friends" -> BestFriendsView(onDismiss = close)
-                "blocked_users" -> BlockedUsersView(onNavigateBack = close)
-                "chat_storage" -> ChatStorageSettingsView(onNavigateBack = close)
-                "data_export" -> DataExportView(onNavigateBack = close)
-                "mute_settings" -> MuteSettingsView(onNavigateBack = close)
-                "password_change" -> PasswordChangeView(onNavigateBack = close)
-                "qr_code" -> QRCodeView(user = viewModel.userProfile, onNavigateBack = close)
-                "archived_stories" -> ArchivedStoriesView(onNavigateBack = close)
-                "privacy_policy" -> PrivacyPolicySheet(onDismiss = close)
-                "moderation_reviews" -> AppealStatusView(onBack = close)
-                "personal_info" -> PersonalInfoView(
-                    username = viewModel.userProfile?.username.orEmpty(),
-                    email = viewModel.userProfile?.email.orEmpty(),
-                    onNavigateBack = close,
-                )
-                "notifications_settings" -> NotificationSettingsView(
-                    viewModel = remember { SettingsViewModel() },
-                    onNavigateBack = close,
-                )
-                "user_activity" -> com.moments.android.views.settings.UserActivityView(onNavigateBack = close)
-                else -> SettingsRouteMissingView(onDismiss = close)
-            }
+    if (showSettings) {
+        ProfileFullScreenSheet(onDismiss = { showSettings = false }) {
+            SettingsView(onNavigateBack = { showSettings = false })
         }
     }
 
@@ -394,7 +430,8 @@ fun ProfileView(
     }
 
     if (showIncognito) {
-        MomentsModalSheet(onDismissRequest = { showIncognito = false }, largeOnly = true) {
+        // ≡ iOS `.presentationDetents([.fraction(0.64), .large])` → medium+large
+        MomentsModalSheet(onDismissRequest = { showIncognito = false }, largeOnly = false) {
             IncognitoModeSheet()
         }
     }
@@ -422,8 +459,65 @@ fun ProfileView(
         }
     }
 
-    // ≡ `ProfileMomentDetailRoute`/`ProfileMomentZoomNavigation`: la rejilla propia abre
-    // su carrusel real aunque el host no inyecte una navegación externa.
+    editingMoment?.let { moment ->
+        MomentsModalSheet(
+            onDismissRequest = { editingMoment = null },
+            largeOnly = true,
+        ) {
+            EditMomentView(
+                moment = moment.toExploreFeedMoment(),
+                onSave = { payload ->
+                    scope.launch {
+                        updateOwnMoment(firestore, viewModel, moment, payload)
+                        editingMoment = null
+                    }
+                },
+                onDismiss = { editingMoment = null },
+            )
+        }
+    }
+
+    // ≡ iOS `.sheet(item: $gridPreviewMoment)` + `.presentationDetents([.large])`
+    gridPreviewMoment?.let { moment ->
+        val imageUrl = moment.previewImageURLString ?: return@let
+        MomentsModalSheet(
+            onDismissRequest = { gridPreviewMoment = null },
+            largeOnly = true,
+        ) {
+            ProfileGridPreviewEditorView(
+                imageUrl = imageUrl,
+                initialSettings = moment.gridPreviewSettings,
+                onDismiss = { gridPreviewMoment = null },
+                onSave = { settings ->
+                    viewModel.saveGridPreview(moment, settings)
+                },
+            )
+        }
+    }
+
+    pendingDeleteMoment?.let { moment ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteMoment = null },
+            title = { Text(stringResource(R.string.context_menu_delete_moment)) },
+            text = { Text(stringResource(R.string.feed_delete_confirm)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteMomentLocally(moment)
+                        pendingDeleteMoment = null
+                    },
+                ) {
+                    Text(stringResource(R.string.common_delete), color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteMoment = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
     momentDestination?.let { destination ->
         val liveMoments = when (destination.feedKind) {
             ProfileMomentZoomFeedKind.OWN_MOMENTS -> viewModel.moments
@@ -441,25 +535,36 @@ fun ProfileView(
     }
 }
 
-/** Destino de Ajustes cuya pantalla aún no está portada; no se finge navegación. */
-@Composable
-private fun SettingsRouteMissingView(onDismiss: () -> Unit) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(ProfileColors.background())
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            stringResource(R.string.common_close),
-            color = ProfileColors.accent,
-            modifier = Modifier.clickable(onClick = onDismiss),
+private suspend fun updateOwnMoment(
+    firestore: FirestoreService,
+    viewModel: ProfileViewModel,
+    moment: Moment,
+    payload: EditMomentPayload,
+) {
+    val momentId = moment.id ?: return
+    runCatching {
+        firestore.updateMomentDetails(
+            userId = moment.authorId,
+            momentId = momentId,
+            content = payload.content,
+            audience = payload.audience,
+            customListId = payload.customListId,
+            customViewers = payload.customViewers,
+            taggedUsers = payload.taggedUsers,
+            mentionedUsers = payload.mentionedUsers,
+            location = payload.locationName.ifBlank { null },
+            locationCoordinate = if (payload.locationLatitude != null && payload.locationLongitude != null) {
+                Moment.LocationCoordinate(payload.locationLatitude, payload.locationLongitude)
+            } else {
+                null
+            },
+            mediaItems = payload.mediaItems,
         )
+        viewModel.refreshProfile()
     }
 }
 
+/** Host a pantalla completa sobre el perfil (ajustes, editor, etc.). */
 @Composable
 private fun ProfileFullScreenSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {

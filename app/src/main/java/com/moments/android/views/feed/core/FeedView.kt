@@ -1,7 +1,6 @@
 package com.moments.android.views.feed.core
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,6 +75,7 @@ import com.moments.android.views.feed.uploads.FloatingMomentUploadOverlay
 import com.moments.android.views.messaging.core.MessagingViewModel
 import com.moments.android.views.permission.shared.PermissionPrimerGate
 import com.moments.android.views.permission.shared.PermissionPrimerGateHost
+import com.moments.android.views.shared.AppErrorBanner
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -487,6 +487,15 @@ fun FeedView(
                     syncStoryRingNavigationOrder()
                     showStories = true
                 }
+                is CoordinatorNavigationEvent.ShowStoriesStartingAt -> {
+                    syncStoryRingNavigationOrder()
+                    val uid = event.userId.trim()
+                    if (uid.isNotEmpty()) {
+                        selectedStoryRoute = StoryUserPresentationRoute(uid)
+                    } else {
+                        showStories = true
+                    }
+                }
                 else -> Unit
             }
         }
@@ -791,19 +800,4 @@ private fun SlowConnectionBanner(isOffline: Boolean, modifier: Modifier = Modifi
             .background(Color(0xFFCC5500), RoundedCornerShape(10.dp))
             .padding(horizontal = 14.dp, vertical = 10.dp),
     )
-}
-
-@Composable
-internal fun AppErrorBanner(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier
-            .fillMaxWidth()
-            .background(Color(0xFFB00020), RoundedCornerShape(10.dp))
-            .clickable(onClick = onRetry)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(message, color = Color.White)
-        Text(stringResource(R.string.feed_error_retry), color = Color.White.copy(alpha = 0.85f))
-    }
 }

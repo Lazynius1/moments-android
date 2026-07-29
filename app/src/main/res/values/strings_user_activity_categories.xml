@@ -52,6 +52,10 @@
     <string name="user_activity_section_shared_content">Content you\'ve shared</string>
     <string name="user_activity_section_history">History</string>
     <string name="user_activity_section_usage">HOW YOU USE MOMENTS</string>
+    <string name="user_activity_archived_header_title">Archived moments</string>
+    <string name="user_activity_range_week">Last 7 days</string>
+    <string name="user_activity_range_month">Last 30 days</string>
+    <string name="user_activity_range_year">Last year</string>
     <string name="user_activity_author_sheet_title">Filter by user</string>
     <string name="user_activity_author_search">Search username</string>
     <string name="user_activity_common_close">Close</string>

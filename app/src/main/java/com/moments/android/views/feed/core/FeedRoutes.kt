@@ -1,20 +1,19 @@
 package com.moments.android.views.feed.core
 
+import com.moments.android.views.profile.core.sections.UserProfileZoomNavigation
+
 /**
  * Port 1:1 de `FeedRoutes.swift`.
  *
- * iOS `FeedProfileSheetRoute.zoomSourceID` usa
- * `UserProfileZoomNavigation.sourceID(userId:)` → `"user-profile-\(userId)"`.
- * Android: misma key para Compose `SharedTransition` (`userProfileZoomSource` / destination).
+ * `zoomSourceID` ≡ `UserProfileZoomNavigation.sourceID` (Compose SharedTransition).
  */
-private fun userProfileZoomSourceId(userId: String): String = "user-profile-$userId"
 
 /** Port 1:1 de `FeedProfileSheetRoute`. */
 data class FeedProfileSheetRoute(val userId: String) {
     val id: String get() = userId
 
     val zoomSourceID: String
-        get() = userProfileZoomSourceId(userId)
+        get() = UserProfileZoomNavigation.sourceID(userId)
 }
 
 /** Port 1:1 de `FeedEchoInvitationRoute`. */
