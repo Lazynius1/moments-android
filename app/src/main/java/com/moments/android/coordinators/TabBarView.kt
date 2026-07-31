@@ -84,6 +84,7 @@ import com.moments.android.views.shared.OfflineBannerOverlay
 import com.moments.android.views.creator.CreatorView
 import com.moments.android.views.components.InAppBannerView
 import com.moments.android.views.messaging.screens.MessagingView
+import com.moments.android.views.nova.NovaView
 import com.moments.android.views.profile.core.ProfileView
 import com.moments.android.views.profile.userprofile.UserProfileView
 import com.moments.android.utilities.HapticManager
@@ -425,10 +426,14 @@ private fun TabContent(
             showCreatorView = showCreatorView,
             onShowCreatorViewChange = onShowCreatorViewChange,
         )
-        AppTab.NOVA -> CoordinatorPlaceholderScreen(
-            title = stringResource(R.string.tab_bar_nova),
-            padding = padding,
-        )
+        AppTab.NOVA -> Box(
+            Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            // ≡ iOS Tab(AppTab.nova) { NovaView() }
+            NovaView()
+        }
         AppTab.CREATE -> Box(Modifier.fillMaxSize())
         AppTab.EXPLORE -> ExploreView(
             contentPadding = padding,

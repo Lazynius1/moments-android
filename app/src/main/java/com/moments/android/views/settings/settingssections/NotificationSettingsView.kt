@@ -60,6 +60,7 @@ import com.moments.android.utilities.momentsPress
 import com.moments.android.views.settings.SettingsProfileColors
 import com.moments.android.views.settings.SettingsSubsectionWrapper
 import com.moments.android.views.settings.SettingsViewModel
+import com.moments.android.views.settings.sections.SettingsSubsectionGroup
 import com.moments.android.views.settings.settingsToggleCases
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -106,16 +107,12 @@ fun NotificationSettingsView(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 22.dp),
-                verticalArrangement = Arrangement.spacedBy(34.dp),
+                    .padding(vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(
-                        stringResource(R.string.settings_notifications_schedule_title),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.Gray,
-                    )
+                SettingsSubsectionGroup(
+                    title = stringResource(R.string.settings_notifications_schedule_title),
+                ) {
                     NotificationToggleRow(
                         title = stringResource(R.string.settings_notifications_schedule_enable),
                         checked = isScheduleEnabled,
@@ -126,6 +123,11 @@ fun NotificationSettingsView(
                         },
                     )
                     if (isScheduleEnabled) {
+                        HorizontalDivider(
+                            Modifier.padding(start = 16.dp),
+                            color = Color.Gray.copy(0.2f),
+                            thickness = 0.5.dp,
+                        )
                         ScheduleTimeRow(
                             label = stringResource(R.string.settings_notifications_schedule_start),
                             timeLabel = timeFormat.format(startTime),
@@ -133,6 +135,11 @@ fun NotificationSettingsView(
                             onClick = {
                                 showTimePicker(context, startTime, onStartTimeChange)
                             },
+                        )
+                        HorizontalDivider(
+                            Modifier.padding(start = 16.dp),
+                            color = Color.Gray.copy(0.2f),
+                            thickness = 0.5.dp,
                         )
                         ScheduleTimeRow(
                             label = stringResource(R.string.settings_notifications_schedule_end),
@@ -167,89 +174,77 @@ fun NotificationSettingsView(
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(
-                        stringResource(R.string.settings_notifications_types_title),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.Gray,
-                    )
-                    Column {
-                        val types = NotificationType.settingsToggleCases
-                        types.forEachIndexed { index, type ->
-                            NotificationToggleRow(
-                                title = stringResource(type.settingsDisplayNameRes()),
-                                checked = viewModel.notificationPreferences[type.raw] ?: true,
-                                primary = primary,
-                                onCheckedChange = {
-                                    viewModel.updateNotificationPreference(type.raw, it)
-                                },
-                            )
-                            if (index < types.lastIndex) {
-                                HorizontalDivider(
-                                    Modifier.padding(start = 4.dp),
-                                    color = Color.Gray.copy(0.2f),
-                                    thickness = 0.5.dp,
-                                )
-                            }
-                        }
-                        HorizontalDivider(
-                            Modifier.padding(start = 4.dp),
-                            color = Color.Gray.copy(0.2f),
-                            thickness = 0.5.dp,
-                        )
+                SettingsSubsectionGroup(
+                    title = stringResource(R.string.settings_notifications_types_title),
+                ) {
+                    val types = NotificationType.settingsToggleCases
+                    types.forEachIndexed { index, type ->
                         NotificationToggleRow(
-                            title = stringResource(R.string.settings_notifications_gentle_reminders_title),
-                            checked = viewModel.notificationPreferences["gentleReminders"] ?: true,
+                            title = stringResource(type.settingsDisplayNameRes()),
+                            checked = viewModel.notificationPreferences[type.raw] ?: true,
                             primary = primary,
                             onCheckedChange = {
-                                viewModel.updateNotificationPreference("gentleReminders", it)
+                                viewModel.updateNotificationPreference(type.raw, it)
                             },
                         )
+                        if (index < types.lastIndex) {
+                            HorizontalDivider(
+                                Modifier.padding(start = 16.dp),
+                                color = Color.Gray.copy(0.2f),
+                                thickness = 0.5.dp,
+                            )
+                        }
                     }
+                    HorizontalDivider(
+                        Modifier.padding(start = 16.dp),
+                        color = Color.Gray.copy(0.2f),
+                        thickness = 0.5.dp,
+                    )
+                    NotificationToggleRow(
+                        title = stringResource(R.string.settings_notifications_gentle_reminders_title),
+                        checked = viewModel.notificationPreferences["gentleReminders"] ?: true,
+                        primary = primary,
+                        onCheckedChange = {
+                            viewModel.updateNotificationPreference("gentleReminders", it)
+                        },
+                    )
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(
-                        stringResource(R.string.settings_notifications_advanced_title),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.Gray,
+                SettingsSubsectionGroup(
+                    title = stringResource(R.string.settings_notifications_advanced_title),
+                ) {
+                    NotificationToggleRow(
+                        title = stringResource(R.string.settings_notifications_mutuals_only),
+                        checked = viewModel.notificationPreferences["commentsMutualsOnly"] ?: false,
+                        primary = primary,
+                        onCheckedChange = {
+                            viewModel.updateNotificationPreference("commentsMutualsOnly", it)
+                        },
                     )
-                    Column {
-                        NotificationToggleRow(
-                            title = stringResource(R.string.settings_notifications_mutuals_only),
-                            checked = viewModel.notificationPreferences["commentsMutualsOnly"] ?: false,
-                            primary = primary,
-                            onCheckedChange = {
-                                viewModel.updateNotificationPreference("commentsMutualsOnly", it)
-                            },
-                        )
-                        HorizontalDivider(
-                            Modifier.padding(start = 4.dp),
-                            color = Color.Gray.copy(0.2f),
-                            thickness = 0.5.dp,
-                        )
-                        NotificationToggleRow(
-                            title = stringResource(R.string.settings_notifications_mute_old_reactions),
-                            checked = viewModel.notificationPreferences["muteOldPostReactions"] ?: false,
-                            primary = primary,
-                            onCheckedChange = {
-                                viewModel.updateNotificationPreference("muteOldPostReactions", it)
-                            },
-                        )
-                    }
+                    HorizontalDivider(
+                        Modifier.padding(start = 16.dp),
+                        color = Color.Gray.copy(0.2f),
+                        thickness = 0.5.dp,
+                    )
+                    NotificationToggleRow(
+                        title = stringResource(R.string.settings_notifications_mute_old_reactions),
+                        checked = viewModel.notificationPreferences["muteOldPostReactions"] ?: false,
+                        primary = primary,
+                        onCheckedChange = {
+                            viewModel.updateNotificationPreference("muteOldPostReactions", it)
+                        },
+                    )
                     Text(
                         stringResource(R.string.settings_notifications_old_posts_explain),
                         fontSize = 12.sp,
                         color = Color.Gray,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                     Text(
                         stringResource(R.string.settings_notifications_gentle_reminders_description),
                         fontSize = 12.sp,
                         color = Color.Gray,
-                        modifier = Modifier.padding(top = 2.dp),
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                     )
                 }
 
@@ -312,7 +307,7 @@ private fun NotificationToggleRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -345,7 +340,7 @@ private fun ScheduleTimeRow(
             .fillMaxWidth()
             .momentsPress(interaction, MomentsPressDefaults.momentsPressSubtle)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, fontSize = 14.sp, color = primary, modifier = Modifier.weight(1f))
@@ -365,7 +360,7 @@ private fun SaveScheduleButton(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(top = 4.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
             .scale(if (isSaving) 0.98f else 1f)
             .clip(RoundedCornerShape(8.dp))
             .background(bg)

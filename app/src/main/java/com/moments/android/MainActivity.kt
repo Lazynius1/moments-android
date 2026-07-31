@@ -4,9 +4,12 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -38,7 +41,26 @@ class MainActivity : ComponentActivity() {
         // ≡ iOS INFOPLIST_KEY_UISupportedInterfaceOrientations = Portrait only
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        val isDarkTheme =
+            resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+                Configuration.UI_MODE_NIGHT_YES
+        val statusBarStyle = if (isDarkTheme) {
+            SystemBarStyle.dark(Color.TRANSPARENT)
+        } else {
+            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        }
+        val navigationBarStyle = if (isDarkTheme) {
+            SystemBarStyle.dark(0xFF070B0D.toInt())
+        } else {
+            SystemBarStyle.light(0xFFF0EFEC.toInt(), 0xFF070B0D.toInt())
+        }
+        enableEdgeToEdge(
+            statusBarStyle = statusBarStyle,
+            navigationBarStyle = navigationBarStyle,
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         requestNotificationPermissionIfNeeded()
         captureDeepLink(intent)
         handlePushIntent(intent)

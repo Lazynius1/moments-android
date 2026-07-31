@@ -124,6 +124,7 @@ import com.moments.android.views.profile.core.sections.userProfileZoomSource
 import com.moments.android.views.profile.highlights.HighlightViewerTitlePill
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.ScreenshotProtectedView
+import com.moments.android.views.shared.ScreenshotProtectionMode
 import com.moments.android.views.story.CurrentUserVerifiedBadge
 import com.moments.android.views.story.LocalStoryDeckGestureGate
 import com.moments.android.views.story.StoryChainView
@@ -1031,6 +1032,8 @@ fun StoryViewerScreen(
                     isProtected = !isEveryoneStoryAudience,
                     fillsContainer = true,
                     cornerRadius = storyViewerCanvasCornerRadius,
+                    // Fullscreen: FLAG_SECURE (ContentSurface no aporta y ya validado).
+                    mode = ScreenshotProtectionMode.WindowFlag,
                 ) {
                     StoryViewerMedia(
                         story = story,

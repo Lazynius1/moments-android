@@ -188,6 +188,7 @@ fun ModernProfileHeader(
     val stories = uid?.let(storyViewModel::storiesFor).orEmpty()
     val dark = isSystemInDarkTheme()
     val content = if (dark) Color.White else Color(0xFF0B1215)
+    val controlSurface = if (dark) Color(0xFF151D21) else Color.White
 
     Column(
         modifier.fillMaxWidth().padding(horizontal = 20.dp),
@@ -270,7 +271,11 @@ fun ModernProfileHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(50))
-                .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                .momentsChromeGlass(
+                    RoundedCornerShape(50),
+                    interactive = true,
+                    tint = controlSurface,
+                )
                 .profileMomentZoomSource(
                     sourceID = ProfileOwnZoomSource.EDIT_PROFILE,
                     cornerRadius = 50.dp,

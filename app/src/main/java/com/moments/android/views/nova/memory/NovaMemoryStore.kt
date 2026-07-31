@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.ConcurrentHashMap
 
-/** Encrypted, user-scoped long-term Nova facts with a small in-memory cache. */
+/** Encrypted, user-scoped long-term Nova facts — port de `NovaMemoryStore.swift`. */
 object NovaMemoryStore {
     private val db = FirebaseFirestore.getInstance()
     private val memoryCache = ConcurrentHashMap<String, NovaMemory>()

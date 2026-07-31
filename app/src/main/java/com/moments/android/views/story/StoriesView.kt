@@ -493,7 +493,20 @@ fun StoriesView(
                 }
                 userIndex = hostUserIds.indexOf(targetId).takeIf { it >= 0 } ?: 0
                 viewModel.fetchStories(forUserId = viewerId, includeConnections = true)
-                applyStoryIndexForUser(userIndex)
+                // `userIds` is the value captured by the current Compose composition.
+                // Unlike SwiftUI's @State, it still points to the old list until the
+                // next recomposition, so calling `applyStoryIndexForUser` here can
+                // fetch the previous/current user instead of the ring item tapped.
+                // Seed the selected reel explicitly; the stories observer resolves
+                // the first unseen index once that reel reaches the state map.
+                pendingUnseenResolveUserId = targetId
+                storyIndex = 0
+                viewModel.loadAuthorReelIfNeeded(targetId, viewerId)
+                listOf(userIndex - 1, userIndex + 1).forEach { neighborIndex ->
+                    lockedRingNavigationUserIds.getOrNull(neighborIndex)?.let { neighborId ->
+                        viewModel.loadAuthorReelIfNeeded(neighborId, viewerId)
+                    }
+                }
                 hostIsLoading = false
             }
             else -> {
@@ -701,7 +714,10 @@ fun StoriesView(
                             userIndex = it
                             applyStoryIndexForUser(it)
                         },
-                        isDeckGestureEnabled = !deckGestureGate.suppressDeckNavigation && userIds.size > 1,
+                        // Foundation's pager arbitrates horizontal drags itself. The
+                        // old manual gate can remain latched by a neighboring page
+                        // and would disable the whole deck.
+                        isDeckGestureEnabled = userIds.size > 1,
                         gestureGate = deckGestureGate,
                         onUserChanged = { applyStoryIndexForUser(it) },
                         modifier = Modifier.fillMaxSize(),

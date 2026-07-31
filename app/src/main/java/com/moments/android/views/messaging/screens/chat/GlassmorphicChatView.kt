@@ -971,7 +971,8 @@ fun GlassmorphicChatView(
             presentation = ClusterGalleryPresentation.PUSHED,
             onClose = { clusterGallerySelection = null },
             onOpenMedia = { message ->
-                session.openMediaForViewing(message) { resolved -> openChatMedia(resolved) }
+                // Solo descarga cuando no hay detail host listo (fallback).
+                session.openMediaForViewing(message) { /* download only; user taps again */ }
             },
             onPrepareDownload = { message ->
                 session.openMediaForViewing(message) { /* download only; user taps again */ }
@@ -981,6 +982,28 @@ fun GlassmorphicChatView(
             downloadProgress = { downloadProgress[it] },
             onDeleteForMe = { items -> items.forEach(session::deleteMessageForMe) },
             onDeleteForEveryone = { items -> items.forEach(session::deleteMessageForEveryone) },
+            detail = { selectedMessage, dismissDetail ->
+                // ≡ clusterGalleryDetailView / ClusterGalleryDetailHost
+                val media = sharedMediaFrom(selectedMessage)
+                if (media != null) {
+                    ConversationFullScreenMediaView(
+                        media = media,
+                        mediaItems = sharedMediaItemsForOverlay(liveCluster, selectedMessage).ifEmpty { listOf(media) },
+                        currentUserId = session.currentUserId,
+                        otherParticipantName = displayName,
+                        displayReactions = session::displayReactions,
+                        onReaction = { messageId, emoji ->
+                            messages.firstOrNull { it.id == messageId }?.let { session.addReaction(it, emoji) }
+                        },
+                        onMoreReactions = { messageId ->
+                            reactionPickerMessage = messages.firstOrNull { it.id == messageId }
+                        },
+                        onClose = dismissDetail,
+                        onSendReply = { shared, text, completion -> sendReplyToOpenedMedia(shared, text, completion) },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            },
             modifier = Modifier.fillMaxSize(),
         )
     }

@@ -12,7 +12,10 @@ import com.moments.android.views.nova.tools.NovaMemoryTools
 import com.moments.android.views.nova.tools.NovaProfileTools
 import com.moments.android.views.nova.tools.NovaSocialTools
 
-/** Executes the function calls issued by Nova, including the sensitive-action gate. */
+/**
+ * Port de `Views/Nova/Agent/NovaToolExecutor.swift`.
+ * Dispatch 1:1 + gate [NovaToolRegistry.confirmationRequiredTools] + dedupe por firma.
+ */
 class NovaToolExecutor(
     context: Context,
     private val userId: String,
@@ -34,15 +37,17 @@ class NovaToolExecutor(
         executedSignatures.clear()
     }
 
-    suspend fun execute(calls: List<NovaAIService.FunctionCall>): List<NovaAIService.FunctionResponse> = calls.map { call ->
-        val signature = "${call.name}:${call.arguments}"
-        val payload = if (!executedSignatures.add(signature)) {
-            mapOf("error" to "Duplicate tool call skipped.")
-        } else {
-            dispatch(call.name, call.arguments)
+    suspend fun execute(calls: List<NovaAIService.FunctionCall>): List<NovaAIService.FunctionResponse> =
+        calls.map { call ->
+            val signature = callSignature(call)
+            val payload = if (!executedSignatures.add(signature)) {
+                mapOf("error" to "Duplicate tool call skipped.")
+            } else {
+                dispatch(call.name, call.arguments)
+            }
+            // Δ iOS FunctionResponsePart sin id explícito: Android Firebase exige id de echo.
+            NovaAIService.FunctionResponse(call.name, payload, call.id)
         }
-        NovaAIService.FunctionResponse(call.name, payload, call.id)
-    }
 
     suspend fun executeCreateMoment(args: Map<String, Any?>, image: Bitmap): Map<String, Any?> {
         attachedImageForTurn = image
@@ -68,16 +73,25 @@ class NovaToolExecutor(
                 args,
                 if (name == "create_moment") attachedImageForTurn else null,
             ) ?: return errorObject("invalid_action_args")
+            // ≡ `requestUserConfirmation?(action) ?? false`
             if (requestUserConfirmation?.invoke(action) != true) {
-                return mapOf("success" to false, "status" to "cancelled_by_user", "message" to "The user declined this action in the app.")
+                return mapOf(
+                    "success" to false,
+                    "status" to "cancelled_by_user",
+                    "message" to "The user declined this action in the app.",
+                )
             }
         }
 
         return when (name) {
             "get_activity_summary" -> runTool("activity_summary_failed") { activityTools.activitySummary(userId) }
             "get_weekly_summary" -> runTool("weekly_summary_failed") { activityTools.weeklySummary(userId) }
-            "get_profile_visits" -> runTool("profile_visits_failed") { activityTools.profileVisits(userId, intArg(args["limit"]) ?: 5) }
-            "get_story_chain_info" -> runTool("story_chain_failed") { activityTools.storyChainInfo(userId, boolArg(args["include_viewers"]) ?: false) }
+            "get_profile_visits" -> runTool("profile_visits_failed") {
+                activityTools.profileVisits(userId, intArg(args["limit"]) ?: 5)
+            }
+            "get_story_chain_info" -> runTool("story_chain_failed") {
+                activityTools.storyChainInfo(userId, boolArg(args["include_viewers"]) ?: false)
+            }
             "create_moment" -> createMomentFromTool(args)
             "list_audience_lists" -> socialTools.listAudienceLists(userId)
             "get_connection_suggestions" -> socialTools.connectionSuggestions(intArg(args["limit"]) ?: 5)
@@ -86,11 +100,17 @@ class NovaToolExecutor(
             "get_my_profile_snapshot" -> profileTools.myProfileSnapshot(userId)
             "get_recent_moments_summary" -> profileTools.recentMomentsSummary(userId, intArg(args["limit"]) ?: 5)
             "get_recent_stories_summary" -> profileTools.recentStoriesSummary(userId, intArg(args["limit"]) ?: 5)
-            "get_profile_and_content_overview" -> profileTools.profileAndContentOverview(userId, intArg(args["moment_limit"]) ?: 5, intArg(args["story_limit"]) ?: 5)
+            "get_profile_and_content_overview" -> profileTools.profileAndContentOverview(
+                userId,
+                intArg(args["moment_limit"]) ?: 5,
+                intArg(args["story_limit"]) ?: 5,
+            )
             "get_mutuals", "get_mutual_connections" -> profileTools.mutuals(userId, intArg(args["limit"]) ?: 5)
             "get_shared_interest_users" -> profileTools.sharedInterestUsers(userId, intArg(args["limit"]) ?: 5)
-            "find_user_by_username" -> stringArg(args["username"])?.let { profileTools.findUser(it) } ?: errorObject("missing_username")
-            "send_follow_request" -> stringArg(args["username"])?.let { profileTools.sendFollowRequest(userId, it) } ?: errorObject("missing_username")
+            "find_user_by_username" -> stringArg(args["username"])?.let { profileTools.findUser(it) }
+                ?: errorObject("missing_username")
+            "send_follow_request" -> stringArg(args["username"])?.let { profileTools.sendFollowRequest(userId, it) }
+                ?: errorObject("missing_username")
             "get_profile_privacy_settings" -> profileTools.profilePrivacy(userId)
             "update_profile_privacy_settings" -> profileTools.updatePrivacy(
                 userId = userId,
@@ -99,14 +119,27 @@ class NovaToolExecutor(
                 showFollowing = boolArg(args["show_following"]),
                 showFollowers = boolArg(args["show_followers"]),
             )
-            "update_profile_bio" -> stringArg(args["bio"])?.let { profileTools.updateBio(userId, it) } ?: errorObject("missing_bio")
-            "update_profile_website" -> stringArg(args["website"])?.let { profileTools.updateWebsite(userId, it) } ?: errorObject("missing_website")
-            "update_active_hours" -> profileTools.updateActiveHours(userId, stringArg(args["start_hour"]), stringArg(args["end_hour"]), boolArg(args["clear"]) ?: false)
+            "update_profile_bio" -> stringArg(args["bio"])?.let { profileTools.updateBio(userId, it) }
+                ?: errorObject("missing_bio")
+            "update_profile_website" -> stringArg(args["website"])?.let { profileTools.updateWebsite(userId, it) }
+                ?: errorObject("missing_website")
+            "update_active_hours" -> profileTools.updateActiveHours(
+                userId,
+                stringArg(args["start_hour"]),
+                stringArg(args["end_hour"]),
+                boolArg(args["clear"]) ?: false,
+            )
             "update_notification_preferences" -> boolDictionaryArgs(args).takeIf { it.isNotEmpty() }
-                ?.let { profileTools.updateNotificationPreferences(userId, it) } ?: errorObject("missing_preferences")
-            "get_user_profile_snapshot" -> profileTools.userProfileSnapshot(userId, stringArg(args["username"]), stringArg(args["user_id"]))
+                ?.let { profileTools.updateNotificationPreferences(userId, it) }
+                ?: errorObject("missing_preferences")
+            "get_user_profile_snapshot" -> profileTools.userProfileSnapshot(
+                userId,
+                stringArg(args["username"]),
+                stringArg(args["user_id"]),
+            )
             "get_moment_details" -> stringArg(args["moment_id"])?.takeIf { it.isNotEmpty() }
-                ?.let { profileTools.momentDetails(it, userId) } ?: errorObject("missing_moment_id")
+                ?.let { profileTools.momentDetails(it, userId) }
+                ?: errorObject("missing_moment_id")
             "get_echo_history_summary" -> profileTools.echoHistorySummary(userId, intArg(args["limit"]) ?: 5)
             "remember_fact" -> rememberFact(args)
             "update_user_preference" -> updatePreference(args)
@@ -117,8 +150,13 @@ class NovaToolExecutor(
     private suspend fun createMomentFromTool(args: Map<String, Any?>): Map<String, Any?> {
         val image = attachedImageForTurn ?: return missingMediaObject()
         val result = socialTools.createMoment(
-            userId, stringArg(args["content"]).orEmpty(), stringArg(args["audience"]) ?: "everyone",
-            stringArg(args["target_username"]), stringArg(args["custom_list_name"]), stringArg(args["custom_list_id"]), image,
+            userId = userId,
+            content = stringArg(args["content"]).orEmpty(),
+            audienceRaw = stringArg(args["audience"]) ?: "everyone",
+            targetUsername = stringArg(args["target_username"]),
+            customListName = stringArg(args["custom_list_name"]),
+            customListId = stringArg(args["custom_list_id"]),
+            attachedImage = image,
         )
         if (result["success"] == true) onMomentCreated?.invoke()
         return result
@@ -153,14 +191,42 @@ class NovaToolExecutor(
     )
 
     private fun errorObject(code: String): Map<String, Any?> = mapOf("success" to false, "error" to code)
+
     private fun stringArg(value: Any?): String? = value as? String
-    private fun intArg(value: Any?): Int? = when (value) { is Number -> value.toInt(); is String -> value.toIntOrNull(); else -> null }
-    private fun boolArg(value: Any?): Boolean? = value as? Boolean
-    private fun boolDictionaryArgs(args: Map<String, Any?>): Map<String, Boolean> = args.mapNotNull { (key, value) -> (value as? Boolean)?.let { key to it } }.toMap()
+
+    private fun intArg(value: Any?): Int? = when (value) {
+        is Number -> value.toInt()
+        is String -> value.toIntOrNull()
+        else -> null
+    }
+
+    /** ≡ iOS `case .bool(flag)` (+ coerción leve de JSON Android). */
+    private fun boolArg(value: Any?): Boolean? = when (value) {
+        is Boolean -> value
+        is Number -> value.toInt() != 0
+        is String -> when (value.lowercase()) {
+            "true", "1", "yes" -> true
+            "false", "0", "no" -> false
+            else -> null
+        }
+        else -> null
+    }
+
+    private fun boolDictionaryArgs(args: Map<String, Any?>): Map<String, Boolean> =
+        args.mapNotNull { (key, value) -> boolArg(value)?.let { key to it } }.toMap()
+
+    /** Firma estable ≡ `name:args.description` (orden de keys no debe romper dedupe). */
+    private fun callSignature(call: NovaAIService.FunctionCall): String {
+        val argsKey = call.arguments.entries
+            .sortedBy { it.key }
+            .joinToString(",") { "${it.key}=${it.value}" }
+        return "${call.name}:{$argsKey}"
+    }
 
     companion object {
         const val maxStepsPerTurn = 15
 
+        /** ≡ iOS `momentSuccessMessage(from:)` — fallback si el follow-up del modelo falla. */
         fun momentSuccessMessage(context: Context, responses: List<NovaAIService.FunctionResponse>): String? {
             val response = responses.firstOrNull { it.name == "create_moment" }?.payload ?: return null
             if (response["success"] != true) return null

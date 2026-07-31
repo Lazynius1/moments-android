@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -53,9 +52,8 @@ import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.settings.SettingsProfileColors
 import com.moments.android.views.settings.SettingsRoute
-import com.moments.android.views.settings.SettingsToolbarBackButton
+import com.moments.android.views.settings.SettingsSubsectionWrapper
 import com.moments.android.views.settings.SettingsViewModel
-import com.moments.android.views.settings.settingsSubsectionNavigationChrome
 import kotlinx.coroutines.tasks.await
 
 /** Port de PrivacySection / MessageRequestPolicyRow / ConnectionVisibilityView. */
@@ -160,13 +158,16 @@ fun MessageRequestPolicyRow(viewModel: SettingsViewModel) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 11.dp, horizontal = 4.dp),
+                .padding(
+                    horizontal = SettingsRowHorizontalPadding,
+                    vertical = 11.dp,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.width(28.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.width(SettingsIconSlotWidth), contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.Email, null, tint = primary, modifier = Modifier.size(19.dp))
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(SettingsIconTextSpacing))
             Column(Modifier.weight(1f)) {
                 Text(
                     stringResource(R.string.settings_privacy_message_requests_title),
@@ -210,9 +211,9 @@ fun MessageRequestPolicyRow(viewModel: SettingsViewModel) {
             }
         }
         HorizontalDivider(
-            Modifier.padding(start = 42.dp),
-            color = primary.copy(0.2f),
-            thickness = 0.5.dp,
+            Modifier.padding(start = SettingsDividerStart),
+            color = SettingsProfileColors.outlineVariant(isDark),
+            thickness = 1.dp,
         )
     }
 }
@@ -239,40 +240,18 @@ fun ConnectionVisibilityView(
     val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
     val density = LocalDensity.current
-    val canvas = SettingsProfileColors.canvas(isDark)
     val primary = SettingsProfileColors.accent(isDark)
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .settingsSubsectionNavigationChrome()
-            .background(canvas)
-            .statusBarsPadding(),
+    SettingsSubsectionWrapper(
+        title = stringResource(R.string.settings_connection_privacy_title),
+        onNavigateBack = onDismiss,
     ) {
-        Column(Modifier.fillMaxSize()) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SettingsToolbarBackButton(onNavigateBack = onDismiss)
-                Spacer(Modifier.weight(1f))
-                Text(
-                    stringResource(R.string.settings_connection_privacy_title),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = with(density) { legacyPoppinsSize(context, 17).toSp() },
-                    color = primary,
-                )
-                Spacer(Modifier.weight(1f))
-                Box(Modifier.size(40.dp))
-            }
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 22.dp),
-            ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 22.dp),
+        ) {
                 Text(
                     stringResource(R.string.settings_privacy_control_title),
                     fontSize = with(density) { legacyPoppinsSize(context, 12).toSp() },
@@ -309,7 +288,6 @@ fun ConnectionVisibilityView(
                     color = Color.Gray.copy(0.8f),
                     modifier = Modifier.padding(top = 14.dp),
                 )
-            }
         }
     }
 }

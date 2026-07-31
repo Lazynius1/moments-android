@@ -22,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.HelpOutline
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -193,26 +192,22 @@ fun QuestionResponsesView(
                 .padding(top = 16.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                Modifier
-                    .size(40.dp)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clip(CircleShape)
-                    .clickable {
-                        if (isDetailFlow) selectedResponse = null else onDismiss()
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
+            if (isDetailFlow) {
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clip(CircleShape)
+                        .clickable { selectedResponse = null },
+                    contentAlignment = Alignment.Center,
+                ) {
                 Icon(
-                    imageVector = if (isDetailFlow) {
-                        Icons.AutoMirrored.Filled.KeyboardArrowLeft
-                    } else {
-                        Icons.Filled.KeyboardArrowDown
-                    },
-                    contentDescription = stringResource(R.string.common_close),
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = stringResource(R.string.common_back),
                     tint = primary,
                     modifier = Modifier.size(22.dp),
                 )
+                }
             }
             Spacer(Modifier.weight(1f))
         }

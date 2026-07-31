@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
@@ -712,16 +711,6 @@ fun GlassmorphicViewersSheet(
                 .padding(horizontal = 22.dp)
                 .padding(top = 12.dp),
         ) {
-            Box(
-                Modifier
-                    .size(40.dp)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(onClick = onDismiss)
-                    .align(Alignment.CenterStart),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = primary)
-            }
             Text(
                 stringResource(R.string.stories_activity_title),
                 color = primary,

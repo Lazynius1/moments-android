@@ -23,7 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -439,9 +438,6 @@ private fun ResetPasswordSheet(onDismiss: () -> Unit) {
                         color = AuthColors.secondary(0.68f),
                         textAlign = TextAlign.Center,
                     )
-                }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp).background(AuthColors.subtle(0.06f), CircleShape)) {
-                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.login_close), tint = AuthColors.primary)
                 }
             }
 

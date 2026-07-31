@@ -1,0 +1,307 @@
+#!/usr/bin/env python3
+"""
+Sync iOS Localizable.strings → Android strings_ios_sync.xml (8 locales).
+
+- Adds iOS keys missing from Android values/
+- Fills locale gaps for iOS-mapped keys only
+- Never overwrites existing Android string resources
+- Dry-run by default; pass --apply to write
+
+Usage:
+  python3 scripts/sync_ios_localizable.py
+  python3 scripts/sync_ios_localizable.py --apply
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]  # MomentsAndroid
+REPO = ROOT.parent  # Nueva
+IOS_ROOT = REPO / "Moments" / "Moments"
+RES_ROOT = ROOT / "app" / "src" / "main" / "res"
+SYNC_FILENAME = "strings_ios_sync.xml"
+
+LOCALES: list[tuple[str, str, str]] = [
+    # (label, ios lproj folder, android values dir)
+    ("en", "en.lproj", "values"),
+    ("es", "es.lproj", "values-es"),
+    ("ca", "ca.lproj", "values-ca"),
+    ("de", "de.lproj", "values-de"),
+    ("fr", "fr.lproj", "values-fr"),
+    ("it", "it.lproj", "values-it"),
+    ("pt-BR", "pt-BR.lproj", "values-b+pt+BR"),
+    ("pt-PT", "pt-PT.lproj", "values-b+pt+PT"),
+]
+
+IOS_ENTRY_RE = re.compile(
+    r'^"((?:\\.|[^"\\])*)"\s*=\s*"((?:\\.|[^"\\])*)"\s*;',
+    re.MULTILINE,
+)
+STRING_NAME_RE = re.compile(r'<string\s+name="([^"]+)"')
+PLURALS_NAME_RE = re.compile(r'<plurals\s+name="([^"]+)"')
+# iOS / printf format tokens we convert
+FMT_TOKEN_RE = re.compile(
+    r"%(\d+\$)?([-+0 #]*)(\d*\.?\d*)?"
+    r"(?:hh|h|ll|l|L|z|t|j)?"
+    r"(@|s|d|i|u|x|X|o|f|e|E|g|G|c|p|%)"
+)
+
+
+def unescape_ios(value: str) -> str:
+    out: list[str] = []
+    i = 0
+    while i < len(value):
+        if value[i] == "\\" and i + 1 < len(value):
+            nxt = value[i + 1]
+            if nxt == "n":
+                out.append("\n")
+            elif nxt == "t":
+                out.append("\t")
+            elif nxt == "r":
+                out.append("\r")
+            elif nxt in '"\\':
+                out.append(nxt)
+            else:
+                out.append(nxt)
+            i += 2
+            continue
+        out.append(value[i])
+        i += 1
+    return "".join(out)
+
+
+def parse_ios(path: Path) -> dict[str, str]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    pairs: dict[str, str] = {}
+    for m in IOS_ENTRY_RE.finditer(text):
+        key = unescape_ios(m.group(1))
+        val = unescape_ios(m.group(2))
+        pairs[key] = val
+    return pairs
+
+
+def ios_to_android_name(key: str) -> str:
+    s = key.replace(".", "_").replace("-", "_")
+    s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s)
+    s = s.lower()
+    s = re.sub(r"_+", "_", s)
+    s = re.sub(r"[^a-z0-9_]", "_", s)
+    s = re.sub(r"_+", "_", s).strip("_")
+    if not s:
+        s = "empty_key"
+    if s[0].isdigit():
+        s = "s_" + s
+    if not re.match(r"^[a-z]", s):
+        s = "s_" + s
+    return s
+
+
+def convert_formats(value: str) -> str:
+    """Convert iOS/ObjC format specs to Android-friendly ones; number unpositioned args."""
+    auto_index = 0
+    positioned_used = False
+
+    def repl(m: re.Match[str]) -> str:
+        nonlocal auto_index, positioned_used
+        pos, flags, width, conv = m.group(1), m.group(2) or "", m.group(3) or "", m.group(4)
+        if conv == "%":
+            return "%%"
+        if conv == "@":
+            conv = "s"
+        elif conv == "i":
+            conv = "d"
+        # u/x/X/o/f/e/E/g/G/c/p/s/d kept
+        if pos:
+            positioned_used = True
+            return f"%{pos}{flags}{width}{conv}"
+        auto_index += 1
+        return f"%{auto_index}${flags}{width}{conv}"
+
+    converted = FMT_TOKEN_RE.sub(repl, value)
+    # If only one auto arg and no explicit positions, Android accepts %s; keep positional for safety.
+    return converted
+
+
+def escape_android_xml(value: str) -> str:
+    # Escape XML specials first
+    s = (
+        value.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', '\\"')
+        .replace("'", r"\'")
+    )
+    # Preserve newlines as \n for single-line XML readability
+    s = s.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\\n").replace("\t", "\\t")
+    # Leading @ or ? are special in Android resources
+    if s.startswith("@"):
+        s = "\\" + s
+    if s.startswith("?"):
+        s = "\\" + s
+    return s
+
+
+def inventory_android_keys(values_dir: Path) -> set[str]:
+    keys: set[str] = set()
+    if not values_dir.is_dir():
+        return keys
+    for f in values_dir.glob("strings*.xml"):
+        if f.name == SYNC_FILENAME:
+            continue
+        text = f.read_text(encoding="utf-8", errors="replace")
+        keys.update(STRING_NAME_RE.findall(text))
+        keys.update(PLURALS_NAME_RE.findall(text))
+    return keys
+
+
+def write_sync_xml(path: Path, entries: dict[str, str]) -> None:
+    lines = [
+        '<?xml version="1.0" encoding="utf-8"?>',
+        "<!-- Auto-generated by scripts/sync_ios_localizable.py — do not hand-edit. -->",
+        "<!-- Source: Moments/*/Localizable.strings (iOS). Missing keys + locale fills only. -->",
+        "<resources>",
+    ]
+    for name in sorted(entries):
+        lines.append(f'    <string name="{name}">{entries[name]}</string>')
+    lines.append("</resources>")
+    lines.append("")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true", help="Write strings_ios_sync.xml files")
+    args = parser.parse_args()
+
+    ios_tables: dict[str, dict[str, str]] = {}
+    for label, lproj, _ in LOCALES:
+        path = IOS_ROOT / lproj / "Localizable.strings"
+        if not path.is_file():
+            print(f"ERROR: missing {path}", file=sys.stderr)
+            return 1
+        ios_tables[label] = parse_ios(path)
+        print(f"iOS {label}: {len(ios_tables[label])} keys")
+
+    ios_en = ios_tables["en"]
+
+    # Stable map ios_key → android_name; detect collisions
+    ios_to_and: dict[str, str] = {}
+    and_to_ios: dict[str, str] = {}
+    collisions = 0
+    for ios_key in sorted(ios_en):
+        and_name = ios_to_android_name(ios_key)
+        ios_to_and[ios_key] = and_name
+        if and_name in and_to_ios and and_to_ios[and_name] != ios_key:
+            collisions += 1
+            continue  # keep first
+        and_to_ios.setdefault(and_name, ios_key)
+
+    en_dir = RES_ROOT / "values"
+    en_base = inventory_android_keys(en_dir)
+
+    new_keys: dict[str, str] = {}  # android_name → escaped en value
+    skipped_empty = 0
+    for ios_key, and_name in ios_to_and.items():
+        if and_name in en_base:
+            continue
+        if and_name in new_keys:
+            continue
+        raw = ios_en.get(ios_key, "")
+        if raw == "" and ios_key not in ios_en:
+            skipped_empty += 1
+            continue
+        converted = convert_formats(raw)
+        new_keys[and_name] = escape_android_xml(converted)
+
+    en_all = en_base | set(new_keys.keys())
+
+    per_locale: dict[str, dict[str, str]] = {"en": dict(new_keys)}
+    stats: dict[str, dict[str, int]] = {
+        "en": {"add": len(new_keys), "fill": 0, "skip_existing": 0},
+    }
+
+    for label, _, and_dir_name in LOCALES:
+        if label == "en":
+            continue
+        loc_dir = RES_ROOT / and_dir_name
+        loc_base = inventory_android_keys(loc_dir)
+        ios_loc = ios_tables[label]
+        entries: dict[str, str] = {}
+        add_count = 0
+        fill_count = 0
+        skip_existing = 0
+
+        for and_name in sorted(en_all):
+            if and_name in loc_base:
+                skip_existing += 1
+                continue
+            ios_key = and_to_ios.get(and_name)
+            if ios_key is None:
+                # Android-only key — leave to EN fallback
+                continue
+            raw = ios_loc.get(ios_key)
+            if raw is None:
+                raw = ios_en.get(ios_key, "")
+            converted = convert_formats(raw)
+            entries[and_name] = escape_android_xml(converted)
+            if and_name in new_keys:
+                add_count += 1
+            else:
+                fill_count += 1
+
+        per_locale[label] = entries
+        stats[label] = {
+            "add": add_count,
+            "fill": fill_count,
+            "skip_existing": skip_existing,
+        }
+
+    print()
+    print(f"Name collisions (ios→android): {collisions}")
+    print(f"EN base keys (excl. sync): {len(en_base)}")
+    print(f"New keys to add (EN): {len(new_keys)}")
+    print()
+    print(f"{'locale':<8} {'add':>6} {'fill':>6} {'skip':>6} {'sync_total':>10}")
+    for label, _, _ in LOCALES:
+        s = stats[label]
+        total = len(per_locale[label])
+        print(
+            f"{label:<8} {s['add']:>6} {s['fill']:>6} {s['skip_existing']:>6} {total:>10}"
+        )
+
+    # Spot samples
+    samples = [
+        "notification_moment_reaction_single_body",
+        "notification_request_accepted_title",
+        "notification_echo_body",
+        "ad_common_ad",
+    ]
+    print()
+    print("Spot-check (will be in sync / already present):")
+    for name in samples:
+        in_en = name in en_base
+        in_new = name in new_keys
+        print(f"  {name}: en_base={in_en} new={in_new}")
+
+    if not args.apply:
+        print()
+        print("Dry-run only. Re-run with --apply to write strings_ios_sync.xml")
+        return 0
+
+    for label, _, and_dir_name in LOCALES:
+        out = RES_ROOT / and_dir_name / SYNC_FILENAME
+        write_sync_xml(out, per_locale[label])
+        print(f"Wrote {out.relative_to(ROOT)} ({len(per_locale[label])} strings)")
+
+    print()
+    print("Done.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

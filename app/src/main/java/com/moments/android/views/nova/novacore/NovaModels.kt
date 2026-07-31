@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import java.util.Date
 import java.util.UUID
 
+/** Port de `Views/Nova/NovaCore/NovaModels.swift`. */
 data class NovaGroundingSource(val title: String, val url: String) {
     val id: String get() = url
 }
@@ -13,7 +14,7 @@ data class NovaGroundingPayload(
     val searchSuggestionsHtml: String?,
 )
 
-/** Chat model shared by Nova's screen, persistence, memory and AI layers. */
+/** ≡ iOS `ChatMessage` — modelo compartido por pantalla, persistencia, memoria y AI. */
 data class NovaChatMessage(
     val id: String = UUID.randomUUID().toString(),
     var text: String,
@@ -27,9 +28,15 @@ data class NovaChatMessage(
     var searchSuggestionsHtml: String? = null,
 ) {
     override fun equals(other: Any?): Boolean = other is NovaChatMessage &&
-        id == other.id && text == other.text && image == other.image && imageStoragePath == other.imageStoragePath &&
-        isUser == other.isUser && isHistorical == other.isHistorical && isSystem == other.isSystem &&
-        groundingSources == other.groundingSources && searchSuggestionsHtml == other.searchSuggestionsHtml
+        id == other.id &&
+        text == other.text &&
+        image == other.image &&
+        imageStoragePath == other.imageStoragePath &&
+        isUser == other.isUser &&
+        isHistorical == other.isHistorical &&
+        isSystem == other.isSystem &&
+        groundingSources == other.groundingSources &&
+        searchSuggestionsHtml == other.searchSuggestionsHtml
 
     override fun hashCode(): Int = arrayOf(
         id, text, image, imageStoragePath, isUser, isHistorical, isSystem, groundingSources, searchSuggestionsHtml,

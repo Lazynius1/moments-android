@@ -9,6 +9,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -68,6 +69,7 @@ import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.core.PendingChatContext
 import com.moments.android.views.messaging.core.PendingChatTimelineMessage
@@ -76,6 +78,8 @@ import com.moments.android.views.components.VerifiedBadge
 import java.util.Calendar
 import java.util.Date
 import kotlinx.coroutines.delay
+import kotlin.math.PI
+
 /** Port de `Views/Messaging/Components/ChatChromeViews.swift`. */
 object ChatComposerChromeMetrics {
     val panelHomeGap = 16.dp
@@ -86,12 +90,21 @@ object ChatComposerChromeMetrics {
     val estimatedComposerChromeHeight = 68.dp
 
     fun listBottomInset(composerChromeHeight: Dp): Dp =
-        // Una vez medido, el composer real manda. Forzar el mínimo estimado deja
-        // un hueco de ~80dp bajo el último mensaje en teléfonos compactos.
+        // Δ iOS `max(height, estimated)+gap`: en Android el composer medido manda;
+        // forzar el mínimo estimado deja ~80dp de hueco en pantallas compactas.
         composerChromeHeight + messageListGap
 
     fun floatingControlBottomInset(composerChromeHeight: Dp): Dp =
         maxOf(composerChromeHeight, estimatedComposerChromeHeight) + 20.dp
+}
+
+/** Spring Compose ≈ iOS `MotionPolicy.Spring.press` (response 0.28, damping 0.72). */
+private fun pressSpring(): SpringSpec<Float> {
+    val omega = (2.0 * PI / MotionPolicy.Spring.PRESS_RESPONSE).toFloat()
+    return spring(
+        dampingRatio = MotionPolicy.Spring.PRESS_DAMPING.toFloat(),
+        stiffness = omega * omega,
+    )
 }
 
 /** Android's system back dispatcher is already gesture-enabled, unlike the iOS controller bridge. */
@@ -365,7 +378,11 @@ fun GlassmorphicAvatar(userId: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun GlassmorphicTypingIndicator(reduceMotion: Boolean, modifier: Modifier = Modifier) {
+fun GlassmorphicTypingIndicator(
+    modifier: Modifier = Modifier,
+    /** ≡ `@Environment(\.accessibilityReduceMotion)` — default [MotionPolicy.reduceMotion]. */
+    reduceMotion: Boolean = MotionPolicy.reduceMotion,
+) {
     val colors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme())
     // ≡ reduceMotion: puntos estáticos 0.85, sin pulso infinito
     if (reduceMotion) {
@@ -381,7 +398,12 @@ fun GlassmorphicTypingIndicator(reduceMotion: Boolean, modifier: Modifier = Modi
                     Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(colors.typingIndicatorColor.copy(alpha = .85f)),
+                        .graphicsLayer {
+                            scaleX = 0.85f
+                            scaleY = 0.85f
+                            alpha = 0.85f
+                        }
+                        .background(colors.typingIndicatorColor),
                 )
             }
         }
@@ -396,8 +418,9 @@ fun GlassmorphicTypingIndicator(reduceMotion: Boolean, modifier: Modifier = Modi
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         repeat(3) { index ->
+            // ≡ iOS animationAmounts 0→1, easeInOut 0.6s, delay index*0.2, autoreverses
             val amount by transition.animateFloat(
-                initialValue = 0.45f,
+                initialValue = 0f,
                 targetValue = 1f,
                 animationSpec = infiniteRepeatable(
                     tween(600, delayMillis = index * 200, easing = FastOutSlowInEasing),
@@ -409,11 +432,12 @@ fun GlassmorphicTypingIndicator(reduceMotion: Boolean, modifier: Modifier = Modi
                 Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(colors.typingIndicatorColor.copy(alpha = amount))
                     .graphicsLayer {
                         scaleX = amount
                         scaleY = amount
-                    },
+                        alpha = amount
+                    }
+                    .background(colors.typingIndicatorColor),
             )
         }
     }
@@ -449,11 +473,12 @@ fun ChatScrollDownButton(
     badgeTextColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    reduceMotion: Boolean = false,
+    /** ≡ iOS `reduceMotion` — default [MotionPolicy.reduceMotion]. */
+    reduceMotion: Boolean = MotionPolicy.reduceMotion,
 ) {
     val isDark = isSystemInDarkTheme()
     var didAppear by remember { mutableStateOf(reduceMotion) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(reduceMotion) {
         if (reduceMotion) {
             didAppear = true
             return@LaunchedEffect
@@ -462,9 +487,10 @@ fun ChatScrollDownButton(
         delay(16)
         didAppear = true
     }
+    // ≡ MotionPolicy.withOptionalAnimation(MotionPolicy.Spring.press)
     val appear by animateFloatAsState(
         targetValue = if (didAppear) 1f else 0f,
-        animationSpec = if (reduceMotion) tween(0) else spring(dampingRatio = 0.72f, stiffness = 400f),
+        animationSpec = if (reduceMotion) tween(0) else pressSpring(),
         label = "scrollDownAppear",
     )
     Box(

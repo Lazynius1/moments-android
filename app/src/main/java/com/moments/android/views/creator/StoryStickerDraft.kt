@@ -64,4 +64,7 @@ data class StoryStickerDraft(
     val revealEffectColor: String? = null,
     val audioURL: String? = null,
     val audioDuration: Double? = null,
+    /** ≡ StickerInteractionData.momentId / mediaCount (shareMoment). */
+    val momentId: String? = null,
+    val mediaCount: Int? = null,
 )

@@ -197,7 +197,7 @@ fun CreatorView(
                 onCurrentFlowChange = { currentFlow = it },
                 onDismiss = { onShowCreatorViewChange(false) },
             )
-            CreatorFlow.VIDEO_EDITING -> MediaEditingView(
+            CreatorFlow.VIDEO_EDITING -> SocialVideoEditorView(
                 selectedMediaItems = selectedMediaItems,
                 onSelectedMediaItemsChange = { selectedMediaItems = it },
                 onCurrentFlowChange = { currentFlow = it },

@@ -44,7 +44,7 @@ sealed interface NovaAgentStatus {
     data object AwaitingConfirmation : NovaAgentStatus
 }
 
-/** Android counterpart of `NovaAgent.swift`. */
+/** Port de `Views/Nova/Agent/NovaAgent.swift` — turnos, tools, confirmación, historial y memoria. */
 class NovaAgent(
     context: Context,
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
@@ -328,13 +328,17 @@ class NovaAgent(
     ): String? {
         val executor = toolExecutor ?: return null
         if (depth > NovaToolExecutor.maxStepsPerTurn) throw NovaAgentError.StepLimitReached
-        val uniqueCalls = calls.filter { seen.add("${it.name}-${it.arguments}") }
-        if (uniqueCalls.isEmpty()) return null
-        if (pendingAction == null) {
-            agentStatus = NovaAgentStatus.CallingTool(uniqueCalls.first().name)
-            activeToolDisplayName = toolDisplayName(uniqueCalls.first().name)
+        // ≡ iOS: actualiza `seen` pero ejecuta el batch completo (dedupe fino = ToolExecutor).
+        for (call in calls) {
+            val signature = "${call.name}-${call.arguments}"
+            if (signature !in seen) seen += signature
         }
-        val responses = executor.execute(uniqueCalls)
+        if (pendingAction == null) {
+            val toolName = calls.firstOrNull()?.name ?: "tool"
+            agentStatus = NovaAgentStatus.CallingTool(toolName)
+            activeToolDisplayName = toolDisplayName(toolName)
+        }
+        val responses = executor.execute(calls)
         NovaToolExecutor.momentSuccessMessage(appContext, responses)?.let { success ->
             val response = runCatching { chat.sendFunctionResponses(responses) }.getOrNull()
             response?.groundingMetadata?.let { mergeGrounding(it, botId) }
@@ -345,7 +349,9 @@ class NovaAgent(
         val response = chat.sendFunctionResponses(responses)
         response.groundingMetadata?.let { mergeGrounding(it, botId) }
         activeToolDisplayName = null
-        if (response.functionCalls.isNotEmpty()) return handleToolCalls(response.functionCalls, chat, seen, botId, depth + 1)
+        if (response.functionCalls.isNotEmpty()) {
+            return handleToolCalls(response.functionCalls, chat, seen, botId, depth + 1)
+        }
         agentStatus = NovaAgentStatus.Streaming
         return response.text
     }
@@ -386,11 +392,37 @@ class NovaAgent(
     }
 
     private fun toolDisplayName(tool: String): String = when (tool) {
-        "get_activity_summary", "get_weekly_summary", "get_profile_visits", "get_story_chain_info", "get_my_profile_snapshot", "get_recent_moments_summary", "get_recent_stories_summary", "get_profile_and_content_overview", "get_user_profile_snapshot", "get_moment_details", "get_echo_history_summary" -> string(R.string.nova_agent_tool_activity)
+        "get_activity_summary",
+        "get_weekly_summary",
+        "get_profile_visits",
+        "get_story_chain_info",
+        "get_my_profile_snapshot",
+        "get_recent_moments_summary",
+        "get_recent_stories_summary",
+        "get_profile_and_content_overview",
+        "get_user_profile_snapshot",
+        "get_moment_details",
+        "get_echo_history_summary",
+        -> string(R.string.nova_agent_tool_activity)
         "remember_fact", "update_user_preference" -> string(R.string.nova_agent_tool_memory)
         "create_moment" -> string(R.string.nova_agent_tool_moment)
         "list_audience_lists" -> string(R.string.nova_agent_tool_lists)
-        "get_connection_suggestions", "get_followers_summary", "get_following_summary", "get_mutuals", "get_mutual_connections", "get_shared_interest_users", "find_user_by_username", "send_follow_request" -> string(R.string.nova_agent_tool_connections)
+        "get_connection_suggestions",
+        "get_followers_summary",
+        "get_following_summary",
+        "get_mutuals",
+        "get_mutual_connections",
+        "get_shared_interest_users",
+        "find_user_by_username",
+        "send_follow_request",
+        -> string(R.string.nova_agent_tool_connections)
+        "get_profile_privacy_settings",
+        "update_profile_privacy_settings",
+        "update_profile_bio",
+        "update_profile_website",
+        "update_active_hours",
+        "update_notification_preferences",
+        -> string(R.string.nova_agent_tool_generic)
         else -> string(R.string.nova_agent_tool_generic)
     }
 
@@ -461,7 +493,7 @@ class NovaAgent(
     }
 
     private suspend fun rebuildChatFromHistoryAsync() {
-        val meaningful = conversationHistory.filter { !it.isSystem && (it.text.isNotBlank() || it.image != null) }
+        val meaningful = meaningfulConversationMessages()
         if (meaningful.isEmpty()) {
             internalHistorySummary = null
             bootstrapChatSession()
@@ -471,6 +503,10 @@ class NovaAgent(
         internalHistorySummary = payload.second
         bootstrapChatSession(payload.first)
     }
+
+    /** ≡ iOS `meaningfulConversationMessages()`. */
+    private fun meaningfulConversationMessages(): List<NovaChatMessage> =
+        conversationHistory.filter { !it.isSystem && (it.text.isNotBlank() || it.image != null) }
 
     private suspend fun buildHistoryPayload(messages: List<NovaChatMessage>): Pair<List<NovaModelContent>, String?> {
         if (messages.size <= COMPACTION_THRESHOLD) return modelHistory(messages) to null
@@ -509,7 +545,10 @@ class NovaAgent(
     }
 
     private fun conversationFingerprint(): String? {
-        val meaningful = conversationHistory.filter { !it.isSystem && it.text.isNotBlank() }
+        // ≡ iOS: texto no vacío tras trim; sin filtrar solo por imagen.
+        val meaningful = conversationHistory.filter {
+            !it.isSystem && it.text.trim().isNotEmpty()
+        }
         if (meaningful.none { it.isUser }) return null
         return "${currentConversationId ?: "draft"}-${meaningful.size}-${meaningful.last().id}"
     }

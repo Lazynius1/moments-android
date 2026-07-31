@@ -7,52 +7,67 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
+import com.moments.android.coordinators.ProfileImageView
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.firestore.FirestoreService
-import com.moments.android.services.firestore.fetchMutuals
-import com.moments.android.services.firestore.fetchUser
+import com.moments.android.views.settings.SettingsSubsectionWrapper
+import com.moments.android.views.settings.SettingsSearchField
+import com.moments.android.services.firestore.fetchUsersInBatches
 import com.moments.android.services.firestore.searchUsersUncapped
 import com.moments.android.services.social.BestFriendsService
+import com.moments.android.utilities.momentsEmptyStateAppear
+import com.moments.android.views.components.UserRowSkeletonList
+import com.moments.android.views.messaging.components.momentsScrollEdgeChrome
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import java.util.Locale
 
 /** Estado de `BestFriendsViewModel`, con el mismo filtrado por texto en las cuatro secciones. */
 private data class BestFriendsState(
@@ -63,10 +78,11 @@ private data class BestFriendsState(
     val remoteResults: List<AppUser> = emptyList(),
 ) {
     fun filtered(searchText: String): BestFriendsState {
-        val query = searchText.trim().lowercase()
+        val query = searchText.lowercase(Locale.getDefault()).trim()
         if (query.isEmpty()) return this
         fun List<AppUser>.match() = filter {
-            it.username.lowercase().contains(query) || it.bio?.lowercase()?.contains(query) == true
+            it.username.lowercase(Locale.getDefault()).contains(query) ||
+                it.bio?.lowercase(Locale.getDefault())?.contains(query) == true
         }
         return copy(
             bestFriends = bestFriends.match(),
@@ -84,166 +100,350 @@ fun BestFriendsView(
     modifier: Modifier = Modifier,
 ) {
     val dark = isSystemInDarkTheme()
-    val canvas = if (dark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
-    val primary = if (dark) Color.White else Color(0xFF0B1215)
-    val secondary = if (dark) Color.White.copy(alpha = 0.6f) else Color(0xFF52626A)
+    val primary = if (dark) Color.White else Color.Black
+    val secondary = Color.Gray.copy(alpha = 0.8f)
 
     val scope = rememberCoroutineScope()
     val firestore = remember { FirestoreService() }
+    val db = remember { FirebaseFirestore.getInstance() }
     val bestFriendsService = remember { BestFriendsService(firestore) }
 
     var state by remember { mutableStateOf(BestFriendsState()) }
     var searchText by remember { mutableStateOf("") }
+    var visibleUserLimit by remember { mutableIntStateOf(30) }
+    var isSearchFocused by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
+    var showError by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var blockedUserIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid }
 
-    suspend fun reloadBestFriends() {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        runCatching { bestFriendsService.fetchBestFriends(userId) }
-            .onSuccess { state = state.copy(bestFriends = it) }
-            .onFailure { errorMessage = it.message }
+    val authError = stringResource(R.string.best_friends_error_auth)
+    val followingErrorFmt = stringResource(R.string.best_friends_error_following)
+    val followersErrorFmt = stringResource(R.string.best_friends_error_followers)
+
+    fun presentError(message: String) {
+        errorMessage = message
+        showError = true
     }
 
-    LaunchedEffect(Unit) {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid
-        if (userId == null) {
-            errorMessage = "auth"
+    suspend fun reloadBestFriends() {
+        val userId = currentUserId ?: run {
+            presentError(authError)
+            return
+        }
+        runCatching { bestFriendsService.fetchBestFriends(userId) }
+            .onSuccess { state = state.copy(bestFriends = it) }
+            .onFailure {
+                presentError(it.message ?: authError)
+            }
+    }
+
+    suspend fun fetchConnections() {
+        val userId = currentUserId ?: run {
+            presentError(authError)
             isLoading = false
-            return@LaunchedEffect
+            return
         }
         isLoading = true
-        val profile = runCatching { firestore.fetchUser(userId) }.getOrNull()
-        val blocked = profile?.blockedUsers.orEmpty().toSet()
-        val following = runCatching { firestore.fetchFollowing(userId) }.getOrDefault(emptyList())
-        val followers = runCatching { firestore.fetchFollowers(userId) }.getOrDefault(emptyList())
-        val mutuals = runCatching { firestore.fetchMutuals(userId) }.getOrDefault(emptyList())
-        state = state.copy(
-            following = following.filterNot { it.id in blocked },
-            followers = followers.filterNot { it.id in blocked },
-            mutuals = mutuals.filterNot { it.id in blocked },
-        )
-        reloadBestFriends()
+        runCatching {
+            val blockedSnap = db.collection("users").document(userId).get().await()
+            @Suppress("UNCHECKED_CAST")
+            val blocked = (blockedSnap.get("blockedUsers") as? List<*>)?.filterIsInstance<String>().orEmpty()
+            blockedUserIds = blocked.toSet()
+
+            val followingIds = db.collection("users").document(userId).collection("following")
+                .get().await().documents.map { it.id }
+            val followerIds = db.collection("users").document(userId).collection("followers")
+                .get().await().documents.map { it.id }
+
+            val followingSet = followingIds.toSet()
+            val followersSet = followerIds.toSet()
+            val mutualIds = followingSet.intersect(followersSet)
+            val connectionIds = followingSet - mutualIds
+            val followerOnlyIds = followersSet - mutualIds
+
+            val followingUsers = firestore.fetchUsersInBatches(connectionIds.toList())
+            val mutualUsers = firestore.fetchUsersInBatches(mutualIds.toList())
+            val followerUsers = firestore.fetchUsersInBatches(followerOnlyIds.toList())
+            state = state.copy(
+                following = followingUsers,
+                mutuals = mutualUsers,
+                followers = followerUsers,
+            )
+        }.onFailure { err ->
+            val msg = err.message.orEmpty()
+            presentError(
+                when {
+                    msg.contains("following", ignoreCase = true) ->
+                        followingErrorFmt.format(msg)
+                    msg.contains("followers", ignoreCase = true) ->
+                        followersErrorFmt.format(msg)
+                    else -> msg.ifBlank { authError }
+                },
+            )
+        }
         isLoading = false
     }
 
-    // Búsqueda global con rebote, como el `searchWorkItem` de iOS.
+    LaunchedEffect(Unit) {
+        if (currentUserId == null) {
+            presentError(authError)
+            isLoading = false
+            return@LaunchedEffect
+        }
+        // ≡ iOS onAppear: fetchBestFriends + fetchConnections en paralelo
+        launch { reloadBestFriends() }
+        launch { fetchConnections() }
+    }
+
     LaunchedEffect(searchText) {
-        val query = searchText.trim()
-        if (query.length < 2) {
+        visibleUserLimit = 30
+        val cleanQuery = searchText.lowercase(Locale.getDefault()).trim()
+        if (cleanQuery.isEmpty()) {
             state = state.copy(remoteResults = emptyList())
             return@LaunchedEffect
         }
-        delay(350)
-        state = state.copy(
-            remoteResults = runCatching { firestore.searchUsersUncapped(query) }.getOrDefault(emptyList()),
-        )
+        delay(250)
+        val users = runCatching { firestore.searchUsersUncapped(cleanQuery) }.getOrDefault(emptyList())
+        val filtered = users.filter { user ->
+            if (user.id == currentUserId) return@filter false
+            if (user.id in blockedUserIds) return@filter false
+            if (currentUserId != null && currentUserId in user.blockedUsers) return@filter false
+            true
+        }
+        state = state.copy(remoteResults = filtered)
     }
 
-    val visible = state.filtered(searchText)
-    val bestFriendIds = state.bestFriends.map { it.id }.toSet()
+    val filtered = state.filtered(searchText)
+    val trimmedSearch = searchText.trim()
+    val isSearchingMode = isSearchFocused || trimmedSearch.isNotEmpty()
+    val selectedIds = state.bestFriends.map { it.id }.toSet()
+    val hasAnyUsers = state.bestFriends.isNotEmpty() ||
+        state.following.isNotEmpty() ||
+        state.mutuals.isNotEmpty() ||
+        state.followers.isNotEmpty()
+
+    fun deduplicated(users: List<AppUser>): List<AppUser> {
+        val seen = mutableSetOf<String>()
+        return users.filter { seen.add(it.id) }
+    }
+
+    val selectedUsers = remember(filtered.bestFriends) {
+        deduplicated(filtered.bestFriends)
+            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.username })
+    }
+    val visibleMutuals = filtered.mutuals.filter { it.id !in selectedIds }
+    val visibleConnections = filtered.following.filter { it.id !in selectedIds }
+    val suggestedUsers = remember(
+        visibleMutuals,
+        visibleConnections,
+        filtered.followers,
+        state.remoteResults,
+        selectedIds,
+    ) {
+        deduplicated(
+            visibleMutuals + visibleConnections + filtered.followers + state.remoteResults,
+        )
+            .filter { it.id !in selectedIds }
+            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.username })
+    }
+    val displayedSuggested = suggestedUsers.take(visibleUserLimit)
 
     fun toggle(user: AppUser) {
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val uid = currentUserId ?: run {
+            presentError(authError)
+            return
+        }
         scope.launch {
             runCatching {
-                if (user.id in bestFriendIds) {
-                    bestFriendsService.removeBestFriend(currentUserId, user.id)
+                if (user.id in selectedIds) {
+                    bestFriendsService.removeBestFriend(uid, user.id)
                 } else {
-                    bestFriendsService.addBestFriend(currentUserId, user.id)
+                    bestFriendsService.addBestFriend(uid, user.id)
                 }
-            }.onFailure { errorMessage = it.message }
+            }.onFailure {
+                presentError(it.message ?: authError)
+            }
             reloadBestFriends()
         }
     }
 
-    Column(modifier.fillMaxSize().background(canvas)) {
-        Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Filled.Close,
-                contentDescription = stringResource(R.string.common_close),
-                tint = primary,
-                modifier = Modifier.size(30.dp).clickable(onClick = onDismiss),
+    SettingsSubsectionWrapper(
+        title = stringResource(R.string.best_friends_title),
+        onNavigateBack = onDismiss,
+        modifier = modifier,
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .imePadding(),
+        ) {
+        Column(Modifier.fillMaxSize()) {
+            when {
+                isLoading -> {
+                    UserRowSkeletonList(
+                        rows = 6,
+                        modifier = Modifier
+                            .padding(horizontal = 20.dp)
+                            .padding(top = 12.dp),
+                    )
+                }
+                !hasAnyUsers -> {
+                    BestFriendsEmptyState(modifier = Modifier.fillMaxSize())
+                }
+                else -> {
+                    Column(Modifier.fillMaxSize()) {
+                        SettingsSearchField(
+                            value = searchText,
+                            onValueChange = { searchText = it },
+                            placeholder = stringResource(R.string.best_friends_search_placeholder),
+                            onFocusChanged = { isSearchFocused = it },
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
+                                .padding(top = 16.dp, bottom = 8.dp),
+                        )
+
+                        val listState = rememberLazyListState()
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .momentsScrollEdgeChrome()
+                                .padding(horizontal = 16.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp),
+                        ) {
+                            if (!isSearchingMode && selectedUsers.isNotEmpty()) {
+                                item(key = "header-selected") {
+                                    UserSectionHeader(
+                                        stringResource(R.string.best_friends_title),
+                                        secondary,
+                                        Modifier.padding(top = 8.dp, bottom = 8.dp),
+                                    )
+                                }
+                                items(selectedUsers, key = { "sel-${it.id}" }) { user ->
+                                    SelectableBestFriendRow(
+                                        user = user,
+                                        isSelected = true,
+                                        onToggle = { toggle(user) },
+                                    )
+                                }
+                            }
+
+                            if (!isSearchingMode || displayedSuggested.isNotEmpty()) {
+                                item(key = "header-suggested") {
+                                    UserSectionHeader(
+                                        stringResource(R.string.explore_suggested_users_title),
+                                        secondary,
+                                        Modifier.padding(top = 24.dp, bottom = 8.dp),
+                                    )
+                                }
+                                itemsIndexed(
+                                    displayedSuggested,
+                                    key = { _, user -> "sug-${user.id}" },
+                                ) { index, user ->
+                                    SelectableBestFriendRow(
+                                        user = user,
+                                        isSelected = user.id in selectedIds,
+                                        onToggle = { toggle(user) },
+                                    )
+                                    // ≡ iOS `.onAppear { loadMoreIfNeeded }`
+                                    val threshold = maxOf(displayedSuggested.size - 5, 0)
+                                    if (index >= threshold && visibleUserLimit < suggestedUsers.size) {
+                                        LaunchedEffect(index, visibleUserLimit, suggestedUsers.size) {
+                                            visibleUserLimit += 30
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (displayedSuggested.isEmpty() && isSearchingMode) {
+                                item(key = "no-results") {
+                                    Row(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 20.dp),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(Icons.Filled.Search, null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                                        Text(
+                                            stringResource(R.string.best_friends_search_no_results, searchText),
+                                            color = Color.Gray,
+                                            fontSize = 14.sp,
+                                            modifier = Modifier.padding(start = 8.dp),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showError) {
+            AlertDialog(
+                onDismissRequest = { showError = false },
+                title = { Text(stringResource(R.string.common_error)) },
+                text = {
+                    Text(errorMessage ?: stringResource(R.string.best_friends_error_auth))
+                },
+                confirmButton = {
+                    TextButton(onClick = { showError = false }) {
+                        Text(stringResource(R.string.common_ok))
+                    }
+                },
             )
-            Text(
-                stringResource(R.string.best_friends_title),
-                color = primary,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center,
-            )
-            Box(Modifier.size(30.dp))
         }
-
-        OutlinedTextField(
-            value = searchText,
-            onValueChange = { searchText = it },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            placeholder = { Text(stringResource(R.string.best_friends_search_placeholder)) },
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            singleLine = true,
-        )
-
-        errorMessage?.let {
-            Text(it, color = Color(0xFFFF3B30), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
-        }
-
-        if (isLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = primary)
-            }
-            return@Column
-        }
-
-        val titleBestFriends = stringResource(R.string.best_friends_title)
-        val titleMutuals = stringResource(R.string.best_friends_section_mutuals)
-        val titleFollowing = stringResource(R.string.best_friends_section_following)
-        val titleFollowers = stringResource(R.string.best_friends_section_followers)
-        val titleSuggested = stringResource(R.string.explore_suggested_users_title)
-
-        LazyColumn(Modifier.fillMaxSize()) {
-            section(titleBestFriends, visible.bestFriends, secondary) { user ->
-                SelectableBestFriendRow(user, isSelected = true, onToggle = { toggle(user) })
-            }
-            section(titleMutuals, visible.mutuals.filterNot { it.id in bestFriendIds }, secondary) { user ->
-                SelectableBestFriendRow(user, isSelected = false, onToggle = { toggle(user) })
-            }
-            section(titleFollowing, visible.following.filterNot { it.id in bestFriendIds }, secondary) { user ->
-                SelectableBestFriendRow(user, isSelected = false, onToggle = { toggle(user) })
-            }
-            section(titleFollowers, visible.followers.filterNot { it.id in bestFriendIds }, secondary) { user ->
-                SelectableBestFriendRow(user, isSelected = false, onToggle = { toggle(user) })
-            }
-            val remote = state.remoteResults.filterNot { candidate ->
-                candidate.id in bestFriendIds ||
-                    visible.following.any { it.id == candidate.id } ||
-                    visible.followers.any { it.id == candidate.id } ||
-                    visible.mutuals.any { it.id == candidate.id }
-            }
-            section(titleSuggested, remote, secondary) { user ->
-                SelectableBestFriendRow(user, isSelected = false, onToggle = { toggle(user) })
-            }
         }
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.section(
-    title: String,
-    users: List<AppUser>,
-    titleColor: Color,
-    row: @Composable (AppUser) -> Unit,
-) {
-    if (users.isEmpty()) return
-    item(key = "header-$title") {
-        Text(
-            title.uppercase(),
-            color = titleColor,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 6.dp),
+@Composable
+private fun UserSectionHeader(title: String, color: Color, modifier: Modifier = Modifier) {
+    Text(
+        title.uppercase(Locale.getDefault()),
+        color = color,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = modifier.padding(start = 4.dp),
+    )
+}
+
+@Composable
+private fun BestFriendsEmptyState(modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .padding(16.dp)
+            .momentsEmptyStateAppear(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        Icon(
+            Icons.Filled.PersonOff,
+            contentDescription = null,
+            tint = Color.Gray,
+            modifier = Modifier.size(50.dp),
         )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                stringResource(R.string.best_friends_empty_title),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                stringResource(R.string.best_friends_empty_description),
+                fontSize = 14.sp,
+                color = Color.Gray,
+                textAlign = TextAlign.Center,
+            )
+        }
+        Spacer(Modifier.weight(1f))
     }
-    items(users, key = { "$title-${it.id}" }) { user -> row(user) }
 }
 
 /** Port de `SelectableBestFriendRow`. */
@@ -255,43 +455,116 @@ fun SelectableBestFriendRow(
     modifier: Modifier = Modifier,
 ) {
     val dark = isSystemInDarkTheme()
-    val primary = if (dark) Color.White else Color(0xFF0B1215)
-    val secondary = if (dark) Color.White.copy(alpha = 0.6f) else Color(0xFF52626A)
-
+    val primary = if (dark) Color.White else Color.Black
     Row(
         modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Box(Modifier.size(44.dp).clip(CircleShape).background(primary.copy(alpha = 0.1f))) {
-            user.profileImagePath?.takeIf { it.isNotBlank() }?.let {
-                AsyncImage(
-                    model = it,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(user.username, color = primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (isSelected) {
-                    Icon(Icons.Filled.Star, contentDescription = null, tint = Color(0xFF34C759), modifier = Modifier.size(13.dp))
-                }
-            }
-            user.bio?.takeIf { it.isNotBlank() }?.let {
-                Text(it, color = secondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
+        ProfileImageView(
+            imagePath = user.profileImagePath,
+            modifier = Modifier.size(40.dp),
+        )
+        Text(
+            user.username,
+            color = primary,
+            fontSize = 15.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
         Icon(
             if (isSelected) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
             contentDescription = null,
-            tint = if (isSelected) Color(0xFF34C759) else secondary,
+            tint = if (isSelected) {
+                primary
+            } else if (dark) {
+                Color.White.copy(0.32f)
+            } else {
+                Color.Black.copy(0.28f)
+            },
             modifier = Modifier.size(24.dp),
+        )
+    }
+}
+
+/** Port de `BestFriendRow` (legacy / no usado por el contentView actual de iOS). */
+@Composable
+fun BestFriendRow(
+    user: AppUser,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ProfileImageView(imagePath = user.profileImagePath, modifier = Modifier.size(40.dp))
+        Text(user.username, fontSize = 14.sp, modifier = Modifier.weight(1f).padding(start = 12.dp))
+        Text(
+            stringResource(R.string.best_friends_button_remove),
+            color = Color.Red,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .background(Color.Red.copy(0.1f), RoundedCornerShape(8.dp))
+                .clickable(onClick = onRemove)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        )
+    }
+}
+
+/** Port de `ConnectionRow` (legacy). */
+@Composable
+fun ConnectionRow(
+    user: AppUser,
+    onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ProfileImageView(imagePath = user.profileImagePath, modifier = Modifier.size(40.dp))
+        Text(user.username, fontSize = 14.sp, modifier = Modifier.weight(1f).padding(start = 12.dp))
+        Text(
+            stringResource(R.string.best_friends_button_add),
+            color = Color(0xFF007AFF),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .background(Color(0xFF007AFF).copy(0.1f), RoundedCornerShape(8.dp))
+                .clickable(onClick = onAdd)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        )
+    }
+}
+
+/** Port de `FollowerRow` (legacy). */
+@Composable
+fun FollowerRow(
+    user: AppUser,
+    onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ProfileImageView(imagePath = user.profileImagePath, modifier = Modifier.size(40.dp))
+        Text(user.username, fontSize = 14.sp, modifier = Modifier.weight(1f).padding(start = 12.dp))
+        Text(
+            stringResource(R.string.best_friends_button_add_generic),
+            color = Color(0xFFFF9500),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .background(Color(0xFFFF9500).copy(0.1f), RoundedCornerShape(8.dp))
+                .clickable(onClick = onAdd)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
         )
     }
 }

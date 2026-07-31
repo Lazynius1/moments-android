@@ -1,8 +1,11 @@
 package com.moments.android.reportes
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -20,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.views.settings.SettingsProfileColors
 import kotlinx.coroutines.launch
 
 /** Port de ModerationReviewStatusView.swift */
@@ -43,6 +49,13 @@ fun ModerationReviewStatusView(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isDark = isSystemInDarkTheme()
+    val canvas = if (isDark) androidx.compose.ui.graphics.Color(0xFF0B1215)
+    else androidx.compose.ui.graphics.Color(0xFFFAF9F6)
+    val surface = SettingsProfileColors.surfaceContainer(isDark)
+    val primary = SettingsProfileColors.onSurface(isDark)
+    val secondary = SettingsProfileColors.onSurfaceVariant(isDark)
+
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val appealService = remember { AppealService.getInstance(context) }
@@ -70,6 +83,10 @@ fun ModerationReviewStatusView(
 
     LaunchedEffect(Unit) { fetchRequests() }
 
+    BackHandler {
+        if (selectedRequest != null) selectedRequest = null else onBack()
+    }
+
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -84,29 +101,63 @@ fun ModerationReviewStatusView(
                     IconButton(onClick = {
                         if (selectedRequest != null) selectedRequest = null else onBack()
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null,
+                            tint = primary,
+                        )
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = canvas,
+                    titleContentColor = primary,
+                    navigationIconContentColor = primary,
+                ),
             )
         },
+        containerColor = canvas,
+        contentColor = primary,
     ) { padding ->
         when {
             selectedRequest != null -> ModerationReviewDetailView(
                 request = selectedRequest!!,
-                modifier = Modifier.padding(padding),
+                modifier = Modifier
+                    .padding(padding)
+                    .consumeWindowInsets(padding),
+                surface = surface,
+                primary = primary,
+                secondary = secondary,
             )
             isLoading -> Column(
-                modifier = Modifier.padding(padding).fillMaxSize(),
+                modifier = Modifier
+                    .padding(padding)
+                    .consumeWindowInsets(padding)
+                    .fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
-            ) { CircularProgressIndicator() }
-            requests.isEmpty() -> ModerationReviewEmptyView(modifier = Modifier.padding(padding))
+            ) { CircularProgressIndicator(color = primary) }
+            requests.isEmpty() -> ModerationReviewEmptyView(
+                modifier = Modifier
+                    .padding(padding)
+                    .consumeWindowInsets(padding),
+                primary = primary,
+                secondary = secondary,
+            )
             else -> LazyColumn(
-                modifier = Modifier.padding(padding).padding(16.dp),
+                modifier = Modifier
+                    .padding(padding)
+                    .consumeWindowInsets(padding)
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 items(requests, key = { it.id }) { request ->
-                    ModerationReviewCard(request = request, onTap = { selectedRequest = request })
+                    ModerationReviewCard(
+                        request = request,
+                        surface = surface,
+                        primary = primary,
+                        secondary = secondary,
+                        onTap = { selectedRequest = request },
+                    )
                 }
             }
         }
@@ -122,29 +173,57 @@ fun ModerationReviewStatusView(
                     Text(stringResource(R.string.appeal_error_ok))
                 }
             },
+            containerColor = surface,
+            titleContentColor = primary,
+            textContentColor = secondary,
         )
     }
 }
 
 @Composable
-private fun ModerationReviewCard(request: ModerationReviewStatus, onTap: () -> Unit) {
-    Card(onClick = onTap, modifier = Modifier.fillMaxWidth()) {
+private fun ModerationReviewCard(
+    request: ModerationReviewStatus,
+    surface: androidx.compose.ui.graphics.Color,
+    primary: androidx.compose.ui.graphics.Color,
+    secondary: androidx.compose.ui.graphics.Color,
+    onTap: () -> Unit,
+) {
+    Card(
+        onClick = onTap,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = surface),
+    ) {
         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(R.string.moderationReview_status_ticket, request.ticketNumber))
-            Text(request.submittedAt, style = MaterialTheme.typography.labelSmall)
+            Text(stringResource(R.string.moderationReview_status_ticket, request.ticketNumber), color = primary)
+            Text(request.submittedAt, style = MaterialTheme.typography.labelSmall, color = secondary)
             AppealStatusBadge(status = request.status, priority = request.priority)
             Text(
                 if (request.contentType == "story") stringResource(R.string.moderationReview_context_story)
                 else stringResource(R.string.moderationReview_context_moment),
+                color = primary,
             )
-            Text(request.reviewMessage, maxLines = 2, style = MaterialTheme.typography.bodySmall)
-            Text(stringResource(R.string.moderationReview_status_estimatedResponse, request.estimatedResponseTime))
+            Text(
+                request.reviewMessage,
+                maxLines = 2,
+                style = MaterialTheme.typography.bodySmall,
+                color = secondary,
+            )
+            Text(
+                stringResource(R.string.moderationReview_status_estimatedResponse, request.estimatedResponseTime),
+                color = secondary,
+            )
         }
     }
 }
 
 @Composable
-private fun ModerationReviewDetailView(request: ModerationReviewStatus, modifier: Modifier = Modifier) {
+private fun ModerationReviewDetailView(
+    request: ModerationReviewStatus,
+    surface: androidx.compose.ui.graphics.Color,
+    primary: androidx.compose.ui.graphics.Color,
+    secondary: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier = modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         detailCard(
             title = stringResource(R.string.moderationReview_previewTitle),
@@ -154,10 +233,25 @@ private fun ModerationReviewDetailView(request: ModerationReviewStatus, modifier
                 moderationReviewScopeText(request.moderationScope),
                 request.moderationCategory?.takeIf { it.isNotEmpty() },
             ),
+            surface = surface,
+            primary = primary,
+            secondary = secondary,
         )
-        detailCard(title = stringResource(R.string.moderationReview_messageTitle), lines = listOf(request.reviewMessage))
+        detailCard(
+            title = stringResource(R.string.moderationReview_messageTitle),
+            lines = listOf(request.reviewMessage),
+            surface = surface,
+            primary = primary,
+            secondary = secondary,
+        )
         request.additionalInfo?.takeIf { it.isNotEmpty() }?.let {
-            detailCard(title = stringResource(R.string.moderationReview_additionalInfo), lines = listOf(it))
+            detailCard(
+                title = stringResource(R.string.moderationReview_additionalInfo),
+                lines = listOf(it),
+                surface = surface,
+                primary = primary,
+                secondary = secondary,
+            )
         }
         detailCard(
             title = stringResource(R.string.moderationReview_contactEmail),
@@ -165,19 +259,37 @@ private fun ModerationReviewDetailView(request: ModerationReviewStatus, modifier
                 request.contactEmail,
                 stringResource(R.string.moderationReview_status_estimatedResponse, request.estimatedResponseTime),
             ),
+            surface = surface,
+            primary = primary,
+            secondary = secondary,
         )
         request.moderatorNotes?.takeIf { it.isNotEmpty() }?.let {
-            detailCard(title = stringResource(R.string.moderationReview_status_teamNotes), lines = listOf(it))
+            detailCard(
+                title = stringResource(R.string.moderationReview_status_teamNotes),
+                lines = listOf(it),
+                surface = surface,
+                primary = primary,
+                secondary = secondary,
+            )
         }
     }
 }
 
 @Composable
-private fun detailCard(title: String, lines: List<String>) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun detailCard(
+    title: String,
+    lines: List<String>,
+    surface: androidx.compose.ui.graphics.Color,
+    primary: androidx.compose.ui.graphics.Color,
+    secondary: androidx.compose.ui.graphics.Color,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = surface),
+    ) {
         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(title, style = MaterialTheme.typography.labelMedium)
-            lines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            Text(title, style = MaterialTheme.typography.labelMedium, color = secondary)
+            lines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = primary) }
         }
     }
 }
@@ -191,16 +303,25 @@ private fun moderationReviewScopeText(scope: String): String = when (scope) {
 }
 
 @Composable
-private fun ModerationReviewEmptyView(modifier: Modifier = Modifier) {
+private fun ModerationReviewEmptyView(
+    primary: androidx.compose.ui.graphics.Color,
+    secondary: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier.fillMaxSize().padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(stringResource(R.string.moderationReview_status_empty_title), style = MaterialTheme.typography.titleLarge)
+        Text(
+            stringResource(R.string.moderationReview_status_empty_title),
+            style = MaterialTheme.typography.titleLarge,
+            color = primary,
+        )
         Text(
             stringResource(R.string.moderationReview_status_empty_message),
             style = MaterialTheme.typography.bodyMedium,
+            color = secondary,
         )
     }
 }

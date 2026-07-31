@@ -1,7 +1,7 @@
 package com.moments.android.views.story.storyviewer
 
+import android.view.LayoutInflater
 import android.view.ViewGroup
-import android.widget.FrameLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -139,7 +139,9 @@ fun GlassmorphicStoryVideoPlayer(
 
     AndroidView(
         factory = { viewContext ->
-            PlayerView(viewContext).apply {
+            // texture_view (story_player_view.xml): SurfaceView + Compose offset/clip = negro.
+            (LayoutInflater.from(viewContext)
+                .inflate(R.layout.story_player_view, null, false) as PlayerView).apply {
                 useController = false
                 resizeMode = if (contentScaleFit) {
                     AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -147,7 +149,7 @@ fun GlassmorphicStoryVideoPlayer(
                     AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                 }
                 this.player = player
-                layoutParams = FrameLayout.LayoutParams(
+                layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
                 )
@@ -159,6 +161,7 @@ fun GlassmorphicStoryVideoPlayer(
             } else {
                 AspectRatioFrameLayout.RESIZE_MODE_ZOOM
             }
+            if (view.player !== player) view.player = player
         },
         modifier = modifier,
     )

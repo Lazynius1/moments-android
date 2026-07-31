@@ -26,7 +26,9 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 
-/** Firebase AI Logic bridge used by the Nova agent. */
+/** Port de `Views/Nova/AI/NovaAIService.swift` — Vertex AI chat/stream/tools/JSON/títulos/compactación.
+ * Wrappers `ChatSession`/`NovaResponse` adaptan el SDK Android (≡ `Chat`/`GenerateContentResponse` iOS).
+ * `NovaAgentError` vive en `NovaAgent.kt` (en iOS está al final de este archivo). */
 object NovaAIService {
     private val firebaseAi = Firebase.ai(backend = GenerativeBackend.vertexAI(NovaGenerationConfig.location))
 

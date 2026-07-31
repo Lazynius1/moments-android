@@ -117,7 +117,7 @@ fun GlassmorphicInputBar(
     val showingDraft = voiceRecordingDraft != null || isPreparingVoiceRecordingPreview
     val composerAccent = colors.userAccentColor
     val panelBg = colors.chatInputBackground
-    val fieldFill = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f)
+    val fieldFill = if (isDark) Color(0xFF0B1215) else Color(0xFFF4F5F5)
     val vanishStroke = if (isDark) Color.White.copy(alpha = 0.28f) else Color.Black.copy(alpha = 0.22f)
 
     fun sendCurrentContent() {

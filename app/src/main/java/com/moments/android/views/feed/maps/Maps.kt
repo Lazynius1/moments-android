@@ -14,7 +14,7 @@ object FeedMaps {
             token.startsWith("pk.")
     }
 
-    /** Legacy Google key check — chat/picker aún usan Google Maps Compose. */
+    /** Google Places / pickers legacy (LocationPicker archive, etc.). Chat location preview = Mapbox. */
     fun hasGoogleMapsKey(): Boolean =
         BuildConfig.GOOGLE_MAPS_API_KEY.isNotBlank() &&
             BuildConfig.GOOGLE_MAPS_API_KEY != PLACEHOLDER_API_KEY

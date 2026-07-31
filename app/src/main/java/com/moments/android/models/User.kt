@@ -180,7 +180,7 @@ data class AppUser(
 
     val requiresFollowApproval: Boolean get() = isPrivate && isActive
 
-    /** ≡ iOS `shouldHideAds` (flag básico; sin PlusSubscription 🚫). */
+    /** ≡ iOS `shouldHideAds` (= `isPlusSubscriber`; sin producto Plus). */
     val shouldHideAds: Boolean get() = isPlusSubscriber
 
     companion object {

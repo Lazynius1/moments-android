@@ -1,6 +1,13 @@
 package com.moments.android.views.settings
 
+import androidx.activity.compose.BackHandler
 import android.app.DatePickerDialog
+import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -30,12 +38,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -61,6 +73,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.moments.android.R
 import com.moments.android.models.Moment
 import com.moments.android.models.Story
@@ -91,6 +104,11 @@ import java.util.Date
 import kotlin.math.max
 import kotlin.math.min
 
+class ActivitySelectionController {
+    var isSelectionMode by mutableStateOf(false)
+    var canSelect by mutableStateOf(false)
+}
+
 /**
  * Port de `UserActivityDetailView.swift`.
  *
@@ -109,6 +127,7 @@ fun ActivityInteractionDetailView(
     category: ActivityInteractionCategory,
     recentlyDeletedKind: RecentlyDeletedContentKind = RecentlyDeletedContentKind.MOMENTS,
     suppressInlineNavigationTitle: Boolean = false,
+    selectionController: ActivitySelectionController? = null,
     onBack: () -> Unit = {},
     onOpenMoment: (Moment, List<Moment>) -> Unit = { _, _ -> },
     onOpenProfile: (String) -> Unit = {},
@@ -137,12 +156,13 @@ fun ActivityInteractionDetailView(
     var customDateTo by remember { mutableStateOf(Date()) }
     var selectedAuthorId by remember { mutableStateOf<String?>(null) }
     var showAuthorSheet by remember { mutableStateOf(false) }
-    var isSelectionMode by remember { mutableStateOf(false) }
+    var localSelectionMode by remember { mutableStateOf(false) }
+    val isSelectionMode = selectionController?.isSelectionMode ?: localSelectionMode
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pendingConfirmation by remember { mutableStateOf<ActivitySelectionConfirmationAction?>(null) }
     var isMutating by remember { mutableStateOf(false) }
     var mutatingAction by remember { mutableStateOf<ActivitySelectionConfirmationAction?>(null) }
-    var successBannerRes by remember { mutableStateOf<Int?>(null) }
+    var actionBanner by remember { mutableStateOf<ActivityActionBanner?>(null) }
     var selectedEchoId by remember { mutableStateOf<String?>(null) }
     var longPressActivatedItemId by remember { mutableStateOf<String?>(null) }
 
@@ -167,6 +187,8 @@ fun ActivityInteractionDetailView(
     }
     val chromeTitle = stringResource(titleRes)
 
+    BackHandler(onBack = onBack)
+
     LaunchedEffect(Unit) { viewModel.loadIfNeeded() }
     LaunchedEffect(viewModel.isLoading) {
         if (!viewModel.isLoading) hasLoadedOnce = true
@@ -188,15 +210,20 @@ fun ActivityInteractionDetailView(
     )
 
     fun clearSelection() {
-        isSelectionMode = false
+        if (selectionController != null) {
+            selectionController.isSelectionMode = false
+        } else {
+            localSelectionMode = false
+        }
         selectedIds = emptySet()
     }
 
-    fun showBanner(res: Int) {
-        successBannerRes = res
+    fun showBanner(res: Int, isError: Boolean = false) {
+        val banner = ActivityActionBanner(res = res, isError = isError)
+        actionBanner = banner
         scope.launch {
             delay(2000)
-            if (successBannerRes == res) successBannerRes = null
+            if (actionBanner == banner) actionBanner = null
         }
     }
 
@@ -215,7 +242,10 @@ fun ActivityInteractionDetailView(
     }
 
     LaunchedEffect(isSelectionMode) {
-        if (!isSelectionMode) stopRecentlyDeletedAutoScroll()
+        if (!isSelectionMode) {
+            selectedIds = emptySet()
+            stopRecentlyDeletedAutoScroll()
+        }
     }
 
     // ≡ onChange(of: selectedReactionIds) — solo al vaciar selección, no al entrar en Select
@@ -225,7 +255,11 @@ fun ActivityInteractionDetailView(
             isSelectionMode &&
             selectedIds.isEmpty()
         ) {
-            isSelectionMode = false
+            if (selectionController != null) {
+                selectionController.isSelectionMode = false
+            } else {
+                localSelectionMode = false
+            }
         }
     }
 
@@ -293,8 +327,12 @@ fun ActivityInteractionDetailView(
     val allVisibleSelected = visibleSelectableIds.isNotEmpty() && selectedIds.containsAll(visibleSelectableIds)
 
     LaunchedEffect(visibleSelectableIds) {
+        selectionController?.canSelect = visibleSelectableIds.isNotEmpty()
         if (supportsSelection) {
             selectedIds = selectedIds.filter { it in visibleSelectableIds }.toSet()
+        }
+        if (visibleSelectableIds.isEmpty() && selectionController?.isSelectionMode == true) {
+            selectionController.isSelectionMode = false
         }
     }
 
@@ -477,25 +515,48 @@ fun ActivityInteractionDetailView(
 
     fun enterSelectionWith(id: String) {
         longPressActivatedItemId = id
-        if (!isSelectionMode) isSelectionMode = true
+        if (!isSelectionMode) {
+            if (selectionController != null) {
+                selectionController.isSelectionMode = true
+            } else {
+                localSelectionMode = true
+            }
+        }
         selectedIds = selectedIds + id
     }
 
-    Box(modifier.fillMaxSize().background(background)) {
+    val systemInsetModifier =
+        if (suppressInlineNavigationTitle) Modifier else Modifier.safeDrawingPadding()
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(background)
+            .then(systemInsetModifier),
+    ) {
         Column(Modifier.fillMaxSize()) {
-            DetailTopBar(
-                titleRes = titleRes,
-                suppressTitle = suppressInlineNavigationTitle,
-                selectionActionLabel = when {
-                    !supportsSelection -> null
-                    isSelectionMode -> R.string.user_activity_cancel
-                    category == ActivityInteractionCategory.ARCHIVED -> null
-                    else -> R.string.user_activity_select
-                },
-                ink = ink,
-                onBack = onBack,
-                onSelectionAction = { if (isSelectionMode) clearSelection() else isSelectionMode = true },
-            )
+            if (!suppressInlineNavigationTitle) {
+                DetailTopBar(
+                    titleRes = titleRes,
+                    suppressTitle = false,
+                    selectionActionLabel = when {
+                        !supportsSelection -> null
+                        isSelectionMode -> R.string.user_activity_cancel
+                        category == ActivityInteractionCategory.ARCHIVED -> null
+                        else -> R.string.user_activity_select
+                    },
+                    ink = ink,
+                    onBack = onBack,
+                    onSelectionAction = {
+                        if (isSelectionMode) {
+                            clearSelection()
+                        } else if (selectionController != null) {
+                            selectionController.isSelectionMode = true
+                        } else {
+                            localSelectionMode = true
+                        }
+                    },
+                )
+            }
 
             when {
                 viewModel.isLoading && !hasLoadedOnce -> LoadingState(ink = ink, inkMuted = inkMuted)
@@ -703,17 +764,30 @@ fun ActivityInteractionDetailView(
             Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 12.dp)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 16.dp)
+                .zIndex(20f),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            successBannerRes?.let { SuccessBanner(it, isDark = isDark, ink = ink) }
+            AnimatedVisibility(
+                visible = actionBanner != null,
+                enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { -it / 2 }) + fadeOut(),
+            ) {
+                actionBanner?.let {
+                    ActionBanner(
+                        res = it.res,
+                        isError = it.isError,
+                        isDark = isDark,
+                        ink = ink,
+                    )
+                }
+            }
             if (isMutating) {
                 ProcessingBanner(
                     titleRes = processingTitleRes(mutatingAction),
-                    subtitleRes = R.string.user_activity_recently_deleted_processing_subtitle,
                     ink = ink,
-                    surface = background,
+                    isDark = isDark,
                 )
             }
         }
@@ -767,13 +841,16 @@ fun ActivityInteractionDetailView(
         MomentsModalSheet(
             onDismissRequest = { showAuthorSheet = false },
             largeOnly = false,
-        ) {
+        ) { dismiss ->
             AuthorFilterSheet(
                 selectedAuthorId = selectedAuthorId,
                 availableAuthorIds = availableAuthorIds,
                 authorUsernameMap = authorUsernameMap,
-                onSelect = { selectedAuthorId = it; showAuthorSheet = false },
-                onClose = { showAuthorSheet = false },
+                onSelect = {
+                    selectedAuthorId = it
+                    dismiss()
+                },
+                onClose = dismiss,
             )
         }
     }
@@ -802,6 +879,13 @@ fun ActivityInteractionDetailView(
                     if (result.isSuccess) {
                         clearSelection()
                         showBanner(successResFor(action))
+                    } else {
+                        Log.e(
+                            "UserActivity",
+                            "Selection action ${action.id} failed",
+                            result.exceptionOrNull(),
+                        )
+                        showBanner(R.string.story_context_menu_action_failed, isError = true)
                     }
                 }
             },
@@ -1664,6 +1748,60 @@ private fun SelectionBar(
 ) {
     val isArchived = category == ActivityInteractionCategory.ARCHIVED
     val isRecentlyDeleted = category == ActivityInteractionCategory.RECENTLY_DELETED
+    if (isRecentlyDeleted) {
+        Row(
+            modifier
+                .fillMaxWidth()
+                .background(
+                    if (isSystemInDarkTheme()) {
+                        Color(0xFF151D21)
+                    } else {
+                        Color.White
+                    },
+                )
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(countLabelRes, count),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = ink,
+            )
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = onSelectAll, enabled = !isBusy) {
+                Icon(
+                    Icons.Default.SelectAll,
+                    contentDescription = stringResource(
+                        if (allVisibleSelected) R.string.common_clear
+                        else R.string.user_activity_select_all,
+                    ),
+                    tint = ink.copy(alpha = if (isBusy) 0.38f else 0.82f),
+                )
+            }
+            IconButton(onClick = onRestore, enabled = count > 0 && !isBusy) {
+                Icon(
+                    Icons.Default.Restore,
+                    contentDescription = stringResource(
+                        R.string.user_activity_recently_deleted_restore_single,
+                    ),
+                    tint = ink.copy(alpha = if (count > 0 && !isBusy) 1f else 0.38f),
+                )
+            }
+            IconButton(onClick = onDelete, enabled = count > 0 && !isBusy) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = stringResource(
+                        R.string.user_activity_recently_deleted_delete_single,
+                    ),
+                    tint = Color(0xFFFF453A).copy(
+                        alpha = if (count > 0 && !isBusy) 1f else 0.38f,
+                    ),
+                )
+            }
+        }
+        return
+    }
     Row(
         modifier
             .fillMaxWidth()
@@ -1778,21 +1916,25 @@ private fun ConfirmationDialog(
     )
 }
 
+private data class ActivityActionBanner(val res: Int, val isError: Boolean)
+
 @Composable
-private fun SuccessBanner(res: Int, isDark: Boolean, ink: Color) {
+private fun ActionBanner(res: Int, isError: Boolean, isDark: Boolean, ink: Color) {
+    val bannerSurface = if (isDark) Color(0xFF20282C) else Color.White
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier
+            .shadow(12.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.16f))
             .clip(CircleShape)
-            .background((if (isDark) Color.White else Color.Black).copy(alpha = 0.08f))
+            .background(bannerSurface)
             .border(0.8.dp, Color.White.copy(alpha = if (isDark) 0.10f else 0.35f), CircleShape)
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Icon(
             imageVector = Icons.Filled.CheckCircle,
             contentDescription = null,
-            tint = Color(0xFF22C55E),
+            tint = if (isError) Color(0xFFEF4444) else Color(0xFF22C55E),
             modifier = Modifier.size(16.dp),
         )
         Text(
@@ -1805,23 +1947,32 @@ private fun SuccessBanner(res: Int, isDark: Boolean, ink: Color) {
 }
 
 @Composable
-private fun ProcessingBanner(titleRes: Int, subtitleRes: Int, ink: Color, surface: Color) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+private fun ProcessingBanner(titleRes: Int, ink: Color, isDark: Boolean) {
+    val bannerSurface = if (isDark) Color(0xFF20282C) else Color.White
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(surface.copy(alpha = 0.96f))
-            .padding(horizontal = 18.dp, vertical = 12.dp),
+            .shadow(12.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.16f))
+            .clip(CircleShape)
+            .background(bannerSurface)
+            .border(
+                0.8.dp,
+                Color.White.copy(alpha = if (isDark) 0.10f else 0.35f),
+                CircleShape,
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CircularProgressIndicator(color = ink, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
-            Text(stringResource(titleRes), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = ink)
-        }
+        CircularProgressIndicator(
+            color = ink,
+            strokeWidth = 2.dp,
+            modifier = Modifier.size(16.dp),
+        )
         Text(
-            stringResource(subtitleRes),
-            fontSize = 11.sp,
-            color = ink.copy(alpha = 0.55f),
-            modifier = Modifier.padding(top = 4.dp),
+            stringResource(titleRes),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = ink,
         )
     }
 }

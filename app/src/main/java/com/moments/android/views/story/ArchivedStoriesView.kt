@@ -1,5 +1,6 @@
 package com.moments.android.views.story
 
+import androidx.activity.compose.BackHandler
 import android.location.Geocoder
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -134,6 +136,10 @@ fun ArchivedStoriesView(
         viewModel.loadArchivedStories()
     }
 
+    if (showTopBar) {
+        BackHandler(onBack = onNavigateBack)
+    }
+
     Scaffold(
         containerColor = backgroundColor,
         topBar = {
@@ -164,7 +170,8 @@ fun ArchivedStoriesView(
         Box(
             Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding),
         ) {
             when {
                 viewModel.isLoading -> {
@@ -322,7 +329,10 @@ fun ArchivedStoriesView(
     viewerStories?.let { stories ->
         Dialog(
             onDismissRequest = { viewerStories = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
         ) {
             ArchiveDayStoriesViewer(
                 stories = stories,

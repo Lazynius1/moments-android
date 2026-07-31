@@ -1,8 +1,12 @@
 package com.moments.android.views.messaging.components
 
+import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
+import android.util.LruCache
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -29,6 +34,7 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.TurnRight
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -46,7 +52,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,27 +64,61 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapType
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.MarkerComposable
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberMarkerState
+import com.mapbox.geojson.Point
+import com.mapbox.maps.CameraOptions
+import com.mapbox.maps.MapSnapshotOptions
+import com.mapbox.maps.Size
+import com.mapbox.maps.Snapshotter
+import com.mapbox.maps.Style
+import com.mapbox.maps.ViewAnnotationAnchor
+import com.mapbox.maps.extension.compose.MapboxMap
+import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
+import com.mapbox.maps.extension.compose.annotation.ViewAnnotation
+import com.mapbox.maps.extension.compose.rememberMapState
+import com.mapbox.maps.extension.compose.style.MapStyle
+import com.mapbox.maps.plugin.gestures.generated.GesturesSettings
+import com.mapbox.maps.viewannotation.annotationAnchor
+import com.mapbox.maps.viewannotation.geometry
+import com.mapbox.maps.viewannotation.viewAnnotationOptions
 import com.moments.android.R
 import com.moments.android.extensions.ProfileChromeIconButton
 import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.views.feed.maps.FeedMaps
+import com.moments.android.views.feed.maps.MapRegionStore
+import com.moments.android.views.feed.maps.MomentsMapStyle
+import com.moments.android.views.feed.maps.MomentsMapboxStandardStyle
 import com.moments.android.views.messaging.models.ChatLocationPayload
 import com.moments.android.views.story.StoryRingAvatarView
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import java.util.Date
+import kotlin.coroutines.resume
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /** Port de `Views/Messaging/Components/ChatLocationMessageBubble.swift`. */
+
+/** ≡ iOS `ChatMapSnapshotCache` (NSCache countLimit 80). */
+object ChatMapSnapshotCache {
+    private val cache = LruCache<String, Bitmap>(80)
+
+    private fun key(lat: Double, lng: Double, widthPx: Int, heightPx: Int, dark: Boolean): String {
+        val rLat = (lat * 1000).roundToInt() / 1000.0
+        val rLng = (lng * 1000).roundToInt() / 1000.0
+        return "$rLat,$rLng,${widthPx}x${heightPx},${if (dark) "d" else "l"}"
+    }
+
+    fun get(lat: Double, lng: Double, widthPx: Int, heightPx: Int, dark: Boolean): Bitmap? =
+        cache.get(key(lat, lng, widthPx, heightPx, dark))
+
+    fun put(bitmap: Bitmap, lat: Double, lng: Double, widthPx: Int, heightPx: Int, dark: Boolean) {
+        cache.put(key(lat, lng, widthPx, heightPx, dark), bitmap)
+    }
+}
+
 object ChatLocationLiveCountdownFormatter {
     /** Devuelve solo el valor `H:MM:SS` / `M:SS` — el wrapper localizado va en el call site Compose. */
     fun value(expiresAt: Date, now: Date = Date()): String {
@@ -94,6 +137,10 @@ object ChatLocationLiveCountdownFormatter {
 private val bubbleWidth = 276.dp
 private val mapHeight = 150.dp
 private val bubbleShape = RoundedCornerShape(18.dp)
+/** ≡ iOS MKMapSnapshotter span 0.01. */
+private const val BUBBLE_SNAPSHOT_LON_DELTA = 0.01
+/** ≡ iOS detail span 0.008. */
+private const val DETAIL_MAP_LON_DELTA = 0.008
 
 @Composable
 fun ChatLocationMessageBubble(
@@ -151,21 +198,21 @@ fun ChatLocationMessageBubble(
     ) {
         Column(Modifier.clickable { showDetail = true }) {
             Box(Modifier.fillMaxWidth().height(mapHeight)) {
-                ChatLocationMapPreview(
+                ChatLocationBubbleMapThumbnail(
                     latitude = payload.lat,
                     longitude = payload.lng,
-                    interactive = false,
-                    showDefaultMarker = false,
+                    isDark = isDark,
                     modifier = Modifier.fillMaxSize(),
                 )
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     if (isLive && !senderId.isNullOrBlank()) {
                         LiveLocationAvatarPin(senderId = senderId, avatarSize = 40.dp, isActive = isLiveActive)
                     } else {
+                        // ≡ iOS `mappin.circle.fill` rojo (estática; live sin senderId también pin)
                         Icon(
                             Icons.Default.LocationOn,
                             contentDescription = null,
-                            tint = if (isLive) Color(0xFF34C759) else Color.Red,
+                            tint = Color.Red,
                             modifier = Modifier.size(30.dp),
                         )
                     }
@@ -248,49 +295,108 @@ fun ChatLocationMessageBubble(
     }
 }
 
+/** Thumbnail estático ≡ iOS `MKMapSnapshotter` + cache. */
 @Composable
-private fun ChatLocationMapPreview(
+private fun ChatLocationBubbleMapThumbnail(
     latitude: Double,
     longitude: Double,
-    interactive: Boolean,
+    isDark: Boolean,
     modifier: Modifier = Modifier,
-    mapType: MapType = MapType.NORMAL,
-    showDefaultMarker: Boolean = true,
-    markerContent: (@Composable () -> Unit)? = null,
 ) {
-    val latLng = LatLng(latitude, longitude)
-    val position = rememberCameraPositionState {
-        this.position = CameraPosition.fromLatLngZoom(latLng, if (interactive) 15.5f else 15f)
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val widthPx = with(density) { bubbleWidth.roundToPx() }
+    val heightPx = with(density) { mapHeight.roundToPx() }
+    var snapshot by remember(latitude, longitude, isDark, widthPx, heightPx) {
+        mutableStateOf(
+            ChatMapSnapshotCache.get(latitude, longitude, widthPx, heightPx, isDark),
+        )
     }
-    LaunchedEffect(latitude, longitude) {
-        position.move(CameraUpdateFactory.newLatLngZoom(latLng, if (interactive) 15.5f else 15f))
+
+    LaunchedEffect(latitude, longitude, isDark, widthPx, heightPx) {
+        ChatMapSnapshotCache.get(latitude, longitude, widthPx, heightPx, isDark)?.let {
+            snapshot = it
+            return@LaunchedEffect
+        }
+        snapshot = null
+        if (!FeedMaps.hasMapboxToken()) return@LaunchedEffect
+        val bitmap = runCatching {
+            captureMapboxSnapshot(
+                context = context.applicationContext,
+                latitude = latitude,
+                longitude = longitude,
+                widthPx = widthPx,
+                heightPx = heightPx,
+                dark = isDark,
+            )
+        }.getOrNull()
+        if (bitmap != null) {
+            ChatMapSnapshotCache.put(bitmap, latitude, longitude, widthPx, heightPx, isDark)
+            snapshot = bitmap
+        }
     }
-    GoogleMap(
-        cameraPositionState = position,
-        modifier = modifier,
-        properties = MapProperties(mapType = mapType),
-        uiSettings = MapUiSettings(
-            zoomControlsEnabled = false,
-            scrollGesturesEnabled = interactive,
-            zoomGesturesEnabled = interactive,
-            tiltGesturesEnabled = false,
-            rotationGesturesEnabled = false,
-            mapToolbarEnabled = false,
-            myLocationButtonEnabled = false,
+
+    Box(
+        modifier.background(
+            if (isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.05f),
         ),
+        contentAlignment = Alignment.Center,
     ) {
-        when {
-            markerContent != null -> {
-                MarkerComposable(state = rememberMarkerState(position = latLng)) {
-                    markerContent()
-                }
+        val bmp = snapshot
+        if (bmp != null) {
+            Image(
+                bitmap = bmp.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.dp,
+                color = if (isDark) Color.White.copy(0.5f) else Color.Black.copy(0.35f),
+            )
+        }
+    }
+}
+
+/** ≡ MKMapSnapshotter via Mapbox `Snapshotter`. */
+private suspend fun captureMapboxSnapshot(
+    context: Context,
+    latitude: Double,
+    longitude: Double,
+    widthPx: Int,
+    heightPx: Int,
+    dark: Boolean,
+): Bitmap? = withContext(Dispatchers.Main) {
+    val zoom = MapRegionStore.zoomFromLongitudeDelta(BUBBLE_SNAPSHOT_LON_DELTA)
+    val options = MapSnapshotOptions.Builder()
+        .size(Size(widthPx.toFloat(), heightPx.toFloat()))
+        .build()
+    val snapshotter = Snapshotter(context, options)
+    try {
+        snapshotter.setStyleUri(if (dark) Style.DARK else Style.MAPBOX_STREETS)
+        snapshotter.setCamera(
+            CameraOptions.Builder()
+                .center(Point.fromLngLat(longitude, latitude))
+                .zoom(zoom)
+                .pitch(MomentsMapStyle.CAMERA_PITCH)
+                .bearing(0.0)
+                .build(),
+        )
+        suspendCancellableCoroutine { cont ->
+            cont.invokeOnCancellation {
+                runCatching { snapshotter.cancel() }
+                runCatching { snapshotter.destroy() }
             }
-            showDefaultMarker -> {
-                MarkerComposable(state = rememberMarkerState(position = latLng)) {
-                    Icon(Icons.Default.LocationOn, null, tint = Color.Red, modifier = Modifier.size(34.dp))
-                }
+            snapshotter.start { bitmap, _ ->
+                if (cont.isActive) cont.resume(bitmap)
+                runCatching { snapshotter.destroy() }
             }
         }
+    } catch (_: Exception) {
+        runCatching { snapshotter.destroy() }
+        null
     }
 }
 
@@ -313,18 +419,39 @@ fun ChatLocationDetailView(
     val scope = rememberCoroutineScope()
     var mapTypeHybrid by remember { mutableStateOf(false) }
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    val latLng = LatLng(payload.lat, payload.lng)
-    val camera = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(latLng, 15.5f)
+    val detailZoom = remember { MapRegionStore.zoomFromLongitudeDelta(DETAIL_MAP_LON_DELTA) }
+    val point = remember(payload.lat, payload.lng) { Point.fromLngLat(payload.lng, payload.lat) }
+    val mapViewportState = rememberMapViewportState {
+        setCameraOptions {
+            center(point)
+            zoom(detailZoom)
+            pitch(MomentsMapStyle.CAMERA_PITCH)
+            bearing(0.0)
+        }
+    }
+    val mapState = rememberMapState {
+        gesturesSettings = GesturesSettings {
+            pitchEnabled = false
+        }
     }
     val markerTint = if (isLive && isLiveActive) Color(0xFF34C759) else Color.Red
     val cardBg = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+    val bottomShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
     LaunchedEffect(isLive, isLiveActive) {
         if (!isLive || !isLiveActive) return@LaunchedEffect
         while (true) {
             nowMillis = System.currentTimeMillis()
             delay(1_000)
+        }
+    }
+
+    LaunchedEffect(payload.lat, payload.lng) {
+        mapViewportState.setCameraOptions {
+            center(Point.fromLngLat(payload.lng, payload.lat))
+            zoom(detailZoom)
+            pitch(MomentsMapStyle.CAMERA_PITCH)
+            bearing(0.0)
         }
     }
 
@@ -347,7 +474,10 @@ fun ChatLocationDetailView(
         val uri = if (directions) {
             Uri.parse("google.navigation:q=${payload.lat},${payload.lng}")
         } else {
-            Uri.parse("geo:${payload.lat},${payload.lng}?q=${payload.lat},${payload.lng}(${Uri.encode(payload.name ?: context.getString(R.string.chat_attachment_location))})")
+            Uri.parse(
+                "geo:${payload.lat},${payload.lng}?q=${payload.lat},${payload.lng}" +
+                    "(${Uri.encode(payload.name ?: context.getString(R.string.chat_attachment_location))})",
+            )
         }
         context.startActivity(Intent(Intent.ACTION_VIEW, uri))
     }
@@ -360,26 +490,54 @@ fun ChatLocationDetailView(
         }
     }
 
+    fun recenter() {
+        mapViewportState.setCameraOptions {
+            center(Point.fromLngLat(payload.lng, payload.lat))
+            zoom(detailZoom)
+            pitch(MomentsMapStyle.CAMERA_PITCH)
+            bearing(0.0)
+        }
+    }
+
     Box(modifier.fillMaxSize().background(Color.Black)) {
-        GoogleMap(
-            cameraPositionState = camera,
-            modifier = Modifier.fillMaxSize(),
-            properties = MapProperties(mapType = if (mapTypeHybrid) MapType.HYBRID else MapType.NORMAL),
-            uiSettings = MapUiSettings(zoomControlsEnabled = false, mapToolbarEnabled = false),
-        ) {
-            MarkerComposable(state = rememberMarkerState(position = latLng)) {
-                if (isLive && !senderId.isNullOrBlank()) {
-                    LiveLocationAvatarPin(senderId = senderId, avatarSize = 48.dp, isActive = isLiveActive)
-                } else {
-                    Icon(
-                        Icons.Default.LocationOn,
-                        contentDescription = null,
-                        tint = markerTint,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .shadow(3.dp, CircleShape),
-                    )
+        if (FeedMaps.hasMapboxToken()) {
+            MapboxMap(
+                modifier = Modifier.fillMaxSize(),
+                mapViewportState = mapViewportState,
+                mapState = mapState,
+                // ≡ iOS `.mapStyle(hybrid ? .hybrid : .standard)`
+                style = {
+                    if (mapTypeHybrid) {
+                        MapStyle(style = Style.SATELLITE_STREETS)
+                    } else {
+                        MomentsMapboxStandardStyle(realisticElevation = false)
+                    }
+                },
+            ) {
+                ViewAnnotation(
+                    options = viewAnnotationOptions {
+                        geometry(point)
+                        annotationAnchor { anchor(ViewAnnotationAnchor.CENTER) }
+                        allowOverlap(true)
+                    },
+                ) {
+                    if (isLive && !senderId.isNullOrBlank()) {
+                        LiveLocationAvatarPin(senderId = senderId, avatarSize = 48.dp, isActive = isLiveActive)
+                    } else {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = markerTint,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .shadow(3.dp, CircleShape),
+                        )
+                    }
                 }
+            }
+        } else {
+            Box(Modifier.fillMaxSize().background(Color.Gray.copy(0.2f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.LocationOn, null, tint = markerTint, modifier = Modifier.size(48.dp))
             }
         }
 
@@ -387,6 +545,7 @@ fun ChatLocationDetailView(
             Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
+                .safeDrawingPadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top,
@@ -401,9 +560,7 @@ fun ChatLocationDetailView(
                 )
                 ProfileChromeIconButton(
                     Icons.Default.MyLocation,
-                    onClick = {
-                        camera.move(CameraUpdateFactory.newLatLngZoom(latLng, 15.5f))
-                    },
+                    onClick = ::recenter,
                     size = 42.dp,
                     iconSize = 16.dp,
                 )
@@ -414,8 +571,8 @@ fun ChatLocationDetailView(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                .momentsChromeGlass(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), interactive = false)
+                .clip(bottomShape)
+                .momentsChromeGlass(bottomShape, interactive = false)
                 .background(cardBg.copy(alpha = 0.92f))
                 .padding(horizontal = 18.dp)
                 .padding(top = 18.dp, bottom = 24.dp),

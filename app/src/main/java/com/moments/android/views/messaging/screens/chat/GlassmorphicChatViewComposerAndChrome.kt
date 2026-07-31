@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -26,6 +25,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,6 +74,32 @@ import com.moments.android.views.messaging.screens.SharedMedia
 import java.util.Date
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/**
+ * The legacy chat host consumes Compose's IME inset before its composer reads it.
+ * Observe the root window instead so visual composer spacing follows the real keyboard.
+ */
+@Composable
+private fun rememberRootKeyboardVisible(): Boolean {
+    val view = LocalView.current
+    var keyboardVisible by remember(view) { mutableStateOf(false) }
+
+    DisposableEffect(view) {
+        val root = view.rootView
+        val visibleFrame = android.graphics.Rect()
+        val listener = android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            root.getWindowVisibleDisplayFrame(visibleFrame)
+            keyboardVisible = root.height - visibleFrame.bottom > root.height * 0.15f
+        }
+        root.viewTreeObserver.addOnGlobalLayoutListener(listener)
+        root.getWindowVisibleDisplayFrame(visibleFrame)
+        keyboardVisible = root.height - visibleFrame.bottom > root.height * 0.15f
+
+        onDispose { root.viewTreeObserver.removeOnGlobalLayoutListener(listener) }
+    }
+
+    return keyboardVisible
+}
 
 /**
  * Port de `GlassmorphicChatView+ComposerAndChrome.swift`.
@@ -275,6 +302,7 @@ fun ChatComposerChrome(
     modifier: Modifier = Modifier,
 ) {
     val context = controller.pendingChatContext
+    val keyboardVisible = rememberRootKeyboardVisible()
     // Aire sobre gesture/nav: insets sistema + margen Moments (Telegram deja el panel con padding).
     val safeModifier = modifier
         .navigationBarsPadding()
@@ -358,6 +386,7 @@ fun ChatComposerChrome(
                 onFinishVoiceRecording = onFinishVoiceRecording,
                 onVoiceRecordingTrimChanged = onVoiceRecordingTrimChanged,
                 onLockChanged = onLockChanged,
+                modifier = if (keyboardVisible) Modifier.padding(bottom = 8.dp) else Modifier,
             )
         }
     }

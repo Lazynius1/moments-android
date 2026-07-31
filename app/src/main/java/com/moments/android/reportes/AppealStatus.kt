@@ -1,5 +1,6 @@
 package com.moments.android.reportes
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,11 +34,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.views.settings.SettingsProfileColors
 import kotlinx.coroutines.launch
 
 /** Port de AppealStatus.swift — lista y detalle de apelaciones del usuario. */
@@ -192,11 +195,15 @@ private fun appealStatusLabel(status: String): String = when (status) {
 }
 
 @Composable
-private fun appealStatusColor(status: String) = when (status) {
-    "approved" -> MaterialTheme.colorScheme.primary
-    "denied" -> MaterialTheme.colorScheme.error
-    "requires_info" -> MaterialTheme.colorScheme.tertiary
-    else -> MaterialTheme.colorScheme.onSurface
+private fun appealStatusColor(status: String): Color {
+    val isDark = isSystemInDarkTheme()
+    return when (status) {
+        "approved" -> Color(0xFF34C759)
+        "denied" -> if (isDark) Color(0xFFFF453A) else Color(0xFFD32F2F)
+        "requires_info" -> if (isDark) Color(0xFFFFB340) else Color(0xFFE66A00)
+        "reviewing" -> if (isDark) Color(0xFF64B5F6) else Color(0xFF1565C0)
+        else -> SettingsProfileColors.onSurface(isDark)
+    }
 }
 
 @Composable

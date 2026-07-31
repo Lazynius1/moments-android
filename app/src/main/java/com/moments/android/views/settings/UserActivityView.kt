@@ -1,5 +1,7 @@
 package com.moments.android.views.settings
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -10,9 +12,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.DropdownMenu
@@ -39,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.extensions.MomentsGlassButtonPreset
+import com.moments.android.views.settings.sections.SettingsSubsectionGroup
 import com.moments.android.views.story.ArchivedStoriesView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -106,11 +111,14 @@ fun UserActivityView(onNavigateBack: () -> Unit = {}) {
         ) {
             LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 12.dp, top = 16.dp, end = 12.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(22.dp),
             ) {
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
                         Text(
                             stringResource(R.string.user_activity_headline),
                             fontSize = 30.sp,
@@ -126,7 +134,7 @@ fun UserActivityView(onNavigateBack: () -> Unit = {}) {
                 }
 
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(32.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
                         sections.forEach { (titleRes, categories) ->
                             ActivitySection(
                                 title = stringResource(titleRes),
@@ -143,6 +151,7 @@ fun UserActivityView(onNavigateBack: () -> Unit = {}) {
 
     route?.let { current ->
         val close = { route = null }
+        BackHandler(onBack = close)
         when (current) {
             is ActivityRoute.Detail -> ActivityInteractionDetailView(
                 category = current.category,
@@ -179,29 +188,20 @@ private fun ActivitySection(
     summaries: Map<ActivityInteractionCategory, ActivityCategorySummary>,
     onOpen: (ActivityInteractionCategory) -> Unit,
 ) {
-    val primary = if (isSystemInDarkTheme()) Color.White else Color.Black
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(
-            title.uppercase(),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.Gray.copy(alpha = 0.8f),
-            modifier = Modifier.padding(start = 4.dp),
-        )
-        Column {
-            categories.forEachIndexed { index, category ->
-                Box(Modifier.clickable { onOpen(category) }) {
-                    ActivityInteractionCategoryRow(
-                        category = category,
-                        summary = summaries[category],
-                    )
-                }
-                if (index < categories.lastIndex) {
-                    HorizontalDivider(
-                        Modifier.padding(start = 62.dp),
-                        color = primary.copy(alpha = 0.08f),
-                    )
-                }
+    val isDark = isSystemInDarkTheme()
+    SettingsSubsectionGroup(title = title) {
+        categories.forEachIndexed { index, category ->
+            Box(Modifier.clickable { onOpen(category) }) {
+                ActivityInteractionCategoryRow(
+                    category = category,
+                    summary = summaries[category],
+                )
+            }
+            if (index < categories.lastIndex) {
+                HorizontalDivider(
+                    Modifier.padding(start = 62.dp),
+                    color = SettingsProfileColors.outlineVariant(isDark),
+                )
             }
         }
     }
@@ -212,14 +212,22 @@ private fun ActivitySection(
 fun RecentlyDeletedActivityView(onNavigateBack: () -> Unit = {}) {
     val isDark = isSystemInDarkTheme()
     val primary = if (isDark) Color.White else Color.Black
+    val background = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     var selectedKind by remember { mutableStateOf(RecentlyDeletedContentKind.MOMENTS) }
     var menuOpen by remember { mutableStateOf(false) }
+    val selectionController = remember { ActivitySelectionController() }
 
     val momentsTitle = stringResource(R.string.profile_tab_moments)
     val storiesTitle = stringResource(R.string.notifications_tab_stories)
     val currentTitle = if (selectedKind == RecentlyDeletedContentKind.MOMENTS) momentsTitle else storiesTitle
 
-    Column(Modifier.fillMaxSize()) {
+    BackHandler(onBack = onNavigateBack)
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(background)
+            .safeDrawingPadding(),
+    ) {
         ActivityKindMenuBar(
             currentTitle = currentTitle,
             primary = primary,
@@ -229,15 +237,27 @@ fun RecentlyDeletedActivityView(onNavigateBack: () -> Unit = {}) {
             momentsTitle = momentsTitle,
             storiesTitle = storiesTitle,
             momentsSelected = selectedKind == RecentlyDeletedContentKind.MOMENTS,
-            onSelectMoments = { selectedKind = RecentlyDeletedContentKind.MOMENTS },
-            onSelectStories = { selectedKind = RecentlyDeletedContentKind.STORIES },
+            onSelectMoments = {
+                selectionController.isSelectionMode = false
+                selectedKind = RecentlyDeletedContentKind.MOMENTS
+            },
+            onSelectStories = {
+                selectionController.isSelectionMode = false
+                selectedKind = RecentlyDeletedContentKind.STORIES
+            },
+            selectionController = selectionController,
         )
-        Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+        ) {
             key(selectedKind) {
                 ActivityInteractionDetailView(
                     category = ActivityInteractionCategory.RECENTLY_DELETED,
                     recentlyDeletedKind = selectedKind,
                     suppressInlineNavigationTitle = true,
+                    selectionController = selectionController,
                     onBack = onNavigateBack,
                 )
             }
@@ -253,6 +273,7 @@ fun ArchivedActivityView(
 ) {
     val isDark = isSystemInDarkTheme()
     val primary = if (isDark) Color.White else Color.Black
+    val background = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     var selectedKind by remember { mutableStateOf(initialKind) }
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -260,7 +281,13 @@ fun ArchivedActivityView(
     val storiesTitle = stringResource(R.string.archived_stories_header_title)
     val currentTitle = if (selectedKind == ArchivedContentKind.MOMENTS) momentsTitle else storiesTitle
 
-    Column(Modifier.fillMaxSize()) {
+    BackHandler(onBack = onNavigateBack)
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(background)
+            .safeDrawingPadding(),
+    ) {
         ActivityKindMenuBar(
             currentTitle = currentTitle,
             primary = primary,
@@ -303,15 +330,22 @@ private fun ActivityKindMenuBar(
     momentsSelected: Boolean,
     onSelectMoments: () -> Unit,
     onSelectStories: () -> Unit,
+    selectionController: ActivitySelectionController? = null,
 ) {
     val controlSize = MomentsGlassButtonPreset.NAVIGATION_BACK.controlSize
+    val edgeSlotWidth = if (selectionController != null) 112.dp else controlSize
     Row(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SettingsToolbarBackButton(onNavigateBack = onBack)
+        Box(
+            modifier = Modifier.width(edgeSlotWidth),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            SettingsToolbarBackButton(onNavigateBack = onBack)
+        }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Row(
                 Modifier.clickable { onMenuOpenChange(true) },
@@ -353,7 +387,42 @@ private fun ActivityKindMenuBar(
                 )
             }
         }
-        Spacer(Modifier.size(controlSize))
+        if (selectionController != null) {
+            Box(
+                modifier = Modifier.width(edgeSlotWidth),
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.compose.material3.TextButton(
+                    enabled = selectionController.canSelect,
+                    onClick = {
+                        selectionController.isSelectionMode =
+                            !selectionController.isSelectionMode
+                    },
+                ) {
+                    Text(
+                        stringResource(
+                            if (selectionController.isSelectionMode) {
+                                R.string.user_activity_cancel
+                            } else {
+                                R.string.user_activity_select
+                            },
+                        ),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (selectionController.isSelectionMode) {
+                            Color(0xFFFF453A)
+                        } else if (!selectionController.canSelect) {
+                            primary.copy(alpha = 0.38f)
+                        } else {
+                            primary
+                        },
+                        maxLines = 1,
+                    )
+                }
+            }
+        } else {
+            Spacer(Modifier.size(edgeSlotWidth))
+        }
     }
 }
 

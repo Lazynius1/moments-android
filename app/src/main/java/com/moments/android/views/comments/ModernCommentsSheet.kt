@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetDefaults
@@ -19,21 +20,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import com.google.firebase.auth.FirebaseAuth
+import com.moments.android.coordinators.CoordinatorNavigationEvent
+import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.views.feed.rememberAdaptiveColors
 
 /**
  * Presentación sheet de comentarios — paridad iOS de comportamiento:
- * detents medium/large + drag indicator.
+ * detents medium/large + drag indicator + teclado (ime).
  * Surface opaca (Android): sin glass/transparencia.
+ *
+ * Defaults de navegación ≡ [ModernCommentsView] (no `{}` vacío: eso dejaba perfil muerto).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModernCommentsSheet(
     moment: FeedMoment,
     onDismiss: () -> Unit,
-    onOpenStory: (userId: String) -> Unit = {},
-    onOpenProfile: (userId: String) -> Unit = {},
+    onOpenStory: (userId: String) -> Unit = { userId ->
+        NavigationEventBus.emit(CoordinatorNavigationEvent.ShowStoriesStartingAt(userId))
+    },
+    onOpenProfile: (userId: String) -> Unit = { userId ->
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid != null && uid == userId) {
+            NavigationEventBus.emit(CoordinatorNavigationEvent.NavigateToOwnProfileTab)
+        } else {
+            NavigationEventBus.emit(CoordinatorNavigationEvent.NavigateToUserProfileInFeed(userId))
+        }
+    },
 ) {
     val colors = rememberAdaptiveColors()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -61,7 +76,8 @@ fun ModernCommentsSheet(
             Modifier
                 .fillMaxWidth()
                 .height(contentHeight)
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .imePadding(),
         ) {
             BottomSheetDefaults.DragHandle(modifier = Modifier.align(Alignment.CenterHorizontally))
             ModernCommentsView(

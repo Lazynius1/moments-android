@@ -73,6 +73,8 @@ import com.moments.android.views.creator.audienceselector.ContentAudience
 import com.moments.android.views.creator.audienceselector.CustomAudienceListsView
 import com.moments.android.views.profile.core.sections.profileThumbnailUrl
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.settings.sections.SettingsDividerStart
+import com.moments.android.views.settings.sections.SettingsSubsectionGroup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -123,16 +125,13 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
                     Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(28.dp),
+                        .padding(horizontal = 12.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
                     // MARK: Stories
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionHeader(
-                            icon = Icons.Filled.RadioButtonUnchecked,
-                            title = stringResource(R.string.content_visibility_stories_title),
-                            labelColor = sectionLabel,
-                        )
+                    SettingsSubsectionGroup(
+                        title = stringResource(R.string.content_visibility_stories_title),
+                    ) {
                         Column {
                             Box(Modifier.clickable { showingStoryAudience = true }) {
                                 CurrentAudienceRow(
@@ -143,14 +142,14 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
                                 )
                             }
                             HorizontalDivider(
-                                Modifier.padding(start = 42.dp),
+                                Modifier.padding(start = SettingsDividerStart),
                                 color = primary.copy(alpha = 0.2f),
                             )
                             Row(
                                 Modifier
                                     .fillMaxWidth()
                                     .clickable { showingStoryInteractions = true }
-                                    .padding(horizontal = 4.dp, vertical = 11.dp),
+                                    .padding(horizontal = 16.dp, vertical = 11.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                             ) {
@@ -177,19 +176,16 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
                                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                     null,
                                     tint = Color.Gray,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
                         }
                     }
 
                     // MARK: Posts
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionHeader(
-                            icon = Icons.Filled.GridView,
-                            title = stringResource(R.string.content_visibility_posts_title),
-                            labelColor = sectionLabel,
-                        )
+                    SettingsSubsectionGroup(
+                        title = stringResource(R.string.content_visibility_posts_title),
+                    ) {
                         Box(Modifier.clickable { showingPostAudience = true }) {
                             CurrentAudienceRow(
                                 audience = viewModel.postAudience,
@@ -201,17 +197,14 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
                     }
 
                     // MARK: Additional restrictions
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SectionHeader(
-                            icon = Icons.Filled.VisibilityOff,
-                            title = stringResource(R.string.content_visibility_additional_restrictions),
-                            labelColor = sectionLabel,
-                        )
+                    SettingsSubsectionGroup(
+                        title = stringResource(R.string.content_visibility_additional_restrictions),
+                    ) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
                                 .clickable { showingHiddenFrom = true }
-                                .padding(horizontal = 4.dp, vertical = 11.dp),
+                                .padding(horizontal = 16.dp, vertical = 11.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
@@ -241,19 +234,14 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
                     }
 
                     // MARK: Audience lists
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            stringResource(R.string.content_visibility_audience_lists).uppercase(),
-                            modifier = Modifier.padding(start = 4.dp),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = sectionLabel,
-                        )
+                    SettingsSubsectionGroup(
+                        title = stringResource(R.string.content_visibility_audience_lists),
+                    ) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
                                 .clickable { showingCustomLists = true }
-                                .padding(horizontal = 4.dp, vertical = 11.dp),
+                                .padding(horizontal = 16.dp, vertical = 11.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
@@ -287,12 +275,12 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
         MomentsModalSheet(
             onDismissRequest = { showingStoryAudience = false },
             largeOnly = true,
-        ) {
+        ) { dismiss ->
             StoryAudienceSelector(
                 viewModel = viewModel,
                 onDone = {
                     viewModel.saveStorySettings()
-                    showingStoryAudience = false
+                    dismiss()
                 },
             )
         }
@@ -302,12 +290,12 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
         MomentsModalSheet(
             onDismissRequest = { showingPostAudience = false },
             largeOnly = true,
-        ) {
+        ) { dismiss ->
             PostAudienceSelector(
                 viewModel = viewModel,
                 onDone = {
                     viewModel.savePostSettings()
-                    showingPostAudience = false
+                    dismiss()
                 },
             )
         }
@@ -317,10 +305,10 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
         MomentsModalSheet(
             onDismissRequest = { showingStoryInteractions = false },
             largeOnly = false,
-        ) {
+        ) { dismiss ->
             StoryInteractionSettingsView(
                 viewModel = viewModel,
-                onDismiss = { showingStoryInteractions = false },
+                onDismiss = dismiss,
             )
         }
     }
@@ -329,8 +317,8 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
         MomentsModalSheet(
             onDismissRequest = { showingCustomLists = false },
             largeOnly = false,
-        ) {
-            CustomAudienceListsView(onDismiss = { showingCustomLists = false })
+        ) { dismiss ->
+            CustomAudienceListsView(onDismiss = dismiss)
         }
     }
 
@@ -338,29 +326,12 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
         MomentsModalSheet(
             onDismissRequest = { showingHiddenFrom = false },
             largeOnly = false,
-        ) {
+        ) { dismiss ->
             HiddenFromView(
                 viewModel = viewModel,
-                onDismiss = { showingHiddenFrom = false },
+                onDismiss = dismiss,
             )
         }
-    }
-}
-
-@Composable
-private fun SectionHeader(icon: ImageVector, title: String, labelColor: Color) {
-    Row(
-        Modifier.padding(start = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        Icon(icon, null, tint = labelColor, modifier = Modifier.size(10.dp))
-        Text(
-            title.uppercase(),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            color = labelColor,
-        )
     }
 }
 
@@ -374,7 +345,7 @@ private fun CurrentAudienceRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 11.dp),
+            .padding(horizontal = 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -398,7 +369,7 @@ private fun CurrentAudienceRow(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
             null,
             tint = Color.Gray,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(20.dp),
         )
     }
 }
@@ -778,34 +749,11 @@ private fun HiddenFromView(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(Icons.Filled.Search, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
-                BasicTextField(
-                    value = searchText,
-                    onValueChange = { searchText = it },
-                    singleLine = true,
-                    textStyle = TextStyle(color = primary, fontSize = 16.sp),
-                    cursorBrush = SolidColor(primary),
-                    modifier = Modifier.weight(1f),
-                    decorationBox = { inner ->
-                        if (searchText.isEmpty()) {
-                            Text(
-                                stringResource(R.string.audience_picker_searchPlaceholder),
-                                color = Color.Gray,
-                                fontSize = 16.sp,
-                            )
-                        }
-                        inner()
-                    },
-                )
-            }
+            SettingsSearchField(
+                value = searchText,
+                onValueChange = { searchText = it },
+                placeholder = stringResource(R.string.audience_picker_searchPlaceholder),
+            )
 
             if (isSearching) {
                 CircularProgressIndicator(

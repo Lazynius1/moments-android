@@ -1,22 +1,29 @@
 package com.moments.android.views.settings.sections
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -25,15 +32,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.moments.android.R
-import com.moments.android.utilities.MomentsPressDefaults
-import com.moments.android.utilities.legacyPoppinsSize
-import com.moments.android.utilities.momentsPress
 import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
 import com.moments.android.views.creator.audienceselector.ContentAudience
@@ -47,23 +50,82 @@ import com.moments.android.views.settings.SettingsProfileColors
  * (SettingsSections.swift) — componentes compartidos del formulario.
  */
 
+internal val SettingsRowHorizontalPadding = 16.dp
+internal val SettingsIconSlotWidth = 28.dp
+internal val SettingsIconTextSpacing = 14.dp
+internal val SettingsDividerStart =
+    SettingsRowHorizontalPadding + SettingsIconSlotWidth + SettingsIconTextSpacing
+val SettingsSectionOuterPadding = 8.dp
+val SettingsSectionShape = RoundedCornerShape(20.dp)
+
+@Composable
+fun SettingsSectionCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val isDark = isSystemInDarkTheme()
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = SettingsSectionShape,
+        color = SettingsProfileColors.surfaceContainer(isDark),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            content = content,
+        )
+    }
+}
+
+@Composable
+fun SettingsSubsectionGroup(
+    title: String? = null,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val isDark = isSystemInDarkTheme()
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = SettingsSectionOuterPadding),
+    ) {
+        if (!title.isNullOrBlank()) {
+            Text(
+                text = title.uppercase(),
+                fontWeight = FontWeight.Medium,
+                color = SettingsProfileColors.onSurfaceVariant(isDark),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(
+                    start = SettingsRowHorizontalPadding,
+                    end = SettingsRowHorizontalPadding,
+                    bottom = 8.dp,
+                ),
+            )
+        }
+        SettingsSectionCard(content = content)
+    }
+}
+
 @Composable
 fun SettingsGroup(
     title: String,
     content: @Composable () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
-    val context = LocalContext.current
-    val density = LocalDensity.current
     Column(Modifier.fillMaxWidth()) {
         Text(
             text = title.uppercase(),
-            fontSize = with(density) { legacyPoppinsSize(context, 11).toSp() },
             fontWeight = FontWeight.Medium,
-            color = if (isDark) Color.White.copy(0.45f) else Color.Black.copy(0.35f),
-            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+            color = SettingsProfileColors.onSurfaceVariant(isDark),
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(
+                start = SettingsRowHorizontalPadding,
+                end = SettingsRowHorizontalPadding,
+                bottom = 8.dp,
+            ),
         )
-        Column(Modifier.fillMaxWidth()) {
+        SettingsSectionCard {
             content()
         }
     }
@@ -83,31 +145,29 @@ fun SettingsRow(
     onClick: () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
-    val context = LocalContext.current
-    val density = LocalDensity.current
-    val interaction = remember { MutableInteractionSource() }
     val titleColor = when {
         isDestructive -> Color.Red
-        isDark -> Color.White
-        else -> Color.Black
+        else -> SettingsProfileColors.onSurface(isDark)
     }
     val iconColor = when {
         isDestructive -> Color.Red
         starFillTint -> Color(0xFF34C759)
-        isDark -> Color.White
-        else -> Color.Black
+        else -> SettingsProfileColors.onSurface(isDark)
     }
 
     Column(
         Modifier
             .fillMaxWidth()
-            .momentsPress(interaction, MomentsPressDefaults.momentsPressSubtle)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+            .clickable(role = Role.Button, onClick = onClick),
     ) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 11.dp, horizontal = 4.dp),
+                .heightIn(min = 64.dp)
+                .padding(
+                    horizontal = SettingsRowHorizontalPadding,
+                    vertical = 10.dp,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             when {
@@ -120,7 +180,7 @@ fun SettingsRow(
                         } else {
                             null
                         },
-                        modifier = Modifier.width(28.dp),
+                        modifier = Modifier.width(SettingsIconSlotWidth),
                     )
                 }
                 attachmentIcon != null -> {
@@ -128,12 +188,12 @@ fun SettingsRow(
                         icon = attachmentIcon,
                         preset = AttachmentIconPreset.SETTINGS_ROW,
                         tintColor = iconColor,
-                        modifier = Modifier.width(28.dp),
+                        modifier = Modifier.width(SettingsIconSlotWidth),
                     )
                 }
                 icon != null -> {
                     Box(
-                        Modifier.width(28.dp),
+                        Modifier.width(SettingsIconSlotWidth),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -145,19 +205,19 @@ fun SettingsRow(
                     }
                 }
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(SettingsIconTextSpacing))
             Column(Modifier.weight(1f)) {
                 Text(
                     title,
-                    fontSize = with(density) { legacyPoppinsSize(context, 15).toSp() },
                     fontWeight = FontWeight.Medium,
                     color = titleColor,
+                    style = MaterialTheme.typography.bodyLarge,
                 )
                 if (!subtitle.isNullOrBlank()) {
                     Text(
                         subtitle,
-                        fontSize = with(density) { legacyPoppinsSize(context, 12).toSp() },
-                        color = Color.Gray,
+                        color = SettingsProfileColors.onSurfaceVariant(isDark),
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
@@ -168,14 +228,14 @@ fun SettingsRow(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight
                 },
                 contentDescription = null,
-                tint = Color.Gray.copy(if (isExternal) 0.5f else 0.3f),
-                modifier = Modifier.size(if (isExternal) 13.dp else 12.dp),
+                tint = SettingsProfileColors.onSurfaceVariant(isDark),
+                modifier = Modifier.size(if (isExternal) 18.dp else 20.dp),
             )
         }
         HorizontalDivider(
-            Modifier.padding(start = 42.dp),
-            color = (if (isDark) Color.White else Color.Black).copy(alpha = 0.2f),
-            thickness = 0.5.dp,
+            Modifier.padding(start = SettingsDividerStart),
+            color = SettingsProfileColors.outlineVariant(isDark),
+            thickness = 1.dp,
         )
     }
 }
@@ -184,7 +244,6 @@ fun SettingsRow(
 fun SettingsVersionFooter() {
     val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
-    val density = LocalDensity.current
     val version = remember {
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
@@ -206,9 +265,9 @@ fun SettingsVersionFooter() {
         Spacer(Modifier.height(8.dp))
         Text(
             text = "v$version",
-            fontSize = with(density) { legacyPoppinsSize(context, 12).toSp() },
             fontWeight = FontWeight.Medium,
-            color = if (isDark) Color.White.copy(0.35f) else Color.Black.copy(0.30f),
+            color = SettingsProfileColors.onSurfaceVariant(isDark),
+            style = MaterialTheme.typography.labelMedium,
         )
     }
 }
@@ -223,47 +282,56 @@ internal fun SettingsToggleRow(
     showDivider: Boolean = true,
 ) {
     val isDark = isSystemInDarkTheme()
-    val context = LocalContext.current
-    val density = LocalDensity.current
-    val primary = if (isDark) Color.White else Color.Black
+    val primary = SettingsProfileColors.onSurface(isDark)
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 11.dp, horizontal = 4.dp),
+                .heightIn(min = 64.dp)
+                .toggleable(
+                    value = checked,
+                    role = Role.Switch,
+                    onValueChange = onCheckedChange,
+                )
+                .padding(
+                    horizontal = SettingsRowHorizontalPadding,
+                    vertical = 8.dp,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.width(28.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.width(SettingsIconSlotWidth), contentAlignment = Alignment.Center) {
                 Icon(icon, null, tint = primary, modifier = Modifier.size(19.dp))
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(SettingsIconTextSpacing))
             Column(Modifier.weight(1f)) {
                 Text(
                     title,
-                    fontSize = with(density) { legacyPoppinsSize(context, 15).toSp() },
                     fontWeight = FontWeight.Medium,
                     color = primary,
+                    style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
                     subtitle,
-                    fontSize = with(density) { legacyPoppinsSize(context, 12).toSp() },
-                    color = Color.Gray,
+                    color = SettingsProfileColors.onSurfaceVariant(isDark),
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            androidx.compose.material3.Switch(
+            Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange,
-                colors = androidx.compose.material3.SwitchDefaults.colors(
+                onCheckedChange = null,
+                colors = SwitchDefaults.colors(
                     checkedTrackColor = SettingsProfileColors.toggleTint,
                     checkedThumbColor = Color.White,
+                    uncheckedTrackColor = SettingsProfileColors.surfaceContainer(isDark),
+                    uncheckedBorderColor = SettingsProfileColors.outlineVariant(isDark),
                 ),
             )
         }
         if (showDivider) {
             HorizontalDivider(
-                Modifier.padding(start = 42.dp),
-                color = primary.copy(alpha = 0.2f),
-                thickness = 0.5.dp,
+                Modifier.padding(start = SettingsDividerStart),
+                color = SettingsProfileColors.outlineVariant(isDark),
+                thickness = 1.dp,
             )
         }
     }

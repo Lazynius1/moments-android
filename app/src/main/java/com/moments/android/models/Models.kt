@@ -838,9 +838,13 @@ data class StickerData(
                 val resized = resizeMaxDimension(sticker.image, 900)
                 bitmapToBase64(resized, android.graphics.Bitmap.CompressFormat.JPEG, 42)?.let { return it }
             }
+            if (sticker.type == StickerType.SHARE_MOMENT) {
+                // Calidad alta: el borde glass + media se recrean en el editor/viewer
+                bitmapToBase64(sticker.image, android.graphics.Bitmap.CompressFormat.JPEG, 88)?.let { return it }
+            }
             val jpegTypes = setOf(
                 StickerType.GENERIC, StickerType.STICKER, StickerType.EMOJI, StickerType.TIME,
-                StickerType.SELFIE, StickerType.QUESTION_RESPONSE, StickerType.SHARE_MOMENT,
+                StickerType.SELFIE, StickerType.QUESTION_RESPONSE,
                 StickerType.LINK, StickerType.COUNTDOWN, StickerType.EMOJI_SLIDER,
                 StickerType.FRAME, StickerType.QUIZ,
             )
@@ -1239,10 +1243,17 @@ data class MomentsNotification(
             val isPending = data["isPending"] as? Boolean
                 ?: (data["isRead"] as? Boolean)?.let { !it }
                 ?: true
-            // reaction: reaction → reactionType → commentText (compat Cloud Functions).
-            val reaction = data["reaction"] as? String ?: data["reactionType"] as? String ?: data["commentText"] as? String
+            // reaction: reaction → reactionType → commentText → moderationType (push/docs de moderación).
+            val reaction = data["reaction"] as? String
+                ?: data["reactionType"] as? String
+                ?: data["commentText"] as? String
+                ?: data["moderationType"] as? String
             val isReactionPlural = data["isReactionPlural"] as? Boolean
                 ?: (data["isReactionPlural"] as? String)?.let { it == "1" || it.lowercase() == "true" }
+            val reactionCount = (data["reactionCount"] as? Number)?.toInt()
+                ?: (data["moderatedMediaCount"] as? Number)?.toInt()
+                ?: (data["reactionCount"] as? String)?.toIntOrNull()
+                ?: (data["moderatedMediaCount"] as? String)?.toIntOrNull()
             return MomentsNotification(
                 id = id ?: data["id"] as? String,
                 type = type,
@@ -1262,7 +1273,7 @@ data class MomentsNotification(
                 targetAuthorId = data["targetAuthorId"] as? String,
                 targetAuthorUsername = data["targetAuthorUsername"] as? String,
                 reaction = reaction,
-                reactionCount = (data["reactionCount"] as? Number)?.toInt(),
+                reactionCount = reactionCount,
                 commentId = data["commentId"] as? String,
                 conversationId = data["conversationId"] as? String,
                 echoId = data["echoId"] as? String,

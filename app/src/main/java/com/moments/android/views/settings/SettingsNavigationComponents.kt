@@ -1,30 +1,36 @@
 package com.moments.android.views.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.moments.android.extensions.ChromeIconDescription
-import com.moments.android.extensions.MomentsGlassButtonPreset
-import com.moments.android.extensions.ProfileChromeIconButton
+import com.moments.android.R
 import com.moments.android.views.messaging.components.momentsScrollEdgeChrome
 import com.moments.android.views.profile.core.sections.momentZoomNavigationSurface
 import com.moments.android.views.profile.core.sections.profileGridNavigationChrome
@@ -36,20 +42,19 @@ import com.moments.android.views.profile.core.sections.profileGridNavigationChro
  * (el `ultraThinMaterial` iOS va a opacity 0.02; en Android no se porta).
  */
 
-/** ≡ iOS `SettingsToolbarBackButton` — ProfileChromeIconButton · navigationBack · sin glass standalone. */
+/** Back común del top de Ajustes y de todas sus subsecciones. */
 @Composable
 fun SettingsToolbarBackButton(
     onNavigateBack: () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
-    ProfileChromeIconButton(
-        icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-        onClick = onNavigateBack,
-        foregroundColor = if (isDark) Color.White else Color.Black,
-        preset = MomentsGlassButtonPreset.NAVIGATION_BACK,
-        standaloneGlass = false,
-        contentDescriptionKey = ChromeIconDescription.BACK,
-    )
+    IconButton(onClick = onNavigateBack) {
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = stringResource(R.string.common_back),
+            tint = if (isDark) Color.White else Color.Black,
+        )
+    }
 }
 
 /**
@@ -65,7 +70,7 @@ fun SettingsNavigationBar(
 ) {
     val isDark = isSystemInDarkTheme()
     val titleColor = if (isDark) Color.White else Color.Black
-    val controlSize = MomentsGlassButtonPreset.NAVIGATION_BACK.controlSize
+    val controlSize = 48.dp
 
     Row(
         modifier
@@ -113,6 +118,7 @@ fun SettingsSubsectionBackground(modifier: Modifier = Modifier) {
  * [onNavigateBack] ≡ dismiss iOS.
  */
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun SettingsSubsectionWrapper(
     title: String,
     onNavigateBack: () -> Unit,
@@ -120,23 +126,55 @@ fun SettingsSubsectionWrapper(
     trailing: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    Box(
-        modifier
+    val isDark = isSystemInDarkTheme()
+    val canvas = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+    val titleColor = if (isDark) Color.White else Color.Black
+
+    BackHandler(onBack = onNavigateBack)
+
+    Scaffold(
+        modifier = modifier
             .fillMaxSize()
-            .settingsSubsectionNavigationChrome()
-            .statusBarsPadding(),
-    ) {
-        SettingsSubsectionBackground()
-        Column(Modifier.fillMaxSize()) {
-            // ≡ navigationTitle(inline) + toolbar leading back (+ trailing opcional)
-            SettingsNavigationBar(
-                title = title,
-                onNavigateBack = onNavigateBack,
-                trailing = trailing,
+            .settingsSubsectionNavigationChrome(),
+        containerColor = canvas,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        text = title,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = titleColor,
+                    )
+                },
+                navigationIcon = {
+                    SettingsToolbarBackButton(onNavigateBack = onNavigateBack)
+                },
+                actions = {
+                    if (trailing != null) {
+                        Box(
+                            Modifier.padding(end = 8.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            trailing()
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = canvas,
+                    scrolledContainerColor = canvas,
+                ),
             )
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                content()
-            }
+        },
+    ) { innerPadding ->
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                .background(canvas),
+        ) {
+            content()
         }
     }
 }

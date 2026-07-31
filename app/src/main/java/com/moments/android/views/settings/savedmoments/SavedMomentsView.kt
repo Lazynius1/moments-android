@@ -3,6 +3,7 @@ package com.moments.android.views.settings.savedmoments
 import android.content.Intent
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -19,10 +20,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -32,6 +36,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.BookmarkRemove
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
@@ -47,6 +52,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -74,7 +80,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
-import com.moments.android.extensions.MomentsGlassButtonPreset
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Moment
@@ -84,6 +89,7 @@ import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.messaging.components.ChatVideoPlayBadge
 import com.moments.android.views.messaging.components.momentsScrollEdgeChrome
+import com.moments.android.views.settings.SettingsSearchField
 import com.moments.android.views.profile.core.sections.MomentCarouselIndicatorIcon
 import com.moments.android.views.profile.core.sections.MomentZoomDestination
 import com.moments.android.views.profile.core.sections.MomentZoomDetailDestination
@@ -146,6 +152,15 @@ fun SavedMomentsView(
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var zoomDestination by remember { mutableStateOf<MomentZoomDestination?>(null) }
     var isRefreshing by remember { mutableStateOf(false) }
+
+    BackHandler {
+        if (isSelectionMode) {
+            isSelectionMode = false
+            selectedMomentIds = emptySet()
+        } else {
+            onNavigateBack()
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (viewModel.moments.isEmpty() && !viewModel.isLoading) {
@@ -291,7 +306,9 @@ fun SavedMomentsView(
             .fillMaxSize()
             .momentZoomNavigationSurface(isDark)
             .momentsScrollEdgeChrome()
-            .statusBarsPadding(),
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding(),
     ) {
         Column(Modifier.fillMaxSize()) {
             SavedMomentsToolbar(
@@ -533,26 +550,33 @@ private fun SavedMomentsToolbar(
     onNavigateBack: () -> Unit,
     onToggleSelection: () -> Unit,
 ) {
-    val controlSize = MomentsGlassButtonPreset.NAVIGATION_BACK.controlSize
+    val actionSlotWidth = 96.dp
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp)
+            .padding(horizontal = 8.dp)
             .padding(top = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SettingsToolbarBackButton(onNavigateBack = onNavigateBack)
-        Spacer(Modifier.weight(1f))
+        Box(
+            modifier = Modifier.width(actionSlotWidth),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            SettingsToolbarBackButton(onNavigateBack = onNavigateBack)
+        }
         Text(
             text = title,
             fontSize = 17.sp,
             fontWeight = FontWeight.SemiBold,
             color = textColor,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.weight(1f))
         Box(
             Modifier
-                .size(controlSize)
+                .width(actionSlotWidth)
+                .widthIn(min = 48.dp)
                 .clickable(onClick = onToggleSelection),
             contentAlignment = Alignment.Center,
         ) {
@@ -577,47 +601,12 @@ private fun SavedMomentsSearchBar(
     textColor: Color,
     secondaryColor: Color,
 ) {
-    Row(
-        Modifier
-            .padding(horizontal = 14.dp)
-            .fillMaxWidth()
-            .momentsChromeGlass(RoundedCornerShape(50), interactive = false)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(Icons.Default.Search, contentDescription = null, tint = secondaryColor, modifier = Modifier.size(18.dp))
-        androidx.compose.foundation.text.BasicTextField(
-            value = searchText,
-            onValueChange = onSearchTextChange,
-            singleLine = true,
-            textStyle = androidx.compose.ui.text.TextStyle(
-                color = textColor,
-                fontSize = 15.sp,
-            ),
-            modifier = Modifier.weight(1f),
-            decorationBox = { inner ->
-                if (searchText.isEmpty()) {
-                    Text(
-                        stringResource(R.string.saved_moments_search_placeholder),
-                        color = secondaryColor,
-                        fontSize = 15.sp,
-                    )
-                }
-                inner()
-            },
-        )
-        if (searchText.isNotEmpty()) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = null,
-                tint = secondaryColor,
-                modifier = Modifier
-                    .size(18.dp)
-                    .clickable { onSearchTextChange("") },
-            )
-        }
-    }
+    SettingsSearchField(
+        value = searchText,
+        onValueChange = onSearchTextChange,
+        placeholder = stringResource(R.string.saved_moments_search_placeholder),
+        modifier = Modifier.padding(horizontal = 14.dp),
+    )
 }
 
 @Composable
@@ -756,51 +745,41 @@ private fun SavedMomentsSelectionBar(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(
-            stringResource(R.string.saved_moments_selection_count, count),
+            if (count == 1) {
+                stringResource(R.string.saved_moments_selection_count_single)
+            } else {
+                stringResource(R.string.saved_moments_selection_count, count)
+            },
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             color = textColor,
         )
         Spacer(Modifier.weight(1f))
-        Row(
-            Modifier
-                .momentsChromeGlass(RoundedCornerShape(50), interactive = enabled)
-                .clickable(enabled = enabled, onClick = onShare)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        IconButton(
+            onClick = onShare,
+            enabled = enabled,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape),
         ) {
             AttachmentIconView(
                 icon = AttachmentIcon.SHARE,
                 preset = AttachmentIconPreset.SHARE_INLINE,
-                tintColor = textColor,
-            )
-            Text(
-                stringResource(R.string.saved_moments_share),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = textColor,
+                tintColor = if (enabled) textColor else textColor.copy(alpha = 0.38f),
             )
         }
-        Row(
-            Modifier
-                .momentsChromeGlass(RoundedCornerShape(50), interactive = enabled)
-                .clickable(enabled = enabled, onClick = onRemove)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        IconButton(
+            onClick = onRemove,
+            enabled = enabled,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape),
         ) {
             Icon(
-                Icons.Default.BookmarkBorder,
-                contentDescription = null,
-                tint = Color(0xFFFF3B30),
-                modifier = Modifier.size(16.dp),
-            )
-            Text(
-                stringResource(R.string.saved_moments_remove),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFFFF3B30),
+                Icons.Default.BookmarkRemove,
+                contentDescription = stringResource(R.string.saved_moments_remove),
+                tint = if (enabled) Color(0xFFFF453A) else Color(0xFFFF453A).copy(alpha = 0.38f),
+                modifier = Modifier.size(22.dp),
             )
         }
     }

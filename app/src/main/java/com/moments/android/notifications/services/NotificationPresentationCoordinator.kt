@@ -163,10 +163,12 @@ object NotificationPresentationCoordinator {
             mentionContext = firstString(userInfo, listOf("mentionContext")),
             targetAuthorId = firstString(userInfo, listOf("targetAuthorId", "momentOwnerId")),
             targetAuthorUsername = firstString(userInfo, listOf("targetAuthorUsername")),
-            reaction = firstString(userInfo, listOf("reactionEmoji", "reactionType", "reaction")),
-            reactionCount = intValue(userInfo, listOf("reactionCount")),
+            reaction = firstString(userInfo, listOf("reactionEmoji", "reactionType", "reaction", "moderationType")),
+            reactionCount = intValue(userInfo, listOf("reactionCount", "moderatedMediaCount")),
+            commentId = firstString(userInfo, listOf("commentId")),
             conversationId = firstString(userInfo, listOf("conversationId", "targetId")),
             echoId = firstString(userInfo, listOf("echoId")),
+            moderationScope = firstString(userInfo, listOf("moderationScope")),
             chainId = firstString(userInfo, listOf("chainId")),
             chainTitle = firstString(userInfo, listOf("chainTitle")),
             chainPosition = intValue(userInfo, listOf("chainPosition")),
@@ -179,6 +181,9 @@ object NotificationPresentationCoordinator {
             isReactionPlural = parseBool(userInfo["isReactionPlural"]),
         )
     }
+
+    /** Expone el mapeo push → modelo para system notifications (FCM tray). */
+    fun notificationFromPush(userInfo: Map<String, Any?>): MomentsNotification? = mapPushPayload(userInfo)
 
     private fun mapPushType(rawType: String): NotificationType? = when (rawType) {
         "new_message" -> NotificationType.MESSAGE

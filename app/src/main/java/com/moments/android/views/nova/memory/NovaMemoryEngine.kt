@@ -14,7 +14,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
-/** Post-conversation memory: extracts durable facts and a rolling conversation summary. */
+/**
+ * Port de `Views/Nova/Memory/NovaMemoryEngine.swift`.
+ * Post-conversation: extract durable facts + rolling chat summary; notifica vía [NovaMemoryStore.notifyMemoryUpdated].
+ */
 object NovaMemoryEngine {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val inFlightKeys = mutableSetOf<String>()

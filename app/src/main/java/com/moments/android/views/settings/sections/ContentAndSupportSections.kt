@@ -207,48 +207,11 @@ fun HelpSection(onRoute: (SettingsRoute) -> Unit) {
 
 @Composable
 fun AdvancedAccountSection(onShowAdvancedAccountManagement: () -> Unit) {
-    val isDark = isSystemInDarkTheme()
-    val context = LocalContext.current
-    val density = LocalDensity.current
-    val primary = if (isDark) Color.White else Color.Black
-    val interaction = remember { MutableInteractionSource() }
-
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .momentsPress(interaction, MomentsPressDefaults.momentsPressSubtle)
-            .clickable(interactionSource = interaction, indication = null, onClick = onShowAdvancedAccountManagement),
-    ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = 11.dp, horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.width(28.dp), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Settings, null, tint = primary, modifier = Modifier.size(19.dp))
-            }
-            Spacer(Modifier.width(14.dp))
-            Text(
-                stringResource(R.string.settings_advanced_title),
-                fontSize = with(density) { legacyPoppinsSize(context, 15).toSp() },
-                fontWeight = FontWeight.Medium,
-                color = primary,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                null,
-                tint = Color.Gray.copy(0.3f),
-                modifier = Modifier.size(12.dp),
-            )
-        }
-        HorizontalDivider(
-            Modifier.padding(start = 42.dp),
-            color = primary.copy(0.2f),
-            thickness = 0.5.dp,
-        )
-    }
+    SettingsRow(
+        icon = Icons.Filled.Settings,
+        title = stringResource(R.string.settings_advanced_title),
+        onClick = onShowAdvancedAccountManagement,
+    )
 }
 
 @Composable

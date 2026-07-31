@@ -1,5 +1,6 @@
 package com.moments.android.views.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -7,12 +8,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,8 +28,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.models.BestFriendsView
@@ -41,6 +40,8 @@ import com.moments.android.views.settings.settingssections.NotificationSettingsV
 import com.moments.android.views.settings.settingssections.PersonalInfoView
 import com.moments.android.views.settings.savedmoments.SavedMomentsView
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.LocalMomentsSharedAnimatedVisibilityScope
+import com.moments.android.views.shared.LocalMomentsSharedTransitionScope
 import com.moments.android.views.story.ArchivedStoriesView
 import java.util.Date
 
@@ -68,6 +69,19 @@ object SettingsProfileColors {
 
     fun canvas(isDark: Boolean): Color =
         if (isDark) backgroundDark else backgroundLight
+
+    /** Material 3 sólido para agrupar filas sin replicar el glass de iOS. */
+    fun surfaceContainer(isDark: Boolean): Color =
+        if (isDark) Color(0xFF151D21) else Color(0xFFFFFFFF)
+
+    fun onSurface(isDark: Boolean): Color =
+        if (isDark) Color(0xFFF2F4F5) else Color(0xFF171C1F)
+
+    fun onSurfaceVariant(isDark: Boolean): Color =
+        if (isDark) Color(0xFFB9C3C8) else Color(0xFF596166)
+
+    fun outlineVariant(isDark: Boolean): Color =
+        if (isDark) Color(0xFF354047) else Color(0xFFE0E3E5)
 }
 
 /**
@@ -192,8 +206,7 @@ fun SettingsView(
     Box(
         Modifier
             .fillMaxSize()
-            .background(canvas)
-            .statusBarsPadding(),
+            .background(canvas),
     ) {
         if (isLoading) {
             Column(
@@ -244,6 +257,31 @@ fun SettingsView(
                 onNavigateBack = onNavigateBack,
             )
         }
+
+        route?.let { current ->
+            BackHandler { route = null }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(canvas),
+            ) {
+                SettingsDestinationHost(
+                    route = current,
+                    viewModel = viewModel,
+                    showFollowing = showFollowing,
+                    onShowFollowingChange = { showFollowing = it },
+                    showFollowers = showFollowers,
+                    onShowFollowersChange = { showFollowers = it },
+                    isScheduleEnabled = isScheduleEnabled,
+                    onIsScheduleEnabledChange = { isScheduleEnabled = it },
+                    startTime = startTime,
+                    onStartTimeChange = { startTime = it },
+                    endTime = endTime,
+                    onEndTimeChange = { endTime = it },
+                    onDismiss = { route = null },
+                )
+            }
+        }
     }
 
     // ≡ iOS `.sheet` QR
@@ -251,8 +289,8 @@ fun SettingsView(
         MomentsModalSheet(
             onDismissRequest = { isShowingQRCode = false },
             largeOnly = false,
-        ) {
-            QRCodeView(onNavigateBack = { isShowingQRCode = false })
+        ) { dismiss ->
+            QRCodeView(onNavigateBack = dismiss)
         }
     }
 
@@ -261,12 +299,12 @@ fun SettingsView(
         MomentsModalSheet(
             onDismissRequest = { isShowingPersonalInfo = false },
             largeOnly = false,
-        ) {
+        ) { dismiss ->
             PersonalInfoView(
                 username = username,
                 email = email,
                 onUsernameUpdated = { username = it },
-                onNavigateBack = { isShowingPersonalInfo = false },
+                onNavigateBack = dismiss,
             )
         }
     }
@@ -280,9 +318,9 @@ fun SettingsView(
             },
             largeOnly = false,
             dismissEnabled = !advancedAccountProcessing,
-        ) {
+        ) { dismiss ->
             AdvancedAccountManagementView(
-                onNavigateBack = { isShowingAdvancedAccountManagement = false },
+                onNavigateBack = dismiss,
                 onProcessingChange = { advancedAccountProcessing = it },
             )
         }
@@ -293,31 +331,9 @@ fun SettingsView(
         MomentsModalSheet(
             onDismissRequest = { isShowingNovaMemory = false },
             largeOnly = false,
-        ) {
-            NovaMemoryManagementView(onDismiss = { isShowingNovaMemory = false })
-        }
-    }
-
-    // ≡ iOS `.navigationDestination(item: $route)`
-    route?.let { current ->
-        Dialog(
-            onDismissRequest = { route = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            SettingsDestinationHost(
-                route = current,
-                viewModel = viewModel,
-                showFollowing = showFollowing,
-                onShowFollowingChange = { showFollowing = it },
-                showFollowers = showFollowers,
-                onShowFollowersChange = { showFollowers = it },
-                isScheduleEnabled = isScheduleEnabled,
-                onIsScheduleEnabledChange = { isScheduleEnabled = it },
-                startTime = startTime,
-                onStartTimeChange = { startTime = it },
-                endTime = endTime,
-                onEndTimeChange = { endTime = it },
-                onDismiss = { route = null },
+        ) { dismiss ->
+            NovaMemoryManagementView(
+                onDismiss = dismiss,
             )
         }
     }
@@ -373,7 +389,15 @@ private fun SettingsDestinationHost(
                 SetPasswordView(onNavigateBack = onDismiss)
             }
         }
-        SettingsRoute.SAVED_MOMENTS -> SavedMomentsView(onNavigateBack = onDismiss)
+        SettingsRoute.SAVED_MOMENTS -> CompositionLocalProvider(
+            LocalMomentsSharedTransitionScope provides null,
+            LocalMomentsSharedAnimatedVisibilityScope provides null,
+        ) {
+            // Ajustes puede vivir en una ventana distinta a Perfil. Una transición
+            // compartida entre ambas jerarquías provoca un crash al reordenar el
+            // grid (por ejemplo al entrar/salir del modo selección).
+            SavedMomentsView(onNavigateBack = onDismiss)
+        }
         SettingsRoute.USER_ACTIVITY -> UserActivityView(onNavigateBack = onDismiss)
         SettingsRoute.DATA_EXPORT -> DataExportView(onNavigateBack = onDismiss)
         SettingsRoute.CHAT_STORAGE -> ChatStorageSettingsView(onNavigateBack = onDismiss)

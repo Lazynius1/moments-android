@@ -1,5 +1,6 @@
 package com.moments.android.views.settings.settingssections
 
+import androidx.activity.compose.BackHandler
 import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -121,6 +122,10 @@ fun PersonalInfoView(
     val title = when (viewState) {
         PersonalInfoViewState.MAIN -> stringResource(R.string.settings_sections_personal_info)
         PersonalInfoViewState.USERNAME -> stringResource(R.string.username_change_title)
+    }
+
+    BackHandler(enabled = viewState == PersonalInfoViewState.USERNAME) {
+        viewState = PersonalInfoViewState.MAIN
     }
 
     Column(Modifier.fillMaxSize()) {
