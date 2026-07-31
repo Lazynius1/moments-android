@@ -21,10 +21,7 @@ object NotificationCopyResolver {
             return NotificationBannerCopy(notification.senderUsername, notification.reaction)
         }
         if (notification.type == NotificationType.MEDIA_MODERATION) {
-            return NotificationBannerCopy(
-                notification.title ?: notification.senderUsername,
-                notification.message ?: notification.reaction,
-            )
+            return mediaModerationCopy(ctx, notification)
         }
         return when (notification.type) {
             NotificationType.MESSAGE -> messageCopy(ctx, notification)
@@ -124,6 +121,66 @@ object NotificationCopyResolver {
             else -> R.string.notification_gentle_reminder_body_neutral_day
         }
         return NotificationBannerCopy(ctx.getString(R.string.notification_gentle_reminder_title), ctx.getString(bodyRes))
+    }
+
+    /**
+     * ≡ APNs `title-loc-key` / `loc-key` de `handleModerationPush` (Functions).
+     * Si el doc/push ya trae title/message, se respetan (como iOS CopyResolver).
+     */
+    private fun mediaModerationCopy(ctx: Context, notification: MomentsNotification): NotificationBannerCopy {
+        val existingTitle = notification.title?.trim()?.takeIf { it.isNotEmpty() }
+        val existingBody = notification.message?.trim()?.takeIf { it.isNotEmpty() }
+            ?: notification.reaction?.trim()?.takeIf { it.isNotEmpty() && it !in setOf("partial", "full") }
+        if (existingTitle != null || existingBody != null) {
+            return NotificationBannerCopy(
+                existingTitle ?: notification.senderUsername,
+                existingBody,
+            )
+        }
+
+        val moderationType = notification.reaction ?: "partial"
+        val scope = notification.moderationScope ?: "post"
+        val count = notification.reactionCount ?: 0
+
+        val titleRes: Int
+        val body: String
+        when (scope) {
+            "storySticker" -> {
+                titleRes = R.string.notification_moderation_story_sticker_partial_title
+                body = if (count == 1) {
+                    ctx.getString(R.string.notification_moderation_story_sticker_partial_body_one)
+                } else {
+                    ctx.getString(R.string.notification_moderation_story_sticker_partial_body_other, count)
+                }
+            }
+            "postHiddenLayer" -> {
+                titleRes = R.string.notification_moderation_post_hidden_layer_partial_title
+                body = if (count == 1) {
+                    ctx.getString(R.string.notification_moderation_post_hidden_layer_partial_body_one)
+                } else {
+                    ctx.getString(R.string.notification_moderation_post_hidden_layer_partial_body_other, count)
+                }
+            }
+            "story" -> {
+                if (moderationType == "full") {
+                    titleRes = R.string.notification_moderation_story_full_title
+                    body = ctx.getString(R.string.notification_moderation_story_full_body)
+                } else {
+                    titleRes = R.string.notification_moderation_story_partial_title
+                    body = ctx.getString(R.string.notification_moderation_story_partial_body, count.toString())
+                }
+            }
+            else -> {
+                if (moderationType == "full") {
+                    titleRes = R.string.notification_moderation_full_title
+                    body = ctx.getString(R.string.notification_moderation_full_body)
+                } else {
+                    titleRes = R.string.notification_moderation_partial_title
+                    body = ctx.getString(R.string.notification_moderation_partial_body, count.toString())
+                }
+            }
+        }
+        return NotificationBannerCopy(ctx.getString(titleRes), body)
     }
 
     private fun momentReactionCopy(ctx: Context, notification: MomentsNotification): NotificationBannerCopy {

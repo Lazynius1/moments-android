@@ -616,10 +616,8 @@ object ChatService {
         message.fileSize?.let { data["fileSize"] = it }
         message.mediaWidth?.let { data["mediaWidth"] = it }
         message.mediaHeight?.let { data["mediaHeight"] = it }
-        message.latitude?.let { data["latitude"] = it }
-        message.longitude?.let { data["longitude"] = it }
-        message.locationName?.let { data["locationName"] = it }
-        message.locationAddress?.let { data["locationAddress"] = it }
+        // Ubicación: coords/name/address solo en `content` cifrado (≡ send path iOS).
+        // No escribir latitude/longitude/locationName/locationAddress en claro.
         message.isLiveLocation?.let { data["isLiveLocation"] = it }
         message.liveLocationExpiresAt?.let { data["liveLocationExpiresAt"] = Timestamp(it) }
         message.liveLocationDuration?.let { data["liveLocationDuration"] = it }
@@ -1323,6 +1321,11 @@ object ChatService {
         conversationId, senderId, latitude, longitude, name, address, true, duration.firestoreValue, sessionId, expiresAt, messageId, isVanishModeMessage,
     )
 
+    /**
+     * ≡ iOS `sendStaticLocationMessage` / `sendLiveLocationMessage`:
+     * coords + lugar solo en `content` cifrado. No rellenar latitude/longitude/name/address
+     * en el EnhancedMessage de envío (si no, `messageToFirestoreData` los subiría en claro).
+     */
     private suspend fun sendLocationMessage(
         conversationId: String,
         senderId: String,
@@ -1337,12 +1340,12 @@ object ChatService {
         messageId: String,
         isVanishModeMessage: Boolean,
     ): Result<EnhancedMessage> = runCatching {
-        val payload = JSONObject().apply {
-            put("lat", latitude)
-            put("lng", longitude)
-            put("name", name)
-            put("address", address)
-        }.toString()
+        val payload = ChatLocationPayload(
+            lat = latitude,
+            lng = longitude,
+            name = name,
+            address = address,
+        ).encodedJSON().orEmpty()
         val encrypted = EncryptionService.encryptChatMessage(payload, conversationId)
         sendMessage(
             EnhancedMessage(
@@ -1351,15 +1354,11 @@ object ChatService {
                 senderId = senderId,
                 type = MessageType.LOCATION,
                 content = encrypted,
-                latitude = latitude,
-                longitude = longitude,
-                locationName = name,
-                locationAddress = address,
                 isLiveLocation = isLive,
                 liveLocationDuration = duration,
                 liveLocationSessionId = sessionId,
                 liveLocationExpiresAt = expiresAt,
-                locationUpdatedAt = Date(),
+                locationUpdatedAt = if (isLive) Date() else null,
                 timestamp = Date(),
                 status = MessageStatus.SENDING,
                 isVanishModeMessage = isVanishModeMessage,

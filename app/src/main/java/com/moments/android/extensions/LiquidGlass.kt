@@ -219,11 +219,17 @@ fun ProfileChromeControlsCluster(
     spacing: Dp = ProfileChromeGlassMetrics.controlsClusterSpacing,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val isDark = isSystemInDarkTheme()
+    val controlSurface = if (isDark) Color(0xFF151D21) else Color.White
     Row(
         modifier = modifier
             .padding(ProfileChromeGlassMetrics.controlsClusterPadding)
             .clip(RoundedCornerShape(50))
-            .momentsChromeGlass(CircleShape, interactive = true),
+            .momentsChromeGlass(
+                CircleShape,
+                interactive = true,
+                tint = controlSurface,
+            ),
         horizontalArrangement = Arrangement.spacedBy(spacing),
         verticalAlignment = Alignment.CenterVertically,
         content = content,
@@ -357,4 +363,3 @@ fun MomentsTabBarChromeBackground(modifier: Modifier = Modifier) {
 // MomentsGlassCluster → ProfileChromeControlsCluster
 // MomentsGlassIconButton → ProfileChromeIconButton
 // MomentsGlassPillBar → ProfileGlassPillTrack
-

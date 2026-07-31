@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -29,10 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.settings.SettingsProfileColors
@@ -96,14 +96,17 @@ fun SettingsFormView(
                 title = {
                     Text(
                         stringResource(R.string.settings_main_title),
-                        fontWeight = FontWeight.Bold,
                         color = primary,
-                        fontSize = 18.sp,
+                        style = MaterialTheme.typography.titleLarge,
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = primary)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.common_back),
+                            tint = primary,
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = canvas),
@@ -114,9 +117,10 @@ fun SettingsFormView(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp),
+                .padding(horizontal = 8.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             AnimatedSettingsBlock(visible = animateSections, delayMs = 0) {
                 SettingsGroup(title = stringResource(R.string.settings_group_account)) {

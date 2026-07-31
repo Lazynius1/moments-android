@@ -8,10 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -53,6 +50,7 @@ import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.messaging.services.LiveLocationSharingService
 import com.moments.android.views.misc.WhatsNewView
 import com.moments.android.views.profile.incognito.IncognitoGlobalOverlay
+import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.MomentsTheme
 import com.moments.android.views.shared.Surface
 import kotlinx.coroutines.CoroutineScope
@@ -65,7 +63,6 @@ import kotlinx.coroutines.launch
  * Init Firebase/AppCheck/caches → [MomentsApplication] (≡ `MomentsApp.init` + partes AppDelegate).
  * Auth gate (Login/cuenta) es capa Android; iOS monta TabBar siempre.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MomentsApp(
     deepLinkUri: Uri? = null,
@@ -197,12 +194,12 @@ fun MomentsApp(
         }
 
         if (showWhatsNew) {
-            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-            ModalBottomSheet(
+            // ≡ `.sheet` + `.presentationDetents([.medium, .large])`
+            MomentsModalSheet(
                 onDismissRequest = { showWhatsNew = false },
-                sheetState = sheetState,
-            ) {
-                WhatsNewView(onDismiss = { showWhatsNew = false })
+                largeOnly = false,
+            ) { dismiss ->
+                WhatsNewView(onDismiss = dismiss)
             }
         }
     }

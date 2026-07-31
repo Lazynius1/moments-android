@@ -1,7 +1,11 @@
 package com.moments.android.views.nova.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +18,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,9 +35,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.moments.android.R
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.views.nova.agent.NovaPendingAction
 
-/** Port de `NovaActionConfirmationOverlay.swift`. */
+/** Port de `Views/Nova/UI/NovaActionConfirmationOverlay.swift`. */
 @Composable
 fun NovaActionConfirmationOverlay(
     action: NovaPendingAction,
@@ -46,13 +51,21 @@ fun NovaActionConfirmationOverlay(
     val scrim = Color.Black.copy(alpha = if (isDark) 0.45f else 0.20f)
     val cardShape = RoundedCornerShape(24.dp)
     val buttonShape = RoundedCornerShape(16.dp)
+    val previewStroke = Color.White.copy(alpha = if (isDark) 0.12f else 0.20f)
 
     Dialog(
         onDismissRequest = onCancel,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         Box(
-            modifier = Modifier.fillMaxSize().background(scrim).clickable(onClick = onCancel),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(scrim)
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() },
+                    onClick = onCancel,
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Column(
@@ -60,9 +73,13 @@ fun NovaActionConfirmationOverlay(
                     .padding(horizontal = 24.dp)
                     .widthIn(max = 360.dp)
                     .fillMaxWidth()
-                    .clip(cardShape)
-                    .background(Color.White.copy(alpha = 0.08f))
+                    .momentsChromeGlass(cardShape, interactive = false)
                     .semantics { dialog() }
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                        onClick = {},
+                    )
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -86,11 +103,15 @@ fun NovaActionConfirmationOverlay(
                     )
                 }
                 action.previewImage?.let { preview ->
-                    androidx.compose.foundation.Image(
+                    Image(
                         bitmap = preview.asImageBitmap(),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxWidth().height(120.dp).clip(buttonShape),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .clip(buttonShape)
+                            .border(0.5.dp, previewStroke, buttonShape),
                     )
                 }
                 Text(
@@ -103,6 +124,7 @@ fun NovaActionConfirmationOverlay(
                     NovaConfirmationButton(
                         text = stringResource(R.string.common_cancel),
                         textColor = primaryText,
+                        fontWeight = FontWeight.Medium,
                         shape = buttonShape,
                         onClick = onCancel,
                         modifier = Modifier.weight(1f),
@@ -110,6 +132,7 @@ fun NovaActionConfirmationOverlay(
                     NovaConfirmationButton(
                         text = stringResource(R.string.nova_confirm_approve),
                         textColor = primaryText,
+                        fontWeight = FontWeight.SemiBold,
                         shape = buttonShape,
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f),
@@ -124,6 +147,7 @@ fun NovaActionConfirmationOverlay(
 private fun NovaConfirmationButton(
     text: String,
     textColor: Color,
+    fontWeight: FontWeight,
     shape: RoundedCornerShape,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -131,11 +155,10 @@ private fun NovaConfirmationButton(
     Box(
         modifier = modifier
             .height(46.dp)
-            .clip(shape)
-            .background(Color.White.copy(alpha = 0.08f))
+            .momentsChromeGlass(shape, interactive = true)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = text, color = textColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(text = text, color = textColor, fontSize = 14.sp, fontWeight = fontWeight)
     }
 }

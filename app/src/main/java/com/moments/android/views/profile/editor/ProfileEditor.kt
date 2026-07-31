@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -317,7 +318,12 @@ fun ModernEditProfileView(
         return
     }
 
-    Box(modifier.fillMaxSize().background(canvas)) {
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(canvas)
+            .safeDrawingPadding(),
+    ) {
         when {
             isLoading && username.isEmpty() && errorMessage == null -> {
                 Column(
@@ -436,7 +442,6 @@ fun ModernEditProfileView(
             PhotoActionsSheetContent(
                 primary = primary,
                 canDelete = currentProfileImage != null || profileImagePath != null,
-                onClose = { showPhotoActions = false },
                 onLibrary = {
                     showPhotoActions = false
                     scope.launch {
@@ -468,7 +473,6 @@ fun ModernEditProfileView(
                 available = availableInterests,
                 selected = selectedInterests,
                 onChange = { selectedInterests = it },
-                onDismiss = { showInterestsPicker = false },
                 primary = primary,
                 secondary = secondary,
                 dark = dark,
@@ -1000,7 +1004,6 @@ private fun InterestsSection(
 private fun PhotoActionsSheetContent(
     primary: Color,
     canDelete: Boolean,
-    onClose: () -> Unit,
     onLibrary: () -> Unit,
     onCamera: () -> Unit,
     onDelete: () -> Unit,
@@ -1013,17 +1016,7 @@ private fun PhotoActionsSheetContent(
                 .padding(top = 12.dp, bottom = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Icons.Filled.KeyboardArrowDown,
-                contentDescription = stringResource(R.string.common_close),
-                tint = primary,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(onClick = onClose)
-                    .padding(10.dp),
-            )
+            Spacer(Modifier.size(36.dp))
             Text(
                 stringResource(R.string.profile_editor_change),
                 color = primary,
@@ -1086,7 +1079,6 @@ private fun InterestsPickerSheet(
     available: List<String>,
     selected: Set<String>,
     onChange: (Set<String>) -> Unit,
-    onDismiss: () -> Unit,
     primary: Color,
     secondary: Color,
     dark: Boolean,
@@ -1100,17 +1092,7 @@ private fun InterestsPickerSheet(
                 .padding(top = 14.dp, bottom = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Icons.Filled.KeyboardArrowDown,
-                contentDescription = stringResource(R.string.common_close),
-                tint = primary,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(onClick = onDismiss)
-                    .padding(10.dp),
-            )
+            Spacer(Modifier.size(36.dp))
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     stringResource(R.string.profile_editor_interests_navigation_title),

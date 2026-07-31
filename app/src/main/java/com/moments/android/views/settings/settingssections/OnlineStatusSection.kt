@@ -42,6 +42,9 @@ import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.models.OnlineStatus
 import com.moments.android.services.messaging.OnlineStatusService
+import com.moments.android.views.settings.sections.SettingsIconSlotWidth
+import com.moments.android.views.settings.sections.SettingsIconTextSpacing
+import com.moments.android.views.settings.sections.SettingsRowHorizontalPadding
 
 /**
  * Port de `OnlineStatusSection.swift`.
@@ -61,7 +64,10 @@ fun OnlineStatusSection(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 11.dp, horizontal = 4.dp),
+            .padding(
+                horizontal = SettingsRowHorizontalPadding,
+                vertical = 11.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -69,10 +75,10 @@ fun OnlineStatusSection(
             contentDescription = null,
             tint = statusColor,
             modifier = Modifier
-                .width(28.dp)
+                .width(SettingsIconSlotWidth)
                 .size(19.dp),
         )
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(SettingsIconTextSpacing))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(
                 stringResource(R.string.settings_online_status_title),

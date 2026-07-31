@@ -8,6 +8,7 @@ import com.moments.android.models.NotificationType
 import com.moments.android.views.nova.tools.NovaMomentAudienceResolver
 import java.util.UUID
 
+/** Port de `Views/Nova/Agent/NovaPendingAction.swift` — confirmaciones de writes sensibles. */
 data class NovaPendingAction(
     val id: String = UUID.randomUUID().toString(),
     val kind: Kind,
@@ -72,7 +73,8 @@ data class NovaPendingAction(
 
         private fun createMoment(context: Context, toolName: String, args: Map<String, Any?>, previewImage: Bitmap?): NovaPendingAction? {
             previewImage ?: return null
-            val content = (args["content"] as? String)?.takeIf { it.isNotBlank() } ?: context.getString(R.string.nova_confirm_photo_only)
+            val content = (args["content"] as? String)?.takeIf { it.isNotBlank() }
+                ?: context.getString(R.string.nova_confirm_photo_only)
             val audienceRaw = args["audience"] as? String ?: "everyone"
             val audience = NovaMomentAudienceResolver.audienceSummary(
                 context = context,
@@ -80,12 +82,16 @@ data class NovaPendingAction(
                 targetUsername = args["target_username"] as? String,
                 customListName = args["custom_list_name"] as? String,
             )
-            val detail = listOf(content, context.getString(R.string.nova_confirm_audience_line, audience)).joinToString("\n\n")
+            // ≡ iOS detailParts: content (si no vacío) + audienceLine
+            val detailParts = buildList {
+                if (content.isNotEmpty()) add(content)
+                add(context.getString(R.string.nova_confirm_audience_line, audience))
+            }
             return NovaPendingAction(
                 kind = Kind.CREATE_MOMENT,
                 toolName = toolName,
                 title = localizedTitle(context, Kind.CREATE_MOMENT),
-                detail = detail,
+                detail = detailParts.joinToString("\n\n"),
                 audienceLabel = audience,
                 previewImage = previewImage,
                 args = args,
@@ -116,7 +122,7 @@ data class NovaPendingAction(
         }.joinToString("\n")
 
         private fun describeActiveHoursArgs(context: Context, args: Map<String, Any?>): String {
-            if (args["clear"] == true) return context.getString(R.string.nova_confirm_active_hours_clear)
+            if (boolArg(args["clear"]) == true) return context.getString(R.string.nova_confirm_active_hours_clear)
             val start = args["start_hour"] as? String ?: "--:--"
             val end = args["end_hour"] as? String ?: "--:--"
             return context.getString(R.string.nova_confirm_active_hours_range, start, end)
@@ -126,16 +132,28 @@ data class NovaPendingAction(
             val values = (args["preferences"] as? Map<*, *>)?.entries
                 ?.mapNotNull { (key, value) -> (key as? String)?.let { it to value } }
                 ?.toMap()
-                ?: args.filterValues { it is Boolean }
+                ?: args.filter { (_, value) -> boolArg(value) != null }
             return values.mapNotNull { (key, value) ->
-                (value as? Boolean)?.let { "${notificationLabel(context, key)}: ${toggleState(context, it)}" }
+                boolArg(value)?.let { "${notificationLabel(context, key)}: ${toggleState(context, it)}" }
             }
                 .sorted()
                 .joinToString("\n")
         }
 
         private fun appendBoolLine(context: Context, value: Any?, @StringRes label: Int): String? =
-            (value as? Boolean)?.let { "${context.getString(label)}: ${yesNoState(context, it)}" }
+            boolArg(value)?.let { "${context.getString(label)}: ${yesNoState(context, it)}" }
+
+        /** ≡ iOS `case .bool(flag)` sobre JSONValue. */
+        private fun boolArg(value: Any?): Boolean? = when (value) {
+            is Boolean -> value
+            is Number -> value.toInt() != 0
+            is String -> when (value.lowercase()) {
+                "true", "1", "yes" -> true
+                "false", "0", "no" -> false
+                else -> null
+            }
+            else -> null
+        }
 
         private fun yesNoState(context: Context, value: Boolean): String = context.getString(
             if (value) R.string.nova_confirm_state_yes else R.string.nova_confirm_state_no,
@@ -145,6 +163,7 @@ data class NovaPendingAction(
             if (value) R.string.nova_confirm_state_enabled else R.string.nova_confirm_state_disabled,
         )
 
+        /** ≡ `NotificationType.displayName` + settings keys especiales. */
         private fun notificationLabel(context: Context, key: String): String {
             val resId = when (key) {
                 NotificationType.LIKE.raw -> R.string.nova_notification_like
@@ -162,9 +181,10 @@ data class NovaPendingAction(
                 NotificationType.DATA_EXPORT_READY.raw -> R.string.nova_notification_data_export
                 NotificationType.STORY_CHAIN_CONTINUED.raw -> R.string.nova_notification_story_chain
                 NotificationType.MEDIA_MODERATION.raw -> R.string.nova_notification_moderation
-                "gentleReminders" -> R.string.nova_notification_daily_reminders
-                "commentsMutualsOnly" -> R.string.nova_notification_mutual_comments_only
-                "muteOldPostReactions" -> R.string.nova_notification_mute_old_reactions
+                // ≡ iOS settings.notifications.* (no NotificationType.displayName)
+                "gentleReminders" -> R.string.settings_notifications_gentle_reminders_title
+                "commentsMutualsOnly" -> R.string.settings_notifications_mutuals_only
+                "muteOldPostReactions" -> R.string.settings_notifications_mute_old_reactions
                 else -> return key
             }
             return context.getString(resId)

@@ -26,15 +26,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -134,6 +139,7 @@ import com.moments.android.views.components.MomentRowButton
 import com.moments.android.views.components.VerifiedBadgeView
 import com.moments.android.views.components.shimmer
 import com.moments.android.views.creator.CreatorView
+import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
@@ -243,16 +249,17 @@ fun ModernShareBottomSheet(
                 }
             }
         }
-    }
 
-    if (showStoryCreator) {
-        AddToStoryView(
-            moment = moment,
-            onDismiss = {
-                showStoryCreator = false
-                onDismiss()
-            },
-        )
+        // ≡ iOS fullScreenCover AddToStoryView (Dialog interno → canvas/insets correctos)
+        if (showStoryCreator) {
+            AddToStoryView(
+                moment = moment,
+                onDismiss = {
+                    showStoryCreator = false
+                    onDismiss()
+                },
+            )
+        }
     }
 }
 
@@ -270,8 +277,9 @@ fun ModernShareBottomSheet(
 
 // MARK: - Main Actions View
 
+/** Port de `MainActionsView` (share.swift) — también usado por ContextMenu. */
 @Composable
-private fun MainActionsView(
+fun ShareMainActionsView(
     moment: FeedMoment,
     onSendMessage: () -> Unit,
     onAddToStory: () -> Unit,
@@ -366,6 +374,21 @@ private fun MainActionsView(
             )
         }
     }
+}
+
+@Composable
+private fun MainActionsView(
+    moment: FeedMoment,
+    onSendMessage: () -> Unit,
+    onAddToStory: () -> Unit,
+    onExternalShare: () -> Unit,
+) {
+    ShareMainActionsView(
+        moment = moment,
+        onSendMessage = onSendMessage,
+        onAddToStory = onAddToStory,
+        onExternalShare = onExternalShare,
+    )
 }
 
 @Composable
@@ -1212,6 +1235,7 @@ private fun EmptySearchState() {
 fun AddToStoryView(
     moment: FeedMoment,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     var showCreatorView by remember { mutableStateOf(false) }
@@ -1230,34 +1254,42 @@ fun AddToStoryView(
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
-        if (!showCreatorView) {
-            PreparingStoryOverlay(
-                errorMessage = errorMessage,
-                onCancel = onDismiss,
-            )
-        }
-    }
-
-    if (showCreatorView && createdSticker != null) {
-        val creatorSurface = Color.Black
-        Dialog(
-            onDismissRequest = onDismiss,
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false,
-            ),
-        ) {
-            Box(Modifier.fillMaxSize().background(creatorSurface)) {
-                CreatorView(
-                    showCreatorView = true,
-                    onShowCreatorViewChange = { visible -> if (!visible) onDismiss() },
-                    isCreatingStory = true,
-                    onIsCreatingStoryChange = {},
-                    initialSticker = createdSticker,
-                    initialMedia = null,
-                    openInStoryMode = false,
-                )
+    // ≡ mismo Dialog que TabBarView → CreatorView / StoryCamera (insets + canvas)
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+        ),
+    ) {
+        val creatorSurface = rememberAdaptiveColors().surfaceBackground
+        Box(Modifier.fillMaxSize().background(creatorSurface)) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars)),
+            ) {
+                if (showCreatorView && createdSticker != null) {
+                    CreatorView(
+                        showCreatorView = true,
+                        onShowCreatorViewChange = { visible -> if (!visible) onDismiss() },
+                        isCreatingStory = true,
+                        onIsCreatingStoryChange = {},
+                        initialSticker = createdSticker,
+                        initialMedia = null,
+                        openInStoryMode = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize().background(Color.Black)) {
+                        PreparingStoryOverlay(
+                            errorMessage = errorMessage,
+                            onCancel = onDismiss,
+                        )
+                    }
+                }
             }
         }
     }
@@ -1355,19 +1387,21 @@ private fun renderCleanShareMomentStickerBitmap(
     val widthPx = (260f * density).toInt().coerceAtLeast(1)
     val heightPx = (heightDp.value * density).toInt().coerceAtLeast(1)
     val corner = FeedMomentCardLayout.mediaCornerRadius.value * density
+    val strokeW = 1.2f * density
 
     val out = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(out)
+    val roundRect = android.graphics.RectF(0f, 0f, widthPx.toFloat(), heightPx.toFloat())
     val clip = android.graphics.Path().apply {
-        addRoundRect(
-            android.graphics.RectF(0f, 0f, widthPx.toFloat(), heightPx.toFloat()),
-            corner,
-            corner,
-            android.graphics.Path.Direction.CW,
-        )
+        addRoundRect(roundRect, corner, corner, android.graphics.Path.Direction.CW)
     }
     canvas.clipPath(clip)
+    // ≡ ShareMomentSticker background (sólido + glass tint)
     canvas.drawColor(android.graphics.Color.parseColor("#1A1A1A"))
+    val glassTint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb((0.08f * 255).toInt(), 255, 255, 255)
+    }
+    canvas.drawRoundRect(roundRect, corner, corner, glassTint)
 
     val scale = maxOf(widthPx.toFloat() / content.width, heightPx.toFloat() / content.height)
     val drawW = content.width * scale
@@ -1401,6 +1435,33 @@ private fun renderCleanShareMomentStickerBitmap(
         }
         canvas.drawPath(path, play)
     }
+
+    // ≡ overlay stroke LinearGradient white 0.4 → 0.05 → 0.2
+    val inset = strokeW / 2f
+    val strokeRect = android.graphics.RectF(
+        inset,
+        inset,
+        widthPx - inset,
+        heightPx - inset,
+    )
+    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = strokeW
+        shader = android.graphics.LinearGradient(
+            0f,
+            0f,
+            widthPx.toFloat(),
+            heightPx.toFloat(),
+            intArrayOf(
+                android.graphics.Color.argb((0.4f * 255).toInt(), 255, 255, 255),
+                android.graphics.Color.argb((0.05f * 255).toInt(), 255, 255, 255),
+                android.graphics.Color.argb((0.2f * 255).toInt(), 255, 255, 255),
+            ),
+            floatArrayOf(0f, 0.5f, 1f),
+            android.graphics.Shader.TileMode.CLAMP,
+        )
+    }
+    canvas.drawRoundRect(strokeRect, corner, corner, strokePaint)
     return out
 }
 

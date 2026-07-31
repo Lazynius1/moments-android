@@ -480,7 +480,10 @@ fun ModernSavedMomentsDetailView(
         storyRoute?.let { route ->
             Dialog(
                 onDismissRequest = { storyRoute = null },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false,
+                ),
             ) {
                 StoriesView(
                     startWithUserId = route.userId,
@@ -560,7 +563,10 @@ fun ModernSavedMomentsDetailView(
             if (editTarget != null) {
                 Dialog(
                     onDismissRequest = { showEditSheet = false },
-                    properties = DialogProperties(usePlatformDefaultWidth = false),
+                    properties = DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        decorFitsSystemWindows = false,
+                    ),
                 ) {
                     Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
                         EditMomentView(
@@ -628,7 +634,10 @@ fun ModernSavedMomentsDetailView(
         if (showExploreWithHashtag) {
             Dialog(
                 onDismissRequest = { showExploreWithHashtag = false },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false,
+                ),
             ) {
                 Surface(Modifier.fillMaxSize()) {
                     ExploreView(

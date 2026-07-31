@@ -557,10 +557,18 @@ enum class ClusterGalleryPresentation { MODAL, PUSHED }
 enum class ClusterGalleryScope { CLUSTER, CONVERSATION_SHARED }
 enum class ClusterGalleryTab { MEDIA, LINKS }
 
+/** ≡ iOS `ClusterGalleryDetailRoute` — índice en `visibleMessages` para push de detalle. */
+data class ClusterGalleryDetailRoute(val index: Int) {
+    val id: Int get() = index
+}
+
 private const val galleryDeleteEveryoneWindowMillis = 7_200_000L
 private val gallerySpacing = 14.dp
 
-/** Port de `ClusterGalleryView` — masonry 2 cols, selección, delete dialog, tabs Media/Links. */
+/**
+ * Port de `ClusterGalleryView` — masonry 2 cols, selección, delete dialog, tabs Media/Links.
+ * `detail` ≡ ViewBuilder iOS: host in-gallery (pop vuelve al grid), no overlay externo.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ClusterGalleryView(
@@ -577,12 +585,15 @@ fun ClusterGalleryView(
     onHydrateMedia: ((EnhancedMessage) -> Unit)? = null,
     isDownloadingMedia: (String) -> Boolean = { false },
     downloadProgress: (String) -> Double? = { null },
+    /** ≡ iOS `detail:` — FullScreenMedia within gallery stack; null → fallback [onOpenMedia]. */
+    detail: (@Composable (message: EnhancedMessage, onDismissDetail: () -> Unit) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var tab by remember { mutableStateOf(initialTab) }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var detailRoute by remember { mutableStateOf<ClusterGalleryDetailRoute?>(null) }
     val uriHandler = LocalUriHandler.current
     val isDark = isSystemInDarkTheme()
     val background = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
@@ -610,6 +621,7 @@ fun ClusterGalleryView(
             hadGalleryContent = true
         } else if (hadGalleryContent) {
             // ≡ iOS onChange: cierra solo si había ítems y ahora está vacío
+            detailRoute = null
             onClose()
             return@LaunchedEffect
         }
@@ -618,9 +630,17 @@ fun ClusterGalleryView(
     LaunchedEffect(tab) {
         selectedIds = selectedIds.intersect(visible.map { it.id }.toSet())
         if (selectedIds.isEmpty()) selectionMode = false
+        // Links tab no tiene detalle media
+        if (tab == ClusterGalleryTab.LINKS) detailRoute = null
     }
     LaunchedEffect(visible.map { it.id }) {
         visible.forEach { onHydrateMedia?.invoke(it) }
+        val route = detailRoute
+        if (route != null && visible.isEmpty()) {
+            detailRoute = null
+        } else if (route != null && route.index !in visible.indices) {
+            detailRoute = ClusterGalleryDetailRoute(route.index.coerceIn(0, visible.lastIndex))
+        }
     }
 
     fun exitSelection() {
@@ -643,20 +663,38 @@ fun ClusterGalleryView(
         selectedIds = setOf(id)
     }
 
+    fun dismissDetail() {
+        detailRoute = null
+    }
+
+    fun closeGallery() {
+        // ≡ iOS closeGallery: limpia push de detalle antes de salir
+        detailRoute = null
+        onClose()
+    }
+
     fun openMessage(message: EnhancedMessage) {
         if (scope == ClusterGalleryScope.CONVERSATION_SHARED && tab == ClusterGalleryTab.LINKS) {
             ChatLinkOpener.openFirstLink(message.content.orEmpty(), uriHandler::openUri)
             return
         }
+        val index = visible.indexOfFirst { it.id == message.id }
+        if (index < 0) return
         if ((message.type == MessageType.IMAGE || message.type == MessageType.VIDEO) && message.needsDownloadForPlayback) {
             // ≡ iOS: solo descarga; el usuario vuelve a pulsar cuando esté listo.
             (onPrepareDownload ?: onOpenMedia).invoke(message)
             return
         }
-        onOpenMedia(message)
+        if (detail != null) {
+            // ≡ modalPath.append / pushedDetailRoute = route
+            detailRoute = ClusterGalleryDetailRoute(index)
+        } else {
+            onOpenMedia(message)
+        }
     }
 
-    Column(modifier.fillMaxSize().background(background)) {
+    Box(modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().background(background)) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -671,7 +709,7 @@ fun ClusterGalleryView(
                 tint = contentColor,
                 modifier = Modifier
                     .size(40.dp)
-                    .clickable(onClick = onClose)
+                    .clickable(onClick = ::closeGallery)
                     .padding(8.dp),
             )
             Spacer(Modifier.weight(1f))
@@ -853,6 +891,22 @@ fun ClusterGalleryView(
             },
         )
     }
+
+    // ≡ ClusterGalleryDetailHost + navigationDestination(item:)
+    val activeRoute = detailRoute
+    if (activeRoute != null && detail != null && visible.isNotEmpty()) {
+        val detailMessage = visible[activeRoute.index.coerceIn(0, visible.lastIndex)]
+        androidx.activity.compose.BackHandler { dismissDetail() }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .zIndex(2f)
+                .background(background),
+        ) {
+            detail(detailMessage) { dismissDetail() }
+        }
+    }
+    } // Box
 }
 
 private fun canDeleteGalleryMessageForEveryone(message: EnhancedMessage, currentUserId: String): Boolean =

@@ -119,7 +119,7 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
             ?: userInfo["reaction"] as? String
             ?: getString(R.string.notification_message_single_default)
 
-        // ≡ resolveMessagePreview (+ reaction)
+        // ≡ resolveMessagePreview (+ reaction); para tipos sociales usa CopyResolver (loc keys iOS).
         val resolved = resolveSystemNotificationContent(title, suppliedBody, userInfo)
         val body = resolved.body
         val resolvedTitle = resolved.title
@@ -163,7 +163,7 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
 
     private data class ResolvedContent(val title: String, val body: String)
 
-    /** ≡ resolveMessagePreview + resolveChatReactionPreview */
+    /** ≡ resolveMessagePreview + resolveChatReactionPreview; resto → NotificationCopyResolver. */
     private suspend fun resolveSystemNotificationContent(
         suppliedTitle: String,
         suppliedBody: String,
@@ -178,36 +178,52 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         }
 
         val conversationId = userInfo["conversationId"] as? String
-        if ((type != "message" && type != "new_message") || conversationId.isNullOrBlank() ||
-            (userInfo["messageType"] as? String) != "text" ||
-            !ChatPreviewPrivacy.shouldRevealPreview(
-                conversationId,
-                ChatPreviewPrivacy.isVanishModeMessage(userInfo),
-            )
-        ) {
+        if (type == "message" || type == "new_message") {
+            if (conversationId.isNullOrBlank() ||
+                (userInfo["messageType"] as? String) != "text" ||
+                !ChatPreviewPrivacy.shouldRevealPreview(
+                    conversationId,
+                    ChatPreviewPrivacy.isVanishModeMessage(userInfo),
+                )
+            ) {
+                return ResolvedContent(
+                    suppliedTitle,
+                    ChatSystemNotificationPreviewContract.safeFallback(suppliedBody, genericBody),
+                )
+            }
+
+            val encryptedContent = userInfo["encryptedContent"] as? String
+            SharedChatDecryptor.decrypt(encryptedContent.orEmpty(), conversationId)?.let { plain ->
+                return applyPreviewText(plain, userInfo, suppliedTitle)
+            }
+
+            val messageId = userInfo["messageId"] as? String
+            if (!messageId.isNullOrBlank()) {
+                val fetched = runCatching {
+                    val snapshot = FirebaseFirestore.getInstance().collection("conversations").document(conversationId)
+                        .collection("messages").document(messageId).get().await()
+                    if (ChatPreviewPrivacy.isVanishModeMessage(snapshot.data ?: emptyMap())) null
+                    else snapshot.getString("content")
+                }.getOrNull()
+                SharedChatDecryptor.decrypt(fetched.orEmpty(), conversationId)?.let { plain ->
+                    return applyPreviewText(plain, userInfo, suppliedTitle)
+                }
+            }
             return ResolvedContent(
                 suppliedTitle,
                 ChatSystemNotificationPreviewContract.safeFallback(suppliedBody, genericBody),
             )
         }
 
-        val encryptedContent = userInfo["encryptedContent"] as? String
-        SharedChatDecryptor.decrypt(encryptedContent.orEmpty(), conversationId)?.let { plain ->
-            return applyPreviewText(plain, userInfo, suppliedTitle)
+        // Data-only FCM (sin APNs loc-key): localizar con NotificationCopyResolver.
+        NotificationPresentationCoordinator.notificationFromPush(userInfo)?.let { mapped ->
+            val copy = NotificationCopyResolver.resolve(mapped)
+            val resolvedTitle = copy.title.ifBlank { suppliedTitle }
+            val resolvedBody = copy.body?.takeIf { it.isNotBlank() }
+                ?: ChatSystemNotificationPreviewContract.safeFallback(suppliedBody, genericBody)
+            return ResolvedContent(resolvedTitle, resolvedBody)
         }
 
-        val messageId = userInfo["messageId"] as? String
-        if (!messageId.isNullOrBlank()) {
-            val fetched = runCatching {
-                val snapshot = FirebaseFirestore.getInstance().collection("conversations").document(conversationId)
-                    .collection("messages").document(messageId).get().await()
-                if (ChatPreviewPrivacy.isVanishModeMessage(snapshot.data ?: emptyMap())) null
-                else snapshot.getString("content")
-            }.getOrNull()
-            SharedChatDecryptor.decrypt(fetched.orEmpty(), conversationId)?.let { plain ->
-                return applyPreviewText(plain, userInfo, suppliedTitle)
-            }
-        }
         return ResolvedContent(
             suppliedTitle,
             ChatSystemNotificationPreviewContract.safeFallback(suppliedBody, genericBody),

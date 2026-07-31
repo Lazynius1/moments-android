@@ -8,6 +8,7 @@ import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.VideoOptions
 import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdOptions
 import com.google.android.ump.ConsentInformation
@@ -27,26 +28,22 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Port de `AdMob Configuration.swift` — configuración AdMob, UMP, managers nativos y Plus.
+ * Port de `AdMob Configuration.swift` — configuración AdMob, UMP y managers nativos.
  *
- * Plus: descartado en modelos Android; [PlusAdManager] mantiene `shouldShowAds = true` por defecto.
+ * El gate de ads usa el mismo flag Firestore `isPlusSubscriber` que iOS (`shouldHideAds`);
+ * no hay producto Plus que portar.
  */
 object AdMobConfiguration {
 
-    // iOS real IDs (reference only — Android app not registered in AdMob/Play yet):
-    // appId = "ca-app-pub-7805678909278568~7091658934"
-    // nativeAdUnitId = "ca-app-pub-7805678909278568/9925436334"
-
-    // REPLACE_WHEN_YOU_HAVE_GOOGLE_KEY: Android AdMob App ID (Play Console / AdMob Android app)
-    const val APP_ID = "REPLACE_WHEN_YOU_HAVE_GOOGLE_KEY"
-
-    // REPLACE_WHEN_YOU_HAVE_GOOGLE_KEY: Android native ad unit
-    const val NATIVE_AD_UNIT_ID = "REPLACE_WHEN_YOU_HAVE_GOOGLE_KEY"
+    // iOS (referencia): app ~7091658934 · native /9925436334
+    // Android AdMob app "Moments" + bloque nativo "feed"
+    const val APP_ID = "ca-app-pub-7805678909278568~1032314948"
+    const val NATIVE_AD_UNIT_ID = "ca-app-pub-7805678909278568/9932290322"
 
     /** Google official test native ad unit (debug / diagnostic). */
     const val TEST_NATIVE_AD_UNIT_ID = "ca-app-pub-3940256099942544/2247696110"
 
-    /** Google sample app ID — also used in AndroidManifest for safe startup. */
+    /** Google sample app ID — fallback si el App ID real no está cableado. */
     const val TEST_APP_ID = "ca-app-pub-3940256099942544~3347511713"
 
     /** Diagnostic mode: force Google test IDs on real devices. */
@@ -221,8 +218,14 @@ object AdMobConfiguration {
         }
 
         val adUnitId = getNativeAdUnitId()
+        // ≡ iOS preload VideoOptions + aspect .any
+        val videoOptions = VideoOptions.Builder()
+            .setStartMuted(false)
+            .setCustomControlsRequested(true)
+            .build()
         val options = NativeAdOptions.Builder()
             .setMediaAspectRatio(NativeAdOptions.NATIVE_MEDIA_ASPECT_RATIO_ANY)
+            .setVideoOptions(videoOptions)
             .build()
 
         val loader = AdLoader.Builder(act, adUnitId)
@@ -243,6 +246,13 @@ object AdMobConfiguration {
     }
 
     fun getPreloadedNativeAd(): NativeAd? = preloadedNativeAd
+
+    /** ≡ iOS `setPreloadedNativeAd(_:)`. */
+    fun setPreloadedNativeAd(ad: NativeAd?) {
+        if (ad === preloadedNativeAd) return
+        preloadedNativeAd?.destroy()
+        preloadedNativeAd = ad
+    }
 
     fun clearPreloadedNativeAd() {
         preloadedNativeAd?.destroy()
@@ -314,7 +324,12 @@ class NativeAdManager {
                     _hasError.value = true
                 }
             })
-            .withNativeAdOptions(AdAspectRatioContext.Feed.nativeAdOptions)
+            .withNativeAdOptions(
+                // ≡ iOS NativeAdManager → AdMobConfiguration.shared.createNativeAdOptions() → .any
+                NativeAdOptions.Builder()
+                    .setMediaAspectRatio(NativeAdOptions.NATIVE_MEDIA_ASPECT_RATIO_ANY)
+                    .build(),
+            )
             .build()
 
         adLoader?.loadAd(AdMobConfiguration.createAdRequest())
@@ -332,12 +347,9 @@ class NativeAdManager {
     }
 }
 
-// MARK: - Plus Ad Manager (Plus N/A — always show ads unless extended later)
+// MARK: - Plus Ad Manager (≡ iOS; mismo flag básico, sin suscripción)
 
-/**
- * Plus subscription was discarded in Android [AppUser]. Defaults to showing ads.
- * Wire [AuthService] when Plus fields are added to the user model.
- */
+/** ≡ iOS `PlusAdManager` — solo `isPlusSubscriber` / `shouldHideAds`. */
 class PlusAdManager(
     private val authService: AuthService = AuthService,
 ) {
@@ -359,7 +371,7 @@ class PlusAdManager(
     fun refreshAdStatus() = updateAdDisplayStatus()
 }
 
-/** ≡ iOS `shouldHideAds` / flag Plus básico (sin PlusSubscription 🚫). */
+/** ≡ iOS `PlusStatusHelper` / `shouldHideAds` (= `isPlusSubscriber`). */
 object PlusStatusHelper {
     fun shouldShowAds(user: AppUser?): Boolean {
         user ?: return true

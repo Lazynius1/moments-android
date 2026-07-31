@@ -1,8 +1,10 @@
 package com.moments.android.views.profile.core
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -38,9 +40,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -49,6 +53,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.coordinators.CoordinatorNavigationEvent
@@ -567,7 +573,33 @@ private suspend fun updateOwnMoment(
 /** Host a pantalla completa sobre el perfil (ajustes, editor, etc.). */
 @Composable
 private fun ProfileFullScreenSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    val isDark = isSystemInDarkTheme()
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        val view = LocalView.current
+        DisposableEffect(view, isDark) {
+            val window = (view.parent as DialogWindowProvider).window
+            val navigationBarColor =
+                if (isDark) Color(0xFF070B0D) else Color(0xFFF0EFEC)
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            @Suppress("DEPRECATION")
+            window.statusBarColor = Color.Transparent.toArgb()
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = navigationBarColor.toArgb()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window.isNavigationBarContrastEnforced = false
+            }
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = !isDark
+                isAppearanceLightNavigationBars = !isDark
+            }
+            onDispose { }
+        }
         content()
     }
 }

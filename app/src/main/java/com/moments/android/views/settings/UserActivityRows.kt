@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -44,6 +45,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -849,11 +852,32 @@ private fun StoryPlaceholder(isVideo: Boolean) {
 @Composable
 private fun StoryDateBadge(date: Date) {
     Column(
-        Modifier.clip(RoundedCornerShape(5.dp)).background(Color.White).padding(horizontal = 5.dp, vertical = 4.dp),
+        Modifier
+            .widthIn(min = 34.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(Color.White)
+            .padding(horizontal = 5.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        Text(SimpleDateFormat("d", Locale.getDefault()).format(date), color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-        Text(SimpleDateFormat("MMM", Locale.getDefault()).format(date).lowercase(), color = Color.Black.copy(alpha = 0.75f), fontSize = 10.sp)
+        Text(
+            SimpleDateFormat("d", Locale.getDefault()).format(date),
+            color = Color.Black,
+            fontWeight = FontWeight.Bold,
+            fontSize = 17.sp,
+            lineHeight = 17.sp,
+            maxLines = 1,
+            style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
+        )
+        Text(
+            SimpleDateFormat("MMM", Locale.getDefault()).format(date).lowercase(),
+            color = Color.Black.copy(alpha = 0.75f),
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 10.sp,
+            lineHeight = 10.sp,
+            maxLines = 1,
+            style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
+        )
     }
 }
 

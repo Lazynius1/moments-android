@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,11 +29,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Photo
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +53,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.google.android.gms.ads.nativead.AdChoicesView
 import com.google.android.gms.ads.nativead.MediaView
@@ -62,8 +64,10 @@ import com.moments.android.R
 import com.moments.android.extensions.fromHex
 import com.moments.android.services.auth.AuthService
 import com.moments.android.services.performance.MotionPolicy
+import com.moments.android.views.permission.shared.PermissionPrimerStage
+import com.moments.android.views.permission.tracking.TrackingPermissionView
 import kotlinx.coroutines.delay
-
+import kotlinx.coroutines.launch
 fun Context.findActivity(): Activity? {
     var ctx: Context = this
     while (ctx is ContextWrapper) {
@@ -121,6 +125,8 @@ fun SmartNativeAdView(
 
     if (!shouldShowAds) return
 
+    val scope = rememberCoroutineScope()
+
     LaunchedEffect(Unit) {
         adManager.loadAd(context.findActivity())
         if (AdMobConfiguration.shouldShowConsentFlow) {
@@ -136,19 +142,31 @@ fun SmartNativeAdView(
         }
     }
 
+    // ≡ iOS fullScreenCover TrackingPermissionView(stage: .primer)
     if (showingPrivacyConsent) {
-        TrackingPermissionDialog(
-            onDismiss = { showingPrivacyConsent = false },
-            onContinue = {
-                showingPrivacyConsent = false
-                val activity = context.findActivity()
-                if (activity != null) {
-                    AdMobConfiguration.startConsentFlow(activity) {
-                        adManager.loadAd(activity)
+        Dialog(
+            onDismissRequest = { showingPrivacyConsent = false },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            Box(Modifier.fillMaxSize().background(Color.Black)) {
+                TrackingPermissionView(stage = PermissionPrimerStage.PRIMER) {
+                    showingPrivacyConsent = false
+                    // ≡ iOS delay 0.3s antes de UMP
+                    scope.launch {
+                        delay(300)
+                        val activity = context.findActivity()
+                        if (activity != null) {
+                            AdMobConfiguration.startConsentFlow(activity) {
+                                adManager.loadAd(activity)
+                            }
+                        }
                     }
                 }
-            },
-        )
+            }
+        }
     }
 }
 
@@ -161,37 +179,6 @@ fun CleanNativeAdView(
     if (PlusStatusHelper.shouldShowAds(currentUser)) {
         SwiftUiNativeAdView(modifier = modifier)
     }
-}
-
-@Composable
-fun TrackingPermissionDialog(
-    onDismiss: () -> Unit,
-    onContinue: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.att_pre_alert_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.att_pre_alert_description))
-                Text(
-                    text = stringResource(R.string.ad_common_ad),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onContinue) {
-                Text(stringResource(R.string.att_pre_alert_continue))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.permission_tracking_primer_not_now))
-            }
-        },
-    )
 }
 
 @Composable
@@ -428,7 +415,16 @@ fun FeedNativeAdMediaView(
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            buildFeedNativeAdView(ctx, nativeAd, headlineSizeSp = 18f, bodySizeSp = 15f, mediaHeightDp = 300)
+            // Modern overlay: texto blanco sobre media oscura (≡ ModernNativeAdView UIKit)
+            buildFeedNativeAdView(
+                context = ctx,
+                nativeAd = nativeAd,
+                headlineSizeSp = 18f,
+                bodySizeSp = 15f,
+                mediaHeightDp = 300,
+                headlineColor = android.graphics.Color.WHITE,
+                bodyColor = android.graphics.Color.argb(230, 255, 255, 255),
+            )
         },
         update = { view ->
             view.setNativeAd(nativeAd)
@@ -441,10 +437,30 @@ fun IntegratedAdMediaView(
     nativeAd: NativeAd,
     modifier: Modifier = Modifier,
 ) {
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    // ≡ iOS .label / .secondaryLabel
+    val headlineColor = if (isDark) {
+        android.graphics.Color.WHITE
+    } else {
+        android.graphics.Color.BLACK
+    }
+    val bodyColor = if (isDark) {
+        android.graphics.Color.argb(179, 255, 255, 255) // ~0.7 white
+    } else {
+        android.graphics.Color.argb(153, 0, 0, 0) // ~0.6 black
+    }
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            buildFeedNativeAdView(ctx, nativeAd, headlineSizeSp = 16f, bodySizeSp = 14f, mediaHeightDp = 300)
+            buildFeedNativeAdView(
+                context = ctx,
+                nativeAd = nativeAd,
+                headlineSizeSp = 16f,
+                bodySizeSp = 14f,
+                mediaHeightDp = 300,
+                headlineColor = headlineColor,
+                bodyColor = bodyColor,
+            )
         },
         update = { view ->
             view.setNativeAd(nativeAd)
@@ -458,6 +474,8 @@ private fun buildFeedNativeAdView(
     headlineSizeSp: Float,
     bodySizeSp: Float,
     mediaHeightDp: Int,
+    headlineColor: Int,
+    bodyColor: Int,
 ): NativeAdView {
     val density = context.resources.displayMetrics.density
     val mediaHeightPx = (mediaHeightDp * density).toInt()
@@ -479,14 +497,14 @@ private fun buildFeedNativeAdView(
         val headlineLabel = TextView(context).apply {
             text = nativeAd.headline ?: context.getString(R.string.ad_common_ad)
             textSize = headlineSizeSp
-            setTextColor(android.graphics.Color.WHITE)
+            setTextColor(headlineColor)
         }
         headlineView = headlineLabel
 
         val bodyLabel = TextView(context).apply {
             text = nativeAd.body ?: ""
             textSize = bodySizeSp
-            setTextColor(android.graphics.Color.argb(230, 255, 255, 255))
+            setTextColor(bodyColor)
         }
         bodyView = bodyLabel
 
@@ -511,6 +529,7 @@ private fun buildFeedNativeAdView(
             ViewGroup.LayoutParams.WRAP_CONTENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
         ).apply {
+            gravity = android.view.Gravity.END
             topMargin = mediaHeightPx + (20 * density).toInt()
             marginEnd = (8 * density).toInt()
         }

@@ -68,6 +68,7 @@ import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.VideoController
+import com.google.android.gms.ads.VideoOptions
 import com.google.android.gms.ads.nativead.AdChoicesView
 import com.google.android.gms.ads.nativead.MediaView
 import com.google.android.gms.ads.nativead.NativeAd
@@ -210,8 +211,14 @@ class StoryNativeAdManager {
         swapAd(null)
 
         val adUnitId = AdMobConfiguration.getNativeAdUnitId()
+        // ≡ iOS storyNativeVideoLoaderOptions() + mediaAspectRatio .any
+        val videoOptions = VideoOptions.Builder()
+            .setStartMuted(false)
+            .setCustomControlsRequested(true)
+            .build()
         val mediaOptions = NativeAdOptions.Builder()
             .setMediaAspectRatio(NativeAdOptions.NATIVE_MEDIA_ASPECT_RATIO_ANY)
+            .setVideoOptions(videoOptions)
             .build()
 
         adLoader = AdLoader.Builder(act, adUnitId)
@@ -609,15 +616,58 @@ private fun StoryAdTopChrome(
                 modifier = Modifier
                     .size(38.dp)
                     .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.16f)),
+                    .background(Color.Black.copy(alpha = 0.16f))
+                    .storyGlassmorphic(CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(text = stringResource(R.string.ad_common_ad), color = Color.White, fontSize = 9.sp)
+                if (!iconUri.isNullOrBlank()) {
+                    coil.compose.AsyncImage(
+                        model = iconUri,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    )
+                } else {
+                    Text(
+                        text = stringResource(R.string.ad_common_ad),
+                        color = Color.White.copy(0.82f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
             }
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 1)
-                Text(subtitle, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 1)
+                Text(
+                    title,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.ad_common_ad),
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(Color.White.copy(0.18f))
+                            .padding(horizontal = 5.dp, vertical = 2.dp),
+                    )
+                    Text(
+                        subtitle,
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                    )
+                }
             }
             trailingContent?.invoke()
             // ≡ iOS close: frame 40 + storyGlassmorphic + clipShape Circle
@@ -791,9 +841,12 @@ private class StoryAdNativeLayout(
     private fun buildLayout(nativeAd: NativeAd, playback: StoryAdVideoPlayback) {
         nativeAdView.removeAllViews()
         val density = resources.displayMetrics.density
+        val d = { dp: Float -> (dp * density).toInt() }
 
+        // ≡ StoryAdMediaViewRepresentable.buildNativeAdView
         val mediaView = MediaView(context).apply {
             setMediaContent(nativeAd.mediaContent)
+            setBackgroundColor(android.graphics.Color.BLACK)
         }
         nativeAdView.mediaView = mediaView
 
@@ -801,6 +854,9 @@ private class StoryAdNativeLayout(
             text = nativeAd.headline
             setTextColor(android.graphics.Color.WHITE)
             textSize = 22f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
         }
         nativeAdView.headlineView = headline
 
@@ -808,49 +864,176 @@ private class StoryAdNativeLayout(
             text = nativeAd.body
             setTextColor(android.graphics.Color.argb(230, 255, 255, 255))
             textSize = 15f
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
         }
         nativeAdView.bodyView = body
 
+        val iconView = ImageView(context).apply {
+            nativeAd.icon?.drawable?.let { setImageDrawable(it) }
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, 6f * density)
+                }
+            }
+        }
+        nativeAdView.iconView = iconView
+
+        val advertiser = TextView(context).apply {
+            // ≡ iOS fallback "Anunciante"
+            text = nativeAd.advertiser ?: context.getString(R.string.ad_common_sponsored)
+            setTextColor(android.graphics.Color.argb(204, 255, 255, 255))
+            textSize = 14f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        nativeAdView.advertiserView = advertiser
+
         val cta = Button(context).apply {
-            text = nativeAd.callToAction ?: context.getString(R.string.ad_common_sponsored)
+            text = nativeAd.callToAction
+                ?: context.getString(R.string.ad_common_sponsored)
+            setTextColor(android.graphics.Color.WHITE)
+            textSize = 15f
+            setBackgroundColor(android.graphics.Color.argb(242, 23, 143, 245)) // ≈ iOS 0.09/0.56/0.96
+            isAllCaps = false
+            minHeight = 0
+            minimumHeight = 0
+            setPadding(d(16f), d(8f), d(16f), d(8f))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(android.graphics.Color.argb(242, 23, 143, 245))
+                cornerRadius = 18f * density
+            }
         }
         nativeAdView.callToActionView = cta
 
         val adChoices = AdChoicesView(context)
         nativeAdView.adChoicesView = adChoices
 
-        val attribution = TextView(context).apply {
+        val attributionLabel = TextView(context).apply {
             text = context.getString(R.string.ad_common_ad)
             setTextColor(android.graphics.Color.WHITE)
+            textSize = 12f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+        }
+        val attribution = FrameLayout(context).apply {
             setBackgroundColor(android.graphics.Color.argb(204, 0, 0, 0))
-            setPadding(8, 4, 8, 4)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(android.graphics.Color.argb(204, 0, 0, 0))
+                cornerRadius = 3f * density
+            }
+            addView(
+                attributionLabel,
+                LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
+            )
         }
 
-        val bottomPanel = LinearLayout(context).apply {
+        val advertiserRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(iconView, LinearLayout.LayoutParams(d(30f), d(30f)).apply {
+                marginEnd = d(8f)
+            })
+            addView(
+                advertiser,
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+            )
+        }
+
+        val contentStack = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(android.graphics.Color.argb(180, 0, 0, 0))
-            setPadding(16, 14, 16, 16)
+            addView(
+                headline,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { bottomMargin = d(8f) },
+            )
+            addView(
+                body,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { bottomMargin = d(8f) },
+            )
+            addView(
+                advertiserRow,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { bottomMargin = d(8f) },
+            )
+            addView(
+                cta,
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, d(34f)).apply {
+                    width = LinearLayout.LayoutParams.WRAP_CONTENT
+                },
+            )
         }
 
-        bottomPanel.addView(attribution)
-        bottomPanel.addView(headline)
-        bottomPanel.addView(body)
-        bottomPanel.addView(cta)
-        bottomPanel.addView(adChoices)
+        // ≈ UIVisualEffectView systemUltraThinMaterialDark + corner 26
+        val bottomPanel = FrameLayout(context).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(android.graphics.Color.argb(200, 20, 20, 24))
+                cornerRadius = 26f * density
+            }
+            clipToOutline = true
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, 26f * density)
+                }
+            }
+        }
+
+        bottomPanel.addView(
+            attribution,
+            LayoutParams(d(30f), d(18f)).apply {
+                gravity = android.view.Gravity.TOP or android.view.Gravity.START
+                topMargin = d(14f)
+                marginStart = d(16f)
+            },
+        )
+        bottomPanel.addView(
+            adChoices,
+            LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
+                gravity = android.view.Gravity.TOP or android.view.Gravity.END
+                topMargin = d(12f)
+                marginEnd = d(16f)
+            },
+        )
+        bottomPanel.addView(
+            contentStack,
+            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+                gravity = android.view.Gravity.BOTTOM
+                topMargin = d(44f)
+                marginStart = d(16f)
+                marginEnd = d(16f)
+                bottomMargin = d(16f)
+            },
+        )
 
         nativeAdView.addView(mediaView)
         nativeAdView.addView(bottomPanel)
 
-        mediaView.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        // Media fills above panel (panel 144 + margins)
+        mediaView.layoutParams = LayoutParams(
+            LayoutParams.MATCH_PARENT,
+            LayoutParams.MATCH_PARENT,
+        ).apply {
+            bottomMargin = d(12f + 144f + 18f)
+        }
 
         bottomPanel.layoutParams = LayoutParams(
             LayoutParams.MATCH_PARENT,
-            (144 * density).toInt(),
+            d(144f),
         ).apply {
             gravity = android.view.Gravity.BOTTOM
-            marginStart = (12 * density).toInt()
-            marginEnd = (12 * density).toInt()
-            bottomMargin = (18 * density).toInt()
+            marginStart = d(12f)
+            marginEnd = d(12f)
+            bottomMargin = d(18f)
         }
 
         if (nativeAd.mediaContent?.hasVideoContent() == true) {

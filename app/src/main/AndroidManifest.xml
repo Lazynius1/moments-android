@@ -23,17 +23,18 @@
         android:label="Moments"
         android:theme="@style/Theme.Moments"
         android:usesCleartextTraffic="false">
-        <!-- Debug: Google sample AdMob App ID. REPLACE_WHEN_YOU_HAVE_GOOGLE_KEY for release Android app. -->
+        <!-- AdMob App ID — Moments (Android) -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-7805678909278568~1032314948" />
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${GOOGLE_MAPS_API_KEY}" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:screenOrientation="portrait">
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

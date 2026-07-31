@@ -61,6 +61,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.moments.android.R
@@ -83,11 +86,10 @@ import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.feed.core.StoryUserPresentationRoute
 import com.moments.android.views.feed.sharing.AddToStoryView
 import com.moments.android.views.feed.sharing.ModernShareSheet
+import com.moments.android.views.feed.sharing.ShareMainActionsView
 import com.moments.android.views.feed.sharing.buildMomentShareUrl
 import com.moments.android.views.story.StoriesView
 import com.moments.android.views.story.StoryRingAvatarView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 import java.util.Date
 /** Paridad iOS `ContextMenuViewState`. */
@@ -300,9 +302,8 @@ fun ModernContextMenuOverlay(
                                 dismiss()
                             },
                         )
-                        ContextMenuViewState.Sharing -> MainActionsPanel(
+                        ContextMenuViewState.Sharing -> ShareMainActionsView(
                             moment = moment,
-                            onClose = { dismiss() },
                             onSendMessage = { viewState = ContextMenuViewState.Messaging },
                             onAddToStory = { showAddToStory = true },
                             onExternalShare = {
@@ -338,29 +339,31 @@ fun ModernContextMenuOverlay(
                 }
             }
         }
-    }
 
-    // ≡ iOS fullScreenCover CreatorView + sticker
-    if (showAddToStory) {
-        AddToStoryView(
-            moment = moment,
-            onDismiss = {
-                showAddToStory = false
-                dismiss()
-            },
-        )
-    }
-
-    // ≡ iOS fullScreenCover StoriesView(startWithUserId:)
-    storyRoute?.let { route ->
-        Dialog(
-            onDismissRequest = { storyRoute = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            StoriesView(
-                startWithUserId = route.userId,
-                onDismiss = { storyRoute = null },
+        // ≡ iOS fullScreenCover encima del menú (mismo root Box → insets/canvas correctos)
+        if (showAddToStory) {
+            AddToStoryView(
+                moment = moment,
+                onDismiss = {
+                    showAddToStory = false
+                    dismiss()
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(10f),
             )
+        }
+
+        storyRoute?.let { route ->
+            Dialog(
+                onDismissRequest = { storyRoute = null },
+                properties = DialogProperties(usePlatformDefaultWidth = false),
+            ) {
+                StoriesView(
+                    startWithUserId = route.userId,
+                    onDismiss = { storyRoute = null },
+                )
+            }
         }
     }
 }
@@ -909,51 +912,6 @@ private fun MomentHiddenLayer.metricsStatusText(): String? = when {
     unlockMode == MomentHiddenLayer.UnlockMode.SCHEDULED && unlockAt != null && unlockAt.after(Date()) ->
         stringResource(R.string.hidden_layers_metrics_status_scheduled, MomentsFormat.smartDate(unlockAt, MomentsFormat.DateContext.MEDIUM_DATE_TIME))
     else -> null
-}
-
-@Composable
-private fun MainActionsPanel(
-    moment: FeedMoment,
-    onClose: () -> Unit,
-    onSendMessage: () -> Unit,
-    onAddToStory: () -> Unit,
-    onExternalShare: () -> Unit,
-) {
-    val isDark = isSystemInDarkTheme()
-    val primary = if (isDark) Color.White else Color.Black
-    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.feed_share_title), color = primary, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-        Spacer(Modifier.height(4.dp))
-        ContextMenuButton(
-            icon = Icons.AutoMirrored.Filled.Send,
-            title = stringResource(R.string.feed_share_message),
-            subtitle = "",
-            forceRedIcon = false,
-            onClick = onSendMessage,
-        )
-        ContextMenuButton(
-            icon = Icons.Filled.Share,
-            title = stringResource(R.string.feed_share_story),
-            subtitle = "",
-            forceRedIcon = false,
-            onClick = onAddToStory,
-        )
-        ContextMenuButton(
-            icon = Icons.Filled.Share,
-            title = stringResource(R.string.feed_share_external),
-            subtitle = "",
-            forceRedIcon = false,
-            onClick = onExternalShare,
-        )
-        ContextMenuButton(
-            icon = Icons.Filled.Share,
-            title = stringResource(R.string.context_menu_cancel),
-            subtitle = "",
-            forceRedIcon = false,
-            onClick = onClose,
-            showChevron = false,
-        )
-    }
 }
 
 @Composable

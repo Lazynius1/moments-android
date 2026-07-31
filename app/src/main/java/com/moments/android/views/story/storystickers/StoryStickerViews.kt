@@ -3,7 +3,9 @@ package com.moments.android.views.story.storystickers
 import android.content.Intent
 import android.os.Build
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,10 +45,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -852,19 +856,36 @@ fun StoryStickerView(
 
 @Composable
 private fun StorySharedMomentSticker(sticker: StickerData, onClick: () -> Unit, modifier: Modifier) {
+    val density = LocalDensity.current
     val corner = FeedMomentCardLayout.mediaCornerRadius
+    val decoded = remember(sticker.content, sticker.stickerId) {
+        decodeShareMomentBitmap(sticker.content)
+    }
+    val widthDp = decoded?.let { with(density) { it.width.toDp() } } ?: 260.dp
+    val heightDp = decoded?.let { with(density) { it.height.toDp() } } ?: 340.dp
+
     Box(
         modifier
-            .width(220.dp)
-            .height(280.dp)
+            .width(widthDp)
+            .height(heightDp)
             .clip(RoundedCornerShape(corner))
             .clickable(enabled = LocalStoryStickerHitTesting.current, onClick = onClick),
     ) {
-        val baseUrl = sticker.gifURL ?: sticker.content.takeIf { it.startsWith("http") }
-        if (!baseUrl.isNullOrBlank()) {
-            AsyncImage(baseUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        } else {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
+        when {
+            decoded != null -> Image(
+                bitmap = decoded.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+            else -> {
+                val baseUrl = sticker.gifURL ?: sticker.content.takeIf { it.startsWith("http") }
+                if (!baseUrl.isNullOrBlank()) {
+                    AsyncImage(baseUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                } else {
+                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
+                }
+            }
         }
         sticker.videoURL?.takeIf { it.isNotBlank() }?.let { url ->
             StickerVideoPlayer(url, Modifier.fillMaxSize())
@@ -877,7 +898,11 @@ private fun StorySharedMomentSticker(sticker: StickerData, onClick: () -> Unit, 
                 .align(Alignment.TopCenter)
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent),
+                        listOf(
+                            Color.White.copy(alpha = 0.22f),
+                            Color.White.copy(alpha = 0.10f),
+                            Color.Transparent,
+                        ),
                     ),
                 )
                 .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -892,7 +917,14 @@ private fun StorySharedMomentSticker(sticker: StickerData, onClick: () -> Unit, 
                         userId = profileUid,
                         modifier = Modifier
                             .size(34.dp)
-                            .clip(CircleShape),
+                            .clip(CircleShape)
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    listOf(Color.White.copy(0.5f), Color.Transparent),
+                                ),
+                                shape = CircleShape,
+                            ),
                     )
                 } else {
                     Icon(
@@ -909,8 +941,8 @@ private fun StorySharedMomentSticker(sticker: StickerData, onClick: () -> Unit, 
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.weight(1f))
             }
         }
 
@@ -921,10 +953,11 @@ private fun StorySharedMomentSticker(sticker: StickerData, onClick: () -> Unit, 
                 tint = Color.White,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 52.dp, end = 12.dp)
-                    .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                    .padding(top = 54.dp, end = 12.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White.copy(alpha = 0.18f))
                     .padding(6.dp)
-                    .size(14.dp),
+                    .size(11.dp),
             )
         }
 
@@ -939,11 +972,20 @@ private fun StorySharedMomentSticker(sticker: StickerData, onClick: () -> Unit, 
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 10.dp)
-                    .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(50))
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(Color.White.copy(alpha = 0.18f))
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
     }
+}
+
+private fun decodeShareMomentBitmap(content: String): android.graphics.Bitmap? {
+    if (content.isBlank() || content.startsWith("http") || content.startsWith("sticker_")) return null
+    return runCatching {
+        val bytes = android.util.Base64.decode(content, android.util.Base64.DEFAULT)
+        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    }.getOrNull()
 }
 
 /** Rama iOS `isAnimated` + videoURL (no shareMoment). */

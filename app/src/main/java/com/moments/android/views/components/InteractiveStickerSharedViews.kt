@@ -2294,6 +2294,7 @@ fun StickerDitherPattern(
             delay(33)
         }
     }
+    val clock = time
     Canvas(modifier = modifier.graphicsLayer { alpha = 0.85f }) {
         val dotSize = 2.5f
         val spacing = 6f
@@ -2303,8 +2304,8 @@ fun StickerDitherPattern(
             var x = 0f
             val offset = if (row % 2 == 0) 0f else spacing / 2f
             while (x < size.width) {
-                val waveX = sin(time * 2f + y * 0.05f) * 2f
-                val waveY = cos(time * 2f + x * 0.05f) * 2f
+                val waveX = sin(clock * 2f + y * 0.05f) * 2f
+                val waveY = cos(clock * 2f + x * 0.05f) * 2f
                 drawCircle(
                     color = color,
                     radius = dotSize / 2f,

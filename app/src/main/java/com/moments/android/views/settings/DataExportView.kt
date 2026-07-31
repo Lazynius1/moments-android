@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -87,6 +88,7 @@ fun DataExportView(
         Column(
             Modifier
                 .fillMaxSize()
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -125,8 +127,11 @@ fun DataExportView(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .background(accent.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 8.dp)
+                    .background(
+                        SettingsProfileColors.surfaceContainer(isDark),
+                        RoundedCornerShape(20.dp),
+                    )
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -190,7 +195,7 @@ fun DataExportView(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
@@ -249,7 +254,12 @@ fun DataExportView(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 8.dp)
+                    .background(
+                        SettingsProfileColors.surfaceContainer(isDark),
+                        RoundedCornerShape(20.dp),
+                    )
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
@@ -284,7 +294,7 @@ fun DataExportView(
                 CurrentRequestSection(
                     request = request,
                     textColor = textColor,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp),
                     onOpenUrl = { url ->
                         runCatching {
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -297,8 +307,11 @@ fun DataExportView(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .background(accent.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 8.dp)
+                    .background(
+                        SettingsProfileColors.surfaceContainer(isDark),
+                        RoundedCornerShape(20.dp),
+                    )
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -341,9 +354,16 @@ fun DataExportView(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .background(Color(0xFFFF9500).copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                    .border(1.dp, Color(0xFFFF9500).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 8.dp)
+                    .background(
+                        SettingsProfileColors.surfaceContainer(isDark),
+                        RoundedCornerShape(20.dp),
+                    )
+                    .border(
+                        1.dp,
+                        Color(0xFFFF9500).copy(alpha = 0.3f),
+                        RoundedCornerShape(20.dp),
+                    )
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -370,10 +390,10 @@ fun DataExportView(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 8.dp)
                     .background(
                         if (viewModel.canRequestExport) accent else Color.Gray,
-                        RoundedCornerShape(12.dp),
+                        RoundedCornerShape(14.dp),
                     )
                     .clickable(enabled = canTap) {
                         viewModel.requestDataExport(

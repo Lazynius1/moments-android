@@ -26,7 +26,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
@@ -166,22 +165,6 @@ fun StoryStatsView(
                         .padding(horizontal = 22.dp)
                         .padding(top = 12.dp),
                 ) {
-                    Box(
-                        Modifier
-                            .size(40.dp)
-                            .align(Alignment.CenterStart)
-                            .momentsChromeGlass(CircleShape, interactive = true)
-                            .clip(CircleShape)
-                            .clickable(onClick = onDismiss),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Filled.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = primaryText,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
                     Text(
                         stringResource(R.string.archived_stories_stats_title),
                         color = primaryText,

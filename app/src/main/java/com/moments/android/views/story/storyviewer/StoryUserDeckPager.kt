@@ -8,11 +8,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,7 +18,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -45,12 +41,14 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** Roles de `StoryDeckPageRole`. */
 enum class StoryDeckPageRole { LEADING, CENTER, TRAILING }
 
 /**
- * Port de `StoryUserDeckPager.swift` — Deck Pass entre usuarios del ring.
- * Preview vecinas + escala/opacity/blur; gesto con bandas laterales vía [StoryGestureCoordinator].
+ * Port directo de `StoryUserDeckPager.swift`.
+ *
+ * El deck escucha en la pasada inicial del árbol de punteros, igual que el
+ * `.simultaneousGesture` de SwiftUI. Es importante: cada StoryViewer consume
+ * sus propios gestos después, así que un pager anidado no llega a armarlos.
  */
 @Composable
 fun StoryUserDeckPager(
@@ -87,7 +85,6 @@ fun StoryUserDeckPager(
     fun resetDrag(animated: Boolean) {
         scope.launch {
             if (animated && !MotionPolicy.reduceMotion) {
-                // ≡ spring(response: 0.42, dampingFraction: 0.78)
                 dragOffset.animateTo(0f, spring(dampingRatio = 0.78f, stiffness = 380f))
             } else {
                 dragOffset.snapTo(0f)
@@ -104,12 +101,11 @@ fun StoryUserDeckPager(
     ) {
         val width = constraints.maxWidth.toFloat().coerceAtLeast(1f)
         val height = constraints.maxHeight.toFloat().coerceAtLeast(1f)
-        // Rect local del pager; el punto del gesto se convierte a root (≡ exclusion boundsInRoot)
         val screenRectLocal = Rect(0f, 0f, width, height)
-        val ids = userIdsState.value
-        val current = indexState.value.coerceIn(0, (ids.size - 1).coerceAtLeast(0))
+        val ids = userIdsState.value.filter { it.isNotBlank() }
+        if (ids.isEmpty()) return@BoxWithConstraints
+        val current = indexState.value.coerceIn(0, ids.lastIndex)
         val visible = ((current - 1)..(current + 1)).filter { it in ids.indices }
-        // ≡ stackBaseOffset: centra la página current en el HStack de visibles
         val stackBase = run {
             val position = visible.indexOf(current).takeIf { it >= 0 } ?: return@run 0f
             val centerOfCurrent = position * width + width / 2f
@@ -121,7 +117,6 @@ fun StoryUserDeckPager(
                 .fillMaxSize()
                 .pointerInput(ids.size, width, height) {
                     awaitEachGesture {
-                        // Initial pass: no esperar a que el viewer consuma el down (≡ simultaneousGesture)
                         val down = awaitFirstDown(requireUnconsumed = false)
                         if (!enabledState.value || userIdsState.value.size <= 1) return@awaitEachGesture
 
@@ -130,18 +125,16 @@ fun StoryUserDeckPager(
                         val screenRectRoot = if (coords != null) {
                             val origin = coords.localToRoot(Offset.Zero)
                             Rect(origin.x, origin.y, origin.x + width, origin.y + height)
-                        } else {
-                            screenRectLocal
-                        }
+                        } else screenRectLocal
 
                         val gate = gateState.value
-                        val allowStart = gestureCoordinator.shouldAllowDeckSwipeStart(
-                            point = pointInRoot,
-                            screenRect = screenRectRoot,
-                            regions = gate?.interactionRegions.orEmpty(),
-                            gate = gate,
-                        )
-                        if (!allowStart) return@awaitEachGesture
+                        if (!gestureCoordinator.shouldAllowDeckSwipeStart(
+                                point = pointInRoot,
+                                screenRect = screenRectRoot,
+                                regions = gate?.interactionRegions.orEmpty(),
+                                gate = gate,
+                            )
+                        ) return@awaitEachGesture
 
                         val tracker = VelocityTracker()
                         tracker.addPosition(down.uptimeMillis, down.position)
@@ -157,11 +150,8 @@ fun StoryUserDeckPager(
                                 tracker.addPosition(change.uptimeMillis, change.position)
                                 total += delta
 
-                                val horizontalTravel = abs(total.x)
-                                val verticalTravel = abs(total.y)
-                                val isHorizontal =
-                                    horizontalTravel > verticalTravel * horizontalDominanceRatio
-                                if (!isHorizontal || horizontalTravel <= deckArmDistancePx) {
+                                val isHorizontal = abs(total.x) > abs(total.y) * horizontalDominanceRatio
+                                if (!isHorizontal || abs(total.x) <= deckArmDistancePx) {
                                     if (armed || dragOffset.value != 0f) {
                                         scope.launch { dragOffset.snapTo(0f) }
                                         isDraggingDeck = false
@@ -170,7 +160,6 @@ fun StoryUserDeckPager(
                                     continue
                                 }
 
-                                // Armado: consumir para no pelear con hold/nav del viewer
                                 change.consume()
                                 if (!armed) {
                                     armed = true
@@ -178,12 +167,12 @@ fun StoryUserDeckPager(
                                     HapticManager.shared.lightImpact(view)
                                 }
 
-                                val idx = indexState.value
+                                val index = indexState.value
                                 val count = userIdsState.value.size
                                 val raw = total.x
                                 val clamped = when {
-                                    raw > 0f && idx == 0 -> raw * 0.22f
-                                    raw < 0f && idx >= count - 1 -> raw * 0.22f
+                                    raw > 0f && index == 0 -> raw * 0.22f
+                                    raw < 0f && index >= count - 1 -> raw * 0.22f
                                     else -> raw
                                 }
                                 scope.launch { dragOffset.snapTo(clamped) }
@@ -198,99 +187,73 @@ fun StoryUserDeckPager(
                             val translationX = dragOffset.value
                             val isHorizontal = abs(total.x) > abs(total.y) * horizontalDominanceRatio &&
                                 abs(total.x) > deckArmDistancePx
-
                             if (!isHorizontal) {
                                 resetDrag(animated = true)
                                 return@awaitEachGesture
                             }
 
-                            val idx = indexState.value
+                            val index = indexState.value
                             val count = userIdsState.value.size
-                            val goToPrevious = translationX > 0f
-                            val canNavigate = if (goToPrevious) idx > 0 else idx < count - 1
+                            val previous = translationX > 0f
+                            val canNavigate = if (previous) index > 0 else index < count - 1
                             val crossed = abs(translationX) > width * commitThreshold
                             val flickedPrevious = velocity.x > flickVelocityPx && translationX >= 0f
                             val flickedNext = velocity.x < -flickVelocityPx && translationX <= 0f
-                            val shouldCommit = canNavigate && (
-                                crossed || (goToPrevious && flickedPrevious) || (!goToPrevious && flickedNext)
-                            )
-
-                            if (shouldCommit) {
+                            if (canNavigate && (crossed || (previous && flickedPrevious) || (!previous && flickedNext))) {
                                 HapticManager.shared.mediumImpact(view)
-                                val exitOffset = if (goToPrevious) width else -width
+                                val exitOffset = if (previous) width else -width
                                 scope.launch {
-                                    // ≡ Spring.sheet + asyncAfter(0.22) desde el inicio (no al terminar)
                                     if (!MotionPolicy.reduceMotion) {
-                                        launch {
-                                            dragOffset.animateTo(
-                                                exitOffset,
-                                                spring(dampingRatio = 0.86f, stiffness = 500f),
-                                            )
-                                        }
+                                        launch { dragOffset.animateTo(exitOffset, spring(dampingRatio = 0.86f, stiffness = 500f)) }
                                         delay(220)
-                                    } else {
-                                        dragOffset.snapTo(exitOffset)
-                                    }
-                                    val next = if (goToPrevious) {
-                                        (idx - 1).coerceAtLeast(0)
-                                    } else {
-                                        (idx + 1).coerceAtMost(count - 1)
-                                    }
-                                    if (next != idx) {
+                                    } else dragOffset.snapTo(exitOffset)
+                                    val next = if (previous) (index - 1).coerceAtLeast(0) else (index + 1).coerceAtMost(count - 1)
+                                    if (next != index) {
                                         onIndexChangeState.value(next)
                                         onUserChangedState.value?.invoke(next)
                                     }
                                     dragOffset.snapTo(0f)
                                     isDraggingDeck = false
                                 }
-                            } else {
-                                resetDrag(animated = true)
-                            }
+                            } else resetDrag(animated = true)
                         }
                     }
                 },
         ) {
-            // ≡ HStack(spacing: 0) + offset(stackOffset + dragOffset)
-            Row(
-                Modifier
-                    .fillMaxSize()
-                    .offset {
-                        IntOffset((stackBase + dragOffset.value).roundToInt(), 0)
-                    },
-            ) {
-                visible.forEach { index ->
-                    val role = when {
-                        index < current -> StoryDeckPageRole.LEADING
-                        index > current -> StoryDeckPageRole.TRAILING
-                        else -> StoryDeckPageRole.CENTER
-                    }
-                    val progress = (index - current).toFloat() + dragOffset.value / width
-
-                    Box(
-                        Modifier
-                            .width(with(density) { width.toDp() })
-                            .fillMaxHeight()
-                            .zIndex(if (role == StoryDeckPageRole.CENTER) 1f else 0f)
-                            .deckPassPageVisual(progress),
-                    ) {
-                        content(ids[index], role, isDraggingDeck)
-                        // ≡ .allowsHitTesting(role == .center): laterales solo visual
-                        if (role != StoryDeckPageRole.CENTER) {
-                            Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(Unit) {
-                                        awaitEachGesture {
-                                            val down = awaitFirstDown(requireUnconsumed = false)
-                                            while (true) {
-                                                val event = awaitPointerEvent(PointerEventPass.Main)
-                                                event.changes.forEach { it.consume() }
-                                                if (event.changes.none { it.id == down.id && it.pressed }) break
-                                            }
+            // No Row(fillMaxSize): Compose limita el maxWidth al viewport y las
+            // páginas 2..N miden ancho 0 → negro. Cada página fillMaxSize + offset
+            // (equivalente al HStack ancho + offset de SwiftUI).
+            visible.forEachIndexed { position, index ->
+                val role = when {
+                    index < current -> StoryDeckPageRole.LEADING
+                    index > current -> StoryDeckPageRole.TRAILING
+                    else -> StoryDeckPageRole.CENTER
+                }
+                val progress = (index - current).toFloat() + dragOffset.value / width
+                val pageX = stackBase + dragOffset.value + position * width
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .offset { IntOffset(pageX.roundToInt(), 0) }
+                        .zIndex(if (role == StoryDeckPageRole.CENTER) 1f else 0f)
+                        .deckPassPageVisual(progress),
+                ) {
+                    content(ids[index], role, isDraggingDeck)
+                    if (role != StoryDeckPageRole.CENTER) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown(requireUnconsumed = false)
+                                        while (true) {
+                                            val event = awaitPointerEvent(PointerEventPass.Main)
+                                            event.changes.forEach { it.consume() }
+                                            if (event.changes.none { it.id == down.id && it.pressed }) break
                                         }
-                                    },
-                            )
-                        }
+                                    }
+                                },
+                        )
                     }
                 }
             }
@@ -298,21 +261,15 @@ fun StoryUserDeckPager(
     }
 }
 
-/** ≡ `DeckPassPageModifier` — scale / opacity / blur según progress. */
 private fun Modifier.deckPassPageVisual(progress: Float): Modifier {
     val magnitude = abs(progress).coerceAtMost(1f)
+    if (magnitude < 0.001f) return this
     val scale = (1f - magnitude * 0.06f).coerceAtLeast(0.94f)
     val alpha = (1f - magnitude * 0.48f).coerceAtLeast(0.52f)
-    val blurRadius = if (magnitude > 0.04f && magnitude < 0.98f) {
-        5f * magnitude.coerceAtMost(1f)
-    } else {
-        0f
+    // No `Modifier.blur`: en Android randeriza negro sobre ExoPlayer/AsyncImage.
+    return graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+        this.alpha = alpha
     }
-    return this
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-            this.alpha = alpha
-        }
-        .blur(blurRadius.dp)
 }

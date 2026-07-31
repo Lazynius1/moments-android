@@ -25,14 +25,20 @@ import com.moments.android.views.components.AnimatedStickerView
 import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
 import com.moments.android.views.components.InteractiveAudioStickerView
+import com.moments.android.views.components.StickerCountdownCardView
 import com.moments.android.views.components.StickerHashtagCardView
 import com.moments.android.views.components.StickerLinkCardView
 import com.moments.android.views.components.StickerLocationCardView
 import com.moments.android.views.components.StickerMentionCardView
 import com.moments.android.views.components.StickerPolaroidFrameView
+import com.moments.android.views.components.StickerQuizCardView
 import com.moments.android.views.components.StickerTimeCardView
 import com.moments.android.views.components.StoryPolaroidFrameStyle
+import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.story.QuestionResponseStoryStickerCardView
+import com.moments.android.views.story.storystickers.InteractiveEmojiSliderSticker
+import com.moments.android.views.story.storystickers.InteractivePollSticker
+import com.moments.android.views.story.storystickers.InteractiveQuestionSticker
 import com.moments.android.views.creator.components.StoryTextOverlayLabel
 import com.moments.android.views.creator.creatorscreens.CreatorFlowPendingScreen
 import com.moments.android.views.creator.creatorscreens.SelfieStickerLiveCameraView
@@ -61,6 +67,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -80,9 +87,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material.icons.filled.FilterNone
+import androidx.compose.material.icons.filled.Person
 import com.moments.android.views.creator.creatoruikit.creatorMomentsCaptureRect
 import com.moments.android.views.creator.creatoruikit.creatorNormalizedUp
 import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
@@ -198,9 +209,6 @@ import com.moments.android.views.messaging.media.ChatMediaSendModeIcon
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.creator.stickerHostLabel
 import kotlinx.coroutines.Dispatchers
-import android.app.DatePickerDialog
-import android.app.TimePickerDialog
-import java.util.Calendar
 import java.util.Date
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -222,15 +230,6 @@ private fun stickerSupportsInlineEdit(sticker: StoryStickerDraft): Boolean = whe
     "poll", "question", "countdown", "quiz", "emojiSlider" -> true
     "hashtag" -> sticker.hashtag.isNullOrBlank()
     else -> false
-}
-
-/** Representación de cuenta atrás para el card del editor: HH:MM:SS, igual que el desglose Swift. */
-private fun formatCountdownRemaining(targetAtMs: Double): String {
-    val totalSeconds = ((targetAtMs - System.currentTimeMillis()) / 1000.0).toLong().coerceAtLeast(0L)
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return "%02d:%02d:%02d".format(hours, minutes, seconds)
 }
 
 /**
@@ -433,6 +432,8 @@ fun StoryEditingView(
         revealEffectColor = data.revealEffectColor,
         audioURL = data.audioURL,
         audioDuration = data.audioDuration,
+        momentId = data.momentId,
+        mediaCount = data.mediaCount,
     )
 
     // ≡ onAppear: initialSticker + initialChain* + SetChainContext listener
@@ -2778,49 +2779,133 @@ fun StoryEditingView(
 }
 
 @Composable
+private fun ShareMomentEditorSticker(
+    sticker: StoryStickerDraft,
+    modifier: Modifier = Modifier,
+) {
+    val bmp = sticker.image ?: return
+    val density = LocalDensity.current
+    // ≡ iOS frame(width: image.size.width/height) — tamaño natural del bitmap limpio (~260pt)
+    val widthDp = with(density) { bmp.width.toDp() }
+    val heightDp = with(density) { bmp.height.toDp() }
+    // ≡ StickerOverlayView.swift clip storyViewerCanvasCornerRadius
+    val corner = storyViewerCanvasCornerRadius
+    val cardShape = RoundedCornerShape(corner)
+
+    Box(
+        modifier
+            .width(widthDp)
+            .height(heightDp)
+            .clip(cardShape),
+    ) {
+        Image(
+            bitmap = bmp.asImageBitmap(),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        // Header + caption + gallery ≡ StickerOverlayView.swift shareMoment (overlays dinámicos)
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        // Aprox. ultraThinMaterial + mask gradient iOS
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(0.22f),
+                                Color.White.copy(0.10f),
+                                Color.Transparent,
+                            ),
+                        ),
+                    )
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val uid = sticker.userId
+                if (!uid.isNullOrBlank()) {
+                    AsyncProfileImageView(
+                        userId = uid,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    listOf(Color.White.copy(0.5f), Color.Transparent),
+                                ),
+                                shape = CircleShape,
+                            ),
+                    )
+                } else {
+                    Icon(
+                        Icons.Filled.Person,
+                        contentDescription = null,
+                        tint = Color.White.copy(0.5f),
+                        modifier = Modifier.size(34.dp),
+                    )
+                }
+                Text(
+                    text = sticker.username?.takeIf { it.isNotBlank() } ?: "User",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            sticker.caption?.takeIf { it.isNotBlank() }?.let { caption ->
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = caption,
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(bottom = 10.dp)
+                            .clip(RoundedCornerShape(percent = 50))
+                            .background(Color.White.copy(0.18f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+            }
+        }
+
+        if ((sticker.mediaCount ?: 0) > 1) {
+            Icon(
+                Icons.Filled.FilterNone,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 54.dp, end = 12.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White.copy(0.18f))
+                    .padding(6.dp)
+                    .size(11.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun StoryStickerChip(
     sticker: StoryStickerDraft,
     modifier: Modifier = Modifier,
     isEditingInline: Boolean = false,
     onUpdate: (StoryStickerDraft) -> Unit = {},
 ) {
-    val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(isEditingInline, sticker.id) {
         if (isEditingInline) {
             runCatching { focusRequester.requestFocus() }
         }
-    }
-
-    fun openCountdownDatePicker() {
-        val current = sticker.countdownTargetAtMs?.toLong()
-            ?: (System.currentTimeMillis() + 86_400_000L)
-        val cal = Calendar.getInstance().apply { timeInMillis = current }
-        DatePickerDialog(
-            context,
-            { _, year, month, day ->
-                cal.set(Calendar.YEAR, year)
-                cal.set(Calendar.MONTH, month)
-                cal.set(Calendar.DAY_OF_MONTH, day)
-                TimePickerDialog(
-                    context,
-                    { _, hour, minute ->
-                        cal.set(Calendar.HOUR_OF_DAY, hour)
-                        cal.set(Calendar.MINUTE, minute)
-                        cal.set(Calendar.SECOND, 0)
-                        val minMs = System.currentTimeMillis() + 60_000L
-                        val ms = maxOf(cal.timeInMillis, minMs).toDouble()
-                        onUpdate(sticker.copy(countdownTargetAtMs = ms))
-                    },
-                    cal.get(Calendar.HOUR_OF_DAY),
-                    cal.get(Calendar.MINUTE),
-                    true,
-                ).show()
-            },
-            cal.get(Calendar.YEAR),
-            cal.get(Calendar.MONTH),
-            cal.get(Calendar.DAY_OF_MONTH),
-        ).apply { datePicker.minDate = System.currentTimeMillis() }.show()
     }
 
     if (sticker.isAnimated && !sticker.gifURL.isNullOrBlank()) {
@@ -2888,13 +2973,10 @@ private fun StoryStickerChip(
     }
 
     if (sticker.type == "shareMoment" && sticker.image != null) {
-        Image(
-            bitmap = sticker.image.asImageBitmap(),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = modifier
-                .width(160.dp)
-                .clip(RoundedCornerShape(12.dp)),
+        // ≡ iOS StickerOverlayView shareMoment: imagen limpia + overlays dinámicos
+        ShareMomentEditorSticker(
+            sticker = sticker,
+            modifier = modifier,
         )
         return
     }
@@ -2973,113 +3055,50 @@ private fun StoryStickerChip(
             )
         }
         "poll" -> {
+            // ≡ InteractivePollSticker en StickerOverlayView.swift (respeta styleVariant / palette).
             val poll = (sticker.pollOptions ?: listOf("", "", "")).let {
                 when {
                     it.size >= 3 -> it.take(3)
                     else -> it + List(3 - it.size) { "" }
                 }
             }
-            Column(
-                modifier
-                    .background(Color.White.copy(0.94f), RoundedCornerShape(26.dp))
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                    .widthIn(min = 200.dp, max = 240.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (isEditingInline) {
-                    InlineStickerField(
-                        value = poll[0],
-                        placeholder = stringResource(R.string.sticker_poll_question),
-                        onValueChange = {
-                            val next = poll.toMutableList().also { list -> list[0] = it.take(44) }
-                            onUpdate(
-                                sticker.copy(
-                                    pollOptions = next,
-                                    questionText = next[0],
-                                    content = next[0].ifBlank { "Poll" },
-                                ),
-                            )
-                        },
-                        focusRequester = focusRequester,
-                        bold = true,
-                    )
-                    listOf(1, 2).forEach { idx ->
-                        InlineStickerField(
-                            value = poll[idx],
-                            placeholder = stringResource(
-                                if (idx == 1) R.string.sticker_poll_option_a else R.string.sticker_poll_option_b,
-                            ),
-                            onValueChange = {
-                                val next = poll.toMutableList().also { list -> list[idx] = it.take(28) }
-                                onUpdate(sticker.copy(pollOptions = next))
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color.Black.copy(0.045f), RoundedCornerShape(17.dp))
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                        )
+            InteractivePollSticker(
+                pollData = poll,
+                storyId = "preview",
+                userId = "preview",
+                stickerId = sticker.id,
+                styleVariant = sticker.styleVariant ?: 0,
+                isEditingInline = isEditingInline,
+                onPollDataChange = { next ->
+                    val normalized = when {
+                        next.size >= 3 -> next.take(3)
+                        else -> next + List(3 - next.size) { "" }
                     }
-                } else {
-                    Text(
-                        poll[0].ifBlank { "…" },
-                        color = Color.Black.copy(0.92f),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
-                        maxLines = 2,
+                    onUpdate(
+                        sticker.copy(
+                            pollOptions = normalized,
+                            questionText = normalized[0],
+                            content = normalized[0].ifBlank { "Poll" },
+                        ),
                     )
-                    listOf(1, 2).forEach { idx ->
-                        Text(
-                            poll[idx].ifBlank { "…" },
-                            color = Color.Black.copy(0.88f),
-                            fontSize = 13.sp,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color.Black.copy(0.045f), RoundedCornerShape(17.dp))
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                        )
-                    }
-                }
-            }
+                },
+                modifier = modifier.width(300.dp),
+            )
         }
         "question" -> {
-            Column(
-                modifier
-                    .background(Color.White.copy(0.94f), RoundedCornerShape(26.dp))
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                    .widthIn(min = 200.dp, max = 240.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                if (isEditingInline) {
-                    InlineStickerField(
-                        value = sticker.questionText.orEmpty(),
-                        placeholder = stringResource(R.string.sticker_question_placeholder),
-                        onValueChange = {
-                            val q = it.take(48)
-                            onUpdate(sticker.copy(questionText = q, content = q.ifBlank { "?" }))
-                        },
-                        focusRequester = focusRequester,
-                        bold = true,
-                    )
-                } else {
-                    Text(
-                        sticker.questionText?.ifBlank { "…" } ?: sticker.content.ifBlank { "…" },
-                        color = Color.Black.copy(0.92f),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
-                        maxLines = 2,
-                    )
-                }
-                Text(
-                    stringResource(R.string.sticker_question_tap),
-                    color = Color(0xFF3D75E0),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.Black.copy(0.05f), RoundedCornerShape(14.dp))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                )
-            }
+            InteractiveQuestionSticker(
+                questionText = sticker.questionText.orEmpty(),
+                storyId = "preview",
+                userId = "preview",
+                stickerId = sticker.id,
+                styleVariant = sticker.styleVariant ?: 0,
+                isEditingInline = isEditingInline,
+                onQuestionChange = { q ->
+                    val trimmed = q.take(48)
+                    onUpdate(sticker.copy(questionText = trimmed, content = trimmed.ifBlank { "?" }))
+                },
+                modifier = modifier.width(300.dp),
+            )
         }
         "link" -> {
             val title = sticker.linkTitle?.takeIf { it.isNotBlank() }
@@ -3101,78 +3120,23 @@ private fun StoryStickerChip(
             )
         }
         "countdown" -> {
-            val title = (sticker.countdownTitle ?: sticker.content).take(26)
-            val remaining = sticker.countdownTargetAtMs?.let { formatCountdownRemaining(it) }
-                ?: stringResource(R.string.sticker_countdown_finished)
-            val parts = remaining.split(":")
-            Column(
-                modifier
-                    .background(Color.White.copy(0.94f), RoundedCornerShape(22.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .widthIn(min = 180.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (isEditingInline) {
-                    InlineStickerField(
-                        value = title,
-                        placeholder = stringResource(R.string.sticker_countdown_title_placeholder),
-                        onValueChange = {
-                            val t = it.take(26)
-                            onUpdate(sticker.copy(countdownTitle = t, content = t))
-                        },
-                        focusRequester = focusRequester,
-                        bold = true,
-                        center = true,
-                    )
-                } else {
-                    Text(
-                        title.ifBlank { stringResource(R.string.sticker_countdown_placeholder) },
-                        color = Color.Black.copy(0.92f),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                    )
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = if (isEditingInline) {
-                        Modifier.clickable { openCountdownDatePicker() }
-                    } else {
-                        Modifier
-                    },
-                ) {
-                    parts.forEachIndexed { index, chunk ->
-                        chunk.forEach { ch ->
-                            Box(
-                                Modifier
-                                    .size(width = 26.dp, height = 32.dp)
-                                    .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    ch.toString(),
-                                    color = Color.Black.copy(0.92f),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp,
-                                )
-                            }
-                        }
-                        if (index < parts.lastIndex) {
-                            Text(
-                                ":",
-                                color = Color(0xFF6E2970),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                            )
-                        }
-                    }
-                }
-            }
+            StickerCountdownCardView(
+                title = (sticker.countdownTitle ?: sticker.content).take(26),
+                targetAtMs = sticker.countdownTargetAtMs
+                    ?: (System.currentTimeMillis() + 86_400_000.0),
+                styleVariant = sticker.styleVariant ?: 0,
+                isEditingInline = isEditingInline,
+                onTitleChange = { t ->
+                    val trimmed = t.take(26)
+                    onUpdate(sticker.copy(countdownTitle = trimmed, content = trimmed))
+                },
+                onTargetAtMsChange = { ms ->
+                    onUpdate(sticker.copy(countdownTargetAtMs = ms))
+                },
+                modifier = modifier.width(220.dp),
+            )
         }
         "quiz" -> {
-            val letters = listOf("A", "B", "C", "D")
             val options = (sticker.quizOptions ?: listOf("", "", "")).let {
                 when {
                     it.isEmpty() -> listOf("", "", "")
@@ -3180,198 +3144,33 @@ private fun StoryStickerChip(
                     else -> it
                 }
             }
-            val correct = sticker.quizCorrectIndex ?: 0
-            Column(
-                modifier
-                    .background(Color.White.copy(0.96f), RoundedCornerShape(24.dp))
-                    .widthIn(min = 240.dp, max = 300.dp),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFFF8A00), RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (isEditingInline) {
-                        InlineStickerField(
-                            value = sticker.quizQuestion.orEmpty(),
-                            placeholder = stringResource(R.string.sticker_quiz_question_prompt),
-                            onValueChange = {
-                                val q = it.take(80)
-                                onUpdate(sticker.copy(quizQuestion = q, content = q))
-                            },
-                            focusRequester = focusRequester,
-                            bold = true,
-                            center = true,
-                            textColor = Color.White,
-                            placeholderColor = Color.White.copy(0.55f),
-                            cursorColor = Color.White,
-                        )
-                    } else {
-                        Text(
-                            sticker.quizQuestion?.ifBlank { null }
-                                ?: stringResource(R.string.sticker_quiz_question_placeholder),
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            textAlign = TextAlign.Center,
-                            maxLines = 3,
-                        )
-                    }
-                }
-                Column(
-                    Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    options.forEachIndexed { index, option ->
-                        val isCorrect = correct == index
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    if (isCorrect) Color(0xFF2E7D32).copy(0.12f) else Color.Black.copy(0.045f),
-                                    RoundedCornerShape(12.dp),
-                                )
-                                .padding(horizontal = 12.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Box(
-                                Modifier
-                                    .size(26.dp)
-                                    .background(
-                                        if (isCorrect) Color(0xFF2E7D32) else Color.Black.copy(0.12f),
-                                        CircleShape,
-                                    )
-                                    .then(
-                                        if (isEditingInline) {
-                                            Modifier.clickable {
-                                                HapticManager.shared.heavyImpact()
-                                                onUpdate(sticker.copy(quizCorrectIndex = index))
-                                            }
-                                        } else {
-                                            Modifier
-                                        },
-                                    ),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    letters.getOrElse(index) { "${index + 1}" },
-                                    color = if (isCorrect) Color.White else Color.Black.copy(0.75f),
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 12.sp,
-                                )
-                            }
-                            if (isEditingInline) {
-                                InlineStickerField(
-                                    value = option,
-                                    placeholder = "${stringResource(R.string.sticker_quiz_option_prompt)} ${index + 1}…",
-                                    onValueChange = {
-                                        val next = options.toMutableList().also { list -> list[index] = it.take(40) }
-                                        onUpdate(sticker.copy(quizOptions = next))
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    bold = true,
-                                )
-                            } else {
-                                Text(
-                                    option.ifBlank { "…" },
-                                    color = Color.Black.copy(0.88f),
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp,
-                                    maxLines = 2,
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                        }
-                    }
-                    if (isEditingInline && options.size < 4) {
-                        Text(
-                            stringResource(R.string.sticker_quiz_add_option),
-                            color = Color.Black.copy(0.7f),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color.Black.copy(0.06f), RoundedCornerShape(12.dp))
-                                .clickable {
-                                    HapticManager.shared.selection()
-                                    onUpdate(sticker.copy(quizOptions = options + ""))
-                                }
-                                .padding(vertical = 10.dp),
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-            }
+            StickerQuizCardView(
+                question = sticker.quizQuestion.orEmpty(),
+                options = options,
+                selectedIndex = null,
+                correctIndex = sticker.quizCorrectIndex,
+                onSelect = {},
+                styleVariant = sticker.styleVariant ?: 0,
+                isEditingInline = isEditingInline,
+                onQuestionChange = { q ->
+                    val trimmed = q.take(80)
+                    onUpdate(sticker.copy(quizQuestion = trimmed, content = trimmed))
+                },
+                onOptionsChange = { next -> onUpdate(sticker.copy(quizOptions = next)) },
+                onCorrectIndexChange = { idx -> onUpdate(sticker.copy(quizCorrectIndex = idx)) },
+                modifier = modifier,
+            )
         }
         "emojiSlider" -> {
-            val emoji = sticker.sliderEmoji?.ifBlank { null } ?: "😍"
-            val prompt = sticker.sliderPrompt.orEmpty()
-            val value = 0.5f
-            Column(
-                modifier
-                    .background(Color.White.copy(0.96f), RoundedCornerShape(24.dp))
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-                    .widthIn(min = 220.dp, max = 280.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (isEditingInline || prompt.isNotBlank()) {
-                    if (isEditingInline) {
-                        InlineStickerField(
-                            value = prompt,
-                            placeholder = stringResource(R.string.sticker_emoji_slider_prompt),
-                            onValueChange = {
-                                onUpdate(sticker.copy(sliderPrompt = it.take(48), content = emoji))
-                            },
-                            focusRequester = focusRequester,
-                            bold = true,
-                            center = true,
-                        )
-                    } else {
-                        Text(
-                            prompt,
-                            color = Color.Black.copy(0.92f),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2,
-                        )
-                    }
-                }
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(36.dp),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(10.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(Color.Black.copy(0.12f))
-                            .align(Alignment.Center),
-                    )
-                    Box(
-                        Modifier
-                            .fillMaxWidth(value)
-                            .height(10.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(Color.Black.copy(0.22f))
-                            .align(Alignment.CenterStart),
-                    )
-                    Text(
-                        emoji,
-                        fontSize = (28f + value * 14f).sp,
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = ((220f * value) - 18f).coerceAtLeast(0f).dp),
-                    )
-                }
-            }
+            InteractiveEmojiSliderSticker(
+                prompt = sticker.sliderPrompt.orEmpty(),
+                emoji = sticker.sliderEmoji?.ifBlank { null } ?: "😍",
+                storyId = "preview",
+                userId = "preview",
+                stickerId = sticker.id,
+                styleVariant = sticker.styleVariant ?: 0,
+                modifier = modifier,
+            )
         }
         else -> {
             Text(
@@ -3520,6 +3319,8 @@ private fun StoryStickerDraft.toChatStickerData(zIndex: Int): StickerData = Stic
     sliderPrompt = sliderPrompt,
     caption = caption,
     profileImagePath = profileImagePath,
+    momentId = momentId,
+    mediaCount = mediaCount,
     quizQuestion = quizQuestion,
     quizOptions = quizOptions,
     quizCorrectIndex = quizCorrectIndex,

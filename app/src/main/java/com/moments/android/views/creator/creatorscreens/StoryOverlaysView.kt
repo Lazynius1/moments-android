@@ -122,14 +122,35 @@ fun isPointOverStoryOverlayTrash(
     canvasHeightPx: Float,
 ): Boolean = hypot(x - canvasWidthPx / 2f, y - (canvasHeightPx - 44f)) < 60f
 
-/** Equivalente visual de la papelera que Swift muestra solo durante un arrastre. */
+/**
+ * ≡ papelera de `StoryOverlaysView` — solo visible al arrastrar;
+ * scale 1.28 + spring cuando `isOverTrash` (MotionPolicy.Spring.press).
+ */
 @Composable
 fun StoryOverlayTrashZone(
     state: StoryOverlayDragState,
     modifier: Modifier = Modifier,
 ) {
-    if (!state.isDragging) return
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+    val visible by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (state.isDragging) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(200),
+        label = "trashVisible",
+    )
+    val hotScale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (state.isOverTrash) 1.28f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.7f,
+            stiffness = 500f,
+        ),
+        label = "trashHotScale",
+    )
+    if (visible <= 0.01f && !state.isDragging) return
+    Box(
+        modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = visible },
+        contentAlignment = Alignment.BottomCenter,
+    ) {
         Icon(
             imageVector = if (state.isOverTrash) Icons.Filled.Delete else Icons.Outlined.Delete,
             contentDescription = null,
@@ -138,8 +159,8 @@ fun StoryOverlayTrashZone(
                 .padding(bottom = 20.dp)
                 .size(48.dp)
                 .graphicsLayer {
-                    scaleX = if (state.isOverTrash) 1.28f else 1f
-                    scaleY = if (state.isOverTrash) 1.28f else 1f
+                    scaleX = hotScale
+                    scaleY = hotScale
                 },
         )
     }

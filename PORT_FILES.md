@@ -194,34 +194,34 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 **`Feed/maps`**
 - [~] WeatherService.swift → `views/feed/maps/WeatherService.kt`
 **`Login`**
-- [~] AuthUIComponents.swift → `views/login/AuthComponents.kt`
-- [~] CreatingProfileView.swift → `views/login/CreatingProfileScreen.kt`
-- [~] DeactivatedAccountView.swift → `views/login/AccountStateScreens.kt`
-- [~] Interestview.swift — N/A (archivo vacío)
-- [~] LiquidGlassComponents.swift → `views/login/AuthComponents.kt + AuthTheme.kt`
-- [~] LoginView.swift → `views/login/LoginScreen.kt`
-- [~] PrivacyPolicyView.swift → `views/login/PrivacyPolicyScreen.kt`
-- [~] ProfileOnboardingView.swift → `views/login/OnboardingScreen.kt`
-- [~] RegisterView.swift → `→ OnboardingScreen.kt`
-- [~] SocialProfileCompletionView.swift — N/A (era Apple; Google crea perfil directo)
-- [~] SplashScreen.swift → `views/login/SplashScreen.kt`
-- [~] SuspendedAccount.swift → `views/login/AccountStateScreens.kt`
+- [x] AuthUIComponents.swift → `views/login/AuthUIComponents.kt`
+- [x] CreatingProfileView.swift → `views/login/CreatingProfileView.kt`
+- [x] DeactivatedAccountView.swift → `views/login/AccountStateScreens.kt` (reactivate+loading+card+aurora)
+- [🚫] Interestview.swift — vacío iOS
+- [x] LiquidGlassComponents.swift → `views/login/AuthUIComponents.kt` + `AuthTheme.kt`
+- [x] LoginView.swift → `views/login/LoginView.kt` (Welcome/form/Google/reset; Passkey 🚫)
+- [x] PrivacyPolicyView.swift → `views/login/PrivacyPolicyView.kt`
+- [x] ProfileOnboardingView.swift → `views/login/ProfileOnboardingView.kt`
+- [x] RegisterView.swift → `views/login/RegisterView.kt`
+- [x] SocialProfileCompletionView.swift → SocialOnboarding (Google ≡ Apple wrapper iOS)
+- [x] SplashScreen.swift → `views/login/SplashScreen.kt`
+- [x] SuspendedAccount.swift → `views/login/AccountStateScreens.kt` (AppealForm+AppealStatus sheets)
 **`Messaging/Attachments`**
-- [~] ChatGiphyPickerSheet.swift → views/messaging/attachments/ChatGiphyPickerSheet.kt (GIF/sticker, búsqueda debounce, paginación, masonry, recientes)
-- [~] ChatLocationSheet.swift → views/messaging/attachments/ChatLocationSheet.kt (mapa pasivo, ubicación actual, POIs, búsqueda, live location y permisos)
+- [x] ChatGiphyPickerSheet.swift → views/messaging/attachments/ChatGiphyPickerSheet.kt (GIF masonry staggered, stickers 4-col, load-more last, debounce, recientes)
+- [x] ChatLocationSheet.swift → views/messaging/attachments/ChatLocationSheet.kt (Mapbox preview, ALWAYS gate live, Places nearby/search ≡ MapKit)
 **`Messaging/Components`**
 - [~] AttachmentIconView.swift → views/messaging/components/AttachmentIconView.kt (assets existentes, métricas, presets y tint template)
 - [~] ChatAdaptiveColors.swift → views/messaging/components/ChatAdaptiveColors.kt (paleta chat y CompositionLocals de burbuja/fila)
 - [~] ChatAttachmentSheet.swift → views/messaging/components/ChatAttachmentSheet.kt (menú anclado, sheets GIF/sticker/ubicación y grid MediaStore multi-select)
 - [~] ChatBuzzEffectViews.swift → views/messaging/components/ChatBuzzEffectViews.kt (shake, toast, evento timeline y wave shape)
-- [~] ChatChromeViews.swift → views/messaging/components/ChatChromeViews.kt (chrome, historial, requests, divisores, typing, toasts y búsqueda)
-- [~] ChatClusterMediaViews.swift → views/messaging/components/ChatClusterMediaViews.kt (agrupado, abanico, tiles, galería, selección y borrado)
+- [x] ChatChromeViews.swift → views/messaging/components/ChatChromeViews.kt (chrome, historial, requests, divisores, typing, toasts y búsqueda)
+- [x] ChatClusterMediaViews.swift → views/messaging/components/ChatClusterMediaViews.kt (agrupado, abanico, tiles, galería, selección, borrado, detail host)
 - [~] ChatEphemeralMessageViews.swift → views/messaging/components/ChatEphemeralMessageViews.kt (compact/standard, preview, media, resolving y expirado)
 - [~] ChatFloatingNavigationOverlay.swift → views/messaging/components/ChatFloatingNavigationOverlay.kt (estado derivado, navegación de búsqueda y scroll)
 - [~] ChatGifMessageBubble.swift → views/messaging/components/ChatGifMessageBubble.kt (ratio, fallback, GIF y progreso de envío)
 - [~] ChatInputViews.swift → views/messaging/components/ChatInputViews.kt (barra, attachments, envío, controles y preview de voz)
 - [~] ChatKFImageViews.swift → views/messaging/components/ChatKFImageViews.kt (Coil, placeholder y prefetch remoto)
-- [~] ChatLocationMessageBubble.swift → views/messaging/components/ChatLocationMessageBubble.kt (mapa, estática/live, countdown, detalle y Maps intents)
+- [x] ChatLocationMessageBubble.swift → views/messaging/components/ChatLocationMessageBubble.kt (Snapshotter Mapbox+cache, detail hybrid, live pin, countdown)
 - [~] ChatMediaViews.swift → views/messaging/components/ChatMediaViews.kt (placeholders, descarga/subida, image/video y fullscreen image)
 - [~] ChatMessageBubbleViews.swift → views/messaging/components/ChatMessageBubbleViews.kt (fila, grupos, reply/long-press/swipe, tipos de mensaje, reacciones, enlaces y preview)
 - [~] ChatMessageForwardSheet.swift → views/messaging/components/ChatMessageForwardSheet.kt (wrapper y selector multi-destinatario)
@@ -237,7 +237,7 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] ConversationContextMenu.swift → views/messaging/components/ConversationContextMenu.kt (overlay cutout+chrome glass+acciones+highlight; pin.slash≈PushPin)
 - [~] MediaProgressRing.swift → views/messaging/components/MediaProgressRing.kt (anillo, gradiente, progreso y porcentaje)
 - [~] MessageTypeIconView.swift → views/messaging/components/MessageTypeIconView.kt (assets custom y fallback por tipo)
-- [~] MessagingComposerAndStatusViews.swift → views/messaging/components/MessagingComposerAndStatusViews.kt (composer gradient+send; status MomentsModalSheet)
+- [x] MessagingComposerAndStatusViews.swift → views/messaging/components/MessagingComposerAndStatusViews.kt (sheet ANDROID_SETTINGS_UI_STYLE + composer canvas sólido/IME)
 - [~] ViewOnceMessageBubble.swift → views/messaging/components/ViewOnceMessageBubble.kt (pill unread/replay/opened/sent; zoom matchedTransition no portado)
 - [~] VoiceNotes.swift → views/messaging/components/VoiceNotes.kt (recorder/compose/trim+bubble scrub/speed/shape; proximidad no portada)
 - [~] VoiceRecordingGestureViews.swift → views/messaging/components/VoiceRecordingGestureViews.kt (hold, lock, cancel y aura reactiva)
@@ -300,51 +300,51 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [~] LiveLocationSharingService.swift → `views/messaging/services/LiveLocationSharingService.kt` (teardown logout)
 - [~] ViewOnceConsumptionService.swift → `views/messaging/services/ViewOnceConsumptionService.kt` (callable de consumo/replay; revisión de paridad pendiente)
 **`Misc`**
-- [~] WhatsNewView.swift
+- [x] WhatsNewView.swift → views/misc/WhatsNewView.kt (bienvenida Android 1.0; chrome≡iOS)
 **`Nova/AI`**
-- [~] NovaAIService.swift → `views/nova/ai/NovaAIService.kt` (Vertex AI, chat/stream/tools/search grounding, JSON, títulos, compactación e imagen)
-- [~] NovaGenerationConfig.swift → `views/nova/ai/NovaGenerationConfig.kt` (model, generation/safety settings; SDK integration pending review with NovaAIService)
-- [~] NovaPromptCatalog.swift → `views/nova/ai/NovaPromptCatalog.kt` (catálogo interno de prompts, contexto de sesión e historial)
+- [x] NovaAIService.swift → `views/nova/ai/NovaAIService.kt` (Vertex chat/stream/tools/JSON/títulos/compactación; wrappers SDK)
+- [x] NovaGenerationConfig.swift → `views/nova/ai/NovaGenerationConfig.kt` (model+chat/JSON/title+safety 1:1)
+- [x] NovaPromptCatalog.swift → `views/nova/ai/NovaPromptCatalog.kt` (catálogo prompts+sesión+historial)
 **`Nova/Agent`**
-- [~] NovaAgent.swift → `views/nova/agent/NovaAgent.kt` (turnos streaming/tools, confirmación, historial, memoria y conversaciones; dependencias Nova se resuelven en sus counterparts)
-- [~] NovaContextAssembler.swift → `views/nova/agent/NovaContextAssembler.kt` (instrucción de sistema con sesión, memoria, resúmenes e historial interno)
-- [~] NovaPendingAction.swift → `views/nova/agent/NovaPendingAction.kt` (confirmaciones y resúmenes de writes sensibles localizados)
-- [~] NovaToolExecutor.swift → `views/nova/agent/NovaToolExecutor.kt` (dispatch completo, dedupe, confirmaciones, media y refresh de memoria)
-- [~] NovaToolRegistry.swift → `views/nova/agent/NovaToolRegistry.kt` (declaraciones completas y gate de confirmación)
+- [x] NovaAgent.swift → `views/nova/agent/NovaAgent.kt` (turnos streaming/tools, confirmación, historial, memoria; handleToolCalls≡iOS; finalizeOnExit en NovaView)
+- [x] NovaContextAssembler.swift → `views/nova/agent/NovaContextAssembler.kt` (instrucción de sistema con sesión, memoria, resúmenes e historial interno)
+- [x] NovaPendingAction.swift → `views/nova/agent/NovaPendingAction.kt` (confirmaciones y resúmenes de writes sensibles localizados)
+- [x] NovaToolExecutor.swift → `views/nova/agent/NovaToolExecutor.kt` (dispatch completo, dedupe, confirmaciones, media y refresh de memoria)
+- [x] NovaToolRegistry.swift → `views/nova/agent/NovaToolRegistry.kt` (declaraciones completas y gate de confirmación)
 **`Nova/Conversation`**
-- [~] NovaConversationStore.swift → `views/nova/conversation/NovaConversationStore.kt` (Firestore user-scoped/legacy, cifrado, títulos, imágenes privadas y grounding)
+- [x] NovaConversationStore.swift → `views/nova/conversation/NovaConversationStore.kt` (user-scoped+legacy, cifrado, títulos, imágenes, grounding; merge≡iOS)
 **`Nova`**
-- [~] Conversationmodels.swift → `views/nova/Conversationmodels.kt` (títulos, documentos Firestore, media legacy y grounding)
+- [x] Conversationmodels.swift → `views/nova/Conversationmodels.kt` (títulos, Saved, messages, legacy decode)
 **`Nova/Core`**
-- [~] NovaLocaleContext.swift → `views/nova/core/NovaLocaleContext.kt` (locale e idioma de sesión)
+- [x] NovaLocaleContext.swift → `views/nova/core/NovaLocaleContext.kt` (locale e idioma de sesión)
 **`Nova/Memory`**
-- [~] NovaContextStore.swift
-- [~] NovaMemoryCrypto.swift → `views/nova/memory/NovaMemoryCrypto.kt` (cifrado de facts/resúmenes y migración legacy)
-- [~] NovaMemoryEngine.swift
-- [~] NovaMemoryModels.swift → `views/nova/memory/NovaMemoryModels.kt` (facts, dedupe, nombre preferido, límites y Firestore)
-- [~] NovaMemoryStore.swift
+- [x] NovaContextStore.swift → `views/nova/memory/NovaContextStore.kt` (summaries cifrados+load/save/clear)
+- [x] NovaMemoryCrypto.swift → `views/nova/memory/NovaMemoryCrypto.kt` (encrypt/decrypt facts+context; migración)
+- [x] NovaMemoryEngine.swift → `views/nova/memory/NovaMemoryEngine.kt` (finalize+sanitize+notify)
+- [x] NovaMemoryModels.swift → `views/nova/memory/NovaMemoryModels.kt` (facts, dedupe, preferredName, límites)
+- [x] NovaMemoryStore.swift → `views/nova/memory/NovaMemoryStore.kt` (cache+encrypt persist; Flow≡Notification)
 **`Nova/NovaCore`**
-- [~] NovaModels.swift
-- [~] NovaTheme.swift
+- [x] NovaModels.swift → `views/nova/novacore/NovaModels.kt` (Grounding+ChatMessage)
+- [x] NovaTheme.swift → `views/nova/novacore/NovaTheme.kt` (colors+BrandIcon+LogConfig)
 **`Nova`**
-- [~] NovaMemoryManagementView.swift
+- [x] NovaMemoryManagementView.swift → `views/nova/NovaMemoryManagementView.kt` (header glass+empty+categorías+clear+VM)
 **`Nova/NovaSections`**
-- [~] NovaAttachmentSheet.swift
-- [~] NovaChatSection.swift
-- [~] NovaChromeSection.swift
-- [~] NovaHistorySection.swift
-- [~] NovaInputSection.swift
+- [x] NovaAttachmentSheet.swift → `views/nova/novasections/NovaAttachmentSheet.kt` (popover anclado+overlay medium+camera/photos chrome)
+- [x] NovaChatSection.swift → `views/nova/novasections/NovaChatSection.kt` (+NovaChatTextFormatting; bubbles+typewriter+grounding+format)
+- [x] NovaChromeSection.swift → `views/nova/novasections/NovaChromeSection.kt` (header+welcome+particles+confetti+loading+badge)
+- [x] NovaHistorySection.swift → `views/nova/novasections/NovaHistorySection.kt` (overlay glass+items)
+- [x] NovaInputSection.swift → `views/nova/novasections/NovaInputSection.kt` (layout+glass+focus+plus/send+chips/shimmer)
 **`Nova`**
-- [~] NovaView.swift
+- [x] NovaView.swift → `views/nova/NovaView.kt` (fades+IME+auto-scroll+overlays+memory sheet)
 **`Nova/Tools`**
-- [~] NovaActivityTools.swift
-- [~] NovaMemoryTools.swift
-- [~] NovaMomentAudience.swift
-- [~] NovaMomentDraftParser.swift
-- [~] NovaProfileTools.swift
-- [~] NovaSocialTools.swift
+- [x] NovaActivityTools.swift → `views/nova/tools/NovaActivityTools.kt` (visitas/semana/story chain; NovaEvents SharedFlow)
+- [x] NovaMemoryTools.swift → `views/nova/tools/NovaMemoryTools.kt` (rememberFact+updatePreference)
+- [x] NovaMomentAudience.swift → `views/nova/tools/NovaMomentAudience.kt` (resolve+errors; customList→Caption.custom)
+- [x] NovaMomentDraftParser.swift → `views/nova/tools/NovaMomentDraftParser.kt` (schema JSON→Draft)
+- [x] NovaProfileTools.swift → `views/nova/tools/NovaProfileTools.kt` (snapshots+social+privacy+content/echo)
+- [x] NovaSocialTools.swift → `views/nova/tools/NovaSocialTools.kt` (lists+create_moment+suggestions)
 **`Nova/UI`**
-- [~] NovaActionConfirmationOverlay.swift
+- [x] NovaActionConfirmationOverlay.swift → `views/nova/ui/NovaActionConfirmationOverlay.kt` (scrim+glass+preview)
 **`Permission/camera`**
 - [~] Contentview.swift
 **`Permission/camera/helpers`**
@@ -545,7 +545,7 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 ## Models  (0/21)
 
 - [ ] AccountHistoryItem.swift
-- [ ] BestFriendsView.swift
+- [~] BestFriendsView.swift → `models/BestFriendsView.kt` (selected/suggested+pagination; chrome; skeleton/empty; IDs categorize)
 - [ ] CachedAction.swift
 - [ ] CachedConnection.swift
 - [ ] CachedConversation.swift
@@ -564,7 +564,7 @@ Ningún archivo se considera espejo 1:1 hasta comparar datos, estados, errores y
 - [ ] User.swift
 - [ ] UserAffinity.swift
 - [ ] UserBadge.swift
-- [ ] VisitsView.swift
+- [~] VisitsView.swift → `models/VisitsView.kt` + `Visit.kt` (TabContent skeleton/empty; rowSubtitle; alert; StalkerCard; unfollow confirm)
 
 ## Moderation  (2/2)
 

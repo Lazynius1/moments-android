@@ -1,17 +1,13 @@
 package com.moments.android.views.messaging.attachments
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
 import android.location.Address
 import android.location.Geocoder
-import android.location.Location
 import android.location.LocationManager
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,10 +20,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -41,28 +42,33 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
-import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.model.CircularBounds
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.net.SearchByTextRequest
 import com.google.android.libraries.places.api.net.SearchNearbyRequest
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberMarkerState
+import com.mapbox.geojson.Point
+import com.mapbox.maps.extension.compose.MapboxMap
+import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
+import com.mapbox.maps.extension.compose.rememberMapState
+import com.mapbox.maps.plugin.gestures.generated.GesturesSettings
 import com.moments.android.BuildConfig
 import com.moments.android.R
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.feed.maps.FeedMaps
+import com.moments.android.views.feed.maps.LocationUtilities
+import com.moments.android.views.feed.maps.MapRegionStore
+import com.moments.android.views.feed.maps.MomentsMapStyle
+import com.moments.android.views.feed.maps.MomentsMapboxStandardStyle
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
@@ -81,6 +87,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.UUID
+import kotlin.math.roundToInt
 
 /** Port de `Views/Messaging/Attachments/ChatLocationSheet.swift`. */
 data class ChatLocationPlace(
@@ -119,22 +126,33 @@ fun ChatLocationSheetContent(
     var showLiveDurationDialog by remember { mutableStateOf(false) }
     val locationGate = remember { LocationPermissionGate() }
 
-    fun loadCurrentLocation() {
+    fun applyUserLocation(latitude: Double, longitude: Double, accuracy: Float?) {
+        if (hasCenteredOnUser) return
+        hasCenteredOnUser = true
+        currentLatitude = latitude
+        currentLongitude = longitude
+        accuracyMeters = accuracy?.takeIf { it >= 0f }
         scope.launch {
-            val location = withContext(Dispatchers.IO) { currentLastKnownLocation(context) } ?: return@launch
-            if (hasCenteredOnUser) return@launch
-            hasCenteredOnUser = true
-            currentLatitude = location.latitude
-            currentLongitude = location.longitude
-            accuracyMeters = location.accuracy.takeIf { it >= 0f }
             val currentAddress = withContext(Dispatchers.IO) {
-                reverseGeocodeAddress(context, location.latitude, location.longitude)
+                reverseGeocodeAddress(context, latitude, longitude)
             }
             currentPlaceName = currentAddress?.name
             currentPlaceAddress = currentAddress?.shortAddress
             nearbyPlaces = withContext(Dispatchers.IO) {
-                searchNearbyPlaces(context, location.latitude, location.longitude)
+                runCatching { searchNearbyPlaces(context, latitude, longitude) }
+                    .getOrDefault(emptyList())
             }
+        }
+    }
+
+    // ≡ iOS `centerOnUserIfPossible` + LocationUtilities.currentLocation
+    fun centerOnUserIfPossible() {
+        if (hasCenteredOnUser) return
+        if (!LocationUtilities.hasForegroundPermission(context)) return
+        LocationUtilities.getCurrentLocation(context) { point ->
+            if (point == null || hasCenteredOnUser) return@getCurrentLocation
+            val accuracy = lastKnownAccuracyMeters(context)
+            applyUserLocation(point.latitude(), point.longitude(), accuracy)
         }
     }
 
@@ -162,7 +180,9 @@ fun ChatLocationSheetContent(
             delay(SEARCH_DEBOUNCE_MILLIS)
             try {
                 val found = withContext(Dispatchers.IO) {
-                    searchPlaces(context, trimmed, currentLatitude, currentLongitude)
+                    runCatching {
+                        searchPlaces(context, trimmed, currentLatitude, currentLongitude)
+                    }.getOrDefault(emptyList())
                 }
                 if (version == requestVersion) searchResults = found
             } catch (error: CancellationException) {
@@ -176,7 +196,8 @@ fun ChatLocationSheetContent(
     }
 
     LaunchedEffect(Unit) {
-        if (hasForegroundLocationPermission(context)) loadCurrentLocation()
+        // ≡ iOS onAppear: solo centra si ya hay permiso (no gate WHEN_IN_USE al abrir)
+        centerOnUserIfPossible()
     }
     DisposableEffect(Unit) {
         onDispose { searchJob?.cancel() }
@@ -194,10 +215,12 @@ fun ChatLocationSheetContent(
                     ChatLocationMapPreview(
                         latitude = currentLatitude,
                         longitude = currentLongitude,
+                        accentColor = accentColor,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(170.dp)
                             .padding(horizontal = 16.dp)
+                            .padding(bottom = 12.dp)
                             .clip(RoundedCornerShape(16.dp)),
                     )
                 }
@@ -207,7 +230,7 @@ fun ChatLocationSheetContent(
                         tint = accentColor,
                         title = stringResource(R.string.chat_location_send_current),
                         subtitle = accuracyMeters?.let {
-                            stringResource(R.string.chat_location_accuracy, it.toInt())
+                            stringResource(R.string.chat_location_accuracy, it.roundToInt())
                         } ?: currentPlaceAddress ?: stringResource(R.string.chat_location_send_current_subtitle),
                         primaryText = primaryText,
                         secondaryText = secondaryText,
@@ -244,13 +267,16 @@ fun ChatLocationSheetContent(
                 }
                 listedPlaces.isEmpty() -> item(key = "empty") {
                     Text(
-                        text = stringResource(if (isShowingSearch) R.string.chat_location_no_results else R.string.chat_location_no_nearby),
+                        text = stringResource(
+                            if (isShowingSearch) R.string.chat_location_no_results else R.string.chat_location_no_nearby,
+                        ),
                         color = secondaryText,
                         fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
                     )
                 }
-                else -> items(listedPlaces, key = { it.id }) { place ->
+                else -> itemsIndexed(listedPlaces, key = { _, place -> place.id }) { index, place ->
                     ChatLocationPlaceRow(
                         place = place,
                         primaryText = primaryText,
@@ -260,6 +286,12 @@ fun ChatLocationSheetContent(
                             onSendStatic(place.latitude, place.longitude, place.name, place.address)
                         },
                     )
+                    if (index != listedPlaces.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 60.dp),
+                            color = secondaryText.copy(alpha = 0.18f),
+                        )
+                    }
                 }
             }
         }
@@ -267,7 +299,11 @@ fun ChatLocationSheetContent(
             placeholderRes = R.string.chat_location_search_places,
             text = searchText,
             onTextChange = ::scheduleSearch,
-            onClear = { scheduleSearch("") },
+            onClear = {
+                searchText = ""
+                searchResults = emptyList()
+                isSearching = false
+            },
             modifier = Modifier.align(Alignment.TopCenter),
         )
     }
@@ -309,28 +345,80 @@ fun ChatLocationSheetContent(
     LocationPermissionGateHost(locationGate)
 }
 
+/** Preview pasivo Mapbox ≡ iOS `Map(interactionModes: [])` + pin centrado. */
 @Composable
-private fun ChatLocationMapPreview(latitude: Double, longitude: Double, modifier: Modifier = Modifier) {
-    val center = LatLng(latitude, longitude)
-    val cameraPositionState = rememberCameraPositionState()
-    LaunchedEffect(latitude, longitude) {
-        cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(center, MAP_PREVIEW_ZOOM))
+private fun ChatLocationMapPreview(
+    latitude: Double,
+    longitude: Double,
+    accentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val previewZoom = remember {
+        MapRegionStore.zoomFromLongitudeDelta(MAP_PREVIEW_LONGITUDE_DELTA)
     }
-    GoogleMap(
-        cameraPositionState = cameraPositionState,
-        uiSettings = MapUiSettings(
-            compassEnabled = false,
-            mapToolbarEnabled = false,
-            myLocationButtonEnabled = false,
-            rotationGesturesEnabled = false,
-            scrollGesturesEnabled = false,
-            tiltGesturesEnabled = false,
-            zoomControlsEnabled = false,
-            zoomGesturesEnabled = false,
-        ),
-        modifier = modifier,
-    ) {
-        Marker(state = rememberMarkerState(position = center))
+    val mapViewportState = rememberMapViewportState {
+        setCameraOptions {
+            center(Point.fromLngLat(longitude, latitude))
+            zoom(previewZoom)
+            pitch(MomentsMapStyle.CAMERA_PITCH)
+            bearing(0.0)
+        }
+    }
+    val mapState = rememberMapState {
+        gesturesSettings = GesturesSettings {
+            scrollEnabled = false
+            pinchToZoomEnabled = false
+            rotateEnabled = false
+            pitchEnabled = false
+            doubleTapToZoomInEnabled = false
+            doubleTouchToZoomOutEnabled = false
+            quickZoomEnabled = false
+            simultaneousRotateAndPinchToZoomEnabled = false
+        }
+    }
+
+    LaunchedEffect(latitude, longitude) {
+        mapViewportState.setCameraOptions {
+            center(Point.fromLngLat(longitude, latitude))
+            zoom(previewZoom)
+            pitch(MomentsMapStyle.CAMERA_PITCH)
+            bearing(0.0)
+        }
+    }
+
+    Box(modifier = modifier) {
+        if (FeedMaps.hasMapboxToken()) {
+            MapboxMap(
+                modifier = Modifier.fillMaxSize(),
+                mapViewportState = mapViewportState,
+                mapState = mapState,
+                style = { MomentsMapboxStandardStyle(realisticElevation = false) },
+            )
+        } else {
+            Box(
+                Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.MyLocation, contentDescription = null, tint = accentColor, modifier = Modifier.size(34.dp))
+            }
+        }
+        // ≡ iOS `location.circle.fill` centrado (no annotation del mapa)
+        Box(
+            Modifier
+                .align(Alignment.Center)
+                .size(28.dp)
+                .shadow(2.dp, CircleShape)
+                .clip(CircleShape)
+                .background(accentColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.MyLocation,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(16.dp),
+            )
+        }
     }
 }
 
@@ -380,27 +468,27 @@ private fun ChatLocationPlaceRow(
 @Composable
 private fun ChatLocationSectionHeader(@StringRes titleRes: Int, secondaryText: Color) {
     Text(
-        text = stringResource(titleRes),
+        text = stringResource(titleRes).uppercase(Locale.getDefault()),
         color = secondaryText,
         fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(top = 14.dp, bottom = 6.dp),
     )
 }
 
 private data class ReverseGeocodedAddress(val name: String?, val shortAddress: String?)
 
-private fun hasForegroundLocationPermission(context: Context): Boolean =
-    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
 @Suppress("DEPRECATION")
-private fun currentLastKnownLocation(context: Context): Location? {
-    if (!hasForegroundLocationPermission(context)) return null
+private fun lastKnownAccuracyMeters(context: Context): Float? {
+    if (!LocationUtilities.hasForegroundPermission(context)) return null
     val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
-    return listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+    return listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
         .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
         .maxByOrNull { it.time }
+        ?.accuracy
 }
 
 @Suppress("DEPRECATION")
@@ -427,14 +515,19 @@ private fun ensurePlacesClient(context: Context): com.google.android.libraries.p
 
 private fun placeFields() = listOf(Place.Field.ID, Place.Field.DISPLAY_NAME, Place.Field.FORMATTED_ADDRESS, Place.Field.LOCATION)
 
+/** Nearby ≡ iOS `MKLocalPointsOfInterestRequest` (Places API; no Mapbox Search en el proyecto). */
 private suspend fun searchNearbyPlaces(context: Context, latitude: Double, longitude: Double): List<ChatLocationPlace> {
     val client = ensurePlacesClient(context) ?: return emptyList()
-    val request = SearchNearbyRequest.builder(CircularBounds.newInstance(LatLng(latitude, longitude), NEARBY_RADIUS_METERS), placeFields())
-        .setMaxResultCount(25)
+    val request = SearchNearbyRequest.builder(
+        CircularBounds.newInstance(LatLng(latitude, longitude), NEARBY_RADIUS_METERS),
+        placeFields(),
+    )
+        .setMaxResultCount(20)
         .build()
     return client.searchNearby(request).await().places.mapNotNull(::toChatLocationPlace)
 }
 
+/** Search ≡ iOS `MKLocalSearch` (Places SearchByText). */
 private suspend fun searchPlaces(
     context: Context,
     query: String,
@@ -452,7 +545,6 @@ private suspend fun searchPlaces(
 private fun toChatLocationPlace(place: Place): ChatLocationPlace? {
     val coordinate = place.location ?: return null
     val name = place.displayName?.takeIf { it.isNotBlank() } ?: return null
-    // Prefer short address (thoroughfare+locality style) when Places only gives formatted
     val address = place.formattedAddress?.takeIf { it.isNotBlank() }?.let { formatted ->
         formatted.split(",").take(2).joinToString(",").trim().ifBlank { formatted }
     }
@@ -467,7 +559,8 @@ private fun toChatLocationPlace(place: Place): ChatLocationPlace? {
 
 private val BARCELONA_LATITUDE = 41.3874
 private val BARCELONA_LONGITUDE = 2.1686
-private const val MAP_PREVIEW_ZOOM = 16f
+/** ≡ iOS span `latitudeDelta: 0.008` tras centrar en usuario. */
+private const val MAP_PREVIEW_LONGITUDE_DELTA = 0.008
 private const val NEARBY_RADIUS_METERS = 1_000.0
 private const val SEARCH_RADIUS_METERS = 10_000.0
 private const val SEARCH_DEBOUNCE_MILLIS = 350L

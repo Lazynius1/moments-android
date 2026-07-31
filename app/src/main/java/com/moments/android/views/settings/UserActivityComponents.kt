@@ -22,8 +22,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -279,16 +277,10 @@ fun AuthorFilterSheet(
             )
         }
 
-        TextField(
+        SettingsSearchField(
             value = searchText,
             onValueChange = { searchText = it },
-            singleLine = true,
-            placeholder = { Text(stringResource(R.string.user_activity_author_search)) },
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                disabledContainerColor = Color.Transparent,
-            ),
+            placeholder = stringResource(R.string.user_activity_author_search),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp),

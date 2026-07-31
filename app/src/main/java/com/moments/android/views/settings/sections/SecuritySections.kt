@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,8 +22,11 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,6 +54,7 @@ import com.moments.android.utilities.MomentsPressDefaults
 import com.moments.android.utilities.momentsPress
 import com.moments.android.views.login.linkGoogleAccount
 import com.moments.android.views.messaging.components.ChatRecoverySettingsView
+import com.moments.android.views.settings.SettingsProfileColors
 import com.moments.android.views.settings.SettingsRoute
 import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.CancellationException
@@ -158,8 +163,8 @@ fun SecuritySection(onRoute: (SettingsRoute) -> Unit) {
         MomentsModalSheet(
             onDismissRequest = { showChatRecovery = false },
             largeOnly = false,
-        ) {
-            ChatRecoverySettingsView(onClose = { showChatRecovery = false })
+        ) { dismiss ->
+            ChatRecoverySettingsView(onClose = dismiss)
         }
     }
 
@@ -253,15 +258,12 @@ private fun SecurityStatusRow(
 ) {
     val isDark = isSystemInDarkTheme()
     val primary = if (isDark) Color.White else Color.Black
-    val interaction = remember { MutableInteractionSource() }
     Column(
         Modifier
             .fillMaxWidth()
             .then(
                 if (onClick != null && !isLoading) {
-                    Modifier
-                        .momentsPress(interaction, MomentsPressDefaults.momentsPressSubtle)
-                        .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                    Modifier.clickable(onClick = onClick)
                 } else {
                     Modifier
                 },
@@ -270,20 +272,32 @@ private fun SecurityStatusRow(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 11.dp, horizontal = 4.dp),
+                .padding(
+                    horizontal = SettingsRowHorizontalPadding,
+                    vertical = 11.dp,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
                 painter = painterResource(R.drawable.google_icon),
                 contentDescription = null,
                 modifier = Modifier
-                    .width(28.dp)
+                    .width(SettingsIconSlotWidth)
                     .size(19.dp),
             )
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(SettingsIconTextSpacing))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = primary)
-                Text(subtitle, fontSize = 12.sp, color = Color.Gray)
+                Text(
+                    title,
+                    fontWeight = FontWeight.Medium,
+                    color = primary,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    subtitle,
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
             when {
                 isLoading -> CircularProgressIndicator(
@@ -300,9 +314,9 @@ private fun SecurityStatusRow(
             }
         }
         HorizontalDivider(
-            Modifier.padding(start = 42.dp),
-            color = Color.Gray.copy(0.2f),
-            thickness = 0.5.dp,
+            Modifier.padding(start = SettingsDividerStart),
+            color = SettingsProfileColors.outlineVariant(isDark),
+            thickness = 1.dp,
         )
     }
 }
@@ -316,13 +330,15 @@ private fun GoogleLinkSettingsRow(
     val primary = if (isDark) Color.White else Color.Black
     val buttonBg = if (isDark) Color.White else Color.Black
     val buttonFg = if (isDark) Color.Black else Color.White
-    val interaction = remember { MutableInteractionSource() }
 
     Column(Modifier.fillMaxWidth()) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 11.dp, horizontal = 4.dp),
+                .padding(
+                    horizontal = SettingsRowHorizontalPadding,
+                    vertical = 11.dp,
+                ),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -330,10 +346,10 @@ private fun GoogleLinkSettingsRow(
                     painter = painterResource(R.drawable.google_icon),
                     contentDescription = null,
                     modifier = Modifier
-                        .width(28.dp)
+                        .width(SettingsIconSlotWidth)
                         .size(19.dp),
                 )
-                Spacer(Modifier.width(14.dp))
+                Spacer(Modifier.width(SettingsIconTextSpacing))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
                         stringResource(R.string.settings_security_google),
@@ -356,21 +372,18 @@ private fun GoogleLinkSettingsRow(
                 }
             }
 
-            Row(
-                Modifier
+            Button(
+                onClick = onLink,
+                enabled = !isLoading,
+                modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(buttonBg)
-                    .momentsPress(interaction, MomentsPressDefaults.momentsPressSubtle)
-                    .clickable(
-                        enabled = !isLoading,
-                        interactionSource = interaction,
-                        indication = null,
-                        onClick = onLink,
-                    ),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = buttonBg,
+                    contentColor = buttonFg,
+                ),
+                contentPadding = PaddingValues(horizontal = 16.dp),
             ) {
                 Image(
                     painter = painterResource(R.drawable.google_icon),
@@ -380,16 +393,15 @@ private fun GoogleLinkSettingsRow(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     stringResource(R.string.auth_google_continue),
-                    color = buttonFg,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.labelLarge,
                 )
             }
         }
         HorizontalDivider(
-            Modifier.padding(start = 42.dp),
-            color = Color.Gray.copy(0.2f),
-            thickness = 0.5.dp,
+            Modifier.padding(start = SettingsDividerStart),
+            color = SettingsProfileColors.outlineVariant(isDark),
+            thickness = 1.dp,
         )
     }
 }

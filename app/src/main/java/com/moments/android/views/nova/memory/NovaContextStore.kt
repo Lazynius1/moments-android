@@ -69,7 +69,7 @@ data class NovaUserContext(
     }
 }
 
-/** User-scoped encrypted summaries that give Nova limited cross-conversation context. */
+/** Port de `NovaContextStore.swift` — summaries cifrados + store Firestore `novaMemory/context`. */
 object NovaContextStore {
     private val db = FirebaseFirestore.getInstance()
     private val cache = mutableMapOf<String, NovaUserContext>()

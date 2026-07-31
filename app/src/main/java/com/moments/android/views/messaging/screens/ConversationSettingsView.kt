@@ -823,13 +823,33 @@ fun ConversationSettingsView(
                 initialTab = model.sharedGalleryInitialTab,
                 onClose = { model.showSharedGallery = false },
                 onOpenMedia = { message ->
-                    model.openMessageMediaForViewing(message) { resolved -> selectedMedia = resolved }
+                    model.openMessageMediaForViewing(message) { /* download only; user taps again */ }
                 },
                 onHydrateMedia = model::hydrateMediaIfNeeded,
                 isDownloadingMedia = model::isDownloadingMedia,
                 downloadProgress = { model.downloadProgress[it] },
                 onDeleteForMe = { messages -> messages.forEach(model::deleteForMe) },
                 onDeleteForEveryone = { messages -> messages.forEach(model::deleteForEveryone) },
+                detail = { selectedMessage, dismissDetail ->
+                    // ≡ detail: FullScreenMediaView in ConversationSettingsView
+                    val media = model.sharedMediaFrom(selectedMessage)
+                    if (media != null) {
+                        ConversationFullScreenMediaView(
+                            media = media,
+                            mediaItems = model.sharedMediaItemsForOverlay(selectedMessage).ifEmpty { listOf(media) },
+                            currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
+                            otherParticipantName = model.liveOtherParticipantUsername.ifBlank {
+                                conversation.otherParticipantUsername.orEmpty()
+                            },
+                            onClose = dismissDetail,
+                            onSendReply = { item, text, completion ->
+                                model.sendReplyToMedia(item, text)
+                                completion(Result.success(Unit))
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }

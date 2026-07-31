@@ -50,7 +50,16 @@ object CloudFunctionsClient {
             val code = connection.responseCode
             val text = (if (code == HttpURLConnection.HTTP_OK) connection.inputStream else connection.errorStream)
                 ?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (code != HttpURLConnection.HTTP_OK) throw BackendException(code, "Backend error $code")
+            if (code !in 200..299) {
+                val backendMessage = runCatching {
+                    val json = JSONObject(text)
+                    json.optString("details").ifBlank { json.optString("error") }
+                }.getOrNull().orEmpty()
+                throw BackendException(
+                    code,
+                    backendMessage.ifBlank { "Backend error $code" },
+                )
+            }
             text
         } finally {
             connection.disconnect()

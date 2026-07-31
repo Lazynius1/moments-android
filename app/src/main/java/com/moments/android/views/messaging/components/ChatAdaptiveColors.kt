@@ -12,7 +12,7 @@ val LocalChatMessageBubbleFrame = staticCompositionLocalOf { Rect.Zero }
 val LocalChatMessageBubbleCornerRadius = staticCompositionLocalOf { 16f }
 
 val AdaptiveColors.chatInputBackground: Color
-    get() = if (isDark) Color(0xFF0B1215).copy(alpha = 0.78f) else Color(0xFFFAF9F6).copy(alpha = 0.94f)
+    get() = if (isDark) Color(0xFF151D21) else Color.White
 
 val AdaptiveColors.chatNavigationBackground: Color
     get() = chatInputBackground

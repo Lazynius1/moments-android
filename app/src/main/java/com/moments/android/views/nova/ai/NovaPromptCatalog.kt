@@ -3,7 +3,8 @@ package com.moments.android.views.nova.ai
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
-/** Single English prompt catalog for all Nova LLM calls. The model responds in the user's language. */
+/** Port de `Views/Nova/AI/NovaPromptCatalog.swift`.
+ * Catálogo EN para todas las llamadas LLM; el modelo responde en el idioma del usuario. */
 object NovaPromptCatalog {
     val systemInstruction = """
         You are Nova, the personal AI companion inside Moments (a social app).

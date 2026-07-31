@@ -1,5 +1,6 @@
 package com.moments.android.views.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -36,7 +37,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.People
@@ -171,6 +171,12 @@ fun AdvancedAccountManagementView(
         navigatingForward = forward
         deletePasswordErrorMessage = null
         flowDestination = to
+    }
+
+    BackHandler(
+        enabled = flowDestination != AdvancedFlowDestination.MAIN && !isProcessing,
+    ) {
+        navigate(AdvancedFlowDestination.MAIN, forward = false)
     }
 
     fun deactivateAccount() {
@@ -316,8 +322,6 @@ private fun AdvancedMainContent(
         AdvancedSheetHeader(
             title = stringResource(R.string.settings_advanced_title),
             subtitle = stringResource(R.string.settings_danger_zone_warning),
-            leadingIcon = Icons.Filled.KeyboardArrowDown,
-            onLeadingTap = onDismiss,
         )
         Column(
             Modifier
@@ -384,8 +388,8 @@ private fun AdvancedMainContent(
 private fun AdvancedSheetHeader(
     title: String,
     subtitle: String?,
-    leadingIcon: ImageVector,
-    onLeadingTap: () -> Unit,
+    leadingIcon: ImageVector? = null,
+    onLeadingTap: (() -> Unit)? = null,
 ) {
     val isDark = isSystemInDarkTheme()
     val primary = SettingsProfileColors.accent(isDark)
@@ -396,15 +400,17 @@ private fun AdvancedSheetHeader(
             .padding(horizontal = 22.dp)
             .padding(top = 12.dp),
     ) {
-        Box(
-            Modifier
-                .size(40.dp)
-                .momentsChromeGlass(CircleShape, interactive = true)
-                .momentsPress(interaction, MomentsPressDefaults.momentsPressSubtle)
-                .clickable(interactionSource = interaction, indication = null, onClick = onLeadingTap),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(leadingIcon, contentDescription = null, tint = primary, modifier = Modifier.size(17.dp))
+        if (leadingIcon != null && onLeadingTap != null) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .momentsChromeGlass(CircleShape, interactive = true)
+                    .momentsPress(interaction, MomentsPressDefaults.momentsPressSubtle)
+                    .clickable(interactionSource = interaction, indication = null, onClick = onLeadingTap),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(leadingIcon, contentDescription = null, tint = primary, modifier = Modifier.size(17.dp))
+            }
         }
         Column(
             Modifier

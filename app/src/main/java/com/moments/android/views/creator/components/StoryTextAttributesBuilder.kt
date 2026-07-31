@@ -250,7 +250,7 @@ private fun effectBackgroundColor(effectRaw: String): Color? =
 private fun effectShadow(effectRaw: String): StoryTextShadowSpec? =
     StoryTextEffect.fromStoredRaw(effectRaw).shadow()
 
-/** ≡ `TextStyle.preset.letterSpacing` (puntos). */
+/** ≡ `TextStyle.preset.letterSpacing` — puntos iOS (`NSKern`); en Compose aplicar con `.sp`. */
 private fun storyTextLetterSpacing(style: StoryTextStyle): Float = style.letterSpacing
 
 /**

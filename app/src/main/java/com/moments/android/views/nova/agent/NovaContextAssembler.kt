@@ -1,7 +1,7 @@
 package com.moments.android.views.nova.agent
 
 import com.moments.android.views.nova.ai.NovaPromptCatalog
-import com.moments.android.views.nova.novacore.NovaLocaleContext
+import com.moments.android.views.nova.core.NovaLocaleContext
 import com.moments.android.views.nova.memory.NovaMemory
 import com.moments.android.views.nova.memory.NovaUserContext
 

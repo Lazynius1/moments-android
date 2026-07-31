@@ -219,10 +219,10 @@ fun MuteSettingsView(
         MomentsModalSheet(
             onDismissRequest = { showAddMutedUser = false },
             largeOnly = true,
-        ) {
+        ) { dismiss ->
             AddMutedUserSheet(
                 viewModel = viewModel,
-                onDismiss = { showAddMutedUser = false },
+                onDismiss = dismiss,
             )
         }
     }
@@ -230,10 +230,10 @@ fun MuteSettingsView(
         MomentsModalSheet(
             onDismissRequest = { showAddMutedWord = false },
             largeOnly = false,
-        ) {
+        ) { dismiss ->
             AddMutedWordSheet(
                 viewModel = viewModel,
-                onDismiss = { showAddMutedWord = false },
+                onDismiss = dismiss,
             )
         }
     }
@@ -506,31 +506,11 @@ private fun AddMutedUserSheet(
             Spacer(Modifier.width(64.dp))
         }
 
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .background(Color.Gray.copy(0.1f), RoundedCornerShape(12.dp))
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(Icons.Default.Search, null, tint = Color.Gray)
-            TextField(
-                value = searchText,
-                onValueChange = { searchText = it },
-                placeholder = { Text(stringResource(R.string.mute_settings_search_placeholder)) },
-                singleLine = true,
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedTextColor = textColor,
-                    unfocusedTextColor = textColor,
-                ),
-                modifier = Modifier.weight(1f),
-            )
-        }
+        SettingsSearchField(
+            value = searchText,
+            onValueChange = { searchText = it },
+            placeholder = stringResource(R.string.mute_settings_search_placeholder),
+        )
 
         Spacer(Modifier.height(12.dp))
 

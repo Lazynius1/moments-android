@@ -3,7 +3,6 @@ package com.moments.android.views.nova.tools
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
-import com.moments.android.R
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchCustomLists
 import com.moments.android.services.firestore.fetchSuggestedUsers
@@ -15,30 +14,38 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 
-/** Port de `NovaSocialTools.swift`. */
+/**
+ * Port de `Views/Nova/Tools/NovaSocialTools.swift`.
+ * Listas de audiencia, create_moment (upload) y sugerencias de conexión.
+ */
 class NovaSocialTools(
     context: Context,
     private val firestoreService: FirestoreService = FirestoreService(),
 ) {
     private val appContext = context.applicationContext
 
-    suspend fun listAudienceLists(userId: String): Map<String, Any?> = runCatching {
-        val lists = firestoreService.fetchCustomLists(userId)
-        mapOf(
-            "count" to lists.size,
-            "lists" to lists.mapNotNull { list ->
-                list.id?.let { id ->
-                    mapOf(
-                        "id" to id,
-                        "name" to list.name,
-                        "member_count" to list.members.size,
-                    )
-                }
-            },
-        )
-    }.getOrElse { error ->
-        mapOf("count" to 0, "error" to (error.message ?: "Unknown error"), "lists" to emptyList<Any>())
-    }
+    suspend fun listAudienceLists(userId: String): Map<String, Any?> =
+        runCatching {
+            val lists = firestoreService.fetchCustomLists(userId)
+            val payload = lists.mapNotNull { list ->
+                val id = list.id ?: return@mapNotNull null
+                mapOf(
+                    "id" to id,
+                    "name" to list.name,
+                    "member_count" to NovaJSON.int(list.members.size),
+                )
+            }
+            mapOf(
+                "count" to NovaJSON.int(payload.size),
+                "lists" to payload,
+            )
+        }.getOrElse { error ->
+            mapOf(
+                "count" to NovaJSON.int(0),
+                "error" to (error.message ?: "Unknown error"),
+                "lists" to emptyList<Any>(),
+            )
+        }
 
     suspend fun createMoment(
         userId: String,
@@ -49,11 +56,13 @@ class NovaSocialTools(
         customListId: String?,
         attachedImage: Bitmap?,
     ): Map<String, Any?> {
+        val trimmed = content.trim()
         val image = attachedImage ?: return mapOf(
             "success" to false,
             "error" to "missing_media",
             "hint" to "Moments require a photo or video. The user must attach media in the chat.",
         )
+
         val audience = NovaMomentAudienceResolver.resolve(
             userId = userId,
             audienceRaw = audienceRaw,
@@ -62,10 +71,17 @@ class NovaSocialTools(
             customListId = customListId,
             firestoreService = firestoreService,
         ).getOrElse { error ->
-            val code = (error as? NovaMomentAudienceError)?.code ?: error.message ?: "audience_resolution_failed"
+            val code = (error as? NovaMomentAudienceError)?.code
+                ?: error.message
+                ?: "audience_resolution_failed"
             return mapOf("success" to false, "error" to code)
         }
-        return uploadMomentWithImage(content.trim(), audience, image)
+
+        return uploadMomentWithImage(
+            content = trimmed,
+            audience = audience,
+            image = image,
+        )
     }
 
     private suspend fun uploadMomentWithImage(
@@ -82,42 +98,57 @@ class NovaSocialTools(
         )
         val media = CreatorMedia(uri = imageUri, aspectRatio = aspectRatio)
         val captionMentionIds = MomentMentionResolver.resolveUserIds(content)
+
+        // ≡ iOS: audienceSetting (.custom también para customList) + customListId aparte.
         val started = BackgroundMomentUploadService.uploadMoment(
             content = content,
             mediaItems = listOf(media),
             taggedUsers = null,
             mentionedUsers = captionMentionIds.takeIf { it.isNotEmpty() },
             location = null,
-            audienceSetting = audience.contentAudience.raw,
+            audienceSetting = audience.audienceSettingRaw(),
             customViewers = audience.customViewers,
             customListId = audience.customListId,
             aspectRatio = media.aspectRatio.displayName,
         ) != null
-        if (!started) return mapOf("success" to false, "error" to "upload_start_failed")
+
+        if (!started) {
+            return mapOf("success" to false, "error" to "upload_start_failed")
+        }
 
         return mapOf(
             "success" to true,
             "status" to "uploading",
             "audience" to audience.contentAudience.raw,
-            "audience_label" to audience.displayLabel(),
+            "audience_label" to audience.displayLabel(appContext),
             "has_media" to true,
             "content_preview" to content.take(120),
-            "mentioned_users_count" to captionMentionIds.size,
+            "mentioned_users_count" to NovaJSON.int(captionMentionIds.size),
         )
     }
 
-    suspend fun connectionSuggestions(limit: Int = 5): Map<String, Any?> = runCatching {
-        val users = firestoreService.fetchSuggestedUsers()
-        val suggestions = users.take(limit.coerceIn(1, 10)).map { user ->
+    suspend fun connectionSuggestions(limit: Int = 5): Map<String, Any?> {
+        val capped = limit.coerceIn(1, 10)
+        return runCatching {
+            val users = firestoreService.fetchSuggestedUsers()
+            val suggestions = users.take(capped).map { user ->
+                mapOf(
+                    "user_id" to user.id,
+                    "username" to user.username,
+                    "bio_preview" to user.bio.orEmpty().take(80),
+                )
+            }
             mapOf(
-                "user_id" to user.id,
-                "username" to user.username,
-                "bio_preview" to user.bio.orEmpty().take(80),
+                "count" to NovaJSON.int(suggestions.size),
+                "suggestions" to suggestions,
+            )
+        }.getOrElse { error ->
+            mapOf(
+                "count" to NovaJSON.int(0),
+                "error" to (error.message ?: "Unknown error"),
+                "suggestions" to emptyList<Any>(),
             )
         }
-        mapOf("count" to suggestions.size, "suggestions" to suggestions)
-    }.getOrElse { error ->
-        mapOf("count" to 0, "error" to (error.message ?: "Unknown error"), "suggestions" to emptyList<Any>())
     }
 
     private fun persistMomentImage(image: Bitmap): Uri? = runCatching {
@@ -127,13 +158,4 @@ class NovaSocialTools(
         }
         Uri.fromFile(output)
     }.getOrNull()
-
-    private fun NovaMomentAudience.displayLabel(): String = when (this) {
-        NovaMomentAudience.Everyone -> appContext.getString(R.string.audience_everyone)
-        NovaMomentAudience.Mutuals -> appContext.getString(R.string.audience_mutuals)
-        NovaMomentAudience.BestFriends -> appContext.getString(R.string.audience_best_friends)
-        NovaMomentAudience.OnlyMe -> appContext.getString(R.string.audience_only_me)
-        is NovaMomentAudience.Custom -> label
-        is NovaMomentAudience.CustomList -> listName
-    }
 }

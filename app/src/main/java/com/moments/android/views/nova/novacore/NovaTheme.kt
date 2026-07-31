@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.moments.android.BuildConfig
 import com.moments.android.R
 
+/** Port de `Views/Nova/NovaCore/NovaTheme.swift` — colores + brand icon + LogConfig. */
 object NovaColors {
     val primary = Color(0xFF00A896)
     val secondary = Color(0xFF6B73FF)
@@ -21,26 +22,62 @@ object NovaColors {
 
     val background: Color
         @Composable get() = if (isSystemInDarkTheme()) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+
     val secondaryBackground: Color
-        @Composable get() = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.02f) else Color.Black.copy(alpha = 0.02f)
+        @Composable get() = if (isSystemInDarkTheme()) {
+            Color.White.copy(alpha = 0.02f)
+        } else {
+            Color.Black.copy(alpha = 0.02f)
+        }
+
     val cardBackground: Color
-        @Composable get() = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.03f)
+        @Composable get() = if (isSystemInDarkTheme()) {
+            Color.White.copy(alpha = 0.05f)
+        } else {
+            Color.Black.copy(alpha = 0.03f)
+        }
+
     val materialBackground: Color
-        @Composable get() = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f)
+        @Composable get() = if (isSystemInDarkTheme()) {
+            Color.White.copy(alpha = 0.08f)
+        } else {
+            Color.Black.copy(alpha = 0.05f)
+        }
+
     val textPrimary: Color
         @Composable get() = if (isSystemInDarkTheme()) Color.White else Color.Black
+
     val textSecondary: Color
-        @Composable get() = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.60f) else Color.Black.copy(alpha = 0.60f)
+        @Composable get() = if (isSystemInDarkTheme()) {
+            Color.White.copy(alpha = 0.60f)
+        } else {
+            Color.Black.copy(alpha = 0.60f)
+        }
+
     val textTertiary: Color
-        @Composable get() = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.30f)
+        @Composable get() = if (isSystemInDarkTheme()) {
+            Color.White.copy(alpha = 0.30f)
+        } else {
+            Color.Black.copy(alpha = 0.30f)
+        }
+
     val borderColor: Color
-        @Composable get() = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.18f)
+        @Composable get() = if (isSystemInDarkTheme()) {
+            Color.White.copy(alpha = 0.18f)
+        } else {
+            Color.Black.copy(alpha = 0.18f)
+        }
+
     val shadowColor: Color
         @Composable get() = textPrimary.copy(alpha = 0.10f)
 }
 
 @Composable
-fun NovaBrandIcon(size: Dp = 22.dp, color: Color = NovaColors.textPrimary, modifier: Modifier = Modifier) {
+fun NovaBrandIcon(
+    size: Dp = 22.dp,
+    color: Color = NovaColors.textPrimary,
+    modifier: Modifier = Modifier,
+) {
     Image(
         painter = painterResource(R.drawable.nova_tab_icon),
         contentDescription = null,
@@ -51,9 +88,13 @@ fun NovaBrandIcon(size: Dp = 22.dp, color: Color = NovaColors.textPrimary, modif
 
 object LogConfig {
     private const val TAG = "Moments"
-    val isVerboseLogging: Boolean get() = BuildConfig.DEBUG
+
+    val isVerboseLogging: Boolean
+        get() = BuildConfig.DEBUG
 
     fun log(message: String, category: String = "Nova") {
-        if (isVerboseLogging || category == "Feed" || category == "BackendFeed") Log.d(TAG, "[$category] $message")
+        if (isVerboseLogging || category == "Feed" || category == "BackendFeed") {
+            Log.d(TAG, "[$category] $message")
+        }
     }
 }

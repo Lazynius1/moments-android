@@ -1,5 +1,7 @@
 package com.moments.android.views.comments
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -54,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -853,6 +857,12 @@ private fun CommentComposer(
     val colors = rememberAdaptiveColors()
     val isDark = isSystemInDarkTheme()
     val canSend = enabled && text.isNotEmpty()
+    // ≡ iOS `.scaleEffect(newComment.isEmpty || isLoading ? 0.95 : 1.0)` + spring
+    val sendScale by animateFloatAsState(
+        targetValue = if (canSend) 1f else 0.95f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+        label = "commentSendScale",
+    )
     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 8.dp)) {
         if (isEditing) {
             // ≡ iOS modo edición: pencil + campo + check azul→púrpura + xmark circular
@@ -886,13 +896,17 @@ private fun CommentComposer(
                         )
                     }
                     Spacer(Modifier.height(4.dp))
+                    // ≡ iOS TextField axis:.vertical + lineLimit(1...4)
                     BasicTextField(
                         value = text,
                         onValueChange = onTextChange,
                         enabled = enabled,
                         cursorBrush = SolidColor(colors.primary),
                         textStyle = TextStyle(color = colors.primary, fontSize = 15.sp),
-                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 4,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 20.dp),
                         decorationBox = { inner ->
                             if (text.isEmpty()) {
                                 Text(
@@ -909,6 +923,10 @@ private fun CommentComposer(
                     Box(
                         Modifier
                             .size(36.dp)
+                            .graphicsLayer {
+                                scaleX = sendScale
+                                scaleY = sendScale
+                            }
                             .background(
                                 if (canSend) {
                                     Brush.linearGradient(
@@ -970,14 +988,17 @@ private fun CommentComposer(
                     )
                     Spacer(Modifier.width(8.dp))
                 }
+                // ≡ iOS TextField axis:.vertical + lineLimit(1...4)
                 BasicTextField(
                     value = text,
                     onValueChange = onTextChange,
                     enabled = enabled,
                     cursorBrush = SolidColor(colors.primary),
                     textStyle = TextStyle(color = colors.primary, fontSize = 15.sp),
+                    maxLines = 4,
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = 44.dp)
                         .background(
                             if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f),
                             RoundedCornerShape(25.dp),
@@ -1003,6 +1024,10 @@ private fun CommentComposer(
                 Box(
                     Modifier
                         .size(44.dp)
+                        .graphicsLayer {
+                            scaleX = sendScale
+                            scaleY = sendScale
+                        }
                         .background(
                             if (canSend) {
                                 Brush.linearGradient(

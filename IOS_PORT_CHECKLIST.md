@@ -18,17 +18,18 @@ Usar como guía para portar **trozo a trozo** al `.kt` equivalente.
 
 | Estado | Significado | Archivos |
 |--------|-------------|--------:|
-| `[ ]` | Pendiente — sin paridad cerrada | 13 |
-| `[~]` | En curso — `.kt` existe, falta comparar/cerrar vs Swift | 159 |
-| `[x]` | Cerrado — revisado 1:1 contra Swift | 406 |
+| `[ ]` | Pendiente — sin paridad cerrada | 9 |
+| `[~]` | En curso — `.kt` existe, falta comparar/cerrar vs Swift | 112 |
+| `[x]` | Cerrado — revisado 1:1 contra Swift | 456 |
 | 🚫 | Fuera de alcance Android | 14 |
-| **En alcance** | excl. 🚫 (+ `[N/A]`) | 573 |
-| **Progreso paridad** | `[x]` / en alcance | 406 / 573 (70.9%) |
+| **En alcance** | excl. 🚫 (+ `[N/A]`) | 572 |
+| **Progreso paridad** | `[x]` / en alcance | 456 / 572 (79.7%) |
 
 ### Cerrados — líneas iOS vs Android
 
 | Archivo | iOS | Android | Δ | Notas |
 |---------|----:|--------:|--:|-------|
+| `AdAspectRatioContext` | 64 | 30 | −34 | enum Stories/Feed/Banner → portrait/landscape; defaultFeedOptions |
 | `AnimatedStickerView` | 87 | 71 | -16 | Coil = GIFCache; sin spinner (paridad iOS) |
 | `AudienceIconView` | 74 | 110 | +36 | Métricas + ActivityGrid; isDark ≡ colorScheme |
 | `CommentRowSkeletonView` | 46 | 85 | +39 | shimmer compartido; padding en call site |
@@ -154,6 +155,8 @@ Usar como guía para portar **trozo a trozo** al `.kt` equivalente.
 | `ChatViewModel` | 3520 | 2284 | −1236 | Core; sin PHAsset/PhotosPicker; Δ≈UIKit/observers/OO |
 | `ChatAttachmentAssets` | 151 | 170 | +19 | Giphy/sticker/location/live; recent stickers SharedPrefs |
 | `ChatAttachmentSheet` | 1113 | 952 | −161 | pickers+menu+photos; fling predicted+primer+search glass; Δ≈PHAsset/UIKit |
+| `ChatChromeViews` | 902 | 549 | −353 | typing 0→1+0.85; FAB Spring.press; MotionPolicy default; Δ≈UIKit chrome |
+| `ChatClusterMediaViews` | 1293 | 1142 | −151 | fan+masonry+select/delete; detail host push≡FullScreen in-gallery |
 | `ChatCameraView` | 460 | 534 | +74 | BackHandler; gallery thumb; recording pill+timer; haptic; aspectRatio; Boundary mic→Settings |
 | `CameraAccessBoundary` | 106 | 160 | +54 | primer vs denied prefs; cam/mic DENIED→Settings; ON_RESUME refresh |
 | `ViewOnceMessageBubble` | 287 | 268 | −19 | pills unread/replay/opened/sent+progress; estado desde message; zoom matchedTransition stub |
@@ -319,6 +322,35 @@ Usar como guía para portar **trozo a trozo** al `.kt` equivalente.
 | `MapBottomSheetSection` | 680 | 643 | −37 | LocationBottomSheet gallery/list + cells |
 | `MapCanvasSection` | 537 | 522 | −15 | Mapbox canvas + ModernLocationPin/Gallery |
 | `WeatherService` | 445 | 217 | −228 | OpenWeather Current 2.5 + cache/rate · overlay helpers |
+| `WhatsNewView` | 231 | 263 | +32 | chrome≡iOS; copy Android 1.0; MomentsModalSheet |
+| `NovaAgent` | 769 | 617 | −152 | handleToolCalls≡iOS (batch completo); finalizeOnExit en NovaView; fingerprint trim |
+| `NovaActivityTools` | 317 | 291 | −26 | queries+week Calendar≡iOS; pct round; NovaEvents SharedFlow |
+| `NovaMemoryTools` | 52 | 44 | −8 | rememberFact+updatePreference 1:1 |
+| `NovaMomentDraftParser` | 53 | 49 | −4 | schema+should_publish+Draft 1:1 |
+| `NovaProfileTools` | 478 | 384 | −94 | snapshots+social+privacy writes+moments/stories/echo ≡iOS |
+| `NovaMomentAudience` | 229 | 231 | +2 | resolve+errors+audienceSetting≡Caption; customList→.custom |
+| `NovaSocialTools` | 164 | 161 | −3 | lists count≡payload; create_moment audienceSettingRaw; suggestions |
+| `NovaAIService` | 89 | 174 | +85 | Vertex chat/tools/JSON; wrappers SDK; AgentError en NovaAgent.kt |
+| `NovaGenerationConfig` | 40 | 48 | +8 | model+chat/JSON/title+safety 1:1 |
+| `NovaPromptCatalog` | 105 | 109 | +4 | system+nudge+draft+finalize+title+compact 1:1 |
+| `NovaMemoryStore` | 61 | 72 | +11 | load/save/cache+encrypt migrate; Flow≡Notification |
+| `NovaMemoryCrypto` | 104 | 49 | −55 | encrypt/decrypt memory+context; migration heuristics |
+| `NovaMemoryModels` | 304 | 206 | −98 | FactType+Fact+Memory upsert/compact/preferredName |
+| `NovaMemoryEngine` | 251 | 153 | −98 | finalize+sanitize+notifyMemoryUpdated |
+| `NovaContextStore` | 136 | 120 | −16 | summaries+load/save/clear cifrado |
+| `NovaConversationStore` | 507 | 437 | −70 | user-scoped+legacy; merge set; titles/encrypt/images |
+| `Conversationmodels` | 214 | 155 | −59 | Title+Saved+Message+legacy decode/storage ref |
+| `NovaLocaleContext` | 12 | 15 | +3 | locale id + languageCode |
+| `NovaModels` | 63 | 44 | −19 | Grounding+ChatMessage equals |
+| `NovaTheme` | 92 | 100 | +8 | colors+BrandIcon+LogConfig |
+| `NovaActionConfirmationOverlay` | 103 | 164 | +61 | scrim+glass card/buttons+preview stroke |
+| `NovaHistorySection` | 211 | 309 | +98 | overlay glass+empty AttachmentIcon+items menu |
+| `NovaInputSection` | 322 | 394 | +72 | layout+glass+focus stroke+plus/send MotionPolicy+chips/shimmer |
+| `NovaChromeSection` | 726 | 752 | +26 | header glass+egg/haptics; welcome SmartChips; particles/confetti; loading/badge glass |
+| `NovaChatSection` | 853 | 859 | +6 | bubbles+typewriter+grounding WebView+format views; +NovaChatTextFormatting |
+| `NovaAttachmentSheet` | 1041 | 785 | −256 | popover anclado+glass; overlay 58%+inset; CaptureButton+story chrome |
+| `NovaMemoryManagementView` | 420 | 574 | +154 | header chevron glass; empty Memory icon; categorías SF→Icons; clear capsule |
+| `NovaView` | 385 | 413 | +28 | fades+IME insets+auto-scroll; gate; overlays zIndex; memory sheet |
 | `MapDiscoverSupport` | 246 | 282 | +36 | BackendMapStory+VisibilityPolicy+ZoneContext async+formatters |
 | `MapPlaceClusterEngine` | 313 | 364 | +51 | build/merge/valid/unnamed · jitter fórmula≡iOS (hash≠Swift) |
 | `LocationMomentDetailView` | 1640 | 1537 | −103 | Detail+Card+Sections · ModernPostCard path + visibility |
@@ -668,32 +700,32 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 680 | `Moments/Moments/Views/Feed/maps/MapsSections/MapBottomSheetSection.swift` | `views/feed/maps/mapssections/MapBottomSheetSection.kt` | [x] 680↔643 · LocationBottomSheet gallery/list + cells/video/row/unavailable |
 | 538 | `Moments/Moments/Views/Feed/maps/MapsSections/MapCanvasSection.swift` | `views/feed/maps/mapssections/MapCanvasSection.kt` | [x] 537↔522 · Mapbox canvas + ModernLocationPin/Gallery/PhotoCard/GalleryView · pins en DiscoverMapView |
 | 445 | `Moments/Moments/Views/Feed/maps/WeatherService.swift` | `views/feed/maps/WeatherService.kt` | [x] 445↔217 · OpenWeather Current 2.5 + cache/rate · overlay helpers |
-| 364 | `Moments/Moments/Views/Login/AuthUIComponents.swift` | `views/login/AuthUIComponents.kt` | [~] |
-| 123 | `Moments/Moments/Views/Login/CreatingProfileView.swift` | `views/login/CreatingProfileView.kt` | [~] |
-| 326 | `Moments/Moments/Views/Login/DeactivatedAccountView.swift` | — | [~] |
+| 364 | `Moments/Moments/Views/Login/AuthUIComponents.swift` | `views/login/AuthUIComponents.kt` | [x] |
+| 123 | `Moments/Moments/Views/Login/CreatingProfileView.swift` | `views/login/CreatingProfileView.kt` | [x] |
+| 326 | `Moments/Moments/Views/Login/DeactivatedAccountView.swift` | `views/login/AccountStateScreens.kt` | [x] 326↔~605 shared · reactivate+loading+card+aurora halo |
 | 1 | `Moments/Moments/Views/Login/Interestview.swift` | — | 🚫 |
-| 475 | `Moments/Moments/Views/Login/LiquidGlassComponents.swift` | — | [~] |
-| 1153 ⚠️ | `Moments/Moments/Views/Login/LoginView.swift` | `views/login/LoginView.kt` | [~] |
-| 100 | `Moments/Moments/Views/Login/PrivacyPolicyView.swift` | `views/login/PrivacyPolicyView.kt` | [~] |
-| 1255 ⚠️ | `Moments/Moments/Views/Login/ProfileOnboardingView.swift` | `views/login/ProfileOnboardingView.kt` | [~] |
-| 17 | `Moments/Moments/Views/Login/RegisterView.swift` | `views/login/RegisterView.kt` | [~] |
-| 10 | `Moments/Moments/Views/Login/SocialProfileCompletionView.swift` | — | [ ] bug: Google registra Auth sin username/user — portar al llegar a login |
+| 475 | `Moments/Moments/Views/Login/LiquidGlassComponents.swift` | `views/login/AuthUIComponents.kt` + `AuthTheme.kt` | [x] |
+| 1153 ⚠️ | `Moments/Moments/Views/Login/LoginView.swift` | `views/login/LoginView.kt` | [x] 1153↔492 · Welcome/form/Google/reset; Passkey 🚫; Apple→Google |
+| 100 | `Moments/Moments/Views/Login/PrivacyPolicyView.swift` | `views/login/PrivacyPolicyView.kt` | [x] |
+| 1255 ⚠️ | `Moments/Moments/Views/Login/ProfileOnboardingView.swift` | `views/login/ProfileOnboardingView.kt` | [x] 1255↔819 · email+social |
+| 17 | `Moments/Moments/Views/Login/RegisterView.swift` | `views/login/RegisterView.kt` | [x] |
+| 10 | `Moments/Moments/Views/Login/SocialProfileCompletionView.swift` | `views/login/LoginView.kt` (SocialOnboarding) | [x] wrapper iOS → onboarding social Google |
 | 103 | `Moments/Moments/Views/Login/SplashScreen.swift` | `views/login/SplashScreen.kt` | [x] 103↔84 · canvas 0B1215/FAF9F6+logo dark/light+shadow AuthColors; reduceMotion; Δ MinimalSplash no en flujo |
-| 662 | `Moments/Moments/Views/Login/SuspendedAccount.swift` | — | [~] |
-| 395 | `Moments/Moments/Views/Messaging/Attachments/ChatGiphyPickerSheet.swift` | `views/messaging/attachments/ChatGiphyPickerSheet.kt` | [~] · load-more solo último ítem |
-| 370 | `Moments/Moments/Views/Messaging/Attachments/ChatLocationSheet.swift` | `views/messaging/attachments/ChatLocationSheet.kt` | [~] · LocationPermissionGate ALWAYS + errors |
+| 662 | `Moments/Moments/Views/Login/SuspendedAccount.swift` | `views/login/AccountStateScreens.kt` | [x] 662↔~605 shared · AppealForm+AppealStatus sheets medium/large; Δ ContactSupport legacy |
+| 395 | `Moments/Moments/Views/Messaging/Attachments/ChatGiphyPickerSheet.swift` | `views/messaging/attachments/ChatGiphyPickerSheet.kt` | [x] 395↔467 · masonry GIF staggered+loadMore last+recents/search debounce |
+| 370 | `Moments/Moments/Views/Messaging/Attachments/ChatLocationSheet.swift` | `views/messaging/attachments/ChatLocationSheet.kt` | [x] 370↔566 · Mapbox preview+ALWAYS gate+Places nearby/search; Δ MapKit→Places |
 | 367 | `Moments/Moments/Views/Messaging/Components/AttachmentIconView.swift` | `views/messaging/components/AttachmentIconView.kt` | [x] 367↔225 · enum+metrics+presets+resolvedSize |
 | 146 | `Moments/Moments/Views/Messaging/Components/ChatAdaptiveColors.swift` | `views/messaging/components/ChatAdaptiveColors.kt` | [x] 146↔70 · locals+extension colors; blue=#007AFF |
 | 1113 ⚠️ | `Moments/Moments/Views/Messaging/Components/ChatAttachmentSheet.swift` | `views/messaging/components/ChatAttachmentSheet.kt` | [x] 1113↔952 · pickers+menu+photos; fling predicted+PermissionPrimer+popover gap+search glass |
 | 145 | `Moments/Moments/Views/Messaging/Components/ChatBuzzEffectViews.swift` | `views/messaging/components/ChatBuzzEffectViews.kt` | [x] 145↔~160 · toast+timeline+shake; icon gradient; shake wire en chat shell |
-| 902 | `Moments/Moments/Views/Messaging/Components/ChatChromeViews.swift` | `views/messaging/components/ChatChromeViews.kt` | [~] · typing/FAB reduceMotion wired via MotionPolicy |
-| 1293 ⚠️ | `Moments/Moments/Views/Messaging/Components/ChatClusterMediaViews.swift` | `views/messaging/components/ChatClusterMediaViews.kt` | [~] · fan+gallery masonry/select/delete; detail push host no portado |
+| 902 | `Moments/Moments/Views/Messaging/Components/ChatChromeViews.swift` | `views/messaging/components/ChatChromeViews.kt` | [x] 902↔549 · typing 0→1+0.85 estático; FAB Spring.press; MotionPolicy default |
+| 1293 ⚠️ | `Moments/Moments/Views/Messaging/Components/ChatClusterMediaViews.swift` | `views/messaging/components/ChatClusterMediaViews.kt` | [x] 1293↔1142 · fan+masonry+select/delete; detail host push≡FullScreen in-gallery |
 | 337 | `Moments/Moments/Views/Messaging/Components/ChatEphemeralMessageViews.swift` | `views/messaging/components/ChatEphemeralMessageViews.kt` | [x] 337↔389 · tap/image/resolving/expired; blur+borders; hydrate; markViewed; Spring.toggle |
 | 112 | `Moments/Moments/Views/Messaging/Components/ChatFloatingNavigationOverlay.swift` | `views/messaging/components/ChatFloatingNavigationOverlay.kt` | [x] 112↔~180 · resolve+search appear+shadow+AnimatedVisibility |
 | 95 | `Moments/Moments/Views/Messaging/Components/ChatGifMessageBubble.swift` | `views/messaging/components/ChatGifMessageBubble.kt` | [x] 95↔117 |
 | 801 | `Moments/Moments/Views/Messaging/Components/ChatInputViews.swift` | `views/messaging/components/ChatInputViews.kt` | [x] 801↔706 · vanish+fill sólido floating/locked+held+trim; Δ no aurora/glass iOS |
 | 66 | `Moments/Moments/Views/Messaging/Components/ChatKFImageViews.swift` | `views/messaging/components/ChatKFImageViews.kt` | [x] 66↔89 |
-| 606 | `Moments/Moments/Views/Messaging/Components/ChatLocationMessageBubble.swift` | `views/messaging/components/ChatLocationMessageBubble.kt` | [~] · bubble+detail+avatar pin+countdown; MK snapshot→GoogleMap |
+| 606 | `Moments/Moments/Views/Messaging/Components/ChatLocationMessageBubble.swift` | `views/messaging/components/ChatLocationMessageBubble.kt` | [x] 606↔708 · Snapshotter+cache+Mapbox detail hybrid; Δ MK→Mapbox |
 | 502 | `Moments/Moments/Views/Messaging/Components/ChatMediaViews.swift` | `views/messaging/components/ChatMediaViews.kt` | [x] 502↔565 · image/video+download+players; downsample; drag px; BlurView≈sólido |
 | 838 | `Moments/Moments/Views/Messaging/Components/ChatMessageBubbleViews.swift` | `views/messaging/components/ChatMessageBubbleViews.kt` | [x] 838↔669 · row swipe/chrome+AttachBubbleBadges; texto sin double overlay; link preview; Δ≈LPLink |
 | 28 | `Moments/Moments/Views/Messaging/Components/ChatMessageForwardSheet.swift` | `views/messaging/components/ChatMessageForwardSheet.kt` | [x] 28↔151 |
@@ -709,7 +741,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 279 | `Moments/Moments/Views/Messaging/Components/ConversationContextMenu.swift` | `views/messaging/components/ConversationContextMenu.kt` | [x] 279↔355 · cutout Clear+chrome+layout+MomentRowButton.menu; pin.slash≈slash overlay; systemBars insets; row highlight 0.96 |
 | 84 | `Moments/Moments/Views/Messaging/Components/MediaProgressRing.swift` | `views/messaging/components/MediaProgressRing.kt` | [x] 84↔58 |
 | 38 | `Moments/Moments/Views/Messaging/Components/MessageTypeIconView.swift` | `views/messaging/components/MessageTypeIconView.kt` | [x] 38↔54 |
-| 186 | `Moments/Moments/Views/Messaging/Components/MessagingComposerAndStatusViews.swift` | `views/messaging/components/MessagingComposerAndStatusViews.kt` | [~] · composer gradient+campo+send; status MomentsModalSheet medium+large+dividers |
+| 186 | `Moments/Moments/Views/Messaging/Components/MessagingComposerAndStatusViews.swift` | `views/messaging/components/MessagingComposerAndStatusViews.kt` | [x] 186↔357 · status MomentsModalSheet+dismiss+SettingsSectionCard; composer canvas sólido+IME |
 | 287 | `Moments/Moments/Views/Messaging/Components/ViewOnceMessageBubble.swift` | `views/messaging/components/ViewOnceMessageBubble.kt` | [x] 287↔268 · pills+progress; estado desde message; zoom matchedTransition stub |
 | 1121 ✅ | `Moments/Moments/Views/Messaging/Components/VoiceNotes.swift` | `views/messaging/components/VoiceNotes.kt` | [x] · recorder/compose/trim+bubble scrub/speed/remaining+cache+proximidad auricular |
 | 535 | `Moments/Moments/Views/Messaging/Components/VoiceRecordingGestureViews.swift` | `views/messaging/components/VoiceRecordingGestureViews.kt` | [~] · fases hold/lock/cancel+follow goma+ticks hápticos+chrome; aura dual; VoiceBlob/AuroraMesh morph→brush stub |
@@ -764,39 +796,39 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 59 | `Moments/Moments/Views/Messaging/Services/ChatVideoPosterGenerator.swift` | `views/messaging/services/ChatVideoPosterGenerator.kt` | [x] 59↔52 |
 | 298 | `Moments/Moments/Views/Messaging/Services/LiveLocationSharingService.swift` | `views/messaging/services/LiveLocationSharingService.kt` | [x] 298↔356 |
 | 33 | `Moments/Moments/Views/Messaging/Services/ViewOnceConsumptionService.swift` | `views/messaging/services/ViewOnceConsumptionService.kt` | [x] 33↔27 |
-| 231 | `Moments/Moments/Views/Misc/WhatsNewView.swift` | `views/misc/WhatsNewView.kt` | [~] |
-| 89 | `Moments/Moments/Views/Nova/AI/NovaAIService.swift` | `views/nova/ai/NovaAIService.kt` | [~] |
-| 40 | `Moments/Moments/Views/Nova/AI/NovaGenerationConfig.swift` | `views/nova/ai/NovaGenerationConfig.kt` | [~] |
-| 105 | `Moments/Moments/Views/Nova/AI/NovaPromptCatalog.swift` | `views/nova/ai/NovaPromptCatalog.kt` | [~] |
-| 769 | `Moments/Moments/Views/Nova/Agent/NovaAgent.swift` | `views/nova/agent/NovaAgent.kt` | [~] |
-| 55 | `Moments/Moments/Views/Nova/Agent/NovaContextAssembler.swift` | `views/nova/agent/NovaContextAssembler.kt` | [~] |
-| 308 | `Moments/Moments/Views/Nova/Agent/NovaPendingAction.swift` | `views/nova/agent/NovaPendingAction.kt` | [~] |
-| 291 | `Moments/Moments/Views/Nova/Agent/NovaToolExecutor.swift` | `views/nova/agent/NovaToolExecutor.kt` | [~] |
-| 304 | `Moments/Moments/Views/Nova/Agent/NovaToolRegistry.swift` | `views/nova/agent/NovaToolRegistry.kt` | [~] |
-| 507 | `Moments/Moments/Views/Nova/Conversation/NovaConversationStore.swift` | `views/nova/conversation/NovaConversationStore.kt` | [~] |
-| 214 | `Moments/Moments/Views/Nova/Conversationmodels.swift` | `views/nova/Conversationmodels.kt` | [~] |
-| 12 | `Moments/Moments/Views/Nova/Core/NovaLocaleContext.swift` | `views/nova/core/NovaLocaleContext.kt` | [~] |
-| 136 | `Moments/Moments/Views/Nova/Memory/NovaContextStore.swift` | `views/nova/memory/NovaContextStore.kt` | [~] |
-| 104 | `Moments/Moments/Views/Nova/Memory/NovaMemoryCrypto.swift` | `views/nova/memory/NovaMemoryCrypto.kt` | [~] |
-| 251 | `Moments/Moments/Views/Nova/Memory/NovaMemoryEngine.swift` | `views/nova/memory/NovaMemoryEngine.kt` | [~] |
-| 304 | `Moments/Moments/Views/Nova/Memory/NovaMemoryModels.swift` | `views/nova/memory/NovaMemoryModels.kt` | [~] |
-| 61 | `Moments/Moments/Views/Nova/Memory/NovaMemoryStore.swift` | `views/nova/memory/NovaMemoryStore.kt` | [~] |
-| 63 | `Moments/Moments/Views/Nova/NovaCore/NovaModels.swift` | `views/nova/novacore/NovaModels.kt` | [~] |
-| 92 | `Moments/Moments/Views/Nova/NovaCore/NovaTheme.swift` | `views/nova/novacore/NovaTheme.kt` | [~] |
-| 420 | `Moments/Moments/Views/Nova/NovaMemoryManagementView.swift` | `views/nova/NovaMemoryManagementView.kt` | [~] |
-| 1041 ⚠️ | `Moments/Moments/Views/Nova/NovaSections/NovaAttachmentSheet.swift` | `views/nova/novasections/NovaAttachmentSheet.kt` | [~] |
-| 853 | `Moments/Moments/Views/Nova/NovaSections/NovaChatSection.swift` | `views/nova/novasections/NovaChatSection.kt` | [~] |
-| 726 | `Moments/Moments/Views/Nova/NovaSections/NovaChromeSection.swift` | `views/nova/novasections/NovaChromeSection.kt` | [~] |
-| 211 | `Moments/Moments/Views/Nova/NovaSections/NovaHistorySection.swift` | `views/nova/novasections/NovaHistorySection.kt` | [~] |
-| 322 | `Moments/Moments/Views/Nova/NovaSections/NovaInputSection.swift` | `views/nova/novasections/NovaInputSection.kt` | [~] |
-| 385 | `Moments/Moments/Views/Nova/NovaView.swift` | `views/nova/NovaView.kt` | [~] |
-| 317 | `Moments/Moments/Views/Nova/Tools/NovaActivityTools.swift` | `views/nova/tools/NovaActivityTools.kt` | [~] |
-| 52 | `Moments/Moments/Views/Nova/Tools/NovaMemoryTools.swift` | `views/nova/tools/NovaMemoryTools.kt` | [~] |
-| 229 | `Moments/Moments/Views/Nova/Tools/NovaMomentAudience.swift` | `views/nova/tools/NovaMomentAudience.kt` | [~] |
-| 53 | `Moments/Moments/Views/Nova/Tools/NovaMomentDraftParser.swift` | `views/nova/tools/NovaMomentDraftParser.kt` | [~] |
-| 478 | `Moments/Moments/Views/Nova/Tools/NovaProfileTools.swift` | `views/nova/tools/NovaProfileTools.kt` | [~] |
-| 164 | `Moments/Moments/Views/Nova/Tools/NovaSocialTools.swift` | `views/nova/tools/NovaSocialTools.kt` | [~] |
-| 103 | `Moments/Moments/Views/Nova/UI/NovaActionConfirmationOverlay.swift` | `views/nova/ui/NovaActionConfirmationOverlay.kt` | [~] |
+| 231 | `Moments/Moments/Views/Misc/WhatsNewView.swift` | `views/misc/WhatsNewView.kt` | [x] 231↔263 · chrome≡iOS; copy Android 1.0 (no changelog 2.18); MomentsModalSheet medium/large |
+| 89 | `Moments/Moments/Views/Nova/AI/NovaAIService.swift` | `views/nova/ai/NovaAIService.kt` | [x] 89↔174 · Vertex chat/tools/JSON; wrappers SDK; AgentError en NovaAgent.kt |
+| 40 | `Moments/Moments/Views/Nova/AI/NovaGenerationConfig.swift` | `views/nova/ai/NovaGenerationConfig.kt` | [x] 40↔48 · model+chat/JSON/title+safety 1:1 |
+| 105 | `Moments/Moments/Views/Nova/AI/NovaPromptCatalog.swift` | `views/nova/ai/NovaPromptCatalog.kt` | [x] 105↔109 · system+nudge+draft+finalize+title+compact 1:1 |
+| 769 | `Moments/Moments/Views/Nova/Agent/NovaAgent.swift` | `views/nova/agent/NovaAgent.kt` | [x] 769↔617 · handleToolCalls batch≡iOS; finalizeOnExit en NovaView; fingerprint trim |
+| 55 | `Moments/Moments/Views/Nova/Agent/NovaContextAssembler.swift` | `views/nova/agent/NovaContextAssembler.kt` | [x] 55↔44 · systemInstruction+facts top10+summaries top5 |
+| 308 | `Moments/Moments/Views/Nova/Agent/NovaPendingAction.swift` | `views/nova/agent/NovaPendingAction.kt` | [x] 308↔193 · kinds+from()+privacy/hours/notifs labels≡iOS |
+| 291 | `Moments/Moments/Views/Nova/Agent/NovaToolExecutor.swift` | `views/nova/agent/NovaToolExecutor.kt` | [x] 291↔238 · dispatch+confirm gate+dedupe+momentSuccessMessage |
+| 304 | `Moments/Moments/Views/Nova/Agent/NovaToolRegistry.swift` | `views/nova/agent/NovaToolRegistry.kt` | [x] 304↔189 · 28 tools+confirm set 1:1; Tool wrap en NovaAIService |
+| 507 | `Moments/Moments/Views/Nova/Conversation/NovaConversationStore.swift` | `views/nova/conversation/NovaConversationStore.kt` | [x] 507↔437 · user-scoped+legacy; merge set; titles/encrypt/images |
+| 214 | `Moments/Moments/Views/Nova/Conversationmodels.swift` | `views/nova/Conversationmodels.kt` | [x] 214↔155 · Title+Saved+Message+legacy decode/storage ref |
+| 12 | `Moments/Moments/Views/Nova/Core/NovaLocaleContext.swift` | `views/nova/core/NovaLocaleContext.kt` | [x] 12↔15 · locale id + languageCode |
+| 136 | `Moments/Moments/Views/Nova/Memory/NovaContextStore.swift` | `views/nova/memory/NovaContextStore.kt` | [x] 136↔120 · summaries+load/save/clear cifrado |
+| 104 | `Moments/Moments/Views/Nova/Memory/NovaMemoryCrypto.swift` | `views/nova/memory/NovaMemoryCrypto.kt` | [x] 104↔49 · encrypt/decrypt memory+context; migration |
+| 251 | `Moments/Moments/Views/Nova/Memory/NovaMemoryEngine.swift` | `views/nova/memory/NovaMemoryEngine.kt` | [x] 251↔153 · finalize+sanitize+notifyMemoryUpdated |
+| 304 | `Moments/Moments/Views/Nova/Memory/NovaMemoryModels.swift` | `views/nova/memory/NovaMemoryModels.kt` | [x] 304↔206 · FactType+Fact+Memory upsert/compact/preferredName |
+| 61 | `Moments/Moments/Views/Nova/Memory/NovaMemoryStore.swift` | `views/nova/memory/NovaMemoryStore.kt` | [x] 61↔72 · load/save/cache+migrate; Flow≡Notification |
+| 63 | `Moments/Moments/Views/Nova/NovaCore/NovaModels.swift` | `views/nova/novacore/NovaModels.kt` | [x] 63↔44 · Grounding+ChatMessage equals |
+| 92 | `Moments/Moments/Views/Nova/NovaCore/NovaTheme.swift` | `views/nova/novacore/NovaTheme.kt` | [x] 92↔100 · colors+BrandIcon+LogConfig |
+| 420 | `Moments/Moments/Views/Nova/NovaMemoryManagementView.swift` | `views/nova/NovaMemoryManagementView.kt` | [x] 420↔574 · header chevron glass; empty; categorías Icons; clear capsule+VM |
+| 1041 ⚠️ | `Moments/Moments/Views/Nova/NovaSections/NovaAttachmentSheet.swift` | `views/nova/novasections/NovaAttachmentSheet.kt` | [x] 1041↔785 · popover anclado+glass; overlay 58%+inset; CaptureButton+story chrome |
+| 853 | `Moments/Moments/Views/Nova/NovaSections/NovaChatSection.swift` | `views/nova/novasections/NovaChatSection.kt` | [x] 853↔859 · bubbles+typewriter+grounding+format; +NovaChatTextFormatting |
+| 726 | `Moments/Moments/Views/Nova/NovaSections/NovaChromeSection.swift` | `views/nova/novasections/NovaChromeSection.kt` | [x] 726↔752 · header glass+egg/haptics; welcome SmartChips; particles/confetti; loading/badge glass |
+| 211 | `Moments/Moments/Views/Nova/NovaSections/NovaHistorySection.swift` | `views/nova/novasections/NovaHistorySection.kt` | [x] 211↔309 · overlay glass+empty AttachmentIcon+items menu |
+| 322 | `Moments/Moments/Views/Nova/NovaSections/NovaInputSection.swift` | `views/nova/novasections/NovaInputSection.kt` | [x] 322↔394 · layout+glass+focus stroke+plus/send MotionPolicy+chips/shimmer |
+| 385 | `Moments/Moments/Views/Nova/NovaView.swift` | `views/nova/NovaView.kt` | [x] 385↔413 · fades+IME insets+auto-scroll; gate; overlays zIndex; memory sheet |
+| 317 | `Moments/Moments/Views/Nova/Tools/NovaActivityTools.swift` | `views/nova/tools/NovaActivityTools.kt` | [x] 317↔291 · week Calendar+pct round; NovaEvents SharedFlow |
+| 52 | `Moments/Moments/Views/Nova/Tools/NovaMemoryTools.swift` | `views/nova/tools/NovaMemoryTools.kt` | [x] 52↔44 · rememberFact+updatePreference 1:1 |
+| 229 | `Moments/Moments/Views/Nova/Tools/NovaMomentAudience.swift` | `views/nova/tools/NovaMomentAudience.kt` | [x] 229↔231 · resolve+errors+audienceSetting≡Caption; customList→.custom |
+| 53 | `Moments/Moments/Views/Nova/Tools/NovaMomentDraftParser.swift` | `views/nova/tools/NovaMomentDraftParser.kt` | [x] 53↔49 · schema+should_publish+Draft 1:1 |
+| 478 | `Moments/Moments/Views/Nova/Tools/NovaProfileTools.swift` | `views/nova/tools/NovaProfileTools.kt` | [x] 478↔384 · snapshots+social+privacy+moments/stories/echo ≡iOS |
+| 164 | `Moments/Moments/Views/Nova/Tools/NovaSocialTools.swift` | `views/nova/tools/NovaSocialTools.kt` | [x] 164↔161 · lists count≡payload; create_moment audienceSettingRaw |
+| 103 | `Moments/Moments/Views/Nova/UI/NovaActionConfirmationOverlay.swift` | `views/nova/ui/NovaActionConfirmationOverlay.kt` | [x] 103↔164 · scrim+glass card/buttons+preview stroke |
 | 21 | `Moments/Moments/Views/Permission/camera/Contentview.swift` | `views/permission/camera/Contentview.kt` | [~] |
 | 318 | `Moments/Moments/Views/Permission/camera/helpers/CameraPermissionsview.swift` | `views/permission/camera/helpers/CameraPermissionsview.kt` | [~] |
 | 182 | `Moments/Moments/Views/Permission/location/LocationPermissionView.swift` | `views/permission/location/LocationPermissionView.kt` | [~] |
@@ -908,8 +940,8 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 74 | `Moments/Moments/Views/Shared/PhotoTagOverlayView.swift` | `views/shared/PhotoTagOverlayView.kt` | [x] 74↔134 · position+triangle+spring |
 | 175 | `Moments/Moments/Views/Shared/ScreenshotProtectedView.swift` | `views/shared/ScreenshotProtectedView.kt` | [x] 175↔~120 · FLAG_SECURE refcount; cornerRadius+updateToken; fillsContainer |
 | 227 | `Moments/Moments/Views/comments/CommentMentionSearchOverlay.swift` | `views/comments/CommentMentionSearchOverlay.kt` | [~] chrome glass header/cancel/+ + stroke panel |
-| 429 | `Moments/Moments/Views/comments/CommentsView.swift` | — | [ ] |
-| 1900 ⚠️ | `Moments/Moments/Views/comments/ModernCommentsView.swift` | `views/comments/ModernCommentsView.kt` | [~] P1: floating composer, edit UI, sort icons, diacritic mentions, chrome overlay; pendiente QA |
+| 429 | `Moments/Moments/Views/comments/CommentsView.swift` | — | [N/A] dead code iOS · 0 call sites · usar ModernCommentsView |
+| 1900 ⚠️ | `Moments/Moments/Views/comments/ModernCommentsView.swift` | `views/comments/ModernCommentsView.kt` + `ModernCommentsSheet.kt` | [~] 1900↔~1100 · sheet nav defaults+ime; composer 1…4 líneas+send scale; mute/sort/edit/mentions OK; QA restante |
 | 503 | `Moments/Moments/Views/story/QuestionResponsesView.swift` | `views/story/QuestionResponsesView.kt` | [x] sheet medium/large; chrome glass; list+detalle+creator; avatar→perfil |
 | 1018 ⚠️ | `Moments/Moments/Views/story/StoriesView.swift` | `views/story/StoriesView.kt` | [x] 1018↔~1050 · NavigateToChainStory+loadChain; pauseAllVideos; ring vacío→following; unseen/error; updateUserIds c/ad |
 | 635 | `Moments/Moments/Views/story/StoryChainView.swift` | `views/story/StoryChainView.kt` | [x] sheet+grid+stats+continue≡ContinueStoryChain; errores tipados; chrome; ItemView legacy N/A |
@@ -1021,7 +1053,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | Líneas | Archivo iOS | Android (.kt) | Paridad |
 |-------:|-------------|---------------|:-------:|
 | 46 | `Moments/Moments/Models/AccountHistoryItem.swift` | `models/AccountHistoryItem.kt` | [x] 46↔56 |
-| 683 | `Moments/Moments/Models/BestFriendsView.swift` | `models/BestFriendsView.kt` | [ ] |
+| 683 | `Moments/Moments/Models/BestFriendsView.swift` | `models/BestFriendsView.kt` | [~] 683↔626 · selected/suggested+pagination; chrome search; skeleton/empty; IDs following/followers |
 | 66 | `Moments/Moments/Models/Cache/CachedAction.swift` | `models/cache/CachedAction.kt` | [x] 66↔83 |
 | 19 | `Moments/Moments/Models/Cache/CachedConnection.swift` | `models/cache/CachedConnection.kt` | [x] 19↔17 |
 | 166 | `Moments/Moments/Models/Cache/CachedConversation.swift` | `models/cache/CachedConversation.kt` | [x] 166↔195 |
@@ -1040,7 +1072,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 677 | `Moments/Moments/Models/User.swift` | `models/User.kt` | [x] 677↔269 |
 | 39 | `Moments/Moments/Models/UserAffinity.swift` | `models/UserAffinity.kt` | [x] 39↔24 |
 | 306 | `Moments/Moments/Models/UserBadge.swift` | — | 🚫 |
-| 969 | `Moments/Moments/Models/VisitsView.swift` | `models/VisitsView.kt` | [ ] |
+| 969 | `Moments/Moments/Models/VisitsView.swift` | `models/VisitsView.kt` | [~] 969↔790 · TabContent skeleton/empty; rowSubtitle+justNow; alert; StalkerCard vertical; unfollow confirm |
 
 ## Notifications
 
@@ -1093,8 +1125,8 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 
 | Líneas | Archivo iOS | Android (.kt) | Paridad |
 |-------:|-------------|---------------|:-------:|
-| 64 | `Moments/Moments/ad/AdAspectRatioContext.swift` | `ad/AdAspectRatioContext.kt` | [~] |
-| 474 | `Moments/Moments/ad/AdMob Configuration.swift` | — | [~] |
+| 64 | `Moments/Moments/ad/AdAspectRatioContext.swift` | `ad/AdAspectRatioContext.kt` | [x] 64↔30 |
+| 474 | `Moments/Moments/ad/AdMob Configuration.swift` | `ad/AdMobConfiguration.kt` | [~] |
 | 604 | `Moments/Moments/ad/FeedNativeAd.swift` | `ad/FeedNativeAd.kt` | [~] |
 | 1479 ⚠️ | `Moments/Moments/ad/StoryNativeAd.swift` | `ad/StoryNativeAd.kt` | [~] |
 
@@ -1237,7 +1269,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 90 | `Moments/Moments/Extensions/InterestEmojiHelper.swift` | [x] 90↔103 |
 | 500 | `Moments/Moments/Extensions/View+LiquidGlass.swift` | [x] 500↔360 |
 | 46 | `Moments/Moments/Models/AccountHistoryItem.swift` | [x] 46↔56 |
-| 683 | `Moments/Moments/Models/BestFriendsView.swift` | [ ] |
+| 683 | `Moments/Moments/Models/BestFriendsView.swift` | [~] 683↔626 |
 | 66 | `Moments/Moments/Models/Cache/CachedAction.swift` | [x] 66↔83 |
 | 19 | `Moments/Moments/Models/Cache/CachedConnection.swift` | [x] 19↔17 |
 | 166 | `Moments/Moments/Models/Cache/CachedConversation.swift` | [x] 166↔195 |
@@ -1256,7 +1288,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 677 | `Moments/Moments/Models/User.swift` | [x] 677↔269 |
 | 39 | `Moments/Moments/Models/UserAffinity.swift` | [x] 39↔24 |
 | 306 | `Moments/Moments/Models/UserBadge.swift` | 🚫 |
-| 969 | `Moments/Moments/Models/VisitsView.swift` | [ ] |
+| 969 | `Moments/Moments/Models/VisitsView.swift` | [~] 969↔790 |
 | 512 | `Moments/Moments/Moderation/CommentsModerationService.swift` | [x] 512↔426 |
 | 1972 ⚠️ | `Moments/Moments/Moderation/MediaModerationService.swift` | [x] 1972↔972 |
 | 211 | `Moments/Moments/MomentsApp.swift` | [x] 211↔258 |
@@ -1523,32 +1555,32 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 680 | `Moments/Moments/Views/Feed/maps/MapsSections/MapBottomSheetSection.swift` | [x] 680↔643 |
 | 538 | `Moments/Moments/Views/Feed/maps/MapsSections/MapCanvasSection.swift` | [x] 537↔522 |
 | 445 | `Moments/Moments/Views/Feed/maps/WeatherService.swift` | [x] 445↔217 |
-| 364 | `Moments/Moments/Views/Login/AuthUIComponents.swift` | [~] |
-| 123 | `Moments/Moments/Views/Login/CreatingProfileView.swift` | [~] |
-| 326 | `Moments/Moments/Views/Login/DeactivatedAccountView.swift` | [~] |
+| 364 | `Moments/Moments/Views/Login/AuthUIComponents.swift` | [x] |
+| 123 | `Moments/Moments/Views/Login/CreatingProfileView.swift` | [x] |
+| 326 | `Moments/Moments/Views/Login/DeactivatedAccountView.swift` | [x] 326↔~605 shared |
 | 1 | `Moments/Moments/Views/Login/Interestview.swift` | 🚫 |
-| 475 | `Moments/Moments/Views/Login/LiquidGlassComponents.swift` | [~] |
-| 1153 ⚠️ | `Moments/Moments/Views/Login/LoginView.swift` | [~] |
-| 100 | `Moments/Moments/Views/Login/PrivacyPolicyView.swift` | [~] |
-| 1255 ⚠️ | `Moments/Moments/Views/Login/ProfileOnboardingView.swift` | [~] |
-| 17 | `Moments/Moments/Views/Login/RegisterView.swift` | [~] |
-| 10 | `Moments/Moments/Views/Login/SocialProfileCompletionView.swift` | [ ] bug Auth sin username |
+| 475 | `Moments/Moments/Views/Login/LiquidGlassComponents.swift` | [x] |
+| 1153 ⚠️ | `Moments/Moments/Views/Login/LoginView.swift` | [x] |
+| 100 | `Moments/Moments/Views/Login/PrivacyPolicyView.swift` | [x] |
+| 1255 ⚠️ | `Moments/Moments/Views/Login/ProfileOnboardingView.swift` | [x] |
+| 17 | `Moments/Moments/Views/Login/RegisterView.swift` | [x] |
+| 10 | `Moments/Moments/Views/Login/SocialProfileCompletionView.swift` | [x] SocialOnboarding |
 | 103 | `Moments/Moments/Views/Login/SplashScreen.swift` | [x] 103↔84 · canvas 0B1215/FAF9F6+logo dark/light+shadow AuthColors; reduceMotion; Δ MinimalSplash no en flujo |
-| 662 | `Moments/Moments/Views/Login/SuspendedAccount.swift` | [~] |
-| 395 | `Moments/Moments/Views/Messaging/Attachments/ChatGiphyPickerSheet.swift` | [~] · load-more solo último ítem |
-| 370 | `Moments/Moments/Views/Messaging/Attachments/ChatLocationSheet.swift` | [~] · LocationPermissionGate ALWAYS + errors |
+| 662 | `Moments/Moments/Views/Login/SuspendedAccount.swift` | [x] 662↔~605 shared · AppealForm+AppealStatus |
+| 395 | `Moments/Moments/Views/Messaging/Attachments/ChatGiphyPickerSheet.swift` | [x] 395↔467 · masonry+loadMore last |
+| 370 | `Moments/Moments/Views/Messaging/Attachments/ChatLocationSheet.swift` | [x] 370↔566 · Mapbox+ALWAYS gate |
 | 367 | `Moments/Moments/Views/Messaging/Components/AttachmentIconView.swift` | [x] 367↔225 · enum+metrics+presets+resolvedSize |
 | 146 | `Moments/Moments/Views/Messaging/Components/ChatAdaptiveColors.swift` | [x] 146↔70 · locals+extension colors; blue=#007AFF |
 | 1113 ⚠️ | `Moments/Moments/Views/Messaging/Components/ChatAttachmentSheet.swift` | [x] 1113↔952 · pickers+menu+photos; fling predicted+PermissionPrimer+popover gap+search glass |
 | 145 | `Moments/Moments/Views/Messaging/Components/ChatBuzzEffectViews.swift` | [x] 145↔~160 · toast+timeline+shake; icon gradient |
-| 902 | `Moments/Moments/Views/Messaging/Components/ChatChromeViews.swift` | [~] · typing/FAB reduceMotion wired via MotionPolicy |
-| 1293 ⚠️ | `Moments/Moments/Views/Messaging/Components/ChatClusterMediaViews.swift` | [~] · fan+gallery masonry/select/delete; detail push host no portado |
+| 902 | `Moments/Moments/Views/Messaging/Components/ChatChromeViews.swift` | [x] 902↔549 · typing 0→1+0.85 estático; FAB Spring.press; MotionPolicy default |
+| 1293 ⚠️ | `Moments/Moments/Views/Messaging/Components/ChatClusterMediaViews.swift` | [x] 1293↔1142 · fan+masonry+select/delete; detail host push≡FullScreen in-gallery |
 | 337 | `Moments/Moments/Views/Messaging/Components/ChatEphemeralMessageViews.swift` | [x] 337↔389 · tap/image/resolving/expired; blur+borders; hydrate; markViewed; Spring.toggle |
 | 112 | `Moments/Moments/Views/Messaging/Components/ChatFloatingNavigationOverlay.swift` | [x] 112↔~180 · resolve+search appear+shadow+AnimatedVisibility |
 | 95 | `Moments/Moments/Views/Messaging/Components/ChatGifMessageBubble.swift` | [x] 95↔117 |
 | 801 | `Moments/Moments/Views/Messaging/Components/ChatInputViews.swift` | [x] 801↔706 · vanish+fill sólido floating/locked+held+trim; Δ no aurora/glass iOS |
 | 66 | `Moments/Moments/Views/Messaging/Components/ChatKFImageViews.swift` | [x] 66↔89 |
-| 606 | `Moments/Moments/Views/Messaging/Components/ChatLocationMessageBubble.swift` | [~] · bubble+detail+avatar pin+countdown; MK snapshot→GoogleMap |
+| 606 | `Moments/Moments/Views/Messaging/Components/ChatLocationMessageBubble.swift` | [x] 606↔708 · Snapshotter+Mapbox detail |
 | 502 | `Moments/Moments/Views/Messaging/Components/ChatMediaViews.swift` | [x] 502↔565 · image/video+download+players; downsample; drag px; BlurView≈sólido |
 | 838 | `Moments/Moments/Views/Messaging/Components/ChatMessageBubbleViews.swift` | [x] 838↔669 · row swipe/chrome+AttachBubbleBadges; texto sin double overlay; link preview; Δ≈LPLink |
 | 28 | `Moments/Moments/Views/Messaging/Components/ChatMessageForwardSheet.swift` | [x] 28↔151 |
@@ -1564,7 +1596,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 279 | `Moments/Moments/Views/Messaging/Components/ConversationContextMenu.swift` | [x] 279↔355 · cutout Clear+chrome+layout+MomentRowButton.menu; pin.slash≈slash overlay; systemBars insets; row highlight 0.96 |
 | 84 | `Moments/Moments/Views/Messaging/Components/MediaProgressRing.swift` | [x] 84↔58 |
 | 38 | `Moments/Moments/Views/Messaging/Components/MessageTypeIconView.swift` | [x] 38↔54 |
-| 186 | `Moments/Moments/Views/Messaging/Components/MessagingComposerAndStatusViews.swift` | [~] · composer gradient+campo+send; status MomentsModalSheet medium+large+dividers |
+| 186 | `Moments/Moments/Views/Messaging/Components/MessagingComposerAndStatusViews.swift` | [x] 186↔357 · sheet style+composer canvas |
 | 287 | `Moments/Moments/Views/Messaging/Components/ViewOnceMessageBubble.swift` | [x] 287↔268 · pills+progress; estado desde message; zoom matchedTransition stub |
 | 1121 ✅ | `Moments/Moments/Views/Messaging/Components/VoiceNotes.swift` | [x] · recorder/compose/trim+audio bubble scrub/speed/shape+proximidad auricular |
 | 535 | `Moments/Moments/Views/Messaging/Components/VoiceRecordingGestureViews.swift` | [~] · fases hold/lock/cancel+follow goma+ticks+chrome; aura dual; VoiceBlob/AuroraMesh→brush stub |
@@ -1620,39 +1652,39 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 59 | `Moments/Moments/Views/Messaging/Services/ChatVideoPosterGenerator.swift` | [x] 59↔52 |
 | 298 | `Moments/Moments/Views/Messaging/Services/LiveLocationSharingService.swift` | [x] 298↔356 |
 | 33 | `Moments/Moments/Views/Messaging/Services/ViewOnceConsumptionService.swift` | [x] 33↔27 |
-| 231 | `Moments/Moments/Views/Misc/WhatsNewView.swift` | [~] |
-| 89 | `Moments/Moments/Views/Nova/AI/NovaAIService.swift` | [~] |
-| 40 | `Moments/Moments/Views/Nova/AI/NovaGenerationConfig.swift` | [~] |
-| 105 | `Moments/Moments/Views/Nova/AI/NovaPromptCatalog.swift` | [~] |
-| 769 | `Moments/Moments/Views/Nova/Agent/NovaAgent.swift` | [~] |
-| 55 | `Moments/Moments/Views/Nova/Agent/NovaContextAssembler.swift` | [~] |
-| 308 | `Moments/Moments/Views/Nova/Agent/NovaPendingAction.swift` | [~] |
-| 291 | `Moments/Moments/Views/Nova/Agent/NovaToolExecutor.swift` | [~] |
-| 304 | `Moments/Moments/Views/Nova/Agent/NovaToolRegistry.swift` | [~] |
-| 507 | `Moments/Moments/Views/Nova/Conversation/NovaConversationStore.swift` | [~] |
-| 214 | `Moments/Moments/Views/Nova/Conversationmodels.swift` | [~] |
-| 12 | `Moments/Moments/Views/Nova/Core/NovaLocaleContext.swift` | [~] |
-| 136 | `Moments/Moments/Views/Nova/Memory/NovaContextStore.swift` | [~] |
-| 104 | `Moments/Moments/Views/Nova/Memory/NovaMemoryCrypto.swift` | [~] |
-| 251 | `Moments/Moments/Views/Nova/Memory/NovaMemoryEngine.swift` | [~] |
-| 304 | `Moments/Moments/Views/Nova/Memory/NovaMemoryModels.swift` | [~] |
-| 61 | `Moments/Moments/Views/Nova/Memory/NovaMemoryStore.swift` | [~] |
-| 63 | `Moments/Moments/Views/Nova/NovaCore/NovaModels.swift` | [~] |
-| 92 | `Moments/Moments/Views/Nova/NovaCore/NovaTheme.swift` | [~] |
-| 420 | `Moments/Moments/Views/Nova/NovaMemoryManagementView.swift` | [~] |
-| 1041 ⚠️ | `Moments/Moments/Views/Nova/NovaSections/NovaAttachmentSheet.swift` | [~] |
-| 853 | `Moments/Moments/Views/Nova/NovaSections/NovaChatSection.swift` | [~] |
-| 726 | `Moments/Moments/Views/Nova/NovaSections/NovaChromeSection.swift` | [~] |
-| 211 | `Moments/Moments/Views/Nova/NovaSections/NovaHistorySection.swift` | [~] |
-| 322 | `Moments/Moments/Views/Nova/NovaSections/NovaInputSection.swift` | [~] |
-| 385 | `Moments/Moments/Views/Nova/NovaView.swift` | [~] |
-| 317 | `Moments/Moments/Views/Nova/Tools/NovaActivityTools.swift` | [~] |
-| 52 | `Moments/Moments/Views/Nova/Tools/NovaMemoryTools.swift` | [~] |
-| 229 | `Moments/Moments/Views/Nova/Tools/NovaMomentAudience.swift` | [~] |
-| 53 | `Moments/Moments/Views/Nova/Tools/NovaMomentDraftParser.swift` | [~] |
-| 478 | `Moments/Moments/Views/Nova/Tools/NovaProfileTools.swift` | [~] |
-| 164 | `Moments/Moments/Views/Nova/Tools/NovaSocialTools.swift` | [~] |
-| 103 | `Moments/Moments/Views/Nova/UI/NovaActionConfirmationOverlay.swift` | [~] |
+| 231 | `Moments/Moments/Views/Misc/WhatsNewView.swift` | [x] 231↔263 · chrome≡iOS; copy Android 1.0 |
+| 89 | `Moments/Moments/Views/Nova/AI/NovaAIService.swift` | [x] 89↔174 · Vertex chat/tools/JSON; wrappers SDK |
+| 40 | `Moments/Moments/Views/Nova/AI/NovaGenerationConfig.swift` | [x] 40↔48 · model+chat/JSON/title+safety 1:1 |
+| 105 | `Moments/Moments/Views/Nova/AI/NovaPromptCatalog.swift` | [x] 105↔109 · system+nudge+draft+finalize+title+compact 1:1 |
+| 769 | `Moments/Moments/Views/Nova/Agent/NovaAgent.swift` | [x] 769↔617 · handleToolCalls batch≡iOS; finalizeOnExit en NovaView |
+| 55 | `Moments/Moments/Views/Nova/Agent/NovaContextAssembler.swift` | [x] 55↔44 · systemInstruction+facts+summaries |
+| 308 | `Moments/Moments/Views/Nova/Agent/NovaPendingAction.swift` | [x] 308↔193 · kinds+from()+labels≡iOS |
+| 291 | `Moments/Moments/Views/Nova/Agent/NovaToolExecutor.swift` | [x] 291↔238 · dispatch+confirm gate+dedupe |
+| 304 | `Moments/Moments/Views/Nova/Agent/NovaToolRegistry.swift` | [x] 304↔189 · 28 tools+confirm set 1:1 |
+| 507 | `Moments/Moments/Views/Nova/Conversation/NovaConversationStore.swift` | [x] 507↔437 · user-scoped+legacy; merge set; titles/encrypt/images |
+| 214 | `Moments/Moments/Views/Nova/Conversationmodels.swift` | [x] 214↔155 · Title+Saved+Message+legacy decode/storage ref |
+| 12 | `Moments/Moments/Views/Nova/Core/NovaLocaleContext.swift` | [x] 12↔15 · locale id + languageCode |
+| 136 | `Moments/Moments/Views/Nova/Memory/NovaContextStore.swift` | [x] 136↔120 · summaries+load/save/clear cifrado |
+| 104 | `Moments/Moments/Views/Nova/Memory/NovaMemoryCrypto.swift` | [x] 104↔49 · encrypt/decrypt memory+context; migration |
+| 251 | `Moments/Moments/Views/Nova/Memory/NovaMemoryEngine.swift` | [x] 251↔153 · finalize+sanitize+notifyMemoryUpdated |
+| 304 | `Moments/Moments/Views/Nova/Memory/NovaMemoryModels.swift` | [x] 304↔206 · FactType+Fact+Memory upsert/compact/preferredName |
+| 61 | `Moments/Moments/Views/Nova/Memory/NovaMemoryStore.swift` | [x] 61↔72 · load/save/cache+migrate; Flow≡Notification |
+| 63 | `Moments/Moments/Views/Nova/NovaCore/NovaModels.swift` | [x] 63↔44 · Grounding+ChatMessage equals |
+| 92 | `Moments/Moments/Views/Nova/NovaCore/NovaTheme.swift` | [x] 92↔100 · colors+BrandIcon+LogConfig |
+| 420 | `Moments/Moments/Views/Nova/NovaMemoryManagementView.swift` | [x] 420↔574 · header chevron glass; empty; categorías Icons; clear capsule+VM |
+| 1041 ⚠️ | `Moments/Moments/Views/Nova/NovaSections/NovaAttachmentSheet.swift` | [x] 1041↔785 · popover anclado+glass; overlay 58%+inset; CaptureButton+story chrome |
+| 853 | `Moments/Moments/Views/Nova/NovaSections/NovaChatSection.swift` | [x] 853↔859 · bubbles+typewriter+grounding+format; +NovaChatTextFormatting |
+| 726 | `Moments/Moments/Views/Nova/NovaSections/NovaChromeSection.swift` | [x] 726↔752 · header glass+egg/haptics; welcome SmartChips; particles/confetti; loading/badge glass |
+| 211 | `Moments/Moments/Views/Nova/NovaSections/NovaHistorySection.swift` | [x] 211↔309 · overlay glass+empty AttachmentIcon+items menu |
+| 322 | `Moments/Moments/Views/Nova/NovaSections/NovaInputSection.swift` | [x] 322↔394 · layout+glass+focus stroke+plus/send MotionPolicy+chips/shimmer |
+| 385 | `Moments/Moments/Views/Nova/NovaView.swift` | [x] 385↔413 · fades+IME insets+auto-scroll; gate; overlays zIndex; memory sheet |
+| 317 | `Moments/Moments/Views/Nova/Tools/NovaActivityTools.swift` | [x] 317↔291 · week Calendar+pct round; NovaEvents SharedFlow |
+| 52 | `Moments/Moments/Views/Nova/Tools/NovaMemoryTools.swift` | [x] 52↔44 · rememberFact+updatePreference 1:1 |
+| 229 | `Moments/Moments/Views/Nova/Tools/NovaMomentAudience.swift` | [x] 229↔231 · resolve+errors+audienceSetting≡Caption |
+| 53 | `Moments/Moments/Views/Nova/Tools/NovaMomentDraftParser.swift` | [x] 53↔49 · schema+should_publish+Draft 1:1 |
+| 478 | `Moments/Moments/Views/Nova/Tools/NovaProfileTools.swift` | [x] 478↔384 · snapshots+social+privacy+moments/stories/echo ≡iOS |
+| 164 | `Moments/Moments/Views/Nova/Tools/NovaSocialTools.swift` | [x] 164↔161 · lists count≡payload; create_moment audienceSettingRaw |
+| 103 | `Moments/Moments/Views/Nova/UI/NovaActionConfirmationOverlay.swift` | [x] 103↔164 · scrim+glass card/buttons+preview stroke |
 | 21 | `Moments/Moments/Views/Permission/camera/Contentview.swift` | [~] |
 | 318 | `Moments/Moments/Views/Permission/camera/helpers/CameraPermissionsview.swift` | [~] |
 | 182 | `Moments/Moments/Views/Permission/location/LocationPermissionView.swift` | [~] |
@@ -1764,8 +1796,8 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 74 | `Moments/Moments/Views/Shared/PhotoTagOverlayView.swift` | [x] 74↔134 |
 | 175 | `Moments/Moments/Views/Shared/ScreenshotProtectedView.swift` | [x] |
 | 227 | `Moments/Moments/Views/comments/CommentMentionSearchOverlay.swift` | [~] chrome glass |
-| 429 | `Moments/Moments/Views/comments/CommentsView.swift` | [ ] |
-| 1900 ⚠️ | `Moments/Moments/Views/comments/ModernCommentsView.swift` | [~] P1 cerrados; pendiente QA |
+| 429 | `Moments/Moments/Views/comments/CommentsView.swift` | [N/A] dead · usar ModernCommentsView |
+| 1900 ⚠️ | `Moments/Moments/Views/comments/ModernCommentsView.swift` | [~] sheet nav+ime; composer 1…4+send scale; QA restante |
 | 503 | `Moments/Moments/Views/story/QuestionResponsesView.swift` | [x] |
 | 1018 ⚠️ | `Moments/Moments/Views/story/StoriesView.swift` | [x] · NavigateToChainStory+loadChain; pauseAllVideos; ring/following |
 | 635 | `Moments/Moments/Views/story/StoryChainView.swift` | [x] |
@@ -1793,7 +1825,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 1067 ⚠️ | `Moments/Moments/Views/story/StoryViewer/StoryViewerOverlay.swift` | [x] |
 | 2381 ⚠️ | `Moments/Moments/Views/story/StoryViewer/StoryViewerScreen.swift` | [x] |
 | 1831 ⚠️ | `Moments/Moments/Views/story/archived stories.swift` | [x] · card+viewer+StoryStatsView+calendar+map |
-| 64 | `Moments/Moments/ad/AdAspectRatioContext.swift` | [~] |
+| 64 | `Moments/Moments/ad/AdAspectRatioContext.swift` | [x] 64↔30 |
 | 474 | `Moments/Moments/ad/AdMob Configuration.swift` | [~] |
 | 604 | `Moments/Moments/ad/FeedNativeAd.swift` | [~] |
 | 1479 ⚠️ | `Moments/Moments/ad/StoryNativeAd.swift` | [~] |

@@ -51,7 +51,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import kotlin.math.PI
 import kotlin.math.cos
@@ -143,7 +142,8 @@ fun StoryTextEditorInput(
                 color = Color.Transparent,
                 fontSize = configuration.fontSize.sp,
                 fontWeight = FontWeight.SemiBold,
-                letterSpacing = attrs.letterSpacing.em,
+                // ≡ iOS `NSKernAttributeName` en puntos (preset.letterSpacing), no em.
+                letterSpacing = attrs.letterSpacing.sp,
                 textAlign = attrs.textAlign,
                 fontFamily = fontFamily,
             ),
@@ -189,7 +189,8 @@ fun StoryTextOverlayContainer(
         color = attrs.foreground,
         fontSize = configuration.fontSize.sp,
         fontWeight = FontWeight.SemiBold,
-        letterSpacing = attrs.letterSpacing.em,
+        // ≡ iOS kern en puntos (`preset.letterSpacing`).
+        letterSpacing = attrs.letterSpacing.sp,
         textAlign = attrs.textAlign,
         fontFamily = fontFamily,
         shadow = attrs.shadow?.let {

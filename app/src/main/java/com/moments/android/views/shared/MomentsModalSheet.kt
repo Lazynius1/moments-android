@@ -1,27 +1,30 @@
 package com.moments.android.views.shared
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import com.moments.android.views.feed.rememberAdaptiveColors
+import kotlinx.coroutines.launch
 
 /**
  * Host de presentación ≡ SwiftUI `.sheet`.
@@ -40,7 +43,7 @@ fun MomentsModalSheet(
     showDragHandle: Boolean = true,
     /** ≡ iOS `interactiveDismissDisabled` — false bloquea swipe/tap fuera. */
     dismissEnabled: Boolean = true,
-    content: @Composable ColumnScope.() -> Unit,
+    content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = largeOnly,
@@ -48,19 +51,18 @@ fun MomentsModalSheet(
             dismissEnabled || newValue != SheetValue.Hidden
         },
     )
-    val screenH = LocalConfiguration.current.screenHeightDp.dp
-    val contentHeight by animateDpAsState(
-        targetValue = when {
-            largeOnly -> screenH * 0.92f
-            sheetState.targetValue == SheetValue.Expanded -> screenH * 0.92f
-            else -> screenH * 0.55f
-        },
-        animationSpec = spring(dampingRatio = 0.9f, stiffness = 400f),
-        label = "momentsModalSheetHeight",
-    )
+    val scope = rememberCoroutineScope()
+    val dismissSheet: () -> Unit = {
+        scope.launch {
+            if (sheetState.currentValue != SheetValue.Hidden) {
+                sheetState.hide()
+            }
+            onDismissRequest()
+        }
+    }
 
     ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = dismissSheet,
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = containerColor,
@@ -71,15 +73,32 @@ fun MomentsModalSheet(
         Column(
             Modifier
                 .fillMaxWidth()
-                .height(contentHeight)
-                .navigationBarsPadding(),
+                // Altura estable: Material 3 mueve la hoja entre sus anclajes.
+                // Cambiarla según targetValue hacía que el contenido compitiese
+                // con el gesto y producía saltos durante el arrastre.
+                .fillMaxHeight(0.92f)
+                .navigationBarsPadding()
+                .imePadding(),
         ) {
             if (showDragHandle) {
-                BottomSheetDefaults.DragHandle(
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .width(32.dp)
+                            .height(4.dp)
+                            .background(
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                RoundedCornerShape(2.dp),
+                            ),
+                    )
+                }
             }
-            content()
+            content(dismissSheet)
         }
     }
 }

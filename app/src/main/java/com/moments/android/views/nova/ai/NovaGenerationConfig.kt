@@ -6,7 +6,7 @@ import com.google.firebase.ai.type.SafetySetting
 import com.google.firebase.ai.type.generationConfig
 import com.google.firebase.ai.type.thinkingConfig
 
-/** Shared Firebase AI Logic generation settings used by Nova's models. */
+/** Port de `Views/Nova/AI/NovaGenerationConfig.swift`. */
 object NovaGenerationConfig {
     const val modelName = "gemini-3.1-flash-lite"
     const val location = "global"
@@ -21,6 +21,7 @@ object NovaGenerationConfig {
         }
     }
 
+    /** ≡ iOS `structuredJSON`. */
     val structuredJson = generationConfig {
         temperature = 0.2f
         maxOutputTokens = 1024

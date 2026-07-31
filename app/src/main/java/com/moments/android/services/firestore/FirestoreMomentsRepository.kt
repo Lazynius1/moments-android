@@ -1,6 +1,5 @@
 package com.moments.android.services.firestore
 
-import com.google.firebase.FirebaseApp
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
@@ -18,14 +17,14 @@ import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.services.privacy.ContentVisibilityService
 import com.moments.android.services.privacy.ContentVisibilityType
+import com.moments.android.services.network.CloudFunctionsClient
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.tasks.await
+import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Date
 import java.util.UUID
 
@@ -51,28 +50,11 @@ suspend fun FirestoreService.deleteMoment(userId: String, momentId: String) {
 suspend fun FirestoreService.permanentlyDeleteRecentlyDeleted(ids: List<String>) {
     val cleanIds = ids.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
     if (cleanIds.isEmpty()) return
-    val currentUser = FirebaseAuth.getInstance().currentUser ?: error("Not authenticated")
-    val projectId = FirebaseApp.getInstance().options.projectId ?: error("Missing project ID")
-    val token = currentUser.getIdToken(false).await().token ?: error("No token")
-    val url = URL("https://europe-southwest1-$projectId.cloudfunctions.net/permanentlyDeleteRecentlyDeletedBatch")
-    val connection = (url.openConnection() as HttpURLConnection).apply {
-        requestMethod = "POST"
-        connectTimeout = 60_000
-        readTimeout = 60_000
-        setRequestProperty("Content-Type", "application/json")
-        setRequestProperty("Authorization", "Bearer $token")
-        doOutput = true
-    }
-    try {
-        connection.outputStream.use {
-            it.write(JSONObject().put("ids", cleanIds).toString().toByteArray())
-        }
-        if (connection.responseCode !in 200..299) {
-            error("Backend error ${connection.responseCode}")
-        }
-    } finally {
-        connection.disconnect()
-    }
+    CloudFunctionsClient.postVoid(
+        function = "permanentlyDeleteRecentlyDeletedBatch",
+        payload = JSONObject().put("ids", JSONArray(cleanIds)),
+        timeoutMs = 60_000,
+    )
 }
 
 suspend fun FirestoreService.permanentlyDeleteMoment(momentId: String, userId: String) {
