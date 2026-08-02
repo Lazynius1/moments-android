@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -52,6 +53,7 @@ import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.components.StoryColorPickerPanel
 import com.moments.android.views.creator.components.StoryDominantColorsExtractor
+import com.moments.android.views.creator.components.StoryEditorChromeColor
 import com.moments.android.views.creator.components.StoryMomentsEditorChrome
 import com.moments.android.views.creator.components.StoryTextBackgroundFill
 import com.moments.android.views.creator.components.StoryTextEditorContext
@@ -284,6 +286,7 @@ fun StoryTextEditor(
         }
 
         // ≡ top bar: X + Done capsule (no check icon)
+        val chromeFg = StoryEditorChromeColor.icon(isSystemInDarkTheme())
         Row(
             Modifier
                 .fillMaxWidth()
@@ -300,12 +303,12 @@ fun StoryTextEditor(
                     .clickable(onClick = onCancel),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Close, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Close, null, tint = chromeFg, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.weight(1f))
             Text(
                 text = stringResource(R.string.story_text_editor_done),
-                color = Color.White,
+                color = chromeFg,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier

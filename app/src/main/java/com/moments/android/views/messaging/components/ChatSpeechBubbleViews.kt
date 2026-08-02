@@ -463,7 +463,13 @@ fun ChatIncomingAvatarButton(
         if (isUnavailable) {
             ProfileUnavailableAvatar(size = size)
         } else {
-            GlassmorphicAvatar(userId = otherUserId.orEmpty(), modifier = Modifier.size(size))
+            // Mismo patrón que el avatar circular del toolbar del chat.
+            GlassmorphicAvatar(
+                userId = otherUserId.orEmpty(),
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape),
+            )
         }
     }
 }
@@ -480,11 +486,12 @@ fun ChatIncomingAvatarGutter(
     onTap: () -> Unit,
 ) {
     // ≡ iOS: frame(width: avatarSize).padding(.trailing, gutterGap)
+    // padding fuera del width para no comprimir el avatar a un no-cuadrado.
     Box(
         Modifier
-            .width(ChatIncomingMessageLayout.gutterAvatarSize)
-            .padding(end = ChatIncomingMessageLayout.gutterGap),
-        contentAlignment = Alignment.BottomStart,
+            .padding(end = ChatIncomingMessageLayout.gutterGap)
+            .width(ChatIncomingMessageLayout.gutterAvatarSize),
+        contentAlignment = Alignment.BottomCenter,
     ) {
         if (showAvatar) {
             ChatIncomingAvatarButton(
@@ -495,6 +502,7 @@ fun ChatIncomingAvatarGutter(
                 onTap = onTap,
             )
         } else {
+            // ≡ iOS Color.clear.frame(width: avatarSize, height: 1)
             Box(Modifier.width(ChatIncomingMessageLayout.gutterAvatarSize).height(1.dp))
         }
     }

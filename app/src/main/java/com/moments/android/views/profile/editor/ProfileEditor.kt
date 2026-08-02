@@ -37,13 +37,12 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -88,6 +87,7 @@ import com.moments.android.views.creator.creatoruikit.CameraCaptureMediaType
 import com.moments.android.views.permissions.CameraAccessBoundary
 import com.moments.android.views.profile.editor.sections.ProfileLibraryCropEntryView
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.MomentsSheetHeader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -331,7 +331,7 @@ fun ModernEditProfileView(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    CircularProgressIndicator(color = primary)
+                    MomentsCircularProgressIndicator()
                     Text(
                         stringResource(R.string.profile_editor_loading_profile),
                         color = primary.copy(0.8f),
@@ -432,7 +432,7 @@ fun ModernEditProfileView(
                     .background(canvas.copy(0.72f)),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator(color = primary)
+                MomentsCircularProgressIndicator()
             }
         }
     }
@@ -514,50 +514,27 @@ private fun EditProfileHeader(
     onPhotoTap: () -> Unit,
 ) {
     Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = 10.dp),
+        Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(top = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.Filled.KeyboardArrowDown,
-                contentDescription = stringResource(R.string.common_close),
-                tint = primary,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(onClick = onDismiss)
-                    .padding(10.dp),
-            )
-            Text(
-                stringResource(R.string.profile_editor_title),
-                color = primary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                stringResource(R.string.common_save),
-                color = if (characterCount <= 150) primary else primary.copy(0.4f),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .momentsChromeGlass(RoundedCornerShape(50), interactive = characterCount <= 150)
-                    .clickable(enabled = characterCount <= 150, onClick = onSave)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            )
-        }
+        MomentsSheetHeader(
+            title = stringResource(R.string.profile_editor_title),
+            titleSize = 18.sp,
+            trailing = {
+                Text(
+                    stringResource(R.string.common_save),
+                    color = if (characterCount <= 150) primary else primary.copy(0.4f),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .momentsChromeGlass(RoundedCornerShape(50), interactive = characterCount <= 150)
+                        .clickable(enabled = characterCount <= 150, onClick = onSave)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+            },
+        )
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,

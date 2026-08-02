@@ -27,13 +27,12 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
@@ -112,7 +111,7 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    CircularProgressIndicator(color = primary)
+                    MomentsCircularProgressIndicator()
                     Spacer(Modifier.height(12.dp))
                     Text(
                         stringResource(R.string.content_visibility_loading),
@@ -532,18 +531,9 @@ private fun StoryInteractionSettingsView(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
-                .padding(top = 10.dp, bottom = 10.dp),
+                .padding(top = 0.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(onClick = onDismiss),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.KeyboardArrowDown, null, tint = primary)
-            }
             Spacer(Modifier.weight(1f))
             Text(
                 stringResource(R.string.content_visibility_save),
@@ -706,31 +696,19 @@ private fun HiddenFromView(
     }
 
     Column(Modifier.fillMaxSize()) {
-        Row(
+        Box(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
-                .padding(top = 10.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(top = 0.dp, bottom = 8.dp),
         ) {
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(onClick = onDismiss),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.KeyboardArrowDown, null, tint = primary)
-            }
-            Spacer(Modifier.weight(1f))
             Text(
                 stringResource(R.string.content_visibility_hide_content_nav),
-                fontSize = 20.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = primary,
+                modifier = Modifier.align(Alignment.Center),
             )
-            Spacer(Modifier.weight(1f))
-            Spacer(Modifier.size(44.dp))
         }
 
         Column(
@@ -756,11 +734,10 @@ private fun HiddenFromView(
             )
 
             if (isSearching) {
-                CircularProgressIndicator(
-                    Modifier
+                MomentsCircularProgressIndicator(
+                    modifier = Modifier
                         .align(Alignment.CenterHorizontally)
                         .padding(top = 8.dp),
-                    color = primary,
                 )
             } else {
                 if (viewModel.hiddenFromUsers.isNotEmpty()) {

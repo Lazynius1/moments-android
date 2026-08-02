@@ -65,10 +65,13 @@ import com.moments.android.views.feed.core.sections.ModernPostCardView
 import com.moments.android.views.feed.maps.LocationMapView
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.rememberAdaptiveColors
-import com.moments.android.views.profile.core.sections.ProfileStickyChromeContainer
 import com.moments.android.views.profile.momentsview.EditMomentView
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
 import com.moments.android.views.shared.ScreenshotProtectedView
+import com.moments.android.views.shared.momentdetail.FeedPinnedTopChrome
+import com.moments.android.views.shared.momentdetail.MomentDetailSolidTopChrome
+import com.moments.android.views.shared.momentdetail.ProfileHeaderCollapseMetrics
+import com.moments.android.views.shared.momentdetail.rememberMomentDetailContentTopInset
 import com.moments.android.views.story.StoriesView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -129,12 +132,7 @@ fun SingleMomentDetailView(
         }
     } ?: stringResource(R.string.tab_bar_explore)
 
-    val chromeBlurProgress = remember(scrollState.value) {
-        ProfileHeaderCollapseMetrics.detailScrollChromeBlurProgress(
-            contentMinY = -scrollState.value.toFloat(),
-            initialContentMinY = 0f,
-        )
-    }
+    val listTopInset = rememberMomentDetailContentTopInset()
 
     val animatedOffset by animateFloatAsState(
         targetValue = dragOffsetPx,
@@ -273,7 +271,7 @@ fun SingleMomentDetailView(
                     .padding(horizontal = FeedMomentCardLayout.listHorizontalPadding)
                     .padding(bottom = 24.dp),
             ) {
-                Spacer(Modifier.height(ProfileHeaderCollapseMetrics.feedStyleDetailTopInset))
+                Spacer(Modifier.height(listTopInset))
                 val isProtected = (currentMoment.audience?.lowercase() ?: "") != "everyone"
                 ScreenshotProtectedView(isProtected = isProtected) {
                     ModernPostCardView(
@@ -303,19 +301,13 @@ fun SingleMomentDetailView(
                 }
             }
 
-            ProfileStickyChromeContainer(
-                blurProgress = chromeBlurProgress,
-                tabsArePinned = false,
-                chrome = {
-                    FeedPinnedTopChrome(
-                        title = resolvedChromeTitle,
-                        onDismiss = onDismiss,
-                    )
-                },
-                blurFadeTail = ProfileHeaderCollapseMetrics.feedDetailChromeBlurFadeTail.dp,
-                horizontalPadding = 0.dp,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
+            MomentDetailSolidTopChrome(modifier = Modifier.align(Alignment.TopCenter)) {
+                FeedPinnedTopChrome(
+                    title = resolvedChromeTitle,
+                    onDismiss = onDismiss,
+                    applySafeAreaTop = false,
+                )
+            }
         }
 
         if (showContextMenu) {

@@ -94,8 +94,9 @@ object AdMobConfiguration {
         BuildConfig.DEBUG || IS_DIAGNOSTIC_MODE || !isPlaceholder(APP_ID)
 
     fun getNativeAdUnitId(): String {
+        // ≡ iOS: solo `isDiagnosticMode` fuerza test IDs (no DEBUG automático)
         val raw = when {
-            IS_DIAGNOSTIC_MODE || BuildConfig.DEBUG -> TEST_NATIVE_AD_UNIT_ID
+            IS_DIAGNOSTIC_MODE -> TEST_NATIVE_AD_UNIT_ID
             isPlaceholder(NATIVE_AD_UNIT_ID) -> TEST_NATIVE_AD_UNIT_ID
             else -> NATIVE_AD_UNIT_ID
         }
@@ -259,6 +260,12 @@ object AdMobConfiguration {
         preloadedNativeAd = null
     }
 
+    /** ≡ iOS `createNativeAdOptions()` — mediaAspectRatio `.any`. */
+    fun createNativeAdOptions(): NativeAdOptions =
+        NativeAdOptions.Builder()
+            .setMediaAspectRatio(NativeAdOptions.NATIVE_MEDIA_ASPECT_RATIO_ANY)
+            .build()
+
     fun createAdRequest(): AdRequest = AdRequest.Builder().build()
 }
 
@@ -325,10 +332,8 @@ class NativeAdManager {
                 }
             })
             .withNativeAdOptions(
-                // ≡ iOS NativeAdManager → AdMobConfiguration.shared.createNativeAdOptions() → .any
-                NativeAdOptions.Builder()
-                    .setMediaAspectRatio(NativeAdOptions.NATIVE_MEDIA_ASPECT_RATIO_ANY)
-                    .build(),
+                // ≡ iOS NativeAdManager → AdMobConfiguration.shared.createNativeAdOptions()
+                AdMobConfiguration.createNativeAdOptions(),
             )
             .build()
 
@@ -349,7 +354,11 @@ class NativeAdManager {
 
 // MARK: - Plus Ad Manager (≡ iOS; mismo flag básico, sin suscripción)
 
-/** ≡ iOS `PlusAdManager` — solo `isPlusSubscriber` / `shouldHideAds`. */
+/**
+ * ≡ iOS `PlusAdManager`.
+ * iOS combina `isPlusSubscriber && hasActivePlusSubscription`; en Android no hay
+ * `plusSubscription` → mismo gate que Feed: `shouldHideAds` (= `isPlusSubscriber`).
+ */
 class PlusAdManager(
     private val authService: AuthService = AuthService,
 ) {
@@ -371,7 +380,10 @@ class PlusAdManager(
     fun refreshAdStatus() = updateAdDisplayStatus()
 }
 
-/** ≡ iOS `PlusStatusHelper` / `shouldHideAds` (= `isPlusSubscriber`). */
+/**
+ * ≡ iOS `PlusStatusHelper` (StoryNativeAd) / gate de Feed (`shouldHideAds`).
+ * Sin `hasActivePlusSubscription` en Android → `isPlusSubscriber` únicamente.
+ */
 object PlusStatusHelper {
     fun shouldShowAds(user: AppUser?): Boolean {
         user ?: return true

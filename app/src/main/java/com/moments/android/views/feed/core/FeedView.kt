@@ -94,6 +94,7 @@ fun FeedView(
     padding: PaddingValues,
     showCreatorView: Boolean = false,
     onShowCreatorViewChange: (Boolean) -> Unit = {},
+    onSuppressTabBarChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -352,18 +353,22 @@ fun FeedView(
     }
 
     fun requestNotificationPermissionIfNeeded() {
-        // ≡ iOS requestNotificationPermissionIfNeeded — delay 20s si .notDetermined
-        if (notificationGate.permissions().isEmpty()) return
-        val granted = notificationGate.permissions().all {
-            androidx.core.content.ContextCompat.checkSelfPermission(context, it) ==
-                android.content.pm.PackageManager.PERMISSION_GRANTED
-        }
-        if (granted) return
-        if (didScheduleNotificationPrompt) return
-        didScheduleNotificationPrompt = true
-        scope.launch {
-            delay(20_000)
-            notificationGate.requestAccess(context) { /* FCM registration handled by MainActivity */ }
+        // ≡ iOS FeedView.requestNotificationPermissionIfNeeded
+        when (notificationGate.currentState(context)) {
+            PermissionPrimerGate.State.AUTHORIZED -> {
+                com.moments.android.notifications.services.FCMTokenService.updateFCMToken()
+            }
+            PermissionPrimerGate.State.NOT_DETERMINED -> {
+                if (didScheduleNotificationPrompt) return
+                didScheduleNotificationPrompt = true
+                scope.launch {
+                    delay(20_000)
+                    notificationGate.requestAccess(context) {
+                        com.moments.android.notifications.services.FCMTokenService.updateFCMToken()
+                    }
+                }
+            }
+            PermissionPrimerGate.State.DENIED -> Unit // ≡ iOS default: break
         }
     }
 
@@ -426,8 +431,14 @@ fun FeedView(
         hasUnreadMessages = unreadMessages > 0
     }
 
+    val isPresentingStoryViewer = selectedStoryRoute != null || showStories
+    LaunchedEffect(isPresentingStoryViewer) {
+        onSuppressTabBarChange(isPresentingStoryViewer)
+    }
+
     DisposableEffect(Unit) {
         onDispose {
+            onSuppressTabBarChange(false)
             pendingEchoesListener?.remove()
             pendingEchoesListener = null
             viewModel.shutdown()
@@ -483,19 +494,7 @@ fun FeedView(
                         HapticManager.shared.warning()
                     }
                 }
-                is CoordinatorNavigationEvent.ShowStories -> {
-                    syncStoryRingNavigationOrder()
-                    showStories = true
-                }
-                is CoordinatorNavigationEvent.ShowStoriesStartingAt -> {
-                    syncStoryRingNavigationOrder()
-                    val uid = event.userId.trim()
-                    if (uid.isNotEmpty()) {
-                        selectedStoryRoute = StoryUserPresentationRoute(uid)
-                    } else {
-                        showStories = true
-                    }
-                }
+                // ShowStories / ShowStoriesStartingAt → host Nav3 en TabBar.
                 else -> Unit
             }
         }
@@ -650,11 +649,11 @@ fun FeedView(
                     onCreateStory = { onShowCreatorViewChange(true) },
                     onOpenStory = { user -> openStoryViewer(user.userId) },
                     onOpenActivity = {
-                        showNotifications = true
+                        // Solo TabBar host — no montar Dialog local en paralelo.
                         LegacyNavigationBridge.showNotifications()
                     },
                     onOpenMessages = {
-                        showMessages = true
+                        // Lista general → TabBar. Conversación concreta sigue en Feed Dialog.
                         LegacyNavigationBridge.showMessages()
                     },
                     onOpenEchoHistory = { showEchoHistory = true },

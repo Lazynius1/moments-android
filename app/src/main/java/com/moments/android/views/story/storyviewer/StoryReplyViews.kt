@@ -9,12 +9,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -536,12 +541,14 @@ fun StoryReplyEphemeralImageCard(
             Text(
                 storyReplyFormatTimeLeft(expirationDate.time - Date().time),
                 color = Color.White,
-                fontSize = 9.sp,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(6.dp)
+                    .padding(8.dp)
+                    .border(0.5.dp, Color.White.copy(0.35f), RoundedCornerShape(50))
                     .background(Color.Black.copy(0.55f), RoundedCornerShape(50))
-                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
     }
@@ -726,7 +733,12 @@ fun FullScreenEphemeralImageView(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars)),
+        ) {
             AsyncImage(
                 model = imageUrl,
                 contentDescription = null,

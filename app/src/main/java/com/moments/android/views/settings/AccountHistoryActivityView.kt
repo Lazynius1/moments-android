@@ -31,7 +31,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -122,7 +122,7 @@ fun AccountHistoryActivityView(onNavigateBack: () -> Unit = {}) {
         Box(Modifier.fillMaxSize().background(background)) {
             if (isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = primary)
+                    MomentsCircularProgressIndicator()
                 }
             } else {
                 ActivityCollapsibleFilterScroll(

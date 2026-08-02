@@ -249,7 +249,10 @@ fun AsyncProfileImageView(
                         .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    // Clip también en la imagen: Coil a veces pinta fuera del clip del Box padre.
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape),
                     loading = {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
@@ -257,7 +260,13 @@ fun AsyncProfileImageView(
                             strokeWidth = 2.dp,
                         )
                     },
-                    success = { SubcomposeAsyncImageContent(modifier = Modifier.fillMaxSize()) },
+                    success = {
+                        SubcomposeAsyncImageContent(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape),
+                        )
+                    },
                 )
             }
             else -> {

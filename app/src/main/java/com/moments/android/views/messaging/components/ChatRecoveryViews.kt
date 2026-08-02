@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
+import android.view.WindowManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -53,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -61,6 +64,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import com.moments.android.R
 import com.moments.android.models.ChatAccessState
 import com.moments.android.models.ChatRecoveryAttemptState
@@ -571,12 +576,34 @@ private fun ChatRecoveryFormContainer(
         },
     )
 
+    // Dialogs fullscreen suelen nacer con decorFitsSystemWindows=true → IME inset = 0
+    // y la card queda detrás del teclado. Forzar edge-to-edge + adjustResize en ese window.
+    val view = LocalView.current
+    DisposableEffect(view) {
+        val window = (view.parent as? DialogWindowProvider)?.window
+        if (window != null) {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            val previousMode = window.attributes.softInputMode
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            onDispose { window.setSoftInputMode(previousMode) }
+        } else {
+            onDispose { }
+        }
+    }
+
+    // Backdrop a pantalla completa; el área útil se encoge con imePadding para que
+    // BottomCenter ancle la card encima del teclado (≡ keyboard avoidance iOS).
     Box(
         Modifier
             .fillMaxSize()
             .background(chatRecoveryBackdropBrush()),
-        contentAlignment = Alignment.BottomCenter,
     ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .imePadding(),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
         Column(
             Modifier
                 .padding(horizontal = 14.dp, vertical = 12.dp)
@@ -587,7 +614,6 @@ private fun ChatRecoveryFormContainer(
                 .background(cardFill)
                 .border(1.dp, cardStroke, RoundedCornerShape(32.dp))
                 .navigationBarsPadding()
-                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 26.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -650,6 +676,7 @@ private fun ChatRecoveryFormContainer(
                     footer()
                 }
             }
+        }
         }
     }
 }

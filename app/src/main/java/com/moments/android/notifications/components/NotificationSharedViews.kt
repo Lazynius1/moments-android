@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.legacyPoppinsSize
+import com.moments.android.views.components.rememberMomentsSkeletonColor
 import com.moments.android.views.components.shimmer
 import com.moments.android.views.feed.FeedCanvas
 import com.moments.android.views.feed.FeedInk
@@ -74,15 +76,17 @@ fun NotificationDateHeader(dateString: String, isDark: Boolean) {
 /** ≡ NotificationSkeletonRow + .shimmer */
 @Composable
 fun NotificationSkeletonRow(isDark: Boolean) {
-    val fill = Color.Gray.copy(alpha = if (isDark) 0.3f else 0.2f)
-    val stroke = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
+    val fill = rememberMomentsSkeletonColor()
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val stroke = onSurface.copy(alpha = if (isDark) 0.1f else 0.05f)
+    val card = onSurface.copy(alpha = if (isDark) 0.06f else 0.04f)
     val shape = RoundedCornerShape(16.dp)
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 0.dp)
             .clip(shape)
-            .background(if (isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.04f), shape)
+            .background(card, shape)
             .border(0.5.dp, stroke, shape)
             .shimmer(isAnimating = true),
     ) {

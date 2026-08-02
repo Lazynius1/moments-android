@@ -31,7 +31,7 @@ import androidx.compose.material.icons.filled.PersonPin
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -311,7 +311,10 @@ private fun ProfileThumbnailVideo(url: String, moment: Moment, size: Dp, cellWid
 @Composable
 private fun ProfileMediaPlaceholder(loading: Boolean, loadingLabel: Int, idleLabel: Int) {
     Column(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .16f)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        if (loading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xFF007AFF)) else Icon(Icons.Filled.VideoLibrary, null, tint = Color.White.copy(.6f), modifier = Modifier.size(16.dp))
+        MomentsCircularProgressIndicator(
+            modifier = Modifier.size(16.dp),
+            strokeWidth = 2.dp,
+        )
         Text(stringResource(if (loading) loadingLabel else idleLabel), color = Color.White.copy(.65f), fontSize = 8.sp)
     }
 }

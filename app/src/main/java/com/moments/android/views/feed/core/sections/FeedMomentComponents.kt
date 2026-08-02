@@ -21,9 +21,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -335,11 +337,9 @@ fun ModernNotificationButton(
                     .background(Color.Red.copy(alpha = 0.08f)),
             )
         }
-        // iOS SF Symbol: heart / heart.fill @ 22pt medium
+        // Keep this control native to Android while preserving the iOS sizing.
         Icon(
-            painter = painterResource(
-                if (hasNotification) R.drawable.ic_heart_fill else R.drawable.ic_heart_outline,
-            ),
+            imageVector = if (hasNotification) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
             contentDescription = stringResource(R.string.feed_activity),
             tint = if (hasNotification) Color.Red else colors.icon,
             modifier = Modifier.size(HeaderIconSize),
@@ -370,9 +370,9 @@ fun ModernMessageButton(
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        // iOS SF Symbol: paperplane @ 22pt
+        // Custom alpha-mask asset, drawn to match the app's iOS paper-plane silhouette.
         Icon(
-            painter = painterResource(R.drawable.ic_paperplane_outline),
+            painter = painterResource(R.drawable.feed_paperplane_icon),
             contentDescription = stringResource(R.string.feed_messages),
             tint = colors.icon,
             modifier = Modifier.size(HeaderIconSize),

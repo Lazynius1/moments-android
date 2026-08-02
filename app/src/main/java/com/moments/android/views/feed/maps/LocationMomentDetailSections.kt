@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -304,7 +305,10 @@ fun FollowButtonForLocation(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (isLoading) {
-            CircularProgressIndicator(Modifier.size(12.dp), color = colors.primary, strokeWidth = 1.5.dp)
+            MomentsCircularProgressIndicator(
+                modifier = Modifier.size(12.dp),
+                strokeWidth = 1.5.dp,
+            )
         } else {
             Icon(
                 followIcon(followButtonState),

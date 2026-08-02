@@ -1,10 +1,7 @@
 package com.moments.android
 
-import android.Manifest
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -12,64 +9,75 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import com.moments.android.notifications.services.FCMTokenService
 import com.moments.android.notifications.services.MomentsFirebaseMessagingService
 import com.moments.android.notifications.services.NotificationBadgeService
 import com.moments.android.notifications.services.NotificationNavigationService
-import com.moments.android.MomentsApp
 import com.moments.android.views.shared.MomentsTheme
+import com.moments.android.views.shared.MomentsSystemBarsHost
 
 /**
- * Wiring de permisos POST_NOTIFICATIONS y deep links desde push (paridad AppDelegate iOS).
+ * Deep links desde push + edge-to-edge (skill `edge-to-edge`).
+ * Barras de sistema transparentes; el chrome (tab bar / pantallas) pinta debajo.
+ * POST_NOTIFICATIONS: no pedir aquí — ≡ iOS AppDelegate (request comentado);
+ * el primer va en FeedView tras 20s vía PermissionPrimerGate.
  */
 class MainActivity : ComponentActivity() {
 
     private var pendingDeepLink by mutableStateOf<android.net.Uri?>(null)
-
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        if (granted) FCMTokenService.updateFCMToken()
-    }
+    /** true si el Intent del deep link trae NEW_TASK (recipe deeplinks-advanced). */
+    private var pendingDeepLinkNewTask by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // ≡ iOS INFOPLIST_KEY_UISupportedInterfaceOrientations = Portrait only
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         super.onCreate(savedInstanceState)
-        val isDarkTheme =
-            resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
-                Configuration.UI_MODE_NIGHT_YES
-        val statusBarStyle = if (isDarkTheme) {
-            SystemBarStyle.dark(Color.TRANSPARENT)
-        } else {
-            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
-        }
-        val navigationBarStyle = if (isDarkTheme) {
-            SystemBarStyle.dark(0xFF070B0D.toInt())
-        } else {
-            SystemBarStyle.light(0xFFF0EFEC.toInt(), 0xFF070B0D.toInt())
-        }
+        // Skill: enableEdgeToEdge before setContent; transparent bars (auto light/dark icons).
         enableEdgeToEdge(
-            statusBarStyle = statusBarStyle,
-            navigationBarStyle = navigationBarStyle,
+            statusBarStyle = SystemBarStyle.auto(
+                lightScrim = Color.TRANSPARENT,
+                darkScrim = Color.TRANSPARENT,
+            ),
+            navigationBarStyle = SystemBarStyle.auto(
+                lightScrim = Color.TRANSPARENT,
+                darkScrim = Color.TRANSPARENT,
+            ),
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
         }
-        requestNotificationPermissionIfNeeded()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         captureDeepLink(intent)
         handlePushIntent(intent)
         setContent {
             MomentsTheme {
-                MomentsApp(
-                    deepLinkUri = pendingDeepLink,
-                    onDeepLinkHandled = { pendingDeepLink = null },
-                )
+                val darkTheme = isSystemInDarkTheme()
+                SideEffect {
+                    // Re-sync icon contrast when theme flips (auto already handles; enforce contrast off).
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        window.isNavigationBarContrastEnforced = false
+                    }
+                    WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = !darkTheme
+                        isAppearanceLightNavigationBars = !darkTheme
+                    }
+                }
+                MomentsSystemBarsHost {
+                    MomentsApp(
+                        deepLinkUri = pendingDeepLink,
+                        deepLinkFromNewTask = pendingDeepLinkNewTask,
+                        onDeepLinkHandled = {
+                            pendingDeepLink = null
+                            pendingDeepLinkNewTask = false
+                        },
+                    )
+                }
             }
         }
     }
@@ -88,20 +96,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun captureDeepLink(intent: Intent?) {
-        val data = intent?.data ?: return
+        if (intent == null) return
         if (intent.getBooleanExtra(MomentsFirebaseMessagingService.EXTRA_FROM_PUSH, false)) return
+        // Skill android-intent-security: no aceptar data URI arbitraria en Activity exported.
+        val data = intent.data ?: return
+        val scheme = data.scheme?.lowercase()
+        if (scheme != "moments" && scheme != "glowsy") return
         pendingDeepLink = data
-    }
-
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            FCMTokenService.updateFCMToken()
-            return
-        }
-        when (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)) {
-            PackageManager.PERMISSION_GRANTED -> FCMTokenService.updateFCMToken()
-            else -> notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
+        pendingDeepLinkNewTask =
+            intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0
     }
 
     private fun handlePushIntent(intent: Intent?) {

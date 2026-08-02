@@ -9,19 +9,13 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.moments.android.views.permission.microphone.MicrophonePermissionView
 import com.moments.android.views.permission.notifications.NotificationsPermissionView
@@ -31,6 +25,9 @@ import com.moments.android.views.permission.photos.PhotosPermissionView
 class PermissionPrimerGate(val kind: Kind) {
     enum class Kind { MICROPHONE, PHOTOS, PHOTOS_SAVE, NOTIFICATIONS }
 
+    /** ≡ private enum State */
+    enum class State { AUTHORIZED, NOT_DETERMINED, DENIED }
+
     var isPresenting by mutableStateOf(false)
         private set
     var stage by mutableStateOf(PermissionPrimerStage.PRIMER)
@@ -39,42 +36,65 @@ class PermissionPrimerGate(val kind: Kind) {
     private var onGranted: (() -> Unit)? = null
 
     fun requestAccess(context: Context, onGranted: () -> Unit) {
-        if (authorized(context)) {
-            onGranted()
+        when (currentState(context)) {
+            State.AUTHORIZED -> onGranted()
+            State.NOT_DETERMINED -> {
+                this.onGranted = onGranted
+                stage = PermissionPrimerStage.PRIMER
+                isPresenting = true
+            }
+            State.DENIED -> {
+                this.onGranted = onGranted
+                stage = PermissionPrimerStage.DENIED
+                isPresenting = true
+            }
+        }
+    }
+
+    fun primaryAction(context: Context, requestNative: () -> Unit) {
+        if (stage == PermissionPrimerStage.PRIMER) {
+            requestNative()
+        } else {
+            openSettings(context)
+        }
+    }
+
+    /** ≡ `finish(granted:)` */
+    fun finish(granted: Boolean) {
+        if (!granted) {
+            stage = PermissionPrimerStage.DENIED
             return
         }
-        this.onGranted = onGranted
-        // ≡ iOS: .notDetermined → .primer; .denied → .denied
-        stage = if (isDenied(context)) PermissionPrimerStage.DENIED else PermissionPrimerStage.PRIMER
-        isPresenting = true
+        isPresenting = false
+        val continuation = onGranted
+        onGranted = null
+        continuation?.invoke()
     }
 
-    fun primaryAction(context: Context, request: () -> Unit) {
-        if (stage == PermissionPrimerStage.PRIMER) {
-            request()
-        } else {
-            context.startActivity(
-                Intent(
-                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    Uri.fromParts("package", context.packageName, null),
-                ),
-            )
-            isPresenting = false
-        }
-    }
-
-    fun onResult(context: Context) {
-        if (authorized(context)) {
-            isPresenting = false
-            onGranted?.invoke()
-            onGranted = null
-        } else {
-            stage = PermissionPrimerStage.DENIED
-        }
+    /** Resultado del launcher nativo → finish. */
+    fun onNativeResult(context: Context) {
+        markAsked(context)
+        finish(granted = isAuthorized(context))
     }
 
     fun dismiss() {
         isPresenting = false
+    }
+
+    /**
+     * ≡ `refreshNotificationStatus` (en iOS no hay callers; se mantiene por paridad API).
+     * En Android relee el estado live vía [currentState].
+     */
+    fun refreshNotificationStatus(context: Context, completion: () -> Unit) {
+        // Forzar relectura de NotificationManager / runtime perms en el próximo currentState.
+        @Suppress("UNUSED_VARIABLE")
+        val ignored = currentState(context)
+        completion()
+    }
+
+    fun currentState(context: Context): State {
+        if (isAuthorized(context)) return State.AUTHORIZED
+        return if (wasAsked(context)) State.DENIED else State.NOT_DETERMINED
     }
 
     fun permissions(): Array<String> = when (kind) {
@@ -84,62 +104,77 @@ class PermissionPrimerGate(val kind: Kind) {
         } else {
             emptyArray()
         }
-        // ≡ iOS PHPhotoLibrary readWrite: imágenes + vídeo en un solo grant.
+        // ≡ PHPhotoLibrary .readWrite
         Kind.PHOTOS -> if (Build.VERSION.SDK_INT >= 33) {
             arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
         } else {
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
-        Kind.PHOTOS_SAVE -> if (Build.VERSION.SDK_INT >= 33) {
-            arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+        // ≡ PHPhotoLibrary .addOnly — API 29+ MediaStore insert sin runtime perm.
+        Kind.PHOTOS_SAVE -> if (Build.VERSION.SDK_INT >= 29) {
+            emptyArray()
         } else {
-            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+            arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
     }
 
-    private fun authorized(c: Context): Boolean =
-        permissions().all {
-            ContextCompat.checkSelfPermission(c, it) == PackageManager.PERMISSION_GRANTED
+    private fun isAuthorized(context: Context): Boolean {
+        val perms = permissions()
+        if (kind == Kind.NOTIFICATIONS) {
+            val runtimeOk = perms.isEmpty() || perms.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }
+            return runtimeOk && NotificationManagerCompat.from(context).areNotificationsEnabled()
         }
+        if (perms.isEmpty()) {
+            // Sin runtime perm (p.ej. photosSave API 29+): “autorizado” tras haber pasado el primer.
+            return wasAsked(context)
+        }
+        return perms.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+    }
 
-    /** Aprox. iOS `.denied`: ya se pidió y sigue sin conceder. */
-    private fun isDenied(c: Context): Boolean {
-        if (authorized(c)) return false
-        val prefs = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val activity = c.findActivity() ?: return prefs.all.keys.any { it.startsWith("asked_") }
-        return permissions().any { perm ->
-            val asked = prefs.getBoolean(askedKey(perm), false)
-            if (!asked) return@any false
-            ContextCompat.checkSelfPermission(c, perm) != PackageManager.PERMISSION_GRANTED &&
-                (
-                    !ActivityCompat.shouldShowRequestPermissionRationale(activity, perm) ||
-                        asked
-                    )
+    private fun wasAsked(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val perms = permissions()
+        if (perms.isEmpty()) {
+            return prefs.getBoolean(kindAskedKey(), false)
         }
+        return perms.any { prefs.getBoolean(askedKey(it), false) }
     }
 
     fun markAsked(context: Context) {
         val edit = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-        permissions().forEach { edit.putBoolean(askedKey(it), true) }
+        val perms = permissions()
+        if (perms.isEmpty()) {
+            edit.putBoolean(kindAskedKey(), true)
+        } else {
+            perms.forEach { edit.putBoolean(askedKey(it), true) }
+        }
         edit.apply()
     }
 
+    private fun openSettings(context: Context) {
+        context.startActivity(
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", context.packageName, null),
+            ),
+        )
+        isPresenting = false
+    }
+
     private fun askedKey(perm: String) = "asked_$perm"
+    private fun kindAskedKey() = "asked_kind_${kind.name}"
 
     companion object {
         private const val PREFS = "moments_permission_primer"
     }
 }
 
-private tailrec fun Context.findActivity(): android.app.Activity? = when (this) {
-    is android.app.Activity -> this
-    is android.content.ContextWrapper -> baseContext.findActivity()
-    else -> null
-}
-
 /**
  * ≡ `permissionPrimerGate` / `.fullScreenCover` de iOS.
- * Dialog a pantalla completa (no overlay inline dentro del host).
  */
 @Composable
 fun PermissionPrimerGateHost(
@@ -149,40 +184,31 @@ fun PermissionPrimerGateHost(
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
-        gate.onResult(context)
+        gate.onNativeResult(context)
     }
     if (!gate.isPresenting) return
 
     val primary = {
         gate.primaryAction(context) {
-            gate.markAsked(context)
-            launcher.launch(gate.permissions())
+            val perms = gate.permissions()
+            if (perms.isEmpty()) {
+                // Sin diálogo del SO (photosSave API 29+ / notif < 33): finish como granted.
+                gate.markAsked(context)
+                gate.finish(granted = true)
+            } else {
+                launcher.launch(perms)
+            }
         }
     }
 
-    // ≡ fullScreenCover
-    Dialog(
-        onDismissRequest = gate::dismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false,
-        ),
-    ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .safeDrawingPadding(),
-        ) {
-            when (gate.kind) {
-                PermissionPrimerGate.Kind.MICROPHONE ->
-                    MicrophonePermissionView(gate.stage, primary, gate::dismiss)
-                PermissionPrimerGate.Kind.PHOTOS, PermissionPrimerGate.Kind.PHOTOS_SAVE ->
-                    PhotosPermissionView(gate.stage, primary, gate::dismiss)
-                PermissionPrimerGate.Kind.NOTIFICATIONS ->
-                    NotificationsPermissionView(gate.stage, primary, gate::dismiss)
-            }
+    PermissionPrimerFullScreenDialog(onDismissRequest = gate::dismiss) {
+        when (gate.kind) {
+            PermissionPrimerGate.Kind.MICROPHONE ->
+                MicrophonePermissionView(gate.stage, primary, gate::dismiss)
+            PermissionPrimerGate.Kind.PHOTOS, PermissionPrimerGate.Kind.PHOTOS_SAVE ->
+                PhotosPermissionView(gate.stage, primary, gate::dismiss)
+            PermissionPrimerGate.Kind.NOTIFICATIONS ->
+                NotificationsPermissionView(gate.stage, primary, gate::dismiss)
         }
     }
 }

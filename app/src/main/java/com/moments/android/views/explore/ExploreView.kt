@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,6 +48,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -77,9 +77,11 @@ import com.moments.android.views.profile.core.sections.MomentZoomDestination
 import com.moments.android.views.profile.core.sections.MomentZoomDetailDestination
 import com.moments.android.views.profile.core.sections.MomentZoomOpener
 import com.moments.android.views.profile.core.sections.MomentZoomPresentationKind
-import com.moments.android.views.profile.userprofile.UserProfileView
+import com.moments.android.views.profile.core.sections.UserProfileZoomNavigationHost
 import com.moments.android.views.shared.AppErrorBanner
+import com.moments.android.views.shared.MomentsContainerTransformOverlay
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.MomentsSharedTransitionLayout
 import com.moments.android.views.story.StoryRingAvatarView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -99,6 +101,7 @@ fun ExploreView(
     val colors = rememberAdaptiveColors()
     val scope = rememberCoroutineScope()
     val view = LocalView.current
+    val layoutDirection = LocalLayoutDirection.current
     val viewModel = remember { ExploreViewModel() }
     var searchText by remember { mutableStateOf(initialSearchQuery.orEmpty()) }
     var isSearchFocused by remember { mutableStateOf(false) }
@@ -155,11 +158,25 @@ fun ExploreView(
         viewModel.smartSearch(searchText)
     }
 
-    Box(
+    MomentsSharedTransitionLayout(
         modifier
             .fillMaxSize()
             .background(colors.surfaceBackground)
-            .padding(contentPadding)
+            // Solo bottom/horizontal del host — el top lo gestiona ExploreTopBar (sin doble statusBars).
+            .padding(
+                start = contentPadding.calculateLeftPadding(layoutDirection),
+                end = contentPadding.calculateRightPadding(layoutDirection),
+                bottom = contentPadding.calculateBottomPadding(),
+            ),
+    ) {
+    UserProfileZoomNavigationHost(
+        profileRoute = selectedProfileRoute,
+        onProfileRouteChange = { selectedProfileRoute = it },
+        modifier = Modifier.fillMaxSize(),
+    ) { _ ->
+    Box(
+        Modifier
+            .fillMaxSize()
             .momentRefresh {
                 viewModel.refreshAllContent()
                 delay(900)
@@ -314,7 +331,22 @@ fun ExploreView(
         }
 
         MomentRefreshOverlayHost(Modifier.align(Alignment.TopCenter))
+
+        // ≡ MomentZoomDetailDestination + navigationTransition(.zoom)
+        MomentsContainerTransformOverlay(visible = zoomDestination != null) {
+            val destination = zoomDestination
+            if (destination != null) {
+                val pool = if (searchText.isBlank()) viewModel.moments else viewModel.filteredMoments
+                MomentZoomDetailDestination(
+                    destination = destination,
+                    moments = MomentZoomOpener.resolvedMoments(destination, pool),
+                    onDismiss = { zoomDestination = null },
+                )
+            }
+        }
     }
+    } // UserProfileZoomNavigationHost
+    } // MomentsSharedTransitionLayout
 
     if (showPrivateProfileAlert) {
         AlertDialog(
@@ -357,38 +389,12 @@ fun ExploreView(
             )
         }
     }
-
-    // ≡ userProfileNavigationDestination
-    selectedProfileRoute?.let { route ->
-        Dialog(
-            onDismissRequest = { selectedProfileRoute = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            Surface(Modifier.fillMaxSize()) {
-                UserProfileView(
-                    userId = route.userId,
-                    onDismiss = { selectedProfileRoute = null },
-                )
-            }
-        }
-    }
-
-    // ≡ MomentZoomDetailDestination
-    zoomDestination?.let { destination ->
-        val pool = if (searchText.isBlank()) viewModel.moments else viewModel.filteredMoments
-        Dialog(
-            onDismissRequest = { zoomDestination = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            MomentZoomDetailDestination(
-                destination = destination,
-                moments = MomentZoomOpener.resolvedMoments(destination, pool),
-                onDismiss = { zoomDestination = null },
-            )
-        }
-    }
 }
 
+/**
+ * ≡ iOS large title + toolbar: fila de acciones (back/mapa) y debajo el título.
+ * Safe area una sola vez aquí (el tab host ya no pasa top inset).
+ */
 @Composable
 private fun ExploreTopBar(
     isDismissable: Boolean,
@@ -396,31 +402,42 @@ private fun ExploreTopBar(
     onOpenMap: () -> Unit,
 ) {
     val colors = rememberAdaptiveColors()
-    Row(
+    Column(
         Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 4.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 4.dp),
     ) {
-        if (isDismissable) {
-            IconButton(onClick = onDismiss) {
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = stringResource(R.string.common_back),
-                )
+        // Nivel 1 — toolbar (mapa / back), pegado a status bar
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (isDismissable) {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = stringResource(R.string.common_back),
+                    )
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = onOpenMap) {
+                Icon(Icons.Filled.Map, contentDescription = null, tint = Color(0xFF0A84FF))
             }
         }
+        // Nivel 2 — large title
         Text(
             stringResource(R.string.explore_title),
-            Modifier.weight(1f).padding(start = if (isDismissable) 0.dp else 12.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
             fontWeight = FontWeight.Bold,
             fontSize = 28.sp,
             color = colors.primary,
         )
-        IconButton(onClick = onOpenMap) {
-            Icon(Icons.Filled.Map, contentDescription = null, tint = Color(0xFF0A84FF))
-        }
     }
 }
 

@@ -134,6 +134,7 @@ import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.permission.shared.PermissionPrimerGate
 import com.moments.android.views.permission.shared.PermissionPrimerGateHost
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.MomentsSheetHeader
 import java.io.File
 import java.util.Calendar
 import java.util.Date
@@ -477,46 +478,24 @@ fun HiddenLayersEditorView(
                 .padding(bottom = bottomPadding),
             verticalArrangement = Arrangement.spacedBy(verticalSpacing),
         ) {
-            // ≡ headerBar
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(headerHeight)
-                    .padding(horizontal = horizontalPadding)
-                    .padding(top = topPadding),
-            ) {
-                Box(
-                    Modifier
-                        .align(Alignment.CenterStart)
-                        .momentsChromeGlass(CircleShape, interactive = true)
-                        .clickable(onClick = onDismiss)
-                        .padding(10.dp),
-                ) {
-                    Icon(Icons.Filled.KeyboardArrowDown, null, tint = primaryText, modifier = Modifier.size(16.dp))
-                }
-                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+            // Sheet Android: sin chevron; título pegado + Done
+            MomentsSheetHeader(
+                title = stringResource(R.string.hidden_layers_editor_title),
+                titleSize = 17.sp,
+                subtitle = if (selectedLayerId == null) layerCountSummary else null,
+                trailing = {
                     Text(
-                        stringResource(R.string.hidden_layers_editor_title),
+                        stringResource(R.string.common_done),
                         color = primaryText,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
+                        fontSize = 14.sp,
+                        modifier = Modifier
+                            .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                            .clickable(onClick = onDismiss)
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
                     )
-                    if (selectedLayerId == null) {
-                        Text(layerCountSummary, color = secondaryText, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                    }
-                }
-                Text(
-                    stringResource(R.string.common_done),
-                    color = primaryText,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
-                        .clickable(onClick = onDismiss)
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                )
-            }
+                },
+            )
 
             // ≡ editorCanvas(height:) + .frame(height: maxCanvasHeight, alignment: .center)
             Box(

@@ -364,6 +364,7 @@ fun MomentsSearchGrid(
         moments = moments,
         onMomentTap = onMomentTap,
         modifier = modifier,
+        zoomIDPrefix = "explore-search",
     )
 }
 

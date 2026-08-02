@@ -2,6 +2,7 @@ package com.moments.android.views.messaging.components
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +30,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.moments.android.views.messaging.core.ChatRenderRow
 import com.moments.android.views.messaging.core.MessageItem
 import kotlinx.coroutines.delay
@@ -45,6 +47,14 @@ import kotlinx.coroutines.flow.filter
  * No portamos UICollectionView/UIKit: sí el contrato de
  * transacciones/intents/commands/viewport de `ChatMessageListView.swift`.
  */
+
+/** ≡ iOS `ChatListLayoutMetrics` (interSectionSpacing / insets de sección). */
+object ChatListLayoutMetrics {
+    val interGroupSpacing = 2.dp
+    val sectionTopInset = 10.dp
+    val sectionBottomInset = 4.dp
+}
+
 data class ChatListRow(
     val id: String,
     val messageIds: Set<String> = emptySet(),
@@ -229,9 +239,13 @@ class ChatMessageListController {
     /**
      * Con `reverseLayout`, índice 0 = fondo (mensaje más reciente).
      * “Arriba” (historial viejo) = índices altos.
+     *
+     * [distanceFromBottom] ≡ iOS (píxeles al borde inferior), no índice de fila —
+     * search usa umbral `> 16`.
      */
     internal fun updateViewport(state: LazyListState, displayRows: List<ChatListRow>) {
-        val visible = state.layoutInfo.visibleItemsInfo
+        val layoutInfo = state.layoutInfo
+        val visible = layoutInfo.visibleItemsInfo
         firstVisibleRowIndex = visible.firstOrNull()?.index
         topVisibleRowId = visible.maxByOrNull { it.index }?.index?.let(displayRows::getOrNull)?.id
         bottomVisibleRowId = visible.minByOrNull { it.index }?.index?.let(displayRows::getOrNull)?.id
@@ -242,10 +256,17 @@ class ChatMessageListController {
         val strict = offsetNearBottom && lastNewestVisible
         isStrictlyAtBottom = strict
         isAtBottom = strict
-        distanceFromBottom = nearestBottom.coerceAtLeast(0)
-        val viewport = state.layoutInfo.viewportEndOffset - state.layoutInfo.viewportStartOffset
+        distanceFromBottom = when {
+            displayRows.isEmpty() || visible.isEmpty() -> 0
+            state.firstVisibleItemIndex == 0 -> state.firstVisibleItemScrollOffset.coerceAtLeast(0)
+            else -> {
+                val avgSize = visible.map { it.size }.average().toInt().coerceAtLeast(1)
+                (state.firstVisibleItemIndex * avgSize + state.firstVisibleItemScrollOffset).coerceAtLeast(0)
+            }
+        }
+        val viewport = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
         val visibleSpan = visible.sumOf { it.size }
-        contentExceedsViewport = state.layoutInfo.totalItemsCount > visible.size || visibleSpan > viewport
+        contentExceedsViewport = layoutInfo.totalItemsCount > visible.size || visibleSpan > viewport
     }
 }
 
@@ -341,6 +362,8 @@ fun ChatMessageListView(
     isVanishModeActive: Boolean = false,
     /** ≡ iOS `composerBottomInset` (para posicionar overlay). */
     composerBottomInset: Dp = 0.dp,
+    /** Row id con menú/highlight activo — eleva el slot LazyColumn (≡ iOS zIndex 100). */
+    elevatedRowId: String? = null,
     onVanishPullReleased: (VanishPullResult) -> Unit = {},
     rowContent: @Composable (ChatListRow) -> Unit,
     modifier: Modifier = Modifier,
@@ -658,6 +681,7 @@ fun ChatMessageListView(
             state = state,
             reverseLayout = true,
             overscrollEffect = null,
+            verticalArrangement = Arrangement.spacedBy(ChatListLayoutMetrics.interGroupSpacing),
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { translationY = threadTranslationPx },
@@ -667,10 +691,14 @@ fun ChatMessageListView(
                 items = displayRows,
                 key = { _, row -> "${row.id}|${row.visualSignature}|$reconfigureGen" },
             ) { _, row ->
+                // ≡ iOS `.zIndex(100)` en la fila seleccionada: el lift/scale debe
+                // ganar a vecinos del LazyColumn (zIndex solo vale entre siblings).
                 Box(
-                    Modifier.onGloballyPositioned { coords ->
-                        controller.reportRowFrame(row.id, coords.boundsInWindow())
-                    },
+                    Modifier
+                        .zIndex(if (row.id == elevatedRowId) 100f else 0f)
+                        .onGloballyPositioned { coords ->
+                            controller.reportRowFrame(row.id, coords.boundsInWindow())
+                        },
                 ) {
                     rowContent(row)
                 }

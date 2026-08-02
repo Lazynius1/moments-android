@@ -50,6 +50,8 @@ import com.moments.android.notifications.core.uniqueSenderIds
 import com.moments.android.notifications.row.EnhancedNotificationRowFollow.resolveSenderUsername
 import com.moments.android.notifications.row.EnhancedNotificationRowMessages.messageForGroup
 import com.moments.android.utilities.MomentsFormat
+import com.moments.android.views.feed.FeedCanvas
+import com.moments.android.views.feed.FeedInk
 
 /**
  * Port de EnhancedNotificationRow.swift (shell).
@@ -96,23 +98,28 @@ fun EnhancedNotificationRow(
     val message = remember(group, isDark, senderUsernameOverride) {
         messageForGroup(group, isDark, senderUsernameOverride)
     }
+    // ≡ canvas de NotificationsView (0B1215 / FAF9F6) — no Transparent (tapaba el swipe rojo)
+    val canvas = if (isDark) FeedInk else FeedCanvas
+    val highlight = when {
+        isPressed -> if (isDark) Color.White.copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.04f)
+        group.isUnread -> if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.04f)
+        else -> Color.Transparent
+    }
 
     // ≡ resolveSenderDisplayData (onAppear)
     LaunchedEffect(group.id, first.senderId, first.senderUsername) {
         resolveSenderUsername(group)?.let { senderUsernameOverride = it }
     }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(canvas),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    when {
-                        isPressed -> if (isDark) Color.White.copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.04f)
-                        group.isUnread -> if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.04f)
-                        else -> Color.Transparent
-                    },
-                )
+                .background(highlight)
                 .pointerInput(opensSenderProfileOnTap, displaySenderIds, group) {
                     detectTapGestures(
                         onPress = {

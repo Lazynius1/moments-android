@@ -79,6 +79,8 @@ import com.moments.android.views.profile.core.sections.ProfileMomentZoomDetailDe
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomDestination
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomFeedKind
 import com.moments.android.views.profile.core.sections.ProfileMomentsGridSkeletonView
+import com.moments.android.views.shared.LocalActiveMomentZoomSourceId
+import com.moments.android.views.shared.MomentsSharedTransitionLayout
 import com.moments.android.views.profile.userprofile.sections.ProfileImageViewer
 import com.moments.android.views.profile.userprofile.sections.UserModernBackgroundView
 import com.moments.android.views.profile.userprofile.sections.UserModernBlockedByMeProfileView
@@ -132,8 +134,8 @@ enum class UserProfileTabType(val raw: String, val icon: ImageVector, val titleR
 }
 
 /**
- * Port de `UserProfilePillTabs`: pastillas con pulgar deslizante, tap y arrastre.
- * El `settleSelection` de iOS (umbral 28% del segmento, tap directo bajo 5pt) se conserva.
+ * Tabs momentos/etiquetas del perfil visitado.
+ * Contraste Android (como [ProfilePillTabs]): thumb sólido + texto invertido.
  */
 @Composable
 fun UserProfilePillTabs(
@@ -146,6 +148,10 @@ fun UserProfilePillTabs(
     val density = LocalDensity.current
     var dragOffset by remember { mutableStateOf(0.dp) }
     val dark = isSystemInDarkTheme()
+    val trackColor = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)
+    val thumbColor = if (dark) Color(0xFFFAF9F6) else Color(0xFF0B1215)
+    val selectedContent = if (dark) Color(0xFF0B1215) else Color.White
+    val unselectedContent = UserProfileColors.textSecondary
 
     BoxWithConstraints(modifier.height(38.dp)) {
         val totalWidth = maxWidth
@@ -157,7 +163,7 @@ fun UserProfilePillTabs(
         Box(
             Modifier
                 .fillMaxSize()
-                .momentsChromeGlass(RoundedCornerShape(50), interactive = false),
+                .background(trackColor, RoundedCornerShape(50)),
         )
 
         Box(
@@ -166,11 +172,7 @@ fun UserProfilePillTabs(
                 .offset(x = thumbOffset)
                 .width(segmentWidth)
                 .height(31.dp)
-                .momentsChromeGlass(
-                    RoundedCornerShape(50),
-                    interactive = true,
-                    tint = if (dark) Color.White.copy(alpha = 0.16f) else Color.Black.copy(alpha = 0.06f),
-                ),
+                .background(thumbColor, RoundedCornerShape(50)),
         )
 
         Row(
@@ -211,6 +213,7 @@ fun UserProfilePillTabs(
         ) {
             tabs.forEach { tab ->
                 val isSelected = tab == selectedTab
+                val contentColor = if (isSelected) selectedContent else unselectedContent
                 Row(
                     Modifier
                         .weight(1f)
@@ -230,12 +233,12 @@ fun UserProfilePillTabs(
                     Icon(
                         tab.icon,
                         contentDescription = null,
-                        tint = if (isSelected) UserProfileColors.textPrimary else UserProfileColors.textSecondary,
+                        tint = contentColor,
                         modifier = Modifier.size(12.dp),
                     )
                     Text(
                         stringResource(tab.titleRes),
-                        color = if (isSelected) UserProfileColors.textPrimary else UserProfileColors.textSecondary,
+                        color = contentColor,
                         fontSize = 12.sp,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                         modifier = Modifier.padding(start = 6.dp),
@@ -246,13 +249,19 @@ fun UserProfilePillTabs(
     }
 }
 
-/** Port de `UserProfileFloatingTabBar`: pastillas sueltas para el chrome fijado. */
+/** Pastillas sueltas cuando el chrome está fijado. */
 @Composable
 fun UserProfileFloatingTabBar(
     selectedTab: UserProfileTabType,
     onSelectTab: (UserProfileTabType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val dark = isSystemInDarkTheme()
+    val selectedBg = if (dark) Color(0xFFFAF9F6) else Color(0xFF0B1215)
+    val unselectedBg = if (dark) Color.White.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.88f)
+    val selectedContent = if (dark) Color(0xFF0B1215) else Color.White
+    val unselectedContent = UserProfileColors.textSecondary
+
     Row(
         modifier.padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -260,9 +269,13 @@ fun UserProfileFloatingTabBar(
     ) {
         UserProfileTabType.entries.forEach { tab ->
             val isSelected = tab == selectedTab
+            val contentColor = if (isSelected) selectedContent else unselectedContent
             Row(
                 Modifier
-                    .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                    .background(
+                        if (isSelected) selectedBg else unselectedBg,
+                        RoundedCornerShape(50),
+                    )
                     .clickable {
                         if (tab != selectedTab) {
                             HapticManager.shared.selection()
@@ -276,12 +289,12 @@ fun UserProfileFloatingTabBar(
                 Icon(
                     tab.icon,
                     contentDescription = null,
-                    tint = if (isSelected) UserProfileColors.textPrimary else UserProfileColors.textSecondary,
+                    tint = contentColor,
                     modifier = Modifier.size(13.dp),
                 )
                 Text(
                     stringResource(tab.titleRes),
-                    color = if (isSelected) UserProfileColors.textPrimary else UserProfileColors.textSecondary,
+                    color = contentColor,
                     fontSize = 12.sp,
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                 )
@@ -381,117 +394,115 @@ fun UserProfileView(
         }
     }
 
-    CompositionLocalProvider(LocalProfileGridHeroCoordinator provides heroCoordinator) {
-        Box(modifier.fillMaxSize()) {
-            UserModernBackgroundView(
-                profileImagePath = viewModel.userProfile?.profileImagePath,
-                scrollOffset = 0f,
-            )
+    CompositionLocalProvider(
+        LocalProfileGridHeroCoordinator provides heroCoordinator,
+        LocalActiveMomentZoomSourceId provides momentZoomDestination?.zoomSourceID,
+    ) {
+        // Siempre STL propio para zoom de momentos — nunca el del host (feed/perfil).
+        val profileBody: @Composable (Modifier) -> Unit = { rootMod ->
+            Box(rootMod.fillMaxSize()) {
+                UserModernBackgroundView(
+                    profileImagePath = viewModel.userProfile?.profileImagePath,
+                    scrollOffset = 0f,
+                )
 
-            when {
-                viewModel.isLoading -> {
-                    Column(Modifier.fillMaxSize().padding(top = safeAreaTop + 12.dp)) {
-                        ProfileHeaderSkeletonView()
-                        ProfileMomentsGridSkeletonView(Modifier.padding(top = 20.dp))
+                when {
+                    viewModel.isLoading -> {
+                        Column(Modifier.fillMaxSize().padding(top = safeAreaTop + 12.dp)) {
+                            ProfileHeaderSkeletonView()
+                            ProfileMomentsGridSkeletonView(Modifier.padding(top = 20.dp))
+                        }
+                    }
+
+                    viewModel.isBlockedByCurrentUser -> {
+                        UserModernBlockedByMeProfileView(
+                            userProfile = viewModel.userProfile,
+                            safeAreaTop = safeAreaTop,
+                            safeAreaBottom = safeAreaBottom,
+                            onUnblock = { viewModel.unblockUser(userId) },
+                            onDismiss = onDismiss,
+                        )
+                    }
+
+                    viewModel.isProfileUnavailable -> {
+                        UserModernUnavailableProfileView(
+                            safeAreaTop = safeAreaTop,
+                            safeAreaBottom = safeAreaBottom,
+                            onDismiss = onDismiss,
+                        )
+                    }
+
+                    viewModel.isOffline && viewModel.userProfile == null -> {
+                        UserModernOfflineProfileView(
+                            safeAreaTop = safeAreaTop,
+                            safeAreaBottom = safeAreaBottom,
+                            onRetry = { viewModel.fetchProfile() },
+                            onDismiss = onDismiss,
+                        )
+                    }
+
+                    !viewModel.canViewContent -> {
+                        UserModernPrivateProfileView(
+                            userProfile = viewModel.userProfile,
+                            userId = userId,
+                            followButtonState = viewModel.followButtonState,
+                            safeAreaTop = safeAreaTop,
+                            safeAreaBottom = safeAreaBottom,
+                            onFollowAction = handleFollowAction,
+                            onDismiss = onDismiss,
+                            onOpenStories = { showingStories = true },
+                            onOpenMessage = openMessageFlow,
+                        )
+                    }
+
+                    else -> {
+                        UserModernPublicProfileView(
+                            viewModel = viewModel,
+                            selectedTab = selectedTab,
+                            onSelectTab = { selectedTab = it },
+                            safeAreaBottom = safeAreaBottom,
+                            onFollowAction = handleFollowAction,
+                            onDismiss = onDismiss,
+                            onOpenStories = { showingStories = true },
+                            onOpenMessage = openMessageFlow,
+                            onShowProfileImageFullscreen = { showProfileImageFullscreen = true },
+                            onShowQrCode = { showingQrCode = true },
+                            onShowReport = { showingReport = true },
+                            onOpenSocial = { tab -> socialConnectionsRoute = SocialConnectionsRoute(initialTab = tab) },
+                            onOpenMoment = { moments, index ->
+                                heroCoordinator.openDirectDetail(moments, index, zoomFeedKind)
+                            },
+                            onMomentLongPress = { moment, index ->
+                                heroCoordinator.openMenu(moment, index, ProfileGridHeroMenuKind.VISITOR)
+                            },
+                        )
                     }
                 }
 
-                viewModel.isBlockedByCurrentUser -> {
-                    UserModernBlockedByMeProfileView(
-                        userProfile = viewModel.userProfile,
-                        safeAreaTop = safeAreaTop,
-                        safeAreaBottom = safeAreaBottom,
-                        onUnblock = { viewModel.unblockUser(userId) },
-                        onDismiss = onDismiss,
-                    )
-                }
+                ProfileGridHeroDetailLayer(
+                    coordinator = heroCoordinator,
+                    moments = zoomMoments,
+                    zoomFeedKind = zoomFeedKind,
+                )
 
-                viewModel.isProfileUnavailable -> {
-                    UserModernUnavailableProfileView(
-                        safeAreaTop = safeAreaTop,
-                        safeAreaBottom = safeAreaBottom,
-                        onDismiss = onDismiss,
-                    )
-                }
+                OfflineBannerOverlay(Modifier.align(Alignment.TopCenter))
 
-                viewModel.isOffline && viewModel.userProfile == null -> {
-                    // Sin caché y sin red: honesto sobre el motivo, en vez de "privado"/"no disponible".
-                    UserModernOfflineProfileView(
-                        safeAreaTop = safeAreaTop,
-                        safeAreaBottom = safeAreaBottom,
-                        onRetry = { viewModel.fetchProfile() },
-                        onDismiss = onDismiss,
-                    )
-                }
-
-                !viewModel.canViewContent -> {
-                    UserModernPrivateProfileView(
-                        userProfile = viewModel.userProfile,
-                        userId = userId,
-                        followButtonState = viewModel.followButtonState,
-                        safeAreaTop = safeAreaTop,
-                        safeAreaBottom = safeAreaBottom,
-                        onFollowAction = handleFollowAction,
-                        onDismiss = onDismiss,
-                        onOpenStories = { showingStories = true },
-                        onOpenMessage = openMessageFlow,
-                    )
-                }
-
-                else -> {
-                    UserModernPublicProfileView(
-                        viewModel = viewModel,
-                        selectedTab = selectedTab,
-                        onSelectTab = { selectedTab = it },
-                        safeAreaBottom = safeAreaBottom,
-                        onFollowAction = handleFollowAction,
-                        onDismiss = onDismiss,
-                        onOpenStories = { showingStories = true },
-                        onOpenMessage = openMessageFlow,
-                        onShowProfileImageFullscreen = { showProfileImageFullscreen = true },
-                        onShowQrCode = { showingQrCode = true },
-                        onShowReport = { showingReport = true },
-                        onOpenSocial = { tab -> socialConnectionsRoute = SocialConnectionsRoute(initialTab = tab) },
-                        onOpenMoment = { moments, index ->
-                            // ≡ iOS heroCoordinator.openDirectDetail
-                            heroCoordinator.openDirectDetail(moments, index, zoomFeedKind)
-                        },
-                        onMomentLongPress = { moment, index ->
-                            // ≡ iOS openVisitorGridMenu → openMenu(kind: .visitor)
-                            heroCoordinator.openMenu(moment, index, ProfileGridHeroMenuKind.VISITOR)
+                // Caller-managed match: sin AnimatedVisibility anidado.
+                momentZoomDestination?.let { destination ->
+                    ProfileMomentZoomDetailDestination(
+                        destination = destination,
+                        moments = zoomMoments,
+                        onDismiss = {
+                            momentZoomDestination = null
+                            heroCoordinator.dismissDetail()
                         },
                     )
                 }
             }
-
-            // ≡ ProfileGridHeroDetailLayer (flying hero + menú visitor)
-            ProfileGridHeroDetailLayer(
-                coordinator = heroCoordinator,
-                moments = zoomMoments,
-                zoomFeedKind = zoomFeedKind,
-            )
-
-            // ≡ iOS `.offlineBannerOverlay()`
-            OfflineBannerOverlay(Modifier.align(Alignment.TopCenter))
         }
-    }
 
-    momentZoomDestination?.let { destination ->
-        Dialog(
-            onDismissRequest = {
-                momentZoomDestination = null
-                heroCoordinator.clearZoomNavigation?.invoke()
-            },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            ProfileMomentZoomDetailDestination(
-                destination = destination,
-                moments = zoomMoments,
-                onDismiss = {
-                    momentZoomDestination = null
-                    heroCoordinator.dismissDetail()
-                },
-            )
+        MomentsSharedTransitionLayout(modifier.fillMaxSize()) {
+            profileBody(modifier)
         }
     }
 
@@ -640,7 +651,10 @@ fun UserProfileView(
     targetConversation?.let { conversation ->
         Dialog(
             onDismissRequest = { targetConversation = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
         ) {
             ChatRecoveryGateView(onCancel = { targetConversation = null }) {
                 GlassmorphicChatView(

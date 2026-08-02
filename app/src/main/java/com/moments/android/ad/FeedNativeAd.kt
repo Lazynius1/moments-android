@@ -53,8 +53,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.google.android.gms.ads.nativead.AdChoicesView
 import com.google.android.gms.ads.nativead.MediaView
@@ -64,6 +62,7 @@ import com.moments.android.R
 import com.moments.android.extensions.fromHex
 import com.moments.android.services.auth.AuthService
 import com.moments.android.services.performance.MotionPolicy
+import com.moments.android.views.permission.shared.PermissionPrimerFullScreenDialog
 import com.moments.android.views.permission.shared.PermissionPrimerStage
 import com.moments.android.views.permission.tracking.TrackingPermissionView
 import kotlinx.coroutines.delay
@@ -144,15 +143,12 @@ fun SmartNativeAdView(
 
     // ≡ iOS fullScreenCover TrackingPermissionView(stage: .primer)
     if (showingPrivacyConsent) {
-        Dialog(
+        PermissionPrimerFullScreenDialog(
             onDismissRequest = { showingPrivacyConsent = false },
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false,
-            ),
         ) {
-            Box(Modifier.fillMaxSize().background(Color.Black)) {
-                TrackingPermissionView(stage = PermissionPrimerStage.PRIMER) {
+            TrackingPermissionView(
+                stage = PermissionPrimerStage.PRIMER,
+                primaryAction = {
                     showingPrivacyConsent = false
                     // ≡ iOS delay 0.3s antes de UMP
                     scope.launch {
@@ -164,8 +160,9 @@ fun SmartNativeAdView(
                             }
                         }
                     }
-                }
-            }
+                },
+                secondaryAction = { showingPrivacyConsent = false },
+            )
         }
     }
 }

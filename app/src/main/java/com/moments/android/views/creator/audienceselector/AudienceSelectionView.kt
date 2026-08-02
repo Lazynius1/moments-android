@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -335,21 +336,21 @@ private fun AudienceSelectionMainContent(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .padding(top = 20.dp, bottom = 32.dp),
+                    .padding(top = 0.dp, bottom = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
                     stringResource(R.string.audience_selection_title),
                     color = content,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = with(density) { legacyPoppinsSize(context, 24).toSp() },
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = with(density) { legacyPoppinsSize(context, 16).toSp() },
                     textAlign = TextAlign.Center,
                 )
                 Text(
                     stringResource(R.string.audience_selection_subtitle),
                     color = secondary,
-                    fontSize = with(density) { legacyPoppinsSize(context, 16).toSp() },
+                    fontSize = with(density) { legacyPoppinsSize(context, 12).toSp() },
                     textAlign = TextAlign.Center,
                 )
             }
@@ -1013,7 +1014,7 @@ fun EditCustomListView(
                 }
                 when {
                     isLoadingMembers -> Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                        MomentsCircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     }
                     currentMembers.isEmpty() -> Column(
                         Modifier.fillMaxWidth().padding(16.dp),
@@ -1370,7 +1371,7 @@ fun MemberPickerView(
                 }
                 isSearching -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        CircularProgressIndicator()
+                        MomentsCircularProgressIndicator()
                         Text(stringResource(R.string.common_searching), color = secondary, fontSize = 16.sp)
                     }
                 }

@@ -50,18 +50,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.libraries.places.api.Places
-import com.google.android.libraries.places.api.model.CircularBounds
-import com.google.android.libraries.places.api.model.Place
-import com.google.android.libraries.places.api.net.SearchByTextRequest
-import com.google.android.libraries.places.api.net.SearchNearbyRequest
 import com.mapbox.geojson.Point
 import com.mapbox.maps.extension.compose.MapboxMap
 import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
 import com.mapbox.maps.extension.compose.rememberMapState
 import com.mapbox.maps.plugin.gestures.generated.GesturesSettings
-import com.moments.android.BuildConfig
 import com.moments.android.R
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.feed.maps.FeedMaps
@@ -69,6 +62,7 @@ import com.moments.android.views.feed.maps.LocationUtilities
 import com.moments.android.views.feed.maps.MapRegionStore
 import com.moments.android.views.feed.maps.MomentsMapStyle
 import com.moments.android.views.feed.maps.MomentsMapboxStandardStyle
+import com.moments.android.views.feed.maps.MomentsPlacesSearch
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
@@ -83,7 +77,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.UUID
@@ -139,8 +132,9 @@ fun ChatLocationSheetContent(
             currentPlaceName = currentAddress?.name
             currentPlaceAddress = currentAddress?.shortAddress
             nearbyPlaces = withContext(Dispatchers.IO) {
-                runCatching { searchNearbyPlaces(context, latitude, longitude) }
-                    .getOrDefault(emptyList())
+                runCatching {
+                    MomentsPlacesSearch.searchNearby(context, latitude, longitude).map { it.toChatPlace() }
+                }.getOrDefault(emptyList())
             }
         }
     }
@@ -181,7 +175,12 @@ fun ChatLocationSheetContent(
             try {
                 val found = withContext(Dispatchers.IO) {
                     runCatching {
-                        searchPlaces(context, trimmed, currentLatitude, currentLongitude)
+                        MomentsPlacesSearch.searchByText(
+                            context,
+                            trimmed,
+                            currentLatitude,
+                            currentLongitude,
+                        ).map { it.toChatPlace() }
                     }.getOrDefault(emptyList())
                 }
                 if (version == requestVersion) searchResults = found
@@ -506,61 +505,17 @@ private fun reverseGeocodeAddress(context: Context, latitude: Double, longitude:
 private fun Address.shortAddress(): String? =
     listOfNotNull(thoroughfare, locality).distinct().joinToString(", ").ifBlank { null }
 
-private fun ensurePlacesClient(context: Context): com.google.android.libraries.places.api.net.PlacesClient? {
-    val key = BuildConfig.GOOGLE_MAPS_API_KEY
-    if (key.isBlank() || key.startsWith("REPLACE_")) return null
-    if (!Places.isInitialized()) Places.initializeWithNewPlacesApiEnabled(context.applicationContext, key)
-    return Places.createClient(context.applicationContext)
-}
-
-private fun placeFields() = listOf(Place.Field.ID, Place.Field.DISPLAY_NAME, Place.Field.FORMATTED_ADDRESS, Place.Field.LOCATION)
-
-/** Nearby ≡ iOS `MKLocalPointsOfInterestRequest` (Places API; no Mapbox Search en el proyecto). */
-private suspend fun searchNearbyPlaces(context: Context, latitude: Double, longitude: Double): List<ChatLocationPlace> {
-    val client = ensurePlacesClient(context) ?: return emptyList()
-    val request = SearchNearbyRequest.builder(
-        CircularBounds.newInstance(LatLng(latitude, longitude), NEARBY_RADIUS_METERS),
-        placeFields(),
-    )
-        .setMaxResultCount(20)
-        .build()
-    return client.searchNearby(request).await().places.mapNotNull(::toChatLocationPlace)
-}
-
-/** Search ≡ iOS `MKLocalSearch` (Places SearchByText). */
-private suspend fun searchPlaces(
-    context: Context,
-    query: String,
-    latitude: Double,
-    longitude: Double,
-): List<ChatLocationPlace> {
-    val client = ensurePlacesClient(context) ?: return emptyList()
-    val request = SearchByTextRequest.builder(query, placeFields())
-        .setMaxResultCount(25)
-        .setLocationBias(CircularBounds.newInstance(LatLng(latitude, longitude), SEARCH_RADIUS_METERS))
-        .build()
-    return client.searchByText(request).await().places.mapNotNull(::toChatLocationPlace)
-}
-
-private fun toChatLocationPlace(place: Place): ChatLocationPlace? {
-    val coordinate = place.location ?: return null
-    val name = place.displayName?.takeIf { it.isNotBlank() } ?: return null
-    val address = place.formattedAddress?.takeIf { it.isNotBlank() }?.let { formatted ->
-        formatted.split(",").take(2).joinToString(",").trim().ifBlank { formatted }
-    }
-    return ChatLocationPlace(
-        id = place.id ?: "${coordinate.latitude}:${coordinate.longitude}:$name",
+private fun MomentsPlacesSearch.Hit.toChatPlace(): ChatLocationPlace =
+    ChatLocationPlace(
+        id = id,
         name = name,
         address = address,
-        latitude = coordinate.latitude,
-        longitude = coordinate.longitude,
+        latitude = latitude,
+        longitude = longitude,
     )
-}
 
 private val BARCELONA_LATITUDE = 41.3874
 private val BARCELONA_LONGITUDE = 2.1686
 /** ≡ iOS span `latitudeDelta: 0.008` tras centrar en usuario. */
 private const val MAP_PREVIEW_LONGITUDE_DELTA = 0.008
-private const val NEARBY_RADIUS_METERS = 1_000.0
-private const val SEARCH_RADIUS_METERS = 10_000.0
 private const val SEARCH_DEBOUNCE_MILLIS = 350L

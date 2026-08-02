@@ -1,29 +1,46 @@
 package com.moments.android.reportes
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Balance
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ButtonDefaults
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,18 +51,29 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MomentsNotification
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchStoriesByIds
+import com.moments.android.views.feed.rememberAdaptiveColors
 import kotlinx.coroutines.launch
 
 /** Port de AppealFormView.swift */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppealFormView(
     suspensionReason: String?,
@@ -55,6 +83,10 @@ fun AppealFormView(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val appealService = remember { AppealService.getInstance(context) }
+    val colors = rememberAdaptiveColors()
+    val isDark = isSystemInDarkTheme()
+    val primary = colors.primary
+    val secondary = if (isDark) Color.White.copy(alpha = 0.72f) else Color.Black.copy(alpha = 0.72f)
 
     var appealMessage by remember { mutableStateOf("") }
     var contactEmail by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser?.email.orEmpty()) }
@@ -79,7 +111,8 @@ fun AppealFormView(
         }
     }
 
-    val canSubmit = contactEmail.contains("@") &&
+    val canSubmit = contactEmail.isNotEmpty() &&
+        contactEmail.contains("@") &&
         characterCount in 50..2000 &&
         !isLoading
 
@@ -126,69 +159,75 @@ fun AppealFormView(
         }
     }
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.appeal_title)) },
-                navigationIcon = {
-                    TextButton(onClick = onDismiss) { Text("✕") }
-                },
-                actions = {
-                    TextButton(onClick = { submitAppeal() }, enabled = canSubmit) {
-                        if (isLoading) CircularProgressIndicator(strokeWidth = 2.dp)
-                        else Text(stringResource(R.string.appeal_submitButton))
-                    }
-                },
-            )
-        },
-    ) { padding ->
+    Box(modifier = modifier.fillMaxSize()) {
         if (showSuccessView && appealResult != null) {
-            AppealSuccessView(result = appealResult!!, onDismiss = onDismiss, modifier = Modifier.padding(padding))
+            AppealSuccessView(result = appealResult!!, onDismiss = onDismiss)
         } else {
             Column(
                 modifier = Modifier
-                    .padding(padding)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
+                    .padding(top = 18.dp, bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(26.dp),
             ) {
-                AppealFormHeader()
-                OutlinedTextField(
-                    value = contactEmail,
-                    onValueChange = { contactEmail = it },
-                    label = { Text(stringResource(R.string.appeal_contactEmail)) },
-                    modifier = Modifier.fillMaxWidth(),
+                AppealSheetHeader(
+                    canSubmit = canSubmit,
+                    isLoading = isLoading,
+                    submitLabel = stringResource(R.string.appeal_submitButton),
+                    onDismiss = onDismiss,
+                    onSubmit = { submitAppeal() },
                 )
-                suspensionReason?.let {
-                    AppealInfoCard(
-                        title = stringResource(R.string.appeal_suspensionReason),
-                        content = it,
+                AppealFormHeader(primary = primary, secondary = secondary)
+                Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                    AppealEmailField(
+                        email = contactEmail,
+                        onEmailChange = { contactEmail = it },
+                        title = stringResource(R.string.appeal_contactEmail),
+                        placeholder = "tu@email.com",
+                        primary = primary,
+                        secondary = secondary,
+                    )
+                    suspensionReason?.let {
+                        AppealInfoCard(
+                            title = stringResource(R.string.appeal_suspensionReason),
+                            content = it,
+                            icon = Icons.Default.Warning,
+                            accent = Color(0xFFFF9800),
+                            primary = primary,
+                            secondary = secondary,
+                        )
+                    }
+                    AppealMessageField(
+                        message = appealMessage,
+                        onMessageChange = {
+                            appealMessage = it
+                            updateCharacterCount()
+                        },
+                        characterCount = characterCount,
+                        messageError = messageError,
+                        title = stringResource(R.string.appeal_yourAppeal),
+                        placeholder = stringResource(R.string.appeal_yourAppeal_placeholder),
+                        minimumLength = 50,
+                        maximumLength = 2000,
+                        primary = primary,
+                        secondary = secondary,
+                    )
+                    AppealOptionalField(
+                        text = additionalInfo,
+                        onTextChange = { additionalInfo = it },
+                        title = stringResource(R.string.appeal_additionalInfo),
+                        placeholder = stringResource(R.string.appeal_additionalInfo_placeholder),
+                        primary = primary,
+                        secondary = secondary,
+                    )
+                    AppealRequirements(
+                        characterCount = characterCount,
+                        email = contactEmail,
+                        primary = primary,
+                        secondary = secondary,
                     )
                 }
-                OutlinedTextField(
-                    value = appealMessage,
-                    onValueChange = {
-                        appealMessage = it
-                        updateCharacterCount()
-                    },
-                    label = { Text(stringResource(R.string.appeal_yourAppeal)) },
-                    placeholder = { Text(stringResource(R.string.appeal_yourAppeal_placeholder)) },
-                    modifier = Modifier.fillMaxWidth().height(150.dp),
-                    supportingText = {
-                        Text(stringResource(R.string.appeal_field_characterCount, characterCount))
-                    },
-                    isError = messageError != null,
-                )
-                messageError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                OutlinedTextField(
-                    value = additionalInfo,
-                    onValueChange = { additionalInfo = it },
-                    label = { Text(stringResource(R.string.appeal_additionalInfo)) },
-                    placeholder = { Text(stringResource(R.string.appeal_additionalInfo_placeholder)) },
-                    modifier = Modifier.fillMaxWidth().height(100.dp),
-                )
-                AppealRequirements(characterCount = characterCount, email = contactEmail)
             }
         }
     }
@@ -207,88 +246,437 @@ fun AppealFormView(
     }
 }
 
+/** ≡ AppealSheetHeader.swift — chevron.down + submit glass. */
 @Composable
-private fun AppealFormHeader() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(stringResource(R.string.appeal_title), style = MaterialTheme.typography.headlineMedium)
-        Text(
-            stringResource(R.string.appeal_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.fillMaxWidth(),
+fun AppealSheetHeader(
+    canSubmit: Boolean,
+    isLoading: Boolean,
+    submitLabel: String,
+    onDismiss: () -> Unit,
+    onSubmit: () -> Unit,
+) {
+    val colors = rememberAdaptiveColors()
+    val isDark = isSystemInDarkTheme()
+    val primary = colors.primary
+    val disabled = if (isDark) Color.White.copy(alpha = 0.42f) else Color.Black.copy(alpha = 0.42f)
+
+    // Sheet Android: sin chevron dismiss; solo Submit a la derecha
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Spacer(Modifier.weight(1f))
+        Box(
+            modifier = Modifier
+                .height(38.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = canSubmit && !isLoading)
+                .clickable(enabled = canSubmit && !isLoading, onClick = onSubmit)
+                .padding(horizontal = 14.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (isLoading) {
+                MomentsCircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(
+                    submitLabel,
+                    color = if (canSubmit) primary else disabled,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppealFormHeader(primary: Color, secondary: Color) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.padding(top = 10.dp).fillMaxWidth(),
+    ) {
+        Icon(
+            Icons.Outlined.Balance,
+            contentDescription = null,
+            tint = primary,
+            modifier = Modifier.size(38.dp),
         )
-    }
-}
-
-@Composable
-fun AppealInfoCard(title: String, content: String) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
-            Text(content, style = MaterialTheme.typography.bodyMedium)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                stringResource(R.string.appeal_title),
+                color = primary,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                stringResource(R.string.appeal_subtitle),
+                color = secondary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                lineHeight = 21.sp,
+            )
         }
     }
 }
 
 @Composable
-private fun AppealRequirements(characterCount: Int, email: String) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.appeal_requirements), style = MaterialTheme.typography.titleSmall)
-            RequirementRow("Min 50", characterCount >= 50)
-            RequirementRow("Max 2000", characterCount in 1..2000)
-            RequirementRow(stringResource(R.string.appeal_contactEmail), email.contains("@"))
+private fun AppealGlassField(
+    focused: Boolean,
+    primary: Color,
+    content: @Composable () -> Unit,
+) {
+    val isDark = isSystemInDarkTheme()
+    val subtle = if (isDark) Color.White else Color.Black
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .momentsChromeGlass(shape, interactive = true)
+            .border(
+                width = if (focused) 1.4.dp else 0.8.dp,
+                color = subtle.copy(alpha = if (focused) 0.28f else 0.12f),
+                shape = shape,
+            ),
+    ) { content() }
+}
+
+@Composable
+fun AppealEmailField(
+    email: String,
+    onEmailChange: (String) -> Unit,
+    title: String,
+    placeholder: String,
+    primary: Color,
+    secondary: Color,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Email, contentDescription = null, tint = secondary, modifier = Modifier.size(14.dp))
+            Text(title, color = secondary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+        AppealGlassField(focused = focused, primary = primary) {
+            BasicTextField(
+                value = email,
+                onValueChange = onEmailChange,
+                singleLine = true,
+                textStyle = TextStyle(color = primary, fontSize = 16.sp),
+                cursorBrush = SolidColor(primary),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .onFocusChanged { focused = it.isFocused },
+                decorationBox = { inner ->
+                    Box {
+                        if (email.isEmpty()) {
+                            Text(placeholder, color = secondary.copy(alpha = 0.48f), fontSize = 16.sp)
+                        }
+                        inner()
+                    }
+                },
+            )
         }
     }
 }
 
 @Composable
-private fun RequirementRow(text: String, isCompleted: Boolean) {
+fun AppealMessageField(
+    message: String,
+    onMessageChange: (String) -> Unit,
+    characterCount: Int,
+    messageError: String?,
+    title: String,
+    placeholder: String,
+    minimumLength: Int,
+    maximumLength: Int,
+    primary: Color,
+    secondary: Color,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val countColor = when {
+        characterCount < minimumLength -> Color(0xFFFF9800)
+        characterCount > maximumLength -> Color.Red
+        else -> secondary.copy(alpha = 0.62f)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Sms, contentDescription = null, tint = secondary, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(title, color = secondary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.weight(1f))
+            Text(
+                stringResource(R.string.appeal_field_characterCount, characterCount),
+                color = countColor,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+        AppealGlassField(focused = focused, primary = primary) {
+            Box(modifier = Modifier.fillMaxWidth().heightIn(min = 150.dp).padding(12.dp)) {
+                if (message.isEmpty()) {
+                    Text(
+                        placeholder,
+                        color = secondary.copy(alpha = 0.48f),
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(4.dp),
+                    )
+                }
+                BasicTextField(
+                    value = message,
+                    onValueChange = onMessageChange,
+                    textStyle = TextStyle(color = primary, fontSize = 16.sp),
+                    cursorBrush = SolidColor(primary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 126.dp)
+                        .onFocusChanged { focused = it.isFocused },
+                )
+            }
+        }
+        messageError?.let { error ->
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFF9800), modifier = Modifier.size(12.dp))
+                Text(error, color = Color(0xFFFF9800), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
+
+@Composable
+fun AppealOptionalField(
+    text: String,
+    onTextChange: (String) -> Unit,
+    title: String,
+    placeholder: String,
+    primary: Color,
+    secondary: Color,
+) {
+    var focused by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.AddCircle, contentDescription = null, tint = secondary, modifier = Modifier.size(14.dp))
+            Text(title, color = secondary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+        AppealGlassField(focused = focused, primary = primary) {
+            Box(modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp).padding(8.dp)) {
+                if (text.isEmpty()) {
+                    Text(
+                        placeholder,
+                        color = secondary.copy(alpha = 0.46f),
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(4.dp),
+                    )
+                }
+                BasicTextField(
+                    value = text,
+                    onValueChange = onTextChange,
+                    textStyle = TextStyle(color = primary, fontSize = 14.sp),
+                    cursorBrush = SolidColor(primary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 64.dp)
+                        .onFocusChanged { focused = it.isFocused },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AppealInfoCard(
+    title: String,
+    content: String,
+    icon: ImageVector = Icons.Default.Info,
+    accent: Color = Color(0xFF2196F3),
+    primary: Color = rememberAdaptiveColors().primary,
+    secondary: Color = rememberAdaptiveColors().secondary,
+) {
+    val isDark = isSystemInDarkTheme()
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .momentsChromeGlass(shape, interactive = false)
+            .border(0.8.dp, accent.copy(alpha = if (isDark) 0.24f else 0.18f), shape)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(14.dp))
+            Text(title, color = primary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+        Text(content, color = secondary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun AppealRequirements(
+    characterCount: Int,
+    email: String,
+    primary: Color,
+    secondary: Color,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .momentsChromeGlass(shape, interactive = false)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFF007AFF).copy(alpha = 0.8f), modifier = Modifier.size(14.dp))
+            Text(stringResource(R.string.appeal_requirements), color = primary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            RequirementRow("Mínimo 50 caracteres", characterCount >= 50, primary, secondary)
+            RequirementRow(
+                "Máximo 2000 caracteres",
+                characterCount in 1..2000,
+                primary,
+                secondary,
+                failed = characterCount > 2000,
+            )
+            RequirementRow("Email válido requerido", email.contains("@"), primary, secondary)
+        }
+    }
+}
+
+@Composable
+private fun RequirementRow(
+    text: String,
+    isCompleted: Boolean,
+    primary: Color,
+    secondary: Color,
+    failed: Boolean = false,
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(
-            Icons.Default.Check,
+            when {
+                failed -> Icons.Default.Warning
+                isCompleted -> Icons.Default.CheckCircle
+                else -> Icons.Default.RadioButtonUnchecked
+            },
             contentDescription = null,
-            tint = if (isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+            tint = when {
+                failed -> Color.Red
+                isCompleted -> Color(0xFF34C759)
+                else -> secondary
+            },
+            modifier = Modifier.size(16.dp),
         )
-        Text(text, style = MaterialTheme.typography.bodySmall)
+        Text(text, color = if (isCompleted) primary else secondary, fontSize = 13.sp)
     }
 }
 
 @Composable
 fun AppealSuccessView(result: AppealResult, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = rememberAdaptiveColors()
+    val isDark = isSystemInDarkTheme()
+    val primary = colors.primary
+    val secondary = if (isDark) Color.White.copy(alpha = 0.74f) else Color.Black.copy(alpha = 0.74f)
+
     Column(
-        modifier = modifier.fillMaxSize().padding(20.dp),
+        modifier = modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+        verticalArrangement = Arrangement.spacedBy(34.dp),
     ) {
         Spacer(Modifier.weight(1f))
-        Text(stringResource(R.string.appeal_success_title), style = MaterialTheme.typography.headlineMedium)
-        Text(result.message, style = MaterialTheme.typography.bodyMedium)
-        result.ticketNumber?.let {
-            AppealInfoCard(stringResource(R.string.appeal_success_ticketNumber), it)
+        Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF34C759), modifier = Modifier.size(42.dp))
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                stringResource(R.string.appeal_success_title),
+                color = primary,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+            Text(result.message, color = secondary, fontSize = 16.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
         }
-        result.estimatedResponseTime?.let {
-            AppealInfoCard(stringResource(R.string.appeal_success_estimatedResponse), it)
-        }
-        result.priority?.let {
-            AppealInfoCard(stringResource(R.string.appeal_success_priority), it.replaceFirstChar { c -> c.uppercase() })
-        }
-        if (result.nextSteps.isNotEmpty()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(stringResource(R.string.appeal_nextSteps), style = MaterialTheme.typography.titleSmall)
-                    result.nextSteps.forEach { step -> Text("• $step", style = MaterialTheme.typography.bodySmall) }
+        Column(verticalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.fillMaxWidth()) {
+            result.ticketNumber?.let {
+                AppealInfoCard(
+                    title = stringResource(R.string.appeal_success_ticketNumber),
+                    content = it,
+                    icon = Icons.Default.ConfirmationNumber,
+                    accent = Color(0xFFAF52DE),
+                    primary = primary,
+                    secondary = secondary,
+                )
+            }
+            result.estimatedResponseTime?.let {
+                AppealInfoCard(
+                    title = stringResource(R.string.appeal_success_estimatedResponse),
+                    content = it,
+                    icon = Icons.Default.Schedule,
+                    accent = Color(0xFF007AFF),
+                    primary = primary,
+                    secondary = secondary,
+                )
+            }
+            result.priority?.let {
+                AppealInfoCard(
+                    title = stringResource(R.string.appeal_success_priority),
+                    content = it.replaceFirstChar { c -> c.uppercase() },
+                    icon = Icons.Default.Info,
+                    accent = Color(0xFFFF9800),
+                    primary = primary,
+                    secondary = secondary,
+                )
+            }
+            if (result.nextSteps.isNotEmpty()) {
+                val shape = RoundedCornerShape(16.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(shape)
+                        .momentsChromeGlass(shape, interactive = false)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.appeal_nextSteps),
+                        color = primary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    result.nextSteps.forEach { step ->
+                        Text("• $step", color = secondary, fontSize = 13.sp)
+                    }
                 }
             }
         }
         Spacer(Modifier.weight(1f))
-        Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.appeal_understood))
+        Button(
+            onClick = onDismiss,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(18.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007AFF)),
+        ) {
+            Text(stringResource(R.string.appeal_understood), fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
 /** Port de ModerationReviewRequestSheet en AppealFormView.swift */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModerationReviewRequestSheet(
     notification: MomentsNotification,
@@ -385,87 +773,142 @@ fun ModerationReviewRequestSheet(
         }
     }
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.moderationReview_title)) },
-                navigationIcon = { TextButton(onClick = onDismiss) { Text("✕") } },
-                actions = {
-                    TextButton(onClick = { submitReviewRequest() }, enabled = canSubmit) {
-                        if (isLoading) CircularProgressIndicator(strokeWidth = 2.dp)
-                        else Text(stringResource(R.string.moderationReview_submit))
-                    }
-                },
-            )
-        },
-    ) { padding ->
+    val colors = rememberAdaptiveColors()
+    val isDark = isSystemInDarkTheme()
+    val primary = colors.primary
+    val secondary = if (isDark) Color.White.copy(alpha = 0.76f) else Color.Black.copy(alpha = 0.76f)
+
+    Box(modifier = modifier.fillMaxSize()) {
         if (showSuccessView) {
             Column(
-                modifier = Modifier.padding(padding).fillMaxSize().padding(24.dp),
+                modifier = Modifier.fillMaxSize().padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text(stringResource(R.string.moderationReview_success_title), style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    stringResource(R.string.moderationReview_success_title),
+                    color = primary,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
                 Text(
                     successTicketNumber?.takeIf { it.isNotEmpty() }?.let {
                         context.getString(R.string.moderationReview_success_message_ticket, it)
                     } ?: stringResource(R.string.moderationReview_success_message),
+                    color = secondary,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center,
                 )
-                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.appeal_understood))
+                Spacer(Modifier.weight(1f))
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007AFF)),
+                ) {
+                    Text(stringResource(R.string.appeal_understood), fontWeight = FontWeight.SemiBold)
                 }
             }
         } else {
             Column(
-                modifier = Modifier.padding(padding).padding(horizontal = 24.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 18.dp, bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                Text(stringResource(R.string.moderationReview_subtitle), style = MaterialTheme.typography.bodyMedium)
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.moderationReview_previewTitle), style = MaterialTheme.typography.labelMedium)
+                Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                    AppealSheetHeader(
+                        canSubmit = canSubmit,
+                        isLoading = isLoading,
+                        submitLabel = stringResource(R.string.moderationReview_submit),
+                        onDismiss = onDismiss,
+                        onSubmit = { submitReviewRequest() },
+                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Text(
-                            if (contentTypeIsStory) stringResource(R.string.moderationReview_context_story)
-                            else stringResource(R.string.moderationReview_context_moment),
-                            style = MaterialTheme.typography.titleMedium,
+                            stringResource(R.string.moderationReview_title),
+                            color = primary,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
                         )
-                        Text(moderationScopeLabel(notification.moderationScope, contentTypeIsStory))
-                        previewUrl?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                        Text(stringResource(R.string.moderationReview_helper), style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            stringResource(R.string.moderationReview_subtitle),
+                            color = secondary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                        )
                     }
                 }
-                OutlinedTextField(
-                    value = contactEmail,
-                    onValueChange = { contactEmail = it },
-                    label = { Text(stringResource(R.string.moderationReview_contactEmail)) },
-                    placeholder = { Text(stringResource(R.string.moderationReview_contactEmail_placeholder)) },
-                    modifier = Modifier.fillMaxWidth(),
+                val scopeLabel = moderationScopeLabel(notification.moderationScope, contentTypeIsStory)
+                AppealInfoCard(
+                    title = stringResource(R.string.moderationReview_previewTitle),
+                    content = buildString {
+                        append(
+                            if (contentTypeIsStory) context.getString(R.string.moderationReview_context_story)
+                            else context.getString(R.string.moderationReview_context_moment),
+                        )
+                        append("\n")
+                        append(scopeLabel)
+                        previewUrl?.let { append("\n").append(it) }
+                        append("\n")
+                        append(context.getString(R.string.moderationReview_helper))
+                    },
+                    icon = Icons.Default.Info,
+                    accent = Color(0xFF007AFF),
+                    primary = primary,
+                    secondary = secondary,
                 )
-                OutlinedTextField(
-                    value = reviewMessage,
-                    onValueChange = {
+                AppealEmailField(
+                    email = contactEmail,
+                    onEmailChange = { contactEmail = it },
+                    title = stringResource(R.string.moderationReview_contactEmail),
+                    placeholder = stringResource(R.string.moderationReview_contactEmail_placeholder),
+                    primary = primary,
+                    secondary = secondary,
+                )
+                AppealMessageField(
+                    message = reviewMessage,
+                    onMessageChange = {
                         reviewMessage = it
                         reviewCharacterCount = it.trim().length
                         reviewMessageError = when {
                             reviewCharacterCount < minimumLength && it.isNotEmpty() ->
-                                context.getString(R.string.moderationReview_messageTooShort, reviewCharacterCount, minimumLength)
+                                context.getString(
+                                    R.string.moderationReview_messageTooShort,
+                                    reviewCharacterCount,
+                                    minimumLength,
+                                )
                             reviewCharacterCount > 2000 ->
                                 context.getString(R.string.moderationReview_messageTooLong, reviewCharacterCount)
                             else -> null
                         }
                     },
-                    label = { Text(stringResource(R.string.moderationReview_messageTitle)) },
-                    placeholder = { Text(stringResource(R.string.moderationReview_messagePlaceholder)) },
-                    modifier = Modifier.fillMaxWidth().height(150.dp),
+                    characterCount = reviewCharacterCount,
+                    messageError = reviewMessageError,
+                    title = stringResource(R.string.moderationReview_messageTitle),
+                    placeholder = stringResource(R.string.moderationReview_messagePlaceholder),
+                    minimumLength = minimumLength,
+                    maximumLength = 2000,
+                    primary = primary,
+                    secondary = secondary,
                 )
-                reviewMessageError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                OutlinedTextField(
-                    value = additionalInfo,
-                    onValueChange = { additionalInfo = it },
-                    label = { Text(stringResource(R.string.moderationReview_additionalInfo)) },
-                    placeholder = { Text(stringResource(R.string.moderationReview_additionalInfo_placeholder)) },
-                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                AppealOptionalField(
+                    text = additionalInfo,
+                    onTextChange = { additionalInfo = it },
+                    title = stringResource(R.string.moderationReview_additionalInfo),
+                    placeholder = stringResource(R.string.moderationReview_additionalInfo_placeholder),
+                    primary = primary,
+                    secondary = secondary,
                 )
             }
         }

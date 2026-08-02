@@ -3,10 +3,11 @@ package com.moments.android.views.story.storyviewer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
@@ -41,10 +42,11 @@ fun StoryQuickActionsMenu(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(22.dp)
+    // ≡ iOS `.frame(minWidth: 200).fixedSize(horizontal: true)` — no full-bleed
     Column(
         modifier
             .widthIn(min = 200.dp)
-            .wrapContentWidth()
+            .width(IntrinsicSize.Max)
             .momentsChromeGlass(shape, interactive = false)
             // ≡ .onTapGesture {} — traga taps del menú (no cierra el overlay)
             .clickable(

@@ -88,6 +88,8 @@ import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.profile.core.sections.MomentZoomDetailDestination
+import com.moments.android.views.shared.MomentsContainerTransformOverlay
+import com.moments.android.views.shared.MomentsSharedTransitionLayout
 import com.moments.android.views.profile.core.sections.MomentZoomDestination
 import com.moments.android.views.profile.core.sections.MomentZoomOpener
 import com.moments.android.views.profile.core.sections.MomentZoomPresentationKind
@@ -527,12 +529,13 @@ fun ActivityInteractionDetailView(
 
     val systemInsetModifier =
         if (suppressInlineNavigationTitle) Modifier else Modifier.safeDrawingPadding()
-    Box(
+    MomentsSharedTransitionLayout(
         modifier
             .fillMaxSize()
             .background(background)
             .then(systemInsetModifier),
     ) {
+    Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             if (!suppressInlineNavigationTitle) {
                 DetailTopBar(
@@ -800,15 +803,18 @@ fun ActivityInteractionDetailView(
             )
         }
 
-        zoomDestination?.let { destination ->
-            MomentZoomDetailDestination(
-                destination = destination,
-                moments = MomentZoomOpener.resolvedMoments(destination, zoomMomentsPool),
-                onDismiss = {
-                    zoomDestination = null
-                    zoomMomentsPool = emptyList()
-                },
-            )
+        MomentsContainerTransformOverlay(visible = zoomDestination != null) {
+            val destination = zoomDestination
+            if (destination != null) {
+                MomentZoomDetailDestination(
+                    destination = destination,
+                    moments = MomentZoomOpener.resolvedMoments(destination, zoomMomentsPool),
+                    onDismiss = {
+                        zoomDestination = null
+                        zoomMomentsPool = emptyList()
+                    },
+                )
+            }
         }
 
         reelsPresentation?.let { presentation ->
@@ -836,6 +842,7 @@ fun ActivityInteractionDetailView(
             )
         }
     }
+    } // MomentsSharedTransitionLayout
 
     if (showAuthorSheet) {
         MomentsModalSheet(

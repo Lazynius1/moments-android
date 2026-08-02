@@ -18,17 +18,41 @@ Usar como guía para portar **trozo a trozo** al `.kt` equivalente.
 
 | Estado | Significado | Archivos |
 |--------|-------------|--------:|
-| `[ ]` | Pendiente — sin paridad cerrada | 9 |
-| `[~]` | En curso — `.kt` existe, falta comparar/cerrar vs Swift | 112 |
-| `[x]` | Cerrado — revisado 1:1 contra Swift | 456 |
-| 🚫 | Fuera de alcance Android | 14 |
+| `[ ]` | Pendiente — sin paridad cerrada | 0 |
+| `[~]` | En curso — `.kt` existe, falta comparar/cerrar vs Swift | 0 |
+| `[x]` | Cerrado — revisado 1:1 contra Swift | 570 |
+| 🚫 | Fuera de alcance Android | 15 |
 | **En alcance** | excl. 🚫 (+ `[N/A]`) | 572 |
-| **Progreso paridad** | `[x]` / en alcance | 456 / 572 (79.7%) |
+| **Progreso paridad** | `[x]` / en alcance | 570 / 572 (99.7%) |
 
 ### Cerrados — líneas iOS vs Android
 
 | Archivo | iOS | Android | Δ | Notas |
 |---------|----:|--------:|--:|-------|
+| `CommentMentionSearchOverlay` | 227 | 284 | +57 | chrome capsule+panel; person placeholder; focus; debounce |
+| `AdMobConfiguration` | 474 | 394 | −80 | UMP+ATT no-op; createNativeAdOptions; test IDs solo diagnostic; Plus=`isPlusSubscriber` |
+| `FeedNativeAd` | 604 | 557 | −47 | Smart/Clean/Modern/Integrated+MediaView; tracking primer+UMP; secondary Ahora no |
+| `StoryNativeAd` | 1479 | 1090 | −389 | StoryNativeAdView+manager+chrome; timeout 15s; IntegratedStoryAd orphan iOS no usado |
+| `GlassmorphicChatView+Search` | 107 | 140 | +33 | toggle/sync/advance/canGoUpDown; restoreLayout 80ms |
+| `GlassmorphicChatView+ViewModelAudio` | 88 | 87 | −1 | sync rows+session count; draft ensureConversationExists |
+| `GlassmorphicChatView+Clustering` | 142 | 120 | −22 | jump/highlight/buzz; moment+story nav SharedStoryAccessEvaluator |
+| `CameraPickerView` | 1845 | 224 | −1621 | huérfano; path chat = ChatCameraView; EnhancedCameraPicker stub |
+| `GlassmorphicChatView+Lifecycle` | 209 | 311 | +102 | online+camera delay 0.35+view-once; unavailable clears ring; unblock→stories |
+| `GlassmorphicChatView+Toolbar` | 251 | 326 | +75 | ProfileChrome back; AsyncProfileImageView; presence icons; search a11y cancel |
+| `GlassmorphicChatView+MessageRendering` | 262 | 288 | +26 | render rows+reply/edit; retry CompositionLocal; pulse on reaction; intro padding |
+| `GlassmorphicChatView+Scroll` | 450 | 301 | −149 | pin/history/jump; Δ UIKit self-sizing retries no aplica Compose |
+| `GlassmorphicChatView+MessageList` | 361 | 251 | −110 | rows+notice+search highlight; Δ reconfigureVisible UIKit N/A |
+| `GlassmorphicChatView+Voice` | 520 | 241 | −279 | hold/lock/trim/send+unread dismiss on reply; Δ screenshot/reconfigure UIKit N/A |
+| `GlassmorphicChatView` | 725 | 1257 | +532 | shell+enrich/intro+draftKey+unread Column; search Local; pending ops; Δ zoom UIKit N/A |
+| `VoiceRecordingGestureViews` | 535 | 779 | +244 | Telegram Android gestos+BlobDrawable; iOS↔TG iOS / Android↔TG Android |
+| `MomentsChatViewModel+Media` | 435 | 252 | −183 | viewOnce/gif/sticker/location+vanish flags; image/audio en ChatViewModel |
+| `ConversationSettingsView` | 2816 | 2122 | −694 | prefs+media FS+vanish sync→sesión+event; FullScreen video |
+| `ChatMessageListView` | 1695 | 709 | −986 | apply/normalize/scroll/pending+spacing2; distanceBottom px; Δ UIKit heightCache N/A |
+| `BestFriendsView` | 683 | 575 | −108 | selected/suggested+search+pagination snapshotFlow; following/followers |
+| `VisitsView` | 969 | 790 | −179 | TabContent skeleton/empty; rowSubtitle+justNow; stalker alert; unfollow confirm |
+| `TabBarView` | 768 | 782 | +14 | AppTab+create restore+badges+scrollTop home; deep links; Δ iOS26 Tab API N/A |
+| `GlowsyWidgetExtension` | 492 | ~350 | −142 | home small/medium RemoteViews+store+deep links; Control/LiveActivity 🚫 |
+| `ModernCommentsView` | 1900 | 1710 | −190 | MomentsModalSheet; mute widthInsensitive; list 16; menu offset; like scale; send shadow |
 | `AdAspectRatioContext` | 64 | 30 | −34 | enum Stories/Feed/Banner → portrait/landscape; defaultFeedOptions |
 | `AnimatedStickerView` | 87 | 71 | -16 | Coil = GIFCache; sin spinner (paridad iOS) |
 | `AudienceIconView` | 74 | 110 | +36 | Métricas + ActivityGrid; isDark ≡ colorScheme |
@@ -528,11 +552,11 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 - [Services](#services) — 69 archivos, 26,913 líneas · paridad `0/67`
 - [Models](#models) — 21 archivos, 7,653 líneas · paridad `0/20`
 - [Notifications](#notifications) — 24 archivos, 6,239 líneas · paridad `0/24`
-- [Reportes](#reportes) — 7 archivos, 3,539 líneas · paridad `0/7`
+- [Reportes](#reportes) — 7 archivos, 3,539 líneas · paridad `7/7`
 - [ad](#ad) — 4 archivos, 2,621 líneas · paridad `0/4`
 - [Moderation](#moderation) — 2 archivos, 2,484 líneas · paridad `0/2`
 - [Coordinators](#coordinators) — 5 archivos, 1,479 líneas · paridad `0/5`
-- [GlowsyWidgetExtension](#glowsywidgetextension) — 7 archivos, 1,315 líneas · paridad `0/7`
+- [GlowsyWidgetExtension](#glowsywidgetextension) — 7 archivos, 1,315 líneas · paridad `3/5` (+2🚫)
 - [Utilities](#utilities) — 11 archivos, 1,072 líneas · paridad `0/11`
 - [MomentsNotificationService](#momentsnotificationservice) — 2 archivos, 956 líneas · paridad `0/2`
 - [Extensions](#extensions) — 5 archivos, 678 líneas · paridad `0/5`
@@ -730,7 +754,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 838 | `Moments/Moments/Views/Messaging/Components/ChatMessageBubbleViews.swift` | `views/messaging/components/ChatMessageBubbleViews.kt` | [x] 838↔669 · row swipe/chrome+AttachBubbleBadges; texto sin double overlay; link preview; Δ≈LPLink |
 | 28 | `Moments/Moments/Views/Messaging/Components/ChatMessageForwardSheet.swift` | `views/messaging/components/ChatMessageForwardSheet.kt` | [x] 28↔151 |
 | 379 | `Moments/Moments/Views/Messaging/Components/ChatMessageInteractionModifiers.swift` | `views/messaging/components/ChatMessageInteractionModifiers.kt` | [x] 379↔414 · pan scroll-friendly+spring return+haptics+longPress 0.42+wrapContentHeight |
-| 1708 ⚠️ | `Moments/Moments/Views/Messaging/Components/ChatMessageListView.swift` | `views/messaging/components/ChatMessageListView.kt` | [~] · contrato apply/normalize/scroll/force/pending/suppress+frames; sin UIKit vanish/heightCache |
+| 1695 ⚠️ | `Moments/Moments/Views/Messaging/Components/ChatMessageListView.swift` | `views/messaging/components/ChatMessageListView.kt` | [x] 1695↔709 · apply/normalize/scroll/pending+spacing2; distanceBottom px; Δ UIKit heightCache N/A |
 | 535 | `Moments/Moments/Views/Messaging/Components/ChatMessageOptionsMenu.swift` | `views/messaging/components/ChatMessageOptionsMenu.kt` | [x] 535↔544 · anchor window→local+safeArea+press chrome+haptic menu+cornerRadius+star.slash≈StarBorder |
 | 882 | `Moments/Moments/Views/Messaging/Components/ChatMessageSupportViews.swift` | `views/messaging/components/ChatMessageSupportViews.kt` | [x] 882↔693 · reply/quote/reactions+cutout Clear+star+timestamp; status twin checks; clusterHitTargetInset |
 | 781 | `Moments/Moments/Views/Messaging/Components/ChatRecoveryViews.swift` | `views/messaging/components/ChatRecoveryViews.kt` | [x] 781↔800 · gate/create/restore/settings+PIN 48×60+lockout; material→sólido; change PIN MomentsModalSheet; lock gradient+press |
@@ -744,31 +768,31 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 186 | `Moments/Moments/Views/Messaging/Components/MessagingComposerAndStatusViews.swift` | `views/messaging/components/MessagingComposerAndStatusViews.kt` | [x] 186↔357 · status MomentsModalSheet+dismiss+SettingsSectionCard; composer canvas sólido+IME |
 | 287 | `Moments/Moments/Views/Messaging/Components/ViewOnceMessageBubble.swift` | `views/messaging/components/ViewOnceMessageBubble.kt` | [x] 287↔268 · pills+progress; estado desde message; zoom matchedTransition stub |
 | 1121 ✅ | `Moments/Moments/Views/Messaging/Components/VoiceNotes.swift` | `views/messaging/components/VoiceNotes.kt` | [x] · recorder/compose/trim+bubble scrub/speed/remaining+cache+proximidad auricular |
-| 535 | `Moments/Moments/Views/Messaging/Components/VoiceRecordingGestureViews.swift` | `views/messaging/components/VoiceRecordingGestureViews.kt` | [~] · fases hold/lock/cancel+follow goma+ticks hápticos+chrome; aura dual; VoiceBlob/AuroraMesh morph→brush stub |
+| 535 | `Moments/Moments/Views/Messaging/Components/VoiceRecordingGestureViews.swift` | `views/messaging/components/VoiceRecordingGestureViews.kt` | [x] 535↔779 · TG Android lock57/cancel140+BlobDrawable; iOS↔TG iOS / Android↔TG Android |
 | 3520 ⚠️ | `Moments/Moments/Views/Messaging/Core/ChatViewModel.swift` | `views/messaging/core/ChatViewModel.kt` | [x] 3520↔2284 |
 | 49 | `Moments/Moments/Views/Messaging/Core/MessageItem.swift` | `views/messaging/core/MessageItem.kt` | [x] 49↔67 |
 | 2514 ⚠️ | `Moments/Moments/Views/Messaging/Core/MessageModel.swift` | `views/messaging/core/MessageModel.kt` | [x] 2514↔1327 |
 | 856 | `Moments/Moments/Views/Messaging/Core/MessagingViewModel.swift` | `views/messaging/core/MessagingViewModel.kt` | [x] 856↔727 |
-| 1845 ⚠️ | `Moments/Moments/Views/Messaging/Media/CameraPickerView.swift` | `views/messaging/media/CameraPickerView.kt` | [~] · huérfano; path chat = ChatCameraView |
+| 1845 ⚠️ | `Moments/Moments/Views/Messaging/Media/CameraPickerView.swift` | `views/messaging/media/CameraPickerView.kt` | [x] 1845↔224 · huérfano; path chat = ChatCameraView |
 | 460 | `Moments/Moments/Views/Messaging/Media/ChatCameraView.swift` | `views/messaging/media/ChatCameraView.kt` | [x] 460↔534 · BackHandler+gallery thumb+recording pill+haptic+aspectRatio |
 | 71 | `Moments/Moments/Views/Messaging/Media/ChatMediaOverlayPayload.swift` | `views/messaging/media/ChatMediaOverlayPayload.kt` | [x] 71↔60 |
 | 37 | `Moments/Moments/Views/Messaging/Media/ChatMediaSendMode.swift` | `views/messaging/media/ChatMediaSendMode.kt` | [x] 37↔27 |
 | 613 | `Moments/Moments/Views/Messaging/Media/ViewOnceImmersiveViewer.swift` | `views/messaging/media/ViewOnceImmersiveViewer.kt` | [x] 613↔669 · canvas+chrome+emoji sheet+consume/replay; FIT_WITH_BLUR; Δ≈blur vídeo muted |
 | 151 | `Moments/Moments/Views/Messaging/Models/ChatAttachmentAssets.swift` | `views/messaging/models/ChatAttachmentAssets.kt` | [x] 151↔170 |
 | 146 | `Moments/Moments/Views/Messaging/Screens/ArchivedConversationsView.swift` | `views/messaging/screens/ArchivedConversationsView.kt` | [x] · empty+GlassmorphicRow+menu+auto-dismiss |
-| 142 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Clustering.swift` | — | [~] |
+| 142 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Clustering.swift` | `screens/chat/GlassmorphicChatViewClustering.kt` | [x] 142↔120 · jump/highlight/buzz; moment+story nav |
 | 1006 ⚠️ | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+ComposerAndChrome.swift` | `screens/chat/GlassmorphicChatViewComposerAndChrome.kt` | [x] 1006↔718 · plus/buzz/shake+media FS+report+cluster reply picker+gallery |
-| 209 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Lifecycle.swift` | — | [~] · markViewed+openCamera delay+view-once wiring |
-| 361 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+MessageList.swift` | `screens/chat/GlassmorphicChatViewMessageList.kt` | [~] · rows+CompositionLocal search highlight/activeId |
-| 262 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+MessageRendering.swift` | — | [~] |
-| 450 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Scroll.swift` | — | [~] |
-| 107 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Search.swift` | `screens/chat/GlassmorphicChatViewSearch.kt` | [~] · sync matches+clearKeepingMode+canGoUp/Down |
-| 251 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Toolbar.swift` | `screens/chat/GlassmorphicChatViewToolbar.kt` | [~] · presence+stories+search chrome; hide when search |
-| 88 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+ViewModelAudio.swift` | — | [~] |
-| 520 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Voice.swift` | `screens/chat/GlassmorphicChatViewVoice.kt` | [~] · wired hold-to-record+lock+floating+send |
-| 725 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView.swift` | `views/messaging/screens/chat/GlassmorphicChatView.kt` | [~] · shell+scroll; search highlight CompositionLocal; pending request ops→MessageRequestService |
-| 435 | `Moments/Moments/Views/Messaging/Screens/Chat/MomentsChatViewModel+Media.swift` | — | [~] |
-| 2816 ⚠️ | `Moments/Moments/Views/Messaging/Screens/ConversationSettingsView.swift` | `screens/ConversationSettingsView.kt` + `ConversationFullScreenMediaView.kt` | [~] 2816↔~2065 · hydrate policy+poster+thumb; prefs grupos+desc+events; LinkPreview; footer created; FullScreen video play/mute/expand/timeline |
+| 209 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Lifecycle.swift` | `screens/chat/GlassmorphicChatViewLifecycle.kt` | [x] 209↔311 · online+camera 0.35+view-once; unavailable clears ring |
+| 361 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+MessageList.swift` | `screens/chat/GlassmorphicChatViewMessageList.kt` | [x] 361↔251 · rows+notice+search highlight; Δ reconfigureVisible N/A |
+| 262 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+MessageRendering.swift` | `screens/chat/GlassmorphicChatViewMessageRendering.kt` | [x] 262↔288 · rows+reply/edit; retry Local; pulse reaction |
+| 450 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Scroll.swift` | `screens/chat/GlassmorphicChatViewScroll.kt` | [x] 450↔301 · pin/history/jump; Δ UIKit self-sizing N/A |
+| 107 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Search.swift` | `screens/chat/GlassmorphicChatViewSearch.kt` | [x] 107↔140 · toggle/sync/advance/canGoUpDown |
+| 251 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Toolbar.swift` | `screens/chat/GlassmorphicChatViewToolbar.kt` | [x] 251↔326 · chrome back; AsyncProfileImageView; presence icons; search cancel |
+| 88 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+ViewModelAudio.swift` | `screens/chat/GlassmorphicChatViewViewModelAudio.kt` | [x] 88↔87 · sync+session; draft ensure |
+| 520 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Voice.swift` | `screens/chat/GlassmorphicChatViewVoice.kt` | [x] 520↔241 · hold/lock/trim/send+unread dismiss; Δ screenshot/reconfigure N/A |
+| 725 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView.swift` | `views/messaging/screens/chat/GlassmorphicChatView.kt` | [x] 725↔1257 · shell+enrich/intro+draftKey+unread Column; search Local; pending ops; Δ zoom N/A |
+| 435 | `Moments/Moments/Views/Messaging/Screens/Chat/MomentsChatViewModel+Media.swift` | `screens/chat/MomentsChatViewModelMedia.kt` | [x] 435↔252 · viewOnce/gif/sticker/location+vanish; image/audio en ChatViewModel |
+| 2816 ⚠️ | `Moments/Moments/Views/Messaging/Screens/ConversationSettingsView.swift` | `screens/ConversationSettingsView.kt` + `ConversationFullScreenMediaView.kt` | [x] 2816↔2122 · prefs+media FS+vanish sync sesión/event; FullScreen video |
 | 254 | `Moments/Moments/Views/Messaging/Screens/MessageRequestsView.swift` | `views/messaging/screens/MessageRequestsView.kt` | [x] · lista+empty+actions+open pending chat |
 | 1864 ⚠️ | `Moments/Moments/Views/Messaging/Screens/MessagingView.swift` | `views/messaging/screens/MessagingView.kt` + `GlassmorphicConversationRow.kt` | [x] · toolbar+search+merged list+row+menu+destinations+pending chat |
 | 90 | `Moments/Moments/Views/Messaging/Services/ChatAccessCoordinator.swift` | `views/messaging/services/ChatAccessCoordinator.kt` | [x] 90↔125 |
@@ -829,20 +853,20 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 478 | `Moments/Moments/Views/Nova/Tools/NovaProfileTools.swift` | `views/nova/tools/NovaProfileTools.kt` | [x] 478↔384 · snapshots+social+privacy+moments/stories/echo ≡iOS |
 | 164 | `Moments/Moments/Views/Nova/Tools/NovaSocialTools.swift` | `views/nova/tools/NovaSocialTools.kt` | [x] 164↔161 · lists count≡payload; create_moment audienceSettingRaw |
 | 103 | `Moments/Moments/Views/Nova/UI/NovaActionConfirmationOverlay.swift` | `views/nova/ui/NovaActionConfirmationOverlay.kt` | [x] 103↔164 · scrim+glass card/buttons+preview stroke |
-| 21 | `Moments/Moments/Views/Permission/camera/Contentview.swift` | `views/permission/camera/Contentview.kt` | [~] |
-| 318 | `Moments/Moments/Views/Permission/camera/helpers/CameraPermissionsview.swift` | `views/permission/camera/helpers/CameraPermissionsview.kt` | [~] |
-| 182 | `Moments/Moments/Views/Permission/location/LocationPermissionView.swift` | `views/permission/location/LocationPermissionView.kt` | [~] |
-| 134 | `Moments/Moments/Views/Permission/microphone/MicrophonePermissionView.swift` | `views/permission/microphone/MicrophonePermissionView.kt` | [~] |
-| 215 | `Moments/Moments/Views/Permission/notifications/NotificationsPermissionView.swift` | `views/permission/notifications/NotificationsPermissionView.kt` | [~] |
-| 99 | `Moments/Moments/Views/Permission/photos/PhotosPermissionView.swift` | `views/permission/photos/PhotosPermissionView.kt` | [~] |
-| 153 | `Moments/Moments/Views/Permission/shared/LocationPermissionGate.swift` | `views/permission/shared/LocationPermissionGate.kt` | [~] |
-| 165 | `Moments/Moments/Views/Permission/shared/PermissionPhoneFrame.swift` | `views/permission/shared/PermissionPhoneFrame.kt` | [~] |
-| 17 | `Moments/Moments/Views/Permission/shared/PermissionPhoneWallpaper.swift` | `views/permission/shared/PermissionPhoneWallpaper.kt` | [~] |
-| 167 | `Moments/Moments/Views/Permission/shared/PermissionPrimerGate.swift` | `views/permission/shared/PermissionPrimerGate.kt` | [~] |
-| 147 | `Moments/Moments/Views/Permission/shared/PermissionPrimerScaffold.swift` | `views/permission/shared/PermissionPrimerScaffold.kt` | [~] |
-| 148 | `Moments/Moments/Views/Permission/tracking/TrackingPermissionView.swift` | `views/permission/tracking/TrackingPermissionView.kt` | [~] |
+| 21 | `Moments/Moments/Views/Permission/camera/Contentview.swift` | `views/permission/camera/Contentview.kt` | [x] preview stub → CameraPermissionsView+pic1 |
+| 318 | `Moments/Moments/Views/Permission/camera/helpers/CameraPermissionsview.swift` | `views/permission/camera/helpers/CameraPermissionsview.kt` | [x] PermissionPhoneFrame Android · sway+shutter+green dot |
+| 182 | `Moments/Moments/Views/Permission/location/LocationPermissionView.swift` | `views/permission/location/LocationPermissionView.kt` | [x] phone sway · map pan sin/cos · pin/puck pulse |
+| 134 | `Moments/Moments/Views/Permission/microphone/MicrophonePermissionView.swift` | `views/permission/microphone/MicrophonePermissionView.kt` | [x] waves 2.4s+gradient · mic 0.22w · orange privacy dot |
+| 215 | `Moments/Moments/Views/Permission/notifications/NotificationsPermissionView.swift` | `views/permission/notifications/NotificationsPermissionView.kt` | [x] lock clock+banner keyframes · chrome glass card |
+| 99 | `Moments/Moments/Views/Permission/photos/PhotosPermissionView.swift` | `views/permission/photos/PhotosPermissionView.kt` | [x] mosaic scroll+denied blur · frame Android |
+| 153 | `Moments/Moments/Views/Permission/shared/LocationPermissionGate.swift` | `views/permission/shared/LocationPermissionGate.kt` | [x] 153↔274 · whenInUse→Always 2-step · decline Always=foreground OK · Dialog cover |
+| 165 | `Moments/Moments/Views/Permission/shared/PermissionPhoneFrame.swift` | `views/permission/shared/PermissionPhoneFrame.kt` | [x] chasis Android punch-hole+pill · motion keyframes≡iOS |
+| 17 | `Moments/Moments/Views/Permission/shared/PermissionPhoneWallpaper.swift` | `views/permission/shared/PermissionPhoneWallpaper.kt` | [x] permission_wallpaper asset (fallback pic1 iOS) |
+| 167 | `Moments/Moments/Views/Permission/shared/PermissionPrimerGate.swift` | `views/permission/shared/PermissionPrimerGate.kt` | [x] 167↔234 · State 3-way · finish · fullScreen Dialog · Feed 20s solo notDetermined |
+| 147 | `Moments/Moments/Views/Permission/shared/PermissionPrimerScaffold.swift` | `views/permission/shared/PermissionPrimerScaffold.kt` | [x] 147↔266 · canvas Adaptive · accent keyframes 2.5s · denied ColorMatrix · tint accent |
+| 148 | `Moments/Moments/Views/Permission/tracking/TrackingPermissionView.swift` | `views/permission/tracking/TrackingPermissionView.kt` | [x] 148↔267 · 5 cards×2 · loop 9s · sin secondary · frame Android |
 | 106 | `Moments/Moments/Views/Permissions/CameraAccessBoundary.swift` | `views/permissions/CameraAccessBoundary.kt` | [x] 106↔160 · primer/denied prefs; mic+cam→Settings; ON_RESUME |
-| 111 | `Moments/Moments/Views/Permissions/CameraPermissionGate.swift` | `views/permissions/CameraPermissionGate.kt` | [~] |
+| 111 | `Moments/Moments/Views/Permissions/CameraPermissionGate.swift` | `views/permissions/CameraPermissionGate.kt` | [x] primer/denied+prefs · fullScreen Dialog ≡ cover |
 | 78 | `Moments/Moments/Views/Profile/Core/MomentGridPreview.swift` | `views/profile/core/MomentGridPreview.kt` | [x] 78↔93 · settings+frame; ZStack center FIT; DEFAULT |
 | 637 | `Moments/Moments/Views/Profile/Core/ProfileView.swift` | `views/profile/core/ProfileView.kt` | [x] 637↔616 · sheets+hero menu+edit/delete; ShowProfileVisits; stories own; temas 🚫 |
 | 857 | `Moments/Moments/Views/Profile/Core/ProfileViewModel.swift` | `views/profile/core/ProfileViewModel.kt` | [x] 857↔566 · performRefresh; removeFollower FS; note maxLength; pin/archive/delete |
@@ -939,9 +963,9 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 214 | `Moments/Moments/Views/Shared/OfflineBannerModifier.swift` | `views/shared/OfflineBannerModifier.kt` | [x] 214↔208 · Collapsible+orb; TabBar+UserProfile overlay |
 | 74 | `Moments/Moments/Views/Shared/PhotoTagOverlayView.swift` | `views/shared/PhotoTagOverlayView.kt` | [x] 74↔134 · position+triangle+spring |
 | 175 | `Moments/Moments/Views/Shared/ScreenshotProtectedView.swift` | `views/shared/ScreenshotProtectedView.kt` | [x] 175↔~120 · FLAG_SECURE refcount; cornerRadius+updateToken; fillsContainer |
-| 227 | `Moments/Moments/Views/comments/CommentMentionSearchOverlay.swift` | `views/comments/CommentMentionSearchOverlay.kt` | [~] chrome glass header/cancel/+ + stroke panel |
+| 227 | `Moments/Moments/Views/comments/CommentMentionSearchOverlay.swift` | `views/comments/CommentMentionSearchOverlay.kt` | [x] 227↔~280 · chrome capsule+panel; person placeholder; focus; debounce search |
 | 429 | `Moments/Moments/Views/comments/CommentsView.swift` | — | [N/A] dead code iOS · 0 call sites · usar ModernCommentsView |
-| 1900 ⚠️ | `Moments/Moments/Views/comments/ModernCommentsView.swift` | `views/comments/ModernCommentsView.kt` + `ModernCommentsSheet.kt` | [~] 1900↔~1100 · sheet nav defaults+ime; composer 1…4 líneas+send scale; mute/sort/edit/mentions OK; QA restante |
+| 1900 ⚠️ | `Moments/Moments/Views/comments/ModernCommentsView.swift` | `views/comments/ModernCommentsView.kt` + `ModernCommentsSheet.kt` + `EnhancedModernCommentRow.kt` | [x] 1900↔1710 · MomentsModalSheet medium/large; nav/ime; mute widthInsensitive; list 16; context menu offset; like scale; send shadow |
 | 503 | `Moments/Moments/Views/story/QuestionResponsesView.swift` | `views/story/QuestionResponsesView.kt` | [x] sheet medium/large; chrome glass; list+detalle+creator; avatar→perfil |
 | 1018 ⚠️ | `Moments/Moments/Views/story/StoriesView.swift` | `views/story/StoriesView.kt` | [x] 1018↔~1050 · NavigateToChainStory+loadChain; pauseAllVideos; ring vacío→following; unseen/error; updateUserIds c/ad |
 | 635 | `Moments/Moments/Views/story/StoryChainView.swift` | `views/story/StoryChainView.kt` | [x] sheet+grid+stats+continue≡ContinueStoryChain; errores tipados; chrome; ItemView legacy N/A |
@@ -1053,7 +1077,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | Líneas | Archivo iOS | Android (.kt) | Paridad |
 |-------:|-------------|---------------|:-------:|
 | 46 | `Moments/Moments/Models/AccountHistoryItem.swift` | `models/AccountHistoryItem.kt` | [x] 46↔56 |
-| 683 | `Moments/Moments/Models/BestFriendsView.swift` | `models/BestFriendsView.kt` | [~] 683↔626 · selected/suggested+pagination; chrome search; skeleton/empty; IDs following/followers |
+| 683 | `Moments/Moments/Models/BestFriendsView.swift` | `models/BestFriendsView.kt` | [x] 683↔575 · selected/suggested+search+pagination snapshotFlow; following/followers |
 | 66 | `Moments/Moments/Models/Cache/CachedAction.swift` | `models/cache/CachedAction.kt` | [x] 66↔83 |
 | 19 | `Moments/Moments/Models/Cache/CachedConnection.swift` | `models/cache/CachedConnection.kt` | [x] 19↔17 |
 | 166 | `Moments/Moments/Models/Cache/CachedConversation.swift` | `models/cache/CachedConversation.kt` | [x] 166↔195 |
@@ -1072,7 +1096,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 677 | `Moments/Moments/Models/User.swift` | `models/User.kt` | [x] 677↔269 |
 | 39 | `Moments/Moments/Models/UserAffinity.swift` | `models/UserAffinity.kt` | [x] 39↔24 |
 | 306 | `Moments/Moments/Models/UserBadge.swift` | — | 🚫 |
-| 969 | `Moments/Moments/Models/VisitsView.swift` | `models/VisitsView.kt` | [~] 969↔790 · TabContent skeleton/empty; rowSubtitle+justNow; alert; StalkerCard vertical; unfollow confirm |
+| 969 | `Moments/Moments/Models/VisitsView.swift` | `models/VisitsView.kt` | [x] 969↔790 · TabContent skeleton/empty; rowSubtitle+justNow; stalker alert; unfollow confirm |
 
 ## Notifications
 
@@ -1111,13 +1135,13 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 
 | Líneas | Archivo iOS | Android (.kt) | Paridad |
 |-------:|-------------|---------------|:-------:|
-| 1128 ⚠️ | `Moments/Moments/Reportes/AppealFormView.swift` | `reportes/AppealFormView.kt` | [~] |
+| 1128 ⚠️ | `Moments/Moments/Reportes/AppealFormView.swift` | `reportes/AppealFormView.kt` | [x] AppealSheetHeader+glass fields · ModerationReview sheet large |
 | 740 | `Moments/Moments/Reportes/AppealService.swift` | `reportes/AppealService.kt` | [x] 740↔827 |
-| 524 | `Moments/Moments/Reportes/AppealStatus.swift` | `reportes/AppealStatus.kt` | [~] |
-| 299 | `Moments/Moments/Reportes/ModerationReviewStatusView.swift` | `reportes/ModerationReviewStatusView.kt` | [~] |
-| 393 | `Moments/Moments/Reportes/ModernReportContent.swift` | `reportes/ModernReportContent.kt` | [~] |
-| 234 | `Moments/Moments/Reportes/ReportBottomSheet.swift` | `reportes/ReportBottomSheet.kt` | [~] |
-| 221 | `Moments/Moments/Reportes/UserReportContent.swift` | `reportes/UserReportContent.kt` | [~] |
+| 524 | `Moments/Moments/Reportes/AppealStatus.swift` | `reportes/AppealStatus.kt` | [x] AppealStatusHeader glass · cards · detail · momentRefresh |
+| 299 | `Moments/Moments/Reportes/ModerationReviewStatusView.swift` | `reportes/ModerationReviewStatusView.kt` | [x] SettingsNavBar · glass cards · momentRefresh · canvas Adaptive |
+| 393 | `Moments/Moments/Reportes/ModernReportContent.swift` | `reportes/ModernReportContent.kt` | [x] NativeReport* + submit LocalPersistence · AdaptiveColors |
+| 234 | `Moments/Moments/Reportes/ReportBottomSheet.swift` | `reportes/ReportBottomSheet.kt` | [x] MomentsModalSheet medium/large · routes User/Moment/Story |
+| 221 | `Moments/Moments/Reportes/UserReportContent.swift` | `reportes/UserReportContent.kt` | [x] reasons+submit · shared NativeReport* |
 
 ## ad
 
@@ -1126,9 +1150,9 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | Líneas | Archivo iOS | Android (.kt) | Paridad |
 |-------:|-------------|---------------|:-------:|
 | 64 | `Moments/Moments/ad/AdAspectRatioContext.swift` | `ad/AdAspectRatioContext.kt` | [x] 64↔30 |
-| 474 | `Moments/Moments/ad/AdMob Configuration.swift` | `ad/AdMobConfiguration.kt` | [~] |
-| 604 | `Moments/Moments/ad/FeedNativeAd.swift` | `ad/FeedNativeAd.kt` | [~] |
-| 1479 ⚠️ | `Moments/Moments/ad/StoryNativeAd.swift` | `ad/StoryNativeAd.kt` | [~] |
+| 474 | `Moments/Moments/ad/AdMob Configuration.swift` | `ad/AdMobConfiguration.kt` | [x] 474↔394 · UMP+ATT N/A; createNativeAdOptions; Plus=`isPlusSubscriber` |
+| 604 | `Moments/Moments/ad/FeedNativeAd.swift` | `ad/FeedNativeAd.kt` | [x] 604↔557 · Smart/Clean/Integrated+Media; tracking primer; Ahora no |
+| 1479 ⚠️ | `Moments/Moments/ad/StoryNativeAd.swift` | `ad/StoryNativeAd.kt` | [x] 1479↔1090 · viewer+manager+chrome; IntegratedStoryAd orphan no usado |
 
 ## Moderation
 
@@ -1149,7 +1173,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 46 | `Moments/Moments/Coordinators/LegacyNavigationBridge.swift` | `coordinators/LegacyNavigationBridge.kt` | [x] 46↔58 |
 | 32 | `Moments/Moments/Coordinators/MainViewModel.swift` | `coordinators/MainViewModel.kt` | [x] 32↔63 |
 | 407 | `Moments/Moments/Coordinators/SharedComponents.swift` | `coordinators/SharedComponents.kt` | [x] 407↔427 |
-| 768 | `Moments/Moments/Coordinators/TabBarView.swift` | `coordinators/TabBarView.kt` | [~] |
+| 768 | `Moments/Moments/Coordinators/TabBarView.swift` | `coordinators/TabBarView.kt` | [x] 768↔782 · AppTab+create+badges+scrollTop; deep links; Δ iOS26 Tab N/A |
 
 ## GlowsyWidgetExtension
 
@@ -1157,13 +1181,13 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 
 | Líneas | Archivo iOS | Android (.kt) | Paridad |
 |-------:|-------------|---------------|:-------:|
-| 18 | `Moments/GlowsyWidgetExtension/AppIntent.swift` | — | [ ] |
-| 492 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtension.swift` | — | [ ] |
-| 22 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtensionBundle.swift` | — | [ ] |
-| 74 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtensionControl.swift` | — | [ ] |
+| 18 | `Moments/GlowsyWidgetExtension/AppIntent.swift` | — | 🚫 | emoji config ejemplo sin uso |
+| 492 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtension.swift` | `widget/MomentsWidget*.kt` | [x] 492↔~350 · small+medium+prefs+events+deep links |
+| 22 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtensionBundle.swift` | Manifest receiver | [x] 22↔manifest · registration |
+| 74 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtensionControl.swift` | — | 🚫 | Control Center iOS 18 |
 | 471 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtensionLiveActivity.swift` | — | 🚫 |
 | 201 | `Moments/GlowsyWidgetExtension/IncognitoLiveActivity.swift` | — | 🚫 |
-| 37 | `Moments/GlowsyWidgetExtension/WidgetColor+Hex.swift` | — | [ ] |
+| 37 | `Moments/GlowsyWidgetExtension/WidgetColor+Hex.swift` | `res/values/widget_colors.xml` | [x] 37↔brand colors |
 
 ## Utilities
 
@@ -1248,13 +1272,13 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 
 | Líneas | Archivo iOS | Paridad |
 |-------:|-------------|:-------:|
-| 18 | `Moments/GlowsyWidgetExtension/AppIntent.swift` | [ ] |
-| 492 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtension.swift` | [ ] |
-| 22 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtensionBundle.swift` | [ ] |
-| 74 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtensionControl.swift` | [ ] |
+| 18 | `Moments/GlowsyWidgetExtension/AppIntent.swift` | 🚫 |
+| 492 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtension.swift` | [x] 492↔~350 |
+| 22 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtensionBundle.swift` | [x] manifest |
+| 74 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtensionControl.swift` | 🚫 |
 | 471 | `Moments/GlowsyWidgetExtension/GlowsyWidgetExtensionLiveActivity.swift` | 🚫 |
 | 201 | `Moments/GlowsyWidgetExtension/IncognitoLiveActivity.swift` | 🚫 |
-| 37 | `Moments/GlowsyWidgetExtension/WidgetColor+Hex.swift` | [ ] |
+| 37 | `Moments/GlowsyWidgetExtension/WidgetColor+Hex.swift` | [x] widget_colors |
 | 48 | `Moments/Moments/Activities/LiveActivityThumbnailStore.swift` | [x] 48↔57 |
 | 39 | `Moments/Moments/Activities/MomentUploadActivityAttributes.swift` | [x] 39↔27 |
 | 37 | `Moments/Moments/Activities/StoryUploadActivityAttributes.swift` | [x] 37↔26 |
@@ -1262,14 +1286,14 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 46 | `Moments/Moments/Coordinators/LegacyNavigationBridge.swift` | [x] 46↔58 |
 | 32 | `Moments/Moments/Coordinators/MainViewModel.swift` | [x] 32↔63 |
 | 407 | `Moments/Moments/Coordinators/SharedComponents.swift` | [x] 407↔427 |
-| 768 | `Moments/Moments/Coordinators/TabBarView.swift` | [~] |
+| 768 | `Moments/Moments/Coordinators/TabBarView.swift` | [x] 768↔782 · AppTab+create+badges+scrollTop; deep links |
 | 1 | `Moments/Moments/Extensions/AVAssetImageGenerator+Thumbnail.swift` | [x] 1↔91 |
 | 79 | `Moments/Moments/Extensions/Color+Hex.swift` | [x] 79↔74 |
 | 8 | `Moments/Moments/Extensions/Date+Extensions.swift` | [x] 8↔10 |
 | 90 | `Moments/Moments/Extensions/InterestEmojiHelper.swift` | [x] 90↔103 |
 | 500 | `Moments/Moments/Extensions/View+LiquidGlass.swift` | [x] 500↔360 |
 | 46 | `Moments/Moments/Models/AccountHistoryItem.swift` | [x] 46↔56 |
-| 683 | `Moments/Moments/Models/BestFriendsView.swift` | [~] 683↔626 |
+| 683 | `Moments/Moments/Models/BestFriendsView.swift` | [x] 683↔575 · selected/suggested+search+pagination snapshotFlow |
 | 66 | `Moments/Moments/Models/Cache/CachedAction.swift` | [x] 66↔83 |
 | 19 | `Moments/Moments/Models/Cache/CachedConnection.swift` | [x] 19↔17 |
 | 166 | `Moments/Moments/Models/Cache/CachedConversation.swift` | [x] 166↔195 |
@@ -1288,7 +1312,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 677 | `Moments/Moments/Models/User.swift` | [x] 677↔269 |
 | 39 | `Moments/Moments/Models/UserAffinity.swift` | [x] 39↔24 |
 | 306 | `Moments/Moments/Models/UserBadge.swift` | 🚫 |
-| 969 | `Moments/Moments/Models/VisitsView.swift` | [~] 969↔790 |
+| 969 | `Moments/Moments/Models/VisitsView.swift` | [x] 969↔790 · TabContent+rowSubtitle+stalker+unfollow |
 | 512 | `Moments/Moments/Moderation/CommentsModerationService.swift` | [x] 512↔426 |
 | 1972 ⚠️ | `Moments/Moments/Moderation/MediaModerationService.swift` | [x] 1972↔972 |
 | 211 | `Moments/Moments/MomentsApp.swift` | [x] 211↔258 |
@@ -1316,13 +1340,13 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 32 | `Moments/Moments/Notifications/Services/NotificationOpenIntentStore.swift` | [x] 32↔31 |
 | 350 | `Moments/Moments/Notifications/Services/NotificationPresentationCoordinator.swift` | [x] 350↔290 |
 | 633 | `Moments/Moments/Notifications/Services/Notificationservice.swift` | [x] 633↔538 |
-| 1128 ⚠️ | `Moments/Moments/Reportes/AppealFormView.swift` | [~] |
+| 1128 ⚠️ | `Moments/Moments/Reportes/AppealFormView.swift` | [x] AppealSheetHeader+glass fields · ModerationReview sheet large |
 | 740 | `Moments/Moments/Reportes/AppealService.swift` | [x] 740↔827 |
-| 524 | `Moments/Moments/Reportes/AppealStatus.swift` | [~] |
-| 299 | `Moments/Moments/Reportes/ModerationReviewStatusView.swift` | [~] |
-| 393 | `Moments/Moments/Reportes/ModernReportContent.swift` | [~] |
-| 234 | `Moments/Moments/Reportes/ReportBottomSheet.swift` | [~] |
-| 221 | `Moments/Moments/Reportes/UserReportContent.swift` | [~] |
+| 524 | `Moments/Moments/Reportes/AppealStatus.swift` | [x] AppealStatusHeader glass · cards · detail · momentRefresh |
+| 299 | `Moments/Moments/Reportes/ModerationReviewStatusView.swift` | [x] SettingsNavBar · glass cards · momentRefresh · canvas Adaptive |
+| 393 | `Moments/Moments/Reportes/ModernReportContent.swift` | [x] NativeReport* + submit LocalPersistence · AdaptiveColors |
+| 234 | `Moments/Moments/Reportes/ReportBottomSheet.swift` | [x] MomentsModalSheet medium/large · routes User/Moment/Story |
+| 221 | `Moments/Moments/Reportes/UserReportContent.swift` | [x] reasons+submit · shared NativeReport* |
 | 222 | `Moments/Moments/Services/Activity/TimeSpentManager.swift` | [x] 222↔279 |
 | 2571 ⚠️ | `Moments/Moments/Services/Auth/AuthService.swift` | [x] 2571↔1635 |
 | 543 | `Moments/Moments/Services/Auth/LoginActivityService.swift` | [x] 543↔412 |
@@ -1585,7 +1609,7 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 838 | `Moments/Moments/Views/Messaging/Components/ChatMessageBubbleViews.swift` | [x] 838↔669 · row swipe/chrome+AttachBubbleBadges; texto sin double overlay; link preview; Δ≈LPLink |
 | 28 | `Moments/Moments/Views/Messaging/Components/ChatMessageForwardSheet.swift` | [x] 28↔151 |
 | 379 | `Moments/Moments/Views/Messaging/Components/ChatMessageInteractionModifiers.swift` | [x] 379↔414 · pan scroll-friendly+spring return+haptics+longPress 0.42+wrapContentHeight |
-| 1708 ⚠️ | `Moments/Moments/Views/Messaging/Components/ChatMessageListView.swift` | [~] · contrato apply/normalize/scroll/force/pending/suppress+frames; sin UIKit vanish/heightCache |
+| 1695 ⚠️ | `Moments/Moments/Views/Messaging/Components/ChatMessageListView.swift` | [x] 1695↔709 · apply/normalize/scroll/pending+spacing2; distanceBottom px; Δ UIKit heightCache N/A |
 | 535 | `Moments/Moments/Views/Messaging/Components/ChatMessageOptionsMenu.swift` | [x] 535↔544 · anchor window→local+safeArea+press chrome+haptic menu+cornerRadius+star.slash≈StarBorder |
 | 882 | `Moments/Moments/Views/Messaging/Components/ChatMessageSupportViews.swift` | [x] 882↔693 · reply/quote/reactions+cutout Clear+star+timestamp; status twin checks; clusterHitTargetInset |
 | 781 | `Moments/Moments/Views/Messaging/Components/ChatRecoveryViews.swift` | [x] 781↔800 · gate/create/restore/settings+PIN 48×60+lockout; material→sólido; change PIN MomentsModalSheet; lock gradient+press |
@@ -1599,32 +1623,32 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 186 | `Moments/Moments/Views/Messaging/Components/MessagingComposerAndStatusViews.swift` | [x] 186↔357 · sheet style+composer canvas |
 | 287 | `Moments/Moments/Views/Messaging/Components/ViewOnceMessageBubble.swift` | [x] 287↔268 · pills+progress; estado desde message; zoom matchedTransition stub |
 | 1121 ✅ | `Moments/Moments/Views/Messaging/Components/VoiceNotes.swift` | [x] · recorder/compose/trim+audio bubble scrub/speed/shape+proximidad auricular |
-| 535 | `Moments/Moments/Views/Messaging/Components/VoiceRecordingGestureViews.swift` | [~] · fases hold/lock/cancel+follow goma+ticks+chrome; aura dual; VoiceBlob/AuroraMesh→brush stub |
-| 520 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Voice.swift` | [~] · hold-to-record wired |
+| 535 | `Moments/Moments/Views/Messaging/Components/VoiceRecordingGestureViews.swift` | [x] 535↔779 · TG Android lock57/cancel140+BlobDrawable; iOS↔TG iOS / Android↔TG Android |
+| 520 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Voice.swift` | [x] 520↔241 · hold/lock/trim/send+unread dismiss; Δ screenshot/reconfigure N/A |
 | 3520 ⚠️ | `Moments/Moments/Views/Messaging/Core/ChatViewModel.swift` | [x] 3520↔2284 |
 | 49 | `Moments/Moments/Views/Messaging/Core/MessageItem.swift` | [x] 49↔67 |
 | 2514 ⚠️ | `Moments/Moments/Views/Messaging/Core/MessageModel.swift` | [x] 2514↔1327 |
 | 856 | `Moments/Moments/Views/Messaging/Core/MessagingViewModel.swift` | [x] 856↔727 |
-| 1845 ⚠️ | `Moments/Moments/Views/Messaging/Media/CameraPickerView.swift` | [~] · huérfano; path chat = ChatCameraView |
+| 1845 ⚠️ | `Moments/Moments/Views/Messaging/Media/CameraPickerView.swift` | [x] 1845↔224 · huérfano; path chat = ChatCameraView |
 | 460 | `Moments/Moments/Views/Messaging/Media/ChatCameraView.swift` | [x] 460↔534 · BackHandler+gallery thumb+recording pill+haptic+aspectRatio |
 | 71 | `Moments/Moments/Views/Messaging/Media/ChatMediaOverlayPayload.swift` | [x] 71↔60 |
 | 37 | `Moments/Moments/Views/Messaging/Media/ChatMediaSendMode.swift` | [x] 37↔27 |
 | 613 | `Moments/Moments/Views/Messaging/Media/ViewOnceImmersiveViewer.swift` | [x] 613↔669 · canvas+chrome+emoji sheet+consume/replay; FIT_WITH_BLUR; Δ≈blur vídeo muted |
 | 151 | `Moments/Moments/Views/Messaging/Models/ChatAttachmentAssets.swift` | [x] 151↔170 |
 | 146 | `Moments/Moments/Views/Messaging/Screens/ArchivedConversationsView.swift` | [x] · empty+GlassmorphicRow+menu+auto-dismiss |
-| 142 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Clustering.swift` | [~] |
+| 142 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Clustering.swift` | [x] 142↔120 · jump/highlight/buzz; moment+story nav |
 | 1006 ⚠️ | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+ComposerAndChrome.swift` | [x] 1006↔718 · plus/buzz/shake+media FS+report+cluster reply picker+gallery |
-| 209 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Lifecycle.swift` | [~] · markViewed+openCamera delay+view-once wiring |
-| 361 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+MessageList.swift` | [~] · rows+CompositionLocal search highlight |
-| 262 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+MessageRendering.swift` | [~] |
-| 450 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Scroll.swift` | [~] |
-| 107 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Search.swift` | [~] · sync+canGoUp/Down |
-| 251 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Toolbar.swift` | [~] · presence+stories+search chrome |
-| 88 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+ViewModelAudio.swift` | [~] |
-| 520 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Voice.swift` | [~] · hold-to-record wired |
-| 725 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView.swift` | [~] · shell+scroll; search highlight; pending request ops |
-| 435 | `Moments/Moments/Views/Messaging/Screens/Chat/MomentsChatViewModel+Media.swift` | [~] |
-| 2816 ⚠️ | `Moments/Moments/Views/Messaging/Screens/ConversationSettingsView.swift` | [~] 2816↔~2065 · hydrate+prefs+links+footer+video controls |
+| 209 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Lifecycle.swift` | [x] 209↔311 · online+camera 0.35+view-once; unavailable clears ring |
+| 361 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+MessageList.swift` | [x] 361↔251 · rows+notice+search highlight; Δ reconfigureVisible N/A |
+| 262 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+MessageRendering.swift` | [x] 262↔288 · rows+reply/edit; retry Local; pulse reaction |
+| 450 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Scroll.swift` | [x] 450↔301 · pin/history/jump; Δ UIKit self-sizing N/A |
+| 107 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Search.swift` | [x] 107↔140 · toggle/sync/advance/canGoUpDown |
+| 251 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Toolbar.swift` | [x] 251↔326 · chrome back; AsyncProfileImageView; presence icons; search cancel |
+| 88 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+ViewModelAudio.swift` | [x] 88↔87 · sync+session; draft ensure |
+| 520 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView+Voice.swift` | [x] 520↔241 · hold/lock/trim/send+unread dismiss; Δ screenshot/reconfigure N/A |
+| 725 | `Moments/Moments/Views/Messaging/Screens/Chat/GlassmorphicChatView.swift` | [x] 725↔1257 · shell+enrich/intro+draftKey+unread Column; search Local; pending ops; Δ zoom N/A |
+| 435 | `Moments/Moments/Views/Messaging/Screens/Chat/MomentsChatViewModel+Media.swift` | [x] 435↔252 · viewOnce/gif/sticker/location+vanish; image/audio en ChatViewModel |
+| 2816 ⚠️ | `Moments/Moments/Views/Messaging/Screens/ConversationSettingsView.swift` | [x] 2816↔2122 · prefs+media FS+vanish sync sesión/event; FullScreen video |
 | 254 | `Moments/Moments/Views/Messaging/Screens/MessageRequestsView.swift` | [x] · lista+empty+actions+open pending chat |
 | 1864 ⚠️ | `Moments/Moments/Views/Messaging/Screens/MessagingView.swift` | [x] · toolbar+search+merged list+row+menu+destinations+pending chat |
 | 90 | `Moments/Moments/Views/Messaging/Services/ChatAccessCoordinator.swift` | [x] 90↔125 |
@@ -1685,20 +1709,20 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 478 | `Moments/Moments/Views/Nova/Tools/NovaProfileTools.swift` | [x] 478↔384 · snapshots+social+privacy+moments/stories/echo ≡iOS |
 | 164 | `Moments/Moments/Views/Nova/Tools/NovaSocialTools.swift` | [x] 164↔161 · lists count≡payload; create_moment audienceSettingRaw |
 | 103 | `Moments/Moments/Views/Nova/UI/NovaActionConfirmationOverlay.swift` | [x] 103↔164 · scrim+glass card/buttons+preview stroke |
-| 21 | `Moments/Moments/Views/Permission/camera/Contentview.swift` | [~] |
-| 318 | `Moments/Moments/Views/Permission/camera/helpers/CameraPermissionsview.swift` | [~] |
-| 182 | `Moments/Moments/Views/Permission/location/LocationPermissionView.swift` | [~] |
-| 134 | `Moments/Moments/Views/Permission/microphone/MicrophonePermissionView.swift` | [~] |
-| 215 | `Moments/Moments/Views/Permission/notifications/NotificationsPermissionView.swift` | [~] |
-| 99 | `Moments/Moments/Views/Permission/photos/PhotosPermissionView.swift` | [~] |
-| 153 | `Moments/Moments/Views/Permission/shared/LocationPermissionGate.swift` | [~] |
-| 165 | `Moments/Moments/Views/Permission/shared/PermissionPhoneFrame.swift` | [~] |
-| 17 | `Moments/Moments/Views/Permission/shared/PermissionPhoneWallpaper.swift` | [~] |
-| 167 | `Moments/Moments/Views/Permission/shared/PermissionPrimerGate.swift` | [~] |
-| 147 | `Moments/Moments/Views/Permission/shared/PermissionPrimerScaffold.swift` | [~] |
-| 148 | `Moments/Moments/Views/Permission/tracking/TrackingPermissionView.swift` | [~] |
+| 21 | `Moments/Moments/Views/Permission/camera/Contentview.swift` | [x] preview stub → CameraPermissionsView+pic1 |
+| 318 | `Moments/Moments/Views/Permission/camera/helpers/CameraPermissionsview.swift` | [x] PermissionPhoneFrame Android · sway+shutter+green dot |
+| 182 | `Moments/Moments/Views/Permission/location/LocationPermissionView.swift` | [x] phone sway · map pan sin/cos · pin/puck pulse |
+| 134 | `Moments/Moments/Views/Permission/microphone/MicrophonePermissionView.swift` | [x] waves 2.4s+gradient · mic 0.22w · orange privacy dot |
+| 215 | `Moments/Moments/Views/Permission/notifications/NotificationsPermissionView.swift` | [x] lock clock+banner keyframes · chrome glass card |
+| 99 | `Moments/Moments/Views/Permission/photos/PhotosPermissionView.swift` | [x] mosaic scroll+denied blur · frame Android |
+| 153 | `Moments/Moments/Views/Permission/shared/LocationPermissionGate.swift` | [x] 153↔274 · whenInUse→Always 2-step · decline Always=foreground OK · Dialog cover |
+| 165 | `Moments/Moments/Views/Permission/shared/PermissionPhoneFrame.swift` | [x] chasis Android punch-hole+pill · motion keyframes≡iOS |
+| 17 | `Moments/Moments/Views/Permission/shared/PermissionPhoneWallpaper.swift` | [x] permission_wallpaper |
+| 167 | `Moments/Moments/Views/Permission/shared/PermissionPrimerGate.swift` | [x] 167↔234 · State 3-way · finish · fullScreen Dialog · Feed 20s solo notDetermined |
+| 147 | `Moments/Moments/Views/Permission/shared/PermissionPrimerScaffold.swift` | [x] 147↔266 · canvas Adaptive · accent keyframes 2.5s · denied ColorMatrix · tint accent |
+| 148 | `Moments/Moments/Views/Permission/tracking/TrackingPermissionView.swift` | [x] 148↔267 · 5 cards×2 · loop 9s · sin secondary · frame Android |
 | 106 | `Moments/Moments/Views/Permissions/CameraAccessBoundary.swift` | [x] 106↔160 · primer/denied prefs; mic+cam→Settings; ON_RESUME |
-| 111 | `Moments/Moments/Views/Permissions/CameraPermissionGate.swift` | [~] |
+| 111 | `Moments/Moments/Views/Permissions/CameraPermissionGate.swift` | [x] primer/denied+prefs · fullScreen Dialog ≡ cover |
 | 78 | `Moments/Moments/Views/Profile/Core/MomentGridPreview.swift` | [x] 78↔93 |
 | 637 | `Moments/Moments/Views/Profile/Core/ProfileView.swift` | [x] 637↔616 |
 | 857 | `Moments/Moments/Views/Profile/Core/ProfileViewModel.swift` | [x] 857↔566 |
@@ -1795,9 +1819,9 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 214 | `Moments/Moments/Views/Shared/OfflineBannerModifier.swift` | [x] 214↔208 |
 | 74 | `Moments/Moments/Views/Shared/PhotoTagOverlayView.swift` | [x] 74↔134 |
 | 175 | `Moments/Moments/Views/Shared/ScreenshotProtectedView.swift` | [x] |
-| 227 | `Moments/Moments/Views/comments/CommentMentionSearchOverlay.swift` | [~] chrome glass |
+| 227 | `Moments/Moments/Views/comments/CommentMentionSearchOverlay.swift` | [x] 227↔~280 |
 | 429 | `Moments/Moments/Views/comments/CommentsView.swift` | [N/A] dead · usar ModernCommentsView |
-| 1900 ⚠️ | `Moments/Moments/Views/comments/ModernCommentsView.swift` | [~] sheet nav+ime; composer 1…4+send scale; QA restante |
+| 1900 ⚠️ | `Moments/Moments/Views/comments/ModernCommentsView.swift` | [x] 1900↔1710 · MomentsModalSheet; mute/list/menu/scale |
 | 503 | `Moments/Moments/Views/story/QuestionResponsesView.swift` | [x] |
 | 1018 ⚠️ | `Moments/Moments/Views/story/StoriesView.swift` | [x] · NavigateToChainStory+loadChain; pauseAllVideos; ring/following |
 | 635 | `Moments/Moments/Views/story/StoryChainView.swift` | [x] |
@@ -1826,9 +1850,9 @@ En Android, un registro vía **Google** (el substituto de Apple) **se salta ese 
 | 2381 ⚠️ | `Moments/Moments/Views/story/StoryViewer/StoryViewerScreen.swift` | [x] |
 | 1831 ⚠️ | `Moments/Moments/Views/story/archived stories.swift` | [x] · card+viewer+StoryStatsView+calendar+map |
 | 64 | `Moments/Moments/ad/AdAspectRatioContext.swift` | [x] 64↔30 |
-| 474 | `Moments/Moments/ad/AdMob Configuration.swift` | [~] |
-| 604 | `Moments/Moments/ad/FeedNativeAd.swift` | [~] |
-| 1479 ⚠️ | `Moments/Moments/ad/StoryNativeAd.swift` | [~] |
+| 474 | `Moments/Moments/ad/AdMob Configuration.swift` | [x] 474↔394 · UMP+ATT N/A; createNativeAdOptions; Plus=`isPlusSubscriber` |
+| 604 | `Moments/Moments/ad/FeedNativeAd.swift` | [x] 604↔557 · Smart/Clean/Integrated+Media; tracking primer; Ahora no |
+| 1479 ⚠️ | `Moments/Moments/ad/StoryNativeAd.swift` | [x] 1479↔1090 · viewer+manager+chrome; IntegratedStoryAd orphan no usado |
 | 812 | `Moments/MomentsNotificationService/NotificationService.swift` | [x] 812↔405 |
 | 144 | `Moments/MomentsNotificationService/SharedChatDecryptor.swift` | [x] 144↔90 |
 | 137 | `Moments/Shared/ChatCommunicationIntentDonor.swift` | [x] 137↔211 |

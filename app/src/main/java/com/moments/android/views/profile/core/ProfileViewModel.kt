@@ -33,6 +33,8 @@ import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.profile.core.sections.ProfileAvatarNoteMetrics
+import com.moments.android.widget.MomentsWidgetStore
+import java.util.Calendar
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -194,7 +196,26 @@ class ProfileViewModel(
             groupedVisits = grouped
             visits = grouped.map { it.user }
             visitTimestamps = grouped.associate { it.user.id to it.visits.map { visit -> visit.timestamp } }
-            // WidgetCenter / App Group iOS → no portado en Android.
+            val cal = Calendar.getInstance()
+            val todayStart = cal.apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.time
+            val todayCount = grouped.sumOf { group ->
+                group.visits.count { visit ->
+                    val day = Calendar.getInstance().apply {
+                        time = visit.timestamp
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }.time
+                    day == todayStart
+                }
+            }
+            MomentsWidgetStore.putInt(MomentsWidgetStore.KEY_PROFILE_VISITS_TODAY, todayCount)
         } finally {
             isLoadingVisits = false
         }

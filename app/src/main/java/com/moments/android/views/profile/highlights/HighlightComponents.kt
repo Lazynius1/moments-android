@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -73,7 +74,7 @@ fun HighlightStoryGrid(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            CircularProgressIndicator()
+            MomentsCircularProgressIndicator()
             Text(stringResource(R.string.common_loading), color = highlightSecondary(), fontSize = 14.sp)
         }
         isEmpty -> Column(

@@ -3,11 +3,9 @@ package com.moments.android.views.creator.creatorscreens
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.location.Address
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,7 +31,6 @@ import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsSubway
 import androidx.compose.material.icons.filled.Hotel
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.LocalLibrary
 import androidx.compose.material.icons.filled.LocalPharmacy
@@ -46,6 +43,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -70,38 +68,45 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberMarkerState
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.shape.CircleShape
+import com.mapbox.geojson.Point
+import com.mapbox.maps.ViewAnnotationAnchor
+import com.mapbox.maps.extension.compose.MapboxMap
+import com.mapbox.maps.extension.compose.animation.viewport.rememberMapViewportState
+import com.mapbox.maps.extension.compose.annotation.ViewAnnotation
+import com.mapbox.maps.extension.compose.rememberMapState
+import com.mapbox.maps.plugin.gestures.generated.GesturesSettings
+import com.mapbox.maps.viewannotation.annotationAnchor
+import com.mapbox.maps.viewannotation.geometry
+import com.mapbox.maps.viewannotation.viewAnnotationOptions
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.Moment
 import com.moments.android.views.feed.maps.FeedMaps
+import com.moments.android.views.feed.maps.MapRegionStore
+import com.moments.android.views.feed.maps.MomentsMapStyle
+import com.moments.android.views.feed.maps.MomentsMapboxStandardStyle
+import com.moments.android.views.feed.maps.MomentsPlacesSearch
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.shared.MomentsSheetHeader
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.permission.shared.LocationPermissionGate
 import com.moments.android.views.permission.shared.LocationPermissionGateHost
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-private val DefaultCenter = LatLng(41.3874, 2.1686) // Barcelona ≡ iOS
-private const val MapZoom = 13.5f // ≈ span 0.05
+/** Barcelona ≡ iOS default region center. */
+private const val DefaultCenterLat = 41.3874
+private const val DefaultCenterLng = 2.1686
 
 /**
  * Port de `LocationPickerView.swift`.
- * MapKit → Google Maps Compose si hay key; Geocoder ≈ MKLocalSearch.
+ * MapKit → Mapbox; Places API ≡ MKLocalSearch.
  */
 @Composable
 fun LocationPickerView(
@@ -126,7 +131,8 @@ fun LocationPickerView(
     var locationError by remember { mutableStateOf<String?>(null) }
     var mapCenter by remember {
         mutableStateOf(
-            selectedLocation?.let { LatLng(it.latitude, it.longitude) } ?: DefaultCenter,
+            selectedLocation?.let { it.latitude to it.longitude }
+                ?: (DefaultCenterLat to DefaultCenterLng),
         )
     }
     var hasPermission by remember { mutableStateOf(hasLocationPermission(context)) }
@@ -162,7 +168,7 @@ fun LocationPickerView(
     fun commitSelection(coord: Moment.LocationCoordinate, name: String) {
         onSelectedLocationChange(coord)
         onLocationNameChange(name)
-        mapCenter = LatLng(coord.latitude, coord.longitude)
+        mapCenter = coord.latitude to coord.longitude
     }
 
     fun loadNearby() {
@@ -170,7 +176,7 @@ fun LocationPickerView(
             val center = withContext(Dispatchers.IO) {
                 lastKnownLocation(context)?.let { it.latitude to it.longitude }
                     ?: selectedLocation?.let { it.latitude to it.longitude }
-                    ?: (mapCenter.latitude to mapCenter.longitude)
+                    ?: (mapCenter.first to mapCenter.second)
             }
             nearbyPlaces = withContext(Dispatchers.IO) {
                 loadNearbyPlaces(context, center.first, center.second, nearbyQueries, categoryPlace)
@@ -191,7 +197,7 @@ fun LocationPickerView(
                 if (alsoSelectIfEmpty || selectedLocation == null) {
                     commitSelection(coord, name)
                 } else {
-                    mapCenter = LatLng(loc.latitude, loc.longitude)
+                    mapCenter = loc.latitude to loc.longitude
                 }
                 loadNearby()
             }
@@ -230,18 +236,25 @@ fun LocationPickerView(
             showingNearbyPlaces = false
             val origin = withContext(Dispatchers.IO) {
                 lastKnownLocation(context)?.let { it.latitude to it.longitude }
-                    ?: (mapCenter.latitude to mapCenter.longitude)
+                    ?: (mapCenter.first to mapCenter.second)
             }
             searchResults = withContext(Dispatchers.IO) {
-                geocodeSearch(
+                MomentsPlacesSearch.searchByText(
                     context = context,
                     query = searchText,
-                    originLat = origin.first,
-                    originLng = origin.second,
-                    halfSpanDegrees = 0.05,
+                    latitude = origin.first,
+                    longitude = origin.second,
                     maxResults = 20,
-                    defaultCategoryLabel = categoryPlace,
-                )
+                ).map { hit ->
+                    PlaceHit(
+                        name = hit.name,
+                        subtitle = hit.address.orEmpty(),
+                        lat = hit.latitude,
+                        lng = hit.longitude,
+                        categoryKey = hit.category,
+                        categoryLabel = categoryPlace,
+                    )
+                }
             }
             isSearching = false
         }
@@ -264,37 +277,20 @@ fun LocationPickerView(
 
     Box(modifier.fillMaxSize().background(colors.surfaceBackground)) {
         Column(Modifier.fillMaxSize()) {
-            // Toolbar ≡ NavigationStack toolbar
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    Icons.Filled.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = colors.primary,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clickable(onClick = onDismiss),
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    stringResource(R.string.creator_add_location),
-                    color = colors.primary,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 17.sp,
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    stringResource(R.string.creator_tag_done),
-                    color = if (selectedLocation != null) colors.primary else colors.secondary.copy(alpha = 0.4f),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
-                    modifier = Modifier.clickable(enabled = selectedLocation != null, onClick = onDismiss),
-                )
-            }
+            // Sheet Android: sin chevron (dismiss = handle); título pegado + Done trailing
+            MomentsSheetHeader(
+                title = stringResource(R.string.creator_add_location),
+                titleSize = 17.sp,
+                trailing = {
+                    Text(
+                        stringResource(R.string.creator_tag_done),
+                        color = if (selectedLocation != null) colors.primary else colors.secondary.copy(alpha = 0.4f),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp,
+                        modifier = Modifier.clickable(enabled = selectedLocation != null, onClick = onDismiss),
+                    )
+                },
+            )
 
             // Search bar
             Row(
@@ -345,12 +341,13 @@ fun LocationPickerView(
 
             Spacer(Modifier.height(12.dp))
 
-            // Map ≡ MapKit 200pt
+            // Map ≡ MapKit 200pt → Mapbox
             LocationPickerMap(
-                center = mapCenter,
+                centerLat = mapCenter.first,
+                centerLng = mapCenter.second,
                 selected = selectedLocation,
                 markerTitle = locationName.ifBlank { stringResource(R.string.creator_location_selected) },
-                onCameraMoved = { mapCenter = it },
+                onCameraMoved = { lat, lng -> mapCenter = lat to lng },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp)
@@ -374,10 +371,9 @@ fun LocationPickerView(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     if (isRequestingLocation) {
-                        CircularProgressIndicator(
-                            color = colors.primary,
-                            strokeWidth = 2.dp,
+                        MomentsCircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
                         )
                     } else {
                         AttachmentIconView(
@@ -480,51 +476,87 @@ fun LocationPickerView(
 
 @Composable
 private fun LocationPickerMap(
-    center: LatLng,
+    centerLat: Double,
+    centerLng: Double,
     selected: Moment.LocationCoordinate?,
     markerTitle: String,
-    onCameraMoved: (LatLng) -> Unit,
+    onCameraMoved: (Double, Double) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val hasKey = FeedMaps.hasGoogleMapsKey()
-    if (!hasKey) {
-        Box(
-            modifier.background(Color.Gray.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Filled.Place, null, tint = Color(0xFF007AFF), modifier = Modifier.size(28.dp))
-                Text(markerTitle, color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
-            }
+    val zoom = remember { MapRegionStore.zoomFromLongitudeDelta(0.05) }
+    val mapViewportState = rememberMapViewportState {
+        setCameraOptions {
+            center(Point.fromLngLat(centerLng, centerLat))
+            zoom(zoom)
+            pitch(MomentsMapStyle.CAMERA_PITCH)
+            bearing(0.0)
         }
-        return
+    }
+    val mapState = rememberMapState {
+        gesturesSettings = GesturesSettings {
+            scrollEnabled = true
+            pinchToZoomEnabled = true
+            rotateEnabled = false
+            pitchEnabled = false
+            doubleTapToZoomInEnabled = true
+            doubleTouchToZoomOutEnabled = true
+            quickZoomEnabled = true
+            simultaneousRotateAndPinchToZoomEnabled = false
+        }
     }
 
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(center, MapZoom)
-    }
-    LaunchedEffect(center.latitude, center.longitude) {
-        cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(center, MapZoom))
-        onCameraMoved(center)
-    }
-    val markerLatLng = selected?.let { LatLng(it.latitude, it.longitude) }
-    val markerState = rememberMarkerState(position = markerLatLng ?: center)
-    LaunchedEffect(markerLatLng?.latitude, markerLatLng?.longitude) {
-        markerLatLng?.let { markerState.position = it }
+    LaunchedEffect(centerLat, centerLng) {
+        mapViewportState.setCameraOptions {
+            center(Point.fromLngLat(centerLng, centerLat))
+            zoom(zoom)
+            pitch(MomentsMapStyle.CAMERA_PITCH)
+            bearing(0.0)
+        }
+        onCameraMoved(centerLat, centerLng)
     }
 
-    GoogleMap(
-        cameraPositionState = cameraPositionState,
-        uiSettings = MapUiSettings(
-            compassEnabled = false,
-            mapToolbarEnabled = false,
-            myLocationButtonEnabled = false,
-            zoomControlsEnabled = false,
-        ),
-        modifier = modifier,
-    ) {
-        if (selected != null) {
-            Marker(state = markerState, title = markerTitle)
+    Box(modifier = modifier) {
+        if (FeedMaps.hasMapboxToken()) {
+            MapboxMap(
+                modifier = Modifier.fillMaxSize(),
+                mapViewportState = mapViewportState,
+                mapState = mapState,
+                style = { MomentsMapboxStandardStyle(realisticElevation = false) },
+            ) {
+                // ≡ iOS Marker(selectedLocation)
+                selected?.let { coord ->
+                    ViewAnnotation(
+                        options = viewAnnotationOptions {
+                            geometry(Point.fromLngLat(coord.longitude, coord.latitude))
+                            annotationAnchor { anchor(ViewAnnotationAnchor.BOTTOM) }
+                            allowOverlap(true)
+                        },
+                    ) {
+                        Box {
+                            Icon(
+                                Icons.Filled.Place,
+                                contentDescription = markerTitle,
+                                tint = Color(0xFF007AFF),
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .shadow(3.dp, CircleShape),
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Gray.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Filled.Place, null, tint = Color(0xFF007AFF), modifier = Modifier.size(28.dp))
+                    Text(markerTitle, color = Color.Gray, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+            }
         }
     }
 }
@@ -619,94 +651,38 @@ private fun lastKnownLocation(context: Context): Location? {
     }.maxByOrNull { it.time }
 }
 
-/** ≡ iOS `loadNearbyPlaces` — prefix(5), ≤3/categoría, ≤15 unique. Queries localizadas. */
+/** ≡ iOS `loadNearbyPlaces` — Places (≡ MKLocalSearch POI). */
 private suspend fun loadNearbyPlaces(
     context: Context,
     lat: Double,
     lng: Double,
     queries: List<Pair<String, Pair<String, String>>>,
     defaultCategoryLabel: String,
-): List<PlaceHit> =
-    coroutineScope {
-        val batches = queries.take(5).map { (query, cat) ->
-            async(Dispatchers.IO) {
-                geocodeSearch(
-                    context = context,
-                    query = query,
-                    originLat = lat,
-                    originLng = lng,
-                    halfSpanDegrees = 0.025,
-                    maxResults = 4,
-                    forcedCategory = cat.first,
-                    forcedCategoryLabel = cat.second,
-                    defaultCategoryLabel = defaultCategoryLabel,
-                ).take(3)
-            }
-        }.awaitAll().flatten()
-
-        val seen = linkedSetOf<String>()
-        batches.filter { place ->
-            seen.add("%.5f,%.5f".format(place.lat, place.lng))
-        }.take(15)
-    }
-
-@Suppress("DEPRECATION")
-private fun geocodeSearch(
-    context: Context,
-    query: String,
-    originLat: Double?,
-    originLng: Double?,
-    halfSpanDegrees: Double = 0.05,
-    maxResults: Int = 12,
-    forcedCategory: String? = null,
-    forcedCategoryLabel: String? = null,
-    defaultCategoryLabel: String = "Place",
 ): List<PlaceHit> {
-    if (!Geocoder.isPresent()) return emptyList()
-    val geocoder = Geocoder(context, Locale.getDefault())
-    val addresses = runCatching {
-        if (originLat != null && originLng != null) {
-            val d = halfSpanDegrees
-            geocoder.getFromLocationName(
-                query,
-                maxResults,
-                originLat - d,
-                originLng - d,
-                originLat + d,
-                originLng + d,
-            ) ?: geocoder.getFromLocationName(query, maxResults)
-        } else {
-            geocoder.getFromLocationName(query, maxResults)
-        }
-    }.getOrNull().orEmpty()
-
-    return addresses.mapNotNull { addr ->
-        addressToPlace(addr, forcedCategory, forcedCategoryLabel, defaultCategoryLabel)
-    }.distinctBy { "%.5f,%.5f".format(it.lat, it.lng) }
-}
-
-private fun addressToPlace(
-    addr: Address,
-    forcedCategory: String?,
-    forcedCategoryLabel: String?,
-    defaultCategoryLabel: String,
-): PlaceHit? {
-    val name = addr.featureName?.takeIf { it.isNotBlank() && it != addr.thoroughfare }
-        ?: addr.thoroughfare
-        ?: addr.locality
-        ?: return null
-    val subtitle = listOfNotNull(addr.subLocality, addr.locality, addr.adminArea)
-        .distinct()
-        .joinToString(", ")
-        .ifBlank { addr.getAddressLine(0).orEmpty() }
-    return PlaceHit(
-        name = name,
-        subtitle = subtitle,
-        lat = addr.latitude,
-        lng = addr.longitude,
-        categoryKey = forcedCategory ?: "place",
-        categoryLabel = forcedCategoryLabel ?: defaultCategoryLabel,
+    val categorized = MomentsPlacesSearch.searchNearbyByQueries(
+        context = context,
+        latitude = lat,
+        longitude = lng,
+        queries = queries.take(5).map { (q, cat) -> q to cat.first },
+        perQueryLimit = 3,
+        totalLimit = 15,
     )
+    val hits = categorized.ifEmpty {
+        MomentsPlacesSearch.searchNearby(context, lat, lng, maxResults = 15)
+    }
+    return hits.map { hit ->
+        val matched = queries.firstOrNull { (_, cat) ->
+            hit.category.contains(cat.first, ignoreCase = true)
+        }?.second
+        PlaceHit(
+            name = hit.name,
+            subtitle = hit.address.orEmpty(),
+            lat = hit.latitude,
+            lng = hit.longitude,
+            categoryKey = matched?.first ?: hit.category.ifBlank { "place" },
+            categoryLabel = matched?.second ?: defaultCategoryLabel,
+        )
+    }
 }
 
 /** ≡ iOS `generateCleanLocationName` / reverse geocode. */

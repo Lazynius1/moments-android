@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.extensions.ChromeIconDescription
+import com.moments.android.extensions.MomentsGlassButtonPreset
 import com.moments.android.extensions.ProfileChromeControlsCluster
 import com.moments.android.extensions.ProfileChromeIconButton
 import com.moments.android.extensions.momentsChromeGlass
@@ -91,8 +92,10 @@ fun ProfileVisitorPinnedTopChrome(
         modifier = modifier,
         leading = {
             ProfileChromeIconButton(
-                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                 onClick = onDismiss,
+                preset = MomentsGlassButtonPreset.NAVIGATION_BACK,
+                standaloneGlass = false,
                 contentDescriptionKey = ChromeIconDescription.BACK,
             )
         },

@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.views.creator.CreatorAspectRatio
 import kotlinx.coroutines.Dispatchers
@@ -68,6 +69,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 import kotlin.math.max
+import androidx.compose.foundation.isSystemInDarkTheme
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -115,6 +117,7 @@ fun CropViewWrapper(
     }
 
     Column(modifier.fillMaxSize().background(Color.Black)) {
+        val chromeFg = MomentsChromeGlass.contentColor(isSystemInDarkTheme())
         Row(
             Modifier
                 .fillMaxWidth()
@@ -128,7 +131,7 @@ fun CropViewWrapper(
                     .clickable(enabled = !isSaving, onClick = onCancel),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Close, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Close, null, tint = chromeFg, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.weight(1f))
             Text(
@@ -166,7 +169,7 @@ fun CropViewWrapper(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Icon(Icons.Filled.Check, null, tint = chromeFg, modifier = Modifier.size(18.dp))
             }
         }
 

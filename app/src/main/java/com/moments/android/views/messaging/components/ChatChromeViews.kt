@@ -355,7 +355,18 @@ private fun Modifier.glassmorphicChrome(circle: Boolean): Modifier {
 @Composable
 fun GlassmorphicDateHeader(date: Date, modifier: Modifier = Modifier) {
     val colors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme())
-    Text(MomentsFormat.smartDate(date, MomentsFormat.DateContext.CHAT_SEPARATOR), color = colors.dateHeaderColor, fontSize = 12.sp, modifier = modifier.padding(horizontal = 16.dp, vertical = 6.dp).glassmorphicChat().clip(RoundedCornerShape(50)))
+    // ≡ iOS: dateHeaderColor + glassmorphicChat + Capsule (texto legible en dark).
+    Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Text(
+            MomentsFormat.smartDate(date, MomentsFormat.DateContext.CHAT_SEPARATOR),
+            color = colors.dateHeaderColor,
+            fontSize = 12.sp,
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .momentsChromeGlass(RoundedCornerShape(50), interactive = false)
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+        )
+    }
 }
 
 @Composable
@@ -374,7 +385,20 @@ fun GlassmorphicUnreadDivider(unreadCount: Int = 0, modifier: Modifier = Modifie
 @Composable
 fun GlassmorphicAvatar(userId: String, modifier: Modifier = Modifier) {
     val colors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme())
-    AsyncProfileImageView(userId, modifier.shadow(4.dp, CircleShape, ambientColor = colors.primary.copy(alpha = .1f), spotColor = colors.primary.copy(alpha = .1f)))
+    // ≡ iOS GlassmorphicAvatar → AsyncProfileImageView (KFImage.clipShape(Circle)).
+    // Clip explícito como el toolbar del chat; shadow con clip=false para no pelearse con el círculo.
+    AsyncProfileImageView(
+        userId = userId,
+        modifier = modifier
+            .clip(CircleShape)
+            .shadow(
+                elevation = 4.dp,
+                shape = CircleShape,
+                clip = false,
+                ambientColor = colors.primary.copy(alpha = .1f),
+                spotColor = colors.primary.copy(alpha = .1f),
+            ),
+    )
 }
 
 @Composable

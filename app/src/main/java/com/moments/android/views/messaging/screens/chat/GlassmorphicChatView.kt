@@ -3,8 +3,11 @@ package com.moments.android.views.messaging.screens.chat
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -19,9 +22,21 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.moments.android.models.Moment
+import com.moments.android.models.Story
 import com.moments.android.reportes.ReportBottomSheet
 import com.moments.android.reportes.ReportTarget
+import com.moments.android.views.explore.toExploreFeedMoment
+import com.moments.android.views.feed.sharing.SharedStoryAccessDenialReason
 import com.moments.android.views.messaging.components.chatBuzzShakeEffect
+import com.moments.android.views.shared.momentdetail.MomentDetailContainerView
+import com.moments.android.views.shared.momentdetail.MomentDetailContext
+import com.moments.android.views.story.StoriesView
 import com.moments.android.views.messaging.screens.ConversationFullScreenMediaView
 import com.moments.android.views.messaging.screens.SharedMedia
 import com.moments.android.utilities.HapticManager
@@ -36,6 +51,10 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import com.moments.android.views.messaging.components.GlassmorphicDateHeader
+import com.moments.android.views.messaging.components.chatMenuDimmedUnlessSelected
+import com.moments.android.views.messaging.components.chatMenuDimmedWhenOpen
 import com.moments.android.R
 import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.performance.MotionPolicy
@@ -44,6 +63,7 @@ import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.core.PendingChatContext
+import com.moments.android.views.messaging.core.PendingChatContextFactory
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.components.AudioRecordingManager
 import com.moments.android.views.messaging.components.ChatAttachmentMediaAsset
@@ -91,8 +111,22 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import kotlinx.coroutines.launch
 
-/** Port de `Views/Messaging/Screens/Chat/GlassmorphicChatView.swift`. */
-data class ChatStoryRoute(val userId: String)
+/**
+ * Port de `ChatStoryRoute` en `GlassmorphicChatView.swift`.
+ * - [UserStories]: toolbar / anillo de stories del otro participante
+ * - [SharedStory]: tap en burbuja de story compartida
+ */
+sealed class ChatStoryRoute {
+    abstract val id: String
+
+    data class UserStories(val userId: String) : ChatStoryRoute() {
+        override val id: String get() = userId
+    }
+
+    data class SharedStory(val story: Story) : ChatStoryRoute() {
+        override val id: String get() = story.id?.takeIf { it.isNotBlank() } ?: story.hashCode().toString()
+    }
+}
 
 @Composable
 fun GlassmorphicChatView(
@@ -132,7 +166,6 @@ fun GlassmorphicChatView(
     messagePresentation.rowFrameProvider = { listController.frameInWindow(it) }
     val listPresentation = rememberChatMessageListPresentation()
     val unreadDivider = remember(session) { ChatUnreadDividerController(session) }
-    val voice = remember(session) { GlassmorphicChatVoiceController(session) }
     val voiceGestureState = remember { VoiceRecordingGestureState() }
     val audioPower by AudioRecordingManager.shared.audioPower.collectAsState()
     var messageText by remember(conversation.id) { mutableStateOf("") }
@@ -144,6 +177,12 @@ fun GlassmorphicChatView(
     var lastBuzzSentAt by remember { mutableStateOf<Long?>(null) }
     var buzzToastText by remember { mutableStateOf<String?>(null) }
     var buzzShakeProgress by remember { mutableFloatStateOf(0f) }
+    val voice = remember(session) {
+        GlassmorphicChatVoiceController(
+            viewModel = session,
+            onError = { resId -> buzzToastText = context.getString(resId) },
+        )
+    }
     var showingConversationSettings by remember { mutableStateOf(false) }
     var showVanishTimerSheet by remember { mutableStateOf(false) }
     var showingUserReportSheet by remember { mutableStateOf(false) }
@@ -155,6 +194,11 @@ fun GlassmorphicChatView(
     var reactionPickerMessage by remember { mutableStateOf<EnhancedMessage?>(null) }
     var forwardingMessage by remember { mutableStateOf<EnhancedMessage?>(null) }
     var starredMessageIds by remember(conversation.id) { mutableStateOf(emptySet<String>()) }
+    // ≡ iOS selectedMoment / showingMomentDetail / storyUnavailable
+    // chatStoryRoute declarado arriba (holder para onStoriesDisabled)
+    var selectedMoment by remember { mutableStateOf<Moment?>(null) }
+    var showingMomentError by remember { mutableStateOf(false) }
+    var storyUnavailableReason by remember { mutableStateOf<SharedStoryAccessDenialReason?>(null) }
     val vanishMessageTimer by session.vanishMessageTimer.collectAsState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -168,10 +212,17 @@ fun GlassmorphicChatView(
         }
     }
 
+    // ≡ iOS draftStorageKey: conversation.id ?? "pending:\(otherParticipantId)"
+    val draftStorageKey = conversation.id?.takeIf { it.isNotBlank() }
+        ?: "pending:${conversation.otherParticipantId}"
+    // ≡ iOS @State conversationIntroContext
+    var conversationIntroContext by remember(conversation.id, conversation.otherParticipantId) {
+        mutableStateOf<PendingChatContext?>(null)
+    }
+
     val messageRequestService = remember { MessageRequestService() }
     val requestLoading by messageRequestService.isLoading.collectAsState()
     val pendingContextRef = remember { mutableStateOf(pendingChatContext) }
-    pendingContextRef.value = pendingChatContext
     val requestOperations = remember(messageRequestService) {
         fun resolveRequest(requestId: String) =
             pendingContextRef.value?.request?.takeIf { it.id == requestId }
@@ -217,7 +268,7 @@ fun GlassmorphicChatView(
     val composer = rememberChatComposerAndChromeController(
         pendingChatContext = pendingChatContext,
         requestOperations = requestOperations,
-        onDraftCleared = { ChatDraftStore.clearDraft(context, conversation.id.orEmpty()) },
+        onDraftCleared = { ChatDraftStore.clearDraft(context, draftStorageKey) },
         onAccepted = onPendingChatAccepted,
         onDismissed = onPendingChatDismissed,
         onError = { error ->
@@ -227,6 +278,39 @@ fun GlassmorphicChatView(
     )
     composer.isRequestLoading = requestLoading
     composer.currentUserId = session.currentUserId
+    // Request ops leen el contexto enriquecido del composer (no el param estático).
+    pendingContextRef.value = composer.pendingChatContext ?: pendingChatContext
+
+    // ≡ iOS .task { enrichPendingChatContextIfNeeded(); loadConversationIntroContextIfNeeded() }
+    LaunchedEffect(pendingChatContext, conversation.id, conversation.otherParticipantId, session.currentUserId) {
+        val viewerId = session.currentUserId
+        val pending = composer.pendingChatContext ?: pendingChatContext
+        val incomingRequest = pending?.request
+        if (pending != null &&
+            pending.direction == PendingChatContext.Direction.INCOMING &&
+            pending.viewerFollowsOther == null &&
+            incomingRequest != null &&
+            viewerId.isNotBlank()
+        ) {
+            val enriched = PendingChatContextFactory.incoming(incomingRequest, viewerId)
+            val current = composer.pendingChatContext ?: pendingChatContext
+            if (current?.request?.id == incomingRequest.id &&
+                current?.status == PendingChatContext.Status.INCOMING_REQUEST_PENDING
+            ) {
+                composer.updatePendingContext(enriched)
+            }
+        }
+
+        if ((composer.pendingChatContext ?: pendingChatContext) == null &&
+            conversationIntroContext == null &&
+            viewerId.isNotBlank()
+        ) {
+            val intro = PendingChatContextFactory.conversationIntro(conversation, viewerId)
+            if ((composer.pendingChatContext ?: pendingChatContext) == null) {
+                conversationIntroContext = intro
+            }
+        }
+    }
 
 
     LaunchedEffect(messages, session.currentUserId) {
@@ -268,6 +352,9 @@ fun GlassmorphicChatView(
         )
     }
     val search = remember(session, scroll) { GlassmorphicChatSearchController(session, scroll) }
+    // Holder antes del lifecycle para que `onStoriesDisabled` limpie storyRoute (≡ iOS)
+    val chatStoryRouteHolder = remember { mutableStateOf<ChatStoryRoute?>(null) }
+    var chatStoryRoute by chatStoryRouteHolder
     val lifecycle = remember(session) {
         GlassmorphicChatLifecycleController(
             viewModel = session,
@@ -293,6 +380,7 @@ fun GlassmorphicChatView(
                     }
                 },
             ),
+            onStoriesDisabled = { chatStoryRouteHolder.value = null },
         )
     }
     val displayName = lifecycle.liveOtherParticipantUsername.ifBlank {
@@ -389,11 +477,27 @@ fun GlassmorphicChatView(
         unreadDivider.initialize()
         scroll.routeInitialScroll()
     }
+    // ≡ handleLastMessageScrollChangeInList — badge de entrantes si no estás al fondo
+    val lastMessageId = messages.lastOrNull()?.id
+    var previousLastMessageId by remember(conversation.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(lastMessageId) {
+        val mine = messages.lastOrNull()?.senderId == session.currentUserId
+        // ≡ dismissUnreadDividerOnUserReply
+        if (mine && previousLastMessageId != null && previousLastMessageId != lastMessageId) {
+            if (unreadDivider.dividerMessageId != null || session.unreadIncomingCount > 0) {
+                unreadDivider.clear()
+                scroll.clearPendingIncoming()
+                session.markVisibleConversationAsRead()
+            }
+        }
+        scroll.handleLastMessageChange(previousLastMessageId, lastMessageId)
+        previousLastMessageId = lastMessageId
+    }
     LaunchedEffect(scroll.hasCompletedInitialScroll) {
         listPresentation.hasCompletedInitialScroll = scroll.hasCompletedInitialScroll
     }
-    LaunchedEffect(conversation.id) {
-        messageText = ChatDraftStore.draft(context, conversation.id.orEmpty())
+    LaunchedEffect(conversation.id, conversation.otherParticipantId) {
+        messageText = ChatDraftStore.draft(context, draftStorageKey)
         session.activateChatSession()
         session.markVisibleConversationAsRead()
         lifecycle.setupOnlineStatusObserver()
@@ -442,11 +546,21 @@ fun GlassmorphicChatView(
         }
     }
 
-    val rows = remember(session.chatRenderRows, pendingChatContext, canLoadMore, messages, scroll.hasCompletedInitialScroll, typingUsers) {
+    val effectivePendingContext = composer.pendingChatContext ?: pendingChatContext
+    val rows = remember(
+        session.chatRenderRows,
+        effectivePendingContext,
+        conversationIntroContext,
+        composer.pendingChatTimelineMessage,
+        canLoadMore,
+        messages,
+        scroll.hasCompletedInitialScroll,
+        typingUsers,
+    ) {
         chatListRows(
             baseRows = session.chatRenderRows,
-            pendingChatContext = pendingChatContext,
-            conversationIntroContext = null,
+            pendingChatContext = effectivePendingContext,
+            conversationIntroContext = conversationIntroContext,
             pendingTimelineMessage = composer.pendingChatTimelineMessage,
             canLoadMore = canLoadMore,
             hasCompletedInitialScroll = scroll.hasCompletedInitialScroll,
@@ -479,8 +593,30 @@ fun GlassmorphicChatView(
             }
             onOpenCluster(cluster)
         },
-        onMomentNavigation = onMomentNavigation,
-        onStoryNavigation = onStoryNavigation,
+        onMomentNavigation = { message ->
+            onMomentNavigation(message)
+            scope.launch {
+                when (val result = GlassmorphicChatSharedContentNavigation.handleMomentNavigationFromChat(message)) {
+                    is ChatMomentNavigationResult.Open -> selectedMoment = result.moment
+                    ChatMomentNavigationResult.Failed -> showingMomentError = true
+                    ChatMomentNavigationResult.Ignored -> Unit
+                }
+            }
+        },
+        onStoryNavigation = { message ->
+            onStoryNavigation(message)
+            scope.launch {
+                when (val result = GlassmorphicChatSharedContentNavigation.handleStoryNavigationFromChat(message)) {
+                    is ChatStoryNavigationResult.Open -> {
+                        chatStoryRoute = ChatStoryRoute.SharedStory(result.story)
+                    }
+                    is ChatStoryNavigationResult.Unavailable -> {
+                        storyUnavailableReason = result.reason
+                    }
+                    ChatStoryNavigationResult.Ignored -> Unit
+                }
+            }
+        },
         onViewOnceOpen = { message, replay -> lifecycle.presentViewOnceViewer(message, replay, displayName, currentUserName) },
         onHydrateMedia = session::hydrateMediaIfNeeded,
         onStopLiveLocation = session::stopLiveLocation,
@@ -526,6 +662,30 @@ fun GlassmorphicChatView(
         session.clearLatestBuzzEvent()
     }
 
+    // Back físico: cerrar overlays locales antes de salir al inbox (no al Feed).
+    // Último registrado gana; handlers disabled se saltan → onBack queda de fallback.
+    // ConversationFullScreenMediaView / ChatCamera / ViewOnce registran los suyos encima.
+    BackHandler(onBack = onBack)
+    BackHandler(enabled = showingConversationSettings) {
+        showingConversationSettings = false
+        session.refreshTypingIndicatorPreference()
+        session.refreshForwardingPreference()
+        session.refreshBuzzPreference()
+        deferredJumpToMessageId?.let { messageId ->
+            deferredJumpToMessageId = null
+            scroll.consumeDeferredJumpToMessage(messageId)
+        }
+    }
+    BackHandler(enabled = clusterGallerySelection != null) {
+        clusterGallerySelection = null
+    }
+    BackHandler(enabled = selectedMoment != null) {
+        selectedMoment = null
+    }
+    BackHandler(enabled = clusterForReply != null) {
+        clusterForReply = null
+    }
+
     GlassmorphicChatRootContent(
         adaptiveColors = colors,
         viewModel = session,
@@ -541,7 +701,7 @@ fun GlassmorphicChatView(
                 else context.getString(R.string.chat_buzz_received, displayName)
             },
             onReplyCancelled = { replyingTo = null },
-            onEditCancelled = { editingMessage = null },
+            onEditCancelled = { editingMessage = null; messageText = "" },
             onEditingStarted = { message ->
                 editingMessage = message
                 replyingTo = null
@@ -581,27 +741,71 @@ fun GlassmorphicChatView(
                     isVanishGestureEnabled = scroll.hasCompletedInitialScroll && !search.isSearchVisible,
                     searchHighlightTerm = search.activeSearchHighlightTerm,
                     searchActiveMessageId = search.currentSearchMatchId,
+                    elevatedRowId = messagePresentation.menuSelection?.rowId,
                     callbacks = ChatMessageListCallbacks(
                         loadOlderHistory = scroll::loadOlderHistoryIfNeeded,
                         retryHistoryLoad = scroll::loadOlderHistoryIfNeeded,
+                        // ≡ iOS onPrependFinished → endHistoryScrollRestoration()
+                        onPrependFinished = session::endHistoryScrollRestoration,
                         onRowsChanged = scroll::routeInitialScroll,
                         onContentExtentChanged = scroll::updateContentExtent,
                         onAtBottomChanged = scroll::handleListAtBottomChange,
                         onVanishPullReleased = scroll::handleVanishPullReleased,
                         renderMessage = { item ->
-                            if (unreadDivider.shouldShowBefore(messageIds(item), canLoadMore)) {
-                                GlassmorphicUnreadDivider(unreadDivider.dividerCount)
+                            // ≡ iOS chatRenderRow(.message): divider + burbuja en VStack.
+                            // Sin Column, LazyColumn mete ambos en un Box → se solapan.
+                            // ≡ iOS `.chatMenuDimmedUnlessSelected` + `.zIndex(100)` — la burbuja
+                            // seleccionada se “levanta” sobre el resto atenuado.
+                            val rowId = "row:message:${item.id}"
+                            val menuOpen = messagePresentation.menuSelection != null
+                            val selected = messagePresentation.menuSelection?.rowId == rowId
+                            val highlighted = messagePresentation.isMessageItemHighlighted(item)
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .zIndex(if (selected || highlighted) 100f else 0f)
+                                    .chatMenuDimmedUnlessSelected(selected, menuOpen),
+                            ) {
+                                if (unreadDivider.shouldShowBefore(messageIds(item), canLoadMore)) {
+                                    GlassmorphicUnreadDivider(
+                                        unreadDivider.dividerCount,
+                                        Modifier.padding(horizontal = 18.dp, vertical = 6.dp),
+                                    )
+                                }
+                                GlassmorphicChatMessageItem(
+                                    item,
+                                    messages,
+                                    session,
+                                    messagePresentation,
+                                    renderer,
+                                    "❤️",
+                                    listController.timestampRevealState,
+                                )
                             }
-                            GlassmorphicChatMessageItem(item, messages, session, messagePresentation, renderer, "❤️", listController.timestampRevealState)
                         },
-                        renderHeader = { header -> GlassmorphicDateHeader(header.date) },
+                        renderHeader = { header ->
+                            GlassmorphicDateHeader(
+                                header.date,
+                                Modifier
+                                    .chatMenuDimmedWhenOpen(messagePresentation.menuSelection != null)
+                                    .padding(vertical = 10.dp),
+                            )
+                        },
                         renderBuzz = { buzz ->
                             ChatBuzzTimelineEventRow(
                                 text = if (buzz.event.senderId == session.currentUserId) stringResource(R.string.chat_buzz_sent) else stringResource(R.string.chat_buzz_received, displayName),
                                 isOutgoing = buzz.event.senderId == session.currentUserId,
+                                modifier = Modifier.chatMenuDimmedWhenOpen(messagePresentation.menuSelection != null),
                             )
                         },
-                        renderTyping = { GlassmorphicTypingIndicator(reduceMotion = MotionPolicy.reduceMotion, modifier = Modifier.padding(horizontal = 16.dp)) },
+                        renderTyping = {
+                            GlassmorphicTypingIndicator(
+                                reduceMotion = MotionPolicy.reduceMotion,
+                                modifier = Modifier
+                                    .chatMenuDimmedWhenOpen(messagePresentation.menuSelection != null)
+                                    .padding(horizontal = 16.dp),
+                            )
+                        },
                     ),
                 )
                 val navigation = ChatFloatingNavigationState.resolve(
@@ -664,7 +868,10 @@ fun GlassmorphicChatView(
                 messageText = messageText,
                 onMessageTextChange = { text ->
                     messageText = text
-                    ChatDraftStore.setDraft(context, text, conversation.id.orEmpty())
+                    // ≡ iOS onChange(messageText): no persistir draft mientras editas
+                    if (editingMessage == null) {
+                        ChatDraftStore.setDraft(context, text, draftStorageKey)
+                    }
                     session.setTyping(text.isNotBlank())
                 },
                 isOtherParticipantBlockedByCurrentUser = lifecycle.isOtherParticipantBlockedByCurrentUser,
@@ -753,7 +960,13 @@ fun GlassmorphicChatView(
             callbacks = ChatToolbarCallbacks(
                 onBack = onBack,
                 onProfile = { onProfile(conversation.otherParticipantId) },
-                onStory = { onStory(ChatStoryRoute(conversation.otherParticipantId)) },
+                onStory = {
+                    val uid = conversation.otherParticipantId
+                    if (uid.isNotBlank()) {
+                        // ≡ iOS fullScreenCover sobre el chat (no reemplaza MessagingView)
+                        chatStoryRoute = ChatStoryRoute.UserStories(uid)
+                    }
+                },
                 onSettings = { showingConversationSettings = true },
                 onSearchClose = search::toggleChatSearch,
                 onSearchClear = search::clearSearchQueryKeepingMode,
@@ -772,10 +985,11 @@ fun GlassmorphicChatView(
                 session.refreshForwardingPreference()
                 // Buzz se aplica en vivo vía ConversationBuzzPreferenceEvents; re-sync local por si acaso
                 session.refreshBuzzPreference()
+                // Vanish: sync en vivo desde ConversationSettingsView.updateVanish → sesión
                 deferredJumpToMessageId?.let { messageId ->
                     deferredJumpToMessageId = null
-                    search.setPendingSearchTarget(messageId)
-                    search.consumePendingSearchTarget()
+                    // ≡ consumeDeferredJumpToMessageIfNeeded (delay 0.35s)
+                    scroll.consumeDeferredJumpToMessage(messageId)
                 }
             },
             onJumpToMessage = { messageId ->
@@ -1014,6 +1228,71 @@ fun GlassmorphicChatView(
             selectedTimer = vanishMessageTimer,
             onSelect = { timer -> session.setVanishMessageTimer(timer) },
             onDismiss = { showVanishTimerSheet = false },
+        )
+    }
+
+    // ≡ fullScreenCover(item: $storyRoute)
+    chatStoryRoute?.let { route ->
+        Dialog(
+            onDismissRequest = { chatStoryRoute = null },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            when (route) {
+                is ChatStoryRoute.UserStories -> StoriesView(
+                    startWithUserId = route.userId,
+                    onDismiss = { chatStoryRoute = null },
+                )
+                is ChatStoryRoute.SharedStory -> StoriesView(
+                    explicitStories = listOf(route.story),
+                    startAtIndex = 0,
+                    onDismiss = { chatStoryRoute = null },
+                )
+            }
+        }
+    }
+
+    // ≡ sheet(isPresented: $showingMomentDetail)
+    selectedMoment?.let { moment ->
+        MomentsModalSheet(
+            onDismissRequest = { selectedMoment = null },
+            largeOnly = true,
+        ) {
+            MomentDetailContainerView(
+                context = MomentDetailContext.Single(moment.toExploreFeedMoment()),
+                onDismiss = { selectedMoment = null },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+
+    // ≡ alert chat.moment.loadError
+    if (showingMomentError) {
+        AlertDialog(
+            onDismissRequest = { showingMomentError = false },
+            title = { Text(stringResource(R.string.common_error)) },
+            text = { Text(stringResource(R.string.chat_moment_load_error)) },
+            confirmButton = {
+                TextButton(onClick = { showingMomentError = false }) {
+                    Text(stringResource(R.string.common_ok))
+                }
+            },
+        )
+    }
+
+    // ≡ alert showingStoryUnavailable
+    storyUnavailableReason?.let { reason ->
+        AlertDialog(
+            onDismissRequest = { storyUnavailableReason = null },
+            title = { Text(stringResource(reason.titleRes)) },
+            text = { Text(stringResource(reason.messageRes)) },
+            confirmButton = {
+                TextButton(onClick = { storyUnavailableReason = null }) {
+                    Text(stringResource(R.string.common_ok))
+                }
+            },
         )
     }
 }

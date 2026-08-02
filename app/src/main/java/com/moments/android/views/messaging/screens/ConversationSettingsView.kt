@@ -5,10 +5,14 @@ import android.content.ContentValues
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -16,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,11 +35,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Person
@@ -47,8 +54,16 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -67,9 +82,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -78,7 +96,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import com.moments.android.R
 import com.moments.android.MomentsApplication
-import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.models.OnlineStatus
 import com.moments.android.services.messaging.OnlineStatusService
 import com.moments.android.utilities.MomentsFormat
@@ -86,6 +104,7 @@ import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.core.PresenceDisplay
+import kotlin.math.roundToInt
 import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.messaging.ChatMediaDownloadPolicy
 import com.moments.android.services.persistence.LocalPersistenceService
@@ -95,7 +114,10 @@ import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.messaging.MessageCatchUpService
 import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.messaging.services.ChatDraftEvent
+import com.moments.android.views.messaging.services.ChatDraftEvents
 import com.moments.android.views.messaging.services.ChatService
+import com.moments.android.views.messaging.services.ChatSessionEngine
 import com.moments.android.views.messaging.services.ChatVideoPosterGenerator
 import com.moments.android.views.messaging.services.ConversationBuzzPreferenceEvents
 import com.moments.android.views.messaging.services.ConversationForwardingPreferenceEvents
@@ -322,12 +344,23 @@ class ConversationSettingsViewModel(
         }
     }
 
+    /** ≡ iOS `updateVanishSettings` + post `conversationVanishModeDidChange`. */
     fun updateVanish(active: Boolean, timer: VanishMessageTimer) {
         val id = conversation?.id ?: return
-        vanishModeActive = active
-        vanishTimer = timer
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            ChatService.setVanishMode(id, active, currentUserId, timer.takeIf { active })
+            val result = ChatService.setVanishMode(id, active, currentUserId, timer.takeIf { active })
+            if (result.isFailure) return@launch
+
+            withContext(Dispatchers.Main.immediate) {
+                vanishModeActive = active
+                vanishTimer = timer
+                conversation?.vanishModeActive = active
+                conversation?.vanishMessageTimer = if (active) timer.raw else null
+                // Empuja al chat abierto (sesión cacheada) sin esperar al snapshot.
+                ChatSessionEngine.cachedSession(id)?.applyVanishSettingsFromSettings(active, timer)
+                ChatDraftEvents.emit(ChatDraftEvent.VanishModeChanged(id, active))
+            }
+
             val conversationRef = FirebaseFirestore.getInstance().collection("conversations").document(id)
             if (active) {
                 conversation?.vanishDisabledNoticeMessageId?.let { disabledId ->
@@ -749,24 +782,54 @@ fun ConversationSettingsView(
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }
                 Text(stringResource(R.string.conversation_settings_title), modifier = Modifier.weight(1f), color = colors.primary, fontWeight = FontWeight.SemiBold)
-                IconButton(onClick = { showMenu = !showMenu }) { Icon(Icons.Default.MoreVert, null, tint = colors.primary) }
-            }
-            if (showMenu) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.End) {
-                    Text(
-                        stringResource(R.string.conversation_settings_block),
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.clickable { showMenu = false; showBlockConfirm = true }.padding(10.dp),
-                    )
-                    Text(
-                        stringResource(R.string.conversation_settings_report),
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.clickable {
-                            showMenu = false
-                            showReport = true
-                            onReport(conversation.otherParticipantId)
-                        }.padding(10.dp),
-                    )
+                // ≡ iOS ToolbarItem trailing Menu { Block, Report } + ellipsis
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = colors.primary)
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(R.string.conversation_settings_block_user),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                showBlockConfirm = true
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Block,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(R.string.report_action_user),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                showReport = true
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Flag,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                        )
+                    }
                 }
             }
             Column(
@@ -796,22 +859,33 @@ fun ConversationSettingsView(
                     },
                     onClearMedia = { clearMediaConfirm = true },
                 )
-                SharedContentTabs(tab, { tab = it }, model, colors, onOpenMedia = { model.openMediaForViewing(it) { resolved -> selectedMedia = resolved } })
+                // ≡ iOS: settingsFooter debajo de vaciar media, antes de Media/Links
                 SettingsFooter(model, colors)
+                SharedContentTabs(tab, { tab = it }, model, colors, onOpenMedia = { model.openMediaForViewing(it) { resolved -> selectedMedia = resolved } })
             }
         }
 
-        // Preferences / Vanish = push full-screen (≡ navigationDestination iOS)
+        // Preferences / Vanish = push full-screen (≡ navigationDestination iOS).
+        // Chat edge-to-edge: mismo padding que ChatCamera (status+nav), no solo statusBarsPadding
+        // (puede quedar a 0 si un ancestro ya consumió insets).
         if (showPreferences) {
             ConversationChatPreferencesView(
                 model = model,
                 onDismiss = { showPreferences = false },
                 onRequestClearConversation = { clearConversationConfirm = true },
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars)),
             )
         }
         if (showVanish) {
-            ConversationVanishModeView(model, onDismiss = { showVanish = false }, modifier = Modifier.fillMaxSize())
+            ConversationVanishModeView(
+                model = model,
+                onDismiss = { showVanish = false },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars)),
+            )
         }
         // ≡ navigationDestination(showSharedGallery) → ClusterGalleryView
         if (model.showSharedGallery) {
@@ -979,20 +1053,11 @@ private fun ConversationSettingsHeader(
         onDispose { stop() }
     }
     Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        val avatar = conversation.otherParticipantProfileImagePath
-        if (!avatar.isNullOrBlank()) {
-            AsyncImage(avatar, null, Modifier.size(92.dp).clip(CircleShape), contentScale = ContentScale.Crop)
-        } else {
-            Box(
-                Modifier
-                    .size(92.dp)
-                    .clip(CircleShape)
-                    .momentsChromeGlass(CircleShape, interactive = false),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Default.Person, null, tint = colors.primary, modifier = Modifier.size(34.dp))
-            }
-        }
+        // ≡ iOS KFImage(path) — en Android resolver por userId (path Storage a menudo no es URL HTTP)
+        AsyncProfileImageView(
+            userId = conversation.otherParticipantId,
+            modifier = Modifier.size(92.dp),
+        )
         Text(
             liveUsername.ifBlank { conversation.otherParticipantUsername.orEmpty() },
             color = colors.primary,
@@ -1012,17 +1077,21 @@ private fun ConversationSettingsHeader(
             }
         }
         Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(34.dp)) {
-            HeaderAction(Icons.Default.Person, R.string.conversation_settings_profile) {
+            HeaderAction(Icons.Default.Person, R.string.conversation_settings_quick_action_profile) {
                 HapticManager.shared.lightImpact()
                 onProfile(conversation.otherParticipantId)
             }
-            HeaderAction(Icons.Default.Search, R.string.conversation_settings_search) {
+            HeaderAction(Icons.Default.Search, R.string.conversation_settings_quick_action_search) {
                 HapticManager.shared.lightImpact()
                 onSearch()
             }
             HeaderAction(
                 if (notificationsEnabled) Icons.Default.Notifications else Icons.Default.NotificationsOff,
-                if (notificationsEnabled) R.string.conversation_settings_mute else R.string.conversation_settings_unmute,
+                if (notificationsEnabled) {
+                    R.string.conversation_settings_quick_action_mute
+                } else {
+                    R.string.conversation_settings_quick_action_unmute
+                },
             ) {
                 HapticManager.shared.lightImpact()
                 onToggleMute()
@@ -1155,40 +1224,54 @@ private fun SettingsRow(
 }
 
 @Composable
-private fun SharedContentTabs(tab: SharedContentTab, onTab: (SharedContentTab) -> Unit, model: ConversationSettingsViewModel, colors: AdaptiveColors, onOpenMedia: (SharedMedia) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TabButton(R.string.conversation_settings_media, tab == SharedContentTab.MEDIA) { onTab(SharedContentTab.MEDIA) }
-        TabButton(R.string.conversation_settings_links, tab == SharedContentTab.LINKS) { onTab(SharedContentTab.LINKS) }
-    }
-    if (tab == SharedContentTab.MEDIA) {
-        if (model.sharedMedia.isEmpty()) EmptyContent(Icons.Default.Folder, R.string.conversation_settings_media_empty, colors)
-        else {
-            val rows = model.sharedMedia.chunked(3)
-            Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                rows.forEach { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        row.forEach { media ->
-                            SharedMediaThumbnail(
-                                media = media,
-                                fillsGrid = true,
-                                onTap = { onOpenMedia(media) },
-                                modifier = Modifier.weight(1f).height(118.dp),
-                            )
+private fun SharedContentTabs(
+    tab: SharedContentTab,
+    onTab: (SharedContentTab) -> Unit,
+    model: ConversationSettingsViewModel,
+    colors: AdaptiveColors,
+    onOpenMedia: (SharedMedia) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // ≡ iOS `.pickerStyle(.segmented)` width 200, centrado — estilo pill perfil
+        SharedContentTabPill(selected = tab, onSelect = onTab)
+        if (tab == SharedContentTab.MEDIA) {
+            if (model.sharedMedia.isEmpty()) {
+                EmptyContent(Icons.Default.Folder, R.string.conversation_settings_media_empty, colors)
+            } else {
+                val rows = model.sharedMedia.chunked(3)
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    rows.forEach { row ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            row.forEach { media ->
+                                SharedMediaThumbnail(
+                                    media = media,
+                                    fillsGrid = true,
+                                    onTap = { onOpenMedia(media) },
+                                    modifier = Modifier.weight(1f).height(118.dp),
+                                )
+                            }
+                            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                         }
-                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
-        }
-    } else {
-        val links = model.sharedLinks()
-        if (links.isEmpty()) EmptyContent(Icons.Default.Link, R.string.conversation_settings_links_empty, colors)
-        else {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                links.forEach { message ->
-                    val url = Regex("https?://\\S+", RegexOption.IGNORE_CASE).find(message.content.orEmpty())?.value
-                    if (url != null) {
-                        LinkPreviewCard(url = url, outgoing = false, embedded = true)
+        } else {
+            val links = model.sharedLinks()
+            if (links.isEmpty()) {
+                EmptyContent(Icons.Default.Link, R.string.conversation_settings_links_empty, colors)
+            } else {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    links.forEach { message ->
+                        val url = Regex("https?://\\S+", RegexOption.IGNORE_CASE).find(message.content.orEmpty())?.value
+                        if (url != null) {
+                            LinkPreviewCard(url = url, outgoing = false, embedded = true)
+                        }
                     }
                 }
             }
@@ -1196,9 +1279,92 @@ private fun SharedContentTabs(tab: SharedContentTab, onTab: (SharedContentTab) -
     }
 }
 
-@Composable private fun TabButton(title: Int, selected: Boolean, onClick: () -> Unit) = Text(stringResource(title), modifier = Modifier.clip(CircleShape).background(if (selected) MaterialTheme.colorScheme.primary.copy(.16f) else MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp))
+/** ≡ iOS segmented Media/Links + estética `ProfilePillTabs` (thumb invertido). */
+@Composable
+private fun SharedContentTabPill(
+    selected: SharedContentTab,
+    onSelect: (SharedContentTab) -> Unit,
+) {
+    val dark = isSystemInDarkTheme()
+    val tabs = SharedContentTab.entries
+    val selectedIndex = tabs.indexOf(selected).coerceAtLeast(0)
+    val track = if (dark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)
+    val thumb = if (dark) Color(0xFFFAF9F6) else Color(0xFF0B1215)
+    val selectedContent = if (dark) Color(0xFF0B1215) else Color.White
+    val unselectedContent = if (dark) Color.White.copy(alpha = 0.55f) else Color.Black.copy(alpha = 0.45f)
 
-@Composable private fun EmptyContent(icon: androidx.compose.ui.graphics.vector.ImageVector, text: Int, colors: AdaptiveColors) = Column(Modifier.fillMaxWidth().padding(36.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, tint = colors.tertiary, modifier = Modifier.size(30.dp)); Text(stringResource(text), color = colors.tertiary, modifier = Modifier.padding(top = 10.dp)) }
+    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+        BoxWithConstraints(
+            Modifier
+                .width(200.dp)
+                .height(32.dp),
+        ) {
+            val density = LocalDensity.current
+            val insetPx = with(density) { 3.dp.toPx() }
+            val segmentPx = ((with(density) { maxWidth.toPx() } - insetPx * 2f) / tabs.size).coerceAtLeast(1f)
+            val thumbPx by animateFloatAsState(
+                targetValue = selectedIndex * segmentPx,
+                animationSpec = tween(durationMillis = 180),
+                label = "sharedContentThumb",
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(track, RoundedCornerShape(50)),
+            )
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .offset { IntOffset((insetPx + thumbPx).roundToInt(), 0) }
+                    .height(26.dp)
+                    .fillMaxWidth(1f / tabs.size)
+                    .background(thumb, RoundedCornerShape(50)),
+            )
+            Row(Modifier.fillMaxSize()) {
+                tabs.forEach { item ->
+                    val isSelected = item == selected
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxSize()
+                            .clickable {
+                                if (!isSelected) {
+                                    HapticManager.shared.selection()
+                                    onSelect(item)
+                                }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            stringResource(
+                                when (item) {
+                                    SharedContentTab.MEDIA -> R.string.chat_gallery_tab_media
+                                    SharedContentTab.LINKS -> R.string.chat_gallery_tab_links
+                                },
+                            ),
+                            color = if (isSelected) selectedContent else unselectedContent,
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyContent(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: Int,
+    colors: AdaptiveColors,
+) = Column(
+    Modifier.fillMaxWidth().padding(36.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+) {
+    Icon(icon, null, tint = colors.tertiary, modifier = Modifier.size(30.dp))
+    Text(stringResource(text), color = colors.tertiary, modifier = Modifier.padding(top = 10.dp))
+}
 
 @Composable
 private fun SettingsFooter(model: ConversationSettingsViewModel, colors: AdaptiveColors) {
@@ -1210,9 +1376,10 @@ private fun SettingsFooter(model: ConversationSettingsViewModel, colors: Adaptiv
         "$createdLabel: ${model.conversationCreatedDate}  •  $messagesLabel: ${model.totalMessages} (${model.sentMessagesCount} $sent, ${model.receivedMessagesCount} $received)",
         color = colors.tertiary,
         fontSize = 12.sp,
+        textAlign = TextAlign.Center,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 20.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
     )
 }
 
@@ -1361,7 +1528,7 @@ private fun ConversationChatPreferencesView(
 ) {
     val context = LocalContext.current
     val colors = rememberAdaptiveColors()
-    Column(modifier.background(colors.chatBackground.first()).fillMaxSize().statusBarsPadding()) {
+    Column(modifier.fillMaxSize().background(colors.chatBackground.first())) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }
             Text(stringResource(R.string.conversation_settings_preferences), color = colors.primary, fontWeight = FontWeight.SemiBold)
@@ -1484,7 +1651,7 @@ private fun ConversationVanishModeView(
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
-    Column(modifier.background(colors.chatBackground.first()).fillMaxSize().statusBarsPadding()) {
+    Column(modifier.fillMaxSize().background(colors.chatBackground.first())) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }
             Text(stringResource(R.string.conversation_settings_vanish), color = colors.primary, fontWeight = FontWeight.SemiBold)

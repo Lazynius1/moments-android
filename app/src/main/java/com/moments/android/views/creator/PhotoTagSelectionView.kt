@@ -27,7 +27,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.HorizontalDivider
@@ -70,6 +69,7 @@ import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.searchUsers
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.components.UserRowSkeletonList
+import com.moments.android.views.shared.MomentsSheetHeader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -101,42 +101,23 @@ fun PhotoTagSelectionView(
 
     Box(modifier.fillMaxSize().background(canvas)) {
         Column(Modifier.fillMaxSize()) {
-            // ≡ Floating custom header
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 16.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier
-                        .size(40.dp)
-                        .momentsChromeGlass(CircleShape, interactive = true)
-                        .clickable(onClick = onDismiss),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Filled.KeyboardArrowDown, null, tint = fg, modifier = Modifier.size(20.dp))
-                }
-                Spacer(Modifier.weight(1f))
-                Text(
-                    stringResource(R.string.creator_tag_people),
-                    color = fg,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 20.sp,
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    stringResource(R.string.creator_tag_done),
-                    color = fg,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
-                    modifier = Modifier
-                        .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
-                        .clickable(onClick = onDismiss)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
+            // Sheet Android: sin chevron; título pegado al handle + Done
+            MomentsSheetHeader(
+                title = stringResource(R.string.creator_tag_people),
+                titleSize = 18.sp,
+                trailing = {
+                    Text(
+                        stringResource(R.string.creator_tag_done),
+                        color = fg,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp,
+                        modifier = Modifier
+                            .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
+                            .clickable(onClick = onDismiss)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                },
+            )
 
             Box(
                 Modifier

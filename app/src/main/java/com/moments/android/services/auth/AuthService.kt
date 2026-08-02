@@ -29,6 +29,7 @@ import com.moments.android.notifications.services.NotificationService
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.storage.StorageService
+import com.moments.android.widget.MomentsWidgetStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -1198,7 +1199,7 @@ object AuthService {
         _authState.value = AuthState.Authenticated
         _isVerifyingAccount.value = false
         startSuspensionListener()
-        // N/A: syncProfileDataToWidget — widgets iOS
+        MomentsWidgetStore.syncProfileData(userData)
     }
 
     private fun applyDeactivatedSession(user: FirebaseUser, userData: AppUser) {

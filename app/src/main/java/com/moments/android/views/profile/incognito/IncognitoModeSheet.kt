@@ -34,7 +34,7 @@ import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.WifiOff
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -106,7 +106,7 @@ fun IncognitoModeSheet(modifier: Modifier = Modifier) {
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
-                .padding(top = 12.dp, bottom = 30.dp),
+                .padding(top = 0.dp, bottom = 30.dp),
             verticalArrangement = Arrangement.spacedBy(26.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -241,10 +241,9 @@ fun IncognitoModeSheet(modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (isSyncing) {
-                    CircularProgressIndicator(
-                        color = colors.primary,
-                        strokeWidth = 2.dp,
+                    MomentsCircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
                     )
                 } else {
                     Icon(

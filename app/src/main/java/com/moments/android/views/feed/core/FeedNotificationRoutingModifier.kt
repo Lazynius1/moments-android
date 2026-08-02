@@ -8,7 +8,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.firebase.auth.FirebaseAuth
+import com.moments.android.coordinators.AppRouter
 import com.moments.android.coordinators.CoordinatorNavigationEvent
+import com.moments.android.coordinators.LegacyNavigationBridge
 import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.notifications.screens.NotificationSummaryService
 import com.moments.android.notifications.services.NotificationBadgeService
@@ -81,29 +83,38 @@ fun FeedNotificationRoutingEffect(
             .filterNotNull()
             .collectLatest { navigation ->
                 when (navigation) {
+                    // Moment / Conversation / Story / StoryChain → host Nav3 en TabBar (no Dialog local).
                     is NotificationNavigationService.PendingNavigation.Conversation -> {
-                        setTargetConversationId(navigation.conversationId)
-                        setShowMessages(true)
+                        LegacyNavigationBridge.conversation(navigation.conversationId)
                     }
                     is NotificationNavigationService.PendingNavigation.Moment -> {
-                        setTargetMomentId(navigation.momentId)
-                        setTargetMomentUserId(navigation.userId)
-                        setShowMomentDetail(true)
+                        LegacyNavigationBridge.moment(
+                            id = navigation.momentId,
+                            authorId = navigation.userId,
+                        )
                     }
                     is NotificationNavigationService.PendingNavigation.Profile -> {
                         // iOS: case .profile: break
                     }
                     is NotificationNavigationService.PendingNavigation.Story -> {
-                        onOpenStory(navigation.storyId, navigation.authorId)
+                        AppRouter.navigate(
+                            AppRouter.Destination.Story(
+                                storyId = navigation.storyId,
+                                authorId = navigation.authorId,
+                            ),
+                        )
                     }
                     is NotificationNavigationService.PendingNavigation.Notifications -> {
-                        setShowNotifications(true)
+                        LegacyNavigationBridge.showNotifications()
                     }
                     is NotificationNavigationService.PendingNavigation.Creator -> {
                         setShowCreatorView(true)
                     }
                     is NotificationNavigationService.PendingNavigation.StoryChain -> {
-                        onOpenStoryChain(navigation.chainId, navigation.chainTitle)
+                        LegacyNavigationBridge.storyChain(
+                            chainId = navigation.chainId,
+                            title = navigation.chainTitle,
+                        )
                     }
                     else -> Unit
                 }
@@ -115,12 +126,8 @@ fun FeedNotificationRoutingEffect(
     LaunchedEffect(Unit) {
         NavigationEventBus.events.collectLatest { event ->
             when (event) {
-                CoordinatorNavigationEvent.ShowMessages -> setShowMessages(true)
-                // iOS: ShowNotifications + NavigateToNotifications + OpenNotifications
-                CoordinatorNavigationEvent.ShowNotifications,
-                is CoordinatorNavigationEvent.NavigateToNotifications,
-                CoordinatorNavigationEvent.OpenNotifications,
-                -> setShowNotifications(true)
+                // ShowMessages / ShowNotifications / NavigateToNotifications / OpenNotifications
+                // → host único en TabBarView (no Dialog local aquí).
                 CoordinatorNavigationEvent.ShowCreatorView -> setShowCreatorView(true)
                 CoordinatorNavigationEvent.ShowExploreView -> setShowExplore(true)
                 CoordinatorNavigationEvent.StoryUploaded -> {
@@ -130,38 +137,7 @@ fun FeedNotificationRoutingEffect(
                 is CoordinatorNavigationEvent.NavigateToUserProfileInFeed -> {
                     if (event.userId.isNotEmpty()) onOpenUserProfile(event.userId)
                 }
-                is CoordinatorNavigationEvent.NavigateToStoryChainInFeed -> {
-                    onOpenStoryChain(event.chainId, event.chainTitle)
-                }
-                is CoordinatorNavigationEvent.NavigateToStoryInFeed -> {
-                    val authorId = event.authorId.trim().ifEmpty { null }
-                    onOpenStory(event.storyId, authorId)
-                }
-                is CoordinatorNavigationEvent.NavigateToConversation -> {
-                    if (event.conversationId.isNotEmpty()) {
-                        setTargetConversationId(event.conversationId)
-                        setShowMessages(true)
-                    }
-                }
-                is CoordinatorNavigationEvent.NavigateToMoment -> {
-                    val momentId = event.momentId
-                    if (momentId.isEmpty()) return@collectLatest
-                    val userId = event.userId?.trim().orEmpty()
-                    if (userId.isNotEmpty()) {
-                        setTargetMomentId(momentId)
-                        setTargetMomentUserId(userId)
-                        setShowMomentDetail(true)
-                        return@collectLatest
-                    }
-                    scope.launch {
-                        val authorId = firestoreService.fetchMomentAuthorId(momentId)
-                        if (!authorId.isNullOrEmpty()) {
-                            setTargetMomentId(momentId)
-                            setTargetMomentUserId(authorId)
-                            setShowMomentDetail(true)
-                        }
-                    }
-                }
+                // Moment / Conversation / Story / StoryChain / ShowStories* → TabBar Nav3 host.
                 else -> Unit
             }
         }

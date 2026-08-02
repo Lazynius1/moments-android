@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 
 /**
@@ -42,6 +43,7 @@ fun CreatorFlowPendingScreen(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val chromeFg = MomentsChromeGlass.contentColor(androidx.compose.foundation.isSystemInDarkTheme())
     Column(
         modifier
             .fillMaxSize()
@@ -64,7 +66,7 @@ fun CreatorFlowPendingScreen(
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = chromeFg,
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -79,7 +81,7 @@ fun CreatorFlowPendingScreen(
                 Icon(
                     Icons.Filled.Close,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = chromeFg,
                     modifier = Modifier.size(18.dp),
                 )
             }

@@ -23,15 +23,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Sensors
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -63,11 +60,14 @@ import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.components.EchoesIconGradients
 import com.moments.android.views.components.EchoesIconMetrics
 import com.moments.android.views.components.EchoesIconView
+import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.MomentsSheetHeader
 import java.util.Date
 
 /**
- * Port 1:1 de `EchoHistoryView.swift`.
- * Tap → fullScreenCover [EchoViewerUI] (history permanece debajo).
+ * Port de `EchoHistoryView.swift` en [MomentsModalSheet].
+ * Sheet Android: sin chevron (dismiss = handle/swipe); cabecera pegada al handle.
+ * Tap → fullScreenCover [EchoViewerUI].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,44 +98,80 @@ fun EchoHistoryView(
         onDispose { registration?.remove() }
     }
 
+    // weight desde el sheet host: lista scrollea; empty/loading arriba (visible en medium).
     Column(modifier.fillMaxSize().background(canvas)) {
-        EchoHistoryHeader(
-            primary = primary,
-            onDismiss = onDismiss,
-            onInfo = { showInfoSheet = true },
+        MomentsSheetHeader(
+            title = stringResource(R.string.echo_history_title),
+            titleSize = 18.sp,
+            trailing = {
+                Box(
+                    Modifier
+                        .size(36.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clickable { showInfoSheet = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Info, contentDescription = null, tint = primary, modifier = Modifier.size(16.dp))
+                }
+            },
         )
         when {
-            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = primary, strokeWidth = 2.dp)
-            }
-            echoes.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                EchoHistoryEmpty(primary = primary)
-            }
-            else -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Row(
-                    Modifier.padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+            isLoading -> {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 48.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    // ≡ waveform.path.ecg / dot.radiowaves.left.and.right
-                    InfoChip(icon = Icons.Filled.GraphicEq, text = "${echoes.size} Echoes", primary = primary)
-                    InfoChip(
-                        icon = Icons.Filled.Sensors,
-                        text = "$activeCount ${stringResource(R.string.echo_status_active)}",
-                        primary = primary,
-                    )
+                    MomentsCircularProgressIndicator(strokeWidth = 2.dp)
                 }
-                LazyColumn(
-                    Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+            }
+            echoes.isEmpty() -> {
+                // Pegado arriba (visible en medium), no centrado en altura expanded
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 28.dp, bottom = 40.dp),
+                    contentAlignment = Alignment.TopCenter,
                 ) {
-                    items(echoes, key = { it.id.orEmpty() }) { echo ->
-                        EchoHistoryCard(
-                            echo = echo,
+                    EchoHistoryEmpty(primary = primary)
+                }
+            }
+            else -> {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = true),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        // ≡ waveform.path.ecg / dot.radiowaves.left.and.right
+                        InfoChip(icon = Icons.Filled.GraphicEq, text = "${echoes.size} Echoes", primary = primary)
+                        InfoChip(
+                            icon = Icons.Filled.Sensors,
+                            text = "$activeCount ${stringResource(R.string.echo_status_active)}",
                             primary = primary,
-                            onTap = { selectedEcho = echo },
                         )
                     }
-                    item { Spacer(Modifier.height(20.dp)) }
+                    LazyColumn(
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = true)
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(echoes, key = { it.id.orEmpty() }) { echo ->
+                            EchoHistoryCard(
+                                echo = echo,
+                                primary = primary,
+                                onTap = { selectedEcho = echo },
+                            )
+                        }
+                        item { Spacer(Modifier.height(20.dp)) }
+                    }
                 }
             }
         }
@@ -156,58 +192,14 @@ fun EchoHistoryView(
         }
     }
 
-    // ≡ .sheet + presentationDetents([.medium, .large])
     if (showInfoSheet) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-        ModalBottomSheet(
+        MomentsModalSheet(
             onDismissRequest = { showInfoSheet = false },
-            sheetState = sheetState,
+            largeOnly = false,
             containerColor = canvas,
-        ) {
-            EchoHistoryInfoSheet(onDismiss = { showInfoSheet = false }, primary = primary)
+        ) { dismiss ->
+            EchoHistoryInfoSheet(onDismiss = dismiss, primary = primary)
         }
-    }
-}
-
-@Composable
-private fun EchoHistoryHeader(
-    primary: Color,
-    onDismiss: () -> Unit,
-    onInfo: () -> Unit,
-) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .padding(top = 10.dp, bottom = 14.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Box(
-                Modifier
-                    .size(36.dp)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(onClick = onDismiss),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.KeyboardArrowDown, null, tint = primary, modifier = Modifier.size(16.dp))
-            }
-            Box(
-                Modifier
-                    .size(36.dp)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(onClick = onInfo),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.Info, null, tint = primary, modifier = Modifier.size(16.dp))
-            }
-        }
-        Text(
-            stringResource(R.string.echo_history_title),
-            color = primary,
-            fontSize = 21.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.align(Alignment.Center),
-        )
     }
 }
 
@@ -351,30 +343,7 @@ private fun EchoHistoryCard(
 private fun EchoHistoryInfoSheet(onDismiss: () -> Unit, primary: Color) {
     val secondary = primary.copy(alpha = 0.6f)
     Column(Modifier.padding(bottom = 24.dp)) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(top = 10.dp, bottom = 18.dp),
-        ) {
-            Box(
-                Modifier
-                    .size(36.dp)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(onClick = onDismiss)
-                    .align(Alignment.CenterStart),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = primary, modifier = Modifier.size(16.dp))
-            }
-            Text(
-                stringResource(R.string.echo_info_title),
-                color = primary,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.align(Alignment.Center),
-            )
-        }
+        MomentsSheetHeader(title = stringResource(R.string.echo_info_title), titleSize = 18.sp)
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())

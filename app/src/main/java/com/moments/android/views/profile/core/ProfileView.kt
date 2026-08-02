@@ -73,16 +73,21 @@ import com.moments.android.views.profile.core.sections.ProfileGridHeroTransition
 import com.moments.android.views.profile.core.sections.ProfileGridPreviewEditorView
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomDestination
 import com.moments.android.views.profile.core.gridPreviewSettings
+import com.moments.android.views.profile.core.sections.ProfileOwnZoomSource
 import com.moments.android.views.profile.core.sections.ProfileSavedContentState
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomDetailDestination
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomFeedKind
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomNavigation
+import com.moments.android.views.profile.core.sections.momentZoomDestination
 import com.moments.android.views.profile.editor.ModernEditProfileView
 import com.moments.android.views.profile.incognito.IncognitoModeSheet
 import com.moments.android.views.profile.momentsview.EditMomentView
 import com.moments.android.views.profile.userprofile.sections.ProfileImageViewer
 import com.moments.android.views.settings.QRCodeView
+import com.moments.android.views.shared.LocalActiveMomentZoomSourceId
+import com.moments.android.views.shared.MomentsContainerTransformOverlay
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.MomentsSharedTransitionLayout
 import com.moments.android.views.settings.SettingsView
 import com.moments.android.views.story.StoriesView
 import com.moments.android.views.story.StoryViewModel
@@ -284,6 +289,8 @@ fun ProfileView(
     savedState: ProfileSavedContentState = ProfileSavedContentState(),
     actions: ProfileViewActions = ProfileViewActions(),
     modifier: Modifier = Modifier,
+    /** ≡ iOS `.toolbar(.hidden, for: .tabBar)` en Settings / edit / moment zoom. */
+    onSuppressTabBarChange: (Boolean) -> Unit = {},
 ) {
     val viewModel = remember { ProfileViewModel() }
     val storyViewModel = remember { StoryViewModel() }
@@ -303,6 +310,14 @@ fun ProfileView(
     var showStories by remember { mutableStateOf(false) }
     var momentDestination by remember { mutableStateOf<ProfileMomentZoomDestination?>(null) }
     var openConnectionsRoute by remember { mutableStateOf<ProfileConnectionsRoute?>(null) }
+
+    val suppressTabBar = showSettings || showEditProfile || momentDestination != null
+    LaunchedEffect(suppressTabBar) {
+        onSuppressTabBarChange(suppressTabBar)
+    }
+    DisposableEffect(Unit) {
+        onDispose { onSuppressTabBarChange(false) }
+    }
     var editingMoment by remember { mutableStateOf<Moment?>(null) }
     var pendingDeleteMoment by remember { mutableStateOf<Moment?>(null) }
     var gridPreviewMoment by remember { mutableStateOf<Moment?>(null) }
@@ -358,74 +373,102 @@ fun ProfileView(
         heroCoordinator.clearZoomNavigation = { momentDestination = null }
     }
 
-    CompositionLocalProvider(LocalProfileGridHeroCoordinator provides heroCoordinator) {
-        Box(modifier.fillMaxSize()) {
-            ModernProfileContentView(
-                viewModel = viewModel,
-                storyViewModel = storyViewModel,
-                selectedTab = profileTab,
-                onSelectTab = { profileTab = it },
-                savedState = savedState,
-                onOpenSavedManager = actions.onOpenSavedManager,
-                onOpenMoment = { moments, index, feedKind ->
-                    moments.getOrNull(index)?.let { moment ->
-                        momentDestination = ProfileMomentZoomDestination(
-                            zoomSourceID = ProfileMomentZoomNavigation.sourceID(moment, index),
-                            initialIndex = index,
-                            initialMomentId = moment.id,
-                            feedKind = feedKind,
-                        )
-                        actions.onOpenMoment(moments, index, feedKind)
+    // ≡ iOS Namespace + navigationTransition(.zoom) → M3 container transform (SharedTransition)
+    MomentsSharedTransitionLayout(modifier.fillMaxSize()) {
+        CompositionLocalProvider(
+            LocalProfileGridHeroCoordinator provides heroCoordinator,
+            LocalActiveMomentZoomSourceId provides momentDestination?.zoomSourceID,
+        ) {
+            Box(Modifier.fillMaxSize()) {
+                ModernProfileContentView(
+                    viewModel = viewModel,
+                    storyViewModel = storyViewModel,
+                    selectedTab = profileTab,
+                    onSelectTab = { profileTab = it },
+                    savedState = savedState,
+                    onOpenSavedManager = actions.onOpenSavedManager,
+                    onOpenMoment = { moments, index, feedKind ->
+                        moments.getOrNull(index)?.let { moment ->
+                            momentDestination = ProfileMomentZoomDestination(
+                                zoomSourceID = ProfileMomentZoomNavigation.sourceID(moment, index),
+                                initialIndex = index,
+                                initialMomentId = moment.id,
+                                feedKind = feedKind,
+                            )
+                            actions.onOpenMoment(moments, index, feedKind)
+                        }
+                    },
+                    onRefreshSavedVisibility = actions.onRefreshSavedVisibility,
+                    onRemoveSaved = actions.onRemoveSaved,
+                    onEditProfile = { actions.onEditProfile(); showEditProfile = true },
+                    onShowStory = { actions.onShowStory(); showStories = true },
+                    onShowProfileImage = { actions.onShowProfileImage(); showProfileImage = true },
+                    onShowNotifications = actions.onShowNotifications,
+                    onShowQr = { actions.onShowQr(); showQr = true },
+                    onShowIncognito = { actions.onShowIncognito(); showIncognito = true },
+                    onShowSettings = { actions.onOpenSettings(); showSettings = true },
+                    isIncognitoActive = isIncognitoActive,
+                    onMomentLongPress = { moment, index, _ ->
+                        heroCoordinator.openMenu(moment, index)
+                    },
+                    openConnectionsRoute = openConnectionsRoute,
+                    onOpenConnectionsRouteConsumed = { openConnectionsRoute = null },
+                )
+
+                // ≡ ProfileGridHeroDetailLayer (flying hero + menú owner)
+                ProfileGridHeroDetailLayer(
+                    coordinator = heroCoordinator,
+                    moments = when (profileTab) {
+                        ProfileTabType.TAGGED -> viewModel.taggedMoments
+                        else -> viewModel.moments
+                    },
+                    zoomFeedKind = when (profileTab) {
+                        ProfileTabType.TAGGED -> ProfileMomentZoomFeedKind.TAGGED_MOMENTS
+                        else -> ProfileMomentZoomFeedKind.OWN_MOMENTS
+                    },
+                )
+
+                // ≡ navigationDestination + .navigationTransition(.zoom "settings-view")
+                MomentsContainerTransformOverlay(visible = showSettings) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .momentZoomDestination(ProfileOwnZoomSource.SETTINGS),
+                    ) {
+                        SettingsView(onNavigateBack = { showSettings = false })
                     }
-                },
-                onRefreshSavedVisibility = actions.onRefreshSavedVisibility,
-                onRemoveSaved = actions.onRemoveSaved,
-                onEditProfile = { actions.onEditProfile(); showEditProfile = true },
-                onShowStory = { actions.onShowStory(); showStories = true },
-                onShowProfileImage = { actions.onShowProfileImage(); showProfileImage = true },
-                onShowNotifications = actions.onShowNotifications,
-                onShowQr = { actions.onShowQr(); showQr = true },
-                onShowIncognito = { actions.onShowIncognito(); showIncognito = true },
-                onShowSettings = { actions.onOpenSettings(); showSettings = true },
-                isIncognitoActive = isIncognitoActive,
-                onMomentLongPress = { moment, index, _ ->
-                    heroCoordinator.openMenu(moment, index)
-                },
-                openConnectionsRoute = openConnectionsRoute,
-                onOpenConnectionsRouteConsumed = { openConnectionsRoute = null },
-            )
+                }
 
-            // ≡ ProfileGridHeroDetailLayer (flying hero + menú owner)
-            ProfileGridHeroDetailLayer(
-                coordinator = heroCoordinator,
-                moments = when (profileTab) {
-                    ProfileTabType.TAGGED -> viewModel.taggedMoments
-                    else -> viewModel.moments
-                },
-                zoomFeedKind = when (profileTab) {
-                    ProfileTabType.TAGGED -> ProfileMomentZoomFeedKind.TAGGED_MOMENTS
-                    else -> ProfileMomentZoomFeedKind.OWN_MOMENTS
-                },
-            )
-        }
-    }
+                // ≡ navigationDestination + .navigationTransition(.zoom "edit-profile-view")
+                MomentsContainerTransformOverlay(visible = showEditProfile) {
+                    ModernEditProfileView(
+                        user = viewModel.userProfile,
+                        onSave = { bio, website, interests ->
+                            viewModel.updateProfileDetails(bio, website, interests)
+                            showEditProfile = false
+                        },
+                        onDismiss = { showEditProfile = false },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .momentZoomDestination(ProfileOwnZoomSource.EDIT_PROFILE),
+                    )
+                }
 
-    if (showSettings) {
-        ProfileFullScreenSheet(onDismiss = { showSettings = false }) {
-            SettingsView(onNavigateBack = { showSettings = false })
-        }
-    }
-
-    if (showEditProfile) {
-        ProfileFullScreenSheet(onDismiss = { showEditProfile = false }) {
-            ModernEditProfileView(
-                user = viewModel.userProfile,
-                onSave = { bio, website, interests ->
-                    viewModel.updateProfileDetails(bio, website, interests)
-                    showEditProfile = false
-                },
-                onDismiss = { showEditProfile = false },
-            )
+                // ≡ ProfileMomentZoomDetailDestination — caller-managed, sin AV anidado
+                momentDestination?.let { destination ->
+                    val liveMoments = when (destination.feedKind) {
+                        ProfileMomentZoomFeedKind.OWN_MOMENTS -> viewModel.moments
+                        ProfileMomentZoomFeedKind.TAGGED_MOMENTS -> viewModel.taggedMoments
+                        ProfileMomentZoomFeedKind.SAVED_MOMENTS -> savedState.moments
+                        else -> viewModel.moments
+                    }
+                    ProfileMomentZoomDetailDestination(
+                        destination = destination,
+                        moments = liveMoments,
+                        onDismiss = { momentDestination = null },
+                    )
+                }
+            }
         }
     }
 
@@ -522,22 +565,6 @@ fun ProfileView(
                 }
             },
         )
-    }
-
-    momentDestination?.let { destination ->
-        val liveMoments = when (destination.feedKind) {
-            ProfileMomentZoomFeedKind.OWN_MOMENTS -> viewModel.moments
-            ProfileMomentZoomFeedKind.TAGGED_MOMENTS -> viewModel.taggedMoments
-            ProfileMomentZoomFeedKind.SAVED_MOMENTS -> savedState.moments
-            else -> viewModel.moments
-        }
-        ProfileFullScreenSheet(onDismiss = { momentDestination = null }) {
-            ProfileMomentZoomDetailDestination(
-                destination = destination,
-                moments = liveMoments,
-                onDismiss = { momentDestination = null },
-            )
-        }
     }
 }
 

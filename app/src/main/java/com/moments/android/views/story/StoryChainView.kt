@@ -28,7 +28,7 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -141,7 +141,7 @@ fun StoryChainView(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    CircularProgressIndicator(color = primary)
+                    MomentsCircularProgressIndicator()
                     Spacer(Modifier.height(18.dp))
                     Text(stringResource(R.string.story_chains_loading), color = secondary, fontSize = 16.sp)
                 }

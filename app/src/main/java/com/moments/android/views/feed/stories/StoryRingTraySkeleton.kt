@@ -22,8 +22,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
+import com.moments.android.views.components.rememberMomentsSkeletonColor
 import com.moments.android.views.components.shimmer
-import com.moments.android.views.feed.core.sections.rememberShimmerBrush
 import com.moments.android.views.story.StorySegmentedRing
 
 /**
@@ -36,7 +36,7 @@ fun StoryRingTraySkeletonCell(
     userId: String? = null,
     modifier: Modifier = Modifier,
 ) {
-    val shimmerBrush = rememberShimmerBrush()
+    val skeleton = rememberMomentsSkeletonColor()
     val label = stringResource(R.string.feed_story_ring_loading)
     val avatarSize = StoryRingLayout.feedHeaderAvatarSize
     val ringLineWidth = StoryRingLayout.feedHeaderLineWidth
@@ -80,7 +80,7 @@ fun StoryRingTraySkeletonCell(
                     Modifier
                         .size(avatarSize)
                         .clip(CircleShape)
-                        .background(shimmerBrush)
+                        .background(skeleton)
                         .shimmer(isAnimating = true),
                 )
             }
@@ -90,7 +90,7 @@ fun StoryRingTraySkeletonCell(
                 .width(if (isOwnStory) 52.dp else 44.dp)
                 .height(10.dp)
                 .clip(RoundedCornerShape(3.dp))
-                .background(shimmerBrush)
+                .background(skeleton)
                 .shimmer(isAnimating = true),
         )
     }

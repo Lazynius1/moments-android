@@ -28,7 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
@@ -377,9 +377,8 @@ private fun SaveScheduleButton(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (isSaving) {
-            CircularProgressIndicator(
-                Modifier.size(16.dp),
-                color = primary,
+            MomentsCircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
                 strokeWidth = 2.dp,
             )
             Spacer(Modifier.width(8.dp))

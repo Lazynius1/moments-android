@@ -299,6 +299,7 @@ fun ChatEphemeralImageCard(
             modifier = Modifier.fillMaxSize(),
         )
         expirationDate?.takeIf { it.after(Date()) }?.let {
+            // ≡ iOS Capsule fill + stroke accent (topTrailing)
             Text(
                 ChatEphemeralTimeFormatting.shortLabel(it),
                 color = Color.White,
@@ -307,9 +308,8 @@ fun ChatEphemeralImageCard(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(8.dp)
-                    .clip(RoundedCornerShape(percent = 50))
-                    .background(Color.Black.copy(alpha = 0.55f))
                     .border(0.5.dp, ephemeralAccent.copy(alpha = 0.5f), RoundedCornerShape(percent = 50))
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(percent = 50))
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }

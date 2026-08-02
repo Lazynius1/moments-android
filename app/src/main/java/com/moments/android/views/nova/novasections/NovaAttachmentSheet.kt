@@ -23,7 +23,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,12 +30,10 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -100,26 +97,24 @@ import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.nova.novacore.NovaColors
+import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
-import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * Port de `Views/Nova/NovaSections/NovaAttachmentSheet.swift`.
- * Menú popover, overlay medium cámara/fotos y chrome story-style.
+ * Nova attachment: menú popover + sheets M3 ([MomentsModalSheet]) para cámara/fotos.
+ * Sin drag vertical custom — gestos del ModalBottomSheet.
  */
 
 enum class NovaAttachmentSheetKind { MENU, CAMERA, PHOTOS }
 
 private object NovaAttachmentSheetMetrics {
-    val horizontalInset = 10.dp
     val cornerRadius = 24.dp
     val menuPopoverMinWidth = 168.dp
     val menuPopoverGap = 16.dp
-    const val heightFraction = 0.58f
 }
 
 // MARK: - Menu popover
@@ -258,7 +253,7 @@ private fun NovaAttachmentMenuRow(
     }
 }
 
-// MARK: - Overlay
+// MARK: - Overlay (M3 ModalBottomSheet)
 
 @Composable
 fun NovaAttachmentSheetOverlay(
@@ -268,90 +263,38 @@ fun NovaAttachmentSheetOverlay(
     onAdd: (Bitmap) -> Unit,
 ) {
     val kind = activeSheet?.takeIf { it != NovaAttachmentSheetKind.MENU } ?: return
-    val isDark = isSystemInDarkTheme()
-    val density = LocalDensity.current
-    val navBottom = WindowInsets.navigationBars.getBottom(density).let { with(density) { it.toDp() } }
-    val bottomPadding = NovaInputBarLayout.attachmentSheetBottomInset(navBottom)
-    var dragOffset by remember(kind) { mutableFloatStateOf(0f) }
-
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .zIndex(45f),
-    ) {
-        val sheetHeight = maxHeight * NovaAttachmentSheetMetrics.heightFraction
-        val sheetHeightPx = with(density) { sheetHeight.toPx() }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = if (isDark) 0.28f else 0.16f))
-                .clickable {
-                    dragOffset = 0f
-                    onSheetChange(null)
-                },
-        )
-
-        NovaAttachmentSheetSurface(
-            kind = kind,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = NovaAttachmentSheetMetrics.horizontalInset)
-                .padding(bottom = bottomPadding)
-                .height(sheetHeight)
-                .offset { IntOffset(0, dragOffset.roundToInt()) }
-                .pointerInput(kind, sheetHeightPx) {
-                    detectVerticalDragGestures(
-                        onDragStart = { dragOffset = 0f },
-                        onDragEnd = {
-                            val shouldDismiss = dragOffset > sheetHeightPx * 0.2f
-                            if (shouldDismiss) {
-                                dragOffset = 0f
-                                onSheetChange(null)
-                            } else {
-                                dragOffset = 0f
-                            }
-                        },
-                        onDragCancel = { dragOffset = 0f },
-                        onVerticalDrag = { _, delta -> dragOffset = max(0f, dragOffset + delta) },
-                    )
-                }
-                .clickable(enabled = false) {},
-        ) {
-            when (kind) {
-                NovaAttachmentSheetKind.CAMERA -> NovaAttachmentCameraSheet(
-                    onCaptured = onCaptured,
-                    onBack = { dragOffset = 0f; onSheetChange(NovaAttachmentSheetKind.MENU) },
-                )
-                NovaAttachmentSheetKind.PHOTOS -> NovaAttachmentPhotoGridSheet(
-                    onAdd = onAdd,
-                    onBack = { dragOffset = 0f; onSheetChange(NovaAttachmentSheetKind.MENU) },
-                )
-                NovaAttachmentSheetKind.MENU -> Unit
-            }
-        }
-    }
-}
-
-@Composable
-private fun NovaAttachmentSheetSurface(
-    kind: NovaAttachmentSheetKind,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    val shape = RoundedCornerShape(NovaAttachmentSheetMetrics.cornerRadius)
-    val bg = when (kind) {
+    val container = when (kind) {
         NovaAttachmentSheetKind.CAMERA -> Color.Black
         else -> MomentsGlassButtonTint.canvas(isSystemInDarkTheme())
     }
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .shadow(24.dp, shape, ambientColor = Color.Black.copy(alpha = 0.18f), spotColor = Color.Black.copy(alpha = 0.18f))
-            .clip(shape)
-            .background(bg),
-    ) {
-        content()
+
+    MomentsModalSheet(
+        onDismissRequest = { onSheetChange(null) },
+        // Cámara: expanded; fotos: partial+expanded (M3), sin altura % forzada.
+        largeOnly = kind == NovaAttachmentSheetKind.CAMERA,
+        containerColor = container,
+        shape = RoundedCornerShape(
+            topStart = NovaAttachmentSheetMetrics.cornerRadius,
+            topEnd = NovaAttachmentSheetMetrics.cornerRadius,
+        ),
+    ) { dismiss ->
+        when (kind) {
+            NovaAttachmentSheetKind.CAMERA -> NovaAttachmentCameraSheet(
+                onCaptured = {
+                    onCaptured(it)
+                    dismiss()
+                },
+                onBack = { onSheetChange(NovaAttachmentSheetKind.MENU) },
+            )
+            NovaAttachmentSheetKind.PHOTOS -> NovaAttachmentPhotoGridSheet(
+                onAdd = {
+                    onAdd(it)
+                    dismiss()
+                },
+                onBack = { onSheetChange(NovaAttachmentSheetKind.MENU) },
+            )
+            NovaAttachmentSheetKind.MENU -> Unit
+        }
     }
 }
 

@@ -20,8 +20,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -35,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -74,6 +77,7 @@ fun CommentMentionSearchOverlay(
     var searchResults by remember { mutableStateOf<List<AppUser>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
+    val focusRequester = remember { FocusRequester() }
 
     fun searchUsers(raw: String) {
         val trimmed = raw.trim()
@@ -98,6 +102,13 @@ fun CommentMentionSearchOverlay(
         } else if (!query.isNullOrBlank()) {
             searchText = query
             searchUsers(query)
+        }
+    }
+
+    // ≡ iOS `isSearchFocused = showsSearchField` onAppear
+    LaunchedEffect(showsSearchField) {
+        if (showsSearchField) {
+            runCatching { focusRequester.requestFocus() }
         }
     }
 
@@ -127,7 +138,9 @@ fun CommentMentionSearchOverlay(
                     singleLine = true,
                     cursorBrush = SolidColor(colors.primary),
                     textStyle = TextStyle(color = colors.primary, fontSize = 15.sp),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester),
                     decorationBox = { inner ->
                         if (searchText.isEmpty()) {
                             Text(placeholder, color = Color.Gray, fontSize = 15.sp)
@@ -199,7 +212,7 @@ fun CommentMentionSearchOverlay(
                 when {
                     isSearching -> {
                         Box(Modifier.fillMaxWidth().height(88.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                            MomentsCircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                         }
                     }
                     searchResults.isEmpty() -> {
@@ -238,7 +251,15 @@ private fun CommentMentionSearchRow(user: AppUser, onClick: () -> Unit) {
                 .size(42.dp)
                 .clip(CircleShape)
                 .background(Color.Gray.copy(0.3f)),
+            contentAlignment = Alignment.Center,
         ) {
+            // ≡ iOS `person.circle.fill` placeholder
+            Icon(
+                Icons.Filled.Person,
+                contentDescription = null,
+                tint = Color.Gray,
+                modifier = Modifier.size(28.dp),
+            )
             if (!user.profileImagePath.isNullOrBlank()) {
                 AsyncImage(
                     model = user.profileImagePath,

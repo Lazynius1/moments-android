@@ -10,6 +10,10 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import com.moments.android.R
 
+/**
+ * Tipografía Material3 ([Typography]) con Inter variable.
+ * Skill `styles` (Compose Styles API experimental) no adoptada aún — usamos Typography M3.
+ */
 // Inter (variable) — sustituto libre y casi calcado de SF Pro que usa iOS.
 val InterFamily = FontFamily(
     Font(R.font.inter_variable, FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),

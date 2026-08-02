@@ -4,14 +4,18 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,6 +79,8 @@ fun UserModernPublicProfileView(
     val colors = rememberAdaptiveColors()
     val density = LocalDensity.current
     val scrollState = rememberScrollState()
+    // ≡ ProfileShellComponents: statusTop + topContentInset (chrome sticky bajo safe area)
+    val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     var highlightsRefreshToken by remember { mutableIntStateOf(0) }
     var storyRingRefreshToken by remember { mutableIntStateOf(0) }
     var tabsMinY by remember { mutableFloatStateOf(Float.POSITIVE_INFINITY) }
@@ -113,7 +119,7 @@ fun UserModernPublicProfileView(
                 .verticalScroll(scrollState)
                 .padding(bottom = safeAreaBottom + 120.dp),
         ) {
-            Box(Modifier.height(ProfileHeaderCollapseMetrics.topContentInset))
+            Spacer(Modifier.height(statusTop + ProfileHeaderCollapseMetrics.topContentInset))
 
             UserModernProfileHeader(
                 viewModel = viewModel,
@@ -202,7 +208,7 @@ fun UserModernPublicProfileView(
                                     Modifier.fillMaxWidth().height(400.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    CircularProgressIndicator(color = colors.primary)
+                                    MomentsCircularProgressIndicator()
                                 }
                             }
                             viewModel.taggedMoments.isEmpty() -> {

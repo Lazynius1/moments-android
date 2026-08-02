@@ -31,7 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -188,10 +188,9 @@ fun IncognitoGlobalOverlay(modifier: Modifier = Modifier) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (isSyncing) {
-                            CircularProgressIndicator(
-                                color = colors.primary,
-                                strokeWidth = 2.dp,
+                            MomentsCircularProgressIndicator(
                                 modifier = Modifier.size(14.dp),
+                                strokeWidth = 2.dp,
                             )
                         } else {
                             Icon(

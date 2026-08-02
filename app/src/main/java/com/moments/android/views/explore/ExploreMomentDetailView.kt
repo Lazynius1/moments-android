@@ -75,7 +75,9 @@ import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
 import com.moments.android.views.settings.hasVideoMedia
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.momentdetail.FeedPinnedTopChrome
+import com.moments.android.views.shared.momentdetail.MomentDetailSolidTopChrome
 import com.moments.android.views.shared.momentdetail.ProfileHeaderCollapseMetrics
+import com.moments.android.views.shared.momentdetail.rememberMomentDetailContentTopInset
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -138,6 +140,7 @@ fun ExploreMomentDetailView(
     var isPeeking by remember { mutableStateOf(false) }
     var peekIsProtected by remember { mutableStateOf(false) }
 
+    val listTopInset = rememberMomentDetailContentTopInset()
     val listState = rememberLazyListState()
     val animatedOffset by animateFloatAsState(
         targetValue = dragOffsetPx,
@@ -316,7 +319,7 @@ fun ExploreMomentDetailView(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
-                    top = ProfileHeaderCollapseMetrics.feedStyleDetailTopInset,
+                    top = listTopInset,
                     bottom = 24.dp,
                     start = FeedMomentCardLayout.listHorizontalPadding,
                     end = FeedMomentCardLayout.listHorizontalPadding,
@@ -368,11 +371,13 @@ fun ExploreMomentDetailView(
                 }
             }
 
-            FeedPinnedTopChrome(
-                title = stringResource(R.string.explore_title),
-                onDismiss = onNavigateBack,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
+            MomentDetailSolidTopChrome(modifier = Modifier.align(Alignment.TopCenter)) {
+                FeedPinnedTopChrome(
+                    title = stringResource(R.string.explore_title),
+                    onDismiss = onNavigateBack,
+                    applySafeAreaTop = false,
+                )
+            }
         }
 
         contextMenuMoment?.let { menuMoment ->

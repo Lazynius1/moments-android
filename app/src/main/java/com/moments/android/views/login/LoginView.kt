@@ -25,13 +25,10 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -55,6 +52,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
+import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -410,10 +408,8 @@ private suspend fun loginWithIdentifier(identifier: String, password: String) {
 }
 
 // MARK: - Reset password (equivalente a EnhancedResetPasswordView)
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ResetPasswordSheet(onDismiss: () -> Unit) {
-    val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
     var email by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -423,7 +419,7 @@ private fun ResetPasswordSheet(onDismiss: () -> Unit) {
     val successMessage = stringResource(R.string.login_reset_password_success)
     val genericErrorMessage = stringResource(R.string.login_reset_password_generic_error)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    MomentsModalSheet(onDismissRequest = onDismiss, largeOnly = false) { _ ->
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 28.dp, top = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

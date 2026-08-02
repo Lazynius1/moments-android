@@ -17,16 +17,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import com.moments.android.views.feed.rememberAdaptiveColors
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import com.moments.android.coordinators.nav3.MomentsDeepLinkParser
+import com.moments.android.coordinators.nav3.MomentsNavKey
+import com.moments.android.coordinators.nav3.MomentsTabNavHost
+import com.moments.android.coordinators.nav3.MomentsTabNavKey
+import com.moments.android.coordinators.nav3.rememberMomentsTabNavigationState
+import com.moments.android.coordinators.nav3.rememberMomentsTabNavigator
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,7 +52,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,19 +78,11 @@ import com.moments.android.R
 import com.moments.android.extensions.MomentsGlassButtonTint
 import com.moments.android.notifications.services.FCMTokenService
 import com.moments.android.notifications.services.InAppNotificationService
-import com.moments.android.notifications.screens.NotificationsScreen
 import com.moments.android.services.auth.AuthService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchUserByUsername
-import com.moments.android.views.explore.ExploreView
-import com.moments.android.views.feed.core.FeedView
 import com.moments.android.views.shared.OfflineBannerOverlay
-import com.moments.android.views.creator.CreatorView
 import com.moments.android.views.components.InAppBannerView
-import com.moments.android.views.messaging.screens.MessagingView
-import com.moments.android.views.nova.NovaView
-import com.moments.android.views.profile.core.ProfileView
-import com.moments.android.views.profile.userprofile.UserProfileView
 import com.moments.android.utilities.HapticManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -122,15 +118,17 @@ enum class AppTab {
 @Composable
 fun TabBarScreen(
     deepLinkUri: Uri? = null,
+    deepLinkFromNewTask: Boolean = false,
     onDeepLinkHandled: () -> Unit = {},
 ) {
     val mainViewModel = remember { MainViewModel.shared }
     val hasNewFeedContent by mainViewModel.hasNewFeedContent.collectAsState()
     val hasUnreadNotifications by mainViewModel.hasUnreadNotifications.collectAsState()
 
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var previousSelectedTab by remember { mutableIntStateOf(0) }
-    var showCreatorView by remember { mutableStateOf(false) }
+    // Nav3 fase 2a/2b: back stacks por tab + DialogSceneStrategy overlays.
+    val tabNavigationState = rememberMomentsTabNavigationState()
+    val tabNavigator = rememberMomentsTabNavigator(tabNavigationState)
+    val selectedTab = tabNavigationState.selectedTabIndex
     var isCreatingStory by remember { mutableStateOf(false) }
     var openCreatorInStoryMode by remember { mutableStateOf(false) }
     var hasPreloadedExplore by remember { mutableStateOf(false) }
@@ -138,16 +136,26 @@ fun TabBarScreen(
     var pendingEchoId by remember { mutableStateOf("") }
     var showEchoViewer by remember { mutableStateOf(false) }
     var echoInvitationRoute by remember { mutableStateOf<String?>(null) }
-    var showNotificationsOverlay by remember { mutableStateOf(false) }
-    var showMessagesOverlay by remember { mutableStateOf(false) }
+    // ≡ iOS `.toolbar(.hidden, for: .tabBar)` desde Settings / edit / moment zoom
+    var suppressTabBar by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val firestoreService = remember { FirestoreService() }
 
-    val routerContext = remember {
+    val routerContext = remember(tabNavigator) {
         AppRouterTabBarContext(
-            setSelectedTab = { selectedTab = it },
-            setShowCreatorView = { showCreatorView = it },
+            setSelectedTab = { index ->
+                if (index == AppTab.toIndex(AppTab.CREATE)) {
+                    isCreatingStory = true
+                    tabNavigator.push(MomentsNavKey.Creator)
+                } else {
+                    tabNavigator.selectTabIndex(index)
+                }
+            },
+            setShowCreatorView = { visible ->
+                if (visible) tabNavigator.push(MomentsNavKey.Creator)
+                else tabNavigator.popIfTop(MomentsNavKey.Creator)
+            },
             setPendingEchoId = { pendingEchoId = it },
             setShowEchoInvitation = { showEchoInvitation = it },
             setShowEchoViewer = { showEchoViewer = it },
@@ -169,7 +177,6 @@ fun TabBarScreen(
 
     LaunchedEffect(Unit) {
         FCMTokenService.updateFCMToken()
-        previousSelectedTab = selectedTab
         if (FirebaseAuth.getInstance().currentUser?.uid != null) {
             delay(2000)
             if (!hasPreloadedExplore) {
@@ -181,13 +188,6 @@ fun TabBarScreen(
     LaunchedEffect(selectedTab) {
         if (selectedTab == AppTab.toIndex(AppTab.EXPLORE) && !hasPreloadedExplore) {
             hasPreloadedExplore = true
-        }
-        if (selectedTab == AppTab.toIndex(AppTab.CREATE)) {
-            showCreatorView = true
-            isCreatingStory = true
-            selectedTab = previousSelectedTab
-        } else {
-            previousSelectedTab = selectedTab
         }
         if (selectedTab == AppTab.toIndex(AppTab.HOME)) {
             mainViewModel.markFeedAsSeen()
@@ -209,42 +209,61 @@ fun TabBarScreen(
         NavigationEventBus.events.collectLatest { event ->
             when (event) {
                 is CoordinatorNavigationEvent.ShowExploreView,
-                -> selectedTab = AppTab.toIndex(AppTab.EXPLORE)
-                is CoordinatorNavigationEvent.NavigateToMoment,
-                is CoordinatorNavigationEvent.NavigateToProfile,
-                is CoordinatorNavigationEvent.NavigateToStoryInFeed,
-                is CoordinatorNavigationEvent.NavigateToStoryChain,
-                is CoordinatorNavigationEvent.NavigateToNotifications,
-                is CoordinatorNavigationEvent.ShowStories,
-                is CoordinatorNavigationEvent.ShowStoriesStartingAt,
+                -> tabNavigator.selectTab(MomentsTabNavKey.Explore)
                 is CoordinatorNavigationEvent.NavigateToUserProfileInFeed,
-                -> selectedTab = AppTab.toIndex(AppTab.HOME)
-                is CoordinatorNavigationEvent.NavigateToFollowRequests,
-                is CoordinatorNavigationEvent.ShowProfileVisits,
-                -> selectedTab = AppTab.toIndex(AppTab.PROFILE)
-                is CoordinatorNavigationEvent.ShowUserProfile -> {
-                    selectedTab = AppTab.toIndex(AppTab.HOME)
+                -> tabNavigator.selectTab(MomentsTabNavKey.Feed)
+                // AppRouter / deep link → host Nav3 (stack Feed + Back al root).
+                is CoordinatorNavigationEvent.NavigateToProfile ->
+                    tabNavigator.openProfile(event.userId)
+                is CoordinatorNavigationEvent.ShowUserProfile ->
+                    tabNavigator.openProfile(event.userId)
+                is CoordinatorNavigationEvent.NavigateToMoment -> {
+                    val momentId = event.momentId.trim()
+                    if (momentId.isEmpty()) return@collectLatest
                     scope.launch {
-                        delay(500)
-                        NavigationEventBus.emit(
-                            CoordinatorNavigationEvent.NavigateToUserProfileInFeed(event.userId),
-                        )
+                        val author = event.userId?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: firestoreService.fetchMomentAuthorId(momentId)
+                        if (!author.isNullOrEmpty()) {
+                            tabNavigator.openMoment(momentId, author)
+                        }
                     }
                 }
-                is CoordinatorNavigationEvent.ShowNotifications -> showNotificationsOverlay = true
-                is CoordinatorNavigationEvent.ShowMessages -> showMessagesOverlay = true
+                is CoordinatorNavigationEvent.NavigateToConversation ->
+                    tabNavigator.openConversation(event.conversationId)
+                is CoordinatorNavigationEvent.ShowStories ->
+                    tabNavigator.openStories()
+                is CoordinatorNavigationEvent.ShowStoriesStartingAt ->
+                    tabNavigator.openStories(startAtUserId = event.userId)
+                is CoordinatorNavigationEvent.NavigateToStoryInFeed ->
+                    tabNavigator.openStory(event.storyId, event.authorId)
+                is CoordinatorNavigationEvent.NavigateToStoryChain ->
+                    tabNavigator.openStoryChain(event.chainId, event.chainTitle)
+                is CoordinatorNavigationEvent.NavigateToStoryChainInFeed ->
+                    tabNavigator.openStoryChain(event.chainId, event.chainTitle)
+                is CoordinatorNavigationEvent.NavigateToNotifications -> {
+                    tabNavigator.selectTab(MomentsTabNavKey.Feed)
+                    tabNavigator.push(MomentsNavKey.ShowNotifications)
+                }
+                is CoordinatorNavigationEvent.NavigateToFollowRequests,
+                is CoordinatorNavigationEvent.ShowProfileVisits,
+                -> tabNavigator.selectTab(MomentsTabNavKey.Profile)
+                // Un solo host Nav3 (DialogSceneStrategy). Feed no monta otro Dialog en paralelo.
+                CoordinatorNavigationEvent.ShowNotifications,
+                CoordinatorNavigationEvent.OpenNotifications,
+                -> tabNavigator.push(MomentsNavKey.ShowNotifications)
+                is CoordinatorNavigationEvent.ShowMessages ->
+                    tabNavigator.push(MomentsNavKey.ShowMessages)
                 is CoordinatorNavigationEvent.ScrollFeedToTop -> Unit
                 is CoordinatorNavigationEvent.ReturnToFeedAfterMomentPublish -> {
-                    previousSelectedTab = AppTab.toIndex(AppTab.HOME)
-                    selectedTab = AppTab.toIndex(AppTab.HOME)
+                    tabNavigator.selectTab(MomentsTabNavKey.Feed)
                 }
-                is CoordinatorNavigationEvent.NavigateToOwnProfileTab -> selectedTab = AppTab.toIndex(AppTab.PROFILE)
-                is CoordinatorNavigationEvent.NavigateToUserProfile -> {
-                    AppRouter.navigate(AppRouter.Destination.Profile(event.userId))
-                }
+                is CoordinatorNavigationEvent.NavigateToOwnProfileTab ->
+                    tabNavigator.selectTab(MomentsTabNavKey.Profile)
+                is CoordinatorNavigationEvent.NavigateToUserProfile ->
+                    tabNavigator.openProfile(event.userId)
                 is CoordinatorNavigationEvent.OpenCreatorForChain -> {
-                    showCreatorView = true
                     isCreatingStory = true
+                    tabNavigator.push(MomentsNavKey.Creator)
                     scope.launch {
                         delay(1000)
                         NavigationEventBus.emit(CoordinatorNavigationEvent.SetContentType("story"))
@@ -257,59 +276,68 @@ fun TabBarScreen(
                         )
                     }
                 }
-                is CoordinatorNavigationEvent.NavigateToStoryChainInFeed -> {
-                    selectedTab = AppTab.toIndex(AppTab.HOME)
-                    scope.launch {
-                        delay(500)
-                        NavigationEventBus.emit(
-                            CoordinatorNavigationEvent.NavigateToStoryChain(event.chainId, event.chainTitle),
-                        )
-                    }
-                }
                 else -> Unit
             }
         }
     }
 
-    LaunchedEffect(deepLinkUri) {
+    LaunchedEffect(deepLinkUri, deepLinkFromNewTask) {
         val uri = deepLinkUri ?: return@LaunchedEffect
-        TabBarDeepLinkHandler.handle(uri, firestoreService) { onDeepLinkHandled() }
+        TabBarDeepLinkHandler.handle(
+            uri = uri,
+            firestoreService = firestoreService,
+            fromNewTask = deepLinkFromNewTask,
+            openDeepLink = { key, newTask -> tabNavigator.openDeepLink(key, newTask) },
+            onHandled = onDeepLinkHandled,
+        )
     }
 
     Box(Modifier.fillMaxSize()) {
+        // Skill edge-to-edge: bottom insets los consume el tab bar (navigationBarsPadding).
+        // Top/horizontal → contentPadding del Scaffold; no doble-padear el dock.
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets.safeDrawing.only(
+                WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
+            ),
             bottomBar = {
-                MomentsCustomTabBar(
-                    selectedTab = selectedTab,
-                    onSelectTab = { index ->
-                        if (index == AppTab.toIndex(AppTab.HOME) && selectedTab == index) {
-                            HapticManager.shared.lightImpact()
-                            NavigationEventBus.emit(CoordinatorNavigationEvent.ScrollFeedToTop)
-                        } else if (index == AppTab.toIndex(AppTab.CREATE)) {
+                // Push Profile (Nav3) oculta dock; overlays DialogScene ya cubren encima.
+                if (!suppressTabBar && !tabNavigator.shouldHideTabBarForPush()) {
+                    MomentsCustomTabBar(
+                        selectedTab = selectedTab,
+                        onSelectTab = { index ->
+                            if (index == AppTab.toIndex(AppTab.HOME) && selectedTab == index) {
+                                HapticManager.shared.lightImpact()
+                                NavigationEventBus.emit(CoordinatorNavigationEvent.ScrollFeedToTop)
+                            } else if (index == AppTab.toIndex(AppTab.CREATE)) {
+                                HapticManager.shared.mediumImpact()
+                                isCreatingStory = true
+                                tabNavigator.push(MomentsNavKey.Creator)
+                            } else {
+                                HapticManager.shared.selection()
+                                tabNavigator.selectTabIndex(index)
+                            }
+                        },
+                        onOpenCreator = {
                             HapticManager.shared.mediumImpact()
-                            showCreatorView = true
-                            isCreatingStory = true
-                        } else {
-                            HapticManager.shared.selection()
-                            selectedTab = index
-                        }
-                    },
-                    onOpenCreator = {
-                        HapticManager.shared.mediumImpact()
-                        showCreatorView = true
-                    },
-                    showFeedBadge = hasNewFeedContent,
-                    showProfileBadge = hasUnreadNotifications,
-                )
+                            tabNavigator.push(MomentsNavKey.Creator)
+                        },
+                        showFeedBadge = hasNewFeedContent,
+                        showProfileBadge = hasUnreadNotifications,
+                    )
+                }
             },
         ) { padding ->
-            TabContent(
-                selectedTab = selectedTab,
+            MomentsTabNavHost(
+                navigationState = tabNavigationState,
+                navigator = tabNavigator,
                 padding = padding,
-                showCreatorView = showCreatorView,
-                onShowCreatorViewChange = { showCreatorView = it },
+                isCreatingStory = isCreatingStory,
+                onIsCreatingStoryChange = { isCreatingStory = it },
+                openCreatorInStoryMode = openCreatorInStoryMode,
+                onOpenCreatorInStoryModeChange = { openCreatorInStoryMode = it },
+                onSuppressTabBarChange = { suppressTabBar = it },
             )
         }
 
@@ -332,47 +360,6 @@ fun TabBarScreen(
             )
         }
 
-        if (showCreatorView) {
-            val creatorSurface = rememberAdaptiveColors().surfaceBackground
-            Dialog(
-                onDismissRequest = {
-                    showCreatorView = false
-                    openCreatorInStoryMode = false
-                    isCreatingStory = false
-                },
-                properties = DialogProperties(
-                    usePlatformDefaultWidth = false,
-                    decorFitsSystemWindows = false,
-                ),
-            ) {
-                // Fondo AdaptiveColors edge-to-edge (también bajo status bar).
-                // El safe drawing va solo en el contenido — no recorta el color de fondo.
-                Box(Modifier.fillMaxSize().background(creatorSurface)) {
-                    // Barras de sistema sí; IME no — el teclado se superpone (como iOS ignoresSafeArea(.keyboard)).
-                    // Si incluimos IME en el padding, el canvas creatorMomentsCaptureRect se encoge.
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars)),
-                    ) {
-                        CreatorView(
-                            showCreatorView = true,
-                            onShowCreatorViewChange = {
-                                showCreatorView = it
-                                if (!it) {
-                                    openCreatorInStoryMode = false
-                                    isCreatingStory = false
-                                }
-                            },
-                            isCreatingStory = isCreatingStory,
-                            onIsCreatingStoryChange = { isCreatingStory = it },
-                            openInStoryMode = openCreatorInStoryMode,
-                        )
-                    }
-                }
-            }
-        }
-
         if (showEchoViewer && pendingEchoId.isNotEmpty()) {
             com.moments.android.views.echoes.EchoViewerUI(
                 echoId = pendingEchoId,
@@ -382,73 +369,13 @@ fun TabBarScreen(
                 },
             )
         }
-
-        if (showNotificationsOverlay) {
-            Dialog(
-                onDismissRequest = {
-                    showNotificationsOverlay = false
-                    mainViewModel.markNotificationsAsSeen()
-                },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
-            ) {
-                Surface(Modifier.fillMaxSize()) {
-                    NotificationsScreen(onBack = {
-                        showNotificationsOverlay = false
-                        mainViewModel.markNotificationsAsSeen()
-                    })
-                }
-            }
-        }
-
-        if (showMessagesOverlay) {
-            Dialog(
-                onDismissRequest = { showMessagesOverlay = false },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
-            ) {
-                Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
-                    MessagingView(onDismiss = { showMessagesOverlay = false })
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TabContent(
-    selectedTab: Int,
-    padding: PaddingValues,
-    showCreatorView: Boolean,
-    onShowCreatorViewChange: (Boolean) -> Unit,
-) {
-    when (AppTab.fromIndex(selectedTab)) {
-        AppTab.HOME -> FeedView(
-            padding = padding,
-            showCreatorView = showCreatorView,
-            onShowCreatorViewChange = onShowCreatorViewChange,
-        )
-        AppTab.NOVA -> Box(
-            Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            // ≡ iOS Tab(AppTab.nova) { NovaView() }
-            NovaView()
-        }
-        AppTab.CREATE -> Box(Modifier.fillMaxSize())
-        AppTab.EXPLORE -> ExploreView(
-            contentPadding = padding,
-        )
-        // El perfil pinta bajo la status bar (≡ `ignoresSafeArea` Swift); solo conserva
-        // el espacio inferior que reserva el dock de Android.
-        AppTab.PROFILE -> ProfileView(
-            modifier = Modifier.padding(bottom = padding.calculateBottomPadding()),
-        )
     }
 }
 
 /**
  * Tab bar docked estilo IG (full-width, sin labels).
- * TODO(paridad TabBarView.swift): auditar show/hide 1:1 al cerrar Coordinators/TabBarView.
+ * Edge-to-edge: [Surface] pinta bajo la gesture/nav bar; iconos en [navigationBarsPadding].
+ * TODO(adaptive): NavigationSuiteScaffold / rail en tablet — skill `adaptive` + Nav3.
  */
 @Composable
 private fun MomentsCustomTabBar(
@@ -461,7 +388,7 @@ private fun MomentsCustomTabBar(
     val isDark = isSystemInDarkTheme()
     val activeColor = if (isDark) Color.White else MomentsGlassButtonTint.dark
     val inactiveColor = activeColor.copy(alpha = 0.55f)
-    val chromeFill = MomentsGlassButtonTint.canvas(isDark)
+    val chromeFill = MaterialTheme.colorScheme.background
     val hairline = Color.Black.copy(alpha = if (isDark) 0.28f else 0.10f)
 
     Surface(
@@ -477,10 +404,11 @@ private fun MomentsCustomTabBar(
                     .height(0.5.dp)
                     .background(hairline),
             )
+            // Altura de iconos fija; el padding de nav bars va fuera para que el
+            // fondo del Surface se extienda edge-to-edge bajo la gesture bar.
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding()
                     .height(49.dp)
                     .padding(horizontal = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -517,7 +445,7 @@ private fun MomentsCustomTabBar(
                     inactiveColor = inactiveColor,
                     onClick = { onSelectTab(3) },
                 )
-                TabBarItem(
+                    TabBarItem(
                     icon = if (selectedTab == 4) Icons.Filled.Person else Icons.Outlined.Person,
                     title = stringResource(R.string.tab_bar_profile),
                     isSelected = selectedTab == 4,
@@ -527,6 +455,12 @@ private fun MomentsCustomTabBar(
                     onClick = { onSelectTab(4) },
                 )
             }
+            // Skill: inset size modifier — chrome del dock bajo la gesture/nav bar.
+            Spacer(
+                Modifier
+                    .fillMaxWidth()
+                    .windowInsetsBottomHeight(WindowInsets.navigationBars),
+            )
         }
     }
 }
@@ -714,69 +648,76 @@ private fun EchoViewerPlaceholder(echoId: String, onDismiss: () -> Unit) {
     }
 }
 
-/** Deep links — port de handleDeepLink / handleCustomScheme / handleUniversalLink. */
+/**
+ * Deep links — port de handleDeepLink / handleCustomScheme / handleUniversalLink.
+ *
+ * Sync: [MomentsDeepLinkParser] → [MomentsNavKey] → [MomentsTabNavigator.openDeepLink]
+ * (stack sintético; skill navigation-3 / deeplink-guide).
+ */
 object TabBarDeepLinkHandler {
 
     private val scope = kotlinx.coroutines.CoroutineScope(
         kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate,
     )
 
-    fun handle(uri: Uri, firestoreService: FirestoreService, onHandled: () -> Unit = {}) {
-        when (uri.scheme?.lowercase()) {
-            "moments", "glowsy" -> handleCustomScheme(uri, firestoreService)
-            "https" -> handleUniversalLink(uri)
-        }
-        onHandled()
-    }
-
-    private fun handleCustomScheme(uri: Uri, firestoreService: FirestoreService) {
+    fun handle(
+        uri: Uri,
+        firestoreService: FirestoreService,
+        fromNewTask: Boolean = false,
+        openDeepLink: (MomentsNavKey, fromNewTask: Boolean) -> Unit,
+        onHandled: () -> Unit = {},
+    ) {
         val host = uri.host?.lowercase().orEmpty()
         val path = uri.path.orEmpty()
+        val scheme = uri.scheme?.lowercase()
 
-        when {
-            host == "moment" && uri.pathSegments.size > 1 -> {
-                AppRouter.navigate(AppRouter.Destination.Moment(uri.pathSegments[1], ""))
+        // profile/visits: padre sintético = tab Profile
+        if (scheme in setOf("moments", "glowsy") && host == "profile" && path == "/visits") {
+            openDeepLink(MomentsNavKey.ShowProfileVisits, fromNewTask)
+            onHandled()
+            return
+        }
+
+        // profile/{username}: resolución async Firestore → push Profile sintético
+        if (scheme in setOf("moments", "glowsy") && host == "profile" && uri.pathSegments.size > 1) {
+            val username = uri.lastPathSegment.orEmpty()
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { firestoreService.fetchUserByUsername(username) }
+                    .onSuccess { user ->
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            openDeepLink(MomentsNavKey.Profile(user.id), fromNewTask)
+                        }
+                    }
             }
-            host == "story" && path == "/create" -> {
-                AppRouter.navigate(AppRouter.Destination.Creator)
-            }
-            host == "profile" && path == "/visits" -> {
-                AppRouter.navigate(AppRouter.Destination.OwnProfileTab)
+            onHandled()
+            return
+        }
+
+        // https universal moment
+        if (scheme == "https") {
+            val key = MomentsDeepLinkParser.parse(uri)
+            if (key is MomentsNavKey.Moment) {
                 scope.launch {
                     delay(500)
-                    AppRouter.navigate(AppRouter.Destination.ShowProfileVisits)
+                    openDeepLink(key, fromNewTask)
                 }
+                onHandled()
+                return
             }
-            host == "profile" && uri.pathSegments.size > 1 -> {
-                val username = uri.lastPathSegment.orEmpty()
-                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    runCatching { firestoreService.fetchUserByUsername(username) }
-                        .onSuccess { user ->
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                AppRouter.navigate(AppRouter.Destination.ShowUserProfile(user.id))
-                            }
-                        }
-                }
-            }
-            host == "messages" -> AppRouter.navigate(AppRouter.Destination.ShowMessages)
-            host == "notifications" -> AppRouter.navigate(AppRouter.Destination.ShowNotifications)
-            host == "stories" -> AppRouter.navigate(AppRouter.Destination.ShowStories)
         }
-    }
 
-    private fun handleUniversalLink(uri: Uri) {
-        val host = uri.host?.lowercase().orEmpty()
-        val supported = setOf(
-            "moments.app", "www.moments.app",
-            "momentsapp.app", "www.momentsapp.app",
-        )
-        if (host !in supported) return
-        val segments = uri.pathSegments
-        if (segments.size >= 2 && segments[0] == "moment") {
-            scope.launch {
-                delay(500)
-                AppRouter.navigate(AppRouter.Destination.Moment(segments[1], ""))
+        val parsed = MomentsDeepLinkParser.parse(uri)
+        when {
+            parsed is MomentsNavKey.Moment && parsed.authorId.isBlank() -> {
+                scope.launch {
+                    val author = firestoreService.fetchMomentAuthorId(parsed.id)
+                    if (!author.isNullOrEmpty()) {
+                        openDeepLink(MomentsNavKey.Moment(parsed.id, author), fromNewTask)
+                    }
+                }
             }
+            parsed != null -> openDeepLink(parsed, fromNewTask)
         }
+        onHandled()
     }
 }

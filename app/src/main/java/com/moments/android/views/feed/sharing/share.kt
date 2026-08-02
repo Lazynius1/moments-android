@@ -127,6 +127,7 @@ import com.moments.android.services.cache.ImagePrefetchManager
 import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.cache.VideoThumbnailCache
 import com.moments.android.services.content.FeedMoment
+import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.searchUsers
 import com.moments.android.services.privacy.PrivacyService
@@ -179,7 +180,6 @@ fun ModernShareBottomSheet(
     val context = LocalContext.current
     var viewState by remember { mutableStateOf(ShareSheetViewState.Main) }
     var showStoryCreator by remember { mutableStateOf(false) }
-    val sheetShape = RoundedCornerShape(32.dp)
 
     fun shareExternally() {
         if (moment.id.isBlank()) return
@@ -195,71 +195,57 @@ fun ModernShareBottomSheet(
         onDismiss()
     }
 
-    Box(modifier.fillMaxSize()) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .clickable {
-                    if (viewState == ShareSheetViewState.Main) onDismiss()
-                    else viewState = ShareSheetViewState.Main
-                },
-        )
-
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Bottom) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .padding(bottom = 20.dp)
-                    .shadow(
-                        elevation = 20.dp,
-                        shape = sheetShape,
-                        clip = false,
-                        ambientColor = Color.Black.copy(0.3f),
-                        spotColor = Color.Black.copy(0.3f),
-                    )
-                    .momentsChromeGlass(sheetShape, interactive = true),
-            ) {
-                AnimatedContent(
-                    targetState = viewState,
-                    transitionSpec = {
-                        if (targetState == ShareSheetViewState.Messaging) {
-                            (slideInHorizontally { it } + fadeIn()) togetherWith
-                                (slideOutHorizontally { -it / 4 } + fadeOut())
-                        } else {
-                            (fadeIn() + scaleIn(initialScale = 0.95f)) togetherWith
-                                (fadeOut() + scaleOut(targetScale = 0.95f))
-                        }
-                    },
-                    label = "shareSheetState",
-                ) { state ->
-                    when (state) {
-                        ShareSheetViewState.Main -> MainActionsView(
-                            moment = moment,
-                            onSendMessage = { viewState = ShareSheetViewState.Messaging },
-                            onAddToStory = { showStoryCreator = true },
-                            onExternalShare = { shareExternally() },
-                        )
-                        ShareSheetViewState.Messaging -> ModernShareSheet(
-                            moment = moment,
-                            onBack = { viewState = ShareSheetViewState.Main },
-                            onDismiss = onDismiss,
-                        )
+    // M3 ModalBottomSheet — sin scrim/drag custom iOS (glass overlay).
+    MomentsModalSheet(
+        onDismissRequest = {
+            if (viewState == ShareSheetViewState.Messaging) {
+                viewState = ShareSheetViewState.Main
+            } else {
+                onDismiss()
+            }
+        },
+        largeOnly = false,
+    ) { dismiss ->
+        Column(modifier.fillMaxWidth()) {
+            AnimatedContent(
+                targetState = viewState,
+                transitionSpec = {
+                    // Forward/backward within sheet — M3 effects (fade+slide), not iOS scale pop.
+                    if (targetState == ShareSheetViewState.Messaging) {
+                        (slideInHorizontally { it } + fadeIn()) togetherWith
+                            (slideOutHorizontally { -it / 4 } + fadeOut())
+                    } else {
+                        (slideInHorizontally { -it / 4 } + fadeIn()) togetherWith
+                            (slideOutHorizontally { it } + fadeOut())
                     }
+                },
+                label = "shareSheetState",
+            ) { state ->
+                when (state) {
+                    ShareSheetViewState.Main -> MainActionsView(
+                        moment = moment,
+                        onSendMessage = { viewState = ShareSheetViewState.Messaging },
+                        onAddToStory = { showStoryCreator = true },
+                        onExternalShare = { shareExternally() },
+                    )
+                    ShareSheetViewState.Messaging -> ModernShareSheet(
+                        moment = moment,
+                        onBack = { viewState = ShareSheetViewState.Main },
+                        onDismiss = dismiss,
+                    )
                 }
             }
         }
+    }
 
-        // ≡ iOS fullScreenCover AddToStoryView (Dialog interno → canvas/insets correctos)
-        if (showStoryCreator) {
-            AddToStoryView(
-                moment = moment,
-                onDismiss = {
-                    showStoryCreator = false
-                    onDismiss()
-                },
-            )
-        }
+    if (showStoryCreator) {
+        AddToStoryView(
+            moment = moment,
+            onDismiss = {
+                showStoryCreator = false
+                onDismiss()
+            },
+        )
     }
 }
 
@@ -294,7 +280,7 @@ fun ShareMainActionsView(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .padding(top = 20.dp, bottom = 24.dp),
+                .padding(top = 0.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -610,15 +596,16 @@ fun ShareRecipientsPickerSheet(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
-                .padding(top = 20.dp, bottom = 20.dp),
+                .padding(top = 0.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            // Solo back dentro del sheet; dismiss = drag handle / swipe (sin chevron/X).
             if (showsBackButton && onBack != null) {
                 Box(
                     Modifier
-                        .size(44.dp)
-                        .background(Color.White.copy(0.1f), CircleShape)
+                        .size(36.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true)
                         .clickable(onClick = onBack),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -627,16 +614,6 @@ fun ShareRecipientsPickerSheet(
                         contentDescription = null,
                         tint = colors.primary,
                     )
-                }
-            } else {
-                Box(
-                    Modifier
-                        .size(44.dp)
-                        .background(Color.White.copy(0.1f), CircleShape)
-                        .clickable(onClick = onDismiss),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Filled.Close, contentDescription = null, tint = colors.primary, modifier = Modifier.size(16.dp))
                 }
             }
             Column(Modifier.weight(1f)) {

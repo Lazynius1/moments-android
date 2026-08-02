@@ -26,7 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterNone
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -1323,8 +1323,14 @@ fun QuestionResponseInputView(
                 enabled = responseText.trim().isNotEmpty() && !isLoading,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                if (isLoading) CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.height(18.dp))
-                else Text("Send answer")
+                if (isLoading) {
+                    MomentsCircularProgressIndicator(
+                        modifier = Modifier.height(18.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Send answer")
+                }
             }
         }
     }

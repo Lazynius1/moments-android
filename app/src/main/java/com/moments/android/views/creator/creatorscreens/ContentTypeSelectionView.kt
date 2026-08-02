@@ -17,6 +17,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -64,8 +65,10 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.moments.android.R
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.creator.components.StoryEditorChromeColor
 import com.moments.android.views.creator.CreatorContentType
 import com.moments.android.views.creator.CreatorFlow
 import com.moments.android.views.creator.creatoruikit.BackgroundCameraView
@@ -193,9 +196,11 @@ fun ContentTypeSelectionView(
                     .padding(top = 10.dp, start = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // ≡ StoryCamera ChromeCircleButton — tint adaptativo (glass opaco Android).
+                val chromeFg = StoryEditorChromeColor.icon(isSystemInDarkTheme())
                 Box(
                     Modifier
-                        .size(44.dp)
+                        .size(42.dp)
                         .momentsChromeGlass(CircleShape, interactive = true)
                         .clickable(onClick = onDismiss),
                     contentAlignment = Alignment.Center,
@@ -203,8 +208,8 @@ fun ContentTypeSelectionView(
                     Icon(
                         Icons.Filled.Close,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp),
+                        tint = chromeFg,
+                        modifier = Modifier.size(18.dp),
                     )
                 }
                 Spacer(Modifier.weight(1f))
@@ -260,7 +265,7 @@ fun ContentTypeSelectionView(
                     .width(dialControlWidth)
                     .height(44.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(Color.Black.copy(alpha = 0.3f))
+                    .background(Color.White.copy(alpha = 0.10f))
                     .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
                     .pointerInput(selectedMode, dialTravelPx, dialBaseOffset) {
                         detectDragGestures(
@@ -288,12 +293,13 @@ fun ContentTypeSelectionView(
                     },
                 contentAlignment = Alignment.Center,
             ) {
+                // Thumb sólido (no glass): texto invertido legible en claro/oscuro.
                 Box(
                     Modifier
                         .offset { IntOffset(dialPillOffset.roundToInt(), 0) }
                         .width(dialPillWidth)
                         .height(36.dp)
-                        .momentsChromeGlass(RoundedCornerShape(50), interactive = true),
+                        .background(Color(0xFFFAF9F6), RoundedCornerShape(50)),
                 )
                 Row(Modifier.fillMaxSize().padding(horizontal = dialInnerPadding)) {
                     DialLabel(
@@ -334,9 +340,9 @@ private fun DialLabel(
     Box(modifier.clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Text(
             text,
-            color = if (active) Color.White.copy(alpha = 0.96f) else Color.White.copy(alpha = 0.58f),
+            color = if (active) Color(0xFF0B1215) else Color.White.copy(alpha = 0.58f),
             fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
         )
     }
 }

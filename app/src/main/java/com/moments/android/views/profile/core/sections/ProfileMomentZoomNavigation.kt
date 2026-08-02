@@ -1,12 +1,13 @@
 package com.moments.android.views.profile.core.sections
 
-import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,14 +18,17 @@ import androidx.compose.ui.unit.dp
 import com.moments.android.models.HighlightedStory
 import com.moments.android.models.Moment
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import com.moments.android.views.explore.ExploreMomentDetailView
 import com.moments.android.views.explore.toExploreFeedMoment
 import com.moments.android.views.feed.maps.LocationMomentDetailView
 import com.moments.android.views.profile.momentsview.ModernMomentDetailView
 import com.moments.android.views.profile.momentsview.ModernSavedMomentsDetailView
-import com.moments.android.views.shared.LocalMomentsSharedAnimatedVisibilityScope
-import com.moments.android.views.shared.LocalMomentsSharedTransitionScope
+import com.moments.android.views.shared.MomentsMotion
+import com.moments.android.views.shared.MomentsZoomSourceCorner
 import com.moments.android.views.shared.momentdetail.SingleMomentDetailView
+import com.moments.android.views.shared.rememberMomentsContainerTransformEnter
+import com.moments.android.views.shared.rememberMomentsContainerTransformExit
 
 /** Port de `ProfileMomentZoomNavigation.swift`. */
 enum class ProfileMomentZoomFeedKind {
@@ -93,37 +97,26 @@ fun Modifier.profileNavigationSurface(isDark: Boolean): Modifier =
 fun Modifier.momentZoomNavigationSurface(isDark: Boolean): Modifier = profileNavigationSurface(isDark)
 
 /**
- * ≡ `matchedTransitionSource` / `ProfileMomentZoomSourceModifier` iOS.
- * Pareja con destination vía `sharedBounds`. Sin scope local → solo clip.
+ * Origen del container transform (grid → detail).
+ *
+ * Compose [SharedTransitionScope] / [sharedElementWithCallerManagedVisibility] crashea
+ * aquí con `layouts are not part of the same hierarchy` (SharedBoundsNode,
+ * animation 1.11.4) al abrir el detalle — el match eleva coords fuera del root del STL
+ * (LazyGrid + overlays + AndroidView en el destino). El morph visual lo hace
+ * [MomentZoomContainerTransformScaffold] con motion M3 (scale+fade), no shared-element.
  */
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun Modifier.profileMomentZoomSource(
     sourceID: String?,
-    cornerRadius: Dp = 4.dp,
+    cornerRadius: Dp = MomentsZoomSourceCorner,
     visible: Boolean = true,
 ): Modifier {
+    @Suppress("UNUSED_PARAMETER")
+    val unusedVisible = visible
+    @Suppress("UNUSED_PARAMETER")
+    val unusedId = sourceID
     if (sourceID.isNullOrBlank()) return this
-    val clipped = this.clip(RoundedCornerShape(cornerRadius))
-    val sharedScope = LocalMomentsSharedTransitionScope.current
-    val animatedScope = LocalMomentsSharedAnimatedVisibilityScope.current
-    if (sharedScope == null) return clipped
-    val state = with(sharedScope) { rememberSharedContentState(key = sourceID) }
-    return if (animatedScope != null) {
-        with(sharedScope) {
-            clipped.sharedBounds(
-                sharedContentState = state,
-                animatedVisibilityScope = animatedScope,
-            )
-        }
-    } else {
-        with(sharedScope) {
-            clipped.sharedElementWithCallerManagedVisibility(
-                sharedContentState = state,
-                visible = visible,
-            )
-        }
-    }
+    return this.clip(RoundedCornerShape(cornerRadius))
 }
 
 /** ≡ `HighlightZoomSourceModifier` iOS. */
@@ -135,21 +128,53 @@ fun Modifier.highlightZoomSource(
 ): Modifier = profileMomentZoomSource(sourceID = sourceID, cornerRadius = size / 2, visible = visible)
 
 /**
- * ≡ `.navigationTransition(.zoom(sourceID:in:))` en el destino —
- * aplica `sharedBounds` si el host provee SharedTransition; si no, no-op.
+ * Destino del zoom (pareja de [profileMomentZoomSource]).
+ * Sin shared-element Compose — ver nota en [profileMomentZoomSource].
+ * El morph lo aplica [MomentZoomContainerTransformScaffold].
  */
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun Modifier.momentZoomDestination(zoomSourceID: String): Modifier {
-    if (zoomSourceID.isBlank()) return this
-    val sharedScope = LocalMomentsSharedTransitionScope.current ?: return this
-    val animatedScope = LocalMomentsSharedAnimatedVisibilityScope.current ?: return this
-    val state = with(sharedScope) { rememberSharedContentState(key = zoomSourceID) }
-    return with(sharedScope) {
-        this@momentZoomDestination.sharedBounds(
-            sharedContentState = state,
-            animatedVisibilityScope = animatedScope,
+    @Suppress("UNUSED_PARAMETER")
+    val unused = zoomSourceID
+    return this
+}
+
+/**
+ * Presentación del detalle con container-transform **aproximado** M3
+ * (fade + scale espacial) sin SharedTransitionScope — estable en LazyGrid/perfil.
+ */
+@Composable
+private fun MomentZoomContainerTransformScaffold(
+    zoomSourceID: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    @Suppress("UNUSED_PARAMETER")
+    val unusedId = zoomSourceID
+    val isDark = isSystemInDarkTheme()
+    val enter = rememberMomentsContainerTransformEnter() +
+        scaleIn(
+            initialScale = 0.92f,
+            animationSpec = MomentsMotion.defaultSpatialSpec(),
         )
+    val exit = rememberMomentsContainerTransformExit() +
+        scaleOut(
+            targetScale = 0.92f,
+            animationSpec = MomentsMotion.defaultSpatialSpec(),
+        )
+    AnimatedVisibility(
+        visible = true,
+        modifier = modifier.fillMaxSize(),
+        enter = enter,
+        exit = exit,
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(ProfileMomentZoomNavigation.canvasBackground(isDark)),
+        ) {
+            content()
+        }
     }
 }
 
@@ -161,32 +186,36 @@ fun ProfileMomentZoomDetailDestination(
     onRemoveSavedMoment: ((Moment) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val zoomMod = modifier.fillMaxSize().momentZoomDestination(destination.zoomSourceID)
-    when (destination.feedKind) {
-        ProfileMomentZoomFeedKind.SAVED_MOMENTS -> {
-            ModernSavedMomentsDetailView(
-                moments = moments,
-                initialIndex = destination.initialIndex,
-                onDismiss = onDismiss,
-                onRemoveMoment = onRemoveSavedMoment,
-                modifier = zoomMod,
-            )
-        }
-        else -> {
-            val selected = MomentZoomOpener.resolvedProfileMoment(destination, moments)
-            if (selected == null) {
-                MomentZoomSingleFallbackView(zoomMod)
-                return
+    MomentZoomContainerTransformScaffold(
+        zoomSourceID = destination.zoomSourceID,
+        modifier = modifier,
+    ) {
+        when (destination.feedKind) {
+            ProfileMomentZoomFeedKind.SAVED_MOMENTS -> {
+                ModernSavedMomentsDetailView(
+                    moments = moments,
+                    initialIndex = destination.initialIndex,
+                    onDismiss = onDismiss,
+                    onRemoveMoment = onRemoveSavedMoment,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
-            ModernMomentDetailView(
-                moments = moments.ifEmpty { listOf(selected) },
-                onDismiss = onDismiss,
-                initialIndex = destination.initialIndex,
-                initialMomentId = destination.initialMomentId ?: selected.id,
-                restrictPlaybackToInitialIndex = destination.restrictPlaybackToInitialIndex,
-                openCommentsOnAppear = destination.openCommentsOnAppear,
-                modifier = zoomMod,
-            )
+            else -> {
+                val selected = MomentZoomOpener.resolvedProfileMoment(destination, moments)
+                if (selected == null) {
+                    MomentZoomSingleFallbackView(Modifier.fillMaxSize())
+                } else {
+                    ModernMomentDetailView(
+                        moments = moments.ifEmpty { listOf(selected) },
+                        onDismiss = onDismiss,
+                        initialIndex = destination.initialIndex,
+                        initialMomentId = destination.initialMomentId ?: selected.id,
+                        restrictPlaybackToInitialIndex = destination.restrictPlaybackToInitialIndex,
+                        openCommentsOnAppear = destination.openCommentsOnAppear,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
         }
     }
 }
@@ -200,67 +229,72 @@ fun MomentZoomDetailDestination(
     onMapPresentedChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val zoomMod = modifier.fillMaxSize().momentZoomDestination(destination.zoomSourceID)
-    when (val presentation = destination.presentation) {
-        MomentZoomPresentationKind.Carousel -> {
-            ModernMomentDetailView(
+    MomentZoomContainerTransformScaffold(
+        zoomSourceID = destination.zoomSourceID,
+        modifier = modifier,
+    ) {
+        val contentMod = Modifier.fillMaxSize()
+        when (val presentation = destination.presentation) {
+            MomentZoomPresentationKind.Carousel -> {
+                ModernMomentDetailView(
+                    moments = moments,
+                    onDismiss = {
+                        onMapPresentedChanged(false)
+                        onDismiss()
+                    },
+                    initialIndex = destination.initialIndex,
+                    initialMomentId = destination.initialMomentId,
+                    restrictPlaybackToInitialIndex = destination.restrictPlaybackToInitialIndex,
+                    modifier = contentMod,
+                )
+            }
+            MomentZoomPresentationKind.Saved -> {
+                ModernSavedMomentsDetailView(
+                    moments = moments,
+                    initialIndex = destination.initialIndex,
+                    onDismiss = onDismiss,
+                    onRemoveMoment = onRemoveSavedMoment,
+                    modifier = contentMod,
+                )
+            }
+            MomentZoomPresentationKind.Single -> {
+                val selected = MomentZoomOpener.resolvedSingleMoment(moments, destination)
+                if (selected == null) {
+                    MomentZoomSingleFallbackView(contentMod)
+                } else {
+                    SingleMomentDetailView(
+                        moment = selected.toExploreFeedMoment(),
+                        onDismiss = onDismiss,
+                        chromeTitle = destination.chromeTitle,
+                        modifier = contentMod,
+                    )
+                }
+            }
+            MomentZoomPresentationKind.Explorer -> {
+                val selected = MomentZoomOpener.resolvedSingleMoment(moments, destination)
+                if (selected == null) {
+                    MomentZoomSingleFallbackView(contentMod)
+                } else {
+                    ExploreMomentDetailView(
+                        moments = moments.ifEmpty { listOf(selected) },
+                        initialIndex = destination.initialIndex,
+                        initialMomentId = destination.initialMomentId ?: selected.id,
+                        onNavigateBack = onDismiss,
+                        modifier = contentMod,
+                    )
+                }
+            }
+            is MomentZoomPresentationKind.Map -> LocationMomentDetailView(
                 moments = moments,
+                initialIndex = destination.initialIndex,
+                locationName = presentation.locationName,
                 onDismiss = {
                     onMapPresentedChanged(false)
                     onDismiss()
                 },
-                initialIndex = destination.initialIndex,
-                initialMomentId = destination.initialMomentId,
-                restrictPlaybackToInitialIndex = destination.restrictPlaybackToInitialIndex,
-                modifier = zoomMod,
+                modifier = contentMod,
             )
         }
-        MomentZoomPresentationKind.Saved -> {
-            ModernSavedMomentsDetailView(
-                moments = moments,
-                initialIndex = destination.initialIndex,
-                onDismiss = onDismiss,
-                onRemoveMoment = onRemoveSavedMoment,
-                modifier = zoomMod,
-            )
-        }
-        MomentZoomPresentationKind.Single -> {
-            val selected = MomentZoomOpener.resolvedSingleMoment(moments, destination)
-            if (selected == null) {
-                MomentZoomSingleFallbackView(zoomMod)
-            } else {
-                SingleMomentDetailView(
-                    moment = selected.toExploreFeedMoment(),
-                    onDismiss = onDismiss,
-                    chromeTitle = destination.chromeTitle,
-                    modifier = zoomMod,
-                )
-            }
-        }
-        MomentZoomPresentationKind.Explorer -> {
-            val selected = MomentZoomOpener.resolvedSingleMoment(moments, destination)
-            if (selected == null) {
-                MomentZoomSingleFallbackView(zoomMod)
-            } else {
-                ExploreMomentDetailView(
-                    moments = moments.ifEmpty { listOf(selected) },
-                    initialIndex = destination.initialIndex,
-                    initialMomentId = destination.initialMomentId ?: selected.id,
-                    onNavigateBack = onDismiss,
-                    modifier = zoomMod,
-                )
-            }
-        }
-        is MomentZoomPresentationKind.Map -> LocationMomentDetailView(
-            moments = moments,
-            initialIndex = destination.initialIndex,
-            locationName = presentation.locationName,
-            onDismiss = {
-                onMapPresentedChanged(false)
-                onDismiss()
-            },
-            modifier = zoomMod,
-        )
     }
 }
 
@@ -273,7 +307,10 @@ fun HighlightZoomDetailDestination(
     content: @Composable (HighlightedStory, () -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier.fillMaxSize().momentZoomDestination(destination.zoomSourceID)) {
+    MomentZoomContainerTransformScaffold(
+        zoomSourceID = destination.zoomSourceID,
+        modifier = modifier,
+    ) {
         content(highlight, onDismiss)
     }
 }
@@ -287,7 +324,7 @@ private fun MomentZoomSingleFallbackView(modifier: Modifier = Modifier) {
             .background(ProfileMomentZoomNavigation.canvasBackground(isDark)),
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator()
+        MomentsCircularProgressIndicator()
     }
 }
 

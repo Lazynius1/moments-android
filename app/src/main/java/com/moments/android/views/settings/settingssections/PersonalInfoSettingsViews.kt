@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -408,9 +409,8 @@ private fun UsernameChangeContent(
                     modifier = Modifier.weight(1f),
                 )
                 when {
-                    isChecking -> CircularProgressIndicator(
-                        Modifier.size(18.dp),
-                        color = primary,
+                    isChecking -> MomentsCircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
                     )
                     newUsername.length >= 3 && isDifferent && isAvailable != null -> {

@@ -40,12 +40,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.fromHex
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.extensions.revealContrastingEffectColor
@@ -96,6 +98,11 @@ fun RevealStickerEditorView(
 ) {
     val sticker = stickers.firstOrNull { it.id == editingId }
     val corner = storyViewerCanvasCornerRadius
+    // X / Listo van sobre chrome glass → contentColor (claro/oscuro). Título sobre la superficie reveal.
+    val isDark = isSystemInDarkTheme()
+    val chromeFg = MomentsChromeGlass.contentColor(isDark)
+    val surfaceColor = Color.fromHex(sticker?.revealPrimaryColor ?: "#000000")
+    val titleFg = if (surfaceColor.luminance() > 0.55f) Color.Black else Color.White
     Box(modifier.fillMaxSize().clip(RoundedCornerShape(corner))) {
         if (sticker != null) {
             RevealSurfaceView(
@@ -121,19 +128,19 @@ fun RevealStickerEditorView(
                     .padding(12.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Close, null, tint = Color.White)
+                Icon(Icons.Filled.Close, null, tint = chromeFg)
             }
             Spacer(Modifier.weight(1f))
             Text(
                 stringResource(R.string.reveal_editor_title),
-                color = Color.White,
+                color = titleFg,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 17.sp,
             )
             Spacer(Modifier.weight(1f))
             Text(
                 stringResource(R.string.common_done),
-                color = Color.White,
+                color = chromeFg,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp,
                 modifier = Modifier
@@ -159,7 +166,6 @@ fun RevealStickerBottomControlsInset(
         modifier
             .fillMaxWidth()
             .momentsChromeGlass(RoundedCornerShape(26.dp), interactive = false)
-            .border(0.75.dp, Color.White.copy(0.05f), RoundedCornerShape(26.dp))
             .padding(horizontal = 16.dp)
             .padding(top = 15.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -312,8 +318,7 @@ private fun RevealStickerControlsContent(
             Modifier
                 .fillMaxWidth()
                 .height(42.dp)
-                .momentsChromeGlass(RoundedCornerShape(50), interactive = false)
-                .border(0.75.dp, Color.White.copy(0.08f), RoundedCornerShape(50)),
+                .momentsChromeGlass(RoundedCornerShape(50), interactive = false),
         ) {
             val totalWidth = constraints.maxWidth.toFloat()
             val segment = (totalWidth - 6f) / RevealEditorTab.entries.size

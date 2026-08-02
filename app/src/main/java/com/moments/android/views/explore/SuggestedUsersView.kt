@@ -23,7 +23,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -123,7 +123,9 @@ fun SuggestedUsersView(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(28.dp), color = colors.primary)
+                        MomentsCircularProgressIndicator(
+                            modifier = Modifier.size(28.dp),
+                        )
                         Text(
                             stringResource(R.string.explore_suggested_users_loading),
                             fontSize = 16.sp,
@@ -197,9 +199,8 @@ fun SuggestedUsersView(
                                     horizontalArrangement = Arrangement.Center,
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    CircularProgressIndicator(
-                                        Modifier.size(18.dp),
-                                        color = colors.primary,
+                                    MomentsCircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
                                         strokeWidth = 2.dp,
                                     )
                                     Spacer(Modifier.size(8.dp))

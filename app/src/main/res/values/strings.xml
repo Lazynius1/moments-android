@@ -2421,6 +2421,7 @@
     <string name="incognito_error_unauthorized">Sign in again to use Incognito.</string>
     <string name="incognito_error_unavailable">Incognito is unavailable right now. Try again in a moment.</string>
     <string name="incognito_feature_read_receipts_body">Opening a chat will not mark messages as read while Incognito is active.</string>
+    <string name="incognito_feature_read_receipts_short">Chats</string>
     <string name="incognito_feature_read_receipts_title">Read receipts stay quiet</string>
     <string name="incognito_feature_stories_body">You can watch stories without appearing in the viewers list.</string>
     <string name="incognito_feature_stories_short">Stories</string>

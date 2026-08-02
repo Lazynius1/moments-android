@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ≡ MomentsBrand en WidgetColor+Hex.swift -->
+    <color name="widget_brand_ink">#FF0B1215</color>
+    <color name="widget_brand_paper">#FFFAF9F6</color>
+    <color name="widget_brand_teal">#FF00A896</color>
+    <color name="widget_brand_blue">#FF007AFF</color>
+    <color name="widget_secondary_text">#99000000</color>
+    <color name="widget_chip_bg">#0D000000</color>
+    <color name="widget_surface">#FFF2F1EE</color>
+</resources>

@@ -17,6 +17,7 @@ import com.moments.android.services.social.StoryRingCacheService
 import com.moments.android.services.social.StoryRingResolverService
 import com.moments.android.services.social.StoryRingSnapshot
 import com.moments.android.views.feed.core.sections.FeedStoryUserState
+import com.moments.android.widget.MomentsWidgetStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -435,18 +436,20 @@ class FeedStoryRingCoordinator(
     private fun updateStoryWidgetCount(from: List<FeedStoryUserState>) {
         val ctx = appContext ?: return
         val count = from.count { it.hasUnseenStory }
-        ctx.getSharedPreferences("group.com.glowsyapp", Context.MODE_PRIVATE)
-            .edit()
-            .putInt("widget_new_stories_count", count)
-            .apply()
+        MomentsWidgetStore.putInt(
+            MomentsWidgetStore.KEY_NEW_STORIES_COUNT,
+            count,
+            context = ctx,
+            reload = false,
+        )
         scheduleWidgetReload()
     }
 
     private fun scheduleWidgetReload(delayMs: Long = 2_000) {
         widgetReloadJob?.cancel()
-        // Android AppWidgetManager se engancha cuando exista el widget; por ahora solo persistimos el count.
         widgetReloadJob = CoroutineScope(Dispatchers.Main).launch {
             delay(delayMs)
+            MomentsWidgetStore.reloadWidgets(appContext)
         }
     }
 

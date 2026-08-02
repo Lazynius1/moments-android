@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -93,7 +92,9 @@ import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.feed.sharing.ModernShareBottomSheet
 import com.moments.android.views.settings.hasVideoMedia
 import com.moments.android.views.shared.ScreenshotProtectedView
+import com.moments.android.views.shared.momentdetail.MomentDetailSolidTopChrome
 import com.moments.android.views.shared.momentdetail.ProfileHeaderCollapseMetrics
+import com.moments.android.views.shared.momentdetail.rememberMomentDetailContentTopInset
 import com.moments.android.views.story.StoriesView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -117,6 +118,9 @@ fun ModernMomentDetailView(
     chromeTitle: String? = null,
 ) {
     val colors = rememberAdaptiveColors()
+    val listTopInset = rememberMomentDetailContentTopInset(
+        chromeBodyHeight = ProfileHeaderCollapseMetrics.profileDetailChromeBodyHeight,
+    )
     val scope = rememberCoroutineScope()
     val firestore = remember { FirestoreService() }
     val configuration = LocalConfiguration.current
@@ -355,7 +359,7 @@ fun ModernMomentDetailView(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
-                    top = ProfileHeaderCollapseMetrics.feedStyleDetailTopInset + topContentInset,
+                    top = listTopInset + topContentInset,
                     bottom = 24.dp,
                     start = FeedMomentCardLayout.listHorizontalPadding,
                     end = FeedMomentCardLayout.listHorizontalPadding,
@@ -408,12 +412,13 @@ fun ModernMomentDetailView(
                 }
             }
 
-            ProfileMomentDetailChrome(
-                moment = currentMoment,
-                chromeTitleOverride = chromeTitle,
-                onDismiss = onDismiss,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
+            MomentDetailSolidTopChrome(modifier = Modifier.align(Alignment.TopCenter)) {
+                ProfileMomentDetailChrome(
+                    moment = currentMoment,
+                    chromeTitleOverride = chromeTitle,
+                    onDismiss = onDismiss,
+                )
+            }
         }
 
         contextMenuMoment?.let { menuMoment ->
@@ -612,7 +617,7 @@ fun ModernMomentDetailView(
     }
 }
 
-/** Toolbar iOS: LiveUsername + subtítulo Moments. */
+/** Toolbar Android: LiveUsername + subtítulo Moments sobre header sólido. */
 @Composable
 private fun ProfileMomentDetailChrome(
     moment: FeedMoment?,
@@ -625,9 +630,7 @@ private fun ProfileMomentDetailChrome(
     Box(
         modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(top = ProfileHeaderCollapseMetrics.topChromePadding)
-            .height(ProfileHeaderCollapseMetrics.chromeHeight + 14.dp)
+            .height(ProfileHeaderCollapseMetrics.profileDetailChromeBodyHeight)
             .padding(horizontal = 12.dp),
     ) {
         Row(

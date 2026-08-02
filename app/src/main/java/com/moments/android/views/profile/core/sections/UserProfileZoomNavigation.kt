@@ -1,33 +1,41 @@
 package com.moments.android.views.profile.core.sections
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moments.android.views.feed.core.FeedProfileSheetRoute
 import com.moments.android.views.profile.userprofile.UserProfileView
+import com.moments.android.views.shared.LocalActiveUserProfileZoomUserId
+import com.moments.android.views.shared.LocalMomentsSharedAnimatedVisibilityScope
 import com.moments.android.views.shared.LocalMomentsSharedTransitionScope
+import com.moments.android.views.shared.MomentsContainerTransformOverlay
 import com.moments.android.views.shared.MomentsSharedTransitionLayout
-import com.moments.android.views.shared.ProvideMomentsSharedAnimatedVisibilityScope
+import com.moments.android.views.shared.rememberMomentsBoundsTransformSpec
+import com.moments.android.views.shared.rememberMomentsContainerTransformEnter
+import com.moments.android.views.shared.rememberMomentsContainerTransformExit
 
 /**
  * Port de `UserProfileZoomNavigation.swift`.
  *
  * iOS: `matchedTransitionSource` + `.navigationTransition(.zoom)` + `Namespace.ID`.
- * Android: Compose `SharedTransitionLayout` / `sharedBounds` vía [MomentsSharedTransitionLayout].
+ * Android: Compose `SharedTransitionLayout` / `sharedBounds` + [MomentsMotion]
+ * (container transform M3 — no Dialog).
+ *
+ * Importante: el `sharedBounds` del destino va en una **capa morph hermana**,
+ * no envolviendo [UserProfileView]. Si el perfil entero lleva sharedBounds,
+ * el grid de momentos queda anidado dentro y el zoom a un momento crashea
+ * ("layouts are not part of the same hierarchy").
  */
 object UserProfileZoomNavigation {
     fun sourceID(userId: String): String = "user-profile-$userId"
@@ -38,8 +46,9 @@ fun userProfileZoomDestinationSourceID(userId: String): String = UserProfileZoom
 
 /**
  * ≡ `userProfileZoomSource` iOS (`matchedTransitionSource`).
- * Pareja con [userProfileZoomDestination] vía `sharedBounds` (no Dialog).
- * Sin [LocalMomentsSharedTransitionScope] solo aplica clip.
+ * Pareja con [userProfileZoomDestination] vía container transform M3.
+ * Origen fuera de AnimatedVisibility → [sharedElementWithCallerManagedVisibility]
+ * (API pública; `sharedBoundsWithCallerManagedVisibility` es internal en animation 1.11).
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -52,19 +61,25 @@ fun Modifier.userProfileZoomSource(
     val sharedScope = LocalMomentsSharedTransitionScope.current
     val clipped = this.clip(RoundedCornerShape(cornerRadius))
     if (sharedScope == null) return clipped
+    val activeUserId = LocalActiveUserProfileZoomUserId.current
+    val sourceVisible = visible && (activeUserId == null || activeUserId != userId)
     val state = with(sharedScope) {
         rememberSharedContentState(key = UserProfileZoomNavigation.sourceID(userId))
     }
+    val boundsSpec = rememberMomentsBoundsTransformSpec()
     return with(sharedScope) {
         clipped.sharedElementWithCallerManagedVisibility(
             sharedContentState = state,
-            visible = visible,
+            visible = sourceVisible,
+            boundsTransform = { _, _ -> boundsSpec },
+            renderInOverlayDuringTransition = false,
         )
     }
 }
 
 /**
  * ≡ `userProfileZoomDestination` iOS (`.navigationTransition(.zoom(...))`).
+ * Solo en la capa morph — no en [UserProfileView].
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -77,10 +92,17 @@ fun Modifier.userProfileZoomDestination(
     val state = with(sharedTransitionScope) {
         rememberSharedContentState(key = UserProfileZoomNavigation.sourceID(userId))
     }
+    val boundsSpec = rememberMomentsBoundsTransformSpec()
+    val enter = rememberMomentsContainerTransformEnter()
+    val exit = rememberMomentsContainerTransformExit()
     return with(sharedTransitionScope) {
         this@userProfileZoomDestination.sharedBounds(
             sharedContentState = state,
             animatedVisibilityScope = animatedVisibilityScope,
+            enter = enter,
+            exit = exit,
+            boundsTransform = { _, _ -> boundsSpec },
+            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds(),
         )
     }
 }
@@ -88,6 +110,9 @@ fun Modifier.userProfileZoomDestination(
 /**
  * ≡ `userProfileNavigationDestination(item:namespace:)` —
  * overlay in-tree (no Dialog) para que el shared-element funcione.
+ *
+ * Si ya hay [LocalMomentsSharedTransitionScope] (p. ej. Feed con story zoom),
+ * reutiliza ese layout; si no, crea uno.
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -97,30 +122,71 @@ fun UserProfileZoomNavigationHost(
     modifier: Modifier = Modifier,
     content: @Composable (profileOpen: Boolean) -> Unit,
 ) {
-    MomentsSharedTransitionLayout(modifier.fillMaxSize()) {
-        val sharedScope = this
-        Box(Modifier.fillMaxSize()) {
+    val existingScope = LocalMomentsSharedTransitionScope.current
+    if (existingScope != null) {
+        UserProfileZoomOverlayBody(
+            sharedScope = existingScope,
+            profileRoute = profileRoute,
+            onProfileRouteChange = onProfileRouteChange,
+            modifier = modifier,
+            content = content,
+        )
+    } else {
+        MomentsSharedTransitionLayout(modifier.fillMaxSize()) {
+            UserProfileZoomOverlayBody(
+                sharedScope = this,
+                profileRoute = profileRoute,
+                onProfileRouteChange = onProfileRouteChange,
+                modifier = Modifier.fillMaxSize(),
+                content = content,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun UserProfileZoomOverlayBody(
+    sharedScope: SharedTransitionScope,
+    profileRoute: FeedProfileSheetRoute?,
+    onProfileRouteChange: (FeedProfileSheetRoute?) -> Unit,
+    modifier: Modifier,
+    content: @Composable (profileOpen: Boolean) -> Unit,
+) {
+    CompositionLocalProvider(LocalActiveUserProfileZoomUserId provides profileRoute?.userId) {
+        Box(modifier.fillMaxSize()) {
             content(profileRoute != null)
-            AnimatedVisibility(
-                visible = profileRoute != null,
-                enter = fadeIn(tween(220)) + scaleIn(initialScale = 0.92f, animationSpec = tween(280)),
-                exit = fadeOut(tween(180)) + scaleOut(targetScale = 0.92f, animationSpec = tween(220)),
-            ) {
+            MomentsContainerTransformOverlay(visible = profileRoute != null) {
+                val animatedVisibilityScope = this
                 val route = profileRoute
-                val animatedScope = this
                 if (route != null) {
-                    ProvideMomentsSharedAnimatedVisibilityScope(animatedScope) {
-                        UserProfileView(
-                            userId = route.userId,
-                            onDismiss = { onProfileRouteChange(null) },
-                            modifier = Modifier
+                    val isDark = isSystemInDarkTheme()
+                    // Capa morph (sharedBounds) + perfil como hermano — el grid
+                    // de momentos no queda anidado dentro de SharedBoundsNode.
+                    Box(Modifier.fillMaxSize()) {
+                        Box(
+                            Modifier
                                 .fillMaxSize()
                                 .userProfileZoomDestination(
                                     userId = route.userId,
                                     sharedTransitionScope = sharedScope,
-                                    animatedVisibilityScope = animatedScope,
-                                ),
+                                    animatedVisibilityScope = animatedVisibilityScope,
+                                )
+                                .background(ProfileMomentZoomNavigation.canvasBackground(isDark)),
                         )
+                        // Aislar el perfil del SharedTransitionScope del feed/perfil-zoom.
+                        // El zoom grid→momento usa su propio SharedTransitionLayout interno;
+                        // reutilizar el del host provoca hierarchy crash al hacer match.
+                        CompositionLocalProvider(
+                            LocalMomentsSharedTransitionScope provides null,
+                            LocalMomentsSharedAnimatedVisibilityScope provides null,
+                        ) {
+                            UserProfileView(
+                                userId = route.userId,
+                                onDismiss = { onProfileRouteChange(null) },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
             }

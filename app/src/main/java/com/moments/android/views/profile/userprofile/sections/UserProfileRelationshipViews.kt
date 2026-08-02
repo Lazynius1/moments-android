@@ -19,14 +19,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
+import com.moments.android.extensions.ChromeIconDescription
 import com.moments.android.extensions.MomentsGlassButtonPreset
 import com.moments.android.extensions.ProfileChromeIconButton
 import com.moments.android.extensions.momentsChromeGlass
@@ -323,9 +324,11 @@ private fun RelationshipListsContent(
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ProfileChromeIconButton(
-                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                 onClick = onBack,
                 preset = MomentsGlassButtonPreset.NAVIGATION_BACK,
+                standaloneGlass = false,
+                contentDescriptionKey = ChromeIconDescription.BACK,
             )
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
@@ -372,7 +375,10 @@ private fun RelationshipListsContent(
                             )
                         }
                         if (isUpdatingLists) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            MomentsCircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
                         } else {
                             Icon(
                                 listIconVector(list.icon),
@@ -408,7 +414,11 @@ private fun RelationshipActionRow(
             Text(title, color = content, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Text(subtitle, color = secondary, fontSize = 12.sp, maxLines = 2)
         }
-        if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) else trailing()
+        if (isLoading) {
+            MomentsCircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        } else {
+            trailing()
+        }
     }
 }
 

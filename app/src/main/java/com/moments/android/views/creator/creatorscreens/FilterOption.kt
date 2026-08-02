@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -46,6 +47,7 @@ fun FilterOption(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val chromeForeground = if (isSystemInDarkTheme()) Color.White else Color.Black.copy(alpha = 0.86f)
     var preview by remember(sourceUri, filter) { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(sourceUri, filter) {
@@ -107,7 +109,7 @@ fun FilterOption(
         Spacer(Modifier.height(8.dp))
         Text(
             filter.raw,
-            color = if (isSelected) Color.White else Color.Gray,
+            color = if (isSelected) chromeForeground else chromeForeground.copy(alpha = 0.58f),
             fontSize = 11.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
         )

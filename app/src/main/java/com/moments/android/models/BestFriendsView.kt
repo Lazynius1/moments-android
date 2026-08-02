@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -38,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
@@ -305,6 +305,18 @@ fun BestFriendsView(
                         )
 
                         val listState = rememberLazyListState()
+                        // ≡ iOS loadMoreIfNeeded: +30 al acercarse al final (una sola vez por umbral)
+                        LaunchedEffect(listState, displayedSuggested.size, suggestedUsers.size, visibleUserLimit) {
+                            snapshotFlow {
+                                listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+                            }.collect { lastVisible ->
+                                if (lastVisible == null) return@collect
+                                val threshold = maxOf(displayedSuggested.size - 5, 0)
+                                if (lastVisible >= threshold && visibleUserLimit < suggestedUsers.size) {
+                                    visibleUserLimit += 30
+                                }
+                            }
+                        }
                         LazyColumn(
                             state = listState,
                             modifier = Modifier
@@ -338,22 +350,15 @@ fun BestFriendsView(
                                         Modifier.padding(top = 24.dp, bottom = 8.dp),
                                     )
                                 }
-                                itemsIndexed(
+                                items(
                                     displayedSuggested,
-                                    key = { _, user -> "sug-${user.id}" },
-                                ) { index, user ->
+                                    key = { "sug-${it.id}" },
+                                ) { user ->
                                     SelectableBestFriendRow(
                                         user = user,
                                         isSelected = user.id in selectedIds,
                                         onToggle = { toggle(user) },
                                     )
-                                    // ≡ iOS `.onAppear { loadMoreIfNeeded }`
-                                    val threshold = maxOf(displayedSuggested.size - 5, 0)
-                                    if (index >= threshold && visibleUserLimit < suggestedUsers.size) {
-                                        LaunchedEffect(index, visibleUserLimit, suggestedUsers.size) {
-                                            visibleUserLimit += 30
-                                        }
-                                    }
                                 }
                             }
 
