@@ -101,6 +101,13 @@ data class FeedMoment(
     /** Paridad iOS `Moment.visibleMediaItems`. */
     val visibleMediaItems: List<FeedMediaItem>
         get() = mediaItems.filter { !it.isHiddenByModeration && it.url.isNotBlank() }
+
+    /**
+     * Vídeo con ExoPlayer/SurfaceView. No envolver en `ScreenshotProtectionMode.ContentSurface`
+     * (el blit a SurfaceView seguro provoca parpadeos).
+     */
+    val hasHardwareVideo: Boolean
+        get() = visibleMediaItems.any { it.type.equals("video", ignoreCase = true) }
 }
 
 data class StoryUser(val id: String, val username: String)
@@ -797,9 +804,9 @@ private fun JSONObject.toBackendStoryDocument(): BackendStoryDocument = BackendS
     forcesAllCaps = optBooleanOrNull("forcesAllCaps"),
     textLayerOrder = optIntOrNull("textLayerOrder"),
     textOverlayLive = optBooleanOrNull("textOverlayLive"),
-    textOverlays = null, // [~] full overlay decode deferred
+    textOverlays = optJSONArray("textOverlays")?.toStoryTextOverlays(),
     drawingData = stringOrNull("drawingData"),
-    stickers = null, // [~] full sticker decode deferred
+    stickers = optJSONArray("stickers")?.toStoryStickers(),
     aspectRatio = stringOrNull("aspectRatio"),
     backgroundFrameURL = stringOrNull("backgroundFrameURL"),
     backgroundBlurredFrameURL = stringOrNull("backgroundBlurredFrameURL"),
@@ -820,6 +827,39 @@ fun BackendStoryDocument.toStory(): Story? =
 
 private fun JSONArray.toStringList(): List<String> =
     (0 until length()).mapNotNull { optString(it).takeIf { s -> s.isNotBlank() } }
+
+/** Stickers del bundle CF → Reveal / poll / etc. en StoryViewer. */
+private fun JSONArray.toStoryStickers(): List<StickerData>? {
+    val list = (0 until length()).mapNotNull { i ->
+        optJSONObject(i)?.toPlainMap()?.let(StickerData::from)
+    }
+    return list.takeIf { it.isNotEmpty() }
+}
+
+private fun JSONArray.toStoryTextOverlays(): List<StoryTextOverlayMetadata>? {
+    val list = (0 until length()).mapNotNull { i ->
+        optJSONObject(i)?.toPlainMap()?.let(StoryTextOverlayMetadata::from)
+    }
+    return list.takeIf { it.isNotEmpty() }
+}
+
+private fun JSONObject.toPlainMap(): Map<String, Any?> =
+    keys().asSequence().associateWith { key ->
+        when (val value = opt(key)) {
+            null, JSONObject.NULL -> null
+            is JSONObject -> value.toPlainMap()
+            is JSONArray -> (0 until value.length()).map { i ->
+                value.opt(i).let { item ->
+                    when (item) {
+                        is JSONObject -> item.toPlainMap()
+                        JSONObject.NULL -> null
+                        else -> item
+                    }
+                }
+            }
+            else -> value
+        }
+    }
 
 private fun JSONObject.stringOrNull(name: String): String? = when (val value = opt(name)) {
     null, JSONObject.NULL -> null

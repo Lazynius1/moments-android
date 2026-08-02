@@ -94,6 +94,7 @@ import com.moments.android.views.messaging.services.ViewOnceConsumptionService
 import com.moments.android.views.messaging.services.ViewOnceReplaySessionStore
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.ScreenshotProtectedView
+import com.moments.android.views.shared.ScreenshotProtectionMode
 import com.moments.android.views.story.StoryRingAvatarView
 import com.moments.android.views.story.storyviewer.GlassmorphicStoryVideoPlayer
 import com.moments.android.views.story.storyviewer.StoryMediaOverlayRendererView
@@ -328,7 +329,12 @@ fun ViewOnceImmersiveViewer(
                         )
                     },
             ) {
-                ScreenshotProtectedView(isProtected = true, fillsContainer = true) {
+                ScreenshotProtectedView(
+                    isProtected = true,
+                    fillsContainer = true,
+                    // View-once: FLAG_SECURE (vídeo + imagen). ContentSurface parpadea con ExoPlayer.
+                    mode = ScreenshotProtectionMode.WindowFlag,
+                ) {
                     ViewOnceMediaCanvas(
                         message = message,
                         mediaUrl = mediaUrl,

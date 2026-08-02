@@ -149,7 +149,11 @@ fun MomentMediaCarousel(
         // iOS MediaItemView.fullScreenCover → ReelsViewer
         Dialog(
             onDismissRequest = { dismissReelsViewer() },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                // Vídeo edge-to-edge (safe area), como momentos / stories.
+                decorFitsSystemWindows = false,
+            ),
         ) {
             val reels = indexedVideos
             ReelsViewer(

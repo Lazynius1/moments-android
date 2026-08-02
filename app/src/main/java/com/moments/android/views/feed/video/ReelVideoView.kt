@@ -24,9 +24,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -167,6 +170,11 @@ fun ReelVideoView(
     val chromeSecondary = if (isDark) Color.White.copy(0.78f) else Color(0xFF0B1215).copy(0.72f)
     val chromeTertiary = if (isDark) Color.White.copy(0.72f) else Color(0xFF0B1215).copy(0.58f)
     val bottomBarBg = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+    // ≡ iOS bottomBarHeight 68 + nav inset − overlap (-6) → caption/acciones encima del progress.
+    val bottomBarHeight = 68.dp
+    val progressCommentOverlap = 6.dp
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottomChromeClearance = bottomBarHeight + navBottom - progressCommentOverlap + 8.dp
 
     val displayAuthorUsername = liveAuthorUsername.trim().ifEmpty { video.moment.username }
 
@@ -392,10 +400,12 @@ fun ReelVideoView(
 
             Spacer(Modifier.weight(1f))
 
+            // Gradiente: misma área útil que iOS (300−22) + clearance del comment/progress.
+            val gradientHeight = 300.dp - 22.dp + bottomChromeClearance
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(300.dp)
+                    .height(gradientHeight)
                     .background(
                         Brush.verticalGradient(
                             listOf(Color.Transparent, Color.Black.copy(0.2f), Color.Black.copy(0.78f)),
@@ -407,7 +417,8 @@ fun ReelVideoView(
                         .align(Alignment.BottomStart)
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp)
-                        .padding(bottom = 22.dp),
+                        // ≡ iOS overlay comment bar: subir chrome por encima del progress + surface.
+                        .padding(bottom = bottomChromeClearance),
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
@@ -565,12 +576,13 @@ fun ReelVideoView(
             }
         }
 
-        // Progress + comment bar
+        // Progress pegado a la surface de comentario (≡ iOS VStack spacing: -6).
+        // Vídeo edge-to-edge: sin navigationBarsPadding en el stack; el inset va dentro del bar.
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .navigationBarsPadding(),
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy((-progressCommentOverlap)),
         ) {
             if (playerManager.duration > 0) {
                 val displayProgress =
@@ -614,44 +626,53 @@ fun ReelVideoView(
                                 },
                             )
                         },
-                    contentAlignment = Alignment.CenterStart,
+                    contentAlignment = Alignment.BottomStart,
                 ) {
+                    // ≡ iOS frame height 12 — barra visual abajo, hit area 30.
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(barHeight)
-                            .background(Color.White.copy(0.24f)),
-                    )
-                    Box(
-                        Modifier
-                            .fillMaxWidth(displayProgress.toFloat().coerceIn(0f, 1f))
-                            .height(barHeight)
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(Color(0xFF4158D0), Color(0xFFC850C0)),
-                                ),
-                            ),
-                    )
-                    if (isDraggingProgress) {
-                        val thumbPx = with(density) { 12.dp.toPx() }
-                        val x = ((progressBarWidthPx * displayProgress.toFloat()) - thumbPx / 2f)
-                            .roundToInt()
+                            .height(12.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
                         Box(
                             Modifier
-                                .offset { IntOffset(x = x, y = 0) }
-                                .size(12.dp)
-                                .background(Color.White, CircleShape),
+                                .fillMaxWidth()
+                                .height(barHeight)
+                                .background(Color.White.copy(0.24f)),
                         )
+                        Box(
+                            Modifier
+                                .fillMaxWidth(displayProgress.toFloat().coerceIn(0f, 1f))
+                                .height(barHeight)
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(Color(0xFF4158D0), Color(0xFFC850C0)),
+                                    ),
+                                ),
+                        )
+                        if (isDraggingProgress) {
+                            val thumbPx = with(density) { 12.dp.toPx() }
+                            val x = ((progressBarWidthPx * displayProgress.toFloat()) - thumbPx / 2f)
+                                .roundToInt()
+                            Box(
+                                Modifier
+                                    .offset { IntOffset(x = x, y = 0) }
+                                    .size(12.dp)
+                                    .background(Color.White, CircleShape),
+                            )
+                        }
                     }
                 }
             }
 
-            // reelCommentBar
+            // reelCommentBar — fondo AdaptiveColors hasta el borde (safe area); padding inset interno.
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(68.dp)
                     .background(bottomBarBg)
+                    .navigationBarsPadding()
+                    .height(bottomBarHeight)
                     .padding(horizontal = 16.dp)
                     .padding(top = 14.dp, bottom = 2.dp),
             ) {

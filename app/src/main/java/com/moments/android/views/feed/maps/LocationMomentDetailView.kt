@@ -397,7 +397,10 @@ fun LocationMomentDetailView(
                     val available = momentAvailability[availabilityKey] ?: true
                     val isProtected = (moment.audience?.lowercase() ?: "") != "everyone"
                     Box(Modifier.fillMaxWidth()) {
-                        ScreenshotProtectedView(isProtected = isProtected) {
+                        ScreenshotProtectedView(
+                            isProtected = isProtected,
+                            containsHardwareVideo = moment.hasHardwareVideo,
+                        ) {
                             ModernPostCardView(
                                 moment = moment,
                                 availableHeight = feedCardHeightPx,

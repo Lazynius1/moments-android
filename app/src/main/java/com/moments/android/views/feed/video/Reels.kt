@@ -64,11 +64,13 @@ fun ReelsViewer(
 
     BackHandler(onBack = onClose)
 
-    // ≡ iOS .statusBarHidden() + preferredColorScheme(.dark)
+    // ≡ iOS .statusBarHidden() + preferredColorScheme(.dark) + vídeo en safe area
     DisposableEffect(Unit) {
         val window = (view.context as? android.app.Activity)?.window
         val controller = window?.let { WindowCompat.getInsetsController(it, view) }
         controller?.hide(WindowInsetsCompat.Type.statusBars())
+        // Nav bar transparente: el vídeo pinta debajo; el comment bar aporta el fondo AdaptiveColors.
+        window?.isNavigationBarContrastEnforced = false
         controller?.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         onDispose {

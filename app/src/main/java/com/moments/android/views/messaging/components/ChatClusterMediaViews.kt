@@ -74,6 +74,7 @@ import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageStatus
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.shared.ScreenshotProtectedView
+import com.moments.android.views.shared.ScreenshotProtectionMode
 import kotlin.math.abs
 import java.net.URI
 
@@ -397,7 +398,10 @@ fun MediaGridBubble(
                     }
                 }
                 if (vanishProtected) {
-                    ScreenshotProtectedView(isProtected = true) { grid() }
+                    ScreenshotProtectedView(
+                        isProtected = true,
+                        mode = ScreenshotProtectionMode.WindowFlag,
+                    ) { grid() }
                 } else {
                     grid()
                 }

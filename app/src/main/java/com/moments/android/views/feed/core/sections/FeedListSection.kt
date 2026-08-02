@@ -245,7 +245,10 @@ fun FeedListSection(
                         val adInterval = if (selectedFeedType == FeedType.ForYou) 3 else 5
                         LaunchedEffect(moment.id) { prefetchUpcoming(index) }
                         Column(Modifier.fillMaxWidth()) {
-                            ScreenshotProtectedView(isProtected = isProtected) {
+                            ScreenshotProtectedView(
+                                isProtected = isProtected,
+                                containsHardwareVideo = moment.hasHardwareVideo,
+                            ) {
                                 ModernPostCardView(
                                     moment = moment,
                                     onOpenProfile = { onOpenUserProfile(moment.authorId) },

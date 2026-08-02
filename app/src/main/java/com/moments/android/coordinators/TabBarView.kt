@@ -1,7 +1,6 @@
 package com.moments.android.coordinators
 
 import android.net.Uri
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,13 +34,13 @@ import com.moments.android.coordinators.nav3.rememberMomentsTabNavigator
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
+import com.moments.android.icons.MomentsIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -59,9 +58,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -434,7 +430,8 @@ private fun MomentsCustomTabBar(
                 )
                 CreateTabButton(
                     isSelected = selectedTab == 2,
-                    isDark = isDark,
+                    activeColor = activeColor,
+                    inactiveColor = inactiveColor,
                     onClick = onOpenCreator,
                 )
                 TabBarItem(
@@ -530,34 +527,30 @@ private fun NovaTabGlyph(size: androidx.compose.ui.unit.Dp, color: Color) {
 @Composable
 private fun RowScope.CreateTabButton(
     isSelected: Boolean,
-    isDark: Boolean,
+    activeColor: Color,
+    inactiveColor: Color,
     onClick: () -> Unit,
 ) {
-    val scale by animateFloatAsState(if (isSelected) 1.1f else 1f, label = "createScale")
-    val gradient = if (isDark) {
-        listOf(Color(0xFF6B73FF), Color(0xFF9B59B6))
-    } else {
-        listOf(Color(0xFF007AFF), Color(0xFF5856D6))
-    }
-
+    // ≡ iOS modern Tab `camera.aperture`: icono suelto (sin pill/gradiente), un poco mayor
+    // que house/person (26) para que lea como el simbólico de captura.
     Box(
         modifier = Modifier
             .weight(1f)
-            .scale(scale)
-            .clickable(onClick = onClick)
+            .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
             .semantics { contentDescription = "Create" },
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            Modifier
-                .size(width = 44.dp, height = 32.dp)
-                .shadow(6.dp, RoundedCornerShape(10.dp))
-                .clip(RoundedCornerShape(10.dp))
-                .background(Brush.linearGradient(gradient)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-        }
+        Icon(
+            MomentsIcons.CameraAperture,
+            contentDescription = null,
+            tint = if (isSelected) activeColor else inactiveColor,
+            modifier = Modifier.size(30.dp),
+        )
     }
 }
 

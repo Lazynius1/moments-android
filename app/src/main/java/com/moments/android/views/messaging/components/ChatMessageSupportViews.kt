@@ -70,6 +70,7 @@ import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageStatus
 import com.moments.android.views.shared.ScreenshotProtectedView
+import com.moments.android.views.shared.ScreenshotProtectionMode
 
 data class ChatFailedMessageRetryAction(
     val canRetry: (EnhancedMessage) -> Boolean,
@@ -183,7 +184,11 @@ fun GlassmorphicReplyBar(
         ReplyBarBody(message, otherParticipantName, large = true, onCancel = onCancel, modifier = modifier)
     }
     if (message.isVanishModeMessage) {
-        ScreenshotProtectedView(isProtected = true, cornerRadius = 12.dp) { content() }
+        ScreenshotProtectedView(
+            isProtected = true,
+            cornerRadius = 12.dp,
+            mode = ScreenshotProtectionMode.WindowFlag,
+        ) { content() }
     } else {
         content()
     }
@@ -207,7 +212,11 @@ fun GlassmorphicReplyPreview(
         )
     }
     if (message.isVanishModeMessage) {
-        ScreenshotProtectedView(isProtected = true, cornerRadius = 10.dp) { content() }
+        ScreenshotProtectedView(
+            isProtected = true,
+            cornerRadius = 10.dp,
+            mode = ScreenshotProtectionMode.WindowFlag,
+        ) { content() }
     } else {
         content()
     }
@@ -263,7 +272,11 @@ fun StackedReplyQuote(
         }
     }
     if (repliedMessage.isVanishModeMessage) {
-        ScreenshotProtectedView(isProtected = true, cornerRadius = 13.dp) { body() }
+        ScreenshotProtectedView(
+            isProtected = true,
+            cornerRadius = 13.dp,
+            mode = ScreenshotProtectionMode.WindowFlag,
+        ) { body() }
     } else {
         body()
     }

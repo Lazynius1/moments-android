@@ -81,6 +81,7 @@ import com.moments.android.views.shared.MomentsVideoGravity
 import com.moments.android.views.shared.MomentsVideoPlaybackTimeline
 import com.moments.android.views.shared.MomentsVideoPlayer
 import com.moments.android.views.shared.ScreenshotProtectedView
+import com.moments.android.views.shared.ScreenshotProtectionMode
 import com.moments.android.views.story.StoryRingAvatarView
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -336,7 +337,12 @@ fun ConversationFullScreenMediaView(
                         }
                     }
                     if (isScreenshotProtected(item)) {
-                        ScreenshotProtectedView(isProtected = true, fillsContainer = true) { body() }
+                        ScreenshotProtectedView(
+                            isProtected = true,
+                            fillsContainer = true,
+                            // Chat fullscreen: FLAG_SECURE (vídeo + imagen). ContentSurface parpadea con ExoPlayer.
+                            mode = ScreenshotProtectionMode.WindowFlag,
+                        ) { body() }
                     } else {
                         body()
                     }

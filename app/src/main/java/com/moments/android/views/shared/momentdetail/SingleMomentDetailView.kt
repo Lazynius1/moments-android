@@ -273,7 +273,10 @@ fun SingleMomentDetailView(
             ) {
                 Spacer(Modifier.height(listTopInset))
                 val isProtected = (currentMoment.audience?.lowercase() ?: "") != "everyone"
-                ScreenshotProtectedView(isProtected = isProtected) {
+                ScreenshotProtectedView(
+                    isProtected = isProtected,
+                    containsHardwareVideo = currentMoment.hasHardwareVideo,
+                ) {
                     ModernPostCardView(
                         moment = currentMoment,
                         onOpenProfile = { openUserProfile(currentMoment.authorId) },
