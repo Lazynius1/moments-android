@@ -353,6 +353,14 @@ data class Moment(
             return videoUrl?.trim()?.takeIf { it.isNotEmpty() }
         }
 
+    /**
+     * Vídeo con ExoPlayer/SurfaceView. No envolver en `ScreenshotProtectionMode.ContentSurface`
+     * (el blit a SurfaceView seguro provoca parpadeos).
+     */
+    val hasHardwareVideo: Boolean
+        get() = visibleMediaItems.any { it.type == MediaItem.MediaType.VIDEO } ||
+            !videoUrl?.trim().isNullOrEmpty()
+
     /** ≡ iOS `scheduledTimeFormatted()` (formato corto `Xh Ym` / `Ym`). */
     fun scheduledTimeFormatted(context: Context): String {
         val scheduled = scheduledDate ?: return ""
@@ -1126,8 +1134,12 @@ data class Story(
                 forcesAllCaps = data["forcesAllCaps"] as? Boolean,
                 textLayerOrder = (data["textLayerOrder"] as? Number)?.toInt(),
                 textOverlayLive = data["textOverlayLive"] as? Boolean,
-                textOverlays = (data["textOverlays"] as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(StoryTextOverlayMetadata::from) },
-                stickers = (data["stickers"] as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(StickerData::from) },
+                textOverlays = (data["textOverlays"] as? List<*>)?.mapNotNull {
+                    it.asStringKeyedMap()?.let(StoryTextOverlayMetadata::from)
+                },
+                stickers = (data["stickers"] as? List<*>)?.mapNotNull {
+                    it.asStringKeyedMap()?.let(StickerData::from)
+                },
                 drawingData = (data["drawingData"] as? com.google.firebase.firestore.Blob)?.toBytes() ?: (data["drawingData"] as? ByteArray),
                 aspectRatio = data["aspectRatio"] as? String,
                 backgroundFrameURL = data["backgroundFrameURL"] as? String,
@@ -1138,6 +1150,13 @@ data class Story(
             )
         }
     }
+}
+
+/** Firestore/JSON maps llegan como `Map<*, *>` — cast tipado fiable. */
+@Suppress("UNCHECKED_CAST")
+private fun Any?.asStringKeyedMap(): Map<String, Any?>? {
+    val map = this as? Map<*, *> ?: return null
+    return map.entries.associate { (key, value) -> key.toString() to value }
 }
 
 // MARK: - Visibilidad de contenido (ContentProtocol en Models.swift)

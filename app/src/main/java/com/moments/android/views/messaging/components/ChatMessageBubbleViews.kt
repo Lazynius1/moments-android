@@ -221,6 +221,7 @@ fun GlassmorphicMessageRow(
                             com.moments.android.views.shared.ScreenshotProtectedView(
                                 isProtected = true,
                                 cornerRadius = cornerRadius.dp,
+                                mode = com.moments.android.views.shared.ScreenshotProtectionMode.WindowFlag,
                             ) {
                                 bubble()
                             }

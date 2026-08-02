@@ -4,6 +4,8 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.os.Handler
+import android.os.Looper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -12,6 +14,10 @@ import kotlinx.coroutines.withContext
 
 /**
  * Centraliza gestión de audio fuera del hilo principal. Equivalente de AVAudioSession.
+ *
+ * AudioFocusRequest exige [OnAudioFocusChangeListener] si se usa delayed focus gain
+ * o pause-on-duck — sin listener, `build()` lanza IllegalStateException
+ * ("Can't use delayed focus or pause on duck without a listener").
  */
 object MomentsAudioSession {
     private var appContext: Context? = null
@@ -19,6 +25,10 @@ object MomentsAudioSession {
     private var focusRequest: AudioFocusRequest? = null
     private var savedMode: Int? = null
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** Listener obligatorio para delayed focus; iOS no tiene equivalente de callbacks. */
+    private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { /* no-op */ }
 
     fun initialize(context: Context) {
         if (appContext == null) {
@@ -61,8 +71,10 @@ object MomentsAudioSession {
                 .setUsage(usage)
                 .setContentType(contentType)
                 .build()
+            // Listener + delayed focus: requerido por AudioFocusRequest.Builder.build()
             val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(attrs)
+                .setOnAudioFocusChangeListener(focusChangeListener, mainHandler)
                 .setAcceptsDelayedFocusGain(true)
                 .build()
             focusRequest = request
@@ -70,7 +82,7 @@ object MomentsAudioSession {
         } else {
             @Suppress("DEPRECATION")
             manager.requestAudioFocus(
-                null,
+                focusChangeListener,
                 legacyStreamType,
                 AudioManager.AUDIOFOCUS_GAIN,
             ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
@@ -80,9 +92,10 @@ object MomentsAudioSession {
     private fun abandonFocus(manager: AudioManager) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             focusRequest?.let { manager.abandonAudioFocusRequest(it) }
+            focusRequest = null
         } else {
             @Suppress("DEPRECATION")
-            manager.abandonAudioFocus(null)
+            manager.abandonAudioFocus(focusChangeListener)
         }
     }
 }

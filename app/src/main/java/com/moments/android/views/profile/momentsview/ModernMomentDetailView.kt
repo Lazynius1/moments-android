@@ -372,6 +372,7 @@ fun ModernMomentDetailView(
                 ) { _, moment ->
                     ScreenshotProtectedView(
                         isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
+                        containsHardwareVideo = moment.hasHardwareVideo,
                     ) {
                         ModernPostCardView(
                             moment = moment,

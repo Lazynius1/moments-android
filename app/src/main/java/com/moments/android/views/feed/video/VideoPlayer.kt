@@ -633,6 +633,9 @@ fun HaloLoadingView(
 
 /**
  * Port de `VideoPlayerRepresentable` — PlayerView + ticks de progress/buffering.
+ *
+ * Feed/detalle: [texture_view] (mismo layout que stories). SurfaceView default
+ * ignora `Modifier.clip` y el vídeo “invade” la card siguiente.
  */
 @Composable
 fun VideoPlayerRepresentable(
@@ -671,7 +674,9 @@ fun VideoPlayerRepresentable(
 
     AndroidView(
         factory = { ctx ->
-            PlayerView(ctx).apply {
+            (android.view.LayoutInflater.from(ctx)
+                .inflate(com.moments.android.R.layout.story_player_view, null, false)
+                as PlayerView).apply {
                 layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,

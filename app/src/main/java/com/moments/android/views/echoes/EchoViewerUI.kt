@@ -17,11 +17,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -271,11 +274,13 @@ fun EchoViewerUI(
                     else -> EchoWaitingState(echo?.participants.orEmpty())
                 }
 
-                // Overlay UI
+                // Overlay UI ≡ iOS VStack (safe top + header + location + Spacer + switcher)
+                // navigationBarsPadding: sin esto los usernames quedan bajo la gesture/nav bar.
                 Column(
                     Modifier
                         .fillMaxSize()
                         .statusBarsPadding()
+                        .navigationBarsPadding()
                         .padding(top = 8.dp),
                 ) {
                     EchoHeader(
@@ -680,6 +685,7 @@ private fun EchoPerspectiveSwitcher(
     secondaryColor: Color,
     onSelect: (Int) -> Unit,
 ) {
+    // ≡ iOS perspectiveSwitcher: HStack(spacing: 14) + Text.frame(maxWidth: 70)
     LazyRow(
         Modifier
             .fillMaxWidth()
@@ -692,12 +698,14 @@ private fun EchoPerspectiveSwitcher(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.clickable {
-                    if (index != selectedIndex) {
-                        HapticManager.shared.selection()
-                        onSelect(index)
-                    }
-                },
+                modifier = Modifier
+                    .wrapContentWidth()
+                    .clickable {
+                        if (index != selectedIndex) {
+                            HapticManager.shared.selection()
+                            onSelect(index)
+                        }
+                    },
             ) {
                 AsyncProfileImageView(
                     p.authorId,
@@ -721,7 +729,8 @@ private fun EchoPerspectiveSwitcher(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
-                    modifier = Modifier.width(70.dp),
+                    // ≡ iOS `.frame(maxWidth: 70)` — no width fijo (separaba de más)
+                    modifier = Modifier.widthIn(max = 70.dp),
                     textAlign = TextAlign.Center,
                     overflow = TextOverflow.Ellipsis,
                 )

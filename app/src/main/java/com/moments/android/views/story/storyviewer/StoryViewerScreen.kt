@@ -327,11 +327,18 @@ fun StoryViewerScreen(
         return if (!id.isNullOrEmpty()) id else "${forStory.authorId}_${forStory.timestamp.time}"
     }
 
-    /** ≡ `resolvedStoryStickers(for:)` — Android ya tiene [StickerData]; cachea por historia. */
+    /**
+     * ≡ `resolvedStoryStickers(for:)` / `convertStickersToStickerItems`.
+     * No cachear lista vacía: el reel backend puede hidratar stickers (reveal) después.
+     */
     fun resolvedStoryStickers(forStory: Story): List<StickerData> {
         val key = stickerCacheKey(forStory)
-        storyStickerCache[key]?.let { return it }
         val stickers = forStory.stickers.orEmpty()
+            .filter { it.moderationState != "hidden" }
+        if (stickers.isEmpty()) {
+            storyStickerCache = storyStickerCache - key
+            return emptyList()
+        }
         storyStickerCache = storyStickerCache + (key to stickers)
         return stickers
     }
@@ -763,7 +770,8 @@ fun StoryViewerScreen(
     }
 
     // MARK: - Lifecycle
-    LaunchedEffect(story.id) {
+    // stickers en keys: getAuthorStoryBundle hidrata reveal/overlays tras el primer frame.
+    LaunchedEffect(story.id, story.stickers) {
         if (story.id != lastPreparedStoryId) {
             lastPreparedStoryId = story.id
             isStoryVideoReady = false
@@ -775,7 +783,7 @@ fun StoryViewerScreen(
             if (allStories.isNotEmpty()) {
                 storyViewModel?.preloadNextStory(story.id.orEmpty(), allStories)
             }
-        } else if (storyStickers.isEmpty()) {
+        } else {
             storyStickers = resolvedStoryStickers(story)
         }
     }

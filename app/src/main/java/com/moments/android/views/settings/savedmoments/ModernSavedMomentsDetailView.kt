@@ -396,6 +396,7 @@ fun ModernSavedMomentsDetailView(
                         ?: domainMoments.firstOrNull { it.id == moment.id }
                     ScreenshotProtectedView(
                         isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
+                        containsHardwareVideo = moment.hasHardwareVideo,
                     ) {
                         ModernPostCardView(
                             moment = moment,

@@ -20,9 +20,8 @@ import java.util.WeakHashMap
 /**
  * Cómo proteger el contenido (paridad con iOS `ScreenshotProtectedView`).
  *
- * - [ContentSurface]: `SurfaceView.setSecure` + fondo AdaptiveColors.
- *   Default Moments/feed/chat. Historias usan [WindowFlag].
- * - [WindowFlag]: `FLAG_SECURE` en la Activity (fullscreen stories).
+ * - [ContentSurface]: `SurfaceView.setSecure` — imágenes (feed/momentos). No usar con ExoPlayer.
+ * - [WindowFlag]: `FLAG_SECURE` en la Activity — historias, chat/view-once (sí protege vídeo).
  */
 enum class ScreenshotProtectionMode {
     ContentSurface,
@@ -33,6 +32,9 @@ enum class ScreenshotProtectionMode {
  * Port de `ScreenshotProtectedView.swift`.
  *
  * Condición típica: `(audience?.lowercased() ?? "") != "everyone"`.
+ *
+ * @param containsHardwareVideo Con [ContentSurface] + vídeo ExoPlayer se omite el host
+ *   (parpadeos). Momentos de vídeo lo usan; chat/historias usan [WindowFlag].
  */
 @Composable
 fun ScreenshotProtectedView(
@@ -41,6 +43,7 @@ fun ScreenshotProtectedView(
     cornerRadius: Dp? = null,
     updateToken: Any? = null,
     mode: ScreenshotProtectionMode = ScreenshotProtectionMode.ContentSurface,
+    containsHardwareVideo: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val body: @Composable () -> Unit = {
@@ -78,9 +81,14 @@ fun ScreenshotProtectedView(
             wrapped()
         }
         ScreenshotProtectionMode.ContentSurface -> {
-            val hostModifier = if (fillsContainer) Modifier.fillMaxSize() else Modifier
-            SecureComposeSurfaceHost(modifier = hostModifier) {
+            // ContentSurface blit vs ExoPlayer SurfaceView → flicker; skip host for video.
+            if (containsHardwareVideo) {
                 wrapped()
+            } else {
+                val hostModifier = if (fillsContainer) Modifier.fillMaxSize() else Modifier
+                SecureComposeSurfaceHost(modifier = hostModifier) {
+                    wrapped()
+                }
             }
         }
     }
@@ -114,6 +122,7 @@ fun ScreenshotProtected(
     cornerRadius: Dp? = null,
     updateToken: Any? = null,
     mode: ScreenshotProtectionMode = ScreenshotProtectionMode.ContentSurface,
+    containsHardwareVideo: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     ScreenshotProtectedView(
@@ -122,6 +131,7 @@ fun ScreenshotProtected(
         cornerRadius = cornerRadius,
         updateToken = updateToken,
         mode = mode,
+        containsHardwareVideo = containsHardwareVideo,
         content = content,
     )
 }
