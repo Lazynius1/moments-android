@@ -21,7 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.models.Moment
 import com.moments.android.services.cache.VideoThumbnailCache
+import com.moments.android.views.profile.core.sections.ProfileMomentZoomNavigation
+import com.moments.android.views.profile.core.sections.profileMomentZoomSource
 import com.moments.android.views.settings.hasVideoMedia
 import com.moments.android.views.settings.isReelCandidate
 import com.moments.android.views.shared.ScreenshotProtectedView
@@ -192,11 +194,13 @@ fun ExploreMomentsGrid(
     moments: List<Moment>,
     onMomentTap: (Moment, Int, List<Moment>) -> Unit,
     modifier: Modifier = Modifier,
+    zoomIDPrefix: String = "explore",
 ) {
     ExploreMomentsBentoGrid(
         moments = moments,
         onMomentTap = onMomentTap,
         modifier = modifier,
+        zoomIDPrefix = zoomIDPrefix,
     )
 }
 
@@ -205,6 +209,7 @@ fun ExploreMomentsBentoGrid(
     moments: List<Moment>,
     onMomentTap: (Moment, Int, List<Moment>) -> Unit,
     modifier: Modifier = Modifier,
+    zoomIDPrefix: String = "explore",
 ) {
     if (moments.isEmpty()) return
 
@@ -232,7 +237,16 @@ fun ExploreMomentsBentoGrid(
                             y = (unit + gap) * placement.y.toInt(),
                         )
                         .width(tileW)
-                        .height(tileH),
+                        .height(tileH)
+                        // ≡ iOS ProfileMomentZoomSourceModifier(cornerRadius: 0)
+                        .profileMomentZoomSource(
+                            sourceID = ProfileMomentZoomNavigation.sourceID(
+                                moment,
+                                placement.index,
+                                zoomIDPrefix,
+                            ),
+                            cornerRadius = 0.dp,
+                        ),
                 ) {
                     ScreenshotProtectedView(
                         isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
@@ -397,10 +411,9 @@ private fun GeneratedVideoThumbnail(videoURL: String) {
         } else {
             Placeholder()
             if (loading) {
-                CircularProgressIndicator(
-                    color = Color(0xFF667EEA),
-                    strokeWidth = 2.dp,
+                MomentsCircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp,
                 )
             }
         }

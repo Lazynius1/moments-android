@@ -7,5 +7,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import com.moments.android.R
 
-/** Port de `PermissionPhoneWallpaper.swift`. */
-@Composable fun PermissionPhoneWallpaper(modifier: Modifier = Modifier) = Image(painterResource(R.drawable.pic1), null, modifier, contentScale = ContentScale.Crop)
+/**
+ * Port de `PermissionPhoneWallpaper.swift`.
+ * iOS: `PermissionWallpaper` asset → fallback `pic1`.
+ */
+@Composable
+fun PermissionPhoneWallpaper(modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(R.drawable.permission_wallpaper),
+        contentDescription = null,
+        modifier = modifier,
+        contentScale = ContentScale.Crop,
+    )
+}

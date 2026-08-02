@@ -7,7 +7,7 @@ import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -66,6 +66,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun MomentsApp(
     deepLinkUri: Uri? = null,
+    deepLinkFromNewTask: Boolean = false,
     onDeepLinkHandled: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -173,7 +174,11 @@ fun MomentsApp(
                 }
             }
             accountState is AccountState.Suspended -> SuspendedScreen(accountState as AccountState.Suspended)
-            else -> TabBarScreen(deepLinkUri = deepLinkUri, onDeepLinkHandled = onDeepLinkHandled)
+            else -> TabBarScreen(
+                deepLinkUri = deepLinkUri,
+                deepLinkFromNewTask = deepLinkFromNewTask,
+                onDeepLinkHandled = onDeepLinkHandled,
+            )
         }
 
         if (incognitoActive && signedIn) {
@@ -205,7 +210,7 @@ fun MomentsApp(
     }
 }
 
-/** ≡ checkVersion() */
+/** ≡ checkVersion() — solo en actualización real, no en 1ª instalación / datos limpios. */
 private fun checkVersion(
     context: Context,
     prefs: android.content.SharedPreferences,
@@ -222,7 +227,13 @@ private fun checkVersion(
         info.versionName
     }.getOrNull() ?: "2.9.0"
 
-    val lastPrompted = prefs.getString(KEY_LAST_VERSION_PROMPTED, "1.0.0") ?: "1.0.0"
+    // Sin clave = install limpio / clear: marcar y no enseñar (iOS default "1.0.0" dispara
+    // el sheet en cada wipe de debug; en Android no interrumpimos el arranque).
+    if (!prefs.contains(KEY_LAST_VERSION_PROMPTED)) {
+        prefs.edit().putString(KEY_LAST_VERSION_PROMPTED, currentVersion).apply()
+        return
+    }
+    val lastPrompted = prefs.getString(KEY_LAST_VERSION_PROMPTED, currentVersion) ?: currentVersion
     if (lastPrompted == currentVersion) return
     scope.launch {
         delay(1_500)
@@ -251,7 +262,7 @@ private fun syncLastAppOpenIfNeeded(
 @Composable
 private fun AccountLoading() {
     Box(Modifier.fillMaxSize().background(Surface), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        MomentsCircularProgressIndicator()
     }
 }
 

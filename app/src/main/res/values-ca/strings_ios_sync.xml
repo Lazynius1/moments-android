@@ -542,7 +542,6 @@
     <string name="creator_advanced_settings">Configuració avançada</string>
     <string name="creator_advanced_settings_title">Configuració avançada</string>
     <string name="creator_album_default">Àlbum</string>
-    <string name="creator_album_elements">%1$d element</string>
     <string name="creator_album_elements_plural">%1$d elements</string>
     <string name="creator_album_recents">Recents</string>
     <string name="creator_album_smart_favorites">Favorits</string>
@@ -2417,4 +2416,11 @@
     <string name="widget_stories_singular">1 història nova</string>
     <string name="widget_visits_plural">Avui %1$d persones han visitat el teu perfil</string>
     <string name="widget_visits_singular">Avui 1 persona ha visitat el teu perfil</string>
+    <string name="widget_home_description">Accedeix ràpid a les teves històries, visites i missatges.</string>
+    <string name="widget_brand_name">Moments</string>
+    <string name="widget_all_caught_up">Tot al dia</string>
+    <string name="widget_echoes_singular">1 amic a prop</string>
+    <string name="widget_echoes_plural">%1$d amics a prop</string>
+    <string name="widget_tags_singular">1 etiqueta nova</string>
+    <string name="widget_tags_plural">%1$d etiquetes noves</string>
 </resources>

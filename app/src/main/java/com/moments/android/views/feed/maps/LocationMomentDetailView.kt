@@ -80,11 +80,12 @@ import com.moments.android.views.feed.core.sections.ModernPostCardView
 import com.moments.android.views.feed.maps.mapssections.MomentUnavailableOverlay
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.rememberAdaptiveColors
-import com.moments.android.views.profile.core.sections.ProfileStickyChromeContainer
 import com.moments.android.views.profile.momentsview.EditMomentView
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.momentdetail.FeedPinnedTopChrome
+import com.moments.android.views.shared.momentdetail.MomentDetailSolidTopChrome
+import com.moments.android.views.shared.momentdetail.rememberMomentDetailContentTopInset
 import com.moments.android.views.shared.momentdetail.ProfileHeaderCollapseMetrics
 import com.moments.android.views.story.StoriesView
 import kotlinx.coroutines.Dispatchers
@@ -143,10 +144,7 @@ fun LocationMomentDetailView(
 
     var locationDisplayTitle by remember(locationName) { mutableStateOf(locationName) }
 
-    val chromeBlurProgress = ProfileHeaderCollapseMetrics.detailScrollChromeBlurProgress(
-        contentMinY = contentMinY,
-        initialContentMinY = initialContentMinY,
-    )
+    val listTopInset = rememberMomentDetailContentTopInset()
 
     val basePlaceName = remember(locationName, feedMoments, currentIndex) {
         val trimmed = locationName.trim()
@@ -384,7 +382,7 @@ fun LocationMomentDetailView(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
-                    top = ProfileHeaderCollapseMetrics.feedStyleDetailTopInset,
+                    top = listTopInset,
                     bottom = 24.dp,
                     start = FeedMomentCardLayout.listHorizontalPadding,
                     end = FeedMomentCardLayout.listHorizontalPadding,
@@ -445,22 +443,17 @@ fun LocationMomentDetailView(
             Box(
                 Modifier
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth()
                     .zIndex(10f),
             ) {
-                // iOS: ProfileStickyChromeContainer(blurProgress:blurFadeTail:locationChromeBlurFadeTail)
-                ProfileStickyChromeContainer(
-                    blurProgress = chromeBlurProgress,
-                    tabsArePinned = false,
-                    chrome = {
-                        FeedPinnedTopChrome(
-                            title = locationDisplayTitle.ifBlank {
-                                stringResource(R.string.feed_location_default)
-                            },
-                            onDismiss = ::dismissLocationDetail,
-                        )
-                    },
-                )
+                MomentDetailSolidTopChrome {
+                    FeedPinnedTopChrome(
+                        title = locationDisplayTitle.ifBlank {
+                            stringResource(R.string.feed_location_default)
+                        },
+                        onDismiss = ::dismissLocationDetail,
+                        applySafeAreaTop = false,
+                    )
+                }
             }
         }
 

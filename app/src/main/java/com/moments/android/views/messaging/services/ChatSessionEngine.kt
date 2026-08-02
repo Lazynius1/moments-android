@@ -67,6 +67,13 @@ object ChatSessionEngine {
         return session
     }
 
+    /** Sesión ya cacheada (sin crear). Para sync desde settings/inbox. */
+    fun cachedSession(conversationId: String): MomentsChatViewModel? {
+        if (conversationId.isBlank()) return null
+        reconcileCurrentUser()
+        return synchronized(lock) { sessions[conversationId] }
+    }
+
     /**
      * Port de `registerMaterializedSession`: una sesión abierta como borrador (sin id) entra al
      * caché al materializarse su conversación, para que las siguientes aperturas la reutilicen.

@@ -30,7 +30,10 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -143,6 +146,7 @@ fun ChatCameraView(
     BackHandler(onBack = onDismiss)
 
     if (isEditorActive) {
+        // Mismo safe-area que la preview: el chat es edge-to-edge; el editor no debe meterse en status bar.
         ChatCameraEditorHost(
             media = mediaForEditor,
             otherUserId = otherUserId,
@@ -155,7 +159,9 @@ fun ChatCameraView(
             startsInTextMode = startsInTextMode,
             onStartsInTextModeChange = { startsInTextMode = it },
             onDismiss = onDismiss,
-            modifier = modifier,
+            modifier = modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars)),
         )
         return
     }
@@ -163,9 +169,17 @@ fun ChatCameraView(
     val canvasBg = if (isSystemInDarkTheme()) Color(0xFF0B1215) else Color(0xFFFAF9F6)
 
     CameraAccessBoundary(requiresMicrophone = true, onCancel = onDismiss) {
-        BoxWithConstraints(modifier.fillMaxSize().background(canvasBg)) {
+        // Chat es edge-to-edge; Creator/StoryCamera ya vienen con status+nav padding del Dialog.
+        // Sin esto el canvas (top = 8.dp) se mete en la status bar.
+        BoxWithConstraints(
+            modifier
+                .fillMaxSize()
+                .background(canvasBg)
+                .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars)),
+        ) {
             val density = LocalDensity.current
-            val bottomInsetPx = WindowInsets.navigationBars.getBottom(density).toFloat()
+            // Insets ya consumidos por windowInsetsPadding (≡ GeometryReader en safe area iOS).
+            val bottomInsetPx = 0f
             val captureRect = creatorMomentsCaptureRect(
                 inSize = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()),
                 topInsetPx = 0f,

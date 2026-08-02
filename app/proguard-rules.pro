@@ -1,2 +1,27 @@
-# Add app-specific R8 rules as feature modules are introduced.
+# Moments release R8 — keep mínimo de app.
+# Firebase / Media3 / Maps / Coil / kotlinx.serialization / CameraX traen consumer ProGuard.
 
+# Stack traces legibles en crash reports.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# Anotaciones / genéricos usados por serializers y APIs Google.
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+
+# Lookups dinámicos de recursos → ver res/raw/keep.xml (tools:keep).
+
+# ---------------------------------------------------------------------------
+# Room / WorkManager — R8 fullMode quitaba `WorkDatabase_Impl.<init>()`,
+# y Room lo instancia por reflexión → crash al arrancar (InitializationProvider).
+# ---------------------------------------------------------------------------
+-keep class * extends androidx.room.RoomDatabase {
+    <init>();
+    <methods>;
+}
+-keep class * extends androidx.room.RoomDatabase$Callback { *; }
+-keep class androidx.work.impl.WorkDatabase_Impl { <init>(); <methods>; }
+-keep class androidx.work.impl.**_Impl { <init>(); <methods>; }
+-keep class androidx.work.impl.model.**_Impl { <init>(); <methods>; }
+-keep class androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory { <init>(); }
+-keep class androidx.startup.** { *; }
+-dontwarn androidx.room.paging.**

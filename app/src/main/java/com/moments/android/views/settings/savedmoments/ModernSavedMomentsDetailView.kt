@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -102,7 +101,8 @@ import com.moments.android.views.profile.momentsview.EditMomentView
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
 import com.moments.android.views.settings.hasVideoMedia
 import com.moments.android.views.shared.ScreenshotProtectedView
-import com.moments.android.views.shared.momentdetail.ProfileHeaderCollapseMetrics
+import com.moments.android.views.shared.momentdetail.MomentDetailSolidTopChrome
+import com.moments.android.views.shared.momentdetail.rememberMomentDetailContentTopInset
 import com.moments.android.views.story.StoriesView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -126,6 +126,7 @@ fun ModernSavedMomentsDetailView(
 ) {
     val colors = rememberAdaptiveColors()
     val isDark = isSystemInDarkTheme()
+    val listTopInset = rememberMomentDetailContentTopInset(chromeBodyHeight = 56.dp)
     val scope = rememberCoroutineScope()
     val firestore = remember { FirestoreService() }
     val configuration = LocalConfiguration.current
@@ -380,7 +381,7 @@ fun ModernSavedMomentsDetailView(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
-                    top = ProfileHeaderCollapseMetrics.feedStyleDetailTopInset + 18.dp,
+                    top = listTopInset,
                     bottom = 40.dp,
                     start = FeedMomentCardLayout.listHorizontalPadding,
                     end = FeedMomentCardLayout.listHorizontalPadding,
@@ -438,14 +439,15 @@ fun ModernSavedMomentsDetailView(
                 }
             }
 
-            ModernSavedDetailHeader(
-                moment = currentDomainMoment,
-                onDismiss = onDismiss,
-                onRemove = {
-                    currentDomainMoment?.let { requestRemove(it) }
-                },
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
+            MomentDetailSolidTopChrome(modifier = Modifier.align(Alignment.TopCenter)) {
+                ModernSavedDetailHeader(
+                    moment = currentDomainMoment,
+                    onDismiss = onDismiss,
+                    onRemove = {
+                        currentDomainMoment?.let { requestRemove(it) }
+                    },
+                )
+            }
         }
 
         contextMenuMoment?.let { menuMoment ->
@@ -706,8 +708,7 @@ fun ModernSavedDetailHeader(
     Column(
         modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(top = 18.dp),
+            .padding(top = 0.dp),
     ) {
         Row(
             Modifier

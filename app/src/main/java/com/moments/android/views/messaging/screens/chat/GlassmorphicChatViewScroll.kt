@@ -18,6 +18,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/** Port de `GlassmorphicChatView+Scroll.swift`.
+ *
+ * Paridad de comportamiento (pin/bottom, history, search jump, vanish pull).
+ * Δ intencional: reintentos/invalidate de self-sizing UIKit no aplican a LazyList Compose.
+ */
 enum class ListBottomSnapReason { KEYBOARD, COMPOSER_RESIZED, USER_REQUESTED, INCOMING_WHILE_PINNED }
 
 data class ChatScrollCallbacks(
@@ -72,7 +77,14 @@ class GlassmorphicChatScrollController(
         private set
 
     fun loadOlderHistoryIfNeeded() {
-        if (!hasCompletedInitialScroll || viewModel.isLoadingMore.value || !viewModel.canLoadMore.value || viewModel.messages.value.isEmpty()) return
+        if (!hasCompletedInitialScroll ||
+            viewModel.isLoadingMore.value ||
+            viewModel.isLoadingOlderHistory.value ||
+            !viewModel.canLoadMore.value ||
+            viewModel.messages.value.isEmpty()
+        ) {
+            return
+        }
         viewModel.loadMoreMessages()
     }
 
@@ -196,9 +208,17 @@ class GlassmorphicChatScrollController(
     fun handleLastMessageChange(oldMessageId: String?, lastMessageId: String?) {
         if (lastMessageId == null || oldMessageId == null || !hasCompletedInitialScroll) return
         val mine = viewModel.messages.value.lastOrNull()?.senderId == viewModel.currentUserId
-        if (mine && !isPinnedToBottom) scheduleListBottomSnap(ListBottomSnapReason.USER_REQUESTED, animated = true)
-        else if (!mine && !viewModel.isLoadingMore.value && !isPinnedToBottom) {
+        if (mine) {
+            // ≡ iOS: reply propia → dismiss divider + snap si no estás al fondo
+            if (!isPinnedToBottom) {
+                scheduleListBottomSnap(ListBottomSnapReason.USER_REQUESTED, animated = true)
+            }
+        } else if (!viewModel.isLoadingMore.value && !isPinnedToBottom) {
             pendingIncomingMessages += 1
+        }
+        // ≡ iOS onChange lastMessage: si ya estás pinned → snap (entrante o propio)
+        if (isPinnedToBottom && oldMessageId != lastMessageId) {
+            scheduleListBottomSnap(ListBottomSnapReason.INCOMING_WHILE_PINNED)
         }
     }
 
@@ -245,6 +265,18 @@ class GlassmorphicChatScrollController(
         if (messageId.isNotBlank()) scheduleSearchHighlightScroll(messageId)
     }
 
+    /**
+     * ≡ iOS `consumeDeferredJumpToMessageIfNeeded` — delay 0.35s tras cerrar settings
+     * para no saltar a mitad de la transición.
+     */
+    fun consumeDeferredJumpToMessage(messageId: String) {
+        if (messageId.isBlank()) return
+        scope.launch {
+            delay(350L)
+            handleJumpToMessageFromOutside(messageId)
+        }
+    }
+
     fun processPendingReactionHighlights(messageIds: Set<String>, shouldScroll: Boolean) {
         if (messageIds.isEmpty()) return
         if (shouldScroll) messageIds.firstOrNull()?.let { scrollToTarget(ChatScrollTarget.HighlightedMessage(it), !reduceMotion()) }
@@ -263,6 +295,10 @@ class GlassmorphicChatScrollController(
                 callbacks.onPendingBuzz()
             }
         }
+    }
+
+    fun clearPendingIncoming() {
+        pendingIncomingMessages = 0
     }
 
     fun allowsVerticalScrolling(): Boolean = hasCompletedInitialScroll && scrollContentExceedsViewport

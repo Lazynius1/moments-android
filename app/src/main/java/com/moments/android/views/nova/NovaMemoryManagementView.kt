@@ -20,7 +20,6 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
@@ -141,7 +140,7 @@ fun NovaMemoryManagementView(
     }
 
     Column(Modifier.fillMaxSize()) {
-        NovaMemoryHeader(onDismiss = onDismiss)
+        NovaMemoryHeader()
         when {
             viewModel.isLoading -> LoadingMemory()
             viewModel.memory?.facts.isNullOrEmpty() -> EmptyMemory()
@@ -160,50 +159,27 @@ fun NovaMemoryManagementView(
 }
 
 @Composable
-private fun NovaMemoryHeader(onDismiss: () -> Unit) {
-    Box(
+private fun NovaMemoryHeader() {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
-            .padding(top = 20.dp, bottom = 18.dp),
+            .padding(top = 0.dp, bottom = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 64.dp)
-                .align(Alignment.Center),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.nova_memory_title),
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = NovaColors.textPrimary,
-            )
-            Text(
-                text = stringResource(R.string.nova_memory_description),
-                fontSize = 13.sp,
-                color = NovaColors.textSecondary,
-                textAlign = TextAlign.Center,
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .size(38.dp)
-                .momentsChromeGlass(CircleShape, interactive = true)
-                .clickable(onClick = onDismiss),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = stringResource(R.string.common_close),
-                tint = NovaColors.textPrimary,
-                modifier = Modifier.size(18.dp),
-            )
-        }
+        Text(
+            text = stringResource(R.string.nova_memory_title),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = NovaColors.textPrimary,
+        )
+        Text(
+            text = stringResource(R.string.nova_memory_description),
+            fontSize = 12.sp,
+            color = NovaColors.textSecondary,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

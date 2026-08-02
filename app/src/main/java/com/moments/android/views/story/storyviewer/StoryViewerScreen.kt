@@ -16,7 +16,6 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +31,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,18 +40,18 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.SentimentSatisfied
 import androidx.compose.material.icons.outlined.SentimentSatisfied
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -68,26 +68,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -98,6 +104,7 @@ import com.google.firebase.firestore.FieldValue
 import com.moments.android.R
 import com.moments.android.coordinators.CoordinatorNavigationEvent
 import com.moments.android.coordinators.NavigationEventBus
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MediaItem
 import com.moments.android.models.StickerData
@@ -117,6 +124,11 @@ import com.moments.android.views.feed.core.FeedProfileSheetRoute
 import com.moments.android.views.feed.core.sections.FeedMomentDetailRoute
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.feed.sharing.StoryShareBottomSheet
+import com.moments.android.views.messaging.components.AttachmentIcon
+import com.moments.android.views.messaging.components.AttachmentIconPreset
+import com.moments.android.views.messaging.components.AttachmentIconView
+import com.moments.android.views.messaging.components.messageTextColor
+import com.moments.android.views.messaging.components.replyBarSecondaryText
 import com.moments.android.views.permission.shared.PermissionPrimerGate
 import com.moments.android.views.permission.shared.PermissionPrimerGateHost
 import com.moments.android.views.profile.core.sections.UserProfileZoomNavigationHost
@@ -896,6 +908,11 @@ fun StoryViewerScreen(
                 safeAreaBottomPx = bottomInset,
                 density = density,
             )
+            val bottomChromeHeight = with(density) {
+                (screenH - bottomInset - captureRect.bottom).coerceAtLeast(0f).toDp()
+            }
+            // IG-like: encima de nav + buffer (~25dp). Antes 8dp quedaba demasiado pegado.
+            val replyBottomPadding = if (isKeyboardVisible) 6.dp else 25.dp
             val canvasRect = Rect(captureRect.left, captureRect.top, captureRect.right, captureRect.bottom)
             val corner = storyViewerCanvasCornerRadius
             val regions = deckGestureGate?.interactionRegions.orEmpty()
@@ -1129,13 +1146,26 @@ fun StoryViewerScreen(
                 )
             }
 
-            // MARK: 4. Progress + Header chrome
+            // MARK: 4. Progress (fuera del marco) + Header (dentro)
+            // ≡ iOS: progressY = max(topInset+1, captureRect.minY - 26); header at minY + 26
+            // SwiftUI `.position` centra el view en ese punto → offset(y - height/2)
             if (!isUIHidden) {
-                Column(
+                val progressCenterY = maxOf(
+                    topInset + with(density) { 1.dp.toPx() },
+                    captureRect.top - with(density) { 26.dp.toPx() },
+                )
+                val headerCenterY = captureRect.top + with(density) { 26.dp.toPx() }
+                var progressH by remember { mutableIntStateOf(with(density) { 3.dp.roundToPx() }) }
+                var headerH by remember { mutableIntStateOf(with(density) { 40.dp.roundToPx() }) }
+
+                Box(
                     Modifier
+                        .offset {
+                            IntOffset(0, (progressCenterY - progressH / 2f).roundToInt())
+                        }
                         .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp)
+                        .onSizeChanged { progressH = it.height },
                 ) {
                     StorySegmentProgressChrome(
                         storyCount = storyCount.coerceAtLeast(1),
@@ -1145,62 +1175,78 @@ fun StoryViewerScreen(
                         },
                         audienceForSegment = ::audienceForSegment,
                     )
-                    Spacer(Modifier.height(10.dp))
-                    StoryViewerHeaderChrome(
-                        username = story.username,
-                        authorId = story.authorId,
-                        isOwnStory = isOwnStory,
-                        profileImagePath = story.profileImagePath,
-                        timestamp = story.timestamp,
-                        highlightTitle = null,
-                        hasChain = story.chainId != null && story.chainTitle != null && story.chainPosition != null,
-                        profileZoomVisible = !profileOpen,
-                        onClose = onDismiss,
-                        onProfileTap = {
-                            profileRoute = FeedProfileSheetRoute(story.authorId)
-                            onProfileTap()
-                        },
-                        onMore = { toggleQuickActions() },
-                        onChain = { showChainActions = !showChainActions },
-                    )
-                    if (showChainActions && story.chainId != null) {
-                        ChainActionsPanel(
-                            chainTitle = story.chainTitle.orEmpty(),
-                            chainPosition = story.chainPosition ?: 1,
-                            canContinue = canContinueChain,
-                            onViewChain = {
-                                showChainActions = false
-                                showChain = true
-                            },
-                            onContinue = {
-                                val id = story.chainId ?: return@ChainActionsPanel
-                                val title = story.chainTitle.orEmpty()
-                                // ≡ iOS: posición actual; el editor hace (pos ?? 0) + 1 al publicar
-                                val pos = story.chainPosition ?: 1
-                                showChainActions = false
-                                onDismiss()
-                                NavigationEventBus.emit(
-                                    CoordinatorNavigationEvent.OpenCreatorForChain(id, title, pos),
-                                )
-                                onContinueChain(id, title, pos)
-                            },
-                            onPreviousPart = {
-                                if (currentChainIndex > 0) {
-                                    val next = currentChainIndex - 1
-                                    currentChainIndex = next
-                                    onOpenChainStory(chainStories, next)
-                                }
-                            },
-                            onNextPart = {
-                                if (currentChainIndex < chainStories.lastIndex) {
-                                    val next = currentChainIndex + 1
-                                    currentChainIndex = next
-                                    onOpenChainStory(chainStories, next)
-                                }
-                            },
-                            currentChainIndex = currentChainIndex,
-                            chainCount = chainStories.size,
-                        )
+                }
+                Box(
+                    Modifier
+                        .offset {
+                            IntOffset(
+                                captureRect.left.roundToInt(),
+                                (headerCenterY - headerH / 2f).roundToInt(),
+                            )
+                        }
+                        .width(with(density) { captureRect.width.toDp() })
+                        .padding(horizontal = 16.dp),
+                ) {
+                    Column {
+                        // Medir solo el header (no el panel chain) ≡ iOS .position del glassmorphicHeader
+                        Box(Modifier.onSizeChanged { headerH = it.height }) {
+                            StoryViewerHeaderChrome(
+                                username = story.username,
+                                authorId = story.authorId,
+                                isOwnStory = isOwnStory,
+                                profileImagePath = story.profileImagePath,
+                                timestamp = story.timestamp,
+                                highlightTitle = null,
+                                hasChain = story.chainId != null && story.chainTitle != null && story.chainPosition != null,
+                                profileZoomVisible = !profileOpen,
+                                onClose = onDismiss,
+                                onProfileTap = {
+                                    profileRoute = FeedProfileSheetRoute(story.authorId)
+                                    onProfileTap()
+                                },
+                                onMore = { toggleQuickActions() },
+                                onChain = { showChainActions = !showChainActions },
+                            )
+                        }
+                        if (showChainActions && story.chainId != null) {
+                            ChainActionsPanel(
+                                chainTitle = story.chainTitle.orEmpty(),
+                                chainPosition = story.chainPosition ?: 1,
+                                canContinue = canContinueChain,
+                                onViewChain = {
+                                    showChainActions = false
+                                    showChain = true
+                                },
+                                onContinue = {
+                                    val id = story.chainId ?: return@ChainActionsPanel
+                                    val title = story.chainTitle.orEmpty()
+                                    // ≡ iOS: posición actual; el editor hace (pos ?? 0) + 1 al publicar
+                                    val pos = story.chainPosition ?: 1
+                                    showChainActions = false
+                                    onDismiss()
+                                    NavigationEventBus.emit(
+                                        CoordinatorNavigationEvent.OpenCreatorForChain(id, title, pos),
+                                    )
+                                    onContinueChain(id, title, pos)
+                                },
+                                onPreviousPart = {
+                                    if (currentChainIndex > 0) {
+                                        val next = currentChainIndex - 1
+                                        currentChainIndex = next
+                                        onOpenChainStory(chainStories, next)
+                                    }
+                                },
+                                onNextPart = {
+                                    if (currentChainIndex < chainStories.lastIndex) {
+                                        val next = currentChainIndex + 1
+                                        currentChainIndex = next
+                                        onOpenChainStory(chainStories, next)
+                                    }
+                                },
+                                currentChainIndex = currentChainIndex,
+                                chainCount = chainStories.size,
+                            )
+                        }
                     }
                 }
             }
@@ -1226,32 +1272,42 @@ fun StoryViewerScreen(
             // MARK: 5. Bottom area ≡ glassmorphicBottomArea
             if (!isUIHidden) {
                 if (isOwnStory) {
-                    StoryOwnStoryBottomBar(
-                        viewers = currentStoryViewers,
-                        reactions = currentStoryReactions,
-                        audience = story.audience,
-                        expirationHours = story.expirationHours,
-                        authorId = story.authorId,
-                        customListId = story.customListId,
-                        onViewActivity = { fetchViewersAndShow(0) },
-                        onReactionsActivity = { fetchViewersAndShow(1) },
-                        showsShare = isEveryoneStoryAudience,
-                        onShare = {
-                            pauseStoryPlayback()
-                            showStoryShareSheet = true
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 24.dp),
-                    )
+                    Box(
+                        Modifier
+                            .offset {
+                                IntOffset(0, captureRect.bottom.roundToInt())
+                            }
+                            .fillMaxWidth()
+                            .height(bottomChromeHeight)
+                            .padding(horizontal = 32.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        StoryOwnStoryBottomBar(
+                            viewers = currentStoryViewers,
+                            reactions = currentStoryReactions,
+                            audience = story.audience,
+                            expirationHours = story.expirationHours,
+                            authorId = story.authorId,
+                            customListId = story.customListId,
+                            onViewActivity = { fetchViewersAndShow(0) },
+                            onReactionsActivity = { fetchViewersAndShow(1) },
+                            showsShare = isEveryoneStoryAudience,
+                            onShare = {
+                                pauseStoryPlayback()
+                                showStoryShareSheet = true
+                            },
+                        )
+                    }
                 } else {
+                    // IG-like height: encima de nav bars + gap corto (no +25 / mid-gap)
                     Column(
                         Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .imePadding()
+                            .navigationBarsPadding()
                             .padding(horizontal = 16.dp)
-                            .padding(bottom = if (isKeyboardVisible) 0.dp else 25.dp),
+                            .padding(bottom = replyBottomPadding),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         if (showReactions && authorAllowsReactions) {
@@ -1277,6 +1333,7 @@ fun StoryViewerScreen(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 ) {
                                     if (showsReplyComposer) {
+                                        // ≡ HStack + padding(h:16, v:14) + Capsule chrome (iOS)
                                         Row(
                                             Modifier
                                                 .weight(1f)
@@ -1309,105 +1366,145 @@ fun StoryViewerScreen(
                                                         Modifier
                                                     },
                                                 )
-                                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                                                .padding(horizontal = 16.dp, vertical = 10.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             if (authorAllowsMessages) {
-                                                TextField(
+                                                // ≡ TextField compacto (no Material TextField min-height)
+                                                val replyText = adaptive.messageTextColor
+                                                val replyHint = adaptive.replyBarSecondaryText
+                                                BasicTextField(
                                                     value = messageText,
                                                     onValueChange = { messageText = it },
-                                                    placeholder = {
-                                                        Text(replyPlaceholder, color = Color.White.copy(0.55f))
-                                                    },
-                                                    colors = TextFieldDefaults.colors(
-                                                        focusedTextColor = Color.White,
-                                                        unfocusedTextColor = Color.White,
-                                                        focusedContainerColor = Color.Transparent,
-                                                        unfocusedContainerColor = Color.Transparent,
-                                                        cursorColor = Color.White,
-                                                        focusedIndicatorColor = Color.Transparent,
-                                                        unfocusedIndicatorColor = Color.Transparent,
-                                                    ),
                                                     singleLine = true,
+                                                    textStyle = TextStyle(
+                                                        color = replyText,
+                                                        fontSize = 14.sp,
+                                                    ),
+                                                    cursorBrush = SolidColor(replyText),
+                                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                                                    keyboardActions = KeyboardActions(
+                                                        onSend = {
+                                                            if (messageText.isNotEmpty()) sendMessageAction()
+                                                        },
+                                                    ),
                                                     modifier = Modifier
                                                         .weight(1f)
                                                         .focusRequester(focusRequester)
                                                         .onFocusChanged { isTextFieldFocused = it.isFocused },
+                                                    decorationBox = { inner ->
+                                                        Box(Modifier.fillMaxWidth()) {
+                                                            if (messageText.isEmpty()) {
+                                                                Text(
+                                                                    replyPlaceholder,
+                                                                    color = replyHint,
+                                                                    fontSize = 14.sp,
+                                                                    maxLines = 1,
+                                                                    overflow = TextOverflow.Ellipsis,
+                                                                )
+                                                            }
+                                                            inner()
+                                                        }
+                                                    },
                                                 )
                                             } else {
                                                 Text(
                                                     stringResource(R.string.stories_replies_disabled_placeholder),
-                                                    color = Color.White.copy(0.55f),
+                                                    color = adaptive.replyBarSecondaryText,
                                                     fontSize = 14.sp,
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .padding(vertical = 10.dp),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f),
                                                 )
                                             }
                                         }
                                     } else if (isEveryoneStoryAudience) {
                                         Spacer(Modifier.weight(1f))
                                     }
-                                    if (authorAllowsReactions && (messageText.isEmpty() || !authorAllowsMessages)) {
-                                        IconButton(
-                                            onClick = {
-                                                // ≡ MotionPolicy.withOptionalAnimation(Spring.toggle)
-                                                showReactions = !showReactions
-                                            },
-                                            modifier = Modifier.onGloballyPositioned { coords ->
-                                                // ≡ geo.frame(in: .named("storyViewerSpace")).mid → dp
-                                                val p = coords.positionInRoot()
-                                                smileyButtonCenterX = with(density) {
-                                                    (p.x + coords.size.width / 2f).toDp().value
-                                                }
-                                                smileyButtonCenterY = with(density) {
-                                                    (p.y + coords.size.height / 2f).toDp().value
-                                                }
-                                            },
-                                        ) {
-                                            Icon(
-                                                if (showReactions) {
-                                                    Icons.Filled.SentimentSatisfied
-                                                } else {
-                                                    Icons.Outlined.SentimentSatisfied
+                                    // ≡ HStack(spacing: 2) + storyViewerReplyActionButton;
+                                    // con teclado: círculo chrome (contraste sobre IME)
+                                    val replyActionTint = adaptive.messageTextColor
+                                    val replyIconsGlass = isKeyboardVisible || isTextFieldFocused
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(
+                                            if (replyIconsGlass) 6.dp else 2.dp,
+                                        ),
+                                    ) {
+                                        if (authorAllowsReactions && (messageText.isEmpty() || !authorAllowsMessages)) {
+                                            StoryViewerReplyActionButton(
+                                                glass = replyIconsGlass,
+                                                onClick = {
+                                                    // ≡ MotionPolicy.withOptionalAnimation(Spring.toggle)
+                                                    showReactions = !showReactions
                                                 },
-                                                contentDescription = stringResource(R.string.stories_reactions),
-                                                tint = Color.White,
-                                            )
+                                                modifier = Modifier.onGloballyPositioned { coords ->
+                                                    // ≡ geo.frame(in: .named("storyViewerSpace")).mid → dp
+                                                    val p = coords.positionInRoot()
+                                                    smileyButtonCenterX = with(density) {
+                                                        (p.x + coords.size.width / 2f).toDp().value
+                                                    }
+                                                    smileyButtonCenterY = with(density) {
+                                                        (p.y + coords.size.height / 2f).toDp().value
+                                                    }
+                                                },
+                                            ) {
+                                                Icon(
+                                                    if (showReactions) {
+                                                        Icons.Filled.SentimentSatisfied
+                                                    } else {
+                                                        Icons.Outlined.SentimentSatisfied
+                                                    },
+                                                    contentDescription = stringResource(R.string.stories_reactions),
+                                                    tint = replyActionTint,
+                                                    modifier = Modifier.size(22.dp),
+                                                )
+                                            }
                                         }
-                                    }
-                                    if (authorAllowsEphemeralPhotos) {
-                                        IconButton(
-                                            onClick = {
-                                                pauseStoryPlayback()
-                                                showEphemeralPicker = true
-                                                ephemeralPicker.launch("image/*")
-                                            },
-                                        ) {
-                                            Text("📸", fontSize = 18.sp)
+                                        if (authorAllowsEphemeralPhotos) {
+                                            StoryViewerReplyActionButton(
+                                                glass = replyIconsGlass,
+                                                onClick = {
+                                                    pauseStoryPlayback()
+                                                    showEphemeralPicker = true
+                                                    ephemeralPicker.launch("image/*")
+                                                },
+                                            ) {
+                                                AttachmentIconView(
+                                                    icon = AttachmentIcon.CAMERA,
+                                                    preset = AttachmentIconPreset.STORY_REPLY_ACTION,
+                                                    tintColor = replyActionTint,
+                                                )
+                                            }
                                         }
-                                    }
-                                    if (messageText.isNotEmpty() && authorAllowsMessages) {
-                                        IconButton(onClick = ::sendMessageAction) {
-                                            Icon(
-                                                Icons.Filled.Send,
-                                                contentDescription = stringResource(R.string.messaging_send_message),
-                                                tint = Color.White,
-                                            )
+                                        if (messageText.isNotEmpty() && authorAllowsMessages) {
+                                            StoryViewerReplyActionButton(
+                                                glass = replyIconsGlass,
+                                                onClick = ::sendMessageAction,
+                                            ) {
+                                                Icon(
+                                                    Icons.AutoMirrored.Filled.Send,
+                                                    contentDescription = stringResource(R.string.messaging_send_message),
+                                                    tint = replyActionTint,
+                                                    modifier = Modifier.size(22.dp),
+                                                )
+                                            }
                                         }
-                                    }
-                                    if (isEveryoneStoryAudience && messageText.isEmpty()) {
-                                        IconButton(
-                                            onClick = {
-                                                pauseStoryPlayback()
-                                                showStoryShareSheet = true
-                                            },
-                                        ) {
-                                            Icon(
-                                                Icons.Filled.Send,
-                                                contentDescription = stringResource(R.string.stories_own_bottom_share),
-                                                tint = Color.White,
-                                            )
+                                        if (isEveryoneStoryAudience && messageText.isEmpty()) {
+                                            StoryViewerReplyActionButton(
+                                                glass = replyIconsGlass,
+                                                onClick = {
+                                                    pauseStoryPlayback()
+                                                    showStoryShareSheet = true
+                                                },
+                                            ) {
+                                                Icon(
+                                                    Icons.AutoMirrored.Filled.Send,
+                                                    contentDescription = stringResource(R.string.stories_own_bottom_share),
+                                                    tint = replyActionTint,
+                                                    modifier = Modifier.size(22.dp),
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1549,19 +1646,21 @@ fun StoryViewerScreen(
             )
         }
 
-        // MARK: Emoji picker sheet ≡ showStoryReactionEmojiPicker
+        // MARK: Emoji picker — M3 ModalBottomSheet (no overlay + altura % iOS)
         if (showStoryReactionEmojiPicker) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(0.45f))) {
+            MomentsModalSheet(
+                onDismissRequest = { showStoryReactionEmojiPicker = false },
+                largeOnly = false,
+            ) { dismiss ->
                 EmojiPickerView(
-                    onDismiss = { showStoryReactionEmojiPicker = false },
+                    onDismiss = dismiss,
                     onSelect = { emoji ->
-                        showStoryReactionEmojiPicker = false
+                        dismiss()
                         sendReactionAction(emoji, viewerScreenWidth, viewerScreenHeight)
                     },
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .fillMaxHeight(0.55f),
+                        .weight(1f),
                 )
             }
         }
@@ -1633,6 +1732,8 @@ private fun StoryViewerHeaderChrome(
     onChain: () -> Unit,
 ) {
     val timeAgo = remember(timestamp) { MomentsFormat.relativeTime(timestamp) }
+    // Chrome opaco Android: no blanco fijo (iOS glass translúcido sobre media oscura).
+    val chromeFg = MomentsChromeGlass.contentColor(isSystemInDarkTheme())
     Row(
         Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -1691,7 +1792,7 @@ private fun StoryViewerHeaderChrome(
                         .clickable(onClick = onChain),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.Link, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Filled.Link, contentDescription = null, tint = chromeFg, modifier = Modifier.size(16.dp))
                 }
             }
             Box(
@@ -1701,7 +1802,7 @@ private fun StoryViewerHeaderChrome(
                     .clickable(onClick = onMore),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.MoreHoriz, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Icon(Icons.Filled.MoreHoriz, contentDescription = null, tint = chromeFg, modifier = Modifier.size(16.dp))
             }
             Box(
                 Modifier
@@ -1710,7 +1811,7 @@ private fun StoryViewerHeaderChrome(
                     .clickable(onClick = onClose),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Icon(Icons.Filled.Close, contentDescription = null, tint = chromeFg, modifier = Modifier.size(16.dp))
             }
         }
     }
@@ -1799,6 +1900,34 @@ private fun ChainActionsPanel(
                 )
             }
         }
+    }
+}
+
+/**
+ * ≡ `storyViewerReplyActionButton` (34×40 → círculo 40).
+ * Con teclado: [momentsChromeGlass] Circle para contraste sobre el IME.
+ */
+@Composable
+private fun StoryViewerReplyActionButton(
+    glass: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier
+            .size(40.dp)
+            .then(
+                if (glass) {
+                    Modifier.momentsChromeGlass(CircleShape, interactive = true)
+                } else {
+                    Modifier
+                },
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }
 

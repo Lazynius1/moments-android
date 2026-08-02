@@ -29,7 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -125,7 +125,7 @@ fun ProfileGridPreviewEditorView(
     ) {
         when {
             isLoading && imageSizePx == Size.Zero -> {
-                CircularProgressIndicator(Modifier.align(Alignment.Center), color = primary)
+                MomentsCircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
             else -> {
                 BoxWithConstraints(Modifier.fillMaxSize()) {

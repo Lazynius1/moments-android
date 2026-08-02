@@ -303,8 +303,12 @@ fun ChatComposerChrome(
 ) {
     val context = controller.pendingChatContext
     val keyboardVisible = rememberRootKeyboardVisible()
-    // Aire sobre gesture/nav: insets sistema + margen Moments (Telegram deja el panel con padding).
+    val chatCanvas = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()).chatBackground.first()
+    // Fondo opaco bajo el chrome + zona de nav/gesture. Sin esto, `navigationBarsPadding`
+    // deja un hueco transparente y los mensajes se ven detrás de los botones Android.
     val safeModifier = modifier
+        .fillMaxWidth()
+        .background(chatCanvas)
         .navigationBarsPadding()
         .imePadding()
         .padding(bottom = 10.dp)

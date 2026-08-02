@@ -23,9 +23,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-/** Port de `Views/Messaging/Screens/Chat/MomentsChatViewModel+Media.swift`. */
+/**
+ * Port de `Views/Messaging/Screens/Chat/MomentsChatViewModel+Media.swift`.
+ *
+ * `sendImageMessage` / `sendAudioMessage` viven en [com.moments.android.views.messaging.core.ChatViewModel]
+ * (mismo comportamiento; aquí solo reply + view-once / gif / sticker / location).
+ */
 private val chatMediaScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
+/** ≡ iOS `sendImageMessage(_:replyTo:)` para respuesta con foto. */
 fun MomentsChatViewModel.sendImageMessageForReply(data: ByteArray, replyTo: String?) {
     if (data.isEmpty()) return
     if (conversationId.isBlank()) {
@@ -48,7 +54,12 @@ fun MomentsChatViewModel.sendViewOnceMessage(
     replyTo: String? = null,
     overlayPayload: ChatMediaOverlayPayload? = null,
 ) {
-    if (data.isEmpty() || conversationId.isBlank()) return
+    if (data.isEmpty()) return
+    if (conversationId.isBlank()) {
+        val app = MomentsApplication.instance
+        reportError(app?.getString(R.string.chat_error_invalid_conversation_view_once))
+        return
+    }
     val messageId = UUID.randomUUID().toString()
     val type = if (mediaType == CameraPickerMediaType.IMAGE) MessageType.VIEW_ONCE_IMAGE else MessageType.VIEW_ONCE_VIDEO
     appendOutgoingMessage(
@@ -65,7 +76,8 @@ fun MomentsChatViewModel.sendViewOnceMessage(
             stickers = overlayPayload?.stickers,
             drawingData = overlayPayload?.drawingData,
             allowReplay = allowReplay.takeIf { it },
-            isVanishModeMessage = marksOutgoingAsVanish,
+            // ≡ iOS temp: outgoingVanishMessageFlag; servicio: marksOutgoingAsVanish
+            isVanishModeMessage = outgoingVanishMessageFlag == true,
         ),
     )
     trackMediaMessageSent()
@@ -82,8 +94,9 @@ fun MomentsChatViewModel.sendViewOnceMessage(
             overlayPayload = overlayPayload,
         ).onSuccess { sent ->
             applyOutgoingMessageUpdate(messageId, sent.status, sent.mediaUrl, sent.thumbnailUrl)
-        }.onFailure {
+        }.onFailure { error ->
             applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED)
+            reportError(error.message)
         }
     }
 }
@@ -105,7 +118,7 @@ fun MomentsChatViewModel.sendGif(asset: ChatGiphyAsset, replyTo: String? = null)
             mediaHeight = asset.height.takeIf { it > 0 },
             status = MessageStatus.SENDING,
             replyTo = replyTo,
-            isVanishModeMessage = marksOutgoingAsVanish,
+            isVanishModeMessage = outgoingVanishMessageFlag == true,
         ),
     )
     trackMediaMessageSent()
@@ -113,8 +126,12 @@ fun MomentsChatViewModel.sendGif(asset: ChatGiphyAsset, replyTo: String? = null)
         ChatService.sendGiphyReferenceMessage(
             conversationId, currentUserId, MessageType.GIF, asset.id, asset.url, asset.width, asset.height,
             messageId, marksOutgoingAsVanish, replyTo,
-        ).onSuccess { sent -> applyOutgoingMessageUpdate(messageId, sent.status, sent.mediaUrl) }
-            .onFailure { applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED) }
+        ).onSuccess { sent ->
+            applyOutgoingMessageUpdate(messageId, sent.status, sent.mediaUrl ?: asset.url)
+        }.onFailure { error ->
+            applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED)
+            reportError(error.message)
+        }
     }
 }
 
@@ -136,7 +153,7 @@ fun MomentsChatViewModel.sendSticker(context: Context, asset: ChatStickerAsset, 
             mediaHeight = asset.height.takeIf { it > 0 },
             status = MessageStatus.SENDING,
             replyTo = replyTo,
-            isVanishModeMessage = marksOutgoingAsVanish,
+            isVanishModeMessage = outgoingVanishMessageFlag == true,
         ),
     )
     trackMediaMessageSent()
@@ -144,15 +161,19 @@ fun MomentsChatViewModel.sendSticker(context: Context, asset: ChatStickerAsset, 
         ChatService.sendGiphyReferenceMessage(
             conversationId, currentUserId, MessageType.STICKER, asset.id, asset.url, asset.width, asset.height,
             messageId, marksOutgoingAsVanish, replyTo,
-        ).onSuccess { sent -> applyOutgoingMessageUpdate(messageId, sent.status, sent.mediaUrl) }
-            .onFailure { applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED) }
+        ).onSuccess { sent ->
+            applyOutgoingMessageUpdate(messageId, sent.status, sent.mediaUrl ?: asset.url)
+        }.onFailure { error ->
+            applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED)
+            reportError(error.message)
+        }
     }
 }
 
 fun MomentsChatViewModel.sendStaticLocation(latitude: Double, longitude: Double, name: String?, address: String?) {
     if (conversationId.isBlank()) {
         val app = MomentsApplication.instance
-        reportError(app?.getString(R.string.chat_error_invalid_conversation))
+        reportError(app?.getString(R.string.chat_error_invalid_conversation_text))
         return
     }
     val messageId = UUID.randomUUID().toString()
@@ -161,20 +182,25 @@ fun MomentsChatViewModel.sendStaticLocation(latitude: Double, longitude: Double,
             id = messageId, conversationId = conversationId, senderId = currentUserId,
             type = MessageType.LOCATION, latitude = latitude, longitude = longitude,
             locationName = name, locationAddress = address, isLiveLocation = false,
-            timestamp = Date(), status = MessageStatus.SENDING, isVanishModeMessage = marksOutgoingAsVanish,
+            timestamp = Date(), status = MessageStatus.SENDING,
+            isVanishModeMessage = outgoingVanishMessageFlag == true,
         ),
     )
     trackMediaMessageSent()
     chatMediaScope.launch {
-        ChatService.sendStaticLocationMessage(conversationId, currentUserId, latitude, longitude, name, address, messageId, marksOutgoingAsVanish)
-            .onSuccess { sent -> applyOutgoingMessageUpdate(messageId, sent.status) }
-            .onFailure { applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED); reportError(it.message) }
+        ChatService.sendStaticLocationMessage(
+            conversationId, currentUserId, latitude, longitude, name, address, messageId, marksOutgoingAsVanish,
+        ).onSuccess { sent -> applyOutgoingMessageUpdate(messageId, sent.status) }
+            .onFailure { error ->
+                applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED)
+                reportError(error.message)
+            }
     }
 }
 
 fun MomentsChatViewModel.startLiveLocation(context: Context, duration: LiveLocationDuration) {
     if (conversationId.isBlank()) {
-        reportError(context.getString(R.string.chat_error_invalid_conversation))
+        reportError(context.getString(R.string.chat_error_invalid_conversation_text))
         return
     }
     val manager = context.applicationContext.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
@@ -199,7 +225,7 @@ fun MomentsChatViewModel.startLiveLocation(context: Context, duration: LiveLocat
             type = MessageType.LOCATION, latitude = location.latitude, longitude = location.longitude,
             isLiveLocation = true, liveLocationExpiresAt = expiresAt, liveLocationDuration = duration.firestoreValue,
             liveLocationSessionId = sessionId, locationUpdatedAt = Date(), timestamp = Date(),
-            status = MessageStatus.SENDING, isVanishModeMessage = marksOutgoingAsVanish,
+            status = MessageStatus.SENDING, isVanishModeMessage = outgoingVanishMessageFlag == true,
         ),
     )
     trackMediaMessageSent()
@@ -210,7 +236,10 @@ fun MomentsChatViewModel.startLiveLocation(context: Context, duration: LiveLocat
         ).onSuccess { sent ->
             applyOutgoingMessageUpdate(messageId, sent.status)
             LiveLocationSharingService.startSession(conversationId, messageId, sessionId, duration, expiresAt)
-        }.onFailure { applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED); reportError(it.message) }
+        }.onFailure { error ->
+            applyOutgoingMessageUpdate(messageId, MessageStatus.FAILED)
+            reportError(error.message)
+        }
     }
 }
 

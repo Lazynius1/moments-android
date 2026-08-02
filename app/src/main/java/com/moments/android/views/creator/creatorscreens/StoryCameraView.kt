@@ -92,6 +92,7 @@ import com.moments.android.views.creator.CreatorMedia
 import com.moments.android.services.camera.SnapCameraKitConfiguration
 import com.moments.android.views.creator.camerakit.CameraKitController
 import com.moments.android.views.creator.camerakit.LensReel
+import com.moments.android.views.creator.components.StoryEditorChromeColor
 import com.moments.android.views.creator.creatoruikit.StoryGalleryPicker
 import com.moments.android.views.creator.creatoruikit.CREATOR_MOMENTS_CAPTURE_ASPECT_RATIO
 import com.moments.android.views.creator.creatoruikit.creatorMomentsCaptureRect
@@ -115,8 +116,13 @@ private const val MAX_STORY_RECORD_SECONDS = 5.0 * 60.0
  * Swift normalizes the JPEG and crops it to the visible preview before opening the editor.
  * Some OEM CameraX pipelines (the Xiaomi one included) write the sensor buffer as-is and
  * omit EXIF orientation, so do both operations in pixels here as well.
+ * [matchFrontPreview]: flip horizontal tras upright — PreviewView espeja; setMirrorMode no soportado.
  */
-private fun normalizeAndCropStoryPhoto(file: File, rotationDegrees: Int) {
+private fun normalizeAndCropStoryPhoto(
+    file: File,
+    rotationDegrees: Int,
+    matchFrontPreview: Boolean = false,
+) {
     val source = BitmapFactory.decodeFile(file.absolutePath) ?: return
     var upright = source
     if (rotationDegrees % 180 != 0 && source.width > source.height) {
@@ -132,6 +138,24 @@ private fun normalizeAndCropStoryPhoto(file: File, rotationDegrees: Int) {
             )
         }.getOrNull() ?: source
         if (upright !== source) source.recycle()
+    }
+
+    if (matchFrontPreview) {
+        val flipped = runCatching {
+            Bitmap.createBitmap(
+                upright,
+                0,
+                0,
+                upright.width,
+                upright.height,
+                Matrix().apply { preScale(-1f, 1f) },
+                true,
+            )
+        }.getOrNull()
+        if (flipped != null && flipped !== upright) {
+            upright.recycle()
+            upright = flipped
+        }
     }
 
     // Same centre crop as PreviewView.ScaleType.FILL_CENTER / iOS's preview metadata rect.
@@ -177,7 +201,7 @@ fun StoryCameraView(
     val lifecycleOwner = LocalLifecycleOwner.current
     val isDark = isSystemInDarkTheme()
     val canvas = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
-    val controlFg = if (isDark) Color.White else Color.Black.copy(0.82f)
+    val controlFg = StoryEditorChromeColor.icon(isDark)
     val controlStroke = if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.08f)
 
     var hasCameraPermission by remember {
@@ -221,6 +245,7 @@ fun StoryCameraView(
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
     var activeRecording by remember { mutableStateOf<Recording?>(null) }
     var boundCamera by remember { mutableStateOf<Camera?>(null) }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var zoomLevel by remember { mutableStateOf(1f) }
     // ≡ StoryCameraView.swift @StateObject cameraKit + usingCameraKit híbrido
     val cameraKit = remember { CameraKitController() }
@@ -243,10 +268,16 @@ fun StoryCameraView(
         cameraKit.prepareLenses()
     }
 
+    // Skill camerax: liberar use-cases al salir (evitar sesión huérfana en OEMs).
     DisposableEffect(Unit) {
         onDispose {
-            activeRecording?.stop()
-            activeRecording = null
+            if (activeRecording != null) {
+                runCatching { activeRecording?.stop() }
+                activeRecording = null
+            }
+            cameraProvider?.unbindAll()
+            cameraProvider = null
+            boundCamera = null
             cameraKit.stop()
             cameraExecutor.shutdown()
         }
@@ -259,13 +290,13 @@ fun StoryCameraView(
     LaunchedEffect(hasCameraPermission, lensFacing, previewView) {
         val view = previewView ?: return@LaunchedEffect
         if (!hasCameraPermission) return@LaunchedEffect
-        val provider = suspendCoroutine { cont ->
+        val provider = cameraProvider ?: suspendCoroutine { cont ->
             val future = ProcessCameraProvider.getInstance(context)
             future.addListener(
                 { cont.resume(future.get()) },
                 ContextCompat.getMainExecutor(context),
             )
-        }
+        }.also { cameraProvider = it }
         val preview = Preview.Builder()
             .setTargetRotation(view.display?.rotation ?: Surface.ROTATION_0)
             .build()
@@ -328,6 +359,7 @@ fun StoryCameraView(
         val photoFile = File(dir, name)
         val output = ImageCapture.OutputFileOptions.Builder(photoFile).build()
         val mainExecutor = ContextCompat.getMainExecutor(context)
+        val facingAtCapture = lensFacing
         imageCapture.takePicture(
             output,
             cameraExecutor,
@@ -335,7 +367,11 @@ fun StoryCameraView(
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                     val rotationDegrees = boundCamera?.cameraInfo
                         ?.getSensorRotationDegrees(imageCapture.targetRotation) ?: 0
-                    normalizeAndCropStoryPhoto(photoFile, rotationDegrees)
+                    normalizeAndCropStoryPhoto(
+                        photoFile,
+                        rotationDegrees,
+                        matchFrontPreview = facingAtCapture == CameraSelector.LENS_FACING_FRONT,
+                    )
                     val uri = outputFileResults.savedUri ?: Uri.fromFile(photoFile)
                     val media = storyMediaFromUri(context, uri)
                     mainExecutor.execute {
@@ -391,7 +427,9 @@ fun StoryCameraView(
     }
 
     fun stopRecording() {
-        activeRecording?.stop()
+        // Skill camerax: no stop si no hay sesión; UI `isRecording` llega en VideoRecordEvent.Start.
+        val session = activeRecording ?: return
+        runCatching { session.stop() }
     }
 
     LaunchedEffect(Unit) {

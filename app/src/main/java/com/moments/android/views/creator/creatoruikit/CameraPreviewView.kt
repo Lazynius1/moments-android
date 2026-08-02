@@ -1,6 +1,10 @@
 package com.moments.android.views.creator.creatoruikit
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import android.util.Rational
 import android.view.Surface
@@ -34,6 +38,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -185,14 +190,19 @@ fun CameraPreviewView(
         appliedZoom = next
     }
 
-    LaunchedEffect(capturePhotoToken) {
+    LaunchedEffect(capturePhotoToken, cameraPosition) {
         if (capturePhotoToken == 0) return@LaunchedEffect
         val output = File(captureDirectory(context), "creator_photo_${UUID.randomUUID()}.jpg")
+        val facing = cameraPosition
         imageCapture.takePicture(
             ImageCapture.OutputFileOptions.Builder(output).build(),
             executor,
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(result: ImageCapture.OutputFileResults) {
+                    // PreviewView espeja la frontal; OEM no soporta setMirrorMode → flip en píxeles.
+                    if (facing == CameraSelector.LENS_FACING_FRONT) {
+                        flipJpegHorizontally(output)
+                    }
                     ContextCompat.getMainExecutor(context).execute {
                         onImageCaptured(result.savedUri ?: Uri.fromFile(output))
                     }
@@ -225,7 +235,9 @@ fun CameraPreviewView(
                 }
             activeRecording = pending
         } else {
-            activeRecording?.stop()
+            // Skill camerax: no stop sin sesión; callbacks llegan async en Start/Finalize.
+            val session = activeRecording ?: return@LaunchedEffect
+            runCatching { session.stop() }
         }
     }
 
@@ -252,3 +264,46 @@ fun CameraPreviewView(
 
 private fun captureDirectory(context: Context): File =
     File(context.cacheDir, "creator_captures").also { it.mkdirs() }
+
+/** Upright (EXIF) + flip horizontal — iguala PreviewView frontal sin setMirrorMode ni EXIF raro. */
+private fun flipJpegHorizontally(file: File) {
+    val source = BitmapFactory.decodeFile(file.absolutePath) ?: return
+    val exifOrientation = runCatching {
+        ExifInterface(file.absolutePath).getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL,
+        )
+    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+    var upright = source.creatorNormalizedUp(exifOrientation)
+    if (upright !== source) source.recycle()
+
+    val flipped = runCatching {
+        Bitmap.createBitmap(
+            upright,
+            0,
+            0,
+            upright.width,
+            upright.height,
+            Matrix().apply { preScale(-1f, 1f) },
+            true,
+        )
+    }.getOrNull()
+    if (flipped == null || flipped === upright) {
+        upright.recycle()
+        return
+    }
+    upright.recycle()
+    runCatching {
+        FileOutputStream(file, false).use { out ->
+            flipped.compress(Bitmap.CompressFormat.JPEG, 95, out)
+        }
+        // Píxeles ya upright; evita que el editor reaplique orientación vieja.
+        runCatching {
+            ExifInterface(file.absolutePath).apply {
+                setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
+                saveAttributes()
+            }
+        }
+    }
+    flipped.recycle()
+}

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -274,9 +275,8 @@ fun ModernFollowButton(
         horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 6.dp),
     ) {
         if (isLoading) {
-            CircularProgressIndicator(
+            MomentsCircularProgressIndicator(
                 modifier = Modifier.size(if (isCompact) 11.dp else 14.dp),
-                color = colors.primary,
                 strokeWidth = 1.5.dp,
             )
         } else {

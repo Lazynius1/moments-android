@@ -1,7 +1,6 @@
 package com.moments.android.views.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.hideFromAccessibility
@@ -26,7 +24,7 @@ import androidx.compose.ui.semantics.semantics
 /** Port de `UserRowSkeletonView.swift`. */
 @Composable
 fun UserRowSkeletonView(avatarSize: Dp = 40.dp, modifier: Modifier = Modifier) {
-    val surface = if (isSystemInDarkTheme()) Color.White.copy(.08f) else Color.Black.copy(.06f)
+    val surface = rememberMomentsSkeletonColor()
     Row(
         modifier.fillMaxWidth().padding(vertical = 8.dp).shimmer(true).semantics { hideFromAccessibility() },
         verticalAlignment = Alignment.CenterVertically,

@@ -20,7 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CheckCircle
@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.ChromeIconDescription
+import com.moments.android.extensions.MomentsGlassButtonPreset
 import com.moments.android.extensions.ProfileChromeIconButton
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
@@ -551,9 +552,11 @@ private fun UserProfileStateTopBar(
     val colors = rememberAdaptiveColors()
     Box(modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
         ProfileChromeIconButton(
-            icon = Icons.AutoMirrored.Filled.ArrowBack,
+            icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
             onClick = onDismiss,
             modifier = Modifier.align(Alignment.CenterStart),
+            preset = MomentsGlassButtonPreset.NAVIGATION_BACK,
+            standaloneGlass = false,
             contentDescriptionKey = ChromeIconDescription.BACK,
         )
         Text(

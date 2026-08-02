@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -96,6 +95,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
+import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.components.SmartLocationInputView
@@ -229,7 +229,6 @@ fun StickerPickerView(
     val pillFillTop = if (isDark) Color.White else Color(0xFF0B1215)
     val pillFillBottom = if (isDark) Color(0xFFF7F2E8) else Color(0xFF141D22)
     val pillText = if (isDark) Color.Black.copy(0.92f) else Color.White
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val scope = rememberCoroutineScope()
     var mode by remember { mutableStateOf(StickerPickerMode.CATALOG) }
     var catalogSearchText by remember { mutableStateOf("") }
@@ -494,18 +493,17 @@ fun StickerPickerView(
         )
     }
 
-    ModalBottomSheet(
+    MomentsModalSheet(
         onDismissRequest = {
             cleanupMemory()
             onDismiss()
         },
-        sheetState = sheetState,
+        largeOnly = false,
         containerColor = bg,
-    ) {
+    ) { _ ->
         Column(
             Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.78f)
                 .padding(bottom = 12.dp),
         ) {
             Row(

@@ -1,5 +1,7 @@
 package com.moments.android.views.comments
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,9 +42,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -50,6 +55,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
@@ -98,6 +104,8 @@ fun EnhancedModernCommentRow(
 
     var showFullContent by remember(comment.id) { mutableStateOf(false) }
     var showContextMenu by remember { mutableStateOf(false) }
+    var menuOffset by remember { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
     val isLong = comment.content.length > 100
     val displayContent = if (isLong && !showFullContent && !isMaskApplied) {
         comment.content.take(100) + "..."
@@ -122,8 +130,11 @@ fun EnhancedModernCommentRow(
             .padding(end = 4.dp)
             .pointerInput(isMaskApplied, canEdit, canDelete) {
                 detectTapGestures(
-                    onLongPress = {
-                        if (!isMaskApplied && (canEdit || canDelete)) showContextMenu = true
+                    onLongPress = { offset ->
+                        if (!isMaskApplied && (canEdit || canDelete)) {
+                            menuOffset = offset
+                            showContextMenu = true
+                        }
                     },
                 )
             },
@@ -132,6 +143,9 @@ fun EnhancedModernCommentRow(
             DropdownMenu(
                 expanded = showContextMenu,
                 onDismissRequest = { showContextMenu = false },
+                offset = with(density) {
+                    DpOffset(menuOffset.x.toDp(), menuOffset.y.toDp())
+                },
             ) {
                 if (canEdit) {
                     DropdownMenuItem(
@@ -435,8 +449,18 @@ private fun CommentActionChip(
 ) {
     val isDark = isSystemInDarkTheme()
     val shape = RoundedCornerShape(20.dp)
+    // ≡ iOS CommentActionButton `.scaleEffect(isActive ? 1.05 : 1.0)`
+    val scale by animateFloatAsState(
+        targetValue = if (active) 1.05f else 1f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+        label = "commentActionScale",
+    )
     Row(
         Modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .background(
                 if (active) activeColor.copy(0.1f)
                 else if (isDark) Color.Black.copy(0.3f) else Color.Gray.copy(0.1f),

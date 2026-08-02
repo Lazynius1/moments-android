@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -23,10 +24,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.Surface
 import com.moments.android.R
-import com.moments.android.coordinators.CoordinatorNavigationEvent
-import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.models.MediaItem
-import com.moments.android.notifications.screens.NotificationsScreen
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.views.feed.FeedInk
@@ -37,7 +35,12 @@ import com.moments.android.views.feed.maps.LocationMapView
 import com.moments.android.views.explore.ExploreView
 import com.moments.android.views.messaging.screens.MessagingView
 import com.moments.android.views.profile.core.sections.UserProfileZoomNavigationHost
+import com.moments.android.views.profile.core.sections.momentZoomDestination
 import com.moments.android.views.profile.momentsview.EditMomentView
+import com.moments.android.views.shared.MomentsContainerTransformOverlay
+import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.MomentsSharedTransitionLayout
+import com.moments.android.views.shared.StoryZoomNavigation
 import com.moments.android.views.story.StoriesView
 
 /**
@@ -49,8 +52,8 @@ import com.moments.android.views.story.StoriesView
  */
 @Composable
 fun FeedPresentations(
-    showNotifications: Boolean,
-    onShowNotificationsChange: (Boolean) -> Unit,
+    @Suppress("UNUSED_PARAMETER") showNotifications: Boolean,
+    @Suppress("UNUSED_PARAMETER") onShowNotificationsChange: (Boolean) -> Unit,
     showMessages: Boolean,
     onShowMessagesChange: (Boolean) -> Unit,
     selectedStoryRoute: StoryUserPresentationRoute?,
@@ -100,6 +103,8 @@ fun FeedPresentations(
         if (selectedProfileRoute == null) onSelectedUserIdChange("")
     }
 
+    // Shared layout para profile zoom + story-ring zoom (mismo Namespace iOS)
+    MomentsSharedTransitionLayout(Modifier.fillMaxSize()) {
     // ≡ userProfileNavigationDestination(item:namespace:) — SharedTransition in-tree
     UserProfileZoomNavigationHost(
         profileRoute = selectedProfileRoute,
@@ -109,28 +114,18 @@ fun FeedPresentations(
         Box(Modifier.fillMaxSize()) {
         content()
 
-        // navigationDestination → NotificationsView
-        if (showNotifications) {
-            Dialog(
-                onDismissRequest = { onShowNotificationsChange(false) },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
-            ) {
-                Surface(Modifier.fillMaxSize()) {
-                    NotificationsScreen(
-                        onBack = { onShowNotificationsChange(false) },
-                        onNotificationsCleared = {
-                            NavigationEventBus.emit(CoordinatorNavigationEvent.NotificationsCleared)
-                        },
-                    )
-                }
-            }
-        }
+        // Notifications: host único en TabBarView (ShowNotifications / OpenNotifications).
+        // Evita Dialog apilado → “hay que volver 2 veces”.
 
-        // navigationDestination → MessagingView
+        // Messaging con conversación concreta (targetConversationId) sigue aquí;
+        // la bandeja general la presenta TabBar vía ShowMessages.
         if (showMessages) {
             Dialog(
                 onDismissRequest = { onShowMessagesChange(false) },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false,
+                ),
             ) {
                 Surface(Modifier.fillMaxSize()) {
                     MessagingView(
@@ -142,21 +137,22 @@ fun FeedPresentations(
             }
         }
 
-        // fullScreenCover(item:) → StoriesView (startAtUserId)
-        selectedStoryRoute?.let { route ->
-            Dialog(
-                onDismissRequest = { onSelectedStoryRouteChange(null) },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
-            ) {
+        // ≡ fullScreenCover + .navigationTransition(.zoom "story-ring-\(userId)")
+        MomentsContainerTransformOverlay(visible = selectedStoryRoute != null) {
+            val route = selectedStoryRoute
+            if (route != null) {
                 StoriesView(
                     startAtUserId = route.userId,
                     ringNavigationUserIds = storyRingNavigationUserIds,
                     onDismiss = { onSelectedStoryRouteChange(null) },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .momentZoomDestination(StoryZoomNavigation.sourceID(route.userId)),
                 )
             }
         }
 
-        // fullScreenCover → StoriesView
+        // fullScreenCover → StoriesView (sin zoom source específico)
         if (showStories && selectedStoryRoute == null) {
             Dialog(
                 onDismissRequest = { onShowStoriesChange(false) },
@@ -306,19 +302,23 @@ fun FeedPresentations(
             )
         }
 
-        // sheet → EchoHistoryView (paridad iOS)
+        // ≡ .sheet { EchoHistoryView().presentationDetents([.medium, .large]) }
         if (showEchoHistory) {
-            Dialog(
+            MomentsModalSheet(
                 onDismissRequest = { onShowEchoHistoryChange(false) },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
-            ) {
-                Surface(Modifier.fillMaxSize()) {
-                    EchoHistoryView(onDismiss = { onShowEchoHistoryChange(false) })
-                }
+                largeOnly = false,
+            ) { dismiss ->
+                EchoHistoryView(
+                    onDismiss = dismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = true),
+                )
             }
         }
     }
     } // UserProfileZoomNavigationHost
+    } // MomentsSharedTransitionLayout
 }
 
 /** Payload espejo de `EditMomentPayload` iOS (EditMomentView.swift). */

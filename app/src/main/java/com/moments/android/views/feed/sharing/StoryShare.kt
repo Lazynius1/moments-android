@@ -43,11 +43,11 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
-import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Story
 import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.components.LiveUsernameContent
@@ -202,30 +202,12 @@ fun StoryShareBottomSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val sheetShape = RoundedCornerShape(32.dp)
-    Box(modifier.fillMaxSize()) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .clickable(onClick = onDismiss),
-        )
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Bottom) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .padding(bottom = 20.dp)
-                    .shadow(
-                        elevation = 20.dp,
-                        shape = sheetShape,
-                        clip = false,
-                        ambientColor = Color.Black.copy(0.3f),
-                        spotColor = Color.Black.copy(0.3f),
-                    )
-                    .momentsChromeGlass(sheetShape, interactive = true),
-            ) {
-                StoryShareRecipientsPanel(story = story, onDismiss = onDismiss)
-            }
+    MomentsModalSheet(
+        onDismissRequest = onDismiss,
+        largeOnly = false,
+    ) { dismiss ->
+        Column(modifier.fillMaxWidth()) {
+            StoryShareRecipientsPanel(story = story, onDismiss = dismiss)
         }
     }
 }

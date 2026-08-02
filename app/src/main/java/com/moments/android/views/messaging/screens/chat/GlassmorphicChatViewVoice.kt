@@ -22,7 +22,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Port de `GlassmorphicChatView+Voice.swift`. */
+/** Port de `GlassmorphicChatView+Voice.swift`.
+ *
+ * Grabación hold/lock/trim/send + unread divider helpers.
+ * Δ: screenshot/capture observers iOS → vanish report en host/Android aparte;
+ * `reconfigureUnreadDividerRow` UIKit no aplica (Compose recomposición).
+ */
 @Stable
 class GlassmorphicChatVoiceController(
     private val viewModel: EnhancedChatViewModel,
@@ -231,6 +236,12 @@ class ChatUnreadDividerController(private val viewModel: EnhancedChatViewModel) 
         val id = dividerMessageId ?: return false
         if (id !in messageIds || !hasUnreadIncomingMessages()) return false
         val index = viewModel.messages.value.indexOfFirst { it.id == id }
-        return index > 0 && viewModel.messages.value.take(index).any { it.isRead || it.senderId == viewModel.currentUserId } || canLoadMore
+        // ≡ iOS shouldShowUnreadDivider: historial leído antes del primer unread, o canLoadMore.
+        if (index > 0 &&
+            viewModel.messages.value.take(index).any { it.isRead || it.senderId == viewModel.currentUserId }
+        ) {
+            return true
+        }
+        return canLoadMore
     }
 }

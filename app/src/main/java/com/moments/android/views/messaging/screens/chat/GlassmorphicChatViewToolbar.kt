@@ -4,8 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -17,14 +17,13 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -41,13 +39,16 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.moments.android.R
+import com.moments.android.coordinators.AsyncProfileImageView
+import com.moments.android.extensions.MomentsGlassButtonPreset
+import com.moments.android.extensions.ProfileChromeIconButton
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.social.StoryRingSnapshot
+import com.moments.android.utilities.momentsPressIcon
 import com.moments.android.views.components.VerifiedBadgeView
-import com.moments.android.views.messaging.core.PresenceDisplay
 import com.moments.android.views.feed.AdaptiveColors
+import com.moments.android.views.messaging.core.PresenceDisplay
 import com.moments.android.views.profile.userprofile.sections.ProfileUnavailableAvatar
 import com.moments.android.views.story.StorySegmentedRing
 
@@ -86,12 +87,25 @@ fun GlassmorphicChatToolbar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        IconButton(onClick = callbacks.onBack) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.chat_toolbar_back), tint = adaptiveColors.primary)
-        }
+        // ≡ iOS ProfileChromeIconButton(.navigationBack) — solo chevron, sin glass standalone
+        ProfileChromeIconButton(
+            icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+            onClick = callbacks.onBack,
+            foregroundColor = adaptiveColors.primary,
+            preset = MomentsGlassButtonPreset.NAVIGATION_BACK,
+            standaloneGlass = false,
+            contentDescriptionKey = com.moments.android.extensions.ChromeIconDescription.BACK,
+        )
+        // ≡ iOS chatToolbarAvatar: AsyncProfileImageView + StorySegmentedRing overlay.
+        // iOS `.overlay` no recorta el stroke (padding lineWidth/2+1); el Box debe
+        // caber outerSize del anillo o solo se ve la mitad interior encima de la foto.
+        val headerAvatarSize = 40.dp
+        val headerRingLineWidth = 2.7.dp
+        val headerRingOuter = headerAvatarSize + headerRingLineWidth + 2.dp
         Box(
             Modifier
-                .size(40.dp)
+                .size(headerRingOuter)
+                .momentsPressIcon()
                 .clickable {
                     if (isUnavailable && !isBlockedByMe) callbacks.onProfile()
                     else if (hasStory && !isBlockedByMe) callbacks.onStory()
@@ -100,16 +114,13 @@ fun GlassmorphicChatToolbar(
             contentAlignment = Alignment.Center,
         ) {
             if (isUnavailable && !isBlockedByMe) {
-                ProfileUnavailableAvatar(size = 40.dp)
+                ProfileUnavailableAvatar(size = headerAvatarSize)
             } else {
-                AsyncImage(
-                    model = profileImagePath,
-                    contentDescription = stringResource(R.string.chat_toolbar_profile),
-                    contentScale = ContentScale.Crop,
+                AsyncProfileImageView(
+                    userId = userId,
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(adaptiveColors.secondary.copy(.2f)),
+                        .size(headerAvatarSize)
+                        .clip(CircleShape),
                 )
                 StorySegmentedRing(
                     storyCount = storyRing.storyCount,
@@ -118,13 +129,20 @@ fun GlassmorphicChatToolbar(
                     storyViewedStatus = storyRing.storyViewedStatus,
                     storyAudiences = storyRing.storyAudiences,
                     isOwnStory = false,
-                    ringSize = 40.dp,
-                    lineWidth = 2.7.dp,
+                    ringSize = headerAvatarSize,
+                    lineWidth = headerRingLineWidth,
                 )
             }
         }
-        Column(Modifier.weight(1f).clickable(onClick = callbacks.onSettings)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(
+            Modifier
+                .weight(1f)
+                .clickable(onClick = callbacks.onSettings),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Text(
                     displayName,
                     color = adaptiveColors.primary,
@@ -132,13 +150,22 @@ fun GlassmorphicChatToolbar(
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    textDecoration = if (isUnavailable && !isBlockedByMe) TextDecoration.LineThrough else TextDecoration.None,
+                    textDecoration = if (isUnavailable && !isBlockedByMe) {
+                        TextDecoration.LineThrough
+                    } else {
+                        TextDecoration.None
+                    },
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 if (!isUnavailable) {
                     VerifiedBadgeView(userId = userId, size = 14.dp)
                 }
-                Icon(Icons.Default.ChevronRight, null, tint = adaptiveColors.secondary.copy(.6f), modifier = Modifier.size(14.dp))
+                Icon(
+                    Icons.Default.ChevronRight,
+                    null,
+                    tint = adaptiveColors.secondary.copy(.6f),
+                    modifier = Modifier.size(14.dp),
+                )
             }
             ChatToolbarSubtitle(
                 isBlockedByMe = isBlockedByMe,

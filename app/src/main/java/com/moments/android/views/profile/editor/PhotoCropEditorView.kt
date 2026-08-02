@@ -47,7 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -332,7 +332,7 @@ fun PhotoCropEditorView(
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = primary)
+                    MomentsCircularProgressIndicator()
                     Text(
                         stringResource(R.string.profile_crop_processing),
                         color = primary,
@@ -400,7 +400,7 @@ private fun CropLoadingState(label: Int, primary: Color) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        CircularProgressIndicator(color = primary)
+        MomentsCircularProgressIndicator()
         Text(
             stringResource(label),
             color = primary.copy(0.8f),

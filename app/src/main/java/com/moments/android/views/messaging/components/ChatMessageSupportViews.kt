@@ -620,15 +620,62 @@ fun MessageTimestamp(
     val time = remember(message.timestamp) {
         MomentsFormat.smartDate(message.timestamp, MomentsFormat.DateContext.TIME_ONLY)
     }
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(time, fontSize = 11.sp, color = colors.timestampColor)
-        if (message.editedAt != null) {
-            Text(stringResource(R.string.chat_edited), fontSize = 11.sp, color = colors.timestampColor)
+    // El gutter del swipe es 55.dp (≡ iOS). Con HStack, "Visto" se partía letra a letra.
+    // Con etiqueta de visto: columna hora + "Visto" (sigue cabiendo; softWrap=false).
+    if (isCurrentUser && showSeenLabel && status == MessageStatus.READ) {
+        Column(
+            modifier,
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(1.dp),
+        ) {
+            Text(
+                time,
+                fontSize = 11.sp,
+                color = colors.timestampColor,
+                maxLines = 1,
+                softWrap = false,
+            )
+            if (message.editedAt != null) {
+                Text(
+                    stringResource(R.string.chat_edited),
+                    fontSize = 11.sp,
+                    color = colors.timestampColor,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+            Text(
+                stringResource(R.string.chat_seen),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = colors.timestampColor.copy(0.9f),
+                maxLines = 1,
+                softWrap = false,
+            )
         }
-        if (isCurrentUser) {
-            if (showSeenLabel && status == MessageStatus.READ) {
-                Text(stringResource(R.string.chat_seen), fontSize = 11.sp, fontWeight = FontWeight.Medium, color = colors.timestampColor.copy(0.9f))
-            } else {
+    } else {
+        Row(
+            modifier,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                time,
+                fontSize = 11.sp,
+                color = colors.timestampColor,
+                maxLines = 1,
+                softWrap = false,
+            )
+            if (message.editedAt != null) {
+                Text(
+                    stringResource(R.string.chat_edited),
+                    fontSize = 11.sp,
+                    color = colors.timestampColor,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+            if (isCurrentUser) {
                 MessageStatusIcon(status)
             }
         }

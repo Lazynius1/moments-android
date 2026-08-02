@@ -153,31 +153,47 @@ fun ChatMessageBubbleChrome(
     content: @Composable () -> Unit,
 ) {
     val dark = isSystemInDarkTheme()
+    val lifted = isMenuSelected || isFlashing
     val selectionScale = when {
-        isMenuSelected || isFlashing -> ChatBubbleAnchorMetrics.highlightScale
+        lifted -> ChatBubbleAnchorMetrics.highlightScale
         isPressing -> ChatBubbleAnchorMetrics.pressScale
         else -> 1f
     }
     // iOS: spring.press para menú/flash; easeOut 0.12 para press.
     val animatedScale by animateFloatAsState(
         targetValue = selectionScale,
-        animationSpec = if (isPressing) {
+        animationSpec = if (isPressing && !lifted) {
             tween(durationMillis = 120)
         } else {
             spring(
                 dampingRatio = MotionPolicy.Spring.PRESS_DAMPING.toFloat(),
+                // response 0.28 → (2π/r)² ≈ 500
                 stiffness = 500f,
             )
         },
         label = "bubbleChromeScale",
     )
     val highlightTint = (if (dark) Color.White else Color.Black).copy(alpha = 0.12f)
+    val liftShadow = if (dark) 0.28f else 0.16f
     Box(
         Modifier
-            .zIndex(if (isMenuSelected || isFlashing) 1f else 0f)
+            .zIndex(if (lifted) 1f else 0f)
+            .then(
+                if (isMenuSelected) {
+                    Modifier.shadow(
+                        elevation = 18.dp,
+                        shape = RoundedCornerShape(cornerRadius.dp),
+                        ambientColor = Color.Black.copy(liftShadow),
+                        spotColor = Color.Black.copy(liftShadow),
+                    )
+                } else {
+                    Modifier
+                },
+            )
             .graphicsLayer {
                 scaleX = animatedScale
                 scaleY = animatedScale
+                clip = false
                 transformOrigin = TransformOrigin(
                     pivotFractionX = if (isOutgoing) 1f else 0f,
                     pivotFractionY = 1f,
@@ -220,6 +236,8 @@ fun ChatMessageContextMenuOverlay(
     val rowCount = visibleMenuRowsCount(item.message, isCurrentUser, currentUserId, forwardingPreferences)
     val systemBars = WindowInsets.systemBars
     var overlayOriginInWindow by remember { mutableStateOf(Offset.Zero) }
+    var reactionsSizePx by remember { mutableStateOf(Offset(300f, 54f)) }
+    var menuSizePx by remember { mutableStateOf(Offset(240f, (rowCount * 36f + 16f).coerceAtLeast(36f))) }
 
     BoxWithConstraints(
         modifier
@@ -253,6 +271,20 @@ fun ChatMessageContextMenuOverlay(
         val bottomMarginPx = with(density) {
             systemBars.getBottom(this).toFloat() + 12.dp.toPx()
         }
+        // iOS usa puntos ≈ dp; clamp/offsets deben ir en px de densidad.
+        val metrics = remember(density) {
+            with(density) {
+                MenuLayoutMetrics(
+                    menuRowHeight = 36.dp.toPx(),
+                    menuVerticalPadding = 16.dp.toPx(),
+                    stackGap = 10.dp.toPx(),
+                    reactionsBarHeight = 54.dp.toPx(),
+                    horizontalInset = 16.dp.toPx(),
+                    reactionsBarEstimatedWidth = 300.dp.toPx(),
+                    menuEstimatedWidth = 240.dp.toPx(),
+                )
+            }
+        }
         val layout = remember(
             localSelection.rowId,
             localSelection.anchorFrame,
@@ -261,6 +293,7 @@ fun ChatMessageContextMenuOverlay(
             containerH,
             topMarginPx,
             bottomMarginPx,
+            metrics,
         ) {
             menuLayout(
                 selection = localSelection,
@@ -269,6 +302,7 @@ fun ChatMessageContextMenuOverlay(
                 containerHeight = containerH,
                 topMarginPx = topMarginPx,
                 bottomMarginPx = bottomMarginPx,
+                metrics = metrics,
             )
         }
 
@@ -276,12 +310,25 @@ fun ChatMessageContextMenuOverlay(
         Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
 
         val reactionsEmojis = remember { emojiTracker.orderedEmojis(EmojiReactionDefaults.chat) }
+        val maxPanelWidth = (containerW - metrics.horizontalInset * 2f).coerceAtLeast(0f)
         Row(
             Modifier
+                .widthIn(max = with(density) { maxPanelWidth.toDp() })
+                .onGloballyPositioned { coords ->
+                    reactionsSizePx = Offset(coords.size.width.toFloat(), coords.size.height.toFloat())
+                }
                 .offset {
+                    val maxX = (containerW - metrics.horizontalInset - reactionsSizePx.x)
+                        .coerceAtLeast(metrics.horizontalInset)
+                    val maxY = (containerH - bottomMarginPx - reactionsSizePx.y)
+                        .coerceAtLeast(topMarginPx)
                     IntOffset(
-                        (layout.reactionsCenter.x - 150f).roundToInt(),
-                        (layout.reactionsCenter.y - 27f).roundToInt(),
+                        (layout.reactionsCenter.x - reactionsSizePx.x / 2f)
+                            .coerceIn(metrics.horizontalInset, maxX)
+                            .roundToInt(),
+                        (layout.reactionsCenter.y - reactionsSizePx.y / 2f)
+                            .coerceIn(topMarginPx, maxY)
+                            .roundToInt(),
                     )
                 }
                 .shadow(24.dp, CircleShape, ambientColor = Color.Black.copy(shadowAlpha), spotColor = Color.Black.copy(shadowAlpha))
@@ -326,14 +373,27 @@ fun ChatMessageContextMenuOverlay(
         if (!item.message.isDeleted && rowCount > 0) {
             Column(
                 Modifier
+                    .widthIn(
+                        min = 240.dp,
+                        max = with(density) { maxPanelWidth.toDp() },
+                    )
+                    .onGloballyPositioned { coords ->
+                        menuSizePx = Offset(coords.size.width.toFloat(), coords.size.height.toFloat())
+                    }
                     .offset {
-                        val halfH = (rowCount * 36f + 16f) / 2f
+                        val maxX = (containerW - metrics.horizontalInset - menuSizePx.x)
+                            .coerceAtLeast(metrics.horizontalInset)
+                        val maxY = (containerH - bottomMarginPx - menuSizePx.y)
+                            .coerceAtLeast(topMarginPx)
                         IntOffset(
-                            (layout.menuCenter.x - 120f).roundToInt(),
-                            (layout.menuCenter.y - halfH).roundToInt(),
+                            (layout.menuCenter.x - menuSizePx.x / 2f)
+                                .coerceIn(metrics.horizontalInset, maxX)
+                                .roundToInt(),
+                            (layout.menuCenter.y - menuSizePx.y / 2f)
+                                .coerceIn(topMarginPx, maxY)
+                                .roundToInt(),
                         )
                     }
-                    .widthIn(min = 240.dp)
                     .shadow(24.dp, RoundedCornerShape(menuCorner), ambientColor = Color.Black.copy(shadowAlpha), spotColor = Color.Black.copy(shadowAlpha))
                     .clip(RoundedCornerShape(menuCorner))
                     .momentsChromeGlass(RoundedCornerShape(menuCorner), interactive = true)
@@ -435,7 +495,14 @@ private fun MenuRow(
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(stringResource(title), color = color, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        Text(
+            stringResource(title),
+            color = color,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
+        )
         Spacer(Modifier.weight(1f))
         Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
     }
@@ -460,6 +527,16 @@ private fun visibleMenuRowsCount(
     return count
 }
 
+private data class MenuLayoutMetrics(
+    val menuRowHeight: Float,
+    val menuVerticalPadding: Float,
+    val stackGap: Float,
+    val reactionsBarHeight: Float,
+    val horizontalInset: Float,
+    val reactionsBarEstimatedWidth: Float,
+    val menuEstimatedWidth: Float,
+)
+
 private fun menuLayout(
     selection: ChatMessageMenuSelection,
     rowCount: Int,
@@ -467,6 +544,7 @@ private fun menuLayout(
     containerHeight: Float,
     topMarginPx: Float,
     bottomMarginPx: Float,
+    metrics: MenuLayoutMetrics,
 ): ChatMessageMenuLayout {
     val scale = ChatBubbleAnchorMetrics.menuSelectionScale
     val anchor = selection.anchorFrame
@@ -489,13 +567,12 @@ private fun menuLayout(
         )
     }
 
-    val menuRowHeight = 36f
-    val menuHeight = rowCount * menuRowHeight + 16f
-    val stackGap = 10f
-    val reactionsBarHeight = 54f
-    val horizontalInset = 16f
-    val reactionsBarEstimatedWidth = 300f
-    val menuEstimatedWidth = 240f
+    val menuHeight = rowCount * metrics.menuRowHeight + metrics.menuVerticalPadding
+    val stackGap = metrics.stackGap
+    val reactionsBarHeight = metrics.reactionsBarHeight
+    val horizontalInset = metrics.horizontalInset
+    val reactionsBarEstimatedWidth = metrics.reactionsBarEstimatedWidth
+    val menuEstimatedWidth = metrics.menuEstimatedWidth
 
     fun clampCenterX(centerX: Float, itemWidth: Float): Float {
         val half = itemWidth / 2f

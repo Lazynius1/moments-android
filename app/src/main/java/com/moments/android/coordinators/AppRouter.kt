@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Navegación tipada centralizada. Migración incremental desde NotificationCenter y
  * [NotificationNavigationService].
+ *
+ * Nav3: [com.moments.android.coordinators.nav3.MomentsNavKey] espeja [Destination];
+ * dispatch sigue aquí hasta NavDisplay por tabs.
  */
 object AppRouter {
 

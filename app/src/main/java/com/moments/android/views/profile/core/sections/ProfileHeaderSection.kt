@@ -75,7 +75,7 @@ import com.moments.android.views.story.StoryViewModel
  * no portar (checklist). Zoom source ids: `"settings-view"` / `"edit-profile-view"`.
  */
 
-private object ProfileOwnZoomSource {
+object ProfileOwnZoomSource {
     const val SETTINGS = "settings-view"
     const val EDIT_PROFILE = "edit-profile-view"
 }
@@ -335,13 +335,14 @@ private fun ProfileHeaderAvatar(
                 )
             }
         }
-        // Anillo solo con historia activa; borde Plus dorado 🚫
-        if (hasActiveStory && storyCount > 0) {
+        // Anillo ≡ iOS overlay(avatarBorderOverlay) cuando hasActiveStory
+        // (storyCount 0 → stroke transparente hasta que carguen las stories)
+        if (hasActiveStory) {
             StorySegmentedRing(
                 storyCount = storyCount,
                 hasStory = true,
                 hasUnseenStory = false,
-                storyViewedStatus = List(storyCount) { true },
+                storyViewedStatus = List(storyCount.coerceAtLeast(0)) { true },
                 storyAudiences = storyAudiences,
                 isOwnStory = true,
                 ringSize = 96.dp,

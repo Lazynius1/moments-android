@@ -46,7 +46,7 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -263,7 +263,7 @@ fun AdvancedAccountManagementView(
                     .background(Color.Black.copy(if (isDark) 0.18f else 0.08f)),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator(color = primary)
+                MomentsCircularProgressIndicator()
             }
         }
     }
@@ -397,8 +397,7 @@ private fun AdvancedSheetHeader(
     Box(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 22.dp)
-            .padding(top = 12.dp),
+            .padding(horizontal = 22.dp),
     ) {
         if (leadingIcon != null && onLeadingTap != null) {
             Box(
@@ -638,9 +637,8 @@ fun DeleteAccountVerificationView(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    CircularProgressIndicator(
+                    MomentsCircularProgressIndicator(
                         modifier = Modifier.size(22.dp),
-                        color = primary,
                         strokeWidth = 2.dp,
                     )
                     Text(

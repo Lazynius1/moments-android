@@ -92,6 +92,8 @@ import com.moments.android.models.MediaItem
 import com.moments.android.models.Story
 import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.utilities.MomentsFormat
+import com.moments.android.views.components.MomentRefreshOverlayHost
+import com.moments.android.views.components.momentRefresh
 import com.moments.android.views.feed.maps.FeedMaps
 import com.moments.android.views.profile.highlights.HighlightStoryDateBadge
 import com.moments.android.views.shared.MomentsModalSheet
@@ -171,7 +173,12 @@ fun ArchivedStoriesView(
             Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .consumeWindowInsets(innerPadding),
+                .consumeWindowInsets(innerPadding)
+                // ≡ iOS `.momentRefresh { await reloadArchivedStories() }`
+                .momentRefresh {
+                    viewModel.loadArchivedStories()
+                    kotlinx.coroutines.delay(700)
+                },
         ) {
             when {
                 viewModel.isLoading -> {
@@ -322,6 +329,7 @@ fun ArchivedStoriesView(
                     }
                 }
             }
+            MomentRefreshOverlayHost(Modifier.align(Alignment.TopCenter))
         }
     }
 

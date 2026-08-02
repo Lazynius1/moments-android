@@ -19,18 +19,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -75,6 +72,7 @@ import com.moments.android.views.creator.creatorscreens.LocationPickerView
 import com.moments.android.views.feed.core.EditMomentPayload
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.MomentsSheetHeader
 import kotlinx.coroutines.launch
 
 /**
@@ -199,63 +197,49 @@ fun EditMomentView(
             .statusBarsPadding(),
     ) {
         Column(Modifier.fillMaxSize()) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = primary)
-                }
-                Text(
-                    stringResource(R.string.edit_moment_title),
-                    Modifier.weight(1f),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 17.sp,
-                    color = primary,
-                )
-                TextButton(
-                    onClick = {
-                        if (!hasChanges || isSaving) return@TextButton
-                        isSaving = true
-                        scope.launch {
-                            val mentions = MomentMentionResolver.resolveUserIds(editedContent)
-                            val payload = EditMomentPayload(
-                                content = editedContent,
-                                audience = selectedAudience.raw,
-                                customListId = if (selectedAudience == ContentAudience.CUSTOM_LIST) {
-                                    selectedListId
-                                } else {
-                                    null
-                                },
-                                customViewers = if (selectedAudience == ContentAudience.CUSTOM) {
-                                    customSelectedUsers
-                                } else {
-                                    emptyList()
-                                },
-                                taggedUsers = taggedUsers,
-                                mentionedUsers = mentions,
-                                locationName = normalizedLocation,
-                                locationLatitude = selectedLocation?.latitude,
-                                locationLongitude = selectedLocation?.longitude,
-                                mediaItems = editedMediaItems,
-                            )
-                            onSave(payload)
-                            isSaving = false
-                            onDismiss()
-                        }
-                    },
-                    enabled = hasChanges && !isSaving,
-                ) {
+            // Sheet Android: sin chevron; título pegado + Save trailing
+            MomentsSheetHeader(
+                title = stringResource(R.string.edit_moment_title),
+                titleSize = 17.sp,
+                trailing = {
                     Text(
-                        stringResource(R.string.edit_moment_save),
+                        stringResource(R.string.common_save),
+                        color = if (hasChanges && !isSaving) primary else primary.copy(alpha = 0.4f),
                         fontWeight = FontWeight.SemiBold,
-                        color = primary.copy(alpha = if (hasChanges && !isSaving) 1f else 0.4f),
+                        fontSize = 16.sp,
+                        modifier = Modifier.clickable(enabled = hasChanges && !isSaving) {
+                            if (!hasChanges || isSaving) return@clickable
+                            isSaving = true
+                            scope.launch {
+                                val mentions = MomentMentionResolver.resolveUserIds(editedContent)
+                                val payload = EditMomentPayload(
+                                    content = editedContent,
+                                    audience = selectedAudience.raw,
+                                    customListId = if (selectedAudience == ContentAudience.CUSTOM_LIST) {
+                                        selectedListId
+                                    } else {
+                                        null
+                                    },
+                                    customViewers = if (selectedAudience == ContentAudience.CUSTOM) {
+                                        customSelectedUsers
+                                    } else {
+                                        emptyList()
+                                    },
+                                    taggedUsers = taggedUsers,
+                                    mentionedUsers = mentions,
+                                    locationName = normalizedLocation,
+                                    locationLatitude = selectedLocation?.latitude,
+                                    locationLongitude = selectedLocation?.longitude,
+                                    mediaItems = editedMediaItems,
+                                )
+                                onSave(payload)
+                                isSaving = false
+                                onDismiss()
+                            }
+                        },
                     )
-                }
-            }
-
+                },
+            )
             Column(
                 Modifier
                     .fillMaxSize()
@@ -387,9 +371,8 @@ fun EditMomentView(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    CircularProgressIndicator(
+                    MomentsCircularProgressIndicator(
                         modifier = Modifier.size(28.dp),
-                        color = primary,
                         strokeWidth = 2.dp,
                     )
                     Text(stringResource(R.string.edit_moment_saving), color = primary, fontWeight = FontWeight.Medium)
@@ -582,9 +565,8 @@ private fun EditMomentPhotoTagSheet(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    CircularProgressIndicator(
+                    MomentsCircularProgressIndicator(
                         modifier = Modifier.size(28.dp),
-                        color = primary,
                         strokeWidth = 2.dp,
                     )
                     Text(

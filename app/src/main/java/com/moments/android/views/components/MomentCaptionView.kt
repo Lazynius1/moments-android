@@ -24,9 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -50,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
+import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Moment
@@ -301,13 +300,10 @@ fun MomentCaptionView(
     }
 
     if (showFullCaption) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-        ModalBottomSheet(
+        MomentsModalSheet(
             onDismissRequest = { showFullCaption = false },
-            sheetState = sheetState,
-            containerColor = Color.Transparent,
-            dragHandle = null,
-        ) {
+            largeOnly = false,
+        ) { _ ->
             MomentCaptionReaderSheet(
                 content = trimmed,
                 mediaPreviewContext = mediaPreviewContext,

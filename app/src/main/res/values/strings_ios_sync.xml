@@ -1614,4 +1614,11 @@
     <string name="widget_stories_singular">1 new story</string>
     <string name="widget_visits_plural">%1$d people visited your profile today</string>
     <string name="widget_visits_singular">1 person visited your profile today</string>
+    <string name="widget_home_description">Quick access to your stories, visits and messages.</string>
+    <string name="widget_brand_name">Moments</string>
+    <string name="widget_all_caught_up">All caught up</string>
+    <string name="widget_echoes_singular">1 friend nearby</string>
+    <string name="widget_echoes_plural">%1$d friends nearby</string>
+    <string name="widget_tags_singular">1 new tag</string>
+    <string name="widget_tags_plural">%1$d new tags</string>
 </resources>

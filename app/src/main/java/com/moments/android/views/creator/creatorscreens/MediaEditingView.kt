@@ -10,6 +10,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,6 +72,7 @@ import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.CreatorAspectRatio
 import com.moments.android.views.creator.CreatorFlow
 import com.moments.android.views.creator.CreatorMedia
+import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -106,6 +108,10 @@ fun MediaEditingView(
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val isDark = isSystemInDarkTheme()
+    val screenBackground = rememberAdaptiveColors().surfaceBackground
+    val chromeForeground = if (isDark) Color.White else Color.Black.copy(alpha = 0.86f)
+    val chromeSecondary = chromeForeground.copy(alpha = 0.68f)
     var currentMediaIndex by remember { mutableIntStateOf(0) }
     var showingCrop by remember { mutableStateOf(false) }
     var showingFilterToolbar by remember { mutableStateOf(false) }
@@ -194,31 +200,34 @@ fun MediaEditingView(
         }
     }
 
-    // Fondo sólido negro (sin blur de imagen — decisión de plataforma ≡ CaptionAndDetails)
-    Box(modifier.fillMaxSize().background(Color.Black)) {
+    Box(modifier.fillMaxSize().background(screenBackground)) {
         Column(Modifier.fillMaxSize()) {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Black.copy(0.6f), Color.Transparent)))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(screenBackground, screenBackground.copy(alpha = 0f)),
+                        ),
+                    )
                     .padding(16.dp),
             ) {
                 if (showingFilterToolbar) {
                     Text(
                         stringResource(R.string.common_cancel),
-                        color = Color.White,
+                        color = chromeForeground,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier
                             .align(Alignment.CenterStart)
                             .clip(RoundedCornerShape(50))
-                            .background(Color.White.copy(0.1f))
+                            .background(chromeForeground.copy(0.1f))
                             .clickable { cancelFilter() }
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                     Text(
                         stringResource(R.string.creator_edit),
-                        color = Color.White,
+                        color = chromeForeground,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.align(Alignment.Center),
@@ -244,11 +253,16 @@ fun MediaEditingView(
                             .clickable { onCurrentFlowChange(CreatorFlow.MEDIA_SELECTION) },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            null,
+                            tint = chromeForeground,
+                            modifier = Modifier.size(22.dp),
+                        )
                     }
                     Text(
                         stringResource(R.string.creator_edit),
-                        color = Color.White,
+                        color = chromeForeground,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.align(Alignment.Center),
@@ -324,7 +338,11 @@ fun MediaEditingView(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(0.9f)))),
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(screenBackground.copy(alpha = 0f), screenBackground),
+                        ),
+                    ),
             ) {
                 if (showingFilterToolbar) {
                     Column(Modifier.padding(vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -333,7 +351,7 @@ fun MediaEditingView(
                                 Row {
                                     Text(
                                         stringResource(R.string.creator_intensity),
-                                        color = Color.White.copy(0.8f),
+                                        color = chromeSecondary,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Medium,
                                     )
@@ -499,10 +517,11 @@ private fun AspectRatioChip(
     recommended: Boolean,
     onClick: () -> Unit,
 ) {
+    val chromeForeground = if (isSystemInDarkTheme()) Color.White else Color.Black.copy(alpha = 0.86f)
     val stroke = when {
         selected -> Color(0xFFE91E63)
         recommended -> Color(0xFF4CAF50).copy(0.6f)
-        else -> Color.White.copy(0.3f)
+        else -> chromeForeground.copy(0.3f)
     }
     val w = when (ratio) {
         CreatorAspectRatio.LANDSCAPE -> 35.dp
@@ -522,10 +541,9 @@ private fun AspectRatioChip(
         )
         Text(
             ratio.displayName,
-            color = if (selected) Color(0xFFE91E63) else Color.White.copy(0.6f),
+            color = if (selected) Color(0xFFE91E63) else chromeForeground.copy(0.6f),
             fontSize = 8.sp,
             fontWeight = FontWeight.Medium,
         )
     }
 }
-

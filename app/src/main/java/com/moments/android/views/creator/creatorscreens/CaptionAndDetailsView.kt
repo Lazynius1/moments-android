@@ -71,6 +71,7 @@ import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.Moment
 import com.moments.android.utilities.HapticManager
@@ -122,7 +123,7 @@ fun CaptionAndDetailsView(
     }
     val isDark = isSystemInDarkTheme()
     val canvas = rememberAdaptiveColors().surfaceBackground
-    val primary = if (isDark) Color.White else Color(0xFF0B1215)
+    val primary = MomentsChromeGlass.contentColor(isDark)
     val secondary = primary.copy(alpha = 0.60f)
     val muted = primary.copy(alpha = 0.55f)
     val divider = primary.copy(alpha = 0.10f)
@@ -199,7 +200,7 @@ fun CaptionAndDetailsView(
                     Icon(
                         Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                         null,
-                        tint = Color.White,
+                        tint = primary,
                         modifier = Modifier.size(22.dp),
                     )
                 }
@@ -575,6 +576,7 @@ fun CaptionAndDetailsView(
             }
         }
         if (showingAudience) {
+            // ≡ iOS `.presentationDetents([.medium, .large])`
             MomentsModalSheet(
                 onDismissRequest = {
                     showingAudience = false
@@ -587,6 +589,7 @@ fun CaptionAndDetailsView(
                         )
                     }
                 },
+                largeOnly = false,
             ) {
                 AudienceSelectionView(
                     selectedAudience = audience,

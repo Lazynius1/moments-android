@@ -93,6 +93,8 @@ import com.moments.android.views.settings.SettingsSearchField
 import com.moments.android.views.profile.core.sections.MomentCarouselIndicatorIcon
 import com.moments.android.views.profile.core.sections.MomentZoomDestination
 import com.moments.android.views.profile.core.sections.MomentZoomDetailDestination
+import com.moments.android.views.shared.MomentsContainerTransformOverlay
+import com.moments.android.views.shared.MomentsSharedTransitionLayout
 import com.moments.android.views.profile.core.sections.MomentZoomOpener
 import com.moments.android.views.profile.core.sections.MomentZoomPresentationKind
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomNavigation
@@ -301,6 +303,7 @@ fun SavedMomentsView(
         context.startActivity(Intent.createChooser(intent, null))
     }
 
+    MomentsSharedTransitionLayout(Modifier.fillMaxSize()) {
     Box(
         Modifier
             .fillMaxSize()
@@ -458,17 +461,21 @@ fun SavedMomentsView(
             }
         }
 
-        zoomDestination?.let { destination ->
-            MomentZoomDetailDestination(
-                destination = destination,
-                moments = MomentZoomOpener.resolvedMoments(destination, accessibleMomentsPool()),
-                onDismiss = { zoomDestination = null },
-                onRemoveSavedMoment = { moment ->
-                    moment.id?.let { viewModel.removeMoment(it) }
-                },
-            )
+        MomentsContainerTransformOverlay(visible = zoomDestination != null) {
+            val destination = zoomDestination
+            if (destination != null) {
+                MomentZoomDetailDestination(
+                    destination = destination,
+                    moments = MomentZoomOpener.resolvedMoments(destination, accessibleMomentsPool()),
+                    onDismiss = { zoomDestination = null },
+                    onRemoveSavedMoment = { moment ->
+                        moment.id?.let { viewModel.removeMoment(it) }
+                    },
+                )
+            }
         }
     }
+    } // MomentsSharedTransitionLayout
 
     if (showRemoveSelectionAlert) {
         AlertDialog(

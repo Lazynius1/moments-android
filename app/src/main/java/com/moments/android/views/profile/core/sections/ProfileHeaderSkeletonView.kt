@@ -1,7 +1,6 @@
 package com.moments.android.views.profile.core.sections
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -16,20 +15,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
+import com.moments.android.views.components.rememberMomentsSkeletonColor
 import com.moments.android.views.components.shimmer
 
 /** Port de `ProfileHeaderSkeletonView.swift`. */
 @Composable
 fun ProfileHeaderSkeletonView(modifier: Modifier = Modifier) {
-    val surface = if (isSystemInDarkTheme()) {
-        androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f)
-    } else {
-        androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.06f)
-    }
+    val surface = rememberMomentsSkeletonColor()
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -74,7 +71,7 @@ fun ProfileMomentsGridSkeletonView(modifier: Modifier = Modifier) {
         BentoTileKind.UNIT, BentoTileKind.TALL, BentoTileKind.UNIT,
         BentoTileKind.UNIT, BentoTileKind.UNIT, BentoTileKind.UNIT,
     )
-    val dark = isSystemInDarkTheme()
+    val onSurface = MaterialTheme.colorScheme.onSurface
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
@@ -86,17 +83,12 @@ fun ProfileMomentsGridSkeletonView(modifier: Modifier = Modifier) {
         Box(Modifier.fillMaxWidth().height(gridHeight)) {
             frames.forEach { frame ->
                 val shade = if (frame.index % 3 == 0) 0.10f else 0.06f
-                val surface = if (dark) {
-                    androidx.compose.ui.graphics.Color.White.copy(alpha = shade)
-                } else {
-                    androidx.compose.ui.graphics.Color.Black.copy(alpha = shade)
-                }
                 Box(
                     Modifier
                         .offset(x = frame.x, y = frame.y)
                         .width(frame.width)
                         .height(frame.height)
-                        .background(surface),
+                        .background(onSurface.copy(alpha = shade)),
                 )
             }
         }

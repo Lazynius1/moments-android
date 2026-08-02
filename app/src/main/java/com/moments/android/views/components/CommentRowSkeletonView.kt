@@ -1,7 +1,6 @@
 package com.moments.android.views.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 
@@ -28,11 +26,7 @@ fun CommentRowSkeletonView(
     textLineCount: Int = 2,
     modifier: Modifier = Modifier,
 ) {
-    val surfaceColor = if (isSystemInDarkTheme()) {
-        Color.White.copy(alpha = 0.08f)
-    } else {
-        Color.Black.copy(alpha = 0.06f)
-    }
+    val surfaceColor = rememberMomentsSkeletonColor()
     Row(
         modifier = modifier
             .shimmer(isAnimating = true)

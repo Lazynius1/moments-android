@@ -37,7 +37,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Circle
@@ -433,29 +432,26 @@ fun CustomAudienceListsView(
                     Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp)
-                        .padding(top = 20.dp, bottom = 12.dp),
+                        .padding(top = 0.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Box(
-                        Modifier
-                            .size(40.dp)
-                            .momentsChromeGlass(CircleShape, interactive = true)
-                            .clickable {
-                                if (embeddedInFlow) onBack?.invoke() else onDismiss?.invoke()
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            if (embeddedInFlow) {
-                                Icons.AutoMirrored.Filled.KeyboardArrowLeft
-                            } else {
-                                Icons.Filled.KeyboardArrowDown
-                            },
-                            null,
-                            tint = content,
-                            modifier = Modifier.size(18.dp),
-                        )
+                    // Solo back en flujo anidado; en sheet root dismiss = handle (sin chevron).
+                    if (embeddedInFlow) {
+                        Box(
+                            Modifier
+                                .size(40.dp)
+                                .momentsChromeGlass(CircleShape, interactive = true)
+                                .clickable { onBack?.invoke() },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                                null,
+                                tint = content,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
                     }
                     Spacer(Modifier.weight(1f))
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {

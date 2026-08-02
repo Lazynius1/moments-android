@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -78,10 +79,14 @@ import com.moments.android.R
 import com.moments.android.extensions.fromHex
 import com.moments.android.services.auth.AuthService
 import com.moments.android.services.performance.MotionPolicy
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 private const val IMAGE_AD_DURATION_SEC = 8.0
 private const val MAX_VIDEO_AD_DURATION_SEC = 60.0
@@ -178,6 +183,8 @@ class StoryAdVideoPlayback {
 }
 
 class StoryNativeAdManager {
+    private val loadScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     private val _nativeAd = MutableStateFlow<NativeAd?>(null)
     val nativeAd: StateFlow<NativeAd?> = _nativeAd.asStateFlow()
 
@@ -238,6 +245,15 @@ class StoryNativeAdManager {
             .build()
 
         adLoader?.loadAd(AdMobConfiguration.createAdRequest())
+
+        // ≡ iOS: timeout 15s → hasError si sigue loading
+        loadScope.launch {
+            delay(15_000)
+            if (_isLoading.value) {
+                _isLoading.value = false
+                _hasError.value = true
+            }
+        }
     }
 
     fun cleanup() {
@@ -249,6 +265,15 @@ class StoryNativeAdManager {
 
     val hasReadyAd: Boolean
         get() = _nativeAd.value != null && !_isLoading.value && !_hasError.value
+
+    /** ≡ iOS `forceReload()` — cleanup + load tras 0.5s. */
+    fun forceReload(activity: Activity?) {
+        cleanup()
+        loadScope.launch {
+            delay(500)
+            loadStoryAd(activity)
+        }
+    }
 
     private fun swapAd(ad: NativeAd?) {
         loadedAd?.destroy()
@@ -395,7 +420,18 @@ fun StoryNativeAdView(
                     .background(Color.Red.copy(alpha = 0.3f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(16.dp),
+                ) {
+                    // ≡ iOS exclamationmark.triangle.fill size 50
+                    Icon(
+                        imageVector = Icons.Filled.Warning,
+                        contentDescription = null,
+                        tint = Color.Red,
+                        modifier = Modifier.size(50.dp),
+                    )
+                    Spacer(Modifier.height(16.dp))
                     Text(
                         text = stringResource(R.string.ad_story_error_loading),
                         color = Color.White,

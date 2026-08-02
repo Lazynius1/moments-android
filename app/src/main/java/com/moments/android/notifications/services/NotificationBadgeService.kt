@@ -4,8 +4,8 @@ import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import com.moments.android.MomentsApplication
 import com.moments.android.models.NotificationType
+import com.moments.android.widget.MomentsWidgetStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,12 +18,11 @@ import kotlinx.coroutines.tasks.await
 
 /**
  * Port de NotificationBadgeService.swift.
- * Widget/App Group → SharedPreferences en Android.
+ * Widget prefs → [MomentsWidgetStore] (`com.moments.android.widget`).
  */
 object NotificationBadgeService {
     private val db = FirebaseFirestore.getInstance()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private const val PREFS = "notification_badge_prefs"
 
     private val _unreadNotificationsCount = MutableStateFlow(0)
     val unreadNotificationsCount: StateFlow<Int> = _unreadNotificationsCount.asStateFlow()
@@ -100,7 +99,10 @@ object NotificationBadgeService {
                     .get()
                     .await()
                 _unreadMessagesCount.value = countUnreadMessages(snapshot.documents.mapNotNull { it.data }, userId)
-                prefs()?.edit()?.putInt(KEY_UNREAD_MESSAGES, _unreadMessagesCount.value)?.apply()
+                MomentsWidgetStore.putBadgeCounts(
+                    unreadMessages = _unreadMessagesCount.value,
+                    reload = false,
+                )
                 updateAppBadgeFromCounts()
             }
             onComplete?.invoke()
@@ -114,7 +116,10 @@ object NotificationBadgeService {
             .addSnapshotListener { snapshot, _ ->
                 val docs = snapshot?.documents ?: return@addSnapshotListener
                 _unreadMessagesCount.value = countUnreadMessages(docs.mapNotNull { it.data }, userId)
-                prefs()?.edit()?.putInt(KEY_UNREAD_MESSAGES, _unreadMessagesCount.value)?.apply()
+                MomentsWidgetStore.putBadgeCounts(
+                    unreadMessages = _unreadMessagesCount.value,
+                    reload = false,
+                )
                 updateAppBadgeFromCounts()
             }
     }
@@ -130,7 +135,8 @@ object NotificationBadgeService {
     }
 
     fun updateAppBadgeFromCounts() {
-        // Android no expone badge unificado como iOS; los counts viven en SharedPreferences para widgets futuros.
+        // Android no expone badge unificado como iOS; prefs + reload del home widget.
+        MomentsWidgetStore.reloadWidgets()
     }
 
     fun clearNotificationBadge() {
@@ -156,19 +162,20 @@ object NotificationBadgeService {
         _unreadNotificationsCount.value = unreadNotifications.coerceAtLeast(0)
         _unreadEchoesCount.value = unreadEchoes.coerceAtLeast(0)
         _unreadTagsCount.value = unreadTags.coerceAtLeast(0)
-        prefs()?.edit()?.apply {
-            putInt(KEY_UNREAD_MESSAGES, _unreadMessagesCount.value)
-            putInt(KEY_UNREAD_NOTIFICATIONS, _unreadNotificationsCount.value)
-            putInt(KEY_UNREAD_ECHOES, _unreadEchoesCount.value)
-            putInt(KEY_UNREAD_TAGS, _unreadTagsCount.value)
-        }?.apply()
+        MomentsWidgetStore.putBadgeCounts(
+            unreadMessages = _unreadMessagesCount.value,
+            unreadNotifications = _unreadNotificationsCount.value,
+            unreadEchoes = _unreadEchoesCount.value,
+            unreadTags = _unreadTagsCount.value,
+            reload = false,
+        )
         updateAppBadgeFromCounts()
         return true
     }
 
     fun clearMessageBadge() {
         _unreadMessagesCount.value = 0
-        prefs()?.edit()?.putInt(KEY_UNREAD_MESSAGES, 0)?.apply()
+        MomentsWidgetStore.putBadgeCounts(unreadMessages = 0, reload = false)
         updateAppBadgeFromCounts()
     }
 
@@ -185,22 +192,16 @@ object NotificationBadgeService {
         _unreadEchoesCount.value = 0
         _unreadTagsCount.value = 0
         persistWidgetCounts()
-        prefs()?.edit()?.putInt(KEY_UNREAD_MESSAGES, 0)?.apply()
+        MomentsWidgetStore.putBadgeCounts(unreadMessages = 0, reload = false)
         clearAppBadge()
     }
 
     private fun persistWidgetCounts() {
-        prefs()?.edit()?.apply {
-            putInt(KEY_UNREAD_NOTIFICATIONS, _unreadNotificationsCount.value)
-            putInt(KEY_UNREAD_ECHOES, _unreadEchoesCount.value)
-            putInt(KEY_UNREAD_TAGS, _unreadTagsCount.value)
-        }?.apply()
+        MomentsWidgetStore.putBadgeCounts(
+            unreadNotifications = _unreadNotificationsCount.value,
+            unreadEchoes = _unreadEchoesCount.value,
+            unreadTags = _unreadTagsCount.value,
+            reload = false,
+        )
     }
-
-    private fun prefs() = MomentsApplication.instance?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-
-    private const val KEY_UNREAD_NOTIFICATIONS = "widget_unread_notifications"
-    private const val KEY_UNREAD_MESSAGES = "widget_unread_messages"
-    private const val KEY_UNREAD_ECHOES = "widget_unread_echoes"
-    private const val KEY_UNREAD_TAGS = "widget_unread_tags"
 }

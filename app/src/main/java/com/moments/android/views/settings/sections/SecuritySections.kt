@@ -21,7 +21,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -300,10 +300,9 @@ private fun SecurityStatusRow(
                 )
             }
             when {
-                isLoading -> CircularProgressIndicator(
+                isLoading -> MomentsCircularProgressIndicator(
                     modifier = Modifier.size(18.dp),
                     strokeWidth = 2.dp,
-                    color = primary,
                 )
                 isConfigured -> Icon(
                     Icons.Filled.Check,
@@ -364,10 +363,9 @@ private fun GoogleLinkSettingsRow(
                     )
                 }
                 if (isLoading) {
-                    CircularProgressIndicator(
+                    MomentsCircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
-                        color = primary,
                     )
                 }
             }

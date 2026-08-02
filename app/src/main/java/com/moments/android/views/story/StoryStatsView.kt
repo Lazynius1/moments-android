@@ -163,16 +163,14 @@ fun StoryStatsView(
                     Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 22.dp)
-                        .padding(top = 12.dp),
+                        .padding(top = 0.dp, bottom = 8.dp),
                 ) {
                     Text(
                         stringResource(R.string.archived_stories_stats_title),
                         color = primaryText,
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 2.dp),
+                        modifier = Modifier.align(Alignment.TopCenter),
                     )
                 }
 

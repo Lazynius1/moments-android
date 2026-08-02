@@ -48,6 +48,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
@@ -789,7 +790,6 @@ fun RevealSurfaceView(
         !secondaryColor.isNullOrBlank() && !secondaryColor.equals(primaryColor, ignoreCase = true) -> secondary
         else -> primary.revealContrastingEffectColor()
     }
-    // ≡ resolvedAccentColor(for:): effectColor ?? secondaryColor
     val holographicAccent = Color.fromHex(effectColor ?: secondaryColor ?: "#C8C8C8")
     val resolvedPattern = pattern?.takeIf { it != "none" }
     val showLegacyDither = (pattern.isNullOrBlank() || pattern == "none") &&
@@ -797,52 +797,49 @@ fun RevealSurfaceView(
     val reduceMotion = MotionPolicy.reduceMotion
     val animateEffects = effectsActive && !reduceMotion
 
-    // Reloj leído en composición para invalidar Canvas cada frame (≡ TimelineView iOS).
-    var timeSeconds by remember { mutableFloatStateOf((System.currentTimeMillis() / 1000.0).toFloat()) }
-    var staticFrame by remember { mutableIntStateOf(0) }
+    // Reloj leído DENTRO del DrawScope (snapshot) → invalida Canvas cada frame.
+    // Antes: Float capturado en composición + `modifier` reutilizado en Box/Canvas → patrones
+    // estáticos o superficie vacía.
+    val timeState = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(animateEffects, resolvedPattern) {
         if (!animateEffects) return@LaunchedEffect
-        val frameDelayMs = (1000.0 / MotionPolicy.canvasFPS).toLong().coerceAtLeast(16L)
         while (true) {
-            timeSeconds = (System.currentTimeMillis() / 1000.0).toFloat()
-            if (resolvedPattern == "static") staticFrame += 1
-            delay(frameDelayMs)
+            withFrameNanos { nanos ->
+                timeState.floatValue = nanos / 1_000_000_000f
+            }
         }
     }
-    val clock = timeSeconds
-    val staticTick = staticFrame
 
-    Box(modifier) {
-        Canvas(modifier.fillMaxSize()) {
+    // Nunca reutilizar el mismo Modifier en dos nodos (regla Compose).
+    Box(modifier.fillMaxSize()) {
+        Canvas(Modifier.fillMaxSize()) {
             if (type == "gradient") {
                 drawRect(Brush.linearGradient(listOf(primary, secondary)))
             } else {
                 drawRect(primary)
             }
 
-            // reduceMotion fallbacks ≡ iOS Reveal*Pattern
+            val clock = timeState.floatValue.toDouble()
             val patternToDraw = when {
-                !animateEffects && resolvedPattern in setOf("grid", "matrix", "scanlines", "waves", "holographic") ->
-                    "lines"
+                !animateEffects && resolvedPattern in setOf(
+                    "grid", "matrix", "scanlines", "waves", "holographic",
+                ) -> "lines"
                 !animateEffects && resolvedPattern == "noise" -> null
                 !animateEffects && resolvedPattern == "static" -> "staticReduced"
+                resolvedPattern == "holographic" && animateEffects -> null // capa aparte
                 else -> resolvedPattern
             }
 
             when (patternToDraw) {
-                "dots" -> Unit
+                "dots" -> Unit // StickerDitherPattern debajo
                 "lines" -> drawRevealLines(effect)
-                "grid" -> drawRevealGrid(effect, clock.toDouble())
-                "noise" -> drawRevealNoise(effect, clock.toDouble())
-                "static" -> {
-                    @Suppress("UNUSED_EXPRESSION")
-                    staticTick
-                    drawRevealStatic(effect, clock.toDouble())
-                }
+                "grid" -> drawRevealGrid(effect, clock)
+                "noise" -> drawRevealNoise(effect, clock)
+                "static" -> drawRevealStatic(effect, clock)
                 "staticReduced" -> drawRect(Color.Black.copy(alpha = 0.08f))
-                "scanlines" -> drawRevealScanlines(effect, clock.toDouble())
-                "waves" -> drawRevealWaves(effect, clock.toDouble())
-                "matrix" -> drawRevealMatrix(effect, clock.toDouble())
+                "scanlines" -> drawRevealScanlines(effect, clock)
+                "waves" -> drawRevealWaves(effect, clock)
+                "matrix" -> drawRevealMatrix(effect, clock)
             }
         }
         if (resolvedPattern == "dots" || showLegacyDither) {
@@ -857,6 +854,8 @@ fun RevealSurfaceView(
                 accentColor = holographicAccent,
                 modifier = Modifier.fillMaxSize(),
             )
+        } else if (resolvedPattern == "holographic" && !animateEffects) {
+            Canvas(Modifier.fillMaxSize()) { drawRevealLines(effect) }
         }
     }
 }
@@ -1063,14 +1062,14 @@ private fun RevealHolographicPattern(
     var pitch by remember { mutableFloatStateOf(0f) }
     var roll by remember { mutableFloatStateOf(0f) }
     var rotationRate by remember { mutableFloatStateOf(0f) }
-    var timeSeconds by remember { mutableFloatStateOf((System.currentTimeMillis() / 1000.0).toFloat()) }
+    val timeState = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         while (true) {
-            timeSeconds = (System.currentTimeMillis() / 1000.0).toFloat()
-            delay(1000L / 24L)
+            withFrameNanos { nanos ->
+                timeState.floatValue = nanos / 1_000_000_000f
+            }
         }
     }
-    val clock = timeSeconds
 
     DisposableEffect(rotationVector) {
         if (rotationVector == null) return@DisposableEffect onDispose { }
@@ -1108,92 +1107,106 @@ private fun RevealHolographicPattern(
     val baseHue = hueOf(color)
     val accentHue = hueOf(accentColor)
 
-    Box(modifier) {
-        Canvas(Modifier.fillMaxSize()) {
-            drawRect(
-                Brush.linearGradient(
-                    listOf(Color(0xFFD1D1D1), Color(0xFFB3B3B3), Color(0xFFC7C7C7)),
-                ),
-            )
-        }
-        Canvas(Modifier.fillMaxSize()) {
-            val isPreview = size.width < 150.dp.toPx()
-            val cell = if (isPreview) 10.dp.toPx() else 20.dp.toPx()
-            val cols = (size.width / cell).toInt() + 2
-            val rows = (size.height / cell).toInt() + 2
-            val tiltHue = roll / Math.PI.toFloat() * 0.4f + pitch / (Math.PI.toFloat() / 2f) * 0.2f
-            val waveT = clock * 0.4f
-            repeat(cols) { column ->
-                repeat(rows) { row ->
-                    val posX = column.toFloat() / cols
-                    val posY = row.toFloat() / rows
-                    var hue = (posX + posY * 0.5f + tiltHue + accentHue * 0.3f) % 1f
-                    if (hue < 0f) hue += 1f
-                    val saturation = (0.5f + 0.4f * sin(posX * Math.PI.toFloat() * 3f + posY * Math.PI.toFloat() * 2f + waveT))
-                        .coerceIn(0f, 1f)
-                    drawRect(
-                        Color.hsv(hue * 360f, saturation, 0.95f, 0.5f),
-                        topLeft = Offset(column * cell, row * cell),
-                        size = Size(cell + 1f, cell + 1f),
-                    )
+    BoxWithConstraints(modifier) {
+        val isPreview = maxWidth < 150.dp
+        val blurRadius = if (isPreview) 8.dp else 18.dp
+
+        Box(Modifier.fillMaxSize()) {
+            Canvas(Modifier.fillMaxSize()) {
+                drawRect(
+                    Brush.linearGradient(
+                        listOf(Color(0xFFD1D1D1), Color(0xFFB3B3B3), Color(0xFFC7C7C7)),
+                    ),
+                )
+            }
+            Canvas(
+                Modifier
+                    .fillMaxSize()
+                    .blur(blurRadius),
+            ) {
+                val t = timeState.floatValue
+                val cell = if (isPreview) 10.dp.toPx() else 20.dp.toPx()
+                val cols = (size.width / cell).toInt() + 2
+                val rows = (size.height / cell).toInt() + 2
+                val tiltHue = roll / Math.PI.toFloat() * 0.4f + pitch / (Math.PI.toFloat() / 2f) * 0.2f
+                val waveT = t * 0.4f
+                repeat(cols) { column ->
+                    repeat(rows) { row ->
+                        val posX = column.toFloat() / cols
+                        val posY = row.toFloat() / rows
+                        var hue = (posX + posY * 0.5f + tiltHue + accentHue * 0.3f) % 1f
+                        if (hue < 0f) hue += 1f
+                        val saturation = (
+                            0.5f + 0.4f * sin(
+                                posX * Math.PI.toFloat() * 3f +
+                                    posY * Math.PI.toFloat() * 2f +
+                                    waveT,
+                            )
+                            ).coerceIn(0f, 1f)
+                        drawRect(
+                            Color.hsv(hue * 360f, saturation, 0.95f, 0.5f),
+                            topLeft = Offset(column * cell, row * cell),
+                            size = Size(cell + 1f, cell + 1f),
+                        )
+                    }
                 }
             }
-        }
-        Canvas(Modifier.fillMaxSize()) {
-            val isPreview = size.width < 150.dp.toPx()
-            val count = if (isPreview) 1000 else 2800
-            val rng = SeededRandom(77)
-            val tiltHue = roll / Math.PI.toFloat() * 0.4f + pitch / (Math.PI.toFloat() / 2f) * 0.2f
-            val motionIntensity = ((rotationRate - 0.1f) / 1.5f).coerceIn(0f, 1f)
-            val effectiveMotion = if (rotationVector == null || isPreview) {
-                (0.35f + 0.25f * abs(sin(clock.toDouble() * 1.2)).toFloat()).coerceIn(0f, 1f)
-            } else {
-                maxOf(motionIntensity, 0.2f + 0.15f * abs(sin(clock.toDouble() * 1.5)).toFloat())
-            }
-            val glintAlpha = effectiveMotion * 0.95f
-            repeat(count) { i ->
-                val x = rng.next().toFloat() * size.width
-                val y = rng.next().toFloat() * size.height
-                val dotSizePx = (rng.next() * (if (isPreview) 1.0 else 1.4) + 0.4).toFloat()
-                val phase = rng.next()
-                var hue = ((baseHue + tiltHue * 0.35f + phase * 0.15).toFloat()) % 1f
-                if (hue < 0f) hue += 1f
-                val isBright = i % 8 == 0
-                val radius = (dotSizePx / 2f).coerceAtLeast(0.4f)
-                if (isBright) {
-                    val staticShimmer = abs(sin(clock * 2.0 + phase * 10.0)) * 0.3
-                    val finalBrightness = (0.7 + staticShimmer + effectiveMotion * 0.3).toFloat().coerceIn(0f, 1f)
-                    drawCircle(
-                        Color.hsv(hue * 360f, 0.8f, finalBrightness, 0.95f),
-                        radius = radius,
-                        center = Offset(x, y),
-                    )
-                    if (dotSizePx > 1.2f && (glintAlpha > 0.1f || isPreview)) {
-                        val gAlpha = if (isPreview) 0.3f else glintAlpha
-                        val rayLen = (dotSizePx * (2.5 + effectiveMotion * 4.0)).toFloat()
-                        val opacity = (gAlpha * (0.5 + rng.next() * 0.5)).toFloat().coerceIn(0f, 1f)
-                        for (arm in 0 until 4) {
-                            val armAngle = arm * Math.PI / 2.0 + (clock * 0.4) + phase
-                            drawLine(
-                                Color.White.copy(alpha = opacity),
-                                Offset(x, y),
-                                Offset(
-                                    (x + cos(armAngle) * rayLen).toFloat(),
-                                    (y + sin(armAngle) * rayLen).toFloat(),
-                                ),
-                                strokeWidth = 0.4f,
-                            )
-                        }
-                    }
+            Canvas(Modifier.fillMaxSize()) {
+                val t = timeState.floatValue
+                val count = if (isPreview) 1000 else 5000
+                val rng = SeededRandom(77)
+                val tiltHue = roll / Math.PI.toFloat() * 0.4f + pitch / (Math.PI.toFloat() / 2f) * 0.2f
+                val motionIntensity = ((rotationRate - 0.1f) / 1.5f).coerceIn(0f, 1f)
+                val effectiveMotion = if (rotationVector == null || isPreview) {
+                    (0.35f + 0.25f * abs(sin(t.toDouble() * 1.2)).toFloat()).coerceIn(0f, 1f)
                 } else {
-                    drawCircle(
-                        Color.hsv(hue * 360f, 0.4f, 0.9f, 0.8f),
-                        radius = radius,
-                        center = Offset(x, y),
-                    )
+                    maxOf(motionIntensity, 0.2f + 0.15f * abs(sin(t.toDouble() * 1.5)).toFloat())
+                }
+                val glintAlpha = effectiveMotion * 0.95f
+                repeat(count) { i ->
+                    val x = rng.next().toFloat() * size.width
+                    val y = rng.next().toFloat() * size.height
+                    val dotSizePx = (rng.next() * (if (isPreview) 1.0 else 1.4) + 0.4).toFloat()
+                    val phase = rng.next()
+                    var hue = ((baseHue + tiltHue * 0.35f + phase * 0.15).toFloat()) % 1f
+                    if (hue < 0f) hue += 1f
+                    val isBright = i % 8 == 0
+                    val radius = (dotSizePx / 2f).coerceAtLeast(0.4f)
+                    if (isBright) {
+                        val staticShimmer = abs(sin(t * 2.0 + phase * 10.0)) * 0.3
+                        val finalBrightness = (0.7 + staticShimmer + effectiveMotion * 0.3).toFloat()
+                            .coerceIn(0f, 1f)
+                        drawCircle(
+                            Color.hsv(hue * 360f, 0.8f, finalBrightness, 0.95f),
+                            radius = radius,
+                            center = Offset(x, y),
+                        )
+                        if (dotSizePx > 1.2f && (glintAlpha > 0.1f || isPreview)) {
+                            val gAlpha = if (isPreview) 0.3f else glintAlpha
+                            val rayLen = (dotSizePx * (2.5 + effectiveMotion * 4.0)).toFloat()
+                            val opacity = (gAlpha * (0.5 + rng.next() * 0.5)).toFloat().coerceIn(0f, 1f)
+                            for (arm in 0 until 4) {
+                                val armAngle = arm * Math.PI / 2.0 + (t * 0.4) + phase
+                                drawLine(
+                                    Color.White.copy(alpha = opacity),
+                                    Offset(x, y),
+                                    Offset(
+                                        (x + cos(armAngle) * rayLen).toFloat(),
+                                        (y + sin(armAngle) * rayLen).toFloat(),
+                                    ),
+                                    strokeWidth = 0.4f,
+                                )
+                            }
+                        }
+                    } else {
+                        drawCircle(
+                            Color.hsv(hue * 360f, 0.4f, 0.9f, 0.8f),
+                            radius = radius,
+                            center = Offset(x, y),
+                        )
+                    }
                 }
             }
         }
     }
 }
-

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Recursos referenciados solo vía Resources.getIdentifier (R8 shrinkResources). -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/splash_logo_light,@drawable/splash_logo_dark,@drawable/ic_launcher_foreground,@string/chat_*" />

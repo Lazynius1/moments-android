@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -640,7 +641,10 @@ fun VoiceRecordingDraftPreview(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (isPreparing || draft?.recording == null) {
-                CircularProgressIndicator(Modifier.size(12.dp), color = colors.primary, strokeWidth = 1.5.dp)
+                MomentsCircularProgressIndicator(
+                    modifier = Modifier.size(12.dp),
+                    strokeWidth = 1.5.dp,
+                )
             } else {
                 Icon(
                     if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,

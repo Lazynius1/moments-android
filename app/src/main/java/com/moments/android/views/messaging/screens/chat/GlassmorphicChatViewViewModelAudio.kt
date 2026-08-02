@@ -64,6 +64,14 @@ class MomentsChatViewModel(
 
     override fun sendTextMessage(text: String, replyTo: String?) {
         if (text.isBlank()) return
+        // ≡ iOS MomentsChatViewModel: draft → ensureConversationExists, luego reintentar
+        // (el contador de sesión solo sube cuando ya hay conversationId).
+        if (conversationId.isBlank()) {
+            ensureConversationExists { id ->
+                if (!id.isNullOrBlank()) sendTextMessage(text, replyTo)
+            }
+            return
+        }
         messagesSentThisSession += 1
         super.sendTextMessage(text, replyTo)
     }

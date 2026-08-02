@@ -34,6 +34,7 @@ import com.moments.android.views.messaging.components.PendingRequestMessageRow
 import com.moments.android.views.messaging.components.ChatConversationIntroRow
 import com.moments.android.views.messaging.components.ChatHistoryStartHeader
 import com.moments.android.views.messaging.components.ChatRequestDisclaimerRow
+import com.moments.android.views.messaging.components.chatMenuDimmedWhenOpen
 import com.moments.android.views.messaging.core.EnhancedChatViewModel
 import com.moments.android.views.messaging.core.ChatRenderRow
 import com.moments.android.views.messaging.core.MessageItem
@@ -41,8 +42,9 @@ import com.moments.android.views.messaging.core.PendingChatTimelineMessage
 import androidx.compose.runtime.collectAsState
 
 /** Port de `GlassmorphicChatView+MessageList.swift`.
- * El routing fino de scroll/búsqueda se recibe por callbacks y se completa en sus extensiones
- * Swift homónimas, sin esconder la política de filas de esta fuente.
+ *
+ * Filas + notice de historial + search highlight CompositionLocal + vanish.
+ * Δ intencional: `reconfigureVisible` UIKit no aplica — Compose recomposición.
  */
 data class ChatMessageListCallbacks(
     val loadOlderHistory: () -> Unit = {},
@@ -165,6 +167,8 @@ fun GlassmorphicChatMessageList(
     searchHighlightTerm: String = "",
     /** ≡ iOS `.environment(\.chatSearchActiveMessageId, …)`. */
     searchActiveMessageId: String? = null,
+    /** Fila elevada al abrir menú / highlight (≡ iOS zIndex 100). */
+    elevatedRowId: String? = null,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(transaction.rows.map { it.id }) { callbacks.onRowsChanged() }
@@ -194,6 +198,7 @@ fun GlassmorphicChatMessageList(
                 isVanishGestureEnabled = isVanishGestureEnabled,
                 isVanishModeActive = vanishModeActive,
                 composerBottomInset = listBottomInset,
+                elevatedRowId = elevatedRowId,
                 onVanishPullReleased = callbacks.onVanishPullReleased,
                 // La lista comparte el Box con el composer: debe reservar su altura
                 // real para que el último mensaje quede inmediatamente por encima,
@@ -208,11 +213,24 @@ fun GlassmorphicChatMessageList(
                     bottom = listBottomInset,
                 ),
                 rowContent = { listRow ->
+                    val menuOpen = elevatedRowId != null
                     when (val row = listRow.payload as? ChatRenderRow) {
-                        is ChatRenderRow.ConversationIntro -> ChatConversationIntroRow(row.context, fallbackName, fallbackUserId, adaptiveColors)
-                        is ChatRenderRow.RequestDisclaimer -> ChatRequestDisclaimerRow(requestDisclaimerRes(row.context), adaptiveColors, Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
-                        is ChatRenderRow.PendingRequestMessage -> PendingRequestMessageRow(row.message, adaptiveColors, Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
-                        is ChatRenderRow.HistoryStart -> ChatHistoryStartHeader(adaptiveColors)
+                        is ChatRenderRow.ConversationIntro -> ChatConversationIntroRow(
+                            row.context, fallbackName, fallbackUserId, adaptiveColors,
+                            Modifier.chatMenuDimmedWhenOpen(menuOpen),
+                        )
+                        is ChatRenderRow.RequestDisclaimer -> ChatRequestDisclaimerRow(
+                            requestDisclaimerRes(row.context), adaptiveColors,
+                            Modifier.chatMenuDimmedWhenOpen(menuOpen).padding(horizontal = 14.dp, vertical = 8.dp),
+                        )
+                        is ChatRenderRow.PendingRequestMessage -> PendingRequestMessageRow(
+                            row.message, adaptiveColors,
+                            Modifier.chatMenuDimmedWhenOpen(menuOpen).padding(horizontal = 14.dp, vertical = 8.dp),
+                        )
+                        is ChatRenderRow.HistoryStart -> ChatHistoryStartHeader(
+                            adaptiveColors,
+                            Modifier.chatMenuDimmedWhenOpen(menuOpen),
+                        )
                         is ChatRenderRow.Message -> callbacks.renderMessage(row.item)
                         is ChatRenderRow.Header -> callbacks.renderHeader(row)
                         is ChatRenderRow.Buzz -> callbacks.renderBuzz(row)

@@ -3,7 +3,7 @@ package com.moments.android.views.story
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -140,8 +140,9 @@ fun StorySegmentedRing(
     }
 
     Canvas(
+        // requiredSize: permitir overflow del stroke (≡ iOS overlay fuera del frame 96 del avatar)
         modifier
-            .size(outerSize)
+            .requiredSize(outerSize)
             .padding(ringPadding),
     ) {
         val stroke = Stroke(width = lineWidth.toPx(), cap = StrokeCap.Round)

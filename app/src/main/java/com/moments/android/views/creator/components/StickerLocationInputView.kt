@@ -74,13 +74,11 @@ import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
+import com.moments.android.views.feed.maps.MomentsPlacesSearch
 import com.moments.android.views.permission.shared.LocationPermissionGate
 import com.moments.android.views.permission.shared.LocationPermissionGateHost
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -220,15 +218,26 @@ fun SmartLocationInputView(
             isSearching = true
             val origin = userLatLng
             searchResults = withContext(Dispatchers.IO) {
-                geocodeSearch(
-                    context = context,
-                    query = query,
-                    originLat = origin?.first,
-                    originLng = origin?.second,
-                    // ≡ 5km search region
-                    halfSpanDegrees = 0.045,
-                    maxResults = 15,
-                ).sortedWith(searchRelevanceComparator())
+                val lat = origin?.first
+                val lng = origin?.second
+                if (lat != null && lng != null && MomentsPlacesSearch.isConfigured()) {
+                    MomentsPlacesSearch.searchByText(context, query, lat, lng, maxResults = 15)
+                        .map { hit ->
+                            StickerLocationResult(
+                                id = hit.id,
+                                displayName = hit.name,
+                                fullName = hit.address?.let { "${hit.name}, $it" } ?: hit.name,
+                                address = hit.address.orEmpty(),
+                                distanceMeters = hit.distanceMeters,
+                                category = hit.category,
+                                latitude = hit.latitude,
+                                longitude = hit.longitude,
+                            )
+                        }
+                        .sortedWith(searchRelevanceComparator())
+                } else {
+                    emptyList()
+                }
             }
             isSearching = false
         }
@@ -588,77 +597,29 @@ private fun lastKnownLocation(context: Context): Location? {
     }.maxByOrNull { it.time }
 }
 
-/** ≡ `searchNearbyPlaces` — 10 queries, `prefix(4)`, ≤2 por categoría, ≤12 total. */
-private suspend fun loadNearbyPlaces(context: Context, lat: Double, lng: Double): List<StickerLocationResult> =
-    coroutineScope {
-        val queries = listOf(
-            R.string.sticker_location_query_restaurants to "restaurant",
-            R.string.sticker_location_query_cafes to "food",
-            R.string.sticker_location_query_shops to "store",
-            R.string.sticker_location_query_parks to "park",
-            R.string.sticker_location_query_museums to "museum",
-            R.string.sticker_location_query_hotels to "hotel",
-            R.string.sticker_location_query_pharmacies to "pharmacy",
-            R.string.sticker_location_query_banks to "bank",
-            R.string.sticker_location_query_metro to "metro",
-            R.string.sticker_location_query_libraries to "library",
-        ).take(4)
-
-        val batches = queries.map { (resId, category) ->
-            async(Dispatchers.IO) {
-                geocodeSearch(
-                    context = context,
-                    query = context.getString(resId),
-                    originLat = lat,
-                    originLng = lng,
-                    halfSpanDegrees = 0.015, // ≡ 1.5km
-                    maxResults = 4,
-                    forcedCategory = category,
-                ).take(2)
-            }
-        }.awaitAll().flatten()
-
-        val current = reverseGeocodePlace(context, lat, lng)
-        val seen = linkedSetOf<String>()
-        val unique = mutableListOf<StickerLocationResult>()
-        (listOfNotNull(current) + batches).forEach { place ->
-            val key = "%.5f,%.5f".format(place.latitude, place.longitude)
-            if (seen.add(key)) unique += place
-        }
-        unique.sortedBy { it.distanceMeters ?: Double.MAX_VALUE }.take(12)
+/** ≡ `searchNearbyPlaces` — Places SearchNearby (≡ MapKit POI). Geocoder ya no. */
+private suspend fun loadNearbyPlaces(context: Context, lat: Double, lng: Double): List<StickerLocationResult> {
+    val hits = MomentsPlacesSearch.searchNearby(context, lat, lng, maxResults = 20)
+    val current = reverseGeocodePlace(context, lat, lng)
+    val fromPlaces = hits.map { hit ->
+        StickerLocationResult(
+            id = hit.id,
+            displayName = hit.name,
+            fullName = hit.address?.let { "${hit.name}, $it" } ?: hit.name,
+            address = hit.address.orEmpty(),
+            distanceMeters = hit.distanceMeters,
+            category = hit.category,
+            latitude = hit.latitude,
+            longitude = hit.longitude,
+        )
     }
-
-@Suppress("DEPRECATION")
-private fun geocodeSearch(
-    context: Context,
-    query: String,
-    originLat: Double?,
-    originLng: Double?,
-    halfSpanDegrees: Double = 0.045,
-    maxResults: Int = 12,
-    forcedCategory: String? = null,
-): List<StickerLocationResult> {
-    if (!Geocoder.isPresent()) return emptyList()
-    val geocoder = Geocoder(context, Locale.getDefault())
-    val addresses = runCatching {
-        if (originLat != null && originLng != null) {
-            val d = halfSpanDegrees
-            geocoder.getFromLocationName(
-                query,
-                maxResults,
-                originLat - d,
-                originLng - d,
-                originLat + d,
-                originLng + d,
-            ) ?: geocoder.getFromLocationName(query, maxResults)
-        } else {
-            geocoder.getFromLocationName(query, maxResults)
-        }
-    }.getOrNull().orEmpty()
-
-    return addresses.mapNotNull { addr ->
-        addressToResult(addr, originLat, originLng, forcedCategory)
-    }.distinctBy { "%.5f,%.5f".format(it.latitude, it.longitude) }
+    val seen = linkedSetOf<String>()
+    val unique = mutableListOf<StickerLocationResult>()
+    (listOfNotNull(current) + fromPlaces).forEach { place ->
+        val key = "%.5f,%.5f".format(place.latitude, place.longitude)
+        if (seen.add(key)) unique += place
+    }
+    return unique.sortedBy { it.distanceMeters ?: Double.MAX_VALUE }.take(12)
 }
 
 @Suppress("DEPRECATION")

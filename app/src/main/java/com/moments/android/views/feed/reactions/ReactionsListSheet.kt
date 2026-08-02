@@ -160,20 +160,22 @@ fun ReactionsListSheet(
         onDispose { FollowStateStore.removeListener(listener) }
     }
 
-    MomentsModalSheet(onDismissRequest = onDismiss) {
+    // Search field arriba — medium OK; si hubiera footer abajo → largeOnly.
+    MomentsModalSheet(onDismissRequest = onDismiss, largeOnly = false) {
         Column(Modifier.fillMaxSize()) {
             Column(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .padding(top = 20.dp, bottom = 24.dp),
+                    .padding(top = 0.dp, bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
                     text = stringResource(R.string.reactions_title),
                     color = if (isDark) Color.White else Color.Black,
-                    fontSize = with(density) { legacyPoppinsSize(context, 22).toSp() },
-                    fontWeight = FontWeight.Bold,
+                    fontSize = with(density) { legacyPoppinsSize(context, 16).toSp() },
+                    fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text = stringResource(
@@ -182,7 +184,7 @@ fun ReactionsListSheet(
                         filteredReactionGroups.size,
                     ),
                     color = if (isDark) Color.White.copy(0.7f) else Color.Black.copy(0.7f),
-                    fontSize = with(density) { legacyPoppinsSize(context, 13).toSp() },
+                    fontSize = with(density) { legacyPoppinsSize(context, 12).toSp() },
                 )
             }
 

@@ -13,6 +13,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moments.android.BuildConfig
 import com.moments.android.R
+import com.moments.android.views.shared.Ink
+import com.moments.android.views.shared.Surface
 
 /** Port de `Views/Nova/NovaCore/NovaTheme.swift` — colores + brand icon + LogConfig. */
 object NovaColors {
@@ -20,8 +22,9 @@ object NovaColors {
     val secondary = Color(0xFF6B73FF)
     val accent = Color(0xFF9B59B6)
 
+    /** Canvas ≡ [Ink] / [Surface] (mismos tokens que MomentsTheme / AdaptiveColors). */
     val background: Color
-        @Composable get() = if (isSystemInDarkTheme()) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+        @Composable get() = if (isSystemInDarkTheme()) Ink else Surface
 
     val secondaryBackground: Color
         @Composable get() = if (isSystemInDarkTheme()) {

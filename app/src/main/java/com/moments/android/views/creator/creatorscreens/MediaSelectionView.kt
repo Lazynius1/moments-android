@@ -39,7 +39,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.moments.android.R
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.views.creator.CreatorAlbumInfo
 import com.moments.android.views.creator.CreatorAspectRatio
@@ -97,7 +98,7 @@ fun MediaSelectionView(
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
     val canvas = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
-    val contentColor = if (isDark) Color.White else Color.Black
+    val contentColor = MomentsChromeGlass.contentColor(isDark)
     val scope = rememberCoroutineScope()
     val photosGate = remember { PermissionPrimerGate(PermissionPrimerGate.Kind.PHOTOS) }
 
@@ -429,7 +430,7 @@ fun MediaSelectionView(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    CircularProgressIndicator(color = Color(0xFF007AFF))
+                    MomentsCircularProgressIndicator()
                     Spacer(Modifier.height(16.dp))
                     Text(stringResource(R.string.creator_gallery_loading), color = Color.Gray, fontSize = 16.sp)
                 }

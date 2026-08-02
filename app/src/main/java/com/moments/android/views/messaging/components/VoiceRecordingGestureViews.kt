@@ -77,7 +77,11 @@ import java.util.UUID
  * Chrome de grabación ≡ Telegram Android (`RecordCircle` + `BlobDrawable` + gestos
  * de `ChatActivityEnterView`), con accent Moments y **sin glass**.
  *
- * Gestos (SDK):
+ * Paridad de plataforma (no clonar métricas iOS):
+ * - iOS Moments ↔ Telegram iOS
+ * - Android Moments ↔ Telegram Android
+ *
+ * Gestos (SDK Android):
  * - Cancel: slide izquierda; distancia `min(width*0.35, 140dp)`; suelta si alpha &lt; 0.45
  * - Lock: slide arriba ≥ `dp(57)`
  *

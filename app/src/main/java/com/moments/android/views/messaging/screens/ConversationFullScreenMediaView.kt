@@ -1,5 +1,6 @@
 package com.moments.android.views.messaging.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,15 +10,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -69,6 +73,7 @@ import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.messaging.components.ChatEphemeralTimeFormatting
 import com.moments.android.views.messaging.components.ChatQuickReactionsBar
 import com.moments.android.views.messaging.components.NormalVideoPlayerView
 import com.moments.android.views.messaging.core.MessageType
@@ -76,6 +81,7 @@ import com.moments.android.views.shared.MomentsVideoGravity
 import com.moments.android.views.shared.MomentsVideoPlaybackTimeline
 import com.moments.android.views.shared.MomentsVideoPlayer
 import com.moments.android.views.shared.ScreenshotProtectedView
+import com.moments.android.views.story.StoryRingAvatarView
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -131,6 +137,15 @@ fun ConversationFullScreenMediaView(
     val secondaryOverlay = primaryOverlay.copy(alpha = 0.58f)
     val canSend = replyText.trim().isNotEmpty() && !isSendingReply
 
+    // Sin esto, el back del sistema hace pop del overlay Messaging → Feed.
+    BackHandler {
+        if (expandedVideoUrl != null) {
+            expandedVideoUrl = null
+        } else {
+            onClose()
+        }
+    }
+
     fun isScreenshotProtected(item: SharedMedia): Boolean =
         item.sourceMessage?.isVanishModeMessage == true ||
             item.sourceMessage?.type == MessageType.EPHEMERAL ||
@@ -173,10 +188,12 @@ fun ConversationFullScreenMediaView(
         }
     }
 
-    Box(
+    // ≡ iOS: ZStack(background + media) + safeAreaInset top/bottom → media entre header y reply
+    Column(
         modifier
             .fillMaxSize()
             .background(colors.chatBackground.first())
+            .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars))
             .offset { IntOffset(0, dragOffset.roundToInt()) }
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
@@ -190,76 +207,44 @@ fun ConversationFullScreenMediaView(
                 )
             },
     ) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            userScrollEnabled = paged.size > 1 && showingReactionBarForMessageId == null && expandedVideoUrl == null,
-        ) { page ->
-            val item = paged[page]
-            val active = page == pagerState.currentPage
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp)
-                    .clickable(
-                        enabled = onReaction != null,
-                        onClick = {},
-                        onClickLabel = null,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                val body: @Composable () -> Unit = {
-                    when (item.type) {
-                        SharedMedia.Type.IMAGE -> AsyncImage(
-                            item.originalUrl,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(18.dp)),
-                            contentScale = ContentScale.Fit,
-                        )
-                        SharedMedia.Type.VIDEO -> ConversationFullScreenVideoPage(
-                            videoUrl = item.originalUrl,
-                            isActive = active,
-                            primaryOverlay = primaryOverlay,
-                            onExpand = {
-                                HapticManager.shared.lightImpact()
-                                expandedVideoUrl = item.originalUrl
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(18.dp)),
-                        )
-                    }
-                }
-                if (isScreenshotProtected(item)) {
-                    ScreenshotProtectedView(isProtected = true, fillsContainer = true) { body() }
-                } else {
-                    body()
-                }
-            }
-        }
-
-        // Header ≡ headerView
+        // Header ≡ headerView / avatarView (StoryRingAvatarView)
         Row(
             Modifier
-                .align(Alignment.TopStart)
                 .fillMaxWidth()
-                .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onClose) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = primaryOverlay)
             }
-            Box(
-                Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .momentsChromeGlass(CircleShape, interactive = false),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Default.Person, null, tint = primaryOverlay, modifier = Modifier.size(18.dp))
+            if (current.senderId.isNotEmpty()) {
+                StoryRingAvatarView(
+                    userId = current.senderId,
+                    size = 40.dp,
+                    lineWidth = 2.dp,
+                    showBaseStroke = true,
+                    baseStrokeColor = if (colors.isDark) {
+                        Color.White.copy(alpha = 0.16f)
+                    } else {
+                        Color.Black.copy(alpha = 0.12f)
+                    },
+                    baseStrokeWidth = 1.dp,
+                )
+            } else {
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(primaryOverlay.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.Person,
+                        contentDescription = null,
+                        tint = primaryOverlay.copy(alpha = 0.62f),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
             Column(Modifier.padding(start = 8.dp).weight(1f)) {
                 Text(
@@ -274,7 +259,10 @@ fun ConversationFullScreenMediaView(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Timer, null, tint = ephemeralAccent, modifier = Modifier.size(12.dp))
                         Text(
-                            stringResource(R.string.stories_expires_in, formatEphemeralShort(ephemeralRemaining)),
+                            stringResource(
+                                R.string.stories_expires_in,
+                                ChatEphemeralTimeFormatting.shortLabel(ephemeralRemaining),
+                            ),
                             color = ephemeralAccent,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
@@ -304,12 +292,83 @@ fun ConversationFullScreenMediaView(
             }
         }
 
+        // Media entre header y reply (≡ safeAreaInset iOS)
+        Box(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                userScrollEnabled = paged.size > 1 && showingReactionBarForMessageId == null && expandedVideoUrl == null,
+            ) { page ->
+                val item = paged[page]
+                val active = page == pagerState.currentPage
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val body: @Composable () -> Unit = {
+                        when (item.type) {
+                            SharedMedia.Type.IMAGE -> AsyncImage(
+                                item.originalUrl,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(18.dp)),
+                                contentScale = ContentScale.Fit,
+                            )
+                            SharedMedia.Type.VIDEO -> ConversationFullScreenVideoPage(
+                                videoUrl = item.originalUrl,
+                                isActive = active,
+                                primaryOverlay = primaryOverlay,
+                                onExpand = {
+                                    HapticManager.shared.lightImpact()
+                                    expandedVideoUrl = item.originalUrl
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(18.dp)),
+                            )
+                        }
+                    }
+                    if (isScreenshotProtected(item)) {
+                        ScreenshotProtectedView(isProtected = true, fillsContainer = true) { body() }
+                    } else {
+                        body()
+                    }
+                }
+            }
+
+            if (showingReactionBarForMessageId == current.id && onReaction != null) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.001f))
+                        .clickable { showingReactionBarForMessageId = null },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ChatQuickReactionsBar(
+                        onReaction = { emoji ->
+                            onReaction(current.id, emoji)
+                            showingReactionBarForMessageId = null
+                        },
+                        onMore = {
+                            onMoreReactions?.invoke(current.id)
+                            showingReactionBarForMessageId = null
+                        },
+                    )
+                }
+            }
+        }
+
         // Reply composer ≡ replyComposer
         Row(
             Modifier
-                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .navigationBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .clip(RoundedCornerShape(22.dp))
                 .momentsChromeGlass(RoundedCornerShape(22.dp), interactive = true)
@@ -349,27 +408,6 @@ fun ConversationFullScreenMediaView(
                         tint = if (canSend) primaryOverlay else primaryOverlay.copy(alpha = 0.32f),
                     )
                 }
-            }
-        }
-
-        if (showingReactionBarForMessageId == current.id && onReaction != null) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.001f))
-                    .clickable { showingReactionBarForMessageId = null },
-                contentAlignment = Alignment.Center,
-            ) {
-                ChatQuickReactionsBar(
-                    onReaction = { emoji ->
-                        onReaction(current.id, emoji)
-                        showingReactionBarForMessageId = null
-                    },
-                    onMore = {
-                        onMoreReactions?.invoke(current.id)
-                        showingReactionBarForMessageId = null
-                    },
-                )
             }
         }
     }
@@ -512,17 +550,6 @@ private fun ConversationFullScreenVideoPage(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 16.dp),
         )
-    }
-}
-
-private fun formatEphemeralShort(seconds: Long): String {
-    val s = seconds.coerceAtLeast(0L)
-    val h = s / 3600
-    val m = (s % 3600) / 60
-    val sec = s % 60
-    return when {
-        h > 0 -> "%d:%02d:%02d".format(h, m, sec)
-        else -> "%d:%02d".format(m, sec)
     }
 }
 

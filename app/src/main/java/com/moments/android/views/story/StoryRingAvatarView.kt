@@ -4,6 +4,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -19,9 +20,9 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -127,7 +128,9 @@ fun StoryRingAvatarView(
     }
 
     val interaction = remember { MutableInteractionSource() }
-    var frameModifier = modifier.size(outerSize)
+    // requiredSize: el frame iOS (outerFrameSize) es mayor que columnWidth 96 del perfil;
+    // con size() Compose lo comprime y el gap-mask (elipse > canvas) borra el aro entero.
+    var frameModifier = modifier.requiredSize(outerSize)
     if (onTap != null) {
         frameModifier = frameModifier
             .momentsPressIcon()
@@ -169,23 +172,29 @@ fun StoryRingAvatarView(
     }
 }
 
-/** ≡ iOS `StoryRingLayout.ringGapMask` / `StoryRingGapCutoutMask` (even-odd cutout). */
+/**
+ * ≡ iOS `StoryRingLayout.ringGapMask` / `StoryRingGapCutoutMask`.
+ * Even-odd: rect − elipse → el aro no pinta el hueco transparente alrededor del avatar.
+ */
 private fun Modifier.storyRingGapMask(avatarSize: Dp): Modifier =
     drawWithCache {
         val innerDiameter = (avatarSize + StoryRingLayout.ringGap * 2).toPx()
+        val bounds = size
         val path = Path().apply {
+            fillType = PathFillType.EvenOdd
+            addRect(Rect(Offset.Zero, bounds))
             addOval(
                 Rect(
                     offset = Offset(
-                        (size.width - innerDiameter) / 2f,
-                        (size.height - innerDiameter) / 2f,
+                        (bounds.width - innerDiameter) / 2f,
+                        (bounds.height - innerDiameter) / 2f,
                     ),
                     size = Size(innerDiameter, innerDiameter),
                 ),
             )
         }
         onDrawWithContent {
-            clipPath(path, ClipOp.Difference) {
+            clipPath(path) {
                 this@onDrawWithContent.drawContent()
             }
         }

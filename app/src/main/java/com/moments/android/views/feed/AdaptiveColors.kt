@@ -1,15 +1,23 @@
 package com.moments.android.views.feed
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.moments.android.views.shared.ControlDark
+import com.moments.android.views.shared.ControlLight
+import com.moments.android.views.shared.Ink
+import com.moments.android.views.shared.MomentsBrandColors
+import com.moments.android.views.shared.Surface
 
 /**
- * Port 1:1 de `AdaptiveColors` (MomentRailComponents.swift).
- * No inventar valores: dark surface = 0B1215, light = FAF9F6;
- * background de escena = black/white; accent = 007AFF.
+ * Port de `AdaptiveColors` (MomentRailComponents.swift) + tokens Android de control.
+ *
+ * Canvas = [Ink]/[Surface]. Controles = [controlSurface] (elevados; no alpha sobre canvas).
+ * Textos: [primary] / [secondary] / [tertiary] / [placeholder] — evitar `Color.Gray` suelto.
+ * Accent feed = `007AFF` (iOS), no [MaterialTheme.colorScheme.primary] (púrpura marca).
  */
 data class AdaptiveColors(
     val isDark: Boolean,
@@ -20,16 +28,31 @@ data class AdaptiveColors(
 
     /** iOS: dark 0B1215 / light FAF9F6 — fondo del feed (`modernBackgroundView`). */
     val surfaceBackground: Color
-        get() = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+        get() = if (isDark) Ink else Surface
+
+    /**
+     * Fill de inputs / botones chrome / pills.
+     * Opaco y distinto del canvas (en Android la transparencia iOS se ve mal).
+     */
+    val controlSurface: Color
+        get() = if (isDark) ControlDark else ControlLight
+
+    /** Borde sutil sobre [controlSurface]. */
+    val controlStroke: Color
+        get() = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f)
 
     val primary: Color
         get() = if (isDark) Color.White else Color.Black
 
     val secondary: Color
-        get() = if (isDark) Color.White.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.7f)
+        get() = if (isDark) Color.White.copy(alpha = 0.78f) else Color.Black.copy(alpha = 0.68f)
 
     val tertiary: Color
-        get() = if (isDark) Color.Gray.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.8f)
+        get() = if (isDark) Color.White.copy(alpha = 0.48f) else Color.Black.copy(alpha = 0.42f)
+
+    /** Hint / placeholder de campos. */
+    val placeholder: Color
+        get() = if (isDark) Color.White.copy(alpha = 0.40f) else Color.Black.copy(alpha = 0.38f)
 
     /** Royal Blue (Premium) */
     val accent: Color
@@ -59,12 +82,11 @@ data class AdaptiveColors(
             listOf(Color(0xFF007AFF), Color.Black.copy(alpha = 0.7f))
         }
 
-    /** iOS: ChatAdaptiveColors.chatBackground — 3x 0B1215 (dark) / 3x FAF9F6 (light). */
+    /** iOS: ChatAdaptiveColors.chatBackground — 3× canvas ([Ink] / [Surface]). */
     val chatBackground: List<Color>
-        get() = if (isDark) {
-            listOf(Color(0xFF0B1215), Color(0xFF0B1215), Color(0xFF0B1215))
-        } else {
-            listOf(Color(0xFFFAF9F6), Color(0xFFFAF9F6), Color(0xFFFAF9F6))
+        get() {
+            val canvas = surfaceBackground
+            return listOf(canvas, canvas, canvas)
         }
 
     val shadowColor: Color
@@ -83,14 +105,16 @@ data class AdaptiveColors(
 @Composable
 fun rememberAdaptiveColors(): AdaptiveColors {
     val isDark = isSystemInDarkTheme()
-    return remember(isDark) { AdaptiveColors(isDark) }
+    // Ancla a colorScheme.background para drift-check vs MomentsTheme (mismo Ink/Surface).
+    val themeBackground = MaterialTheme.colorScheme.background
+    return remember(isDark, themeBackground) { AdaptiveColors(isDark) }
 }
 
-// Aliases legacy del feed (mismos hex que surface/ink iOS).
-internal val FeedCanvas = Color(0xFFFAF9F6) // light surfaceBackground
-internal val FeedInk = Color(0xFF0B1215) // dark surfaceBackground
+// Aliases legacy del feed (mismos tokens que [Ink]/[Surface]).
+internal val FeedCanvas = Surface
+internal val FeedInk = Ink
 internal val FeedTeal = Color(0xFF00A896)
-internal val FeedPurple = Color(0xFFAF52DE)
+internal val FeedPurple = MomentsBrandColors.purple
 
-internal val StoryRingColors = listOf(Color(0xFF007AFF), Color(0xFFAF52DE), Color(0xFFFF2D55))
+internal val StoryRingColors = MomentsBrandColors.storyRing
 internal val StoryRingViewed = listOf(Color(0xFFC2C2C2), Color(0xFFF0F0F0))

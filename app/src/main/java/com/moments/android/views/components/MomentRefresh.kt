@@ -16,6 +16,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -27,6 +28,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.performance.MotionPolicy
@@ -45,6 +47,8 @@ object MomentRefreshState {
     val pull = _pull.asStateFlow()
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing = _isRefreshing.asStateFlow()
+
+    @Volatile
     var action: (suspend () -> Unit)? = null
 
     val isActive: Boolean get() = _pull.value > 2f || _isRefreshing.value
@@ -56,13 +60,20 @@ object MomentRefreshState {
         if (_pull.value >= threshold) startRefresh()
     }
 
+    fun cancelPullIfIdle() {
+        if (_isRefreshing.value) return
+        if (_pull.value > 0f && _pull.value < threshold) {
+            _pull.value = 0f
+        }
+    }
+
     private fun startRefresh() {
         val currentAction = action ?: return
         if (_isRefreshing.value) return
         _isRefreshing.value = true
         _pull.value = threshold
         scope.launch {
-            currentAction()
+            runCatching { currentAction() }
             _isRefreshing.value = false
             _pull.value = 0f
         }
@@ -70,31 +81,49 @@ object MomentRefreshState {
 }
 
 /**
- * Port de `.momentRefresh { }` — detecta overscroll y alimenta el estado compartido.
- * En Android el fallback visual es `PullToRefreshBox`; la gota global usa `MomentRefreshOverlayHost`.
+ * Port de `.momentRefresh { }` — detecta overscroll al tope y alimenta el estado compartido.
+ * La gota visual va con [MomentRefreshOverlayHost].
  */
 fun Modifier.momentRefresh(action: suspend () -> Unit): Modifier = composed {
-    DisposableEffect(action) {
-        MomentRefreshState.action = action
+    val latestAction by rememberUpdatedState(action)
+    DisposableEffect(Unit) {
+        MomentRefreshState.action = { latestAction() }
         onDispose {
-            if (MomentRefreshState.action === action) {
-                MomentRefreshState.action = null
-            }
+            MomentRefreshState.action = null
+            MomentRefreshState.cancelPullIfIdle()
         }
     }
     val connection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (source == NestedScrollSource.UserInput) {
-                    if (available.y > 0f) {
-                        MomentRefreshState.updatePull(MomentRefreshState.pull.value + available.y)
-                    } else if (available.y < 0f) {
-                        MomentRefreshState.updatePull(
-                            (MomentRefreshState.pull.value + available.y).coerceAtLeast(0f),
-                        )
-                    }
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
+                val pull = MomentRefreshState.pull.value
+                // Ya tirando: absorber el gesto hacia arriba para “soltar” la gota.
+                if (pull > 0f && available.y < 0f) {
+                    val consumed = available.y.coerceAtLeast(-pull)
+                    MomentRefreshState.updatePull(pull + consumed)
+                    return Offset(0f, consumed)
                 }
                 return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
+                // Solo overscroll no consumido por LazyColumn/ScrollView (tope).
+                if (available.y > 0f) {
+                    MomentRefreshState.updatePull(MomentRefreshState.pull.value + available.y)
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                MomentRefreshState.cancelPullIfIdle()
+                return Velocity.Zero
             }
         }
     }

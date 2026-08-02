@@ -52,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -2287,22 +2288,23 @@ fun StickerDitherPattern(
     color: Color,
     modifier: Modifier = Modifier,
 ) {
-    var time by remember { mutableFloatStateOf(0f) }
+    val timeState = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         while (isActive) {
-            time = System.currentTimeMillis() / 1000f
-            delay(33)
+            withFrameNanos { nanos ->
+                timeState.floatValue = nanos / 1_000_000_000f
+            }
         }
     }
-    val clock = time
     Canvas(modifier = modifier.graphicsLayer { alpha = 0.85f }) {
+        val clock = timeState.floatValue
         val dotSize = 2.5f
         val spacing = 6f
         var row = 0
         var y = 0f
         while (y < size.height) {
             var x = 0f
-            val offset = if (row % 2 == 0) 0f else spacing / 2f
+            val offset = if (row % 2 == 0) spacing / 2f else 0f
             while (x < size.width) {
                 val waveX = sin(clock * 2f + y * 0.05f) * 2f
                 val waveY = cos(clock * 2f + x * 0.05f) * 2f

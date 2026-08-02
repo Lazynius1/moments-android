@@ -1977,6 +1977,22 @@ open class EnhancedChatViewModel(
     val outgoingVanishMessageFlag: Boolean? get() = _vanishModeActive.value.takeIf { it }
     val marksOutgoingAsVanish: Boolean get() = _vanishModeActive.value
 
+    /**
+     * ≡ sync local tras `ConversationSettingsView.updateVanishSettings` /
+     * notificación `conversationVanishModeDidChange` (antes de que el snapshot
+     * de prefs reafirme el mismo valor).
+     */
+    fun applyVanishSettingsFromSettings(active: Boolean, timer: VanishMessageTimer) {
+        val wasActive = _vanishModeActive.value
+        _vanishModeActive.value = active
+        _vanishMessageTimer.value = timer
+        conversation.vanishModeActive = active
+        conversation.vanishMessageTimer = if (active) timer.raw else null
+        if (wasActive && !active) {
+            purgeVanishMessagesLocally()
+        }
+    }
+
     fun toggleVanishMode(completion: ((Throwable?) -> Unit)? = null) {
         if (conversationId.isBlank()) { completion?.invoke(IllegalStateException()); return }
         val target = !_vanishModeActive.value

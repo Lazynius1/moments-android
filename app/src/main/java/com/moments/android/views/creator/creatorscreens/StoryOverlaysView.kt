@@ -4,16 +4,21 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroidSize
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -38,6 +43,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
@@ -50,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.creator.components.StoryEditorChromeColor
 import com.moments.android.views.creator.components.StoryTextOverlayDraft
 import kotlinx.coroutines.delay
 import kotlin.math.hypot
@@ -114,7 +122,7 @@ fun StoryOverlayToastHost(
     }
 }
 
-/** Radio y posición de la zona de borrado: 20 px de margen + mitad del icono de 48 px. */
+/** Radio y posición de la zona de borrado: 20 px de margen + tamaño del icono de 48 px. */
 fun isPointOverStoryOverlayTrash(
     x: Float,
     y: Float,
@@ -125,6 +133,8 @@ fun isPointOverStoryOverlayTrash(
 /**
  * ≡ papelera de `StoryOverlaysView` — solo visible al arrastrar;
  * scale 1.28 + spring cuando `isOverTrash` (MotionPolicy.Spring.press).
+ *
+ * Sin hit-target a pantalla completa: solo el icono recibe touches.
  */
 @Composable
 fun StoryOverlayTrashZone(
@@ -176,6 +186,8 @@ fun StoryRevealStatusBadge(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // ≡ iOS: texto/icono heredan label; no forzar blanco (invisible sobre glass claro).
+    val chrome = StoryEditorChromeColor.icon(isSystemInDarkTheme())
     Row(
         modifier
             .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
@@ -186,12 +198,12 @@ fun StoryRevealStatusBadge(
         Icon(
             Icons.Filled.VisibilityOff,
             contentDescription = null,
-            tint = Color.White,
+            tint = chrome,
             modifier = Modifier.size(14.dp),
         )
         Text(
             stringResource(R.string.story_editor_reveal_active),
-            color = Color.White,
+            color = chrome,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(start = 6.dp),
@@ -199,7 +211,7 @@ fun StoryRevealStatusBadge(
         Icon(
             Icons.Filled.Close,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.6f),
+            tint = chrome.copy(alpha = 0.6f),
             modifier = Modifier
                 .padding(start = 8.dp)
                 .size(16.dp)
@@ -247,8 +259,43 @@ fun StoryPolaroidCaptionField(
 }
 
 /**
- * ≡ capa de dibujo en `StoryOverlaysView`: arrastre, pellizco y papelera
- * solo cuando no hay text overlays (misma regla Swift).
+ * Gestos Android (docs Compose + multitouch SO):
+ * - 1 dedo → `positionChange()` (drag 1:1)
+ * - 2+ dedos → `calculatePan` + `calculateZoom`
+ * Un solo `pointerInput` (sin `detectTapGestures` hermano que robe el stream).
+ */
+private data class OverlayTransformDelta(
+    val pan: Offset,
+    val zoom: Float,
+    val pointerCount: Int,
+)
+
+private fun androidx.compose.ui.input.pointer.PointerEvent.overlayTransformDelta(): OverlayTransformDelta {
+    val pressed = changes.filter { it.pressed }
+    return when {
+        pressed.size >= 2 -> OverlayTransformDelta(
+            pan = calculatePan(),
+            zoom = calculateZoom(),
+            pointerCount = pressed.size,
+        )
+        pressed.size == 1 -> {
+            val change = pressed.first()
+            OverlayTransformDelta(
+                pan = change.positionChange(),
+                zoom = 1f,
+                pointerCount = 1,
+            )
+        }
+        else -> OverlayTransformDelta(Offset.Zero, 1f, 0)
+    }
+}
+
+/**
+ * ≡ capa de dibujo en `StoryOverlaysView`.
+ *
+ * Visual (`Image` + graphicsLayer) separado del hit-target a pantalla completa:
+ * si el gesture va en el mismo nodo que el scale/translation, el área tocable
+ * se encoge y el media de debajo se come el gesto.
  */
 @Composable
 fun StoryDrawingCanvasOverlay(
@@ -266,98 +313,118 @@ fun StoryDrawingCanvasOverlay(
     onBackgroundTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var pinchStartScale by remember { mutableStateOf<Float?>(null) }
-    var dragOrigin by remember { mutableStateOf<Offset?>(null) }
-    var accumulatedDrag by remember { mutableStateOf(Offset.Zero) }
     var isOverTrash by remember { mutableStateOf(false) }
     val latestOffsetX by rememberUpdatedState(offsetX)
     val latestOffsetY by rememberUpdatedState(offsetY)
     val latestScale by rememberUpdatedState(scale)
+    val latestOnOffset by rememberUpdatedState(onOffsetChange)
+    val latestOnScale by rememberUpdatedState(onScaleChange)
+    val latestOnClear by rememberUpdatedState(onClear)
+    val latestOnDragState by rememberUpdatedState(onDragStateChange)
+    val latestOnTap by rememberUpdatedState(onBackgroundTap)
 
-    Image(
-        bitmap = bitmap.asImageBitmap(),
-        contentDescription = null,
-        contentScale = ContentScale.FillBounds,
-        modifier = modifier
-            .fillMaxSize()
-            .graphicsLayer {
-                translationX = offsetX
-                translationY = offsetY
-                scaleX = scale
-                scaleY = scale
-            }
-            .pointerInput(hasTextOverlays, canvasWidthPx, canvasHeightPx) {
-                if (hasTextOverlays) {
-                    detectTapGestures(onTap = { onBackgroundTap() })
-                    return@pointerInput
-                }
-                detectDragGestures(
-                    onDragStart = {
-                        dragOrigin = Offset(latestOffsetX, latestOffsetY)
-                        accumulatedDrag = Offset.Zero
+    Box(
+        modifier
+            .fillMaxSize(),
+    ) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    translationX = offsetX
+                    translationY = offsetY
+                    scaleX = scale
+                    scaleY = scale
+                },
+        )
+        // Hit-target siempre full-canvas (no hereda el graphicsLayer del dibujo).
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(canvasWidthPx, canvasHeightPx) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        var liveX = latestOffsetX
+                        var liveY = latestOffsetY
+                        var liveScale = latestScale
+                        var moved = false
+                        var dragged = false
+                        var cumulativePan = Offset.Zero
+                        var cumulativeZoom = 1f
+                        var gesturePastTouchSlop = false
+                        val gestureStartScale = latestScale
                         isOverTrash = false
-                        onDragStateChange(StoryOverlayDragState(isDragging = true))
-                    },
-                    onDrag = { change, drag ->
-                        change.consume()
-                        val origin = dragOrigin ?: Offset(latestOffsetX, latestOffsetY)
-                        accumulatedDrag += Offset(drag.x, drag.y)
-                        val liveX = origin.x + accumulatedDrag.x
-                        val liveY = origin.y + accumulatedDrag.y
-                        onOffsetChange(liveX, liveY)
-                        val fingerX = canvasWidthPx / 2f + liveX
-                        val fingerY = canvasHeightPx / 2f + liveY
-                        val over = isPointOverStoryOverlayTrash(
-                            fingerX,
-                            fingerY,
-                            canvasWidthPx,
-                            canvasHeightPx,
-                        )
-                        if (!isOverTrash && over) HapticManager.shared.mediumImpact()
-                        isOverTrash = over
-                        onDragStateChange(StoryOverlayDragState(isDragging = true, isOverTrash = over))
-                    },
-                    onDragEnd = {
-                        if (isOverTrash) {
-                            onClear()
-                            onOffsetChange(0f, 0f)
-                            onScaleChange(1f)
+                        latestOnDragState(StoryOverlayDragState())
+                        try {
+                            do {
+                                val event = awaitPointerEvent()
+                                if (!event.changes.any { it.pressed }) break
+
+                                val delta = event.overlayTransformDelta()
+                                cumulativePan += delta.pan
+                                cumulativeZoom *= delta.zoom
+                                val wasPastTouchSlop = gesturePastTouchSlop
+                                if (!gesturePastTouchSlop) {
+                                    val centroidSize = event.calculateCentroidSize(useCurrent = false)
+                                    val zoomMotion = kotlin.math.abs(1f - cumulativeZoom) * centroidSize
+                                    gesturePastTouchSlop =
+                                        cumulativePan.getDistance() > viewConfiguration.touchSlop ||
+                                        zoomMotion > viewConfiguration.touchSlop
+                                }
+                                if (!gesturePastTouchSlop) continue
+                                val effectivePan = if (!wasPastTouchSlop) cumulativePan else delta.pan
+                                moved = true
+                                dragged = dragged ||
+                                    cumulativePan.getDistance() > viewConfiguration.touchSlop
+
+                                liveX += effectivePan.x
+                                liveY += effectivePan.y
+                                if (delta.pointerCount >= 2) {
+                                    liveScale = (gestureStartScale * cumulativeZoom).coerceIn(0.3f, 4f)
+                                }
+                                latestOnOffset(liveX, liveY)
+                                latestOnScale(liveScale)
+
+                                val interactionPoint = event.changes.firstOrNull { it.pressed }?.position
+                                    ?: Offset(canvasWidthPx / 2f + liveX, canvasHeightPx / 2f + liveY)
+                                val over = dragged && isPointOverStoryOverlayTrash(
+                                    interactionPoint.x,
+                                    interactionPoint.y,
+                                    canvasWidthPx,
+                                    canvasHeightPx,
+                                )
+                                if (!isOverTrash && over) HapticManager.shared.mediumImpact()
+                                isOverTrash = over
+                                latestOnDragState(
+                                    StoryOverlayDragState(isDragging = dragged, isOverTrash = over),
+                                )
+                                event.changes.forEach { change ->
+                                    if (change.positionChanged()) change.consume()
+                                }
+                            } while (true)
+                        } finally {
+                            if (dragged && isOverTrash) {
+                                latestOnClear()
+                                latestOnOffset(0f, 0f)
+                                latestOnScale(1f)
+                            } else if (!moved) {
+                                latestOnTap()
+                            }
+                            isOverTrash = false
+                            latestOnDragState(StoryOverlayDragState())
                         }
-                        dragOrigin = null
-                        accumulatedDrag = Offset.Zero
-                        isOverTrash = false
-                        onDragStateChange(StoryOverlayDragState())
-                    },
-                    onDragCancel = {
-                        dragOrigin = null
-                        accumulatedDrag = Offset.Zero
-                        isOverTrash = false
-                        onDragStateChange(StoryOverlayDragState())
-                    },
-                )
-            }
-            .pointerInput(hasTextOverlays) {
-                if (hasTextOverlays) return@pointerInput
-                detectTransformGestures { _, _, zoom, _ ->
-                    if (zoom == 1f) return@detectTransformGestures
-                    if (pinchStartScale == null) pinchStartScale = latestScale
-                    val base = pinchStartScale ?: latestScale
-                    onScaleChange((base * zoom).coerceIn(0.3f, 4f))
-                }
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { onBackgroundTap() })
-            },
-    )
-    LaunchedEffect(scale) {
-        delay(120)
-        pinchStartScale = null
+                    }
+                },
+        )
     }
 }
 
 /**
- * Primer bloque de `StoryOverlaysView.swift`: un texto queda centrado en sus coordenadas
- * normalizadas, no puede salir del lienzo, se arrastra a la papelera y se escala entre 16–72.
+ * Texto en canvas: drag 1 dedo + pinch 2 dedos (patrón Compose multitouch).
+ * Hit mínimo 48dp para que el pellizco sea usable.
  */
 @Composable
 fun StoryTextOverlayItem(
@@ -375,17 +442,23 @@ fun StoryTextOverlayItem(
     var contentWidthPx by remember(overlay.id) { mutableStateOf(0) }
     var contentHeightPx by remember(overlay.id) { mutableStateOf(0) }
     var isOverTrash by remember(overlay.id) { mutableStateOf(false) }
-    // Punto propuesto sin clamp: permite alcanzar la papelera aunque el label quede limitado al lienzo.
-    var rawDragCenter by remember(overlay.id) { mutableStateOf<Offset?>(null) }
+    val latestOverlay by rememberUpdatedState(overlay)
+    val latestContentW by rememberUpdatedState(contentWidthPx)
+    val latestContentH by rememberUpdatedState(contentHeightPx)
+    val latestOnUpdate by rememberUpdatedState(onUpdate)
+    val latestOnEdit by rememberUpdatedState(onEdit)
+    val latestOnDelete by rememberUpdatedState(onDelete)
+    val latestOnDragState by rememberUpdatedState(onDragStateChange)
 
     fun boundedDraft(
-        x: Float = overlay.normalizedX.toFloat() * canvasWidthPx,
-        y: Float = overlay.normalizedY.toFloat() * canvasHeightPx,
-        fontSize: Float = overlay.fontSize.toFloat(),
+        x: Float,
+        y: Float,
+        fontSize: Float,
+        base: StoryTextOverlayDraft,
     ): StoryTextOverlayDraft {
-        val halfWidth = minOf(contentWidthPx / 2f, canvasWidthPx / 2f)
-        val halfHeight = minOf(contentHeightPx / 2f, canvasHeightPx / 2f)
-        return overlay.copy(
+        val halfWidth = minOf(latestContentW / 2f, canvasWidthPx / 2f).coerceAtLeast(1f)
+        val halfHeight = minOf(latestContentH / 2f, canvasHeightPx / 2f).coerceAtLeast(1f)
+        return base.copy(
             normalizedX = (x.coerceIn(halfWidth, canvasWidthPx - halfWidth) / canvasWidthPx).toDouble(),
             normalizedY = (y.coerceIn(halfHeight, canvasHeightPx - halfHeight) / canvasHeightPx).toDouble(),
             fontSize = fontSize.coerceIn(16f, 72f).toDouble(),
@@ -406,50 +479,87 @@ fun StoryTextOverlayItem(
                 contentWidthPx = it.width
                 contentHeightPx = it.height
             }
+            .wrapContentSize(unbounded = false)
+            .defaultMinSize(minWidth = 56.dp, minHeight = 56.dp)
             .then(
-                if (isEditorPresented) Modifier else Modifier
-                    .pointerInput(overlay.id, canvasWidthPx, canvasHeightPx) {
-                        detectDragGestures(
-                            onDragStart = {
+                if (isEditorPresented) {
+                    Modifier
+                } else {
+                    Modifier.pointerInput(overlay.id, canvasWidthPx, canvasHeightPx) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            val start = latestOverlay
+                            var liveX = start.normalizedX.toFloat() * canvasWidthPx
+                            var liveY = start.normalizedY.toFloat() * canvasHeightPx
+                            var liveFont = start.fontSize.toFloat().coerceIn(16f, 72f)
+                            isOverTrash = false
+                            var moved = false
+                            var dragged = false
+                            var cumulativePan = Offset.Zero
+                            var cumulativeZoom = 1f
+                            var gesturePastTouchSlop = false
+                            val gestureStartFont = liveFont
+                            latestOnDragState(StoryOverlayDragState())
+                            try {
+                                do {
+                                    val event = awaitPointerEvent()
+                                    if (!event.changes.any { it.pressed }) break
+
+                                    val delta = event.overlayTransformDelta()
+                                    cumulativePan += delta.pan
+                                    cumulativeZoom *= delta.zoom
+                                    val wasPastTouchSlop = gesturePastTouchSlop
+                                    if (!gesturePastTouchSlop) {
+                                        val centroidSize = event.calculateCentroidSize(useCurrent = false)
+                                        val zoomMotion = kotlin.math.abs(1f - cumulativeZoom) * centroidSize
+                                        gesturePastTouchSlop =
+                                            cumulativePan.getDistance() > viewConfiguration.touchSlop ||
+                                            zoomMotion > viewConfiguration.touchSlop
+                                    }
+                                    if (!gesturePastTouchSlop) continue
+                                    val effectivePan = if (!wasPastTouchSlop) cumulativePan else delta.pan
+                                    moved = true
+                                    dragged = dragged ||
+                                        cumulativePan.getDistance() > viewConfiguration.touchSlop
+
+                                    liveX += effectivePan.x
+                                    liveY += effectivePan.y
+                                    if (delta.pointerCount >= 2) {
+                                        liveFont = (gestureStartFont * cumulativeZoom).coerceIn(16f, 72f)
+                                    }
+
+                                    val updated = boundedDraft(liveX, liveY, liveFont, start)
+                                    isOverTrash = dragged && isPointOverStoryOverlayTrash(
+                                        liveX,
+                                        liveY,
+                                        canvasWidthPx,
+                                        canvasHeightPx,
+                                    )
+                                    latestOnUpdate(updated)
+                                    latestOnDragState(
+                                        StoryOverlayDragState(
+                                            isDragging = dragged,
+                                            isOverTrash = isOverTrash,
+                                        ),
+                                    )
+                                    event.changes.forEach { change ->
+                                        if (change.positionChanged()) change.consume()
+                                    }
+                                } while (true)
+                            } finally {
+                                if (dragged && isOverTrash) {
+                                    latestOnDelete()
+                                } else if (!moved) {
+                                    latestOnEdit()
+                                }
                                 isOverTrash = false
-                                rawDragCenter = Offset(centerX, centerY)
-                                onDragStateChange(StoryOverlayDragState(isDragging = true))
-                            },
-                            onDrag = { change, drag ->
-                                change.consume()
-                                val base = rawDragCenter ?: Offset(centerX, centerY)
-                                val proposed = Offset(base.x + drag.x, base.y + drag.y)
-                                rawDragCenter = proposed
-                                val updated = boundedDraft(x = proposed.x, y = proposed.y)
-                                isOverTrash = isPointOverStoryOverlayTrash(
-                                    proposed.x,
-                                    proposed.y,
-                                    canvasWidthPx,
-                                    canvasHeightPx,
-                                )
-                                onUpdate(updated)
-                                onDragStateChange(StoryOverlayDragState(isDragging = true, isOverTrash = isOverTrash))
-                            },
-                            onDragEnd = {
-                                if (isOverTrash) onDelete()
-                                rawDragCenter = null
-                                isOverTrash = false
-                                onDragStateChange(StoryOverlayDragState())
-                            },
-                            onDragCancel = {
-                                rawDragCenter = null
-                                isOverTrash = false
-                                onDragStateChange(StoryOverlayDragState())
-                            },
-                        )
-                    }
-                    .pointerInput(overlay.id, overlay.fontSize) {
-                        detectTransformGestures { _, _, zoom, _ ->
-                            if (zoom != 1f) onUpdate(boundedDraft(fontSize = overlay.fontSize.toFloat() * zoom))
+                                latestOnDragState(StoryOverlayDragState())
+                            }
                         }
                     }
-                    .pointerInput(overlay.id) { detectTapGestures(onTap = { onEdit() }) },
+                },
             ),
+        contentAlignment = Alignment.Center,
     ) {
         content()
     }

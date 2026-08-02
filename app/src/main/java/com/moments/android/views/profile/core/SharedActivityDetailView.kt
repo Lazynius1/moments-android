@@ -28,7 +28,7 @@ import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -562,7 +562,7 @@ fun SharedActivityDetailView(
                         enabled = selected.isNotEmpty() && !deleting,
                     ) {
                         if (deleting) {
-                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                            MomentsCircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         } else {
                             Icon(Icons.Filled.Delete, contentDescription = null)
                             Spacer(Modifier.width(6.dp))
@@ -1001,7 +1001,7 @@ private fun SharedActivityLoading(primary: Color) {
             .heightIn(min = 420.dp),
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator(color = primary)
+        MomentsCircularProgressIndicator()
     }
 }
 
@@ -1272,8 +1272,8 @@ private fun SharedCommentsColumn(
         }
         if (hasMore) {
             if (isLoading) {
-                CircularProgressIndicator(
-                    Modifier
+                MomentsCircularProgressIndicator(
+                    modifier = Modifier
                         .size(22.dp)
                         .padding(4.dp)
                         .align(Alignment.CenterHorizontally),

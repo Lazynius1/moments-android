@@ -31,6 +31,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -326,27 +329,29 @@ fun EpicReactionButton(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = if (hasReacted) (currentReaction?.filledIcon ?: "❤️") else "♡",
-                    style = TextStyle(
-                        fontSize = emojiSizeSp.sp,
-                        fontWeight = FontWeight.Black,
-                        brush = if (hasReacted) {
-                            val c = currentReaction?.color ?: Color.Red
-                            Brush.linearGradient(listOf(c, c.copy(0.7f)))
-                        } else {
-                            Brush.linearGradient(
-                                listOf(
-                                    if (isDark) Color.White else ink,
-                                    if (isDark) Color.White.copy(0.8f) else ink.copy(0.8f),
-                                ),
-                            )
-                        },
-                    ),
-                    modifier = Modifier
-                        .scale(pulseScale)
-                        .rotate(rotationAngle),
-                )
+                if (hasReacted) {
+                    val reactionColor = currentReaction?.color ?: Color.Red
+                    Text(
+                        text = currentReaction?.filledIcon ?: "❤️",
+                        style = TextStyle(
+                            fontSize = emojiSizeSp.sp,
+                            fontWeight = FontWeight.Black,
+                            brush = Brush.linearGradient(
+                                listOf(reactionColor, reactionColor.copy(0.7f)),
+                            ),
+                        ),
+                        modifier = Modifier
+                            .scale(pulseScale)
+                            .rotate(rotationAngle),
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.FavoriteBorder,
+                        contentDescription = null,
+                        tint = if (isDark) Color.White else ink,
+                        modifier = Modifier.size(emojiSizeSp.dp),
+                    )
+                }
 
                 if (showParticles) {
                     repeat(6) { index ->

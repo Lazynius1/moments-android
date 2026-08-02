@@ -176,6 +176,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.coordinators.CoordinatorNavigationEvent
 import com.moments.android.coordinators.NavigationEventBus
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.CachedSticker
 import com.moments.android.models.CachedStickerInteractionData
@@ -186,6 +187,7 @@ import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.searchUsers
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.creator.components.StoryEditorChromeColor
 import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.views.creator.BackgroundStoryUploadService
 import com.moments.android.views.creator.CreatorAspectRatio
@@ -266,8 +268,8 @@ fun StoryEditingView(
     val scope = rememberCoroutineScope()
     val isDark = isSystemInDarkTheme()
     val canvas = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
-    val controlFg = if (isDark) Color.White else Color.Black.copy(0.82f)
-    val controlStroke = if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.08f)
+    val controlFg = StoryEditorChromeColor.icon(isDark)
+    val controlStroke = MomentsChromeGlass.strokeColor(isDark)
     val shareBg = if (isDark) Color(0xFFFAF9F6) else Color(0xFF0B1215)
     val shareFg = if (isDark) Color.Black.copy(0.9f) else Color.White
 
@@ -1540,7 +1542,10 @@ fun StoryEditingView(
                                 isInteractionEnabled = activeEditorMode == ActiveEditorMode.IDLE &&
                                     activeEditingStickerId == null &&
                                     editingPolaroidId == null &&
-                                    editingRevealId == null,
+                                    editingRevealId == null &&
+                                    drawingImage == null &&
+                                    textOverlays.none { it.isReady } &&
+                                    stickers.isEmpty(),
                                 modifier = Modifier.fillMaxSize(),
                             )
                         } else {
@@ -1574,7 +1579,10 @@ fun StoryEditingView(
                                     isInteractionEnabled = activeEditorMode == ActiveEditorMode.IDLE &&
                                         activeEditingStickerId == null &&
                                         editingPolaroidId == null &&
-                                        editingRevealId == null,
+                                        editingRevealId == null &&
+                                        drawingImage == null &&
+                                        textOverlays.none { it.isReady } &&
+                                        stickers.isEmpty(),
                                     modifier = Modifier.fillMaxSize(),
                                 ) { _ ->
                                     StoryVideoPlayerView(
@@ -1860,12 +1868,8 @@ fun StoryEditingView(
                                 overlayDragState = state
                             },
                         ) {
-                            StoryCanvasTextLabel(
-                                overlay = overlay,
-                                modifier = Modifier
-                                    .background(Color.Black.copy(0.25f), RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                            )
+                            // Sin plate inventado: el fill lo decide `backgroundFillRaw` (none/solid/…).
+                            StoryCanvasTextLabel(overlay = overlay)
                         }
                     }
 
@@ -2186,8 +2190,9 @@ fun StoryEditingView(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 8.dp),
+                    // Reveal: casi edge-to-edge y más abajo (sin doble padding 16+16).
+                    .padding(horizontal = if (editingRevealId != null) 0.dp else 16.dp)
+                    .padding(bottom = if (editingRevealId != null) 4.dp else 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
             if (activeEditorMode == ActiveEditorMode.FILTERS && media != null && !media.isVideo) {
@@ -2244,10 +2249,7 @@ fun StoryEditingView(
                     onStickersChange = { stickers = it },
                     editingId = editingRevealId,
                     onEditingIdChange = { editingRevealId = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = 8.dp),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             } else if (isChatSendMode && activeEditorMode == ActiveEditorMode.IDLE && activeEditingStickerId == null && editingPolaroidId == null) {
                 // ≡ iOS chatSendBottomBar

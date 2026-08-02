@@ -542,7 +542,6 @@
     <string name="creator_advanced_settings">Réglages avancés</string>
     <string name="creator_advanced_settings_title">Réglages avancés</string>
     <string name="creator_album_default">Album</string>
-    <string name="creator_album_elements">%1$d élément</string>
     <string name="creator_album_elements_plural">%1$d éléments</string>
     <string name="creator_album_recents">Récents</string>
     <string name="creator_album_smart_favorites">Favoris</string>
@@ -2419,4 +2418,11 @@
     <string name="widget_stories_singular">1 nouvelle story</string>
     <string name="widget_visits_plural">%1$d personnes ont visité votre profil aujourd’hui</string>
     <string name="widget_visits_singular">1 personne a visité votre profil aujourd’hui</string>
+    <string name="widget_home_description">Accédez vite à vos stories, visites et messages.</string>
+    <string name="widget_brand_name">Moments</string>
+    <string name="widget_all_caught_up">Tout est à jour</string>
+    <string name="widget_echoes_singular">1 ami à proximité</string>
+    <string name="widget_echoes_plural">%1$d amis à proximité</string>
+    <string name="widget_tags_singular">1 nouveau tag</string>
+    <string name="widget_tags_plural">%1$d nouveaux tags</string>
 </resources>

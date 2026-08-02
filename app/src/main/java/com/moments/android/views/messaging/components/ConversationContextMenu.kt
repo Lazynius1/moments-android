@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -230,8 +231,11 @@ private fun ConversationContextMenuActions(
         action(conversation)
     }
 
+    // ≡ iOS `.frame(minWidth: 230).fixedSize(horizontal: true, vertical: true)`
+    // Sin IntrinsicSize.Max, fillMaxWidth de las filas estira el panel a todo el ancho del Box.
     Column(
         modifier
+            .width(IntrinsicSize.Max)
             .widthIn(min = 230.dp)
             .clip(shape)
             .momentsChromeGlass(shape, interactive = true),

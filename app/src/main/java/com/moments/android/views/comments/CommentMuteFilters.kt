@@ -12,8 +12,18 @@ internal data class CommentFilterResult(
 )
 
 internal fun normalizeMutedText(text: String): String {
+    // ≡ iOS `.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive])`
     val trimmed = text.trim()
-    val decomposed = Normalizer.normalize(trimmed, Normalizer.Form.NFD)
+    val halfWidth = buildString(trimmed.length) {
+        for (c in trimmed) {
+            when {
+                c == '\u3000' -> append(' ') // ideographic space
+                c in '\uFF01'..'\uFF5E' -> append((c.code - 0xFEE0).toChar())
+                else -> append(c)
+            }
+        }
+    }
+    val decomposed = Normalizer.normalize(halfWidth, Normalizer.Form.NFD)
     return decomposed.replace("\\p{Mn}+".toRegex(), "").lowercase()
 }
 

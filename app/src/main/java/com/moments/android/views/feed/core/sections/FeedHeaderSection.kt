@@ -209,7 +209,8 @@ fun FeedHeaderBar(
 
         Row(
             Modifier.padding(end = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            // Cada acción ya reserva 36 dp; 6 dp deja los centros a 42 dp, como los glifos iOS.
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box {

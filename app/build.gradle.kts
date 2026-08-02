@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.google.services)
 }
 
@@ -22,8 +23,6 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"REPLACE_WHEN_YOU_HAVE_GOOGLE_KEY\"")
-        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = "REPLACE_WHEN_YOU_HAVE_GOOGLE_KEY"
         // Snap Camera Kit ≡ iOS Info.plist SCCameraKit* + SnapCameraKit.plist (vacío = no configurado).
         buildConfigField("String", "SC_CAMERA_KIT_API_TOKEN", "\"\"")
         buildConfigField("String", "SC_CAMERA_KIT_CLIENT_ID", "\"\"")
@@ -34,6 +33,14 @@ android {
             val f = rootProject.file("local.properties")
             if (f.exists()) f.inputStream().use { load(it) }
         }
+
+        // Google Places / Maps — GOOGLE_MAPS_API_KEY=AIza… (Places API New + Geocoding).
+        val googleMapsKey = localProps.getProperty("GOOGLE_MAPS_API_KEY")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() && !it.startsWith("REPLACE_") && it != "YOUR_GOOGLE_MAPS_API_KEY" }
+            ?: "REPLACE_WHEN_YOU_HAVE_GOOGLE_KEY"
+        buildConfigField("String", "GOOGLE_MAPS_API_KEY", "\"${googleMapsKey.replace("\"", "\\\"")}\"")
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = googleMapsKey
 
         // Mapbox public token — MAPBOX_ACCESS_TOKEN=pk.…
         val mapboxToken = localProps.getProperty("MAPBOX_ACCESS_TOKEN")
@@ -57,7 +64,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // Firma debug para instalar release local (Play Store usará keystore propio).
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -80,6 +90,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
+    // Navigation 3 (migración incremental — skill navigation-3)
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)

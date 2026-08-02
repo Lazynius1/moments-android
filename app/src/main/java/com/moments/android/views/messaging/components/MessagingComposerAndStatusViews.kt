@@ -61,7 +61,7 @@ import com.moments.android.views.shared.MomentsModalSheet
 
 // Retícula ≡ ANDROID_SETTINGS_UI_STYLE (cajas y filas).
 private val SheetContentHorizontalPadding = 20.dp
-private val SheetHeaderTopExtra = 8.dp
+private val SheetHeaderTopExtra = 0.dp
 private val RowHorizontalPadding = 16.dp
 private val RowMinHeight = 64.dp
 private val IconSlotWidth = 28.dp

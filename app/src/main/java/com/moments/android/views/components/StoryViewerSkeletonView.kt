@@ -14,17 +14,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
-/** Port de `StoryViewerSkeletonView.swift`. */
+/** Port de `StoryViewerSkeletonView.swift` — canvas oscuro de stories; onSurface claro. */
 @Composable
 fun StoryViewerSkeletonView(segmentCount: Int = 3, modifier: Modifier = Modifier) {
-    val surface = Color.White.copy(.16f)
+    val surface = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f)
     Column(modifier.fillMaxSize().shimmer(true).semantics { hideFromAccessibility() }) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(segmentCount.coerceAtLeast(1)) {

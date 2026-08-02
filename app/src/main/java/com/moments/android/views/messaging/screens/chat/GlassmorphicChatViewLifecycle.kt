@@ -27,8 +27,8 @@ import kotlinx.coroutines.launch
 
 /** Port de `GlassmorphicChatView+Lifecycle.swift`.
  *
- * Los envíos de view-once y el replay store viven todavía en sus fuentes Swift propias;
- * sus contratos están aquí para que el ciclo de la pantalla no pierda estados al portarlos.
+ * View-once (mark viewed / replay store) y cámara se cablean desde el host vía
+ * [ChatCameraCaptureOperations] / [ChatViewOnceSessionOperations].
  */
 enum class ChatCameraCapturedMediaType { IMAGE, VIDEO }
 
@@ -145,10 +145,13 @@ class GlassmorphicChatLifecycleController(
         mode: com.moments.android.views.messaging.media.ChatMediaSendMode,
         overlayPayload: Any? = null,
     ) {
-        if (isOtherParticipantUnavailable || viewModel.conversation.id.isNullOrBlank()) {
+        // ≡ iOS: unavailable → cierra cámara; sin conversationId → return sin cerrar
+        if (isOtherParticipantUnavailable) {
             shouldShowCamera = false
             return
         }
+        if (viewModel.conversation.id.isNullOrBlank()) return
+
         val replyTo = pendingCameraReplyToMessageId
         pendingCameraReplyToMessageId = null
         when (mode) {
@@ -252,6 +255,18 @@ class GlassmorphicChatLifecycleController(
             liveOtherParticipantUsername = ""
             isOtherParticipantBlockedByCurrentUser = false
         }
+        disableUnavailableParticipantStories()
+    }
+
+    /** ≡ iOS `disableUnavailableParticipantStories()`. */
+    fun disableUnavailableParticipantStories() {
+        storyRing = StoryRingSnapshot(
+            hasStory = false,
+            hasUnseenStory = false,
+            storyCount = 0,
+            storyViewedStatus = emptyList(),
+            storyAudiences = emptyList(),
+        )
         onStoriesDisabled()
     }
 
@@ -264,22 +279,28 @@ class GlassmorphicChatLifecycleController(
                 isOtherParticipantBlockedByCurrentUser = false
                 isOtherParticipantUnavailable = false
                 refreshOtherParticipantUsername()
+                // ≡ iOS checkUserStories()
+                checkUserStories()
                 onStoriesRefresh()
             }
         }
     }
 
     fun shouldShowAvatar(message: EnhancedMessage, messages: List<EnhancedMessage> = viewModel.messages.value): Boolean {
-        val index = messages.indexOfFirst { it.id == message.id }
-        if (index < 0 || index == messages.lastIndex) return true
-        return messages[index + 1].senderId != message.senderId
+        // ≡ iOS: usa messageIndexById + viewModel.messages (ignora el param `in` como fuente)
+        val source = viewModel.messages.value
+        val index = viewModel.messageIndexById[message.id] ?: return true
+        if (index >= source.size) return true
+        if (index == source.lastIndex) return true
+        return source[index + 1].senderId != message.senderId
     }
 
     fun messageGroupPosition(message: EnhancedMessage, messages: List<EnhancedMessage> = viewModel.messages.value): ChatMessageGroupPosition {
-        val index = messages.indexOfFirst { it.id == message.id }
-        if (index < 0) return ChatMessageGroupPosition.SINGLE
-        val previousSameSender = index > 0 && messages[index - 1].senderId == message.senderId
-        val nextSameSender = index < messages.lastIndex && messages[index + 1].senderId == message.senderId
+        val source = viewModel.messages.value
+        val index = viewModel.messageIndexById[message.id] ?: return ChatMessageGroupPosition.SINGLE
+        if (index >= source.size) return ChatMessageGroupPosition.SINGLE
+        val previousSameSender = index > 0 && source[index - 1].senderId == message.senderId
+        val nextSameSender = index < source.lastIndex && source[index + 1].senderId == message.senderId
         return when {
             !previousSameSender && !nextSameSender -> ChatMessageGroupPosition.SINGLE
             !previousSameSender -> ChatMessageGroupPosition.FIRST

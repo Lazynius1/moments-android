@@ -29,7 +29,7 @@ import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,8 +60,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.coordinators.AppRouter
@@ -95,6 +93,9 @@ import com.moments.android.views.profile.core.sections.MomentZoomDetailDestinati
 import com.moments.android.views.profile.core.sections.MomentZoomOpener
 import com.moments.android.views.profile.core.sections.MomentZoomPresentationKind
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomNavigation
+import com.moments.android.views.shared.MomentsContainerTransformOverlay
+import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.MomentsSharedTransitionLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -130,6 +131,12 @@ fun NotificationsScreen(
     var moderationReviewNotification by remember { mutableStateOf<MomentsNotification?>(null) }
     var zoomDestination by remember { mutableStateOf<MomentZoomDestination?>(null) }
     var zoomResolvedMoment by remember { mutableStateOf<Moment?>(null) }
+
+    // System back: primero cierra zoom de moment; luego la pantalla (Dialog).
+    androidx.activity.compose.BackHandler(enabled = zoomDestination != null) {
+        zoomDestination = null
+        zoomResolvedMoment = null
+    }
 
     // ≡ applyPendingNotificationsFilterIfNeeded + refresh + clearNotificationsAutomatically
     LaunchedEffect(Unit) {
@@ -226,6 +233,7 @@ fun NotificationsScreen(
         NotificationService.markAsRead(first)
     }
 
+    MomentsSharedTransitionLayout(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = canvas,
         topBar = {
@@ -254,7 +262,11 @@ fun NotificationsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .background(canvas)
-                .momentRefresh { viewModel.refreshNotifications() },
+                .momentRefresh {
+                    // ≡ iOS await refreshNotifications(); delay para que la gota sea visible
+                    viewModel.refreshNotifications()
+                    kotlinx.coroutines.delay(700)
+                },
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 NotificationTabBar(
@@ -281,6 +293,7 @@ fun NotificationsScreen(
                         groupedByDate = groupedByDate,
                         viewModel = viewModel,
                         isDark = isDark,
+                        canvas = canvas,
                         canLoadMore = canLoadMore,
                         isLoadingMore = isLoadingMore,
                         onShowGroupedFollowers = { overlayGroup = it },
@@ -328,26 +341,23 @@ fun NotificationsScreen(
     }
 
     moderationReviewNotification?.let { notification ->
-        Dialog(
+        // ≡ iOS `.sheet` + `.presentationDetents([.large])`
+        MomentsModalSheet(
             onDismissRequest = { moderationReviewNotification = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
+            largeOnly = true,
         ) {
             ModerationReviewRequestSheet(
                 notification = notification,
                 onDismiss = { moderationReviewNotification = null },
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
 
-    zoomDestination?.let { destination ->
-        val pool = listOfNotNull(zoomResolvedMoment)
-        Dialog(
-            onDismissRequest = {
-                zoomDestination = null
-                zoomResolvedMoment = null
-            },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
+    MomentsContainerTransformOverlay(visible = zoomDestination != null) {
+        val destination = zoomDestination
+        if (destination != null) {
+            val pool = listOfNotNull(zoomResolvedMoment)
             MomentZoomDetailDestination(
                 destination = destination,
                 moments = MomentZoomOpener.resolvedMoments(destination, pool),
@@ -358,6 +368,7 @@ fun NotificationsScreen(
             )
         }
     }
+    } // MomentsSharedTransitionLayout
 }
 
 @Composable
@@ -438,6 +449,7 @@ private fun NotificationsList(
     groupedByDate: Map<String, List<NotificationGroup>>,
     viewModel: NotificationsViewModel,
     isDark: Boolean,
+    canvas: Color,
     canLoadMore: Boolean,
     isLoadingMore: Boolean,
     onShowGroupedFollowers: (NotificationGroup) -> Unit,
@@ -445,7 +457,6 @@ private fun NotificationsList(
     onModerationReviewTap: (MomentsNotification) -> Unit,
     onTapAction: (NotificationGroup) -> Unit,
 ) {
-    val context = LocalContext.current
     val listState = rememberLazyListState()
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
         dateKeys.forEach { section ->
@@ -463,10 +474,16 @@ private fun NotificationsList(
                             }
                         },
                     )
+                    // ≡ iOS .swipeActions: el rojo/delete solo se revela al arrastrar.
+                    // Sin fondo opaco en el content, backgroundContent se ve siempre.
                     SwipeToDismissBox(
                         state = dismissState,
                         enableDismissFromStartToEnd = false,
                         backgroundContent = {
+                            val revealing =
+                                dismissState.targetValue != SwipeToDismissBoxValue.Settled ||
+                                    dismissState.progress > 0.01f
+                            if (!revealing) return@SwipeToDismissBox
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -488,15 +505,21 @@ private fun NotificationsList(
                             }
                         },
                     ) {
-                        EnhancedNotificationRow(
-                            group = group,
-                            viewModel = viewModel,
-                            isDark = isDark,
-                            onTapAction = { onTapAction(group) },
-                            onShowGroupedFollowers = onShowGroupedFollowers,
-                            onModerationReviewTap = onModerationReviewTap,
-                            onOpenProfile = onOpenProfile,
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(canvas),
+                        ) {
+                            EnhancedNotificationRow(
+                                group = group,
+                                viewModel = viewModel,
+                                isDark = isDark,
+                                onTapAction = { onTapAction(group) },
+                                onShowGroupedFollowers = onShowGroupedFollowers,
+                                onModerationReviewTap = onModerationReviewTap,
+                                onOpenProfile = onOpenProfile,
+                            )
+                        }
                     }
                 }
             }
@@ -505,7 +528,7 @@ private fun NotificationsList(
             item {
                 Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     if (isLoadingMore) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        MomentsCircularProgressIndicator(modifier = Modifier.size(24.dp))
                     } else {
                         Text(
                             stringResource(R.string.notifications_load_more),

@@ -1,5 +1,6 @@
 package com.moments.android.views.messaging.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,7 +33,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Forum
-import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -80,6 +81,8 @@ import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.messaging.OnlineStatusService
 import com.moments.android.services.messaging.displayName
 import com.moments.android.utilities.momentsEmptyStateAppear
+import com.moments.android.views.components.MomentRefreshOverlayHost
+import com.moments.android.views.components.momentRefresh
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.components.ChatRecoveryGateView
 import com.moments.android.views.messaging.components.ConversationContextMenuInsets
@@ -95,6 +98,7 @@ import com.moments.android.views.messaging.core.MessageRequest
 import com.moments.android.views.messaging.core.MessagingViewModel
 import com.moments.android.views.messaging.core.PendingChatContext
 import com.moments.android.views.messaging.core.PendingChatContextFactory
+import com.moments.android.views.messaging.screens.chat.ChatStoryRoute
 import com.moments.android.views.messaging.screens.chat.GlassmorphicChatView
 import com.moments.android.views.messaging.services.ChatDraftEvent
 import com.moments.android.views.messaging.services.ChatDraftEvents
@@ -143,6 +147,14 @@ fun MessagingView(
     val outgoingPending by requestService.outgoingPendingRequests.collectAsState()
     val currentStatus by onlineStatusService.currentUserStatus.collectAsState()
     val pendingRequestCount = pendingRequests.size
+
+    LaunchedEffect(pendingRequestCount) {
+        // ≡ MessagingView.updatePendingRequestCount → widget_pending_message_requests
+        com.moments.android.widget.MomentsWidgetStore.putInt(
+            com.moments.android.widget.MomentsWidgetStore.KEY_PENDING_MESSAGE_REQUESTS,
+            pendingRequestCount,
+        )
+    }
 
     fun showToast(message: String) {
         actionToastMessage = message
@@ -199,10 +211,12 @@ fun MessagingView(
 
     when {
         storyUserId != null -> {
+            BackHandler { storyUserId = null }
             StoriesView(startWithUserId = storyUserId, onDismiss = { storyUserId = null })
             return
         }
         showingNewConversation -> {
+            BackHandler { showingNewConversation = false }
             GlassmorphicNewConversationView(
                 viewModel = viewModel,
                 onDismiss = { showingNewConversation = false },
@@ -221,6 +235,7 @@ fun MessagingView(
             return
         }
         showingRequests -> {
+            BackHandler { showingRequests = false }
             Column(Modifier.fillMaxSize().background(colors.surfaceBackground).statusBarsPadding()) {
                 MessagingDestinationHeader(
                     title = stringResource(R.string.message_requests_title),
@@ -238,6 +253,7 @@ fun MessagingView(
             return
         }
         showingArchived -> {
+            BackHandler { showingArchived = false }
             ArchivedConversationsView(
                 viewModel = viewModel,
                 onBack = { showingArchived = false },
@@ -303,7 +319,12 @@ fun MessagingView(
                 GlassmorphicChatView(
                     conversation = selected,
                     onBack = { viewModel.closeChat() },
-                    onStory = { route -> storyUserId = route.userId },
+                    onStory = { route ->
+                        when (route) {
+                            is ChatStoryRoute.UserStories -> storyUserId = route.userId
+                            is ChatStoryRoute.SharedStory -> Unit // cubierto dentro del chat
+                        }
+                    },
                 )
             } else {
                 Column(Modifier.fillMaxSize()) {
@@ -339,61 +360,76 @@ fun MessagingView(
                             },
                         )
                     }
-                    MessagingConversationList(
-                        viewModel = viewModel,
-                        outgoingPending = outgoingPending,
-                        isSearching = isSearching,
-                        searchText = searchText,
-                        conversationMenuSelection = conversationMenuSelection,
-                        onOpenConversation = { viewModel.openConversation(it) },
-                        onOpenArchived = { showingArchived = true },
-                        onOpenOutgoing = { user ->
-                            scope.launch {
-                                val current = uid ?: return@launch
-                                pendingChatContext = PendingChatContextFactory.outgoing(user, current)
-                            }
-                        },
-                        onOpenStory = { storyUserId = it },
-                        onCompose = { showingNewConversation = true },
-                        onLongPressConversation = { conv ->
-                            val id = conv.id ?: return@MessagingConversationList
-                            val frame = conversationRowFrames[id] ?: return@MessagingConversationList
-                            if (frame.width <= 0f || frame.height <= 0f) return@MessagingConversationList
-                            conversationMenuSelection = ConversationMenuSelection(
-                                item = ConversationMenuData(
-                                    conversation = conv,
-                                    unreadCount = conv.unreadCount(uid.orEmpty()),
-                                    isPinned = conv.isPinned(uid),
-                                    isMuted = conv.isMuted(uid),
-                                    isArchived = false,
-                                ),
-                                rowFrame = frame,
-                            )
-                        },
-                        onRowFrame = { id, rect ->
-                            conversationRowFrames = conversationRowFrames + (id to rect)
-                        },
-                        onOpenSearchMessage = { result ->
-                            viewModel.openConversation(result.conversation)
-                            searchText = ""
-                            isSearching = false
-                            viewModel.clearSearch()
-                        },
-                        onStartDraftWithUser = { user ->
-                            searchText = ""
-                            isSearching = false
-                            viewModel.clearSearch()
-                            val current = uid ?: return@MessagingConversationList
-                            viewModel.startConversation(user = user, fromUserId = current) { conversation ->
-                                if (conversation != null) viewModel.openConversation(conversation)
-                                else if (viewModel.requiresMessageRequest) {
-                                    scope.launch {
-                                        pendingChatContext = PendingChatContextFactory.outgoing(user, current)
+                    // ≡ iOS `.momentRefresh { fetchConversations }` en la lista de inbox
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .momentRefresh {
+                                val current = uid
+                                if (!current.isNullOrBlank()) {
+                                    viewModel.fetchConversations(current)
+                                }
+                                kotlinx.coroutines.delay(700)
+                            },
+                    ) {
+                        MessagingConversationList(
+                            viewModel = viewModel,
+                            outgoingPending = outgoingPending,
+                            isSearching = isSearching,
+                            searchText = searchText,
+                            conversationMenuSelection = conversationMenuSelection,
+                            onOpenConversation = { viewModel.openConversation(it) },
+                            onOpenArchived = { showingArchived = true },
+                            onOpenOutgoing = { user ->
+                                scope.launch {
+                                    val current = uid ?: return@launch
+                                    pendingChatContext = PendingChatContextFactory.outgoing(user, current)
+                                }
+                            },
+                            onOpenStory = { storyUserId = it },
+                            onCompose = { showingNewConversation = true },
+                            onLongPressConversation = { conv ->
+                                val id = conv.id ?: return@MessagingConversationList
+                                val frame = conversationRowFrames[id] ?: return@MessagingConversationList
+                                if (frame.width <= 0f || frame.height <= 0f) return@MessagingConversationList
+                                conversationMenuSelection = ConversationMenuSelection(
+                                    item = ConversationMenuData(
+                                        conversation = conv,
+                                        unreadCount = conv.unreadCount(uid.orEmpty()),
+                                        isPinned = conv.isPinned(uid),
+                                        isMuted = conv.isMuted(uid),
+                                        isArchived = false,
+                                    ),
+                                    rowFrame = frame,
+                                )
+                            },
+                            onRowFrame = { id, rect ->
+                                conversationRowFrames = conversationRowFrames + (id to rect)
+                            },
+                            onOpenSearchMessage = { result ->
+                                viewModel.openConversation(result.conversation)
+                                searchText = ""
+                                isSearching = false
+                                viewModel.clearSearch()
+                            },
+                            onStartDraftWithUser = { user ->
+                                searchText = ""
+                                isSearching = false
+                                viewModel.clearSearch()
+                                val current = uid ?: return@MessagingConversationList
+                                viewModel.startConversation(user = user, fromUserId = current) { conversation ->
+                                    if (conversation != null) viewModel.openConversation(conversation)
+                                    else if (viewModel.requiresMessageRequest) {
+                                        scope.launch {
+                                            pendingChatContext = PendingChatContextFactory.outgoing(user, current)
+                                        }
                                     }
                                 }
-                            }
-                        },
-                    )
+                            },
+                        )
+                        MomentRefreshOverlayHost(Modifier.align(Alignment.TopCenter))
+                    }
                 }
             }
 
@@ -653,7 +689,7 @@ private fun MessagingConversationList(
     when {
         viewModel.isLoading && viewModel.conversations.isEmpty() && !isSearching -> {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = colors.primary)
+                MomentsCircularProgressIndicator()
             }
         }
         error != null && viewModel.conversations.isEmpty() && !isSearching -> {
@@ -1091,7 +1127,7 @@ private fun GlassmorphicNewConversationView(
         val users = viewModel.suggestedUsers
         when {
             users.isEmpty() && searchText.isBlank() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                MomentsCircularProgressIndicator()
             }
             users.isEmpty() -> Column(
                 Modifier.fillMaxSize().padding(vertical = 32.dp),

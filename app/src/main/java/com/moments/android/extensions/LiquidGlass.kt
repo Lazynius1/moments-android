@@ -116,33 +116,45 @@ object ProfileChromeGlassMetrics {
 }
 
 /**
- * Tint de chrome alineado al canvas de la app.
+ * Tint de chrome **elevado** vs canvas (Ink/Surface).
  *
- * Android: fills **opacos** (sin Liquid Glass / material). Métricas y API
- * 1:1 con iOS; el render es sólido porque la transparencia sin glass se ve mal.
+ * Android: fills **opacos** (sin Liquid Glass). Usar el mismo hex que el canvas
+ * hace que botones/inputs desaparezcan; por eso dark=ControlDark / light=blanco.
  */
 object MomentsGlassButtonTint {
-    val dark = Color.fromHex("0B1215")
-    val light = Color.fromHex("FAF9F6")
+    /** ≡ [com.moments.android.views.shared.ControlDark] */
+    val dark = Color.fromHex("151D21")
+    /** ≡ [com.moments.android.views.shared.ControlLight] */
+    val light = Color.fromHex("FFFFFF")
+    /** Canvas app (solo referencia; no usar como fill de control). */
+    val canvasDark = Color.fromHex("0B1215")
+    val canvasLight = Color.fromHex("FAF9F6")
 
     fun canvas(isDark: Boolean): Color = if (isDark) dark else light
 }
 
 object MomentsChromeGlass {
-    /** ≡ iOS; en Android [canvasTint] fuerza alpha 1 (chrome sólido). */
+    /** ≡ iOS; en Android [canvasTint] fuerza alpha 1 (chrome sólido elevado). */
     const val defaultTintOpacity = 0.60f
     const val defaultDarkTintOpacity = 0.82f
     const val nativeTintedOpacityScale = 0.45f
 
     fun canvasTint(isDark: Boolean, opacity: Float = defaultTintOpacity): Color {
-        // Platform: ignore opacity — opaque canvas fill.
+        // Platform: ignore opacity — opaque elevated fill.
         @Suppress("UNUSED_PARAMETER")
         val ignored = opacity
         return MomentsGlassButtonTint.canvas(isDark).copy(alpha = 1f)
     }
 
+    fun strokeColor(isDark: Boolean): Color =
+        // Un pelín más marcado: el fill opaco se funde con el canvas sin borde visible.
+        if (isDark) Color.White.copy(alpha = 0.20f) else Color.Black.copy(alpha = 0.14f)
+
+    /** Ancho del stroke de chrome / liquid glass. */
+    val strokeWidth = 0.75.dp
+
     fun contentColor(isDark: Boolean): Color =
-        if (isDark) Color.White else MomentsGlassButtonTint.dark
+        if (isDark) Color.White else MomentsGlassButtonTint.canvasDark
 
     /** ≡ underlayOpacity; Android siempre opaco. */
     @Suppress("UNUSED_PARAMETER")
@@ -184,7 +196,7 @@ fun Modifier.liquidGlass(
         .background(fill, shape)
         .then(
             if (variant == LiquidGlassVariant.REGULAR) {
-                Modifier.border(0.5.dp, Color.Black.copy(alpha = if (isDark) 0.12f else 0.08f), shape)
+                Modifier.border(MomentsChromeGlass.strokeWidth, MomentsChromeGlass.strokeColor(isDark), shape)
             } else {
                 Modifier
             },
@@ -199,14 +211,14 @@ fun Modifier.momentsChromeGlass(
     tint: Color? = null,
 ): Modifier = composed {
     val isDark = isSystemInDarkTheme()
-    // Todos los estilos → fill opaco del canvas (Android no usa ultraThinMaterial).
+    // Fill opaco elevado vs canvas (no alpha / no mismo hex que Ink|Surface).
     val fill = (tint ?: MomentsChromeGlass.canvasTint(isDark, tintOpacity)).copy(alpha = 1f)
     this
         .clip(shape)
         .background(fill, shape)
         .border(
-            width = 0.5.dp,
-            color = Color.Black.copy(alpha = if (isDark) 0.14f else 0.10f),
+            width = MomentsChromeGlass.strokeWidth,
+            color = MomentsChromeGlass.strokeColor(isDark),
             shape = shape,
         )
 }
@@ -219,8 +231,6 @@ fun ProfileChromeControlsCluster(
     spacing: Dp = ProfileChromeGlassMetrics.controlsClusterSpacing,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val isDark = isSystemInDarkTheme()
-    val controlSurface = if (isDark) Color(0xFF151D21) else Color.White
     Row(
         modifier = modifier
             .padding(ProfileChromeGlassMetrics.controlsClusterPadding)
@@ -228,7 +238,6 @@ fun ProfileChromeControlsCluster(
             .momentsChromeGlass(
                 CircleShape,
                 interactive = true,
-                tint = controlSurface,
             ),
         horizontalArrangement = Arrangement.spacedBy(spacing),
         verticalAlignment = Alignment.CenterVertically,
