@@ -190,6 +190,7 @@ fun MomentsApp(
         }
 
         if (showSplash) {
+            // Encima del contenido (≡ iOS ZStack order) para la cortina zoom→fade.
             SplashScreen(
                 onComplete = {
                     showSplash = false
