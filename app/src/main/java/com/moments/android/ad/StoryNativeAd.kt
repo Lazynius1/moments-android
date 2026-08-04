@@ -15,6 +15,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -76,6 +77,7 @@ import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdOptions
 import com.google.android.gms.ads.nativead.NativeAdView
 import com.moments.android.R
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.fromHex
 import com.moments.android.services.auth.AuthService
 import com.moments.android.services.performance.MotionPolicy
@@ -721,7 +723,7 @@ private fun StoryAdTopChrome(
                 Icon(
                     Icons.Default.Close,
                     contentDescription = stringResource(R.string.common_close),
-                    tint = Color.White,
+                    tint = MomentsChromeGlass.contentColor(isSystemInDarkTheme()),
                     modifier = Modifier.size(16.dp),
                 )
             }

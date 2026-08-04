@@ -208,7 +208,7 @@ object ChatService {
             .filter { MessageSyncCursor(it.timestamp, it.id).isAfter(after) }
     }
 
-    /** ≡ `fetchOlderMessages` — página DESC con cursor del último doc. */
+    /** Página DESC con cursor del último doc. */
     suspend fun fetchOlderMessages(
         conversationId: String,
         before: MessageSyncCursor,
@@ -217,20 +217,21 @@ object ChatService {
     ): Result<MessageHistoryPage> = runCatching {
         preloadEncryption(conversationId)
         val collection = db.collection("conversations").document(conversationId).collection("messages")
+        val beforeTs = Timestamp(before.timestamp)
         val snapshot = if (before.messageId.isEmpty()) {
             collection
-                .whereLessThan("timestamp", Timestamp(before.timestamp))
+                .whereLessThan("timestamp", beforeTs)
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .limit(limit.toLong())
-                .get()
+                .get(com.google.firebase.firestore.Source.SERVER)
                 .await()
         } else {
             collection
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .orderBy(FieldPath.documentId(), Query.Direction.DESCENDING)
-                .startAfter(Timestamp(before.timestamp), before.messageId)
+                .startAfter(beforeTs, before.messageId)
                 .limit(limit.toLong())
-                .get()
+                .get(com.google.firebase.firestore.Source.SERVER)
                 .await()
         }
         val nextCursor = snapshot.documents.lastOrNull()?.let { doc ->

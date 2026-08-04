@@ -108,7 +108,41 @@ object StoryViewerLayoutHelpers {
         position.x.toFloat() * containerWidth.coerceAtLeast(1f) to
             position.y.toFloat() * containerHeight.coerceAtLeast(1f)
 
-    /** ≡ `stickerForDisplay` (solo escala × width/375). */
-    fun stickerDisplayScale(scale: Double, containerWidth: Float): Float =
-        scale.toFloat() * containerWidth.coerceAtLeast(1f) / 375f
+    /**
+     * ≡ `stickerForDisplay`: escala guardada × (ancho del canvas / referencia).
+     *
+     * iOS usa **points** (SwiftUI). En Android el canvas suele medirse en **px**;
+     * hay que pasar a **dp** (≈ points) antes del factor 375. Si se usa px,
+     * historias iOS se ven enormes en Android y las de Android enanas en iOS.
+     *
+     * La referencia **375** es el contrato Firestore compartido
+     * (`referenceContentWidth`), no el ancho de un dispositivo concreto.
+     */
+    fun stickerDisplayScale(scale: Double, containerWidthPx: Float, density: Float): Float {
+        val widthDp = canvasWidthDp(containerWidthPx, density)
+        return scale.toFloat() * widthDp.coerceAtLeast(1f) / STORY_STICKER_REFERENCE_WIDTH
+    }
+
+    /**
+     * ≡ iOS `normalizedScale = editorScale * (375 / contentRect.width)` donde
+     * `contentRect.width` está en points.
+     */
+    fun normalizeStickerScaleForFirestore(
+        editorScale: Double,
+        containerWidthPx: Float,
+        density: Float,
+    ): Double {
+        val widthDp = canvasWidthDp(containerWidthPx, density).toDouble().coerceAtLeast(1.0)
+        return editorScale * (STORY_STICKER_REFERENCE_WIDTH.toDouble() / widthDp)
+    }
+
+    /** Ancho del canvas en unidades de layout iOS (points ≈ dp). */
+    fun canvasWidthDp(containerWidthPx: Float, density: Float): Float =
+        containerWidthPx / density.coerceAtLeast(0.01f)
+
+    /** Referencia de escala en Firestore (iOS `referenceContentWidth = 375`). */
+    const val STORY_STICKER_REFERENCE_WIDTH = 375f
+
+    /** @deprecated Usar [STORY_STICKER_REFERENCE_WIDTH]; el nombre “PX” era engañoso. */
+    const val STORY_STICKER_REFERENCE_WIDTH_PX = STORY_STICKER_REFERENCE_WIDTH
 }

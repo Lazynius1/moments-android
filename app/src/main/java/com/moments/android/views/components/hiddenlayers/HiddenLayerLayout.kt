@@ -52,12 +52,12 @@ object HiddenLayerLayout {
         )
     }
 
-    fun frame(layer: MomentHiddenLayer, imageRect: Rect): Rect {
-        val width = maxOf(44f, imageRect.width * layer.width.toFloat())
+    fun frame(layer: MomentHiddenLayer, imageRect: Rect, minimumSizePx: Float): Rect {
+        val width = maxOf(minimumSizePx, imageRect.width * layer.width.toFloat())
         val height = if (layer.type == MomentHiddenLayer.LayerType.IMAGE) {
-            maxOf(44f, width * imageAspectRatio)
+            maxOf(minimumSizePx, width * imageAspectRatio)
         } else {
-            maxOf(44f, imageRect.height * layer.height.toFloat())
+            maxOf(minimumSizePx, imageRect.height * layer.height.toFloat())
         }
         val centerX = imageRect.left + imageRect.width * layer.anchorX.toFloat()
         val centerY = imageRect.top + imageRect.height * layer.anchorY.toFloat()
@@ -70,12 +70,12 @@ object HiddenLayerLayout {
     }
 
     /** Port de `frame(for draft: HiddenLayerDraft, in imageRect:)`. */
-    fun frame(draft: HiddenLayerDraft, imageRect: Rect): Rect {
-        val width = maxOf(44f, imageRect.width * draft.width.toFloat())
+    fun frame(draft: HiddenLayerDraft, imageRect: Rect, minimumSizePx: Float): Rect {
+        val width = maxOf(minimumSizePx, imageRect.width * draft.width.toFloat())
         val height = if (draft.type == MomentHiddenLayer.LayerType.IMAGE) {
-            maxOf(44f, width * imageAspectRatio)
+            maxOf(minimumSizePx, width * imageAspectRatio)
         } else {
-            maxOf(44f, imageRect.height * draft.height.toFloat())
+            maxOf(minimumSizePx, imageRect.height * draft.height.toFloat())
         }
         val centerX = imageRect.left + imageRect.width * draft.anchorX.toFloat()
         val centerY = imageRect.top + imageRect.height * draft.anchorY.toFloat()
@@ -88,6 +88,10 @@ object HiddenLayerLayout {
     }
 
     /** Helper Android: frame con tamaño de contenedor (equiv. imageRect origen cero). */
-    fun frame(layer: MomentHiddenLayer, containerSize: IntSize): Rect =
-        frame(layer, Rect(0f, 0f, containerSize.width.toFloat(), containerSize.height.toFloat()))
+    fun frame(layer: MomentHiddenLayer, containerSize: IntSize, minimumSizePx: Float): Rect =
+        frame(
+            layer,
+            Rect(0f, 0f, containerSize.width.toFloat(), containerSize.height.toFloat()),
+            minimumSizePx,
+        )
 }

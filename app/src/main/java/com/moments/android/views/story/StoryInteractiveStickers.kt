@@ -20,6 +20,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -78,6 +79,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.fromHex
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.extensions.revealContrastingEffectColor
@@ -93,6 +95,7 @@ import com.moments.android.views.story.storyviewer.RevealScratchPanOverlay
 import com.moments.android.views.story.storyviewer.StoryGestureCoordinator
 import com.moments.android.views.story.storyviewer.StoryGestureIntent
 import com.moments.android.views.story.storyviewer.StoryGestureSuppressionScope
+import com.moments.android.views.story.storyviewer.StoryViewerLayoutHelpers
 import com.moments.android.views.story.storyviewer.storyDeckInteractionExclusion
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -333,7 +336,7 @@ private fun StoryInteractiveFrameStickers(
     reportsDeckInteractionExclusion: Boolean,
 ) {
     val density = LocalDensity.current
-    val displayScale = (widthPx / 375f).coerceAtLeast(0.01f)
+    val canvasScaleFactor = StoryViewerLayoutHelpers.stickerDisplayScale(1.0, widthPx, density.density)
 
     stickers
         .filter { it.type == "frame" }
@@ -344,6 +347,7 @@ private fun StoryInteractiveFrameStickers(
             val frameWidthPx = with(density) { 200.dp.toPx() }
             val frameHeightPx = with(density) { 240.dp.toPx() }
             val exclusionId = "sticker.$storyId.${sticker.stickerId.orEmpty()}"
+            val displayScale = sticker.scale.toFloat() * canvasScaleFactor
 
             InteractiveFrameSticker(
                 storyId = "$storyId.${sticker.stickerId.orEmpty()}",
@@ -365,8 +369,8 @@ private fun StoryInteractiveFrameStickers(
                         )
                     }
                     .graphicsLayer {
-                        scaleX = sticker.scale.toFloat() * displayScale
-                        scaleY = sticker.scale.toFloat() * displayScale
+                        scaleX = displayScale
+                        scaleY = displayScale
                         rotationZ = Math.toDegrees(sticker.rotation).toFloat()
                     }
                     .storyDeckInteractionExclusion(
@@ -753,10 +757,11 @@ private fun RevealViewerHint(
             .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = false)
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
+        val chromeFg = MomentsChromeGlass.contentColor(isSystemInDarkTheme())
         Icon(
             imageVector = Icons.Filled.PanTool,
             contentDescription = null,
-            tint = Color.White.copy(alpha = 0.96f),
+            tint = chromeFg.copy(alpha = 0.96f),
             modifier = Modifier
                 .size(13.dp)
                 .graphicsLayer { rotationZ = rotation }
@@ -764,7 +769,7 @@ private fun RevealViewerHint(
         )
         Text(
             text = stringResource(R.string.reveal_viewer_hint),
-            color = Color.White.copy(alpha = 0.96f),
+            color = chromeFg.copy(alpha = 0.96f),
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
         )

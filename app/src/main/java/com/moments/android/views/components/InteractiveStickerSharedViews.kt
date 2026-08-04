@@ -32,9 +32,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -78,6 +80,7 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -466,17 +469,27 @@ fun StickerPolaroidFrameView(
     contentOffsetX: Float = 0f,
     contentOffsetY: Float = 0f,
     progress: Float = 1f,
+    /** Editor: caption editable en la franja blanca (sin TextField flotante). */
+    isEditingContent: Boolean = false,
+    onCaptionChange: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var isShaking by remember { mutableStateOf(false) }
     var shakeJob by remember { mutableStateOf<Job?>(null) }
     var didReceiveProgressChange by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val captionFocus = remember { FocusRequester() }
     val shakeOpacity by animateFloatAsState(
         targetValue = if (isShaking) 1f else 0f,
         animationSpec = tween(durationMillis = if (isShaking) 250 else 450, easing = FastOutSlowInEasing),
         label = "polaroidShakeOpacity",
     )
+
+    LaunchedEffect(isEditingContent) {
+        if (isEditingContent && onCaptionChange != null) {
+            runCatching { captionFocus.requestFocus() }
+        }
+    }
 
     LaunchedEffect(progress) {
         // iOS: onChange(of: progress) — no shake en el primer compose
@@ -585,19 +598,17 @@ fun StickerPolaroidFrameView(
                         } else {
                             0f
                         }
+                        // ≡ iOS `.frame(w,h)` + clip del viewport: la foto puede ser más
+                        // grande que 180×180. `size()` respetaría maxConstraints del padre
+                        // y aplastaría a cuadrado; `requiredSize` fuerza el aspect real.
                         Image(
                             bitmap = bitmap.asImageBitmap(),
                             contentDescription = null,
                             contentScale = ContentScale.FillBounds,
                             modifier = Modifier
-                                .size(drawSize.width.dp, drawSize.height.dp)
-                                .offset {
-                                    val center = PolaroidImageViewportSize.dp.roundToPx() / 2f
-                                    IntOffset(
-                                        (center + clampedOffset.x - drawSize.width / 2f).roundToInt(),
-                                        (center + clampedOffset.y - drawSize.height / 2f).roundToInt(),
-                                    )
-                                }
+                                .align(Alignment.Center)
+                                .requiredSize(drawSize.width.dp, drawSize.height.dp)
+                                .offset(x = clampedOffset.x.dp, y = clampedOffset.y.dp)
                                 .graphicsLayer {
                                     alpha = imageAlpha
                                     colorFilter = polaroidImageColorFilter(progress)
@@ -633,26 +644,65 @@ fun StickerPolaroidFrameView(
                     .background(frameColor),
                 contentAlignment = Alignment.Center,
             ) {
-                caption?.takeIf { it.isNotEmpty() }?.let { text ->
-                    val visibleCount = (text.length * progress).toInt()
-                    Text(
-                        text = buildAnnotatedString {
-                            append(text.take(visibleCount))
-                            withStyle(SpanStyle(color = Color.Transparent)) {
-                                append(text.drop(visibleCount))
-                            }
-                        },
-                        color = polaroidCaptionColor(frameStyle),
-                        fontFamily = polaroidCaptionFontFamily(frameStyle),
-                        fontWeight = polaroidCaptionFontWeight(frameStyle),
-                        fontSize = polaroidCaptionFontSize(frameStyle),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                if (isEditingContent && onCaptionChange != null) {
+                    val captionValue = caption.orEmpty()
+                    BasicTextField(
+                        value = captionValue,
+                        onValueChange = onCaptionChange,
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = polaroidCaptionColor(frameStyle),
+                            fontFamily = polaroidCaptionFontFamily(frameStyle),
+                            fontWeight = polaroidCaptionFontWeight(frameStyle),
+                            fontSize = polaroidCaptionFontSize(frameStyle),
+                            textAlign = TextAlign.Center,
+                        ),
+                        cursorBrush = SolidColor(polaroidCaptionColor(frameStyle)),
                         modifier = Modifier
+                            .fillMaxWidth()
                             .padding(horizontal = 12.dp)
+                            .focusRequester(captionFocus)
                             .rotate(polaroidCaptionRotation(frameStyle))
                             .offset(y = polaroidCaptionVerticalOffset(frameStyle)),
+                        decorationBox = { inner ->
+                            Box(contentAlignment = Alignment.Center) {
+                                if (captionValue.isBlank()) {
+                                    Text(
+                                        text = stringResource(R.string.story_editor_polaroid_add_note),
+                                        color = polaroidCaptionColor(frameStyle).copy(alpha = 0.42f),
+                                        fontFamily = polaroidCaptionFontFamily(frameStyle),
+                                        fontWeight = polaroidCaptionFontWeight(frameStyle),
+                                        fontSize = polaroidCaptionFontSize(frameStyle),
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                    )
+                                }
+                                inner()
+                            }
+                        },
                     )
+                } else {
+                    caption?.takeIf { it.isNotEmpty() }?.let { text ->
+                        val visibleCount = (text.length * progress).toInt()
+                        Text(
+                            text = buildAnnotatedString {
+                                append(text.take(visibleCount))
+                                withStyle(SpanStyle(color = Color.Transparent)) {
+                                    append(text.drop(visibleCount))
+                                }
+                            },
+                            color = polaroidCaptionColor(frameStyle),
+                            fontFamily = polaroidCaptionFontFamily(frameStyle),
+                            fontWeight = polaroidCaptionFontWeight(frameStyle),
+                            fontSize = polaroidCaptionFontSize(frameStyle),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp)
+                                .rotate(polaroidCaptionRotation(frameStyle))
+                                .offset(y = polaroidCaptionVerticalOffset(frameStyle)),
+                        )
+                    }
                 }
             }
         }
@@ -1423,6 +1473,19 @@ fun getCountdownComponents(targetAtMs: Double, now: Date = Date()): CountdownCom
     )
 }
 
+/**
+ * Ancho del card = 4 timers + gaps + inset lateral (paridad con iOS `CountdownCardLayout`).
+ * Sin huecos laterales sobrantes: el título vive dentro de ese ancho (máx. 2 líneas).
+ */
+object CountdownCardLayout {
+    val segmentSize = 52.dp
+    val segmentSpacing = 8.dp
+    val sideInset = 12.dp
+    const val titleMaxChars = 48
+    val timersWidth = segmentSize * 4 + segmentSpacing * 3
+    val cardWidth = timersWidth + sideInset * 2
+}
+
 /** Port de `CountdownSegment`. */
 @Composable
 fun CountdownSegment(
@@ -1433,13 +1496,13 @@ fun CountdownSegment(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier,
+        modifier = modifier.width(CountdownCardLayout.segmentSize),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Box(
             Modifier
-                .size(52.dp)
+                .size(CountdownCardLayout.segmentSize)
                 .background(boxBg, RoundedCornerShape(12.dp))
                 .border(0.5.dp, ink.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center,
@@ -1452,6 +1515,9 @@ fun CountdownSegment(
             fontSize = 8.sp,
             fontWeight = FontWeight.Black,
             letterSpacing = 0.5.sp,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
         )
     }
 }
@@ -1650,14 +1716,20 @@ fun StickerCountdownCardView(
     }
 
     Box(
-        modifier = modifier.clip(RoundedCornerShape(24.dp)),
+        modifier = modifier
+            .width(CountdownCardLayout.cardWidth)
+            .wrapContentHeight()
+            .clip(RoundedCornerShape(24.dp)),
     ) {
         AnimatedMomentsCardStickerSurface(
             styleVariant = styleVariant,
             isDark = isDark,
             modifier = Modifier.matchParentSize(),
         )
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier.width(CountdownCardLayout.cardWidth),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             Box(Modifier.fillMaxWidth()) {
                 AnimatedMomentsCardStickerHeaderSurface(
                     styleVariant = styleVariant,
@@ -1667,8 +1739,8 @@ fun StickerCountdownCardView(
                 if (isEditingInline && onTitleChange != null) {
                     BasicTextField(
                         value = title,
-                        onValueChange = onTitleChange,
-                        singleLine = true,
+                        onValueChange = { onTitleChange(it.take(CountdownCardLayout.titleMaxChars)) },
+                        maxLines = 2,
                         textStyle = TextStyle(
                             color = headerInk,
                             fontSize = 15.sp,
@@ -1677,7 +1749,10 @@ fun StickerCountdownCardView(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 12.dp),
+                            .padding(
+                                horizontal = CountdownCardLayout.sideInset,
+                                vertical = 10.dp,
+                            ),
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.Center) {
                                 if (title.isEmpty()) {
@@ -1687,6 +1762,7 @@ fun StickerCountdownCardView(
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Black,
                                         textAlign = TextAlign.Center,
+                                        maxLines = 2,
                                     )
                                 }
                                 inner()
@@ -1700,11 +1776,15 @@ fun StickerCountdownCardView(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 0.5.sp,
-                        maxLines = 1,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 12.dp),
+                            .padding(
+                                horizontal = CountdownCardLayout.sideInset,
+                                vertical = 10.dp,
+                            ),
                     )
                 }
             }
@@ -1717,8 +1797,11 @@ fun StickerCountdownCardView(
                         HapticManager.shared.mediumImpact()
                         openDatePicker()
                     }
-                    .padding(horizontal = 22.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(
+                        horizontal = CountdownCardLayout.sideInset,
+                        vertical = 14.dp,
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(CountdownCardLayout.segmentSpacing),
             ) {
                 CountdownSegment(comps.days, labelDays, ink, boxBg)
                 CountdownSegment(comps.hours, labelHours, ink, boxBg)
@@ -2342,6 +2425,11 @@ fun InteractiveAudioStickerView(
     var animatedHeights by remember { mutableStateOf(listOf(10f, 14f, 10f)) }
     var didConfigureAudioSession by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val foregroundColor = if (isSystemInDarkTheme()) {
+        Color.White
+    } else {
+        Color.Black.copy(alpha = 0.82f)
+    }
 
     fun stopPlayback() {
         progressJob?.cancel()
@@ -2480,7 +2568,7 @@ fun InteractiveAudioStickerView(
         Canvas(Modifier.matchParentSize()) {
             drawArc(
                 brush = Brush.verticalGradient(
-                    colors = listOf(Color.White, Color.White.copy(alpha = 0.8f)),
+                    colors = listOf(foregroundColor, foregroundColor.copy(alpha = 0.8f)),
                 ),
                 startAngle = -90f,
                 sweepAngle = 360f * progress,
@@ -2496,7 +2584,7 @@ fun InteractiveAudioStickerView(
             Icon(
                 imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.Mic,
                 contentDescription = null,
-                tint = Color.White,
+                tint = foregroundColor,
                 modifier = Modifier.size(20.dp),
             )
             Row(
@@ -2508,7 +2596,7 @@ fun InteractiveAudioStickerView(
                         Modifier
                             .width(3.dp)
                             .height(barHeight.dp)
-                            .background(Color.White, RoundedCornerShape(1.5.dp)),
+                            .background(foregroundColor, RoundedCornerShape(1.5.dp)),
                     )
                 }
             }

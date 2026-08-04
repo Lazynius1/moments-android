@@ -17,16 +17,19 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculateCentroidSize
-import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material3.Icon
@@ -47,11 +50,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -67,15 +72,18 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
  * Contenedor interactivo equivalente a `StickerOverlayView.swift`.
  *
- * El contenido del sticker permanece en `storyeditor.kt`, donde Android ya concentra sus
- * variantes visuales e inputs inline; este overlay conserva la geometría común de Swift:
- * posición centrada, límites teniendo en cuenta escala/rotación, pellizco amortiguado y giro.
+ * Gestos (idiomáticos Compose, semántica iOS):
+ * - Drag en **coordenadas de ventana absolutas** (≡ `DragGesture(coordinateSpace: .named("storyCanvas"))`)
+ *   para que mover el `offset` del sticker no corrompa el pan local.
+ * - Hit-target = tamaño natural × `max(scale, 1)` (≡ `interactiveBoundsSize`).
+ * - Escala/rotación visual en el contenido interno; el área táctil no se encoge al agrandar.
  */
 @Composable
 fun StickerOverlayView(
@@ -88,7 +96,7 @@ fun StickerOverlayView(
     isEditingInline: Boolean,
     onUpdate: (StoryStickerDraft) -> Unit,
     onDelete: () -> Unit,
-    /** Segundo arg ≡ `isPointOverTrash` sobre el punto propuesto (sin clamp), como el dedo en iOS. */
+    /** Segundo arg: sobre papelera usando el centro propuesto (sin clamp), más fácil al agrandar. */
     onDragChanged: (StoryStickerDraft, Boolean) -> Unit = { draft, _ -> onUpdate(draft) },
     onDragEnded: (StoryStickerDraft, Boolean) -> Unit = { draft, overTrash ->
         if (overTrash) onDelete() else onUpdate(draft)
@@ -97,9 +105,11 @@ fun StickerOverlayView(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    var contentWidthPx by remember(sticker.id) { mutableIntStateOf(0) }
-    var contentHeightPx by remember(sticker.id) { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    var naturalWidthPx by remember(sticker.id) { mutableIntStateOf(0) }
+    var naturalHeightPx by remember(sticker.id) { mutableIntStateOf(0) }
     var interactionFeedback by remember(sticker.id) { mutableStateOf(false) }
+    var layoutCoords by remember(sticker.id) { mutableStateOf<LayoutCoordinates?>(null) }
 
     LaunchedEffect(interactionFeedback) {
         if (interactionFeedback) {
@@ -111,18 +121,24 @@ fun StickerOverlayView(
     val minScale = stickerMinimumScale(sticker.type)
     val maxScale = stickerMaximumScale(
         type = sticker.type,
-        baseWidthPx = contentWidthPx,
-        baseHeightPx = contentHeightPx,
+        baseWidthPx = naturalWidthPx,
+        baseHeightPx = naturalHeightPx,
         canvasWidthPx = canvasWidthPx,
         canvasHeightPx = canvasHeightPx,
     )
     val currentScale = sticker.scale.toFloat().coerceIn(minScale, maxScale)
     val currentRotation = sticker.rotationRadians.toFloat()
+    val feedbackScale = if (interactionFeedback) 1.05f else 1f
+    // ≡ interactiveBoundsSize: hit area nunca menor que el tamaño natural.
+    val hitScale = max(currentScale * feedbackScale, 1f)
+    val hitWidthPx = if (naturalWidthPx > 0) (naturalWidthPx * hitScale).roundToInt().coerceAtLeast(1) else 0
+    val hitHeightPx = if (naturalHeightPx > 0) (naturalHeightPx * hitScale).roundToInt().coerceAtLeast(1) else 0
+
     val clampedPosition = clampStickerPosition(
         x = sticker.normalizedX.toFloat() * canvasWidthPx,
         y = sticker.normalizedY.toFloat() * canvasHeightPx,
-        contentWidthPx = contentWidthPx,
-        contentHeightPx = contentHeightPx,
+        contentWidthPx = naturalWidthPx,
+        contentHeightPx = naturalHeightPx,
         scale = currentScale,
         rotationRadians = currentRotation,
         canvasWidthPx = canvasWidthPx,
@@ -135,194 +151,297 @@ fun StickerOverlayView(
     val latestRotation by rememberUpdatedState(currentRotation)
     val latestMinScale by rememberUpdatedState(minScale)
     val latestMaxScale by rememberUpdatedState(maxScale)
-    val latestContentW by rememberUpdatedState(contentWidthPx)
-    val latestContentH by rememberUpdatedState(contentHeightPx)
+    val latestContentW by rememberUpdatedState(naturalWidthPx)
+    val latestContentH by rememberUpdatedState(naturalHeightPx)
     val latestIsContentEditing by rememberUpdatedState(isContentEditing)
     val latestOnDragChanged by rememberUpdatedState(onDragChanged)
     val latestOnDragEnded by rememberUpdatedState(onDragEnded)
     val latestOnUpdate by rememberUpdatedState(onUpdate)
     val latestOnStickerTapped by rememberUpdatedState(onStickerTapped)
+    val latestLayoutCoords by rememberUpdatedState(layoutCoords)
 
     Box(
         modifier = modifier
             .offset {
+                val halfW = if (hitWidthPx > 0) hitWidthPx / 2f else naturalWidthPx / 2f
+                val halfH = if (hitHeightPx > 0) hitHeightPx / 2f else naturalHeightPx / 2f
                 IntOffset(
-                    (clampedPosition.first - contentWidthPx / 2f).roundToInt(),
-                    (clampedPosition.second - contentHeightPx / 2f).roundToInt(),
+                    (clampedPosition.first - halfW).roundToInt(),
+                    (clampedPosition.second - halfH).roundToInt(),
                 )
             }
-            .onSizeChanged {
-                contentWidthPx = it.width
-                contentHeightPx = it.height
-            }
-            .graphicsLayer {
-                val feedbackScale = if (interactionFeedback) 1.05f else 1f
-                scaleX = currentScale * feedbackScale
-                scaleY = currentScale * feedbackScale
-                rotationZ = Math.toDegrees(currentRotation.toDouble()).toFloat()
-                transformOrigin = TransformOrigin.Center
-            }
             .then(
-                if (isEditingInline) {
-                    Modifier
+                if (hitWidthPx > 0 && hitHeightPx > 0) {
+                    with(density) {
+                        Modifier.requiredSize(hitWidthPx.toDp(), hitHeightPx.toDp())
+                    }
                 } else {
-                    Modifier
-                        // Gesto propio (≡ Drag+Magnify+Rotate de Swift) con onEnded fiable
-                        // para la papelera y el tap. Unificamos tap/drag/pinch aquí para que
-                        // no compitan dos recognizers distintos y el sticker responda igual
-                        // que texto y dibujo.
-                        .pointerInput(sticker.id, canvasWidthPx, canvasHeightPx) {
-                            awaitEachGesture {
-                                awaitFirstDown(requireUnconsumed = false)
-                                var liveX = latestClamped.first
-                                var liveY = latestClamped.second
-                                var liveScale = latestScale
-                                var liveRotation = latestRotation
-                                val gestureStartScale = latestScale
-                                val gestureStartRotation = latestRotation
-                                val gestureStartContentScale =
-                                    (latestSticker.contentScale?.toFloat() ?: 1f).coerceAtLeast(1f)
-                                var cumulativeZoom = 1f
-                                var cumulativeRotationDegrees = 0f
-                                var cumulativePan = Offset.Zero
-                                var gesturePastTouchSlop = false
-                                var latestDraft: StoryStickerDraft? = null
-                                var isOverTrash = false
-                                var transformed = false
-                                var dragged = false
+                    Modifier.wrapContentSize(unbounded = true)
+                },
+            )
+            .onGloballyPositioned { layoutCoords = it }
+            // Fondo transparente: asegura hit-test del área aunque el contenido no lo pinte.
+            .background(Color.Transparent)
+            .then(
+                when {
+                    isEditingInline -> Modifier
+                    // ≡ iOS DragGesture(translation) + MagnifyGesture: crop de la foto interior.
+                    // translation absoluta desde el down; px→dp (contentOffset está en points/dp).
+                    isContentEditing && sticker.type == "frame" -> Modifier.pointerInput(sticker.id) {
+                        // PointerInputScope.density = px por dp (contentOffset ≡ points iOS).
+                        val densityScale = this.density.coerceAtLeast(0.01f)
+                        awaitEachGesture {
+                            // requireUnconsumed: el BasicTextField del caption puede consumir el down.
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            val activeAtStart = latestSticker
+                            val startOffsetX = activeAtStart.contentOffsetX?.toFloat() ?: 0f
+                            val startOffsetY = activeAtStart.contentOffsetY?.toFloat() ?: 0f
+                            val startContentScale =
+                                (activeAtStart.contentScale?.toFloat() ?: 1f).coerceAtLeast(1f)
+                            var pinchStartDistance = -1f
+                            var pinchBaseScale = startContentScale
+                            var panAnchorLocal = down.position
+                            var panBaseOffsetX = startOffsetX
+                            var panBaseOffsetY = startOffsetY
+                            var lastPointerCount = 1
 
-                                do {
-                                    val event = awaitPointerEvent()
-                                    val pressed = event.changes.filter { it.pressed }
-                                    val pointerCount = pressed.size
-                                    val panChange = when {
-                                        pointerCount >= 2 -> event.calculatePan()
-                                        pointerCount == 1 -> pressed.first().positionChange()
-                                        else -> Offset.Zero
+                            do {
+                                val event = awaitPointerEvent()
+                                val pressed = event.changes.filter { it.pressed }
+                                if (pressed.isEmpty()) break
+
+                                val stickerScale = latestScale.coerceAtLeast(0.0001f)
+                                val pointerCount = pressed.size
+
+                                if (pointerCount != lastPointerCount) {
+                                    // ≡ iOS: al cambiar 1↔2 dedos, reanclar base.
+                                    panAnchorLocal = if (pointerCount >= 2) {
+                                        event.calculateCentroid(useCurrent = true)
+                                    } else {
+                                        pressed.first().position
                                     }
-                                    val zoomChange = if (pointerCount >= 2) event.calculateZoom() else 1f
-                                    val rotationChange = if (pointerCount >= 2) event.calculateRotation() else 0f
-                                    cumulativePan += panChange
-                                    cumulativeZoom *= zoomChange
-                                    cumulativeRotationDegrees += rotationChange
+                                    panBaseOffsetX =
+                                        latestSticker.contentOffsetX?.toFloat() ?: panBaseOffsetX
+                                    panBaseOffsetY =
+                                        latestSticker.contentOffsetY?.toFloat() ?: panBaseOffsetY
+                                    if (pointerCount >= 2) {
+                                        val a = pressed[0].position
+                                        val b = pressed[1].position
+                                        pinchStartDistance = (a - b).getDistance()
+                                        pinchBaseScale =
+                                            (latestSticker.contentScale?.toFloat() ?: 1f)
+                                                .coerceAtLeast(1f)
+                                    } else {
+                                        pinchStartDistance = -1f
+                                    }
+                                    lastPointerCount = pointerCount
+                                }
 
-                                    val wasPastTouchSlop = gesturePastTouchSlop
-                                    if (!gesturePastTouchSlop) {
-                                        val centroidSize = event.calculateCentroidSize(useCurrent = false)
-                                        val zoomMotion = abs(1f - cumulativeZoom) * centroidSize
-                                        val rotationMotion = abs(
-                                            Math.toRadians(cumulativeRotationDegrees.toDouble()).toFloat(),
-                                        ) * centroidSize
-                                        val panMotion = cumulativePan.getDistance()
-                                        gesturePastTouchSlop =
-                                            zoomMotion > viewConfiguration.touchSlop ||
+                                val safeScale = if (pointerCount >= 2 && pinchStartDistance > 0f) {
+                                    val a = pressed[0].position
+                                    val b = pressed[1].position
+                                    val dist = (a - b).getDistance()
+                                    (pinchBaseScale * (dist / pinchStartDistance))
+                                        .coerceIn(1f, 4f)
+                                } else {
+                                    (latestSticker.contentScale?.toFloat() ?: startContentScale)
+                                        .coerceAtLeast(1f)
+                                }
+
+                                val centroid = if (pointerCount >= 2) {
+                                    event.calculateCentroid(useCurrent = true)
+                                } else {
+                                    pressed.first().position
+                                }
+                                val translationPx = centroid - panAnchorLocal
+                                // Pantalla px → dp (points iOS), luego / stickerScale (foto dentro del scale).
+                                val proposedOffsetX =
+                                    panBaseOffsetX + (translationPx.x / densityScale) / stickerScale
+                                val proposedOffsetY =
+                                    panBaseOffsetY + (translationPx.y / densityScale) / stickerScale
+                                val offset = clampFrameContentOffset(
+                                    latestSticker,
+                                    proposedOffsetX,
+                                    proposedOffsetY,
+                                    safeScale,
+                                )
+                                latestOnUpdate(
+                                    latestSticker.copy(
+                                        contentScale = safeScale.toDouble(),
+                                        contentOffsetX = offset.first.toDouble(),
+                                        contentOffsetY = offset.second.toDouble(),
+                                    ),
+                                )
+                                event.changes.forEach {
+                                    if (it.positionChanged()) it.consume()
+                                }
+                            } while (event.changes.any { it.pressed })
+                        }
+                    }
+                    else -> Modifier.pointerInput(sticker.id, canvasWidthPx, canvasHeightPx) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            var liveX = latestClamped.first
+                            var liveY = latestClamped.second
+                            var liveScale = latestScale
+                            var liveRotation = latestRotation
+                            val gestureStartScale = latestScale
+                            val gestureStartRotation = latestRotation
+                            var cumulativeZoom = 1f
+                            var cumulativeRotationDegrees = 0f
+                            var gesturePastTouchSlop = false
+                            var latestDraft: StoryStickerDraft? = null
+                            var isOverTrash = false
+                            var transformed = false
+                            var dragged = false
+
+                            // Ancla absoluta en ventana (no se mueve con el offset del sticker).
+                            fun fingerWindow(local: Offset): Offset {
+                                val coords = latestLayoutCoords?.takeIf { it.isAttached }
+                                    ?: return local
+                                return coords.localToWindow(local)
+                            }
+
+                            var anchorCenterX = liveX
+                            var anchorCenterY = liveY
+                            var anchorWindow = fingerWindow(down.position)
+                            var lastPointerCount = 1
+
+                            do {
+                                val event = awaitPointerEvent()
+                                val pressed = event.changes.filter { it.pressed }
+                                val pointerCount = pressed.size
+                                if (pointerCount == 0) break
+
+                                val zoomChange = if (pointerCount >= 2) event.calculateZoom() else 1f
+                                val rotationChange = if (pointerCount >= 2) event.calculateRotation() else 0f
+                                cumulativeZoom *= zoomChange
+                                cumulativeRotationDegrees += rotationChange
+
+                                val centroidLocal = if (pointerCount >= 2) {
+                                    event.calculateCentroid(useCurrent = true)
+                                } else {
+                                    pressed.first().position
+                                }
+                                val fingerWin = fingerWindow(centroidLocal)
+
+                                // Al pasar 1↔2 dedos, reanclar para no saltar.
+                                if (pointerCount != lastPointerCount) {
+                                    anchorCenterX = liveX
+                                    anchorCenterY = liveY
+                                    anchorWindow = fingerWin
+                                    lastPointerCount = pointerCount
+                                }
+
+                                val panFromAnchor = Offset(
+                                    fingerWin.x - anchorWindow.x,
+                                    fingerWin.y - anchorWindow.y,
+                                )
+                                val proposedX = anchorCenterX + panFromAnchor.x
+                                val proposedY = anchorCenterY + panFromAnchor.y
+
+                                if (!gesturePastTouchSlop) {
+                                    val centroidSize = event.calculateCentroidSize(useCurrent = false)
+                                    val zoomMotion = abs(1f - cumulativeZoom) * centroidSize
+                                    val rotationMotion = abs(
+                                        Math.toRadians(cumulativeRotationDegrees.toDouble()).toFloat(),
+                                    ) * centroidSize
+                                    val panMotion = panFromAnchor.getDistance()
+                                    gesturePastTouchSlop =
+                                        zoomMotion > viewConfiguration.touchSlop ||
                                             rotationMotion > viewConfiguration.touchSlop ||
                                             panMotion > viewConfiguration.touchSlop
-                                    }
-                                    val effectivePan = if (!wasPastTouchSlop && gesturePastTouchSlop) {
-                                        cumulativePan
-                                    } else {
-                                        panChange
-                                    }
-
-                                    val active = latestSticker
-                                    if (!gesturePastTouchSlop) {
-                                        // Keep taps still and let child controls retain their click semantics.
-                                    } else if (latestIsContentEditing && active.type == "frame") {
-                                        val safeScale = (
-                                            gestureStartContentScale * cumulativeZoom
-                                            ).coerceIn(1f, 4f)
-                                        val proposedX =
-                                            (active.contentOffsetX?.toFloat() ?: 0f) +
-                                                effectivePan.x / liveScale.coerceAtLeast(.0001f)
-                                        val proposedY =
-                                            (active.contentOffsetY?.toFloat() ?: 0f) +
-                                                effectivePan.y / liveScale.coerceAtLeast(.0001f)
-                                        val offset = clampFrameContentOffset(
-                                            active,
-                                            proposedX,
-                                            proposedY,
-                                            safeScale,
-                                        )
-                                        latestOnUpdate(
-                                            active.copy(
-                                                contentScale = safeScale.toDouble(),
-                                                contentOffsetX = offset.first.toDouble(),
-                                                contentOffsetY = offset.second.toDouble(),
-                                            ),
-                                        )
-                                        transformed = true
-                                    } else if (panChange != Offset.Zero || zoomChange != 1f || rotationChange != 0f) {
-                                        dragged = dragged ||
-                                            cumulativePan.getDistance() > viewConfiguration.touchSlop
-                                        liveX += effectivePan.x
-                                        liveY += effectivePan.y
-                                        liveScale = (
-                                            gestureStartScale * dampedStickerMagnification(cumulativeZoom)
-                                            ).coerceIn(
-                                            latestMinScale,
-                                            latestMaxScale,
-                                        )
-                                        liveRotation = gestureStartRotation + Math.toRadians(
-                                            cumulativeRotationDegrees.toDouble(),
-                                        ).toFloat()
-
-                                        val visual = clampStickerPosition(
-                                            x = liveX,
-                                            y = liveY,
-                                            contentWidthPx = latestContentW,
-                                            contentHeightPx = latestContentH,
-                                            scale = liveScale,
-                                            rotationRadians = liveRotation,
-                                            canvasWidthPx = canvasWidthPx,
-                                            canvasHeightPx = canvasHeightPx,
-                                        )
-                                        isOverTrash = dragged && isPointOverStoryOverlayTrash(
-                                            liveX,
-                                            liveY,
-                                            canvasWidthPx.toFloat(),
-                                            canvasHeightPx.toFloat(),
-                                        )
-                                        val updated = active.copy(
-                                            normalizedX =
-                                                (visual.first / canvasWidthPx).toDouble(),
-                                            normalizedY =
-                                                (visual.second / canvasHeightPx).toDouble(),
-                                            scale = liveScale.toDouble(),
-                                            rotationRadians = liveRotation.toDouble(),
-                                        )
-                                        latestDraft = updated
-                                        transformed = true
-                                        if (dragged) {
-                                            latestOnDragChanged(updated, isOverTrash)
-                                        } else {
-                                            latestOnUpdate(updated)
-                                        }
-                                    }
-                                    event.changes.forEach {
-                                        if (it.positionChanged()) it.consume()
-                                    }
-                                } while (event.changes.any { it.pressed })
-
-                                if (transformed) {
-                                    latestDraft?.let { draft ->
-                                        if (dragged) {
-                                            latestOnDragEnded(draft, isOverTrash)
-                                        } else {
-                                            latestOnUpdate(draft)
-                                        }
-                                    }
-                                } else if (!latestIsContentEditing) {
-                                    interactionFeedback = true
-                                    HapticManager.shared.lightImpact()
-                                    latestOnStickerTapped(latestSticker)
                                 }
+
+                                val active = latestSticker
+                                if (!gesturePastTouchSlop) {
+                                    // Tap todavía posible.
+                                } else {
+                                    dragged = dragged ||
+                                        panFromAnchor.getDistance() > viewConfiguration.touchSlop
+                                    liveX = proposedX
+                                    liveY = proposedY
+                                    liveScale = (
+                                        gestureStartScale * dampedStickerMagnification(cumulativeZoom)
+                                        ).coerceIn(latestMinScale, latestMaxScale)
+                                    liveRotation = gestureStartRotation + Math.toRadians(
+                                        cumulativeRotationDegrees.toDouble(),
+                                    ).toFloat()
+
+                                    val visual = clampStickerPosition(
+                                        x = liveX,
+                                        y = liveY,
+                                        contentWidthPx = latestContentW,
+                                        contentHeightPx = latestContentH,
+                                        scale = liveScale,
+                                        rotationRadians = liveRotation,
+                                        canvasWidthPx = canvasWidthPx,
+                                        canvasHeightPx = canvasHeightPx,
+                                    )
+                                    // Papelera con centro propuesto sin clamp: con scale grande
+                                    // el clamp deja el centro lejos de la zona inferior.
+                                    isOverTrash = dragged && isPointOverStoryOverlayTrash(
+                                        liveX,
+                                        liveY,
+                                        canvasWidthPx.toFloat(),
+                                        canvasHeightPx.toFloat(),
+                                        density,
+                                    )
+                                    val updated = active.copy(
+                                        normalizedX = (visual.first / canvasWidthPx).toDouble(),
+                                        normalizedY = (visual.second / canvasHeightPx).toDouble(),
+                                        scale = liveScale.toDouble(),
+                                        rotationRadians = liveRotation.toDouble(),
+                                    )
+                                    latestDraft = updated
+                                    transformed = true
+                                    if (dragged) {
+                                        latestOnDragChanged(updated, isOverTrash)
+                                    } else {
+                                        latestOnUpdate(updated)
+                                    }
+                                }
+                                event.changes.forEach {
+                                    if (it.positionChanged()) it.consume()
+                                }
+                            } while (event.changes.any { it.pressed })
+
+                            if (transformed) {
+                                latestDraft?.let { draft ->
+                                    if (dragged) {
+                                        latestOnDragEnded(draft, isOverTrash)
+                                    } else {
+                                        latestOnUpdate(draft)
+                                    }
+                                }
+                            } else {
+                                interactionFeedback = true
+                                HapticManager.shared.lightImpact()
+                                latestOnStickerTapped(latestSticker)
                             }
                         }
+                    }
                 },
             ),
+        contentAlignment = Alignment.Center,
     ) {
-        content()
+        Box(
+            Modifier
+                .wrapContentSize()
+                .onSizeChanged {
+                    naturalWidthPx = it.width
+                    naturalHeightPx = it.height
+                }
+                .graphicsLayer {
+                    // Escala visual completa; el padre solo amplía el hit-target (max(scale, 1)).
+                    scaleX = currentScale * feedbackScale
+                    scaleY = currentScale * feedbackScale
+                    rotationZ = Math.toDegrees(currentRotation.toDouble()).toFloat()
+                    transformOrigin = TransformOrigin.Center
+                },
+        ) {
+            content()
+        }
     }
 }
 

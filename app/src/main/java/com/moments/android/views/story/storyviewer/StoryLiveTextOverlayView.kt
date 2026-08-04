@@ -47,7 +47,9 @@ fun StoryLiveTextOverlayView(
         }
         if (!styleKnown) return@BoxWithConstraints
 
-        val config = metadata.scaledRenderConfiguration(container.width)
+        // iOS usa points; Android container está en px → dp para el factor 375.
+        val containerWidthDp = with(density) { container.width.toDp().value }
+        val config = metadata.scaledRenderConfiguration(containerWidthDp)
         val anchor = metadata.displayPosition(container)
         val maxWidth = with(density) { (container.width - 48f).coerceAtLeast(120f).toDp() }
         var contentWidthPx by remember(metadata.id) { mutableFloatStateOf(0f) }

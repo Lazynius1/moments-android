@@ -70,6 +70,7 @@ import coil.compose.AsyncImage
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
 import com.moments.android.extensions.fromHex
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
 import com.moments.android.models.Story
@@ -143,8 +144,9 @@ fun GlassmorphicActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // ≡ iOS: blanco / rojo sobre storyGlassmorphic
-    val titleColor = if (isDestructive) Color.Red else Color.White
+    val isDark = isSystemInDarkTheme()
+    val chromeFg = MomentsChromeGlass.contentColor(isDark)
+    val titleColor = if (isDestructive) Color.Red else chromeFg
     Row(
         modifier
             .fillMaxWidth()
@@ -161,7 +163,7 @@ fun GlassmorphicActionButton(
         Column(Modifier.weight(1f)) {
             Text(title, color = titleColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             subtitle?.let {
-                Text(it, color = Color.White.copy(0.7f), fontSize = 11.sp)
+                Text(it, color = chromeFg.copy(0.7f), fontSize = 11.sp)
             }
         }
     }
@@ -169,6 +171,7 @@ fun GlassmorphicActionButton(
 
 @Composable
 fun GlassmorphicSuccessMessage(text: String, modifier: Modifier = Modifier) {
+    val chromeFg = MomentsChromeGlass.contentColor(isSystemInDarkTheme())
     Row(
         modifier
             .clip(RoundedCornerShape(percent = 50))
@@ -185,7 +188,7 @@ fun GlassmorphicSuccessMessage(text: String, modifier: Modifier = Modifier) {
         )
         Text(
             text,
-            color = Color.White,
+            color = chromeFg,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
         )

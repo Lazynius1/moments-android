@@ -427,7 +427,7 @@ open class EnhancedChatViewModel(
     }
 
     fun commitMessagesPresentation(nextMessages: List<EnhancedMessage>) {
-        // ≡ iOS: no reordenar aquí; el orden ya viene de `messageTimelinePrecedes`.
+        // No reordenar aquí; el orden ya viene de messageTimelinePrecedes.
         _chatTimelineMutation.value = forcedNextTimelineMutation
             ?: deriveTimelineMutation(_messages.value, nextMessages)
         forcedNextTimelineMutation = null
@@ -639,6 +639,26 @@ open class EnhancedChatViewModel(
     }
 
     private fun applyFirestoreListenerMessages(incoming: List<EnhancedMessage>) {
+        // Mensajes que salen del limitToLast se promueven a histórico (no se pierden).
+        val newSet = incoming.map { it.id }.toSet()
+        val droppedMessages = realTimeMessages.filter { it.id !in newSet }
+        if (droppedMessages.isNotEmpty()) {
+            // Vanish que desaparecen del snapshot = purga server-side → no promover.
+            val droppedVanishIds = droppedMessages
+                .filter { it.isVanishModeMessage && it.type != MessageType.CHAT_NOTICE }
+                .map { it.id }
+            if (droppedVanishIds.isNotEmpty()) {
+                optimisticallyHiddenVanishIds += droppedVanishIds
+                for (id in droppedVanishIds) outgoingTempMessages.remove(id)
+                chatService.purgeVanishMessagesLocally(conversationId, droppedVanishIds)
+            }
+            val droppedVanishIdSet = droppedVanishIds.toSet()
+            val promotable = messagesRespectingDeletionCutoff(droppedMessages)
+                .filter { it.id !in droppedVanishIdSet }
+            val existingIds = (historicalMessages + realTimeMessages).map { it.id }.toSet()
+            historicalMessages += promotable.filter { it.id !in existingIds }
+        }
+
         val existing = (historicalMessages + realTimeMessages + _messages.value).associateBy { it.id }
         realTimeMessages.clear()
         realTimeMessages += incoming.map { message ->
@@ -672,6 +692,7 @@ open class EnhancedChatViewModel(
         chatService.listenToMessages(
             conversationId,
             cutoffDate = effectiveDeletedAtCutoff(),
+            replaceExisting = false,
         ) { result ->
             result.onSuccess(::applyFirestoreListenerMessages).onFailure { _error.value = it.message }
         }
@@ -705,7 +726,7 @@ open class EnhancedChatViewModel(
                 ChatDraftEvents.emit(ChatDraftEvent.VanishModeChanged(conversationId, true))
             }
         }
-        chatService.listenToMessageReactions(conversationId) { result ->
+        chatService.listenToMessageReactions(conversationId, replaceExisting = false) { result ->
             result.onSuccess { update -> applyReactionUpdate(update, conversationId) }
                 .onFailure { _error.value = it.message }
         }
@@ -1146,6 +1167,10 @@ open class EnhancedChatViewModel(
         (this as? MomentsChatViewModel)?.syncMessagePresentation()
     }
 
+    /**
+     * Carga página anterior: disco primero; si hay prepend visible, sale y el
+     * siguiente scroll continúa. Si no, Firebase; fin solo cuando no hay más.
+     */
     fun loadMoreMessages() = scope.launch {
         val oldest = _messages.value.firstOrNull() ?: return@launch
         if (_isLoadingMore.value || !_canLoadMore.value || conversationId.isBlank()) return@launch
@@ -1156,6 +1181,7 @@ open class EnhancedChatViewModel(
         val cutoff = effectiveDeletedAtCutoff()
         val pageSize = historyPageSize
         var remoteCursor = MessageSyncCursor(oldest.timestamp, oldest.id)
+        var didPrependVisible = false
 
         val localPage = LocalPersistenceService.loadMessagesBeforeInBackground(
             conversationId = conversationId,
@@ -1165,18 +1191,29 @@ open class EnhancedChatViewModel(
         )
         if (localPage.isNotEmpty()) {
             if (prependHistoryPage(localPage)) {
+                didPrependVisible = true
+                // Tras prepend local visible, salir con canLoadMore=true.
+                // No pedir Firebase en la misma pasada: un snapshot vacío/corto
+                // marcaría canLoadMore=false y cortaría el historial.
                 finishHistoryLoad(canLoadMore = true)
+                scheduleHistoryScrollRestorationFallback()
                 return@launch
-            }
-            localPage.firstOrNull()?.let { oldestExamined ->
-                remoteCursor = MessageSyncCursor(oldestExamined.timestamp, oldestExamined.id)
+            } else {
+                localPage.firstOrNull()?.let { oldestExamined ->
+                    remoteCursor = MessageSyncCursor(oldestExamined.timestamp, oldestExamined.id)
+                }
             }
         }
 
         if (!NetworkMonitor.isConnected) {
-            _historyLoadNotice.value = HistoryLoadNotice.OFFLINE
-            finishHistoryLoad(canLoadMore = _canLoadMore.value)
-            endHistoryScrollRestoration()
+            if (didPrependVisible) {
+                finishHistoryLoad(canLoadMore = true)
+                scheduleHistoryScrollRestorationFallback()
+            } else {
+                _historyLoadNotice.value = HistoryLoadNotice.OFFLINE
+                finishHistoryLoad(canLoadMore = _canLoadMore.value)
+                endHistoryScrollRestoration()
+            }
             return@launch
         }
 
@@ -1188,8 +1225,12 @@ open class EnhancedChatViewModel(
                 limit = pageSize,
             ).getOrElse {
                 _historyLoadNotice.value = HistoryLoadNotice.ERROR
-                finishHistoryLoad(canLoadMore = _canLoadMore.value)
-                endHistoryScrollRestoration()
+                finishHistoryLoad(canLoadMore = true)
+                if (didPrependVisible) {
+                    scheduleHistoryScrollRestorationFallback()
+                } else {
+                    endHistoryScrollRestoration()
+                }
                 return@launch
             }
             val existingIds = (historicalMessages + realTimeMessages).map { it.id }.toSet()
@@ -1200,6 +1241,7 @@ open class EnhancedChatViewModel(
                 LocalPersistenceService.appendMessagesInBackground(novel, conversationId)
                 if (prependHistoryPage(novel)) {
                     finishHistoryLoad(canLoadMore = page.hasMore)
+                    scheduleHistoryScrollRestorationFallback()
                     return@launch
                 }
             }
@@ -1210,6 +1252,14 @@ open class EnhancedChatViewModel(
                 return@launch
             }
             remoteCursor = next
+        }
+    }
+
+    /** Si `onPrependFinished` no llega (kind mal clasificado / race con listener), desbloquea load more. */
+    private fun scheduleHistoryScrollRestorationFallback() {
+        scope.launch {
+            delay(900)
+            if (_isLoadingOlderHistory.value) endHistoryScrollRestoration()
         }
     }
 
@@ -1269,7 +1319,7 @@ open class EnhancedChatViewModel(
                 }
             }
         }
-        // ≡ iOS: mensajes outgoing stuck en sending/pending/failed → outgoingTempMessages
+        // Mensajes outgoing stuck en sending/pending/failed → outgoingTempMessages
         val now = Date().time
         recent = recent.map { message ->
             if (message.senderId != currentUserId) return@map message

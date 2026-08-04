@@ -621,6 +621,7 @@ private fun StoryStickerRendererContent(
     onMentionTap: (String) -> Unit,
     onMomentTap: (momentId: String, authorId: String) -> Unit,
 ) {
+    val density = LocalDensity.current.density
     stickers
         .filterNot { it.type == "frame" || it.type == "reveal" }
         .sortedBy { it.zIndex ?: 0 }
@@ -631,7 +632,18 @@ private fun StoryStickerRendererContent(
                 widthPx,
                 heightPx,
             )
-            val displayScale = StoryViewerLayoutHelpers.stickerDisplayScale(sticker.scale, widthPx)
+            val displayScale = StoryViewerLayoutHelpers.stickerDisplayScale(
+                sticker.scale,
+                widthPx,
+                density,
+            )
+            android.util.Log.d(
+                "StoryStickerScale",
+                "view type=${sticker.type} firestoreScale=${sticker.scale} " +
+                    "canvasPx=$widthPx density=$density " +
+                    "widthDp=${StoryViewerLayoutHelpers.canvasWidthDp(widthPx, density)} " +
+                    "displayScale=$displayScale",
+            )
             var contentWidthPx by remember(sticker.stickerId, sticker.content) { mutableFloatStateOf(0f) }
             var contentHeightPx by remember(sticker.stickerId, sticker.content) { mutableFloatStateOf(0f) }
             val exclusionId = "sticker.$storyId.${sticker.stickerId.orEmpty()}"

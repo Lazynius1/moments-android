@@ -38,22 +38,31 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
 /**
- * Lista de chat Compose al estilo apps grandes (Telegram/WhatsApp/Signal):
- * `LazyColumn(reverseLayout = true)` + filas newest-first en el adapter.
+ * Lista de chat Compose: `LazyColumn(reverseLayout = true)` + filas newest-first
+ * en el adapter.
  *
  * Contrato de datos de [ChatListUpdateTransaction.rows]: cronológico oldest→newest
- * (igual que iOS / ViewModel). Aquí se invierte solo para el layout.
- *
- * No portamos UICollectionView/UIKit: sí el contrato de
- * transacciones/intents/commands/viewport de `ChatMessageListView.swift`.
+ * (igual que el ViewModel). Aquí se invierte solo para el layout.
  */
 
-/** ≡ iOS `ChatListLayoutMetrics` (interSectionSpacing / insets de sección). */
+/** Métricas de layout de la lista (espaciado e insets de sección). */
 object ChatListLayoutMetrics {
     val interGroupSpacing = 2.dp
     val sectionTopInset = 10.dp
     val sectionBottomInset = 4.dp
 }
+
+private const val LOAD_OLDER_SCROLL_THRESHOLD = 25
+private const val LOAD_OLDER_IDLE_THRESHOLD = 5
+
+/** Snapshot ligero para el flow de carga de historial. */
+private data class HistoryLoadViewport(
+    val signature: List<Pair<Int, Int>>,
+    val topish: Int,
+    val lastIndex: Int,
+    val rowCount: Int,
+    val scrolling: Boolean,
+)
 
 data class ChatListRow(
     val id: String,
@@ -99,18 +108,18 @@ internal data class PendingScrollRequest(val id: String, val animated: Boolean)
 
 @Stable
 class ChatMessageListController {
-    /** ≡ iOS `ChatMessageListController.timestampRevealState` — compartido por todas las filas. */
+    /** Estado de reveal de timestamp compartido por todas las filas. */
     val timestampRevealState = ChatTimestampRevealState()
     var initialScrollPolicy by mutableStateOf<ChatListInitialScrollPolicy>(ChatListInitialScrollPolicy.AutomaticBottom)
     internal var nextIntent by mutableStateOf<ChatListScrollIntent?>(null)
     internal var command by mutableStateOf<ChatListScrollCommand>(ChatListScrollCommand.None)
-    /** bump para forzar recomposición de filas visibles (≡ `reconfigureVisible`). */
+    /** Bump para forzar recomposición de filas visibles. */
     var reconfigureGeneration by mutableIntStateOf(0)
         private set
 
     var isAtBottom by mutableStateOf(true)
         private set
-    /** ≡ iOS `isStrictlyAtBottom` — pegado real al mensaje más reciente. */
+    /** Pegado real al mensaje más reciente. */
     var isStrictlyAtBottom by mutableStateOf(true)
         private set
     var contentExceedsViewport by mutableStateOf(false)
@@ -191,14 +200,12 @@ class ChatMessageListController {
     }
 
     /**
-     * Frame de fila en coordenadas de ventana (≡ iOS UIKit `frameInWindow`).
+     * Frame de fila en coordenadas de ventana.
      * Se rellena vía [reportRowFrame] en el item Compose.
      */
     fun frameInWindow(forRowId: String): Rect? = rowFramesInWindow[forRowId]
 
-    /**
-     * ≡ iOS `resetVanishPullState` — limpia lift/overlay del pull-to-vanish.
-     */
+    /** Limpia lift/overlay del pull-to-vanish. */
     var vanishPullResetSignal by mutableIntStateOf(0)
         private set
 
@@ -240,7 +247,7 @@ class ChatMessageListController {
      * Con `reverseLayout`, índice 0 = fondo (mensaje más reciente).
      * “Arriba” (historial viejo) = índices altos.
      *
-     * [distanceFromBottom] ≡ iOS (píxeles al borde inferior), no índice de fila —
+     * [distanceFromBottom] es en píxeles al borde inferior, no índice de fila —
      * search usa umbral `> 16`.
      */
     internal fun updateViewport(state: LazyListState, displayRows: List<ChatListRow>) {
@@ -356,13 +363,11 @@ fun ChatMessageListView(
     onPrependFinished: () -> Unit = {},
     onPrefetchRows: (List<ChatListRow>) -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-    /** ≡ iOS `isVanishGestureEnabled` */
     isVanishGestureEnabled: Boolean = true,
-    /** ≡ iOS `isVanishModeActive` */
     isVanishModeActive: Boolean = false,
-    /** ≡ iOS `composerBottomInset` (para posicionar overlay). */
+    /** Inset inferior del composer (para posicionar overlay). */
     composerBottomInset: Dp = 0.dp,
-    /** Row id con menú/highlight activo — eleva el slot LazyColumn (≡ iOS zIndex 100). */
+    /** Row id con menú/highlight activo — eleva el slot LazyColumn. */
     elevatedRowId: String? = null,
     onVanishPullReleased: (VanishPullResult) -> Unit = {},
     rowContent: @Composable (ChatListRow) -> Unit,
@@ -383,6 +388,10 @@ fun ChatMessageListView(
     var displayIndexByMessageId by remember { mutableStateOf(emptyMap<String, Int>()) }
     var hasLoadedInitial by remember { mutableStateOf(false) }
     var historyLoadArmed by remember { mutableStateOf(true) }
+    val displayRowsUpdated = rememberUpdatedState(displayRows)
+    val onReachedTopUpdated = rememberUpdatedState(onReachedTop)
+    val onContentExtentChangedUpdated = rememberUpdatedState(onContentExtentChanged)
+    val onPrefetchRowsUpdated = rememberUpdatedState(onPrefetchRows)
 
     fun rebuildIndices(chrono: List<ChatListRow>) {
         chronoRows = chrono
@@ -415,7 +424,7 @@ fun ChatMessageListView(
         when (command) {
             is ChatListScrollCommand.Bottom -> {
                 if (displayRows.isEmpty()) return
-                // ≡ forceScrollToBottom(allowDuringNavigation: true)
+                // forceScrollToBottom(allowDuringNavigation = true)
                 controller.resetVanishPullState(animated = false)
                 state.goTo(0, command.animated)
             }
@@ -487,6 +496,7 @@ fun ChatMessageListView(
         rebuildIndices(transaction.rows)
 
         if (normalized == ChatListUpdateKind.PREPEND_HISTORY) {
+            // Suppress solo durante el scrollToItem programático.
             controller.suppressHistoryLoadUntilNextUserScroll = true
             val anchorId = previousAnchorId ?: transaction.anchorRowId
             if (anchorId != null && displayIndexById.containsKey(anchorId)) {
@@ -498,7 +508,14 @@ fun ChatMessageListView(
                     controller.isProgrammaticScroll = false
                 }
             }
+            controller.suppressHistoryLoadUntilNextUserScroll = false
             onPrependFinished()
+            // Si tras insertar sigues cerca del tope, encadena otra página.
+            val topish = state.layoutInfo.visibleItemsInfo.maxOfOrNull { it.index } ?: 0
+            val distanceFromOldest = (displayRows.lastIndex - topish).coerceAtLeast(0)
+            if (displayRows.isNotEmpty() && distanceFromOldest <= LOAD_OLDER_IDLE_THRESHOLD) {
+                onReachedTop()
+            }
             applyScrollCommand(transaction.scrollCommand)
             resolvePendingScrollIfPossible()
             return@LaunchedEffect
@@ -581,7 +598,7 @@ fun ChatMessageListView(
         controller.consumeIntent()
     }
 
-    // Gesto de usuario: liberar suppress + nav target (≡ scrollViewWillBeginDragging).
+    // Gesto de usuario: liberar suppress + nav target.
     // NO terminar vanish aquí: al enganchar el pull, isScrollInProgress pasa a false
     // (la lista ya no scrollea) y eso mataba el gesto a los pocos px → shake.
     LaunchedEffect(state) {
@@ -602,16 +619,26 @@ fun ChatMessageListView(
         if (!isVanishGestureEnabled) vanishPull.reset()
     }
 
-    LaunchedEffect(state, displayRows) {
+    // No keyear por displayRows: cancelaba el delay y dejaba armed=false para siempre.
+    LaunchedEffect(state) {
         snapshotFlow {
-            state.layoutInfo.visibleItemsInfo.map { it.index to it.offset }
+            val rows = displayRowsUpdated.value
+            val visible = state.layoutInfo.visibleItemsInfo
+            val topish = visible.maxOfOrNull { it.index } ?: 0
+            HistoryLoadViewport(
+                signature = visible.map { it.index to it.offset },
+                topish = topish,
+                lastIndex = rows.lastIndex,
+                rowCount = rows.size,
+                scrolling = state.isScrollInProgress && !controller.isProgrammaticScroll,
+            )
         }
             .distinctUntilChanged()
-            .collect {
-                controller.updateViewport(state, displayRows)
-                onContentExtentChanged(controller.contentExceedsViewport)
+            .collect { vp ->
+                val rows = displayRowsUpdated.value
+                controller.updateViewport(state, rows)
+                onContentExtentChangedUpdated.value(controller.contentExceedsViewport)
 
-                // ≡ iOS: solo limpiar si el usuario se fue del fondo y ya no arrastra vanish.
                 if (!controller.isStrictlyAtBottom &&
                     vanishPull.isActive &&
                     !vanishPull.isDragging
@@ -619,22 +646,27 @@ fun ChatMessageListView(
                     vanishPull.reset()
                 }
 
-                val topish = state.layoutInfo.visibleItemsInfo.maxOfOrNull { it.index } ?: 0
-                if (historyLoadArmed &&
-                    !controller.suppressHistoryLoadUntilNextUserScroll &&
-                    displayRows.isNotEmpty() &&
-                    topish >= (displayRows.lastIndex - 10).coerceAtLeast(0)
-                ) {
-                    historyLoadArmed = false
-                    onReachedTop()
-                    delay(350)
-                    historyLoadArmed = true
+                // residual hacia el historial viejo (índices altos con reverseLayout)
+                val distanceFromOldest = (vp.lastIndex - vp.topish).coerceAtLeast(0)
+                val checkLoadCount =
+                    if (vp.scrolling) LOAD_OLDER_SCROLL_THRESHOLD else LOAD_OLDER_IDLE_THRESHOLD
+                val shouldLoad = vp.rowCount > 0 && distanceFromOldest <= checkLoadCount
+                if (shouldLoad) {
+                    if (historyLoadArmed && !controller.suppressHistoryLoadUntilNextUserScroll) {
+                        historyLoadArmed = false
+                        try {
+                            onReachedTopUpdated.value()
+                            delay(350)
+                        } finally {
+                            historyLoadArmed = true
+                        }
+                    }
                 }
 
                 val first = state.firstVisibleItemIndex
                 val from = (first - 5).coerceAtLeast(0)
-                val to = (first + 40).coerceAtMost(displayRows.size)
-                if (from < to) onPrefetchRows(displayRows.subList(from, to))
+                val to = (first + 40).coerceAtMost(rows.size)
+                if (from < to) onPrefetchRowsUpdated.value(rows.subList(from, to))
             }
     }
 
@@ -655,7 +687,7 @@ fun ChatMessageListView(
     // Solo elevación del vanish pull. Un offset fijo de reposo (+Y) empujaba el
     // último mensaje debajo del composer (contentPadding ya despeja el input).
     val threadTranslationPx = -liftPx
-    // Patrón sinasamaki: nestedScroll en el padre; LazyColumn con overscrollEffect=null
+    // nestedScroll en el padre; LazyColumn con overscrollEffect=null
     // para que el sobrante llegue a onPostScroll (el glow nativo se lo comía).
     Box(
         modifier
@@ -691,8 +723,8 @@ fun ChatMessageListView(
                 items = displayRows,
                 key = { _, row -> "${row.id}|${row.visualSignature}|$reconfigureGen" },
             ) { _, row ->
-                // ≡ iOS `.zIndex(100)` en la fila seleccionada: el lift/scale debe
-                // ganar a vecinos del LazyColumn (zIndex solo vale entre siblings).
+                // En la fila seleccionada el lift/scale debe ganar a vecinos
+                // (zIndex solo vale entre siblings).
                 Box(
                     Modifier
                         .zIndex(if (row.id == elevatedRowId) 100f else 0f)

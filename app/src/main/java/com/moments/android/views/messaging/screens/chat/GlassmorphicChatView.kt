@@ -155,6 +155,7 @@ fun GlassmorphicChatView(
     val context = LocalContext.current
     val colors = rememberAdaptiveColors()
     val messages by session.messages.collectAsState()
+    val timelineMutation by session.chatTimelineMutation.collectAsState()
     val downloadProgress by session.downloadProgress.collectAsState()
     val searching by session.isSearchingHistory.collectAsState()
     val canLoadMore by session.canLoadMore.collectAsState()
@@ -567,7 +568,9 @@ fun GlassmorphicChatView(
             hasTypingUsers = typingUsers.isNotEmpty(),
         )
     }
-    val transaction = chatListTransaction(session, rows) { id -> rows.firstOrNull { id in rowMessageIds(it) }?.id }
+    val transaction = remember(rows, timelineMutation) {
+        chatListTransaction(session, rows) { id -> rows.firstOrNull { id in rowMessageIds(it) }?.id }
+    }
     val renderer = ChatMessageRendererCallbacks(
         otherParticipantName = displayName,
         otherParticipantId = conversation.otherParticipantId,
