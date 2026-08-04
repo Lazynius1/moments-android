@@ -17,6 +17,9 @@ import androidx.compose.runtime.setValue
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.moments.android.activities.LiveActivityThumbnailStore
+import com.moments.android.activities.StoryUploadActivityAttributes
+import com.moments.android.activities.UploadProgressNotificationHelper
 import com.moments.android.coordinators.CoordinatorNavigationEvent
 import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.moderation.MediaModerationAction
@@ -114,7 +117,7 @@ class UploadingStory(
 
 /**
  * Port de `BackgroundStoryUploadService.swift` (`Views/Creator`).
- * Live Activity / ActivityKit → 🚫 (no-op honesto).
+ * ActivityKit → notificación ongoing ([UploadProgressNotificationHelper]).
  */
 object BackgroundStoryUploadService {
 
@@ -212,7 +215,7 @@ object BackgroundStoryUploadService {
         uploadingStory = story
         isProcessing = true
         StoryUploadProgressManager.startUpload()
-        startLiveActivity()
+        startLiveActivity(story)
         return story
     }
 
@@ -234,6 +237,8 @@ object BackgroundStoryUploadService {
         StoryUploadProgressManager.updateProgress(0.0)
         this.uploadingStory = uploadingStory
         isProcessing = true
+        // Thumbnail ya disponible — reinicia notif de progreso (≡ Live Activity).
+        startLiveActivity(uploadingStory)
 
         uploadScope.launch {
             if (shouldPersistAction) {
@@ -1460,7 +1465,17 @@ object BackgroundStoryUploadService {
             story.uploadProgress = clamped
             story.status = status
         }
-        updateLiveActivity(clamped, status.name.lowercase())
+        val statusString = when (status) {
+            UploadStatus.Initializing, UploadStatus.Uploading ->
+                StoryUploadActivityAttributes.ContentState.STATUS_UPLOADING
+            UploadStatus.Processing, UploadStatus.Moderated ->
+                StoryUploadActivityAttributes.ContentState.STATUS_PROCESSING
+            UploadStatus.Completed ->
+                StoryUploadActivityAttributes.ContentState.STATUS_COMPLETED
+            UploadStatus.Failed ->
+                StoryUploadActivityAttributes.ContentState.STATUS_FAILED
+        }
+        updateLiveActivity(clamped, statusString)
     }
 
     private fun failAction(actionId: String, message: String?) {
@@ -1476,7 +1491,11 @@ object BackgroundStoryUploadService {
             story.uploadProgress = 0.0
         }
         isProcessing = false
-        endLiveActivity()
+        updateLiveActivity(0.0, StoryUploadActivityAttributes.ContentState.STATUS_FAILED)
+        uploadScope.launch {
+            delay(2_000)
+            endLiveActivity()
+        }
     }
 
     private fun finishSuccess(action: CachedAction) {
@@ -1488,14 +1507,66 @@ object BackgroundStoryUploadService {
             story.uploadProgress = 1.0
         }
         NavigationEventBus.emit(CoordinatorNavigationEvent.StoryUploaded)
-        endLiveActivity()
+        updateLiveActivity(1.0, StoryUploadActivityAttributes.ContentState.STATUS_COMPLETED)
+        uploadScope.launch {
+            delay(3_000)
+            endLiveActivity()
+        }
     }
 
-    // Live Activity stubs (ActivityKit 🚫)
-    @Suppress("unused")
-    private fun startLiveActivity() = Unit
-    @Suppress("unused")
-    private fun updateLiveActivity(progress: Double, status: String) = Unit
-    @Suppress("unused")
-    private fun endLiveActivity() = Unit
+    // MARK: - Upload progress notification (≡ iOS ActivityKit Live Activity)
+
+    private var liveActivityAttributes: StoryUploadActivityAttributes? = null
+    private var liveActivityStoryId: String? = null
+
+    private fun startLiveActivity(story: UploadingStory? = uploadingStory) {
+        val ctx = appContext ?: return
+        val uploading = story ?: return
+        val previewName = uploading.thumbnailBitmap?.let {
+            LiveActivityThumbnailStore.save(ctx, it, uploading.tempId)
+        }
+        val attrs = StoryUploadActivityAttributes(
+            storyId = uploading.tempId,
+            mediaType = if (uploading.mediaItem.isVideo) "video" else "image",
+            previewImageFileName = previewName,
+        )
+        liveActivityAttributes = attrs
+        liveActivityStoryId = uploading.tempId
+        UploadProgressNotificationHelper.showStoryUpload(
+            ctx,
+            attrs,
+            StoryUploadActivityAttributes.ContentState(
+                progress = uploading.uploadProgress.coerceIn(0.0, 1.0),
+                status = StoryUploadActivityAttributes.ContentState.STATUS_UPLOADING,
+            ),
+        )
+    }
+
+    private fun updateLiveActivity(progress: Double, status: String) {
+        val ctx = appContext ?: return
+        val attrs = liveActivityAttributes ?: return
+        val previewName = attrs.previewImageFileName ?: run {
+            uploadingStory?.thumbnailBitmap?.let {
+                LiveActivityThumbnailStore.save(ctx, it, attrs.storyId)
+            }
+        }
+        val resolved = if (previewName != null && previewName != attrs.previewImageFileName) {
+            attrs.copy(previewImageFileName = previewName).also { liveActivityAttributes = it }
+        } else {
+            attrs
+        }
+        UploadProgressNotificationHelper.showStoryUpload(
+            ctx,
+            resolved,
+            StoryUploadActivityAttributes.ContentState(progress = progress, status = status),
+        )
+    }
+
+    private fun endLiveActivity() {
+        val ctx = appContext ?: return
+        val id = liveActivityStoryId ?: return
+        UploadProgressNotificationHelper.cancelStoryUpload(ctx, id)
+        liveActivityAttributes = null
+        liveActivityStoryId = null
+    }
 }

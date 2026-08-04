@@ -30,6 +30,13 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${GOOGLE_MAPS_API_KEY}" />
+        <!-- FCM: silueta blanca si el sistema pinta el push sin pasar por nuestro Builder. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_moments" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

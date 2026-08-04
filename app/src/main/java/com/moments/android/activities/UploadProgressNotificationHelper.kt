@@ -129,7 +129,9 @@ object UploadProgressNotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_upload)
+            // Silueta blanca Moments (mismo que push / chat) — no icono genérico del sistema.
+            .setSmallIcon(R.drawable.ic_stat_moments)
+            .setColor(context.getColor(R.color.notification_accent))
             .setContentTitle(title)
             .setContentText(body)
             .setContentIntent(pendingIntent)

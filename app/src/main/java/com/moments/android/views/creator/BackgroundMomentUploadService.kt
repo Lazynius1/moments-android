@@ -14,6 +14,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
+import com.moments.android.activities.LiveActivityThumbnailStore
+import com.moments.android.activities.MomentUploadActivityAttributes
+import com.moments.android.activities.UploadProgressNotificationHelper
 import com.moments.android.models.CachedHiddenLayerDraft
 import com.moments.android.models.CachedUploadMediaItem
 import com.moments.android.models.HiddenLayerImageFrameStyle
@@ -246,7 +249,7 @@ object BackgroundMomentUploadService {
         uploadingMoments.add(uploadingMoment)
         isProcessing = true
         trackProgress(uploadingMoment)
-        startLiveActivity(uploadingMoment) // stub ActivityKit
+        startLiveActivity(uploadingMoment)
 
         val job = scope.launch {
             try {
@@ -321,6 +324,8 @@ object BackgroundMomentUploadService {
         } catch (e: Exception) {
             if (job?.isCancelled == true || !scope.isActive) return
             updateProgress(uploadingMoment, 0.0, UploadStatus.Failed, e.message)
+            delay(2_000)
+            endLiveActivityAsync()
             delay(500)
             resumeFeedListeners()
         }
@@ -644,30 +649,87 @@ object BackgroundMomentUploadService {
         val storagePrefix = "users/${moment.userId}/moments/${moment.plannedMomentId}/"
         runningUploadJobs.remove(moment.tempId)?.cancel()
         MediaUploadService.cancelUploads(storagePrefix)
+        if (liveActivityMomentId == moment.tempId) endLiveActivity()
         removeUploadingMoment(moment)
     }
 
-    // MARK: - Live Activity stubs (ActivityKit iOS-only 🚫)
+    // MARK: - Upload progress notification (≡ iOS ActivityKit Live Activity)
 
-    @Suppress("UNUSED_PARAMETER")
-    private fun startLiveActivity(uploadingMoment: UploadingMoment) = Unit
+    private var liveActivityAttributes: MomentUploadActivityAttributes? = null
+    private var liveActivityMomentId: String? = null
 
-    @Suppress("UNUSED_PARAMETER")
-    private fun updateLiveActivity(progress: Double, status: String) = Unit
+    private fun startLiveActivity(uploadingMoment: UploadingMoment) {
+        val ctx = appContext ?: return
+        val hasVideo = uploadingMoment.mediaItems.any { it.isVideo }
+        val hasImage = uploadingMoment.mediaItems.any { !it.isVideo }
+        val mediaType = when {
+            hasVideo && hasImage -> "mixed"
+            hasVideo -> "video"
+            else -> "image"
+        }
+        val previewName = uploadingMoment.thumbnailBitmap?.let {
+            LiveActivityThumbnailStore.save(ctx, it, uploadingMoment.tempId)
+        }
+        val attrs = MomentUploadActivityAttributes(
+            momentId = uploadingMoment.tempId,
+            mediaType = mediaType,
+            mediaCount = uploadingMoment.mediaCount,
+            previewImageFileName = previewName,
+        )
+        liveActivityAttributes = attrs
+        liveActivityMomentId = uploadingMoment.tempId
+        UploadProgressNotificationHelper.showMomentUpload(
+            ctx,
+            attrs,
+            MomentUploadActivityAttributes.ContentState(
+                progress = 0.0,
+                status = MomentUploadActivityAttributes.ContentState.STATUS_UPLOADING,
+            ),
+        )
+    }
 
-    /** iOS async variant — mismo no-op en Android. */
-    @Suppress("UNUSED_PARAMETER")
+    private fun updateLiveActivity(progress: Double, status: String) {
+        val ctx = appContext ?: return
+        val attrs = liveActivityAttributes ?: return
+        // Refresh preview once thumbnail becomes available mid-upload.
+        val previewName = attrs.previewImageFileName ?: run {
+            val moment = uploadingMoments.firstOrNull { it.tempId == attrs.momentId }
+            moment?.thumbnailBitmap?.let { LiveActivityThumbnailStore.save(ctx, it, attrs.momentId) }
+        }
+        val resolved = if (previewName != null && previewName != attrs.previewImageFileName) {
+            attrs.copy(previewImageFileName = previewName).also { liveActivityAttributes = it }
+        } else {
+            attrs
+        }
+        UploadProgressNotificationHelper.showMomentUpload(
+            ctx,
+            resolved,
+            MomentUploadActivityAttributes.ContentState(progress = progress, status = status),
+        )
+    }
+
     private suspend fun updateLiveActivityAsync(progress: Double, status: String) {
         updateLiveActivity(progress, status)
     }
 
-    private fun endLiveActivity() = Unit
+    private fun endLiveActivity() {
+        val ctx = appContext ?: return
+        val id = liveActivityMomentId ?: return
+        UploadProgressNotificationHelper.cancelMomentUpload(ctx, id)
+        liveActivityAttributes = null
+        liveActivityMomentId = null
+    }
 
     private suspend fun endLiveActivityAsync() {
         endLiveActivity()
     }
 
-    fun cleanupStaleUploadActivities() = Unit
+    fun cleanupStaleUploadActivities() {
+        val ctx = appContext ?: return
+        liveActivityMomentId?.let { UploadProgressNotificationHelper.cancelMomentUpload(ctx, it) }
+        liveActivityAttributes = null
+        liveActivityMomentId = null
+    }
 
     // MARK: - Persistence
 
