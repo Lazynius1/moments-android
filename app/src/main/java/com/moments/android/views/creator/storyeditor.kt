@@ -36,9 +36,11 @@ import com.moments.android.views.components.StickerTimeCardView
 import com.moments.android.views.components.StoryPolaroidFrameStyle
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.story.QuestionResponseStoryStickerCardView
+import com.moments.android.views.story.storystickers.AnimatedWeatherSticker
 import com.moments.android.views.story.storystickers.InteractiveEmojiSliderSticker
 import com.moments.android.views.story.storystickers.InteractivePollSticker
 import com.moments.android.views.story.storystickers.InteractiveQuestionSticker
+import com.moments.android.views.story.storyviewer.StoryViewerLayoutHelpers
 import com.moments.android.views.creator.components.StoryTextOverlayLabel
 import com.moments.android.views.creator.creatorscreens.CreatorFlowPendingScreen
 import com.moments.android.views.creator.creatorscreens.SelfieStickerLiveCameraView
@@ -47,7 +49,6 @@ import com.moments.android.views.creator.creatorscreens.StoryOverlayDragState
 import com.moments.android.views.creator.creatorscreens.StoryOverlayTrashZone
 import com.moments.android.views.creator.creatorscreens.StoryOverlayToast
 import com.moments.android.views.creator.creatorscreens.StoryOverlayToastHost
-import com.moments.android.views.creator.creatorscreens.StoryPolaroidCaptionField
 import com.moments.android.views.creator.creatorscreens.StoryRevealStatusBadge
 import com.moments.android.views.creator.creatorscreens.StickerOverlayView
 import com.moments.android.views.creator.creatorscreens.StoryTextEditor
@@ -65,7 +66,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -79,6 +80,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
@@ -266,6 +268,8 @@ fun StoryEditingView(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val densityScale = density.density
     val isDark = isSystemInDarkTheme()
     val canvas = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     val controlFg = StoryEditorChromeColor.icon(isDark)
@@ -458,7 +462,6 @@ fun StoryEditingView(
     var focusedInlineStickerOriginal by remember { mutableStateOf<StoryStickerDraft?>(null) }
     var editingPolaroidId by remember { mutableStateOf<String?>(null) }
     var editingPolaroidOriginal by remember { mutableStateOf<StoryStickerDraft?>(null) }
-    var polaroidCaptionBuffer by remember { mutableStateOf("") }
     var polaroidSwipeOffsetX by remember { mutableStateOf(0f) }
     var editingRevealId by remember { mutableStateOf<String?>(null) }
     val isEditingStickerChrome = activeEditingStickerId != null || editingPolaroidId != null
@@ -632,7 +635,6 @@ fun StoryEditingView(
         restoreFocusedInlineSticker()
         editingPolaroidId = sticker.id
         editingPolaroidOriginal = sticker
-        polaroidCaptionBuffer = sticker.caption.orEmpty()
         stickers = stickers.map { item ->
             if (item.id == sticker.id) {
                 item.copy(normalizedX = .5, normalizedY = .33, scale = 1.4, rotationRadians = 0.0)
@@ -736,7 +738,6 @@ fun StoryEditingView(
         }
         editingPolaroidId = null
         editingPolaroidOriginal = null
-        polaroidCaptionBuffer = ""
     }
 
     fun cyclePolaroidFrameStyle(direction: Int) {
@@ -1057,7 +1058,12 @@ fun StoryEditingView(
             .sortedBy { it.layerOrder }
             .mapNotNull { it.toMetadata() }
         val stickerPayload = stickers.sortedBy { it.zIndex }.mapIndexed { index, draft ->
-            draft.toChatStickerData(index)
+            val normalizedScale = StoryViewerLayoutHelpers.normalizeStickerScaleForFirestore(
+                editorScale = draft.scale,
+                containerWidthPx = mediaCanvasWidthPx,
+                density = densityScale,
+            )
+            draft.toChatStickerData(index).copy(scale = normalizedScale)
         }
         val payload = ChatMediaOverlayPayload(
             textOverlayLive = if (prepared.isEmpty()) null else true,
@@ -1237,6 +1243,7 @@ fun StoryEditingView(
             val capturedRotation = imageRotationRadians
             val capturedCanvasW = mediaCanvasWidthPx
             val capturedCanvasH = mediaCanvasHeightPx
+            val capturedDensity = densityScale
             val capturedPalette = resolvedStoryBackgroundPalette()
             val capturedStickers = stickers.toList()
             val primary = prepared.firstOrNull()
@@ -1277,6 +1284,21 @@ fun StoryEditingView(
             val appCtx = context.applicationContext
             val pendingDir = File(appCtx.filesDir, "pending_uploads").also { it.mkdirs() }
             val cachedStickers = withContext(Dispatchers.Default) {
+                // Contrato Firestore compartido con iOS (BackgroundStoryUploadService):
+                // - position ya en (u,v) 0…1 del canvas 9:16
+                // - scale relativo a 375 **points/dp** (iOS contentRect.width), NO píxeles.
+                //   Viewer: scale * (canvasWidthDp / 375) en ambas plataformas.
+                val scaleNorm = StoryViewerLayoutHelpers.normalizeStickerScaleForFirestore(
+                    editorScale = 1.0,
+                    containerWidthPx = capturedCanvasW,
+                    density = capturedDensity,
+                )
+                android.util.Log.d(
+                    "StoryStickerScale",
+                    "upload canvasPx=$capturedCanvasW density=$capturedDensity " +
+                        "widthDp=${StoryViewerLayoutHelpers.canvasWidthDp(capturedCanvasW, capturedDensity)} " +
+                        "scaleNorm=$scaleNorm",
+                )
                 capturedStickers.sortedBy { it.zIndex }.map { draft ->
                     val stickerBitmap = when {
                         draft.type == "emoji" && draft.content.isNotBlank() -> renderEmojiStickerBitmap(draft.content)
@@ -1293,11 +1315,18 @@ fun StoryEditingView(
                     } else {
                         null
                     }
+                    val normalizedX = draft.normalizedX.takeIf { it.isFinite() }?.coerceIn(0.0, 1.0) ?: 0.5
+                    val normalizedY = draft.normalizedY.takeIf { it.isFinite() }?.coerceIn(0.0, 1.0) ?: 0.5
+                    val normalizedScale = (draft.scale * scaleNorm).takeIf { it.isFinite() } ?: draft.scale
+                    android.util.Log.d(
+                        "StoryStickerScale",
+                        "upload type=${draft.type} editorScale=${draft.scale} → firestoreScale=$normalizedScale",
+                    )
                     CachedSticker(
                         id = draft.id,
                         localImageName = localName,
-                        position = Point(draft.normalizedX, draft.normalizedY),
-                        scale = draft.scale,
+                        position = Point(normalizedX, normalizedY),
+                        scale = normalizedScale,
                         rotationRadians = draft.rotationRadians,
                         gifURL = draft.gifURL,
                         videoURL = draft.videoURL,
@@ -1317,6 +1346,7 @@ fun StoryEditingView(
                             location = draft.location,
                             latitude = draft.latitude,
                             longitude = draft.longitude,
+                            styleVariant = draft.styleVariant,
                             countdownTitle = draft.countdownTitle,
                             countdownTargetAtMs = draft.countdownTargetAtMs,
                             quizQuestion = draft.quizQuestion,
@@ -1688,6 +1718,7 @@ fun StoryEditingView(
 
                 // Equivalente al fondo de foco de StoryOverlaysView.swift: queda detrás del
                 // sticker editado y permite volver a su transformación original al tocar fuera.
+                // No usar detectDragGestures aquí: se come el multitouch del polaroid (pinch/pan foto).
                 if (activeEditingStickerId != null || editingPolaroidId != null) {
                     Box(
                         Modifier
@@ -1697,23 +1728,21 @@ fun StoryEditingView(
                                 Color.Black.copy(alpha = if (editingPolaroidId != null) .82f else .65f),
                             )
                             .pointerInput(editingPolaroidId) {
-                                if (editingPolaroidId != null) {
-                                    detectDragGestures(
-                                        onDragStart = { polaroidSwipeOffsetX = 0f },
-                                        onDragEnd = {
-                                            if (abs(polaroidSwipeOffsetX) >= 36f) {
-                                                cyclePolaroidFrameStyle(if (polaroidSwipeOffsetX < 0f) 1 else -1)
-                                            }
-                                            polaroidSwipeOffsetX = 0f
-                                        },
-                                        onDrag = { change, drag ->
-                                            if (abs(drag.x) > abs(drag.y)) {
-                                                change.consume()
-                                                polaroidSwipeOffsetX += drag.x
-                                            }
-                                        },
-                                    )
-                                }
+                                if (editingPolaroidId == null) return@pointerInput
+                                // ≡ iOS polaroidFrameSwipeGesture — solo sobre el fondo oscuro.
+                                detectHorizontalDragGestures(
+                                    onDragStart = { polaroidSwipeOffsetX = 0f },
+                                    onDragEnd = {
+                                        if (abs(polaroidSwipeOffsetX) >= 36f) {
+                                            cyclePolaroidFrameStyle(if (polaroidSwipeOffsetX < 0f) 1 else -1)
+                                        }
+                                        polaroidSwipeOffsetX = 0f
+                                    },
+                                    onHorizontalDrag = { change, dragX ->
+                                        change.consume()
+                                        polaroidSwipeOffsetX += dragX
+                                    },
+                                )
                             }
                             .clickable {
                                 if (editingPolaroidId != null) {
@@ -1736,6 +1765,7 @@ fun StoryEditingView(
                         val selected = selectedStickerId == sticker.id || armed || editing
                         val effectiveZ = when {
                             editing -> 3000f
+                            // Sobre el fondo de foco (1500); caption va in-place en el marco.
                             polaroidEditing -> 2000f
                             selected -> 500f
                             else -> sticker.zIndex.toFloat()
@@ -1815,6 +1845,7 @@ fun StoryEditingView(
                                 StoryStickerChip(
                                     sticker = sticker,
                                     isEditingInline = editing,
+                                    isContentEditing = polaroidEditing,
                                     onUpdate = { updated ->
                                         stickers = stickers.map { if (it.id == updated.id) updated else it }
                                     },
@@ -1890,25 +1921,6 @@ fun StoryEditingView(
                     }
 
                     StoryOverlayTrashZone(overlayDragState)
-
-                    // Pie de foto vivo del frame, sobre el fondo de foco y bajo el sticker hero.
-                    if (editingPolaroidId != null) {
-                        StoryPolaroidCaptionField(
-                            value = polaroidCaptionBuffer,
-                            onValueChange = { caption ->
-                                polaroidCaptionBuffer = caption
-                                val id = editingPolaroidId
-                                if (id != null) {
-                                    stickers = stickers.map { item ->
-                                        if (item.id == id) item.copy(caption = caption) else item
-                                    }
-                                }
-                            },
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 24.dp),
-                        )
-                    }
                 }
 
                 if (editingRevealId != null) {
@@ -1957,8 +1969,12 @@ fun StoryEditingView(
                                 modifier = Modifier
                                     .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
                                     .clickable {
-                                        activeEditingStickerId = null
-                                        editingPolaroidId = null
+                                        if (editingPolaroidId != null) {
+                                            savePolaroidEditing()
+                                        } else {
+                                            activeEditingStickerId = null
+                                            restoreFocusedInlineSticker()
+                                        }
                                         HapticManager.shared.lightImpact()
                                     }
                                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -2901,6 +2917,7 @@ private fun StoryStickerChip(
     sticker: StoryStickerDraft,
     modifier: Modifier = Modifier,
     isEditingInline: Boolean = false,
+    isContentEditing: Boolean = false,
     onUpdate: (StoryStickerDraft) -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -2922,6 +2939,7 @@ private fun StoryStickerChip(
     }
 
     if (sticker.type == "frame") {
+        // ≡ iOS StickerOverlayView `.frame(width: 200, height: 240)`
         StickerPolaroidFrameView(
             image = sticker.image,
             caption = sticker.caption,
@@ -2929,7 +2947,13 @@ private fun StoryStickerChip(
             contentScale = sticker.contentScale?.toFloat() ?: 1f,
             contentOffsetX = sticker.contentOffsetX?.toFloat() ?: 0f,
             contentOffsetY = sticker.contentOffsetY?.toFloat() ?: 0f,
-            modifier = modifier,
+            isEditingContent = isContentEditing,
+            onCaptionChange = if (isContentEditing) {
+                { caption -> onUpdate(sticker.copy(caption = caption)) }
+            } else {
+                null
+            },
+            modifier = modifier.size(width = 200.dp, height = 240.dp),
         )
         return
     }
@@ -2991,19 +3015,11 @@ private fun StoryStickerChip(
             Text(sticker.content, fontSize = fontSp.sp, modifier = modifier)
         }
         "weather" -> {
-            Text(
-                sticker.weatherSymbol ?: sticker.content,
-                fontSize = 28.sp,
-                modifier = modifier
-                    .background(
-                        brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                            listOf(Color(0xFF2196F3), Color(0xFF00BCD4)),
-                        ),
-                        shape = RoundedCornerShape(25.dp),
-                    )
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold,
+            // ≡ iOS AnimatedWeatherSticker + `.frame(width: 140, height: 50)`
+            AnimatedWeatherSticker(
+                weatherSymbol = sticker.weatherSymbol ?: sticker.content,
+                temperature = sticker.questionText ?: "🌤️",
+                modifier = modifier.width(140.dp).height(50.dp),
             )
         }
         "time" -> {
@@ -3084,7 +3100,7 @@ private fun StoryStickerChip(
                         ),
                     )
                 },
-                modifier = modifier.width(300.dp),
+                modifier = modifier.width(300.dp).height(172.dp),
             )
         }
         "question" -> {
@@ -3099,7 +3115,7 @@ private fun StoryStickerChip(
                     val trimmed = q.take(48)
                     onUpdate(sticker.copy(questionText = trimmed, content = trimmed.ifBlank { "?" }))
                 },
-                modifier = modifier.width(300.dp),
+                modifier = modifier.width(300.dp).height(132.dp),
             )
         }
         "link" -> {
@@ -3123,19 +3139,20 @@ private fun StoryStickerChip(
         }
         "countdown" -> {
             StickerCountdownCardView(
-                title = (sticker.countdownTitle ?: sticker.content).take(26),
+                title = (sticker.countdownTitle ?: sticker.content)
+                    .take(com.moments.android.views.components.CountdownCardLayout.titleMaxChars),
                 targetAtMs = sticker.countdownTargetAtMs
                     ?: (System.currentTimeMillis() + 86_400_000.0),
                 styleVariant = sticker.styleVariant ?: 0,
                 isEditingInline = isEditingInline,
                 onTitleChange = { t ->
-                    val trimmed = t.take(26)
+                    val trimmed = t.take(com.moments.android.views.components.CountdownCardLayout.titleMaxChars)
                     onUpdate(sticker.copy(countdownTitle = trimmed, content = trimmed))
                 },
                 onTargetAtMsChange = { ms ->
                     onUpdate(sticker.copy(countdownTargetAtMs = ms))
                 },
-                modifier = modifier.width(220.dp),
+                modifier = modifier,
             )
         }
         "quiz" -> {
@@ -3160,7 +3177,8 @@ private fun StoryStickerChip(
                 },
                 onOptionsChange = { next -> onUpdate(sticker.copy(quizOptions = next)) },
                 onCorrectIndexChange = { idx -> onUpdate(sticker.copy(quizCorrectIndex = idx)) },
-                modifier = modifier,
+                // ≡ iOS StickerOverlayView `.frame(width: 300)` (card interno 280)
+                modifier = modifier.width(300.dp),
             )
         }
         "emojiSlider" -> {

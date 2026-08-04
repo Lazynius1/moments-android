@@ -3,8 +3,10 @@ package com.moments.android.views.creator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import android.graphics.Paint as AndroidPaint
 import android.graphics.Typeface
+import android.media.ExifInterface
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.net.Uri
@@ -17,6 +19,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -37,11 +40,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,19 +56,23 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.AddComment
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CropFree
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FilterNone
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SelectableDates
@@ -77,6 +88,7 @@ import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -85,11 +97,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -103,6 +118,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -111,6 +127,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
@@ -124,6 +142,8 @@ import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.components.InteractiveAudioStickerView
 import com.moments.android.views.components.hiddenlayers.HiddenLayerLayout
 import com.moments.android.views.creator.components.StoryFontRegistry
+import com.moments.android.views.creator.creatoruikit.creatorNormalizedUp
+import com.moments.android.views.creator.creatoruikit.exifOrientation
 import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.moments.MomentCarouselLayoutRules
@@ -134,7 +154,6 @@ import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.permission.shared.PermissionPrimerGate
 import com.moments.android.views.permission.shared.PermissionPrimerGateHost
 import com.moments.android.views.shared.MomentsModalSheet
-import com.moments.android.views.shared.MomentsSheetHeader
 import java.io.File
 import java.util.Calendar
 import java.util.Date
@@ -144,6 +163,9 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Espejo 1:1 de iOS `HiddenLayerDraft` (HiddenLayersEditorView.swift L6–88).
@@ -225,6 +247,7 @@ fun HiddenLayersEditorView(
     val context = LocalContext.current
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
+    val scope = rememberCoroutineScope()
     val isDark = isSystemInDarkTheme()
 
     // ≡ colores iOS L116–127
@@ -235,19 +258,23 @@ fun HiddenLayersEditorView(
     val strongSurface = if (isDark) Color.White.copy(0.12f) else Color.Black.copy(0.07f)
     val previewStroke = if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.08f)
     val sheetTint = if (isDark) Color.Transparent else Color.White.copy(0.58f)
+    // Fondo menús Material3 (canvas AdaptiveColors) — evita blanco-sobre-blanco en dark
+    val menuContainer = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+    val textPlaceholder = stringResource(R.string.hidden_layers_text_placeholder)
 
     // ≡ @StateObject audioRecorder + micGate (iOS L99–100)
     val audioRecorder = remember { HiddenLayerAudioRecorder(context.applicationContext) }
     val micGate = remember { PermissionPrimerGate(PermissionPrimerGate.Kind.MICROPHONE) }
     var isPreviewPlaying by remember { mutableStateOf(false) }
     var audioPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var previewingLayerId by remember { mutableStateOf<String?>(null) }
+    var recordingLayerId by remember { mutableStateOf<String?>(null) }
 
-    var selectedLayerId by remember { mutableStateOf(layers.firstOrNull()?.id) }
+    var selectedLayerId by remember { mutableStateOf<String?>(null) }
     var selectedDockType by remember { mutableStateOf(MomentHiddenLayer.LayerType.TEXT) }
     var switcherTransientOffset by remember { mutableFloatStateOf(0f) }
     var adjustingImageLayerId by remember { mutableStateOf<String?>(null) }
-    // ≡ dragOffset / draggingLayerId / magnifyingLayerId / magnifyBaseSize (iOS L106–109)
-    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    // ≡ draggingLayerId / magnifyingLayerId / magnifyBaseSize (iOS L107–109)
     var draggingLayerId by remember { mutableStateOf<String?>(null) }
     var magnifyingLayerId by remember { mutableStateOf<String?>(null) }
     var magnifyBaseSize by remember { mutableStateOf<Pair<Double, Double>?>(null) }
@@ -261,8 +288,6 @@ fun HiddenLayersEditorView(
 
     val selectedLayerIndex = layers.indexOfFirst { it.id == selectedLayerId }.takeIf { it >= 0 }
     val dockEditorLayerIndex = selectedLayerIndex?.takeIf { layers[it].type == selectedDockType }
-    // ≡ dockHeight iOS
-    val dockHeightDp = if (dockEditorLayerIndex != null) 272.dp else 156.dp
 
     val readyLayerCount = layers.count { it.isReadyToPublish }
     val incompleteLayerCount = max(0, layers.size - readyLayerCount)
@@ -272,20 +297,27 @@ fun HiddenLayersEditorView(
         stringResource(R.string.hidden_layers_count, layers.size)
     }
 
+    val latestLayersState by rememberUpdatedState(layers)
+    val latestOnLayersChangeState by rememberUpdatedState(onLayersChange)
+    val latestSelectedLayerId by rememberUpdatedState(selectedLayerId)
+
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val bitmap = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
-            ?: return@rememberLauncherForActivityResult
-        addImageLayer(
-            image = bitmap,
-            layers = layers,
-            onLayersChange = onLayersChange,
-            selectedLayerId = selectedLayerId,
-            onSelectedLayerId = { selectedLayerId = it },
-            onSelectedDockType = { selectedDockType = it },
-        )
+        scope.launch {
+            val bitmap = withContext(Dispatchers.IO) { loadHiddenLayerBitmap(context, uri) }
+                ?: return@launch
+            val currentLayers = latestLayersState
+            addImageLayer(
+                image = bitmap,
+                layers = currentLayers,
+                onLayersChange = latestOnLayersChangeState,
+                selectedLayerId = latestSelectedLayerId,
+                onSelectedLayerId = { selectedLayerId = it },
+                onSelectedDockType = { selectedDockType = it },
+            )
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -296,15 +328,25 @@ fun HiddenLayersEditorView(
         }
     }
 
-    val latestLayersState by rememberUpdatedState(layers)
-    val latestOnLayersChangeState by rememberUpdatedState(onLayersChange)
-
     val caveatTypeface = remember {
         StoryFontRegistry.typeface(context, "Caveat-Bold")
     }
 
+    val explicitPreferredMediaRatio = mediaItem.recommendedAspectRatio?.value
+        ?: mediaItem.aspectRatio
+            .takeIf { it != CreatorAspectRatio.SQUARE }
+            ?.value
+    var mediaRatio by remember(mediaItem.uri) {
+        mutableFloatStateOf(explicitPreferredMediaRatio ?: 1f)
+    }
+    LaunchedEffect(mediaItem.uri, explicitPreferredMediaRatio) {
+        mediaRatio = withContext(Dispatchers.IO) {
+            decodedImageAspectRatio(context, mediaItem.uri)
+        } ?: explicitPreferredMediaRatio ?: 1f
+    }
+
     fun resizeText(layer: HiddenLayerDraft): HiddenLayerDraft =
-        resizeTextLayerToFitContent(layer, density, caveatTypeface)
+        resizeTextLayerToFitContent(layer, density, caveatTypeface, textPlaceholder)
 
     fun activateLayer(id: String) {
         val snapshot = latestLayersState
@@ -331,7 +373,7 @@ fun HiddenLayersEditorView(
     fun createLayer(type: MomentHiddenLayer.LayerType) {
         when (type) {
             MomentHiddenLayer.LayerType.TEXT -> addTextLayer(
-                layers, onLayersChange, density, caveatTypeface,
+                layers, onLayersChange, density, caveatTypeface, textPlaceholder,
                 onSelected = { selectedLayerId = it },
                 onDockType = { selectedDockType = it },
             )
@@ -351,15 +393,24 @@ fun HiddenLayersEditorView(
         onLayersChange(layers.mapIndexed { i, item -> if (i == index) transform(item) else item })
     }
 
+    fun updateLayer(layerId: String, transform: (HiddenLayerDraft) -> HiddenLayerDraft): Boolean {
+        val snapshot = latestLayersState
+        if (snapshot.none { it.id == layerId }) return false
+        latestOnLayersChangeState(snapshot.map { item ->
+            if (item.id == layerId) transform(item) else item
+        })
+        return true
+    }
+
     fun stopAudioPreview() {
         audioPlayer?.runCatching { stop() }
         audioPlayer?.release()
         audioPlayer = null
         isPreviewPlaying = false
+        previewingLayerId = null
     }
 
-    fun startAudioPreview(index: Int) {
-        val uri = layers.getOrNull(index)?.localAudioUri ?: return
+    fun startAudioPreview(uri: Uri, layerId: String) {
         stopAudioPreview()
         runCatching {
             val player = MediaPlayer().apply {
@@ -370,6 +421,7 @@ fun HiddenLayersEditorView(
                     if (audioPlayer === this) {
                         audioPlayer = null
                         isPreviewPlaying = false
+                        previewingLayerId = null
                     }
                 }
                 prepare()
@@ -377,16 +429,40 @@ fun HiddenLayersEditorView(
             }
             audioPlayer = player
             isPreviewPlaying = true
+            previewingLayerId = layerId
         }.onFailure { stopAudioPreview() }
+    }
+
+    fun startAudioPreview(index: Int) {
+        val layer = latestLayersState.getOrNull(index) ?: return
+        val uri = layer.localAudioUri ?: return
+        startAudioPreview(uri, layer.id)
+    }
+
+    fun storeAudioRecording(layerId: String, result: HiddenLayerAudioRecording) {
+        val stored = updateLayer(layerId) {
+            it.copy(localAudioUri = result.uri, duration = result.duration)
+        }
+        recordingLayerId = null
+        if (!stored) {
+            result.uri.path?.let(::File)?.delete()
+            return
+        }
+        startAudioPreview(result.uri, layerId)
     }
 
     fun clearAudio(index: Int) {
         if (index !in layers.indices) return
+        val previousUri = layers[index].localAudioUri
         stopAudioPreview()
-        if (audioRecorder.isRecording) {
-            audioRecorder.stopRecording()
+        if (audioRecorder.isRecording && recordingLayerId == layers[index].id) {
+            audioRecorder.stopRecording()?.uri?.path?.let(::File)?.delete()
+            recordingLayerId = null
         }
         updateAt(index) { it.copy(localAudioUri = null, duration = null) }
+        if (previousUri?.scheme == "file") {
+            previousUri.path?.let(::File)?.delete()
+        }
     }
 
     fun restartAudioRecording(index: Int) {
@@ -394,14 +470,15 @@ fun HiddenLayersEditorView(
     }
 
     // Auto-stop a 15s ≡ AVAudioRecorder.record(forDuration: 15); asigna como stop manual.
-    LaunchedEffect(audioRecorder.isRecording, audioRecorder.elapsedTime, dockEditorLayerIndex) {
-        val index = dockEditorLayerIndex ?: return@LaunchedEffect
+    LaunchedEffect(audioRecorder.isRecording, audioRecorder.elapsedTime, recordingLayerId) {
+        val layerId = recordingLayerId ?: return@LaunchedEffect
         if (!audioRecorder.isRecording || audioRecorder.elapsedTime < 15.0) return@LaunchedEffect
-        val result = audioRecorder.stopRecording() ?: return@LaunchedEffect
-        updateAt(index) {
-            it.copy(localAudioUri = result.uri, duration = result.duration)
+        val result = audioRecorder.stopRecording()
+        if (result == null) {
+            recordingLayerId = null
+            return@LaunchedEffect
         }
-        startAudioPreview(index)
+        storeAudioRecording(layerId, result)
     }
 
     fun applyPendingSchedule(layerId: String) {
@@ -424,7 +501,10 @@ fun HiddenLayersEditorView(
 
     DisposableEffect(Unit) {
         onDispose {
-            if (audioRecorder.isRecording) audioRecorder.stopRecording()
+            if (audioRecorder.isRecording) {
+                audioRecorder.stopRecording()?.uri?.path?.let(::File)?.delete()
+            }
+            recordingLayerId = null
             audioRecorder.release()
             audioPlayer?.runCatching { stop() }
             audioPlayer?.release()
@@ -432,35 +512,33 @@ fun HiddenLayersEditorView(
         }
     }
 
-    @Suppress("UNUSED_VARIABLE")
-    val keepStrong = strongSurface
-    @Suppress("UNUSED_VARIABLE")
-    val keepDragOffset = dragOffset // grab-offset absoluto iOS; pan deltas cubren el drag actual
-
-    // ≡ body GeometryReader + VStack (L167–204)
+    // Canvas estable: el dock ocupa siempre 156dp en layout y crece sobre el media al editar.
     BoxWithConstraints(
         modifier
-            .fillMaxSize()
-            .background(subtleSurface)
-            .background(sheetTint),
+            .fillMaxWidth()
+            .background(sheetTint)
+            .navigationBarsPadding(),
     ) {
         val horizontalPadding = 14.dp
         val headerHeight = 48.dp
         val verticalSpacing = 10.dp
         val topPadding = 6.dp
         val bottomPadding = 8.dp
-        val maxCanvasHeightDp = maxOf(
-            260.dp,
-            maxHeight - headerHeight - dockHeightDp - topPadding - bottomPadding - verticalSpacing * 2,
-        )
+        val dockSlotHeightDp = 156.dp
+        val dockVisualHeightDp = if (dockEditorLayerIndex != null) 272.dp else 180.dp
+        val headerBlock = topPadding + headerHeight
+        val maxCanvasHeightDp = (
+            maxHeight - headerBlock - dockSlotHeightDp - bottomPadding - verticalSpacing * 2
+        ).coerceAtLeast(0.dp)
         val availableWidthPx = with(density) { (maxWidth - horizontalPadding * 2).toPx() }.coerceAtLeast(1f)
-        val preferredRatio = mediaItem.aspectRatio.value
+        val preferredRatio = explicitPreferredMediaRatio
+            ?: CreatorAspectRatio.fromRatio(mediaRatio).value
         val displayedRatio = HiddenLayerLayout.displayedPostAspectRatio(
             imageWidth = 1f,
             imageHeight = 1f,
             preferredAspectRatio = preferredRatio,
         )
-        val mediaRatio = preferredRatio.takeIf { it > 0f && it.isFinite() } ?: displayedRatio
+        val resolvedMediaRatio = mediaRatio.takeIf { it > 0f && it.isFinite() } ?: displayedRatio
         val screenHpx = with(density) { configuration.screenHeightDp.dp.toPx() }
         val screenWdp = configuration.screenWidthDp.toFloat()
         val previewHpx = previewCanvasHeight(
@@ -471,33 +549,72 @@ fun HiddenLayersEditorView(
             density = density.density,
         )
         val canvasHeightDp = minOf(maxCanvasHeightDp, with(density) { previewHpx.toDp() })
-
         Column(
             Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .height(maxHeight)
                 .padding(bottom = bottomPadding),
             verticalArrangement = Arrangement.spacedBy(verticalSpacing),
         ) {
-            // Sheet Android: sin chevron; título pegado + Done
-            MomentsSheetHeader(
-                title = stringResource(R.string.hidden_layers_editor_title),
-                titleSize = 17.sp,
-                subtitle = if (selectedLayerId == null) layerCountSummary else null,
-                trailing = {
+            // ≡ headerBar (L261–296)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = topPadding)
+                    .height(headerHeight)
+                    .padding(horizontal = horizontalPadding),
+            ) {
+                Box(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .size(40.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = primaryText,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                Column(
+                    Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                ) {
                     Text(
-                        stringResource(R.string.common_done),
+                        stringResource(R.string.hidden_layers_editor_title),
                         color = primaryText,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        modifier = Modifier
-                            .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
-                            .clickable(onClick = onDismiss)
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        fontSize = 17.sp,
+                        maxLines = 1,
                     )
-                },
-            )
+                    if (selectedLayerId == null) {
+                        Text(
+                            layerCountSummary,
+                            color = secondaryText,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                        )
+                    }
+                }
+                Text(
+                    stringResource(R.string.common_done),
+                    color = primaryText,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                        .clickable(onClick = onDismiss)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+            }
 
-            // ≡ editorCanvas(height:) + .frame(height: maxCanvasHeight, alignment: .center)
+            // ≡ editorCanvas iOS L195–197 — frame = maxCanvasHeight; media = canvasHeight centrada
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -522,22 +639,31 @@ fun HiddenLayersEditorView(
                             density = density.density,
                         ),
                     )
-                    val presentationMode = MomentCarouselLayoutRules.presentationMode(mediaRatio, displayedRatio)
+                    val presentationMode = MomentCarouselLayoutRules.presentationMode(
+                        resolvedMediaRatio,
+                        displayedRatio,
+                    )
                     val corner = storyViewerCanvasCornerRadius
 
                     Box(
                         Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(corner))
-                            .background(subtleSurface)
-                            .momentsChromeGlass(RoundedCornerShape(corner), interactive = false)
-                            .clickable { selectedLayerId = null },
+                            .fillMaxSize(),
                     ) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(subtleSurface, RoundedCornerShape(corner))
+                                .momentsChromeGlass(RoundedCornerShape(corner), interactive = false)
+                                .clickable { selectedLayerId = null },
+                        )
                         if (presentationMode == MomentCarouselPresentationMode.FitWithBlur) {
                             AsyncImage(
                                 model = mediaItem.uri,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
+                                colorFilter = ColorFilter.colorMatrix(
+                                    ColorMatrix().apply { setToSaturation(0.9f) },
+                                ),
                                 modifier = Modifier
                                     .offset {
                                         IntOffset(imageRect.left.roundToInt(), imageRect.top.roundToInt())
@@ -546,7 +672,7 @@ fun HiddenLayersEditorView(
                                         width = with(density) { imageRect.width.toDp() },
                                         height = with(density) { imageRect.height.toDp() },
                                     )
-                                    .clip(RoundedCornerShape(26.dp))
+                                    .clip(RoundedCornerShape(corner))
                                     .blur(30.dp),
                             )
                             Box(
@@ -578,7 +704,7 @@ fun HiddenLayersEditorView(
                                     width = with(density) { imageRect.width.toDp() },
                                     height = with(density) { imageRect.height.toDp() },
                                 )
-                                .clip(RoundedCornerShape(26.dp))
+                                .clip(RoundedCornerShape(corner))
                                 .clickable { selectedLayerId = null },
                         )
 
@@ -589,7 +715,11 @@ fun HiddenLayersEditorView(
                         val latestAdjustingId by rememberUpdatedState(adjustingImageLayerId)
 
                         layers.sortedBy { if (it.id == draggingLayerId) Int.MAX_VALUE else it.zIndex }.forEach { layer ->
-                            val frame = HiddenLayerLayout.frame(layer, imageRect)
+                            val frame = HiddenLayerLayout.frame(
+                                layer,
+                                imageRect,
+                                minimumSizePx = with(density) { 44.dp.toPx() },
+                            )
                             Box(
                                 Modifier
                                     .offset { IntOffset(frame.left.roundToInt(), frame.top.roundToInt()) }
@@ -633,9 +763,9 @@ fun HiddenLayersEditorView(
                                                 if (pan != Offset.Zero) {
                                                     adjustPanAccum += pan
                                                     next = next.copy(
-                                                        imageOffsetX = (adjustStartOffsetX + adjustPanAccum.x)
+                                                        imageOffsetX = (adjustStartOffsetX + adjustPanAccum.x / density.density)
                                                             .coerceIn(-48.0, 48.0),
-                                                        imageOffsetY = (adjustStartOffsetY + adjustPanAccum.y)
+                                                        imageOffsetY = (adjustStartOffsetY + adjustPanAccum.y / density.density)
                                                             .coerceIn(-48.0, 48.0),
                                                     )
                                                 }
@@ -683,7 +813,6 @@ fun HiddenLayersEditorView(
                                             } while (event.changes.any { it.pressed })
                                             val endId = magnifyingLayerId ?: layer.id
                                             activateLayer(endId)
-                                            dragOffset = Offset.Zero
                                             magnifyingLayerId = null
                                             magnifyBaseSize = null
                                             draggingLayerId = null
@@ -702,528 +831,596 @@ fun HiddenLayersEditorView(
                         }
                     }
                 }
-            }
+            } // editorCanvas frame
 
-            // ≡ dockContent (L412–630)
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .height(dockHeightDp)
-                    .padding(horizontal = horizontalPadding),
-            ) {
-            val index = dockEditorLayerIndex
-            val canCreate = layers.size < MaxHiddenLayers
-            if (index != null) {
+            // Reserva estable: su altura nunca cambia cuando se selecciona una capa.
+            Spacer(Modifier.fillMaxWidth().height(dockSlotHeightDp))
+        } // Column VStack iOS
+
+        // Overlay real con bounds táctiles completos. Crece hacia arriba sobre el canvas
+        // sin modificar su medida ni dejar pasar gestos a las capas inferiores.
+        Column(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(dockVisualHeightDp)
+                .padding(bottom = bottomPadding)
+                .padding(horizontal = horizontalPadding),
+        ) {
+                val index = dockEditorLayerIndex
+                val canCreate = layers.size < MaxHiddenLayers
+                if (index != null) {
                 Column(
                     Modifier
                         .fillMaxSize()
                         .padding(horizontal = 6.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
+                // ≡ iOS: panel glass tamaño natural + Spacer; typeSwitcher abajo
                 Column(
                     Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .momentsChromeGlass(RoundedCornerShape(24.dp), interactive = false)
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Box(Modifier.fillMaxWidth()) {
-                        Row(
-                            Modifier.align(Alignment.CenterStart),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            MiniCircleButton(Icons.Filled.KeyboardArrowDown, primaryText, strongSurface) {
-                                selectedLayerId = null
-                            }
-                            if (layers[index].type == MomentHiddenLayer.LayerType.IMAGE && canCreate) {
-                                MiniCircleButton(Icons.Filled.Add, primaryText, strongSurface) {
-                                    createLayer(selectedDockType)
+                        Box(Modifier.fillMaxWidth()) {
+                            Row(
+                                Modifier.align(Alignment.CenterStart),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                MiniCircleButton(Icons.Filled.KeyboardArrowDown, primaryText, strongSurface) {
+                                    selectedLayerId = null
+                                }
+                                if (layers[index].type == MomentHiddenLayer.LayerType.IMAGE && canCreate) {
+                                    MiniCircleButton(Icons.Filled.Add, primaryText, strongSurface) {
+                                        createLayer(selectedDockType)
+                                    }
                                 }
                             }
-                        }
-                        Text(
-                            layerTitle(layers[index]),
-                            color = primaryText,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .offset(
-                                    x = if (layers[index].type == MomentHiddenLayer.LayerType.IMAGE) (-12).dp else 0.dp,
-                                ),
-                        )
-                        Row(
-                            Modifier.align(Alignment.CenterEnd),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            if (canCreate && layers[index].type != MomentHiddenLayer.LayerType.IMAGE) {
-                                MiniCircleButton(Icons.Filled.Add, primaryText, strongSurface) {
-                                    createLayer(selectedDockType)
+                            Text(
+                                layerTitle(layers[index]),
+                                color = primaryText,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 16.sp,
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .offset(
+                                        x = if (layers[index].type == MomentHiddenLayer.LayerType.IMAGE) (-12).dp else 0.dp,
+                                    ),
+                            )
+                            Row(
+                                Modifier.align(Alignment.CenterEnd),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                if (canCreate && layers[index].type != MomentHiddenLayer.LayerType.IMAGE) {
+                                    MiniCircleButton(Icons.Filled.Add, primaryText, strongSurface) {
+                                        createLayer(selectedDockType)
+                                    }
                                 }
-                            }
-                            if (layers[index].type == MomentHiddenLayer.LayerType.IMAGE) {
-                                MiniSheetHeaderIconButton(
-                                    icon = Icons.Filled.Image,
-                                    primaryText = primaryText,
-                                    fill = subtleSurface,
-                                    stroke = previewStroke,
-                                    isActive = false,
-                                    onClick = {
-                                        imagePicker.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                                        )
-                                    },
-                                )
-                                MiniSheetHeaderIconButton(
-                                    icon = Icons.Filled.CropFree,
-                                    primaryText = primaryText,
-                                    fill = if (adjustingImageLayerId == layers[index].id) strongSurface else subtleSurface,
-                                    stroke = if (adjustingImageLayerId == layers[index].id) {
-                                        if (isDark) Color.White.copy(0.9f) else Color.Black.copy(0.5f)
-                                    } else {
-                                        previewStroke
-                                    },
-                                    isActive = adjustingImageLayerId == layers[index].id,
-                                    onClick = {
-                                        adjustingImageLayerId =
-                                            if (adjustingImageLayerId == layers[index].id) null else layers[index].id
-                                    },
-                                )
+                                if (layers[index].type == MomentHiddenLayer.LayerType.IMAGE) {
+                                    MiniSheetHeaderIconButton(
+                                        icon = Icons.Filled.Image,
+                                        primaryText = primaryText,
+                                        fill = subtleSurface,
+                                        stroke = previewStroke,
+                                        isActive = false,
+                                        onClick = {
+                                            imagePicker.launch(
+                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                            )
+                                        },
+                                    )
+                                    MiniSheetHeaderIconButton(
+                                        icon = Icons.Filled.CropFree,
+                                        primaryText = primaryText,
+                                        fill = if (adjustingImageLayerId == layers[index].id) strongSurface else subtleSurface,
+                                        stroke = if (adjustingImageLayerId == layers[index].id) {
+                                            if (isDark) Color.White.copy(0.9f) else Color.Black.copy(0.5f)
+                                        } else {
+                                            previewStroke
+                                        },
+                                        isActive = adjustingImageLayerId == layers[index].id,
+                                        onClick = {
+                                            adjustingImageLayerId =
+                                                if (adjustingImageLayerId == layers[index].id) null else layers[index].id
+                                        },
+                                    )
                             }
                             MiniCircleButton(Icons.Filled.Delete, primaryText, strongSurface) {
-                                val removedType = layers[index].type
+                                val removedLayer = layers[index]
+                                val removedType = removedLayer.type
+                                if (previewingLayerId == removedLayer.id) stopAudioPreview()
+                                if (recordingLayerId == removedLayer.id && audioRecorder.isRecording) {
+                                    audioRecorder.stopRecording()?.uri?.path?.let(::File)?.delete()
+                                    recordingLayerId = null
+                                }
+                                if (removedLayer.localAudioUri?.scheme == "file") {
+                                    removedLayer.localAudioUri.path?.let(::File)?.delete()
+                                }
                                 onLayersChange(layers.filterIndexed { i, _ -> i != index })
-                                selectedLayerId = null
-                                selectedDockType = removedType
-                                HapticManager.shared.warning()
+                                    selectedLayerId = null
+                                    selectedDockType = removedType
+                                    HapticManager.shared.warning()
+                                }
                             }
                         }
-                    }
 
-                    when (layers[index].type) {
-                        MomentHiddenLayer.LayerType.TEXT -> {
-                            BasicTextField(
-                                value = layers[index].text,
-                                onValueChange = { raw ->
-                                    val clipped = raw.take(120)
-                                    updateAt(index) {
-                                        resizeText(it.copy(text = clipped))
-                                    }
-                                },
+                        when (layers[index].type) {
+                            MomentHiddenLayer.LayerType.TEXT -> {
+                                // ≡ iOS TextField + momentsChromeGlass corner 18
+                                BasicTextField(
+                                    value = layers[index].text,
+                                    onValueChange = { raw ->
+                                        val clipped = raw.take(120)
+                                        updateAt(index) {
+                                            resizeText(it.copy(text = clipped))
+                                        }
+                                    },
                                 textStyle = TextStyle(color = primaryText, fontSize = 16.sp),
                                 cursorBrush = SolidColor(primaryText),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .momentsChromeGlass(RoundedCornerShape(18.dp), interactive = true)
-                                    .padding(14.dp),
-                                decorationBox = { inner ->
-                                    if (layers[index].text.isEmpty()) {
-                                        Text(
-                                            stringResource(R.string.hidden_layers_text_placeholder),
-                                            color = secondaryText,
+                                singleLine = true,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(38.dp)
+                                        .momentsChromeGlass(RoundedCornerShape(18.dp), interactive = true)
+                                        .padding(horizontal = 12.dp),
+                                    decorationBox = { inner ->
+                                        if (layers[index].text.isEmpty()) {
+                                            Text(
+                                                stringResource(R.string.hidden_layers_text_placeholder),
+                                                color = secondaryText,
+                                            )
+                                        }
+                                        inner()
+                                    },
+                                )
+                                // ≡ iOS HStack Estilo/Fuente — chips a partes iguales + iconos
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Box(Modifier.weight(1f)) {
+                                        CompactSelectionChip(
+                                            title = stringResource(R.string.hidden_layers_text_style),
+                                            value = layers[index].presentationStyle.displayName,
+                                            leadingIcon = Icons.Filled.Dashboard,
+                                            primaryText = primaryText,
+                                            secondaryText = secondaryText,
+                                            previewStroke = previewStroke,
+                                            subtleSurface = subtleSurface,
+                                            onClick = { styleMenuExpanded = true },
                                         )
-                                    }
-                                    inner()
-                                },
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box {
-                                    CompactSelectionChip(
-                                        title = stringResource(R.string.hidden_layers_text_style),
-                                        value = layers[index].presentationStyle.displayName,
-                                        primaryText = primaryText,
-                                        secondaryText = secondaryText,
-                                        previewStroke = previewStroke,
-                                        onClick = { styleMenuExpanded = true },
-                                    )
-                                    DropdownMenu(styleMenuExpanded, onDismissRequest = { styleMenuExpanded = false }) {
-                                        HiddenLayerPresentationStyle.entries.forEach { style ->
-                                            DropdownMenuItem(
-                                                text = { Text(style.displayName) },
-                                                onClick = {
+                                        HiddenLayerOptionsMenu(
+                                            expanded = styleMenuExpanded,
+                                            onDismissRequest = { styleMenuExpanded = false },
+                                            primaryText = primaryText,
+                                            menuContainer = menuContainer,
+                                            previewStroke = previewStroke,
+                                            options = HiddenLayerPresentationStyle.entries.map { style ->
+                                                style.displayName to {
                                                     val updated = resizeText(
                                                         layers[index].copy(presentationStyle = style),
                                                     )
                                                     updateAt(index) { updated }
-                                                    styleMenuExpanded = false
-                                                },
-                                            )
-                                        }
+                                                }
+                                            },
+                                        )
                                     }
-                                }
-                                Box {
-                                    CompactSelectionChip(
-                                        title = stringResource(R.string.hidden_layers_text_font),
-                                        value = layers[index].textStyle.displayName,
-                                        primaryText = primaryText,
-                                        secondaryText = secondaryText,
-                                        previewStroke = previewStroke,
-                                        onClick = { fontMenuExpanded = true },
-                                    )
-                                    DropdownMenu(fontMenuExpanded, onDismissRequest = { fontMenuExpanded = false }) {
-                                        HiddenLayerTextStyle.entries.forEach { style ->
-                                            DropdownMenuItem(
-                                                text = { Text(style.displayName) },
-                                                onClick = {
+                                    Box(Modifier.weight(1f)) {
+                                        CompactSelectionChip(
+                                            title = stringResource(R.string.hidden_layers_text_font),
+                                            value = layers[index].textStyle.displayName,
+                                            leadingIcon = Icons.Filled.TextFields,
+                                            primaryText = primaryText,
+                                            secondaryText = secondaryText,
+                                            previewStroke = previewStroke,
+                                            subtleSurface = subtleSurface,
+                                            onClick = { fontMenuExpanded = true },
+                                        )
+                                        HiddenLayerOptionsMenu(
+                                            expanded = fontMenuExpanded,
+                                            onDismissRequest = { fontMenuExpanded = false },
+                                            primaryText = primaryText,
+                                            menuContainer = menuContainer,
+                                            previewStroke = previewStroke,
+                                            options = HiddenLayerTextStyle.entries.map { style ->
+                                                style.displayName to {
                                                     val updated = resizeText(
                                                         layers[index].copy(textStyle = style),
                                                     )
                                                     updateAt(index) { updated }
-                                                    fontMenuExpanded = false
-                                                },
-                                            )
-                                        }
+                                                }
+                                            },
+                                        )
                                     }
                                 }
+                                AvailabilityControls(
+                                    layer = layers[index],
+                                    primaryText = primaryText,
+                                    secondaryText = secondaryText,
+                                    previewStroke = previewStroke,
+                                    subtleSurface = subtleSurface,
+                                    menuContainer = menuContainer,
+                                    unlockMenuExpanded = unlockMenuExpanded,
+                                    onUnlockMenuExpanded = { unlockMenuExpanded = it },
+                                    opensMenuExpanded = opensMenuExpanded,
+                                    onOpensMenuExpanded = { opensMenuExpanded = it },
+                                    onImmediate = {
+                                        updateAt(index) {
+                                            it.copy(
+                                                unlockMode = MomentHiddenLayer.UnlockMode.IMMEDIATE,
+                                                unlockAt = null,
+                                                authorTimezoneIdentifier = TimeZone.getDefault().id,
+                                            )
+                                        }
+                                    },
+                                    onScheduled = {
+                                        updateAt(index) {
+                                            it.copy(
+                                                unlockMode = MomentHiddenLayer.UnlockMode.SCHEDULED,
+                                                unlockAt = it.unlockAt ?: tonightUnlockDate(),
+                                                authorTimezoneIdentifier = TimeZone.getDefault().id,
+                                            )
+                                        }
+                                    },
+                                    onTonight = {
+                                        updateAt(index) {
+                                            it.copy(
+                                                unlockAt = tonightUnlockDate(),
+                                                authorTimezoneIdentifier = TimeZone.getDefault().id,
+                                            )
+                                        }
+                                    },
+                                    onTomorrow = {
+                                        updateAt(index) {
+                                            it.copy(
+                                                unlockAt = tomorrowUnlockDate(),
+                                                authorTimezoneIdentifier = TimeZone.getDefault().id,
+                                            )
+                                        }
+                                    },
+                                    onPickDate = { openSchedulePicker(index) },
+                                )
                             }
-                            AvailabilityControls(
-                                layer = layers[index],
-                                primaryText = primaryText,
-                                secondaryText = secondaryText,
-                                previewStroke = previewStroke,
-                                unlockMenuExpanded = unlockMenuExpanded,
-                                onUnlockMenuExpanded = { unlockMenuExpanded = it },
-                                opensMenuExpanded = opensMenuExpanded,
-                                onOpensMenuExpanded = { opensMenuExpanded = it },
-                                onImmediate = {
-                                    updateAt(index) {
-                                        it.copy(
-                                            unlockMode = MomentHiddenLayer.UnlockMode.IMMEDIATE,
-                                            unlockAt = null,
-                                            authorTimezoneIdentifier = TimeZone.getDefault().id,
-                                        )
-                                    }
-                                },
-                                onScheduled = {
-                                    updateAt(index) {
-                                        it.copy(
-                                            unlockMode = MomentHiddenLayer.UnlockMode.SCHEDULED,
-                                            unlockAt = it.unlockAt ?: tonightUnlockDate(),
-                                            authorTimezoneIdentifier = TimeZone.getDefault().id,
-                                        )
-                                    }
-                                },
-                                onTonight = {
-                                    updateAt(index) {
-                                        it.copy(
-                                            unlockAt = tonightUnlockDate(),
-                                            authorTimezoneIdentifier = TimeZone.getDefault().id,
-                                        )
-                                    }
-                                },
-                                onTomorrow = {
-                                    updateAt(index) {
-                                        it.copy(
-                                            unlockAt = tomorrowUnlockDate(),
-                                            authorTimezoneIdentifier = TimeZone.getDefault().id,
-                                        )
-                                    }
-                                },
-                                onPickDate = { openSchedulePicker(index) },
-                            )
-                        }
-                        MomentHiddenLayer.LayerType.IMAGE -> {
-                            BasicTextField(
-                                value = layers[index].caption,
-                                onValueChange = { raw -> updateAt(index) { it.copy(caption = raw.take(40)) } },
+                            MomentHiddenLayer.LayerType.IMAGE -> {
+                                BasicTextField(
+                                    value = layers[index].caption,
+                                    onValueChange = { raw -> updateAt(index) { it.copy(caption = raw.take(40)) } },
                                 textStyle = TextStyle(color = primaryText, fontSize = 16.sp),
                                 cursorBrush = SolidColor(primaryText),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .momentsChromeGlass(RoundedCornerShape(18.dp), interactive = true)
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                decorationBox = { inner ->
-                                    if (layers[index].caption.isEmpty()) {
-                                        Text(
-                                            stringResource(R.string.hidden_layers_image_caption_placeholder),
-                                            color = secondaryText,
+                                singleLine = true,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(38.dp)
+                                        .momentsChromeGlass(RoundedCornerShape(18.dp), interactive = true)
+                                        .padding(horizontal = 12.dp),
+                                    decorationBox = { inner ->
+                                        if (layers[index].caption.isEmpty()) {
+                                            Text(
+                                                stringResource(R.string.hidden_layers_image_caption_placeholder),
+                                                color = secondaryText,
+                                            )
+                                        }
+                                        inner()
+                                    },
+                                )
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Box(Modifier.weight(1f)) {
+                                        CompactSelectionChip(
+                                            title = stringResource(R.string.hidden_layers_image_frame),
+                                            value = layers[index].imageFrameStyle.displayName,
+                                            leadingIcon = Icons.Filled.FilterNone,
+                                            primaryText = primaryText,
+                                            secondaryText = secondaryText,
+                                            previewStroke = previewStroke,
+                                            subtleSurface = subtleSurface,
+                                            onClick = { frameMenuExpanded = true },
                                         )
-                                    }
-                                    inner()
-                                },
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box {
-                                    CompactSelectionChip(
-                                        title = stringResource(R.string.hidden_layers_image_frame),
-                                        value = layers[index].imageFrameStyle.displayName,
-                                        primaryText = primaryText,
-                                        secondaryText = secondaryText,
-                                        previewStroke = previewStroke,
-                                        onClick = { frameMenuExpanded = true },
-                                    )
-                                    DropdownMenu(frameMenuExpanded, onDismissRequest = { frameMenuExpanded = false }) {
-                                        HiddenLayerImageFrameStyle.entries.forEach { style ->
-                                            DropdownMenuItem(
-                                                text = { Text(style.displayName) },
-                                                onClick = {
+                                        HiddenLayerOptionsMenu(
+                                            expanded = frameMenuExpanded,
+                                            onDismissRequest = { frameMenuExpanded = false },
+                                            primaryText = primaryText,
+                                            menuContainer = menuContainer,
+                                            previewStroke = previewStroke,
+                                            options = HiddenLayerImageFrameStyle.entries.map { style ->
+                                                style.displayName to {
                                                     updateAt(index) { it.copy(imageFrameStyle = style) }
-                                                    frameMenuExpanded = false
-                                                },
-                                            )
-                                        }
+                                                }
+                                            },
+                                        )
                                     }
-                                }
-                                Box {
-                                    CompactSelectionChip(
-                                        title = stringResource(R.string.hidden_layers_image_font),
-                                        value = layers[index].textStyle.displayName,
-                                        primaryText = primaryText,
-                                        secondaryText = secondaryText,
-                                        previewStroke = previewStroke,
-                                        onClick = { fontMenuExpanded = true },
-                                    )
-                                    DropdownMenu(fontMenuExpanded, onDismissRequest = { fontMenuExpanded = false }) {
-                                        listOf(
-                                            HiddenLayerTextStyle.CLEAN,
-                                            HiddenLayerTextStyle.HANDWRITTEN,
-                                            HiddenLayerTextStyle.MONO,
-                                        ).forEach { style ->
-                                            DropdownMenuItem(
-                                                text = { Text(style.displayName) },
-                                                onClick = {
+                                    Box(Modifier.weight(1f)) {
+                                        CompactSelectionChip(
+                                            title = stringResource(R.string.hidden_layers_image_font),
+                                            value = layers[index].textStyle.displayName,
+                                            leadingIcon = Icons.Filled.TextFields,
+                                            primaryText = primaryText,
+                                            secondaryText = secondaryText,
+                                            previewStroke = previewStroke,
+                                            subtleSurface = subtleSurface,
+                                            onClick = { fontMenuExpanded = true },
+                                        )
+                                        HiddenLayerOptionsMenu(
+                                            expanded = fontMenuExpanded,
+                                            onDismissRequest = { fontMenuExpanded = false },
+                                            primaryText = primaryText,
+                                            menuContainer = menuContainer,
+                                            previewStroke = previewStroke,
+                                            options = listOf(
+                                                HiddenLayerTextStyle.CLEAN,
+                                                HiddenLayerTextStyle.HANDWRITTEN,
+                                                HiddenLayerTextStyle.MONO,
+                                            ).map { style ->
+                                                style.displayName to {
                                                     updateAt(index) { it.copy(textStyle = style) }
-                                                    fontMenuExpanded = false
-                                                },
-                                            )
-                                        }
+                                                }
+                                            },
+                                        )
                                     }
                                 }
+                                AvailabilityControls(
+                                    layer = layers[index],
+                                    primaryText = primaryText,
+                                    secondaryText = secondaryText,
+                                    previewStroke = previewStroke,
+                                    subtleSurface = subtleSurface,
+                                    menuContainer = menuContainer,
+                                    unlockMenuExpanded = unlockMenuExpanded,
+                                    onUnlockMenuExpanded = { unlockMenuExpanded = it },
+                                    opensMenuExpanded = opensMenuExpanded,
+                                    onOpensMenuExpanded = { opensMenuExpanded = it },
+                                    onImmediate = {
+                                        updateAt(index) {
+                                            it.copy(
+                                                unlockMode = MomentHiddenLayer.UnlockMode.IMMEDIATE,
+                                                unlockAt = null,
+                                                authorTimezoneIdentifier = TimeZone.getDefault().id,
+                                            )
+                                        }
+                                    },
+                                    onScheduled = {
+                                        updateAt(index) {
+                                            it.copy(
+                                                unlockMode = MomentHiddenLayer.UnlockMode.SCHEDULED,
+                                                unlockAt = it.unlockAt ?: tonightUnlockDate(),
+                                                authorTimezoneIdentifier = TimeZone.getDefault().id,
+                                            )
+                                        }
+                                    },
+                                    onTonight = {
+                                        updateAt(index) {
+                                            it.copy(
+                                                unlockAt = tonightUnlockDate(),
+                                                authorTimezoneIdentifier = TimeZone.getDefault().id,
+                                            )
+                                        }
+                                    },
+                                    onTomorrow = {
+                                        updateAt(index) {
+                                            it.copy(
+                                                unlockAt = tomorrowUnlockDate(),
+                                                authorTimezoneIdentifier = TimeZone.getDefault().id,
+                                            )
+                                        }
+                                    },
+                                    onPickDate = { openSchedulePicker(index) },
+                                )
                             }
-                            AvailabilityControls(
-                                layer = layers[index],
-                                primaryText = primaryText,
-                                secondaryText = secondaryText,
-                                previewStroke = previewStroke,
-                                unlockMenuExpanded = unlockMenuExpanded,
-                                onUnlockMenuExpanded = { unlockMenuExpanded = it },
-                                opensMenuExpanded = opensMenuExpanded,
-                                onOpensMenuExpanded = { opensMenuExpanded = it },
-                                onImmediate = {
-                                    updateAt(index) {
-                                        it.copy(
-                                            unlockMode = MomentHiddenLayer.UnlockMode.IMMEDIATE,
-                                            unlockAt = null,
-                                            authorTimezoneIdentifier = TimeZone.getDefault().id,
-                                        )
-                                    }
-                                },
-                                onScheduled = {
-                                    updateAt(index) {
-                                        it.copy(
-                                            unlockMode = MomentHiddenLayer.UnlockMode.SCHEDULED,
-                                            unlockAt = it.unlockAt ?: tonightUnlockDate(),
-                                            authorTimezoneIdentifier = TimeZone.getDefault().id,
-                                        )
-                                    }
-                                },
-                                onTonight = {
-                                    updateAt(index) {
-                                        it.copy(
-                                            unlockAt = tonightUnlockDate(),
-                                            authorTimezoneIdentifier = TimeZone.getDefault().id,
-                                        )
-                                    }
-                                },
-                                onTomorrow = {
-                                    updateAt(index) {
-                                        it.copy(
-                                            unlockAt = tomorrowUnlockDate(),
-                                            authorTimezoneIdentifier = TimeZone.getDefault().id,
-                                        )
-                                    }
-                                },
-                                onPickDate = { openSchedulePicker(index) },
-                            )
-                        }
-                        MomentHiddenLayer.LayerType.AUDIO -> {
-                            AudioControls(
-                                layer = layers[index],
-                                primaryText = primaryText,
-                                tertiaryText = tertiaryText,
-                                subtleSurface = subtleSurface,
-                                previewStroke = previewStroke,
-                                audioRecorder = audioRecorder,
-                                isPreviewPlaying = isPreviewPlaying,
-                                onClear = { clearAudio(index) },
-                                onRestart = { restartAudioRecording(index) },
-                                onTogglePreview = {
-                                    if (isPreviewPlaying) stopAudioPreview() else startAudioPreview(index)
-                                },
-                                onRecordToggle = {
-                                    if (audioRecorder.isRecording) {
-                                        val result = audioRecorder.stopRecording()
-                                        if (result != null) {
-                                            updateAt(index) {
-                                                it.copy(
-                                                    localAudioUri = result.uri,
-                                                    duration = result.duration,
-                                                )
-                                            }
+                            MomentHiddenLayer.LayerType.AUDIO -> {
+                                AudioControls(
+                                    layer = layers[index],
+                                    primaryText = primaryText,
+                                    tertiaryText = tertiaryText,
+                                    subtleSurface = subtleSurface,
+                                    previewStroke = previewStroke,
+                                    audioRecorder = audioRecorder,
+                                    isPreviewPlaying = isPreviewPlaying && previewingLayerId == layers[index].id,
+                                    onClear = { clearAudio(index) },
+                                    onRestart = { restartAudioRecording(index) },
+                                    onTogglePreview = {
+                                        if (previewingLayerId == layers[index].id && isPreviewPlaying) {
+                                            stopAudioPreview()
+                                        } else {
                                             startAudioPreview(index)
                                         }
-                                    } else {
-                                        stopAudioPreview()
-                                        micGate.requestAccess(context) {
-                                            audioRecorder.startRecording()
+                                    },
+                                    onRecordToggle = {
+                                        if (audioRecorder.isRecording) {
+                                            val result = audioRecorder.stopRecording()
+                                            val ownerId = recordingLayerId
+                                            if (result != null && ownerId != null) {
+                                                storeAudioRecording(ownerId, result)
+                                            } else {
+                                                recordingLayerId = null
+                                            }
+                                        } else {
+                                            stopAudioPreview()
+                                            val targetLayerId = layers[index].id
+                                            micGate.requestAccess(context) {
+                                                if (latestLayersState.none { it.id == targetLayerId }) {
+                                                    return@requestAccess
+                                                }
+                                                recordingLayerId = targetLayerId
+                                                audioRecorder.startRecording()
+                                                if (!audioRecorder.isRecording) recordingLayerId = null
+                                            }
                                         }
-                                    }
-                                },
-                            )
-                            AvailabilityControls(
-                                layer = layers[index],
-                                primaryText = primaryText,
-                                secondaryText = secondaryText,
-                                previewStroke = previewStroke,
-                                unlockMenuExpanded = unlockMenuExpanded,
-                                onUnlockMenuExpanded = { unlockMenuExpanded = it },
-                                opensMenuExpanded = opensMenuExpanded,
-                                onOpensMenuExpanded = { opensMenuExpanded = it },
-                                onImmediate = {
-                                    updateAt(index) {
-                                        it.copy(
-                                            unlockMode = MomentHiddenLayer.UnlockMode.IMMEDIATE,
-                                            unlockAt = null,
-                                            authorTimezoneIdentifier = TimeZone.getDefault().id,
-                                        )
-                                    }
-                                },
-                                onScheduled = {
-                                    updateAt(index) {
-                                        it.copy(
-                                            unlockMode = MomentHiddenLayer.UnlockMode.SCHEDULED,
-                                            unlockAt = it.unlockAt ?: tonightUnlockDate(),
-                                            authorTimezoneIdentifier = TimeZone.getDefault().id,
-                                        )
-                                    }
-                                },
-                                onTonight = {
-                                    updateAt(index) {
-                                        it.copy(
-                                            unlockAt = tonightUnlockDate(),
-                                            authorTimezoneIdentifier = TimeZone.getDefault().id,
-                                        )
-                                    }
-                                },
-                                onTomorrow = {
-                                    updateAt(index) {
-                                        it.copy(
-                                            unlockAt = tomorrowUnlockDate(),
-                                            authorTimezoneIdentifier = TimeZone.getDefault().id,
-                                        )
-                                    }
-                                },
-                                onPickDate = { openSchedulePicker(index) },
-                            )
-                        }
-                    }
-                } // glass card
-                    Spacer(Modifier.weight(1f, fill = true))
-                    TypeSwitcherPill(
-                        activeType = selectedDockType,
-                        primaryText = primaryText,
-                        secondaryText = secondaryText,
-                        previewStroke = previewStroke,
-                        isDark = isDark,
-                        transientOffset = switcherTransientOffset,
-                        onTransientOffset = { switcherTransientOffset = it },
-                        onSelect = { type ->
-                            if (type != selectedDockType) HapticManager.shared.selection()
-                            selectDockType(type)
-                            switcherTransientOffset = 0f
-                        },
-                    )
-                } // editing dock VStack
-            } else {
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
-                    ) {
-                        Text(
-                            emptyStateTitle(selectedDockType),
-                            color = primaryText,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            textAlign = TextAlign.Center,
-                        )
-                        Text(
-                            emptyStateSubtitle(selectedDockType),
-                            color = secondaryText,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Row(
-                        Modifier
-                            .alpha(if (canCreate) 1f else 0.48f)
-                            .momentsChromeGlass(RoundedCornerShape(50), interactive = canCreate)
-                            .clickable(enabled = canCreate) {
-                                createLayer(selectedDockType)
-                                HapticManager.shared.success()
+                                    },
+                                )
+                                AvailabilityControls(
+                                    layer = layers[index],
+                                    primaryText = primaryText,
+                                    secondaryText = secondaryText,
+                                    previewStroke = previewStroke,
+                                    subtleSurface = subtleSurface,
+                                    menuContainer = menuContainer,
+                                    unlockMenuExpanded = unlockMenuExpanded,
+                                    onUnlockMenuExpanded = { unlockMenuExpanded = it },
+                                    opensMenuExpanded = opensMenuExpanded,
+                                    onOpensMenuExpanded = { opensMenuExpanded = it },
+                                    onImmediate = {
+                                        updateAt(index) {
+                                            it.copy(
+                                                unlockMode = MomentHiddenLayer.UnlockMode.IMMEDIATE,
+                                                unlockAt = null,
+                                                authorTimezoneIdentifier = TimeZone.getDefault().id,
+                                            )
+                                        }
+                                    },
+                                    onScheduled = {
+                                        updateAt(index) {
+                                            it.copy(
+                                                unlockMode = MomentHiddenLayer.UnlockMode.SCHEDULED,
+                                                unlockAt = it.unlockAt ?: tonightUnlockDate(),
+                                                authorTimezoneIdentifier = TimeZone.getDefault().id,
+                                            )
+                                        }
+                                    },
+                                    onTonight = {
+                                        updateAt(index) {
+                                            it.copy(
+                                                unlockAt = tonightUnlockDate(),
+                                                authorTimezoneIdentifier = TimeZone.getDefault().id,
+                                            )
+                                        }
+                                    },
+                                    onTomorrow = {
+                                        updateAt(index) {
+                                            it.copy(
+                                                unlockAt = tomorrowUnlockDate(),
+                                                authorTimezoneIdentifier = TimeZone.getDefault().id,
+                                            )
+                                        }
+                                    },
+                                    onPickDate = { openSchedulePicker(index) },
+                                )
                             }
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .widthIn(min = 168.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                        }
+                    } // glass card
+                    TypeSwitcherPill(
+                            activeType = selectedDockType,
+                            primaryText = primaryText,
+                            secondaryText = secondaryText,
+                            previewStroke = previewStroke,
+                            isDark = isDark,
+                            transientOffset = switcherTransientOffset,
+                            onTransientOffset = { switcherTransientOffset = it },
+                            onSelect = { type ->
+                                if (type != selectedDockType) HapticManager.shared.selection()
+                                selectDockType(type)
+                                switcherTransientOffset = 0f
+                            },
+                        )
+                    } // editing dock VStack
+                } else {
+                    // ≡ empty state iOS L589–628 — tab typeSwitcher siempre visible
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
                     ) {
-                        Icon(Icons.Filled.Add, null, tint = primaryText, modifier = Modifier.size(14.dp))
-                        Text(
-                            addActionTitle(selectedDockType),
-                            color = primaryText,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
+                        Column(
+                            Modifier.align(Alignment.TopCenter),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(3.dp),
+                            ) {
+                                Text(
+                                    emptyStateTitle(selectedDockType),
+                                    color = primaryText,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 17.sp,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                Text(
+                                    emptyStateSubtitle(selectedDockType),
+                                    color = secondaryText,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                            Row(
+                                Modifier
+                                    .alpha(if (canCreate) 1f else 0.48f)
+                                    .momentsChromeGlass(RoundedCornerShape(50), interactive = canCreate)
+                                    .clickable(enabled = canCreate) {
+                                        createLayer(selectedDockType)
+                                        HapticManager.shared.success()
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 9.dp)
+                                    .widthIn(min = 168.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                            ) {
+                                // ≡ iOS plusActionIcon: plus.bubble / waveform.badge.plus / photo.badge.plus
+                                Icon(
+                                    plusActionIcon(selectedDockType),
+                                    null,
+                                    tint = primaryText,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                Text(
+                                    addActionTitle(selectedDockType),
+                                    color = primaryText,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                )
+                            }
+                        }
+                        TypeSwitcherPill(
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                            activeType = selectedDockType,
+                            primaryText = primaryText,
+                            secondaryText = secondaryText,
+                            previewStroke = previewStroke,
+                            isDark = isDark,
+                            transientOffset = switcherTransientOffset,
+                            onTransientOffset = { switcherTransientOffset = it },
+                            onSelect = { type ->
+                                if (type != selectedDockType) HapticManager.shared.selection()
+                                selectDockType(type)
+                                switcherTransientOffset = 0f
+                            },
                         )
                     }
-                    Spacer(Modifier.weight(1f, fill = true))
-                    TypeSwitcherPill(
-                        activeType = selectedDockType,
-                        primaryText = primaryText,
-                        secondaryText = secondaryText,
-                        previewStroke = previewStroke,
-                        isDark = isDark,
-                        transientOffset = switcherTransientOffset,
-                        onTransientOffset = { switcherTransientOffset = it },
-                        onSelect = { type ->
-                            if (type != selectedDockType) HapticManager.shared.selection()
-                            selectDockType(type)
-                            switcherTransientOffset = 0f
-                        },
-                    )
                 }
+        } // visual dock overlay
+
+        // ≡ .sheet schedulePicker (L207–234)
+        if (schedulePickerLayerId != null) {
+            MomentsModalSheet(
+                onDismissRequest = { schedulePickerLayerId = null },
+                largeOnly = false,
+                showDragHandle = true,
+            ) {
+                HiddenLayerScheduleSheet(
+                    date = pendingScheduleDate,
+                    onDateChange = { pendingScheduleDate = it },
+                    onCancel = { schedulePickerLayerId = null },
+                    onApply = {
+                        val id = schedulePickerLayerId ?: return@HiddenLayerScheduleSheet
+                        applyPendingSchedule(id)
+                        schedulePickerLayerId = null
+                    },
+                )
             }
-            } // dockContent
-        } // body Column
-    } // GeometryReader ≡ BoxWithConstraints
-    // ≡ .sheet schedulePicker (L207–234)
-    if (schedulePickerLayerId != null) {
-        MomentsModalSheet(
-            onDismissRequest = { schedulePickerLayerId = null },
-            largeOnly = false,
-            showDragHandle = false,
-        ) {
-            HiddenLayerScheduleSheet(
-                date = pendingScheduleDate,
-                onDateChange = { pendingScheduleDate = it },
-                onCancel = { schedulePickerLayerId = null },
-                onApply = {
-                    val id = schedulePickerLayerId ?: return@HiddenLayerScheduleSheet
-                    applyPendingSchedule(id)
-                    schedulePickerLayerId = null
-                },
-            )
         }
-    }
+    } // BoxWithConstraints
     // ≡ .permissionPrimerGate(micGate)
     PermissionPrimerGateHost(gate = micGate)
 }
@@ -1263,7 +1460,7 @@ private fun CanvasLayerPreview(
                 InteractiveAudioStickerView(
                     audioURL = layer.localAudioUri?.toString().orEmpty(),
                     duration = layer.duration ?: 15.0,
-                    modifier = Modifier.fillMaxWidth(0.85f),
+                    modifier = Modifier.requiredSize(72.dp),
                 )
             }
         }
@@ -1312,7 +1509,7 @@ private fun TextCanvasPreview(
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Box(
             Modifier
-                .size(
+                .requiredSize(
                     width = with(density) { baseSize.width.toDp() },
                     height = with(density) { baseSize.height.toDp() },
                 )
@@ -1388,7 +1585,7 @@ private fun HiddenLayerTextCardPreview(
     }
     val rotation = if (presentationStyle == HiddenLayerPresentationStyle.PAPER_NOTE) -1.2f else 0f
 
-    val textModifier = Modifier
+    val cardModifier = Modifier
         .fillMaxWidth()
         .heightIn(min = 74.dp)
         .then(
@@ -1412,24 +1609,29 @@ private fun HiddenLayerTextCardPreview(
             },
         )
         .clip(shape)
-        .padding(horizontal = 16.dp, vertical = 12.dp)
 
-    Text(
-        text,
-        color = foreground,
-        fontSize = fontSize,
-        fontWeight = fontWeight,
-        fontFamily = fontFamily,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
+    Box(
         modifier = Modifier
             .graphicsLayer {
                 rotationZ = rotation
                 alpha = if (isPlaceholder) 0.7f else 1f
             }
-            .then(textModifier),
-    )
+            .then(cardModifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            color = foreground,
+            fontSize = fontSize,
+            fontWeight = fontWeight,
+            fontFamily = fontFamily,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        )
+    }
 }
 
 /**
@@ -1452,14 +1654,14 @@ private fun HiddenLayerPolaroidPreview(
     val density = LocalDensity.current
     val context = LocalContext.current
     val caveat = remember { StoryFontRegistry.typeface(context, "Caveat-Bold") }
-    val contentWidth = max(88f, canvasWidthPx)
-    val contentHeight = max(96f, canvasHeightPx)
+    val contentWidth = max(with(density) { 88.dp.toPx() }, canvasWidthPx)
+    val contentHeight = max(with(density) { 96.dp.toPx() }, canvasHeightPx)
     val imageAreaHeight = contentHeight * 0.76f
-    val captionAreaHeight = max(24f, contentHeight - imageAreaHeight)
+    val captionAreaHeight = max(with(density) { 24.dp.toPx() }, contentHeight - imageAreaHeight)
     val inset = when (frameStyle) {
-        HiddenLayerImageFrameStyle.CLASSIC -> 10f
-        HiddenLayerImageFrameStyle.CLEAN -> 8f
-        HiddenLayerImageFrameStyle.VINTAGE -> 12f
+        HiddenLayerImageFrameStyle.CLASSIC -> 10.dp
+        HiddenLayerImageFrameStyle.CLEAN -> 8.dp
+        HiddenLayerImageFrameStyle.VINTAGE -> 12.dp
     }
     val frameColor = when (frameStyle) {
         HiddenLayerImageFrameStyle.CLASSIC -> Color.White
@@ -1497,38 +1699,43 @@ private fun HiddenLayerPolaroidPreview(
 
     Column(
         Modifier
-            .width(with(density) { (contentWidth + inset * 2).toDp() })
+            .wrapContentSize(Alignment.Center, unbounded = true)
+            .requiredWidth(with(density) { contentWidth.toDp() } + inset * 2)
             .clip(RoundedCornerShape(outerCorner))
             .background(frameColor),
     ) {
         Box(
             Modifier
-                .padding(with(density) { inset.toDp() })
-                .width(with(density) { contentWidth.toDp() })
-                .height(with(density) { imageAreaHeight.toDp() })
-                .background(imageBackground)
-                .clip(RoundedCornerShape(0))
-                .graphicsLayer { clip = true },
+                .requiredSize(
+                    width = with(density) { contentWidth.toDp() } + inset * 2,
+                    height = with(density) { imageAreaHeight.toDp() } + inset * 2,
+                )
+                .background(frameColor)
+                .padding(inset),
             contentAlignment = Alignment.Center,
         ) {
-            Image(
-                bitmap = image.asImageBitmap(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = imageScale.toFloat()
-                        scaleY = imageScale.toFloat()
-                        translationX = imageOffsetX.toFloat()
-                        translationY = imageOffsetY.toFloat()
-                    },
-            )
+            Box(Modifier.fillMaxSize().background(imageBackground).clip(RoundedCornerShape(0))) {
+                Image(
+                    bitmap = image.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = imageScale.toFloat()
+                            scaleY = imageScale.toFloat()
+                            translationX = with(density) { imageOffsetX.toFloat().dp.toPx() }
+                            translationY = with(density) { imageOffsetY.toFloat().dp.toPx() }
+                        },
+                )
+            }
         }
         Box(
             Modifier
-                .width(with(density) { (contentWidth + inset * 2).toDp() })
-                .height(with(density) { captionAreaHeight.toDp() })
+                .requiredSize(
+                    width = with(density) { contentWidth.toDp() } + inset * 2,
+                    height = with(density) { captionAreaHeight.toDp() },
+                )
                 .background(frameColor),
             contentAlignment = Alignment.Center,
         ) {
@@ -1541,10 +1748,11 @@ private fun HiddenLayerPolaroidPreview(
                     fontFamily = captionFamily,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
                     modifier = Modifier
-                        .padding(horizontal = 12.dp)
                         .offset(y = captionOffsetY)
-                        .graphicsLayer { rotationZ = captionRotation },
+                        .graphicsLayer { rotationZ = captionRotation }
+                        .padding(horizontal = 12.dp),
                 )
             }
         }
@@ -1585,14 +1793,14 @@ fun HiddenLayerRemotePolaroidPreview(
     val density = LocalDensity.current
     val context = LocalContext.current
     val caveat = remember { StoryFontRegistry.typeface(context, "Caveat-Bold") }
-    val contentWidth = max(88f, canvasWidthPx)
-    val contentHeight = max(96f, canvasHeightPx)
+    val contentWidth = max(with(density) { 88.dp.toPx() }, canvasWidthPx)
+    val contentHeight = max(with(density) { 96.dp.toPx() }, canvasHeightPx)
     val imageAreaHeight = contentHeight * 0.76f
-    val captionAreaHeight = max(24f, contentHeight - imageAreaHeight)
+    val captionAreaHeight = max(with(density) { 24.dp.toPx() }, contentHeight - imageAreaHeight)
     val inset = when (frameStyle) {
-        HiddenLayerImageFrameStyle.CLASSIC -> 10f
-        HiddenLayerImageFrameStyle.CLEAN -> 8f
-        HiddenLayerImageFrameStyle.VINTAGE -> 12f
+        HiddenLayerImageFrameStyle.CLASSIC -> 10.dp
+        HiddenLayerImageFrameStyle.CLEAN -> 8.dp
+        HiddenLayerImageFrameStyle.VINTAGE -> 12.dp
     }
     val frameColor = when (frameStyle) {
         HiddenLayerImageFrameStyle.CLASSIC -> Color.White
@@ -1630,43 +1838,49 @@ fun HiddenLayerRemotePolaroidPreview(
 
     Column(
         Modifier
-            .width(with(density) { (contentWidth + inset * 2).toDp() })
+            .wrapContentSize(Alignment.Center, unbounded = true)
+            .requiredWidth(with(density) { contentWidth.toDp() } + inset * 2)
             .clip(RoundedCornerShape(outerCorner))
             .background(frameColor),
     ) {
         Box(
             Modifier
-                .padding(with(density) { inset.toDp() })
-                .width(with(density) { contentWidth.toDp() })
-                .height(with(density) { imageAreaHeight.toDp() })
-                .background(imageBackground)
-                .clip(RoundedCornerShape(0)),
+                .requiredSize(
+                    width = with(density) { contentWidth.toDp() } + inset * 2,
+                    height = with(density) { imageAreaHeight.toDp() } + inset * 2,
+                )
+                .background(frameColor)
+                .padding(inset),
         ) {
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = imageScale.toFloat()
-                        scaleY = imageScale.toFloat()
-                        translationX = imageOffsetX.toFloat()
-                        translationY = imageOffsetY.toFloat()
-                        // ≡ brightness/contrast developing: overlay blanco que se desvanece
-                        alpha = 0.4f + 0.6f * developingProgress
-                    },
-            )
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.White.copy(0.6f * (1f - developingProgress))),
-            )
+            Box(Modifier.fillMaxSize().background(imageBackground).clip(RoundedCornerShape(0))) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = imageScale.toFloat()
+                            scaleY = imageScale.toFloat()
+                            translationX = with(density) { imageOffsetX.toFloat().dp.toPx() }
+                            translationY = with(density) { imageOffsetY.toFloat().dp.toPx() }
+                            // ≡ brightness/contrast developing: overlay blanco que se desvanece
+                            alpha = 0.4f + 0.6f * developingProgress
+                        },
+                )
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.White.copy(0.6f * (1f - developingProgress))),
+                )
+            }
         }
         Box(
             Modifier
-                .width(with(density) { (contentWidth + inset * 2).toDp() })
-                .height(with(density) { captionAreaHeight.toDp() })
+                .requiredSize(
+                    width = with(density) { contentWidth.toDp() } + inset * 2,
+                    height = with(density) { captionAreaHeight.toDp() },
+                )
                 .background(frameColor),
             contentAlignment = Alignment.Center,
         ) {
@@ -1679,46 +1893,83 @@ fun HiddenLayerRemotePolaroidPreview(
                     fontFamily = captionFamily,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
                     modifier = Modifier
-                        .padding(horizontal = 12.dp)
                         .offset(y = captionOffsetY)
                         .graphicsLayer {
                             rotationZ = captionRotation
                             alpha = developingProgress
-                        },
+                        }
+                        .padding(horizontal = 12.dp),
                 )
             }
         }
     }
 }
 
+/** ≡ iOS `editorGhostRail` — zona “fail” abajo-derecha del post; hint visual, sin hit-testing. */
 @Composable
 private fun EditorGhostRail(imageRect: Rect) {
     val density = LocalDensity.current
-    val railWidth = min(max(imageRect.width * 0.52f, 164f), 214f)
-    val railHeight = 56f
-    val railX = imageRect.right - 16f - (railWidth / 2f)
-    val railY = imageRect.bottom - 16f - (railHeight / 2f)
-    Row(
+    val isDark = isSystemInDarkTheme()
+    val minRailWidthPx = with(density) { 164.dp.toPx() }
+    val maxRailWidthPx = with(density) { 214.dp.toPx() }
+    val railHeightPx = with(density) { 56.dp.toPx() }
+    val marginPx = with(density) { 16.dp.toPx() }
+    val railContentWidthPx = with(density) { 212.dp.toPx() }
+    val railWidthPx = min(max(imageRect.width * 0.52f, minRailWidthPx), maxRailWidthPx)
+    val railX = imageRect.right - marginPx - (railWidthPx / 2f)
+    val railY = imageRect.bottom - marginPx - (railHeightPx / 2f)
+    Box(
         Modifier
             .offset {
-                IntOffset((railX - railWidth / 2f).roundToInt(), (railY - railHeight / 2f).roundToInt())
+                IntOffset(
+                    (railX - railContentWidthPx / 2f).roundToInt(),
+                    (railY - railHeightPx / 2f).roundToInt(),
+                )
             }
-            .size(with(density) { railWidth.toDp() }, with(density) { railHeight.toDp() })
-            .clip(RoundedCornerShape(50))
-            .background(Color.White.copy(0.12f))
-            .padding(6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .size(212.dp, 56.dp)
     ) {
-        repeat(4) { index ->
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(if (index == 0) 0.26f else 0.14f))
-                    .border(1.dp, Color.White.copy(if (index == 0) 0.24f else 0.10f), CircleShape),
-            )
+        // SwiftUI aplica opacity(0.5) sobre material + contenido. En Android el
+        // glass es un fill opaco; limitar la opacidad al material evita que los
+        // cuatro círculos blancos desaparezcan sobre el rail claro.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .alpha(0.5f)
+                .momentsChromeGlass(RoundedCornerShape(50), interactive = false)
+                .border(0.8.dp, Color.White.copy(0.12f), RoundedCornerShape(50)),
+        )
+        Row(
+            Modifier
+                .fillMaxSize()
+                .padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(4) { index ->
+                val fill = if (isDark) {
+                    Color.White.copy(if (index == 0) 0.26f else 0.14f)
+                } else {
+                    Color.Black.copy(if (index == 0) 0.18f else 0.09f)
+                }
+                val stroke = if (isDark) {
+                    Color.White.copy(if (index == 0) 0.24f else 0.10f)
+                } else {
+                    Color.Black.copy(if (index == 0) 0.16f else 0.07f)
+                }
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(fill)
+                        .border(
+                            1.dp,
+                            stroke,
+                            CircleShape,
+                        ),
+                )
+            }
         }
     }
 }
@@ -1745,7 +1996,7 @@ private fun AudioControls(
     )
     Column(
         Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (layer.localAudioUri != null && !audioRecorder.isRecording) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -1778,7 +2029,7 @@ private fun AudioControls(
                             .background(subtleSurface)
                             .border(1.dp, previewStroke, RoundedCornerShape(50))
                             .clickable(onClick = onTogglePreview)
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .padding(horizontal = 11.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
@@ -1807,11 +2058,11 @@ private fun AudioControls(
             Column(
                 Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Box(
                     Modifier
-                        .size(58.dp)
+                        .size(40.dp)
                         .scale(recordScale)
                         .momentsChromeGlass(CircleShape, interactive = true)
                         .clickable(onClick = onRecordToggle),
@@ -1834,7 +2085,7 @@ private fun AudioControls(
                 }
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
                 ) {
                     Text(
                         formattedDetailedDuration(
@@ -1842,7 +2093,7 @@ private fun AudioControls(
                         ),
                         color = if (audioRecorder.isRecording) Color.Red else primaryText,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
+                        fontSize = 16.sp,
                         fontFamily = FontFamily.Monospace,
                     )
                     Text(
@@ -1855,7 +2106,7 @@ private fun AudioControls(
                         ),
                         color = tertiaryText,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
+                        fontSize = 10.sp,
                     )
                 }
             }
@@ -1948,7 +2199,7 @@ private class HiddenLayerAudioRecorder(private val context: Context) {
         val active = recorder ?: return null
         val file = outputFile
         handler.removeCallbacks(tickRunnable)
-        runCatching { active.stop() }
+        val stopped = runCatching { active.stop() }.isSuccess
         active.release()
         recorder = null
         isRecording = false
@@ -1958,7 +2209,10 @@ private class HiddenLayerAudioRecorder(private val context: Context) {
         )
         elapsedTime = duration
         outputFile = null
-        if (file == null || !file.exists()) return null
+        if (!stopped || file == null || !file.exists() || file.length() == 0L) {
+            file?.delete()
+            return null
+        }
         return HiddenLayerAudioRecording(Uri.fromFile(file), duration)
     }
 
@@ -1984,6 +2238,7 @@ private fun formattedDetailedDuration(seconds: Double): String {
 
 @Composable
 private fun TypeSwitcherPill(
+    modifier: Modifier = Modifier,
     activeType: MomentHiddenLayer.LayerType,
     primaryText: Color,
     secondaryText: Color,
@@ -1994,8 +2249,9 @@ private fun TypeSwitcherPill(
     onSelect: (MomentHiddenLayer.LayerType) -> Unit,
 ) {
     val options = MomentHiddenLayer.LayerType.entries
+    val density = LocalDensity.current.density
     BoxWithConstraints(
-        Modifier
+        modifier
             .fillMaxWidth()
             .height(42.dp)
             .momentsChromeGlass(RoundedCornerShape(50), interactive = false)
@@ -2011,7 +2267,7 @@ private fun TypeSwitcherPill(
                         drag += dx
                         change.consume()
                         onTransientOffset(
-                            constrainedSwitcherTranslation(drag, totalWidth, activeType),
+                            constrainedSwitcherTranslation(drag, totalWidth, activeType, density),
                         )
                     }
                     settleSwitcherSelection(
@@ -2019,6 +2275,7 @@ private fun TypeSwitcherPill(
                         locationX = down.position.x,
                         width = totalWidth,
                         activeType = activeType,
+                        density = density,
                         onSelect = onSelect,
                         onTransientOffset = onTransientOffset,
                     )
@@ -2026,15 +2283,30 @@ private fun TypeSwitcherPill(
             },
     ) {
         val totalWidth = constraints.maxWidth.toFloat()
-        val segmentWidth = max((totalWidth - 6f) / options.size, 1f)
-        val baseOffset = switcherBaseOffset(totalWidth, activeType)
+        val segmentWidth = max((totalWidth - 6f * density) / options.size, 1f)
+        val baseOffset = switcherBaseOffset(totalWidth, activeType, density)
         val pillOffset = baseOffset + transientOffset
+        val renderedPillOffset by animateFloatAsState(
+            targetValue = pillOffset,
+            animationSpec = if (abs(transientOffset) > 0.5f) {
+                snap()
+            } else {
+                spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
+            },
+            label = "hiddenLayerTypeSwitcherOffset",
+        )
         Box(
             Modifier
                 .align(Alignment.Center)
-                .offset { IntOffset(pillOffset.roundToInt(), 0) }
+                .offset { IntOffset(renderedPillOffset.roundToInt(), 0) }
                 .width(with(LocalDensity.current) { segmentWidth.toDp() })
                 .height(34.dp)
+                .shadow(
+                    elevation = if (isDark) 7.dp else 4.dp,
+                    shape = RoundedCornerShape(50),
+                    ambientColor = Color.Black.copy(if (isDark) 0.24f else 0.08f),
+                    spotColor = Color.Black.copy(if (isDark) 0.24f else 0.08f),
+                )
                 .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
                 .background(Color.White.copy(if (isDark) 0.055f else 0.035f)),
         )
@@ -2233,6 +2505,8 @@ private fun AvailabilityControls(
     primaryText: Color,
     secondaryText: Color,
     previewStroke: Color,
+    subtleSurface: Color,
+    menuContainer: Color,
     unlockMenuExpanded: Boolean,
     onUnlockMenuExpanded: (Boolean) -> Unit,
     opensMenuExpanded: Boolean,
@@ -2243,66 +2517,110 @@ private fun AvailabilityControls(
     onTomorrow: () -> Unit,
     onPickDate: () -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box {
+    // ≡ iOS availabilityControls — chips reloj / calendario a ancho completo
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(Modifier.weight(1f)) {
             CompactSelectionChip(
                 title = stringResource(R.string.hidden_layers_unlock_title),
                 value = unlockModeTitle(layer.unlockMode),
+                leadingIcon = Icons.Filled.Schedule,
                 primaryText = primaryText,
                 secondaryText = secondaryText,
                 previewStroke = previewStroke,
+                subtleSurface = subtleSurface,
                 onClick = { onUnlockMenuExpanded(true) },
             )
-            DropdownMenu(unlockMenuExpanded, onDismissRequest = { onUnlockMenuExpanded(false) }) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.hidden_layers_unlock_now)) },
-                    onClick = {
-                        onImmediate()
-                        onUnlockMenuExpanded(false)
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.hidden_layers_unlock_scheduled)) },
-                    onClick = {
-                        onScheduled()
-                        onUnlockMenuExpanded(false)
-                    },
-                )
-            }
+            HiddenLayerOptionsMenu(
+                expanded = unlockMenuExpanded,
+                onDismissRequest = { onUnlockMenuExpanded(false) },
+                primaryText = primaryText,
+                menuContainer = menuContainer,
+                previewStroke = previewStroke,
+                options = listOf(
+                    stringResource(R.string.hidden_layers_unlock_now) to onImmediate,
+                    stringResource(R.string.hidden_layers_unlock_scheduled) to onScheduled,
+                ),
+            )
         }
         if (layer.unlockMode == MomentHiddenLayer.UnlockMode.SCHEDULED) {
-            Box {
+            Box(Modifier.weight(1f)) {
                 CompactSelectionChip(
                     title = stringResource(R.string.hidden_layers_unlock_opens),
                     value = formattedUnlockDate(layer.unlockAt),
+                    leadingIcon = Icons.Filled.CalendarMonth,
                     primaryText = primaryText,
                     secondaryText = secondaryText,
                     previewStroke = previewStroke,
+                    subtleSurface = subtleSurface,
                     onClick = { onOpensMenuExpanded(true) },
                 )
-                DropdownMenu(opensMenuExpanded, onDismissRequest = { onOpensMenuExpanded(false) }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.hidden_layers_unlock_tonight)) },
-                        onClick = {
-                            onTonight()
-                            onOpensMenuExpanded(false)
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.hidden_layers_unlock_tomorrow)) },
-                        onClick = {
-                            onTomorrow()
-                            onOpensMenuExpanded(false)
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.hidden_layers_unlock_pick_date)) },
-                        onClick = {
-                            onPickDate()
-                            onOpensMenuExpanded(false)
-                        },
-                    )
-                }
+                HiddenLayerOptionsMenu(
+                    expanded = opensMenuExpanded,
+                    onDismissRequest = { onOpensMenuExpanded(false) },
+                    primaryText = primaryText,
+                    menuContainer = menuContainer,
+                    previewStroke = previewStroke,
+                    options = listOf(
+                        stringResource(R.string.hidden_layers_unlock_tonight) to onTonight,
+                        stringResource(R.string.hidden_layers_unlock_tomorrow) to onTomorrow,
+                        stringResource(R.string.hidden_layers_unlock_pick_date) to onPickDate,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * ≡ iOS `Menu` sobre `compactSelectionChip`: popup overlay que no recompone el dock/media.
+ */
+@Composable
+private fun HiddenLayerOptionsMenu(
+    expanded: Boolean,
+    onDismissRequest: () -> Unit,
+    primaryText: Color,
+    menuContainer: Color,
+    previewStroke: Color,
+    options: List<Pair<String, () -> Unit>>,
+) {
+    if (!expanded) return
+    val density = LocalDensity.current
+    Popup(
+        // El dock vive en la parte baja: igual que SwiftUI.Menu, desplegar hacia el
+        // espacio libre superior mantiene las opciones sobre el canvas.
+        alignment = Alignment.BottomStart,
+        offset = IntOffset(0, with(density) { (-46).dp.roundToPx() }),
+        onDismissRequest = onDismissRequest,
+        properties = PopupProperties(focusable = true, clippingEnabled = false),
+    ) {
+        Column(
+            Modifier
+                .widthIn(min = 168.dp, max = 260.dp)
+                .shadow(16.dp, RoundedCornerShape(14.dp), clip = false)
+                .clip(RoundedCornerShape(14.dp))
+                .background(menuContainer)
+                .border(0.5.dp, previewStroke, RoundedCornerShape(14.dp))
+                .padding(vertical = 6.dp),
+        ) {
+            options.forEach { (label, action) ->
+                Text(
+                    text = label,
+                    color = primaryText,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            action()
+                            onDismissRequest()
+                        }
+                        .padding(horizontal = 16.dp, vertical = 11.dp),
+                )
             }
         }
     }
@@ -2312,26 +2630,54 @@ private fun AvailabilityControls(
 private fun CompactSelectionChip(
     title: String,
     value: String,
+    leadingIcon: ImageVector,
     primaryText: Color,
     secondaryText: Color,
     previewStroke: Color,
+    subtleSurface: Color,
     onClick: () -> Unit,
 ) {
+    // ≡ iOS compactSelectionChip (L1368–1398): icono + título/valor + spacer + chevron
     Row(
         Modifier
+            .fillMaxWidth()
             .height(42.dp)
-            .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+            .clip(RoundedCornerShape(50))
+            .background(subtleSurface)
             .border(1.dp, previewStroke, RoundedCornerShape(50))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column {
-            Text(title, color = secondaryText, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-            Text(value, color = primaryText, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Icon(leadingIcon, null, tint = primaryText, modifier = Modifier.size(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(
+                title,
+                color = secondaryText,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                style = TextStyle(
+                    fontSize = 10.sp,
+                    lineHeight = 11.sp,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                ),
+            )
+            Text(
+                value,
+                color = primaryText,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = TextStyle(
+                    fontSize = 12.sp,
+                    lineHeight = 13.sp,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                ),
+            )
         }
-        Icon(Icons.Filled.UnfoldMore, null, tint = secondaryText, modifier = Modifier.size(12.dp))
+        Spacer(Modifier.weight(1f))
+        Icon(Icons.Filled.UnfoldMore, null, tint = secondaryText, modifier = Modifier.size(10.dp))
     }
 }
 
@@ -2421,6 +2767,13 @@ private fun layerIcon(type: MomentHiddenLayer.LayerType): ImageVector = when (ty
     MomentHiddenLayer.LayerType.IMAGE -> Icons.Filled.Image
 }
 
+/** ≡ iOS `plusActionIcon(for:)` */
+private fun plusActionIcon(type: MomentHiddenLayer.LayerType): ImageVector = when (type) {
+    MomentHiddenLayer.LayerType.TEXT -> Icons.Filled.AddComment
+    MomentHiddenLayer.LayerType.AUDIO -> Icons.Filled.GraphicEq
+    MomentHiddenLayer.LayerType.IMAGE -> Icons.Filled.AddAPhoto
+}
+
 private val HiddenLayerTextStyle.displayName: String
     get() = when (this) {
         HiddenLayerTextStyle.CLEAN -> "Clean"
@@ -2448,6 +2801,68 @@ private val HiddenLayerImageFrameStyle.displayName: String
         HiddenLayerImageFrameStyle.VINTAGE -> "Vintage"
     }
 
+private fun decodedImageAspectRatio(context: Context, uri: Uri): Float? {
+    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    context.contentResolver.openInputStream(uri)?.use { input ->
+        BitmapFactory.decodeStream(input, null, options)
+    } ?: return null
+    if (options.outWidth <= 0 || options.outHeight <= 0) return null
+
+    val orientation = uri.exifOrientation(context)
+    val swapsDimensions = orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+        orientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+        orientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+        orientation == ExifInterface.ORIENTATION_TRANSVERSE
+    val width = if (swapsDimensions) options.outHeight else options.outWidth
+    val height = if (swapsDimensions) options.outWidth else options.outHeight
+    return width.toFloat() / height.coerceAtLeast(1).toFloat()
+}
+
+private fun loadHiddenLayerBitmap(context: Context, uri: Uri): Bitmap? {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        val decoded = runCatching {
+            ImageDecoder.decodeBitmap(
+                ImageDecoder.createSource(context.contentResolver, uri),
+            ) { decoder, info, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                val sourceWidth = info.size.width.coerceAtLeast(1)
+                val sourceHeight = info.size.height.coerceAtLeast(1)
+                val longestSide = max(sourceWidth, sourceHeight)
+                if (longestSide > 2_048) {
+                    val scale = 2_048f / longestSide
+                    decoder.setTargetSize(
+                        (sourceWidth * scale).roundToInt().coerceAtLeast(1),
+                        (sourceHeight * scale).roundToInt().coerceAtLeast(1),
+                    )
+                }
+            }
+        }.getOrNull()
+        if (decoded != null) return decoded
+    }
+
+    // Compatibilidad pre-28 y fallback para proveedores que no soporten ImageDecoder.
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    context.contentResolver.openInputStream(uri)?.use { input ->
+        BitmapFactory.decodeStream(input, null, bounds)
+    } ?: return null
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+    var sampleSize = 1
+    while (max(bounds.outWidth, bounds.outHeight) / sampleSize > 2_048) {
+        sampleSize *= 2
+    }
+    val bitmap = context.contentResolver.openInputStream(uri)?.use { input ->
+        BitmapFactory.decodeStream(
+            input,
+            null,
+            BitmapFactory.Options().apply { inSampleSize = sampleSize },
+        )
+    } ?: return null
+    val normalized = bitmap.creatorNormalizedUp(context, uri)
+    if (normalized !== bitmap) bitmap.recycle()
+    return normalized
+}
+
 private fun nextLayerOrigin(count: Int): Pair<Double, Double> {
     val presets = listOf(0.30 to 0.26, 0.50 to 0.56, 0.72 to 0.28)
     return presets[min(count, presets.lastIndex)]
@@ -2458,6 +2873,7 @@ private fun addTextLayer(
     onLayersChange: (List<HiddenLayerDraft>) -> Unit,
     density: Density,
     caveatTypeface: Typeface?,
+    placeholder: String,
     onSelected: (String) -> Unit,
     onDockType: (MomentHiddenLayer.LayerType) -> Unit,
 ) {
@@ -2473,7 +2889,7 @@ private fun addTextLayer(
         zIndex = layers.size,
         text = "",
     )
-    layer = resizeTextLayerToFitContent(layer, density, caveatTypeface)
+    layer = resizeTextLayerToFitContent(layer, density, caveatTypeface, placeholder)
     onLayersChange(layers + layer)
     onSelected(layer.id)
     onDockType(MomentHiddenLayer.LayerType.TEXT)
@@ -2528,7 +2944,7 @@ private fun addImageLayer(
         anchorX = origin.first,
         anchorY = origin.second,
         width = imageWidth,
-        height = imageHeight.toDouble(),
+        height = imageHeight,
         zIndex = layers.size,
         localImage = image,
         presentationStyle = HiddenLayerPresentationStyle.PAPER_NOTE,
@@ -2541,15 +2957,15 @@ private fun addImageLayer(
 private fun resizeTextLayerToFitContent(
     layer: HiddenLayerDraft,
     density: Density,
-    caveatTypeface: Typeface? = null,
+    caveatTypeface: Typeface?,
+    placeholder: String,
 ): HiddenLayerDraft {
     if (layer.type != MomentHiddenLayer.LayerType.TEXT) return layer
-    val placeholder = "Escribe el secreto..." // medido como iOS; UI usa stringResource
     val text = layer.text.ifEmpty { placeholder }
     val measured = hiddenLayerTextCardBaseSizePx(text, layer.textStyle, density, caveatTypeface)
     val measuredWidthDp = measured.width / density.density
     val referenceWidth = 220f
-    val widthRatio = min(0.62, max(0.16, 0.34 * (measuredWidthDp / referenceWidth))).toDouble()
+    val widthRatio = min(0.62, max(0.16, 0.34 * (measuredWidthDp / referenceWidth)))
     val heightRatio = min(0.32, max(0.10, widthRatio * HiddenLayerLayout.textAspectRatio))
     return layer.copy(width = widthRatio, height = heightRatio)
 }
@@ -2575,7 +2991,9 @@ private fun hiddenLayerTextCardBaseSizePx(
         typeface = when (textStyle) {
             HiddenLayerTextStyle.MONO -> Typeface.MONOSPACE
             HiddenLayerTextStyle.HANDWRITTEN -> caveatTypeface ?: Typeface.DEFAULT
-            HiddenLayerTextStyle.BUBBLE, HiddenLayerTextStyle.EDITORIAL ->
+            HiddenLayerTextStyle.SERIF, HiddenLayerTextStyle.EDITORIAL ->
+                Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            HiddenLayerTextStyle.BUBBLE ->
                 Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             else -> Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
@@ -2617,7 +3035,7 @@ private fun previewCanvasHeight(
     screenHeightPx: Float,
     density: Float,
 ): Float {
-    if (availableWidth <= 0f) return 340f
+    if (availableWidth <= 0f) return 340f * density
     val ratio = if (displayedPostAspectRatio > 0f && displayedPostAspectRatio.isFinite()) {
         displayedPostAspectRatio
     } else {
@@ -2625,13 +3043,13 @@ private fun previewCanvasHeight(
     }
     val canonicalFeedWidth = FeedMomentCardLayout.mediaContentWidth(screenWidthDp) * density
     val canonicalFeedHeight = feedCardHeight(canonicalFeedWidth, ratio, screenHeightPx, density)
-    if (canonicalFeedWidth <= 0f || canonicalFeedHeight <= 0f) return 340f
+    if (canonicalFeedWidth <= 0f || canonicalFeedHeight <= 0f) return 340f * density
     val scale = min(availableWidth / canonicalFeedWidth, 1f)
     return canonicalFeedHeight * scale
 }
 
 private fun feedCardHeight(width: Float, ratio: Float, screenHeightPx: Float, density: Float): Float {
-    if (width <= 0f) return 300f
+    if (width <= 0f) return 300f * density
     val safeRatio = if (ratio > 0f && ratio.isFinite()) ratio else 1f
     val idealHeight = width / safeRatio
     val feedHeaderHeight = 88f * density
@@ -2642,9 +3060,13 @@ private fun feedCardHeight(width: Float, ratio: Float, screenHeightPx: Float, de
     return max(max(min(idealHeight, maxAllowed), 150f * density), 200f * density)
 }
 
-private fun switcherBaseOffset(totalWidth: Float, activeType: MomentHiddenLayer.LayerType): Float {
+private fun switcherBaseOffset(
+    totalWidth: Float,
+    activeType: MomentHiddenLayer.LayerType,
+    density: Float,
+): Float {
     val options = MomentHiddenLayer.LayerType.entries
-    val segmentWidth = (totalWidth - 6f) / options.size
+    val segmentWidth = (totalWidth - 6f * density) / options.size
     val start = -((options.size - 1) * segmentWidth) / 2f
     val currentIndex = options.indexOf(activeType).coerceAtLeast(0).toFloat()
     return start + currentIndex * segmentWidth
@@ -2654,12 +3076,13 @@ private fun constrainedSwitcherTranslation(
     translation: Float,
     width: Float,
     activeType: MomentHiddenLayer.LayerType,
+    density: Float,
 ): Float {
     val options = MomentHiddenLayer.LayerType.entries
-    val segmentWidth = (width - 6f) / options.size
+    val segmentWidth = (width - 6f * density) / options.size
     val minOffset = -((options.size - 1) * segmentWidth) / 2f
     val maxOffset = ((options.size - 1) * segmentWidth) / 2f
-    val base = switcherBaseOffset(width, activeType)
+    val base = switcherBaseOffset(width, activeType, density)
     val proposed = base + translation
     val clamped = min(max(proposed, minOffset), maxOffset)
     return clamped - base
@@ -2670,22 +3093,23 @@ private fun settleSwitcherSelection(
     locationX: Float?,
     width: Float,
     activeType: MomentHiddenLayer.LayerType,
+    density: Float,
     onSelect: (MomentHiddenLayer.LayerType) -> Unit,
     onTransientOffset: (Float) -> Unit,
 ) {
     val options = MomentHiddenLayer.LayerType.entries
-    val segmentWidth = (width - 6f) / options.size
-    val proposedOffset = switcherBaseOffset(width, activeType) + translation
+    val segmentWidth = (width - 6f * density) / options.size
+    val proposedOffset = switcherBaseOffset(width, activeType, density) + translation
     val start = -((options.size - 1) * segmentWidth) / 2f
     val fractionalIndex = (proposedOffset - start) / segmentWidth
-    val threshold = min(segmentWidth * 0.28f, 36f)
+    val threshold = min(segmentWidth * 0.28f, 36f * density)
     val currentIndex = options.indexOf(activeType).coerceAtLeast(0)
     val targetIndex = when {
         abs(translation) > threshold && abs(translation) < segmentWidth * 0.5f -> {
             val direction = if (translation > 0f) 1 else -1
             (currentIndex + direction).coerceIn(0, options.lastIndex)
         }
-        abs(translation) < 5f && locationX != null -> {
+        abs(translation) < 5f * density && locationX != null -> {
             (locationX / segmentWidth).toInt().coerceIn(0, options.lastIndex)
         }
         else -> fractionalIndex.roundToInt().coerceIn(0, options.lastIndex)

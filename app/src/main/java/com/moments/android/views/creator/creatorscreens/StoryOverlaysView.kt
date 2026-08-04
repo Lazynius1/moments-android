@@ -37,6 +37,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -47,10 +49,13 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -122,13 +127,18 @@ fun StoryOverlayToastHost(
     }
 }
 
-/** Radio y posición de la zona de borrado: 20 px de margen + tamaño del icono de 48 px. */
+/** Radio y centro de la papelera ≡ iOS `isPointOverTrash` (44pt / 60pt), en px densos. */
 fun isPointOverStoryOverlayTrash(
     x: Float,
     y: Float,
     canvasWidthPx: Float,
     canvasHeightPx: Float,
-): Boolean = hypot(x - canvasWidthPx / 2f, y - (canvasHeightPx - 44f)) < 60f
+    density: Density,
+): Boolean {
+    val bottomOffsetPx = with(density) { 44.dp.toPx() } // padding 20 + mitad icono 48
+    val radiusPx = with(density) { 60.dp.toPx() }
+    return hypot(x - canvasWidthPx / 2f, y - (canvasHeightPx - bottomOffsetPx)) < radiusPx
+}
 
 /**
  * ≡ papelera de `StoryOverlaysView` — solo visible al arrastrar;
@@ -227,6 +237,12 @@ fun StoryPolaroidCaptionField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboard?.show()
+    }
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -239,6 +255,7 @@ fun StoryPolaroidCaptionField(
         ),
         cursorBrush = SolidColor(Color.Black),
         modifier = modifier
+            .focusRequester(focusRequester)
             .widthIn(max = 320.dp)
             .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
             .padding(horizontal = 25.dp, vertical = 12.dp),
@@ -314,6 +331,7 @@ fun StoryDrawingCanvasOverlay(
     modifier: Modifier = Modifier,
 ) {
     var isOverTrash by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
     val latestOffsetX by rememberUpdatedState(offsetX)
     val latestOffsetY by rememberUpdatedState(offsetY)
     val latestScale by rememberUpdatedState(scale)
@@ -395,6 +413,7 @@ fun StoryDrawingCanvasOverlay(
                                     interactionPoint.y,
                                     canvasWidthPx,
                                     canvasHeightPx,
+                                    density,
                                 )
                                 if (!isOverTrash && over) HapticManager.shared.mediumImpact()
                                 isOverTrash = over
@@ -442,6 +461,7 @@ fun StoryTextOverlayItem(
     var contentWidthPx by remember(overlay.id) { mutableStateOf(0) }
     var contentHeightPx by remember(overlay.id) { mutableStateOf(0) }
     var isOverTrash by remember(overlay.id) { mutableStateOf(false) }
+    val density = LocalDensity.current
     val latestOverlay by rememberUpdatedState(overlay)
     val latestContentW by rememberUpdatedState(contentWidthPx)
     val latestContentH by rememberUpdatedState(contentHeightPx)
@@ -534,6 +554,7 @@ fun StoryTextOverlayItem(
                                         liveY,
                                         canvasWidthPx,
                                         canvasHeightPx,
+                                        density,
                                     )
                                     latestOnUpdate(updated)
                                     latestOnDragState(

@@ -3,6 +3,7 @@ package com.moments.android.views.creator.creatorscreens
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,7 +32,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Schedule
@@ -63,6 +63,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -94,6 +96,9 @@ import com.moments.android.views.creator.PhotoTagSelectionView
 import com.moments.android.views.creator.audienceselector.AudienceSelectionView
 import com.moments.android.views.creator.audienceselector.ContentAudience
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.messaging.components.AttachmentIcon
+import com.moments.android.views.messaging.components.AttachmentIconPreset
+import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -370,7 +375,7 @@ fun CaptionAndDetailsView(
                     )
                     OptionDivider(divider)
                     MinimalOptionRow(
-                        icon = Icons.Filled.Layers,
+                        attachmentIcon = AttachmentIcon.HIDDEN_LAYER,
                         title = stringResource(R.string.creator_hidden_layers),
                         value = when {
                             !canUseHiddenLayers -> stringResource(R.string.creator_hidden_layers_single_only)
@@ -639,20 +644,41 @@ fun CaptionAndDetailsView(
             }
         }
         if (showingHiddenLayers && canUseHiddenLayers) {
-            MomentsModalSheet(
-                onDismissRequest = { showingHiddenLayers = false },
-                largeOnly = true,
-                showDragHandle = false,
+            // Superficie large estable dentro del Creator. Evita que ModalBottomSheet
+            // renegocie su altura y recomponga la geometría del canvas durante la animación.
+            val windowHpx = LocalWindowInfo.current.containerSize.height
+            val editorHeight = with(LocalDensity.current) {
+                (windowHpx * 0.90f).toDp()
+            }
+            BackHandler(enabled = true) { /* interactiveDismissDisabled: cerrar desde el header */ }
+            Box(
+                Modifier
+                    .fillMaxSize(),
+                contentAlignment = Alignment.BottomCenter,
             ) {
-                HiddenLayersEditorView(
-                    mediaItem = selectedMediaItems.first(),
-                    layers = hiddenLayerDrafts,
-                    onLayersChange = { hiddenLayerDrafts = it },
-                    onDismiss = { showingHiddenLayers = false },
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.28f))
+                        .pointerInput(Unit) {
+                            detectTapGestures(onTap = { /* consumir scrim sin cerrar */ })
+                        },
+                )
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
-                )
+                        .height(editorHeight)
+                        .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                        .background(canvas),
+                ) {
+                    HiddenLayersEditorView(
+                        mediaItem = selectedMediaItems.first(),
+                        layers = hiddenLayerDrafts,
+                        onLayersChange = { hiddenLayerDrafts = it },
+                        onDismiss = { showingHiddenLayers = false },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
     }
@@ -698,7 +724,8 @@ private fun OptionDivider(color: Color) {
 
 @Composable
 private fun MinimalOptionRow(
-    icon: ImageVector?,
+    icon: ImageVector? = null,
+    attachmentIcon: AttachmentIcon? = null,
     title: String,
     value: String?,
     primary: Color,
@@ -715,10 +742,20 @@ private fun MinimalOptionRow(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (audience != null) {
-            AudienceIconView(audience = audience, size = AudienceIconMetrics.creatorRow)
-        } else if (icon != null) {
-            Icon(icon, null, tint = primary.copy(alpha = 0.85f), modifier = Modifier.size(22.dp))
+        // ≡ iOS MinimalOptionRowContent: AudienceIcon / AttachmentIconView(.creatorMetaRow) / SF Symbol
+        when {
+            audience != null -> AudienceIconView(audience = audience, size = AudienceIconMetrics.creatorRow)
+            attachmentIcon != null -> AttachmentIconView(
+                icon = attachmentIcon,
+                preset = AttachmentIconPreset.CREATOR_META_ROW,
+                tintColor = primary.copy(alpha = 0.85f),
+            )
+            icon != null -> Icon(
+                icon,
+                null,
+                tint = primary.copy(alpha = 0.85f),
+                modifier = Modifier.size(22.dp),
+            )
         }
         Spacer(Modifier.width(14.dp))
         Text(title, color = primary, modifier = Modifier.weight(1f), fontSize = 15.sp)

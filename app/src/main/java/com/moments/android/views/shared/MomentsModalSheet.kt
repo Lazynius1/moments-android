@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -88,6 +89,13 @@ fun MomentsModalSheet(
             dismissEnabled || newValue != SheetValue.Hidden
         },
     )
+    // largeOnly: forzar Expanded (si no, en fullScreenDialog/Creator a veces queda
+    // PartiallyExpanded → handle a media pantalla y el contenido se recompone al subir).
+    LaunchedEffect(sheetState, largeOnly) {
+        if (largeOnly && sheetState.currentValue != SheetValue.Expanded) {
+            sheetState.expand()
+        }
+    }
     val scope = rememberCoroutineScope()
     val dismissSheet: () -> Unit = {
         scope.launch {

@@ -1507,8 +1507,13 @@ fun StoryTextOverlayMetadata.toMap(): Map<String, Any> = buildMap {
 
 fun StickerData.toMap(): Map<String, Any> = buildMap {
     stickerId?.let { put("stickerId", it) }
-    put("type", type); put("content", content); put("position", position.toMap())
-    put("scale", scale); put("rotation", rotation)
+    put("type", type)
+    put("content", content)
+    // ≡ iOS FirestoreStoriesRepository.serializedStorySticker — positionX/Y, no mapa `position`.
+    put("positionX", position.x)
+    put("positionY", position.y)
+    put("scale", scale)
+    put("rotation", rotation)
     zIndex?.let { put("zIndex", it) }
     username?.let { put("username", it) }; userId?.let { put("userId", it) }
     hashtag?.let { put("hashtag", it) }; location?.let { put("location", it) }

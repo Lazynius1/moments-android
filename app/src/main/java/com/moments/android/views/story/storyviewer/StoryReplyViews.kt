@@ -778,19 +778,13 @@ fun FullScreenEphemeralImageView(
 // MARK: - Glassmorphic Extensions (≡ View.glassmorphic / storyGlassmorphic)
 
 /**
- * ≡ `View.glassmorphic()` — chrome canvas + stroke blanco 0.2.
- * Call sites vivos usan sobre todo [storyGlassmorphic].
+ * Chrome canvas elevado (fill + stroke adaptativos vía [momentsChromeGlass]).
  */
 fun Modifier.glassmorphic(shape: Shape = RectangleShape): Modifier =
-    this
-        .momentsChromeGlass(shape, interactive = false)
-        .border(0.5.dp, Color.White.copy(alpha = 0.2f), shape)
+    this.momentsChromeGlass(shape, interactive = false)
 
 /**
- * ≡ `View.storyGlassmorphic()` — chrome canvas + stroke blanco 0.1
- * (Overlay action/success, StoryNativeAd close).
+ * Chrome canvas elevado para overlays del story viewer.
  */
 fun Modifier.storyGlassmorphic(shape: Shape = RectangleShape): Modifier =
-    this
-        .momentsChromeGlass(shape, interactive = false)
-        .border(0.5.dp, Color.White.copy(alpha = 0.1f), shape)
+    this.momentsChromeGlass(shape, interactive = false)

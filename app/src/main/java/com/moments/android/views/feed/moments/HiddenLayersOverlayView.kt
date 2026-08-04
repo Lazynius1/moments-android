@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -419,7 +421,11 @@ fun HiddenLayersOverlayView(
         }
 
         layers.forEachIndexed { index, layer ->
-            val frame = HiddenLayerLayout.frame(layer, imageRect)
+            val frame = HiddenLayerLayout.frame(
+                layer,
+                imageRect,
+                minimumSizePx = with(density) { 44.dp.toPx() },
+            )
             val revealed = layer.id in revealedIds
 
             Box(
@@ -539,6 +545,7 @@ private fun HiddenLayerTextReveal(
     frameHeightPx: Float,
 ) {
     val density = LocalDensity.current
+    val isDark = isSystemInDarkTheme()
     var appearProgress by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(layer.id) {
         val charCount = layer.text?.length ?: 0
@@ -562,7 +569,13 @@ private fun HiddenLayerTextReveal(
     val foreground = when (layer.presentationStyle) {
         HiddenLayerPresentationStyle.PAPER_NOTE -> Color.Black.copy(0.82f)
         HiddenLayerPresentationStyle.MARKER_LABEL -> Color.Black
-        else -> Color.White
+        HiddenLayerPresentationStyle.GLASS_CARD ->
+            if (isDark) Color.White else Color.Black.copy(0.88f)
+        HiddenLayerPresentationStyle.MINIMAL_TEXT ->
+            if (isDark) Color.White.copy(0.96f) else Color.Black.copy(0.9f)
+        HiddenLayerPresentationStyle.CAPTION_PILL,
+        HiddenLayerPresentationStyle.FLOATING_QUOTE,
+        -> Color.White
     }
     val fontSize = when (layer.textStyle ?: HiddenLayerTextStyle.CLEAN) {
         HiddenLayerTextStyle.CLEAN -> 15.sp
@@ -585,6 +598,9 @@ private fun HiddenLayerTextReveal(
     }
     val rawText = layer.text.orEmpty()
     val visibleCount = (rawText.length * appearProgress).toInt().coerceIn(0, rawText.length)
+    var fittedScale by remember(layer.id, rawText, frameWidthPx, frameHeightPx) {
+        mutableFloatStateOf(1f)
+    }
 
     Box(
         Modifier
@@ -640,12 +656,17 @@ private fun HiddenLayerTextReveal(
             Text(
                 text = rawText.take(visibleCount),
                 color = foreground,
-                fontSize = fontSize,
+                fontSize = fontSize * fittedScale,
                 fontFamily = fontFamily,
                 fontWeight = fontWeight,
                 maxLines = 5,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
+                onTextLayout = { result ->
+                    if (result.hasVisualOverflow && fittedScale > 0.6f) {
+                        fittedScale = (fittedScale - 0.05f).coerceAtLeast(0.6f)
+                    }
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 14.dp, vertical = 11.dp),
@@ -847,8 +868,13 @@ private fun HiddenLayerImageReveal(
 ) {
     Box(
         Modifier
+            // La polaroid incluye el marco y el área de caption fuera del hotspot.
+            // SwiftUI permite ese desbordamiento; sin medirlo sin límites, el
+            // graphicsLayer de sombra/rotación recorta la parte inferior.
+            .wrapContentSize(Alignment.Center, unbounded = true)
             .shadow(8.dp, RoundedCornerShape(4.dp), ambientColor = Color.Black.copy(0.2f), spotColor = Color.Black.copy(0.2f))
             .rotate(-2f),
+        contentAlignment = Alignment.Center,
     ) {
         HiddenLayerRemotePolaroidPreview(
             url = url,

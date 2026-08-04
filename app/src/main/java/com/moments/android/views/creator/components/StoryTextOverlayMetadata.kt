@@ -269,13 +269,14 @@ fun StoryTextOverlayMetadata.renderConfiguration(): StoryTextRenderConfiguration
     )
 }
 
-fun StoryTextOverlayMetadata.scaledFontSize(containerWidth: Float): Float {
-    val scaleFactor = containerWidth.coerceAtLeast(1f) / 375f
+fun StoryTextOverlayMetadata.scaledFontSize(containerWidthDp: Float): Float {
+    // ≡ iOS: containerWidth en points; en Android hay que pasar dp, no px.
+    val scaleFactor = containerWidthDp.coerceAtLeast(1f) / 375f
     return (fontSize * scaleFactor).toFloat()
 }
 
-fun StoryTextOverlayMetadata.scaledRenderConfiguration(containerWidth: Float): StoryTextRenderConfiguration =
-    renderConfiguration().copy(fontSize = scaledFontSize(containerWidth))
+fun StoryTextOverlayMetadata.scaledRenderConfiguration(containerWidthDp: Float): StoryTextRenderConfiguration =
+    renderConfiguration().copy(fontSize = scaledFontSize(containerWidthDp))
 
 fun StoryTextOverlayMetadata.displayPosition(containerSize: Size): Offset =
     Offset(

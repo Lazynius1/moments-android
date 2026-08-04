@@ -3,6 +3,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import com.moments.android.models.CachedSticker
+import com.moments.android.models.Point
 import com.moments.android.models.StickerData
 import com.moments.android.services.storage.storageUploadJpegData
 import java.io.ByteArrayOutputStream
@@ -12,11 +13,15 @@ import java.io.File
 internal object StoryStickerRebuild {
 
     fun rebuildStickers(cachedStickers: List<CachedSticker>, uploadsDir: File): List<StickerData> =
-        cachedStickers.mapNotNull { cached ->
-            runCatching { toStickerData(cached, uploadsDir) }.getOrNull()
+        cachedStickers.mapIndexedNotNull { index, cached ->
+            runCatching { toStickerData(cached, uploadsDir, zIndex = index) }.getOrNull()
         }
 
-    private fun toStickerData(cached: CachedSticker, uploadsDir: File): StickerData {
+    private fun toStickerData(
+        cached: CachedSticker,
+        uploadsDir: File,
+        zIndex: Int,
+    ): StickerData {
         val bitmap = cached.localImageName?.let { name ->
             val file = File(uploadsDir, name)
             if (file.exists()) BitmapFactory.decodeFile(file.absolutePath) else null
@@ -26,9 +31,14 @@ internal object StoryStickerRebuild {
             stickerId = cached.id,
             type = cached.type,
             content = extractContent(cached, bitmap),
-            position = cached.position,
-            scale = cached.scale,
-            rotation = cached.rotationRadians,
+            position = Point(
+                cached.position.x.takeIf { it.isFinite() }?.coerceIn(0.0, 1.0) ?: 0.5,
+                cached.position.y.takeIf { it.isFinite() }?.coerceIn(0.0, 1.0) ?: 0.5,
+            ),
+            scale = cached.scale.takeIf { it.isFinite() } ?: 1.0,
+            // Firestore / iOS: `rotation` en radianes.
+            rotation = cached.rotationRadians.takeIf { it.isFinite() } ?: 0.0,
+            zIndex = zIndex,
             username = interaction?.username,
             userId = interaction?.userId,
             hashtag = interaction?.hashtag,
