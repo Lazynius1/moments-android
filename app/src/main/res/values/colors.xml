@@ -2,4 +2,6 @@
 <resources>
     <!-- Fondo del adaptive icon — alineado con el AppIcon claro de iOS -->
     <color name="ic_launcher_background">#FFFFFFFF</color>
+    <!-- Tinte del smallIcon en la status bar (FCM default_notification_color). -->
+    <color name="notification_accent">#0B1215</color>
 </resources>
