@@ -247,7 +247,10 @@ fun StickerPickerView(
 
     /** ≡ `createGiphySticker` — gifURL + fallback bitmap downscale 180. */
     fun emitGiphySticker(gif: com.moments.android.views.creator.components.GiphyGif) {
-        val url = gif.preferredStickerUrl ?: return
+        // fixed_height es GIF fiable; `original` a veces es mp4/webp que iOS no anima.
+        val url = gif.images.fixedHeight.url.takeIf { it.isNotBlank() }
+            ?: gif.preferredStickerUrl
+            ?: return
         scope.launch {
             val bitmap = withContext(Dispatchers.IO) {
                 runCatching {
@@ -256,6 +259,8 @@ fun StickerPickerView(
                     connection.readTimeout = 8_000
                     connection.getInputStream().use { BitmapFactory.decodeStream(it) }
                 }.getOrNull()?.let { src -> downscaleBitmapIfNeeded(src, maxDimension = 180) }
+                    // iOS siempre tiene image de tamaño; sin esto el viewer iOS usa SF Symbol ~20pt.
+                    ?: placeholderStickerBitmap(180)
             }
             val (x, y) = 0.5 + Random.nextDouble(-0.06, 0.06) to 0.42 + Random.nextDouble(-0.06, 0.06)
             emit(
@@ -1115,6 +1120,10 @@ fun renderEmojiStickerBitmap(emoji: String, size: Int = 200): Bitmap {
     canvas.drawText(emoji, size / 2f, y, paint)
     return bmp
 }
+
+/** Placeholder de tamaño para GIFs (≡ iOS `downscaleImageIfNeeded(..., 180)`). */
+fun placeholderStickerBitmap(side: Int = 180): Bitmap =
+    Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
 
 /** iOS `catalogPillTilt(for:)`. */
 private fun catalogPillTiltDegrees(index: Int): Float = when (index % 6) {
