@@ -3,6 +3,7 @@ package com.moments.android.views.login
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -121,14 +123,17 @@ fun LoginScreen(onAuthenticated: () -> Unit) {
 // MARK: - Header (logo + título; equivalente a EnhancedHeaderView)
 @Composable
 private fun AuthHeader(modifier: Modifier = Modifier) {
+    // ≡ iOS: dark `LoginLogo` / light `whatsnew`
+    val logoRes = if (isSystemInDarkTheme()) R.drawable.login_logo else R.drawable.whatsnew
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(18.dp),
         modifier = modifier,
     ) {
         Image(
-            painter = painterResource(R.drawable.login_logo),
+            painter = painterResource(logoRes),
             contentDescription = stringResource(R.string.brand_wordmark),
+            contentScale = ContentScale.Fit,
             modifier = Modifier.size(84.dp),
         )
         Text(

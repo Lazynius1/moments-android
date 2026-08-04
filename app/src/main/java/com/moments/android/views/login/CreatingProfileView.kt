@@ -8,6 +8,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -63,8 +65,12 @@ fun CreatingProfileOverlay() {
             modifier = Modifier.padding(horizontal = 24.dp),
         ) {
             Image(
-                painter = painterResource(R.drawable.login_logo),
+                // ≡ iOS CreatingProfileView: dark LoginLogo / light whatsnew
+                painter = painterResource(
+                    if (isSystemInDarkTheme()) R.drawable.login_logo else R.drawable.whatsnew,
+                ),
                 contentDescription = null,
+                contentScale = ContentScale.Fit,
                 modifier = Modifier.size(118.dp),
             )
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {

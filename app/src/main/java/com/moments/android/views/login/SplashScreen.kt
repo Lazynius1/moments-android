@@ -1,6 +1,8 @@
 package com.moments.android.views.login
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -13,30 +15,32 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.moments.android.R
 import com.moments.android.services.performance.MotionPolicy
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Port de `SplashScreenView` — canvas AdaptiveColors + logo por colorScheme + scale/fade.
- * MinimalSplashScreenView (LiquidAurora) no se usa en el flujo de arranque iOS.
+ * Port de `SplashScreenView`.
+ *
+ * Cortina estilo iOS / X: hold → squeeze 0.84 → zoom ×26 + fade del logo y del canvas.
+ * El scale va en `graphicsLayer` (sin clip) para que el logo avance a pantalla completa;
+ * las animaciones se **await**-ean para no cortar la cortina con un `delay` fijo.
  */
 @Composable
 fun SplashScreen(onComplete: () -> Unit) {
     val isDark = isSystemInDarkTheme()
-    // ≡ iOS: dark 0B1215 / light FAF9F6 (no `Surface` fijo claro).
+    // ≡ iOS: dark 0B1215 / light FAF9F6
     val canvas = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     val logoRes = if (isDark) R.drawable.splash_logo_dark else R.drawable.splash_logo_light
-    // ≡ AuthColors.primary(colorScheme)
-    val primary = if (isDark) Color.White else Color.Black
-    val shadowAlpha = if (isDark) 0.16f else 0.08f
 
     val logoScale = remember { Animatable(1f) }
     val logoOpacity = remember { Animatable(1f) }
@@ -45,40 +49,54 @@ fun SplashScreen(onComplete: () -> Unit) {
     LaunchedEffect(Unit) {
         if (MotionPolicy.reduceMotion) {
             delay(500)
-            launch { logoOpacity.animateTo(0f, tween(250)) }
-            launch { backgroundOpacity.animateTo(0f, tween(250)) }
-            delay(320)
+            coroutineScope {
+                launch { logoOpacity.animateTo(0f, tween(250, easing = EaseOut)) }
+                launch { backgroundOpacity.animateTo(0f, tween(250, easing = EaseOut)) }
+            }
             onComplete()
             return@LaunchedEffect
         }
+
+        // ≡ iOS absolute timeline: 0.78s squeeze, 1.04s explode, 1.44s done.
         delay(780)
-        launch { logoScale.animateTo(0.84f, tween(220)) }
-        delay(260) // t = 1.04s desde start
-        launch { logoScale.animateTo(26f, tween(340)) }
-        launch { logoOpacity.animateTo(0f, tween(340)) }
-        launch { backgroundOpacity.animateTo(0f, tween(340)) }
-        delay(400) // t = 1.44s
+        // Anticipación (rebote): esperar a terminar antes del zoom.
+        logoScale.animateTo(0.84f, tween(durationMillis = 220, easing = EaseInOut))
+
+        // Cortina: logo hacia la cámara (×26) + fade canvas/logo a la vez.
+        coroutineScope {
+            launch { logoScale.animateTo(26f, tween(durationMillis = 340, easing = EaseInOut)) }
+            launch { logoOpacity.animateTo(0f, tween(durationMillis = 340, easing = EaseInOut)) }
+            launch { backgroundOpacity.animateTo(0f, tween(durationMillis = 340, easing = EaseInOut)) }
+        }
         onComplete()
     }
+
+    val scale = logoScale.value
+    val logoAlpha = logoOpacity.value
+    val bgAlpha = backgroundOpacity.value
 
     Box(
         Modifier
             .fillMaxSize()
-            .background(canvas.copy(alpha = backgroundOpacity.value)),
+            .zIndex(2000f)
+            // Canvas a pantalla completa; el fade es del color, no del Box entero,
+            // para que el logo en zoom no herede un alpha prematuro del contenedor.
+            .background(canvas.copy(alpha = bgAlpha)),
         contentAlignment = Alignment.Center,
     ) {
         Image(
             painter = painterResource(logoRes),
             contentDescription = null,
+            contentScale = ContentScale.Fit,
             modifier = Modifier
                 .size(156.dp)
-                .shadow(
-                    elevation = 18.dp,
-                    ambientColor = primary.copy(alpha = shadowAlpha),
-                    spotColor = primary.copy(alpha = shadowAlpha),
-                )
-                .scale(logoScale.value)
-                .alpha(logoOpacity.value),
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = logoAlpha
+                    transformOrigin = TransformOrigin.Center
+                    clip = false
+                },
         )
     }
 }
