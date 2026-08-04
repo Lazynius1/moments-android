@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.io.FileInputStream
 
 plugins {
     alias(libs.plugins.android.application)
@@ -21,6 +22,7 @@ android {
         applicationId = "com.moments.android"
         minSdk = 26
         targetSdk = 37
+        // Subir versionCode en cada AAB que subas a Play.
         versionCode = 1
         versionName = "0.1.0"
         // Snap Camera Kit ≡ iOS Info.plist SCCameraKit* + SnapCameraKit.plist (vacío = no configurado).
@@ -62,12 +64,37 @@ android {
         buildConfig = true
     }
 
+    // Firma release: keystore.properties (gitignored). Sin ese fichero, release usa debug
+    // solo para builds locales — Play Store requiere el upload keystore.
+    val keystorePropsFile = rootProject.file("keystore.properties")
+    val keystoreProps = Properties().takeIf { keystorePropsFile.exists() }?.apply {
+        FileInputStream(keystorePropsFile).use { load(it) }
+    }
+    signingConfigs {
+        create("release") {
+            if (keystoreProps != null) {
+                val storePath = keystoreProps.getProperty("storeFile")
+                    ?: error("keystore.properties: falta storeFile")
+                storeFile = rootProject.file(storePath)
+                storePassword = keystoreProps.getProperty("storePassword")
+                    ?: error("keystore.properties: falta storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                    ?: error("keystore.properties: falta keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+                    ?: error("keystore.properties: falta keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            // Firma debug para instalar release local (Play Store usará keystore propio).
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (keystoreProps != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

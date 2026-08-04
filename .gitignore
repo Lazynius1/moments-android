@@ -13,6 +13,8 @@ local.properties
 # Firmas / secretos — nunca subir
 *.jks
 *.keystore
+keystore.properties
+keystore/
 
 .kotlin/
 *.hprof
