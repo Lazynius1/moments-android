@@ -427,7 +427,9 @@ fun StickerOverlayView(
     ) {
         Box(
             Modifier
-                .wrapContentSize()
+                // Inline editors can grow after their first measurement. The previous
+                // hit-target must not constrain the next pass or lower rows get clipped.
+                .wrapContentSize(unbounded = true)
                 .onSizeChanged {
                     naturalWidthPx = it.width
                     naturalHeightPx = it.height

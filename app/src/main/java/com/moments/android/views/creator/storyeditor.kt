@@ -26,6 +26,7 @@ import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
 import com.moments.android.views.components.InteractiveAudioStickerView
 import com.moments.android.views.components.StickerCountdownCardView
+import com.moments.android.views.components.StickerEmojiSliderCardView
 import com.moments.android.views.components.StickerHashtagCardView
 import com.moments.android.views.components.StickerLinkCardView
 import com.moments.android.views.components.StickerLocationCardView
@@ -37,7 +38,6 @@ import com.moments.android.views.components.StoryPolaroidFrameStyle
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.story.QuestionResponseStoryStickerCardView
 import com.moments.android.views.story.storystickers.AnimatedWeatherSticker
-import com.moments.android.views.story.storystickers.InteractiveEmojiSliderSticker
 import com.moments.android.views.story.storystickers.InteractivePollSticker
 import com.moments.android.views.story.storystickers.InteractiveQuestionSticker
 import com.moments.android.views.story.storyviewer.StoryViewerLayoutHelpers
@@ -599,7 +599,16 @@ fun StoryEditingView(
 
     fun restoreFocusedInlineSticker() {
         val original = focusedInlineStickerOriginal ?: return
-        stickers = stickers.map { item -> if (item.id == original.id) original else item }
+        // Restore only the transform used to bring the sticker into editing position.
+        // Replacing the whole draft discarded text entered while it was focused.
+        stickers = stickers.map { item ->
+            if (item.id != original.id) item else item.copy(
+                normalizedX = original.normalizedX,
+                normalizedY = original.normalizedY,
+                scale = original.scale,
+                rotationRadians = original.rotationRadians,
+            )
+        }
         focusedInlineStickerOriginal = null
     }
 
@@ -1300,9 +1309,14 @@ fun StoryEditingView(
                         "scaleNorm=$scaleNorm",
                 )
                 capturedStickers.sortedBy { it.zIndex }.map { draft ->
+                    // ≡ iOS: el fallback bitmap del GIF va en `content` (Base64) para el frame;
+                    // sin él iOS usa SF Symbol ~20pt y el GIF queda invisible.
                     val stickerBitmap = when {
                         draft.type == "emoji" && draft.content.isNotBlank() -> renderEmojiStickerBitmap(draft.content)
                         draft.type == "selfie" || draft.type == "frame" || draft.type == "shareMoment" -> draft.image
+                        draft.isAnimated || !draft.gifURL.isNullOrBlank() -> draft.image
+                            ?: placeholderStickerBitmap(180)
+                        draft.image != null -> draft.image
                         else -> null
                     }
                     val localName = if (stickerBitmap != null) {
@@ -2928,11 +2942,13 @@ private fun StoryStickerChip(
     }
 
     if (sticker.isAnimated && !sticker.gifURL.isNullOrBlank()) {
+        // ≡ iOS: `sticker.image.size` tras `downscaleImageIfNeeded(..., 180)`
+        val gifSize = stickerFallbackDpSize(sticker.image, maxSide = 180f)
         AnimatedStickerView(
             sticker = sticker,
-            size = androidx.compose.ui.unit.DpSize(128.dp, 128.dp),
+            size = gifSize,
             modifier = modifier
-                .size(128.dp)
+                .size(gifSize.width, gifSize.height)
                 .clip(RoundedCornerShape(14.dp)),
         )
         return
@@ -3009,10 +3025,13 @@ private fun StoryStickerChip(
 
     when (sticker.type) {
         "emoji" -> {
-            // La escala se aplica una sola vez por StickerOverlayView, igual que `scaleEffect`
-            // en el contenedor Swift; multiplicarla aquí duplicaba el pellizco del emoji.
-            val fontSp = 42f
-            Text(sticker.content, fontSize = fontSp.sp, modifier = modifier)
+            // ≡ iOS createEmojiSticker: canvas 200×200, font ~150 (la escala la aplica el overlay).
+            Box(
+                modifier = modifier.size(200.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(sticker.content, fontSize = 150.sp)
+            }
         }
         "weather" -> {
             // ≡ iOS AnimatedWeatherSticker + `.frame(width: 140, height: 50)`
@@ -3100,7 +3119,7 @@ private fun StoryStickerChip(
                         ),
                     )
                 },
-                modifier = modifier.width(300.dp).height(172.dp),
+                modifier = modifier.width(300.dp),
             )
         }
         "question" -> {
@@ -3115,7 +3134,7 @@ private fun StoryStickerChip(
                     val trimmed = q.take(48)
                     onUpdate(sticker.copy(questionText = trimmed, content = trimmed.ifBlank { "?" }))
                 },
-                modifier = modifier.width(300.dp).height(132.dp),
+                modifier = modifier.width(300.dp),
             )
         }
         "link" -> {
@@ -3182,13 +3201,15 @@ private fun StoryStickerChip(
             )
         }
         "emojiSlider" -> {
-            InteractiveEmojiSliderSticker(
+            StickerEmojiSliderCardView(
                 prompt = sticker.sliderPrompt.orEmpty(),
                 emoji = sticker.sliderEmoji?.ifBlank { null } ?: "😍",
-                storyId = "preview",
-                userId = "preview",
-                stickerId = sticker.id,
+                value = 0.5,
                 styleVariant = sticker.styleVariant ?: 0,
+                isEditingInline = isEditingInline,
+                onPromptChange = { prompt ->
+                    onUpdate(sticker.copy(sliderPrompt = prompt.take(60)))
+                },
                 modifier = modifier,
             )
         }
@@ -3584,4 +3605,18 @@ private fun audienceLabel(audience: ContentAudience): String = when (audience) {
     ContentAudience.BEST_FRIENDS -> stringResource(R.string.audience_type_best_friends)
     ContentAudience.CUSTOM, ContentAudience.CUSTOM_LIST -> stringResource(R.string.audience_type_custom)
     ContentAudience.ONLY_ME -> stringResource(R.string.audience_type_only_me)
+}
+
+/** ≡ iOS `downscaleImageIfNeeded(..., maxDimension)` → tamaño de layout del sticker. */
+private fun stickerFallbackDpSize(
+    bitmap: android.graphics.Bitmap?,
+    maxSide: Float = 180f,
+): androidx.compose.ui.unit.DpSize {
+    if (bitmap == null || bitmap.width <= 0 || bitmap.height <= 0) {
+        return androidx.compose.ui.unit.DpSize(maxSide.dp, maxSide.dp)
+    }
+    val longest = maxOf(bitmap.width, bitmap.height).toFloat().coerceAtLeast(1f)
+    val w = bitmap.width / longest * maxSide
+    val h = bitmap.height / longest * maxSide
+    return androidx.compose.ui.unit.DpSize(w.dp, h.dp)
 }

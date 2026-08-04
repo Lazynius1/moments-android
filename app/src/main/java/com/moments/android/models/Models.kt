@@ -839,7 +839,8 @@ data class StickerData(
 
         /** ≡ iOS `extractContent(from:)` (Bitmap → Base64 / metadatos). */
         private fun extractContent(sticker: StickerItem): String {
-            if (sticker.type == StickerType.SELFIE) {
+            // Selfie/emoji: PNG para conservar alpha (JPEG → fondo negro).
+            if (sticker.type == StickerType.SELFIE || sticker.type == StickerType.EMOJI) {
                 bitmapToBase64(sticker.image, android.graphics.Bitmap.CompressFormat.PNG, 100)?.let { return it }
             }
             if (sticker.type == StickerType.FRAME) {

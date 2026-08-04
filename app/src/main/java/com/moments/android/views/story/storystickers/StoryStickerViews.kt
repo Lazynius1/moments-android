@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,7 +16,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -44,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -51,10 +55,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -69,6 +76,7 @@ import coil.request.ImageRequest
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.models.StickerData
 import com.moments.android.utilities.MomentsFormat
@@ -175,6 +183,57 @@ private object StoryPollVoteStore {
 }
 
 /**
+ * Misma fórmula que el título del poll / iOS `multilineTextAlignment(.center)`:
+ * ancho completo + [TextAlign.Center] (tanto placeholder [Text] como el valor tipado).
+ */
+@Composable
+private fun StickerCenteredTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    color: Color,
+    placeholderColor: Color,
+    fontSize: TextUnit,
+    modifier: Modifier = Modifier,
+) {
+    val style = TextStyle(
+        color = color,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+        fontSize = fontSize,
+    )
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = style,
+        cursorBrush = SolidColor(color),
+        modifier = modifier.fillMaxWidth(),
+        decorationBox = { innerTextField ->
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                // Misma fórmula que el título no editable: Text + fillMaxWidth + Center
+                if (value.isEmpty()) {
+                    Text(
+                        placeholder,
+                        color = placeholderColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = fontSize,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                innerTextField()
+            }
+        },
+    )
+}
+
+/**
  * Port de `InteractivePollSticker`: tarjeta inline y voto persistido por usuario.
  * `onPollDataChange` cubre el modo de edición que Swift recibe mediante Binding.
  */
@@ -197,7 +256,8 @@ fun InteractivePollSticker(
     val isLight = styleVariant % 6 == 0
     val ink = if (isLight) momentsStickerInk(isDark) else Color.White
     val headerInk = if (isLight) momentsStickerInverseInk(isDark) else Color.White
-    val title = pollData.getOrNull(0).takeUnless { it.isNullOrBlank() } ?: "Ask a question"
+    val title = pollData.getOrNull(0).takeUnless { it.isNullOrBlank() }
+        ?: stringResource(R.string.stickerview_poll_placeholder)
 
     LaunchedEffect(storyId, userId, stickerId, viewerId) {
         if (!isPreview) {
@@ -210,6 +270,7 @@ fun InteractivePollSticker(
     Box(
         modifier = modifier
             .width(300.dp)
+            .height(172.dp) // ≡ StickerOverlayView.swift poll frame
             .clip(RoundedCornerShape(24.dp)),
     ) {
         AnimatedMomentsCardStickerSurface(
@@ -217,27 +278,30 @@ fun InteractivePollSticker(
             isDark = isDark,
             modifier = Modifier.matchParentSize(),
         )
-        Column(Modifier.fillMaxWidth()) {
-            Box(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxSize()) {
+            // Header pregunta — centrado H+V (≡ iOS multilineTextAlignment .center)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                contentAlignment = Alignment.Center,
+            ) {
                 AnimatedMomentsCardStickerHeaderSurface(
                     styleVariant = styleVariant,
                     isDark = isDark,
                     modifier = Modifier.matchParentSize(),
                 )
                 if (isEditingInline) {
-                    OutlinedTextField(
+                    StickerCenteredTextField(
                         value = pollData.getOrNull(0).orEmpty(),
                         onValueChange = { onPollDataChange(pollData.replaceAt(0, it)) },
-                        placeholder = { Text("Ask a question") },
-                        textStyle = androidx.compose.ui.text.TextStyle(
-                            color = headerInk,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            fontSize = 18.sp,
-                        ),
+                        placeholder = stringResource(R.string.story_editor_poll_question_prompt),
+                        color = headerInk,
+                        placeholderColor = headerInk.copy(alpha = 0.45f),
+                        fontSize = 18.sp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 8.dp),
+                            .padding(horizontal = 18.dp),
                     )
                 } else {
                     Text(
@@ -246,38 +310,58 @@ fun InteractivePollSticker(
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
                         fontSize = 18.sp,
-                        maxLines = 3,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 16.dp),
+                            .padding(horizontal = 18.dp),
                     )
                 }
             }
 
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
             ) {
                 repeat(2) { index ->
                     val optionIndex = index + 1
                     if (isEditingInline) {
-                        OutlinedTextField(
-                            value = pollData.getOrNull(optionIndex).orEmpty(),
-                            onValueChange = { onPollDataChange(pollData.replaceAt(optionIndex, it)) },
-                            placeholder = { Text("Option ${index + 1}") },
-                            textStyle = androidx.compose.ui.text.TextStyle(
-                                color = if (isLight) ink.copy(alpha = 0.9f) else Color.White,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center,
-                                fontSize = 15.sp,
-                            ),
-                            modifier = Modifier
+                        val option = pollData.getOrNull(optionIndex).orEmpty()
+                        Box(
+                            Modifier
                                 .fillMaxWidth()
+                                .weight(1f)
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(
                                     if (isLight) ink.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.18f),
                                 ),
-                        )
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            StickerCenteredTextField(
+                                value = option,
+                                onValueChange = { onPollDataChange(pollData.replaceAt(optionIndex, it)) },
+                                placeholder = stringResource(
+                                    if (index == 0) {
+                                        R.string.stickerview_poll_option1_placeholder
+                                    } else {
+                                        R.string.stickerview_poll_option2_placeholder
+                                    },
+                                ),
+                                color = if (isLight) ink.copy(alpha = 0.9f) else Color.White,
+                                placeholderColor = if (isLight) {
+                                    ink.copy(alpha = 0.45f)
+                                } else {
+                                    Color.White.copy(alpha = 0.45f)
+                                },
+                                fontSize = 15.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                            )
+                        }
                     } else {
                         val text = pollData.getOrNull(optionIndex).takeUnless { it.isNullOrBlank() }
                             ?: if (index == 0) "Yes" else "No"
@@ -287,6 +371,9 @@ fun InteractivePollSticker(
                             isSelected = voteState.selectedOption == index,
                             hasVoted = voteState.hasVoted,
                             styleVariant = styleVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
                             onTap = {
                                 if (voteState.hasVoted || viewerId == null || isPreview) return@InteractivePollOptionButton
                                 voteState = voteState.copy(selectedOption = index)
@@ -314,6 +401,7 @@ private fun InteractivePollOptionButton(
     hasVoted: Boolean,
     styleVariant: Int,
     onTap: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
     val isLight = styleVariant % 6 == 0
@@ -325,9 +413,9 @@ private fun InteractivePollOptionButton(
         label = "pollPercent",
     )
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(
                 if (isSelected) ink.copy(alpha = 0.92f)
@@ -335,12 +423,14 @@ private fun InteractivePollOptionButton(
                 else Color.White.copy(alpha = 0.18f),
             )
             .clickable(enabled = !hasVoted && LocalStoryStickerHitTesting.current, onClick = onTap),
+        contentAlignment = Alignment.Center,
     ) {
         if (hasVoted) {
             Box(
                 Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxHeight()
                     .fillMaxWidth(animatedPercent.coerceIn(0f, 1f))
-                    .height(52.dp)
                     .background(
                         if (isSelected) ink.copy(alpha = 0.92f)
                         else if (isLight) ink.copy(alpha = 0.16f)
@@ -350,15 +440,21 @@ private fun InteractivePollOptionButton(
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = if (hasVoted) Arrangement.Start else Arrangement.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
         ) {
             Text(
                 text,
                 color = if (isSelected) surface else if (isLight) ink.copy(alpha = 0.9f) else Color.White,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                // Sin voto: misma fórmula que el título (centrado). Con voto: leading + %.
+                modifier = if (hasVoted) Modifier.weight(1f) else Modifier,
+                textAlign = if (hasVoted) TextAlign.Start else TextAlign.Center,
             )
-            Spacer(Modifier.weight(1f))
             if (hasVoted) {
                 Text(
                     "${percentage.toInt()}%",
@@ -731,10 +827,21 @@ fun StoryStickerView(
             },
             modifier = modifier,
         )
-        sticker.isAnimated && !sticker.gifURL.isNullOrBlank() -> StoryGifSticker(
-            gifURL = sticker.gifURL,
-            modifier = modifier,
-        )
+        sticker.isAnimated && !sticker.gifURL.isNullOrBlank() -> {
+            // ≡ iOS AnimatedStickerView: frame = sticker.image.size (Base64 de tamaño en content).
+            val sizeMod = remember(sticker.content, sticker.stickerId) {
+                val decoded = decodeShareMomentBitmap(sticker.content)
+                if (decoded != null && decoded.width > 0 && decoded.height > 0) {
+                    Modifier.size(decoded.width.dp, decoded.height.dp)
+                } else {
+                    Modifier.size(180.dp)
+                }
+            }
+            StoryGifSticker(
+                gifURL = sticker.gifURL,
+                modifier = modifier.then(sizeMod),
+            )
+        }
         sticker.type == "poll" -> InteractivePollSticker(
             pollData = sticker.pollOptions?.let { listOf(sticker.questionText.orEmpty()) + it }
                 ?: listOf(sticker.content, "", ""),
@@ -742,7 +849,7 @@ fun StoryStickerView(
             userId = userId,
             stickerId = sticker.stickerId.orEmpty(),
             styleVariant = sticker.styleVariant ?: 0,
-            modifier = modifier.width(300.dp).height(172.dp),
+            modifier = modifier.width(300.dp),
         )
         sticker.type == "emojiSlider" -> InteractiveEmojiSliderSticker(
             prompt = sticker.sliderPrompt.orEmpty(),
@@ -768,7 +875,7 @@ fun StoryStickerView(
             onPauseStory = onPauseStory,
             onResumeStory = onResumeStory,
             onOpenProfile = gatedMentionTap,
-            modifier = modifier.width(300.dp).height(132.dp),
+            modifier = modifier.width(300.dp),
         )
         sticker.type == "questionResponse" -> QuestionResponseStoryStickerCardView(
             questionText = sticker.questionText ?: sticker.content,
@@ -850,7 +957,9 @@ fun StoryStickerView(
             dateText = sticker.caption?.takeIf { it.isNotBlank() }
                 ?: MomentsFormat.smartDate(Date(), MomentsFormat.DateContext.NUMERIC_DATE),
             styleVariant = sticker.styleVariant ?: 0,
-            modifier = modifier.width(164.dp).height(56.dp),
+            // Same intrinsic layout as the editor. 56 dp cannot contain both text
+            // lines plus the card's 28 dp vertical padding and compressed the viewer.
+            modifier = modifier,
         )
         sticker.type == "audio" -> {
             val url = sticker.audioURL
@@ -1046,7 +1155,7 @@ private fun StoryAnimatedVideoSticker(
     }
 }
 
-/** Rama iOS `AnimatedStickerView` (GIF). */
+/** Rama iOS `AnimatedStickerView` (GIF). El tamaño lo fija el caller (≡ sticker.image.size). */
 @Composable
 private fun StoryGifSticker(gifURL: String, modifier: Modifier) {
     val context = LocalContext.current
@@ -1065,7 +1174,7 @@ private fun StoryGifSticker(gifURL: String, modifier: Modifier) {
         model = request,
         contentDescription = null,
         contentScale = ContentScale.Fit,
-        modifier = modifier.size(160.dp),
+        modifier = modifier,
         loading = { Box(Modifier.fillMaxSize()) },
         error = { Box(Modifier.fillMaxSize()) },
         success = { SubcomposeAsyncImageContent(modifier = Modifier.fillMaxSize()) },
@@ -1076,16 +1185,63 @@ private fun StoryGifSticker(gifURL: String, modifier: Modifier) {
 private fun StoryStaticSticker(sticker: StickerData, modifier: Modifier) {
     val corner = FeedMomentCardLayout.mediaCornerRadius
     val shaped = modifier.clip(RoundedCornerShape(corner))
+    // Estándar chat/stories: glyph nativo del SO desde caption (Unicode).
+    // Base64 solo fallback legacy sin caption.
+    if (sticker.type == "emoji") {
+        val glyph = sticker.caption?.takeIf { it.isNotBlank() && it.length <= 8 }
+            ?: sticker.content.takeIf { it.length <= 8 }
+        if (glyph != null) {
+            // ≡ iOS createEmojiGlyphImage: canvas 200×200, font ~150
+            Box(shaped.size(200.dp), contentAlignment = Alignment.Center) {
+                Text(glyph, fontSize = 150.sp)
+            }
+            return
+        }
+        val decodedEmoji = remember(sticker.content, sticker.stickerId) {
+            decodeShareMomentBitmap(sticker.content)
+        }
+        if (decodedEmoji != null) {
+            Image(
+                bitmap = decodedEmoji.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = shaped.size(decodedEmoji.width.dp, decodedEmoji.height.dp),
+            )
+            return
+        }
+    }
+    // ≡ iOS else: Image(uiImage) — selfie/generic guardan PNG/JPEG en Base64.
+    val decoded = remember(sticker.content, sticker.stickerId) {
+        decodeShareMomentBitmap(sticker.content)
+    }
     when {
         !sticker.videoURL.isNullOrBlank() -> StickerVideoPlayer(sticker.videoURL, shaped)
-        !sticker.gifURL.isNullOrBlank() -> StoryGifSticker(sticker.gifURL, shaped)
+        !sticker.gifURL.isNullOrBlank() -> {
+            val sizeMod = if (decoded != null && decoded.width > 0 && decoded.height > 0) {
+                Modifier.size(decoded.width.dp, decoded.height.dp)
+            } else {
+                Modifier.size(180.dp)
+            }
+            StoryGifSticker(sticker.gifURL, shaped.then(sizeMod))
+        }
+        decoded != null -> Image(
+            bitmap = decoded.asImageBitmap(),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = shaped.size(decoded.width.dp, decoded.height.dp),
+        )
         sticker.content.startsWith("http") -> AsyncImage(
             sticker.content,
             null,
-            shaped,
+            shaped.size(180.dp),
             contentScale = ContentScale.Fit,
         )
-        sticker.content.isNotBlank() -> Text(sticker.content, fontSize = 32.sp, modifier = shaped)
+        // Solo texto corto; nunca volcar Base64/payload binario.
+        sticker.content.isNotBlank() && sticker.content.length <= 16 -> Text(
+            sticker.content,
+            fontSize = 32.sp,
+            modifier = shaped,
+        )
     }
 }
 
@@ -1164,10 +1320,11 @@ fun InteractiveQuestionSticker(
     }
 
     val subtitle = when {
-        isAuthor && state.responseCount > 0 -> "${state.responseCount} responses"
-        isAuthor -> "Tap to see responses"
-        state.hasResponded -> "Already answered"
-        else -> "Tap to answer"
+        isAuthor && state.responseCount > 0 ->
+            stringResource(R.string.question_responses, state.responseCount)
+        isAuthor -> stringResource(R.string.question_tap_to_see)
+        state.hasResponded -> stringResource(R.string.question_already_asked)
+        else -> stringResource(R.string.question_tap_to_answer)
     }
     val actionModifier = if (!isEditingInline) {
         modifier.clickable(enabled = LocalStoryStickerHitTesting.current && (isAuthor || !state.hasResponded)) {
@@ -1176,9 +1333,11 @@ fun InteractiveQuestionSticker(
         }
     } else modifier
 
+    // ≡ StickerOverlayView.swift `.frame(width: 300, height: 132)` — contenido debe CABER
     Box(
         modifier = actionModifier
             .width(300.dp)
+            .height(132.dp)
             .clip(RoundedCornerShape(24.dp)),
     ) {
         AnimatedMomentsCardStickerSurface(
@@ -1186,57 +1345,63 @@ fun InteractiveQuestionSticker(
             isDark = isDark,
             modifier = Modifier.matchParentSize(),
         )
-        Column(Modifier.fillMaxWidth()) {
-            Box(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
                 AnimatedMomentsCardStickerHeaderSurface(
                     styleVariant = styleVariant,
                     isDark = isDark,
                     modifier = Modifier.matchParentSize(),
                 )
                 if (isEditingInline) {
-                    OutlinedTextField(
+                    StickerCenteredTextField(
                         value = questionText,
                         onValueChange = onQuestionChange,
-                        placeholder = { Text("Ask a question") },
-                        textStyle = androidx.compose.ui.text.TextStyle(
-                            color = headerInk,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            fontSize = 18.sp,
-                        ),
+                        placeholder = stringResource(R.string.question_answer_title),
+                        color = headerInk,
+                        placeholderColor = headerInk.copy(alpha = 0.45f),
+                        fontSize = 17.sp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                            .padding(horizontal = 20.dp),
                     )
                 } else {
                     Text(
-                        text = questionText.ifBlank { "Ask a question" },
+                        text = questionText.ifBlank { stringResource(R.string.question_answer_title) },
                         color = headerInk,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         textAlign = TextAlign.Center,
-                        maxLines = 3,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                            .padding(horizontal = 20.dp),
                     )
                 }
             }
-            // ≡ iOS Capsule subtitle
+            // ≡ iOS Capsule subtitle — padding exterior + cápsula; cabe en 132
             Text(
                 subtitle,
                 color = if (isLight) ink.copy(alpha = 0.72f) else Color.White,
                 fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
+                fontSize = 13.sp,
                 textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 4.dp, bottom = 12.dp)
                     .clip(RoundedCornerShape(percent = 50))
                     .background(
                         if (isLight) ink.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.18f),
                     )
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
             )
         }
     }

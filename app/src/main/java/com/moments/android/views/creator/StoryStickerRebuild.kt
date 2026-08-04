@@ -80,7 +80,8 @@ internal object StoryStickerRebuild {
     }
 
     private fun extractContent(cached: CachedSticker, bitmap: Bitmap?): String {
-        if (cached.type == "selfie" && bitmap != null) {
+        // Selfie/emoji: PNG para conservar alpha (≡ iOS extractContent).
+        if ((cached.type == "selfie" || cached.type == "emoji") && bitmap != null) {
             val png = ByteArrayOutputStream().apply {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, this)
             }.toByteArray()
@@ -91,6 +92,7 @@ internal object StoryStickerRebuild {
                 return Base64.encodeToString(it, Base64.NO_WRAP)
             }
         }
+        // ≡ iOS: stickers (incl. GIF) llevan JPEG de tamaño en `content` + gifURL aparte.
         val imageTypes = setOf(
             "generic", "sticker", "emoji", "time", "selfie", "questionResponse",
             "shareMoment", "link", "countdown", "emojiSlider", "frame", "quiz",
