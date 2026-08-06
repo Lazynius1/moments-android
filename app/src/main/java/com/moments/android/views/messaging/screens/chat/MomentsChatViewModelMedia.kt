@@ -1,7 +1,10 @@
 package com.moments.android.views.messaging.screens.chat
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.location.LocationManager
+import androidx.core.content.ContextCompat
 import com.moments.android.MomentsApplication
 import com.moments.android.R
 import com.moments.android.views.messaging.core.EnhancedMessage
@@ -203,11 +206,21 @@ fun MomentsChatViewModel.startLiveLocation(context: Context, duration: LiveLocat
         reportError(context.getString(R.string.chat_error_invalid_conversation_text))
         return
     }
+    val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED
+    val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+        PackageManager.PERMISSION_GRANTED
+    if (!fine && !coarse) {
+        reportError(context.getString(R.string.chat_location_permission_needed))
+        return
+    }
     val manager = context.applicationContext.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
     val location = runCatching {
         manager?.let { mgr ->
-            listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
-                .mapNotNull { mgr.getLastKnownLocation(it) }
+            listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+                .mapNotNull { provider ->
+                    runCatching { mgr.getLastKnownLocation(provider) }.getOrNull()
+                }
                 .maxByOrNull { it.time }
         }
     }.getOrNull()
@@ -246,7 +259,8 @@ fun MomentsChatViewModel.startLiveLocation(context: Context, duration: LiveLocat
 fun MomentsChatViewModel.stopLiveLocation(messageId: String) {
     if (conversationId.isBlank()) return
     LiveLocationSharingService.stopSharing(messageId, conversationId)
+    val stoppedAt = Date()
     messages.value.firstOrNull { it.id == messageId }?.let { message ->
-        appendOrReplaceMessage(message.copy(liveLocationStoppedAt = Date()))
+        appendOrReplaceMessage(message.copy(liveLocationStoppedAt = stoppedAt))
     }
 }

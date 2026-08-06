@@ -128,7 +128,6 @@ fun LocationMomentDetailView(
     var showContextMenu by remember { mutableStateOf(false) }
     var contextMenuMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var showEditSheet by remember { mutableStateOf(false) }
-    var showDeleteAlert by remember { mutableStateOf(false) }
     var commentsMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var selectedHashtag by remember { mutableStateOf("") }
     var showExploreWithHashtag by remember { mutableStateOf(false) }
@@ -470,8 +469,8 @@ fun LocationMomentDetailView(
                     showContextMenu = false
                 },
                 onDelete = {
-                    showDeleteAlert = true
                     showContextMenu = false
+                    deleteMoment()
                 },
                 onReport = {},
                 modifier = Modifier.fillMaxSize(),
@@ -504,29 +503,6 @@ fun LocationMomentDetailView(
                     )
                 }
             }
-        }
-
-        if (showDeleteAlert) {
-            AlertDialog(
-                onDismissRequest = { showDeleteAlert = false },
-                title = { Text(stringResource(R.string.location_moment_detail_delete_title)) },
-                text = { Text(stringResource(R.string.location_moment_detail_delete_message)) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showDeleteAlert = false
-                            deleteMoment()
-                        },
-                    ) {
-                        Text(stringResource(R.string.location_moment_detail_delete_confirm), color = Color.Red)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteAlert = false }) {
-                        Text(stringResource(R.string.location_moment_detail_delete_cancel))
-                    }
-                },
-            )
         }
 
         if (showEditSheet && contextMenuMoment != null) {

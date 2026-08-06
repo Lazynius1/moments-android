@@ -237,14 +237,17 @@ object LiveLocationSharingService {
     private fun beginTracking(expiresAt: Date) {
         val ctx = appContext ?: return
         val lm = locationManager ?: return
-        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
+        val fine = ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!fine && !coarse) {
             scheduleExpiration(expiresAt)
             return
         }
 
         // ≡ iOS: Always → background updates; While Using → solo foreground (LocationManager).
+        stopLocationUpdates()
         val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
             .filter { lm.isProviderEnabled(it) }
         for (provider in providers) {
@@ -257,6 +260,12 @@ object LiveLocationSharingService {
                     Looper.getMainLooper(),
                 )
             }
+        }
+        // Empujar primera coordenada conocida sin esperar al throttle.
+        runCatching {
+            providers.mapNotNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
+                .maxByOrNull { it.time }
+                ?.let(::handleNewLocation)
         }
         scheduleExpiration(expiresAt)
     }
@@ -283,16 +292,20 @@ object LiveLocationSharingService {
         }
 
         val now = System.currentTimeMillis()
-        lastUpdateSentAtMs?.let { last ->
-            if (now - last < MIN_UPDATE_INTERVAL_MS) return
-        }
+        // Primera fix: enviar siempre (aunque no haya movimiento).
+        val isFirstFix = lastUpdateSentAtMs == null
+        if (!isFirstFix) {
+            lastUpdateSentAtMs?.let { last ->
+                if (now - last < MIN_UPDATE_INTERVAL_MS) return
+            }
 
-        val lastLat = lastSentLat
-        val lastLng = lastSentLng
-        if (lastLat != null && lastLng != null) {
-            val results = FloatArray(1)
-            Location.distanceBetween(lastLat, lastLng, location.latitude, location.longitude, results)
-            if (results[0] < MIN_DISTANCE_METERS) return
+            val lastLat = lastSentLat
+            val lastLng = lastSentLng
+            if (lastLat != null && lastLng != null) {
+                val results = FloatArray(1)
+                Location.distanceBetween(lastLat, lastLng, location.latitude, location.longitude, results)
+                if (results[0] < MIN_DISTANCE_METERS) return
+            }
         }
 
         lastUpdateSentAtMs = now

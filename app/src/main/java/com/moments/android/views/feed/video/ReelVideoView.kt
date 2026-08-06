@@ -152,7 +152,6 @@ fun ReelVideoView(
     var isDoubleTapAnimating by remember { mutableStateOf(false) }
     var showContextMenu by remember { mutableStateOf(false) }
     var showShareSheet by remember { mutableStateOf(false) }
-    var showDeleteAlert by remember { mutableStateOf(false) }
     var storyRouteUserId by remember { mutableStateOf<String?>(null) }
     var hasStory by remember { mutableStateOf(false) }
     var hasUnseenStory by remember { mutableStateOf(false) }
@@ -717,7 +716,10 @@ fun ReelVideoView(
                 isPresented = showContextMenu,
                 onPresentedChange = { showContextMenu = it },
                 onEdit = {},
-                onDelete = { showDeleteAlert = true },
+                onDelete = {
+                    showContextMenu = false
+                    deleteMoment()
+                },
                 onReport = {},
             )
         }
@@ -768,27 +770,6 @@ fun ReelVideoView(
                 onDismiss = { storyRouteUserId = null },
             )
         }
-    }
-
-    if (showDeleteAlert) {
-        AlertDialog(
-            onDismissRequest = { showDeleteAlert = false },
-            title = { Text(stringResource(R.string.reels_delete_title)) },
-            text = { Text(stringResource(R.string.reels_delete_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDeleteAlert = false
-                    deleteMoment()
-                }) {
-                    Text(stringResource(R.string.common_delete))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteAlert = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
     }
 }
 

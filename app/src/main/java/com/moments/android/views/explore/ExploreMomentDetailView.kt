@@ -126,7 +126,6 @@ fun ExploreMomentDetailView(
     var showContextMenu by remember { mutableStateOf(false) }
     var contextMenuMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var showEditSheet by remember { mutableStateOf(false) }
-    var showDeleteAlert by remember { mutableStateOf(false) }
     var commentsMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var selectedHashtag by remember { mutableStateOf("") }
     var showExploreWithHashtag by remember { mutableStateOf(false) }
@@ -392,8 +391,8 @@ fun ExploreMomentDetailView(
                         showContextMenu = false
                     },
                     onDelete = {
-                        showDeleteAlert = true
                         showContextMenu = false
+                        deleteContextMoment()
                     },
                     onReport = {},
                     modifier = Modifier.fillMaxSize(),
@@ -442,29 +441,6 @@ fun ExploreMomentDetailView(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-        }
-
-        if (showDeleteAlert) {
-            AlertDialog(
-                onDismissRequest = { showDeleteAlert = false },
-                title = { Text(stringResource(R.string.feed_actions_delete_title)) },
-                text = { Text(stringResource(R.string.feed_delete_confirm)) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showDeleteAlert = false
-                            deleteContextMoment()
-                        },
-                    ) {
-                        Text(stringResource(R.string.feed_actions_delete), color = Color.Red)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteAlert = false }) {
-                        Text(stringResource(R.string.feed_actions_cancel))
-                    }
-                },
-            )
         }
 
         if (showEditSheet) {

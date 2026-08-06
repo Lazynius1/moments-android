@@ -206,14 +206,23 @@ fun AdvancedAccountManagementView(
         scope.launch {
             try {
                 AuthService.deleteAccount(confirmation)
+                // AuthService ya deja AuthState.Unauthenticated → login; no hace falta más.
                 onNavigateBack()
             } catch (e: Exception) {
-                val pwd = AccountDeletionErrorPresenter.passwordMessage(e, wrongPasswordText)
-                if (pwd != null) {
-                    deletePasswordErrorMessage = pwd
+                // Si el servidor borró la cuenta pero el cliente falló al leer la respuesta,
+                // no dejar al usuario en Settings con sesión zombi.
+                val authGone = FirebaseAuth.getInstance().currentUser == null
+                if (authGone) {
+                    AuthService.logout()
+                    onNavigateBack()
                 } else {
-                    errorMessage = deleteErrorFormat.format(e.localizedMessage ?: e.toString())
-                    showError = true
+                    val pwd = AccountDeletionErrorPresenter.passwordMessage(e, wrongPasswordText)
+                    if (pwd != null) {
+                        deletePasswordErrorMessage = pwd
+                    } else {
+                        errorMessage = deleteErrorFormat.format(e.localizedMessage ?: e.toString())
+                        showError = true
+                    }
                 }
             } finally {
                 isProcessing = false

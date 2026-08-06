@@ -25,3 +25,12 @@
 -keep class androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory { <init>(); }
 -keep class androidx.startup.** { *; }
 -dontwarn androidx.room.paging.**
+
+# ---------------------------------------------------------------------------
+# Compose + R8 horizontal class merging — StoryEditingView genera lambdas con
+# ~90 params. R8 las fusionaba en clases ajenas (p.ej. Ktor PipelinePhaseRelation)
+# y ART rechaza el dex: VerifyError (register Reference vs Integer esperado).
+# Crash al abrir 1.0.2. Mantener el facade Kt evita el merge.
+# ---------------------------------------------------------------------------
+-keep class com.moments.android.views.creator.StoryeditorKt { *; }
+-keep class com.moments.android.views.creator.HiddenLayersEditorViewKt { *; }

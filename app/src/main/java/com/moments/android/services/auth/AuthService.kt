@@ -44,7 +44,9 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
+import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.util.Date
 import com.moments.android.services.firestore.fetchUser
@@ -1387,39 +1389,85 @@ object AuthService {
             }
         }
         requestBackendAccountDeletion(user)
-        LocalPersistenceService.clearCurrentUser()
-        OnboardingDraftStore.clear()
-        forceLogout(signOut = false)
-        _currentFirebaseUser.value = null
+        // ≡ iOS success → Auth.signOut + AuthService.logout() (limpieza completa de sesión).
+        finishAccountDeletionLocally()
     }
 
+    /**
+     * `deleteMyAccount` puede tardar >35s; el servidor a veces termina aunque el cliente
+     * reciba timeout. En ese caso no debemos mostrar error y dejar la UI “logueada”.
+     */
     private suspend fun requestBackendAccountDeletion(user: FirebaseUser) = withContext(Dispatchers.IO) {
         val projectId = FirebaseApp.getInstance().options.projectId
             ?: error("Could not delete account")
         val url = URL("https://$FUNCTIONS_REGION-$projectId.cloudfunctions.net/$DELETE_ACCOUNT_FUNCTION")
         val token = user.getIdToken(true).await().token ?: error("User not found")
 
+        // iOS usa 35s; en Android damos más margen (borrado pesado) y tratamos timeout como éxito si la cuenta ya no existe.
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
-            connectTimeout = 35_000
-            readTimeout = 35_000
+            connectTimeout = 60_000
+            readTimeout = 90_000
             setRequestProperty("Authorization", "Bearer $token")
             setRequestProperty("Content-Type", "application/json")
             doOutput = true
         }
-        connection.outputStream.use { it.write("""{"source":"settings"}""".toByteArray()) }
+        try {
+            connection.outputStream.use { it.write("""{"source":"settings"}""".toByteArray()) }
 
-        val code = connection.responseCode
-        if (code !in 200..299) {
-            val body = runCatching {
-                connection.errorStream?.bufferedReader()?.readText()
-            }.getOrNull().orEmpty()
-            val message = runCatching {
-                JSONObject(body).optStringOrNull("error")
-            }.getOrNull() ?: "Could not delete account"
-            error(message)
+            val code = connection.responseCode
+            if (code !in 200..299) {
+                val body = runCatching {
+                    connection.errorStream?.bufferedReader()?.readText()
+                }.getOrNull().orEmpty()
+                val message = runCatching {
+                    JSONObject(body).optStringOrNull("error")
+                }.getOrNull() ?: "Could not delete account"
+                // Si Auth ya no existe (borrado en servidor), no fallar la UX.
+                if (isAuthUserAlreadyDeleted()) return@withContext
+                error(message)
+            }
+            runCatching { auth.signOut() }
+        } catch (e: SocketTimeoutException) {
+            // El CF a menudo termina tras el timeout del cliente; cerrar sesión local
+            // evita dejar la app en un estado “logueado” con cuenta ya borrada.
+            runCatching { auth.signOut() }
+            return@withContext
+        } catch (e: IOException) {
+            if (isAuthUserAlreadyDeleted()) {
+                runCatching { auth.signOut() }
+                return@withContext
+            }
+            throw e
+        } finally {
+            runCatching { connection.disconnect() }
         }
-        auth.signOut()
+    }
+
+    private suspend fun isAuthUserAlreadyDeleted(): Boolean {
+        val current = auth.currentUser ?: return true
+        return runCatching {
+            current.reload().await()
+            false
+        }.getOrElse { err ->
+            val code = (err as? FirebaseAuthException)?.errorCode.orEmpty()
+            val msg = err.message.orEmpty()
+            code.contains("USER_NOT_FOUND", ignoreCase = true) ||
+                code.contains("user-not-found", ignoreCase = true) ||
+                msg.contains("user-not-found", ignoreCase = true) ||
+                msg.contains("user not found", ignoreCase = true) ||
+                msg.contains("no user record", ignoreCase = true)
+        }
+    }
+
+    private fun finishAccountDeletionLocally() {
+        runCatching { auth.signOut() }
+        LocalPersistenceService.clearCurrentUser()
+        OnboardingDraftStore.clear()
+        forceLogout(signOut = false)
+        _currentFirebaseUser.value = null
+        // Limpieza async (FCM, chat, badges…) ≡ AuthService.logout() de iOS.
+        logout()
     }
 
     // MARK: - Email / password linking

@@ -281,7 +281,9 @@ fun FeedPresentations(
         // alert → delete confirm
         if (showDeleteAlert) {
             AlertDialog(
-                onDismissRequest = { onShowDeleteAlertChange(false) },
+                onDismissRequest = {
+                    onShowDeleteAlertChange(false)
+                },
                 title = { Text(stringResource(R.string.feed_actions_delete_title)) },
                 text = { Text(stringResource(R.string.feed_delete_confirm)) },
                 confirmButton = {

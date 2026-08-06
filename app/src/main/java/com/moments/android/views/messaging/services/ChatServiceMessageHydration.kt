@@ -294,9 +294,9 @@ suspend fun ChatService.buildEnhancedMessage(
         isLiveLocation = data["isLiveLocation"] as? Boolean,
         liveLocationExpiresAt = (data["liveLocationExpiresAt"] as? Timestamp)?.toDate(),
         liveLocationDuration = data["liveLocationDuration"] as? String,
-        liveLocationStoppedAt = (data["liveLocationStoppedAt"] as? Timestamp)?.toDate(),
+        liveLocationStoppedAt = parseFirestoreDate(data["liveLocationStoppedAt"]),
         liveLocationSessionId = data["liveLocationSessionId"] as? String,
-        locationUpdatedAt = (data["locationUpdatedAt"] as? Timestamp)?.toDate(),
+        locationUpdatedAt = parseFirestoreDate(data["locationUpdatedAt"]),
         timestamp = timestamp,
         status = status,
         isRead = resolvedIncomingIsRead(data, senderId),
@@ -333,6 +333,14 @@ suspend fun ChatService.buildEnhancedMessage(
         parsed,
         FirebaseAuth.getInstance().currentUser?.uid,
     )
+}
+
+/** Acepta Timestamp / Date / epoch ms — serverTimestamp pendiente a veces no llega como Timestamp. */
+private fun parseFirestoreDate(value: Any?): Date? = when (value) {
+    is Timestamp -> value.toDate()
+    is Date -> value
+    is Number -> Date(value.toLong())
+    else -> null
 }
 
 suspend fun ChatService.resolveEncryptedMediaForMessage(
