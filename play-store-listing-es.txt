@@ -1,0 +1,52 @@
+Moments — Google Play Store listing (ES)
+Fuente para ficha / traducciones
+
+=== NOMBRE DE LA APP (máx. 30) ===
+Moments: Amigos y Momentos
+
+=== DESCRIPCIÓN CORTA (máx. 80) ===
+Red social privada: fotos, historias, capas ocultas, chat y Nova.
+
+=== DESCRIPCIÓN COMPLETA ===
+Moments es una red social privada donde cada momento sigue siendo tuyo.
+
+Aquí puedes compartir tu día con la gente que eliges, sin sentir que todo tiene que ser perfecto, público o pensado para gustarle a todo el mundo. Fotos, vídeos, historias, mensajes, lugares, recuerdos y pequeñas cosas que solo tienen sentido con tus amigos.
+
+Moments está hecha para sentirse más cercana: menos ruido, más intención y más control sobre lo que compartes.
+
+CAPAS OCULTAS
+Hay publicaciones que esconden algo más.
+
+Con las capas ocultas puedes añadir texto, audio o imágenes dentro de una foto. Tus amigos las descubren tocando el momento, y también puedes programarlas para que se abran más tarde.
+
+Una nota secreta. Una voz. Una pista. Una imagen dentro de otra. Algo que no se ve a primera vista, pero estaba ahí.
+
+HISTORIAS CON MÁS MAGIA
+Crea historias con stickers para expresarte, jugar y contar mejor lo que pasa. Entre ellos:
+
+Reveal: rasca para descubrir contenido oculto.
+Polaroid: añade una imagen con estilo y caption.
+Audio: graba voz o ambiente directamente en tu historia.
+
+PRIVACIDAD SIN COMPLICARLO
+Tú decides quién ve cada momento:
+
+mejores amigos
+audiencias personalizadas
+solo yo
+listas privadas
+control de comentarios
+ocultar tus seguidores y seguidos
+ocultar contenido a personas concretas
+bloquear o silenciar cuentas y palabras
+
+CHAT Y CONEXIONES REALES
+Habla con tus amigos con mensajes privados cifrados, fotos, vídeos, audio y contenido efímero. Comparte cuando te apetezca, con quien te apetezca.
+
+NOVA, TU ASISTENTE IA
+Nova te acompaña dentro de Moments para ayudarte a recordar preferencias, entender contexto y darte sugerencias útiles sin quitarte el control. Los mensajes con Nova también están pensados para sentirse personales y protegidos.
+
+Moments no va de publicar más.
+Va de compartir mejor.
+
+Descárgala en Google Play y comparte solo con quienes realmente importan.

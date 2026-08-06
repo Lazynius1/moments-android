@@ -19,12 +19,13 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.moments.android"
+        // Play package (irreversible). Code namespace stays com.moments.android.
+        applicationId = "com.momentsapp"
         minSdk = 26
         targetSdk = 37
         // Subir versionCode en cada AAB que subas a Play.
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 4
+        versionName = "1.0.3"
         // Snap Camera Kit ≡ iOS Info.plist SCCameraKit* + SnapCameraKit.plist (vacío = no configurado).
         buildConfigField("String", "SC_CAMERA_KIT_API_TOKEN", "\"\"")
         buildConfigField("String", "SC_CAMERA_KIT_CLIENT_ID", "\"\"")

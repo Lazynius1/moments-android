@@ -583,6 +583,9 @@ open class EnhancedChatViewModel(
                     reactions = chatService.mergeLegacyAndLiveReactions(existing.reactions, current.reactions),
                 )
             }
+            if (existing.liveLocationStoppedAt != null && current.liveLocationStoppedAt == null) {
+                current = current.copy(liveLocationStoppedAt = existing.liveLocationStoppedAt)
+            }
             merged[index] = current
         }
 
@@ -673,6 +676,11 @@ open class EnhancedChatViewModel(
             if (cached != null) {
                 val vanished = ((preserved.vanishedFor) + cached.vanishedFor).distinct()
                 if (vanished != preserved.vanishedFor) preserved = preserved.copy(vanishedFor = vanished)
+                // No pisar un stop optimista: el serverTimestamp puede llegar null un frame
+                // y el listener borraría liveLocationStoppedAt → UI “sigue en vivo”.
+                if (cached.liveLocationStoppedAt != null && preserved.liveLocationStoppedAt == null) {
+                    preserved = preserved.copy(liveLocationStoppedAt = cached.liveLocationStoppedAt)
+                }
             }
             if (preserved.id in optimisticallyHiddenVanishIds && currentUserId !in preserved.vanishedFor) {
                 preserved = preserved.copy(vanishedFor = preserved.vanishedFor + currentUserId)

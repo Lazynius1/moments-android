@@ -8,17 +8,33 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:543287427123:android:3c6963012c4276fa1b6346",
+        "mobilesdk_app_id": "1:543287427123:android:b1c3de7e77c5652b1b6346",
         "android_client_info": {
-          "package_name": "com.moments.android"
+          "package_name": "com.momentsapp"
         }
       },
       "oauth_client": [
         {
-          "client_id": "543287427123-vt2l35235kclb6ktcmp2efvlii6jfmj0.apps.googleusercontent.com",
+          "client_id": "543287427123-31lmj2meguuf8j63vsmarg1jgv03erlo.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.moments.android",
+            "package_name": "com.momentsapp",
+            "certificate_hash": "e87bded5e0014da7404c0ba16366bef686106292"
+          }
+        },
+        {
+          "client_id": "543287427123-39qnn34bv2ej7hpkjqlrnfroti79j6vv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.momentsapp",
+            "certificate_hash": "f1203b2d44e846bb8bc234f0391ad137253decc5"
+          }
+        },
+        {
+          "client_id": "543287427123-9u3kv0li76t7cvogjcaagut9ibaqg1oa.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.momentsapp",
             "certificate_hash": "cd5a3b73edda9f6e54754624acce9cdf218c381e"
           }
         },

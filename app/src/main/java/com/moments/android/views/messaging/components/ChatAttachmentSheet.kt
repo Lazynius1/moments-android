@@ -261,8 +261,12 @@ fun ChatAttachmentPickerSheet(
                         onDismiss()
                     },
                     onStartLive = { duration ->
-                        onStartLive(duration)
+                        // Cerrar el sheet (MapboxMap) ANTES de crear el bubble/Snapshotter:
+                        // destruir el mapa a la vez que arranca el snapshot crashea en varios devices.
                         onDismiss()
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            onStartLive(duration)
+                        }
                     },
                 )
                 else -> Unit

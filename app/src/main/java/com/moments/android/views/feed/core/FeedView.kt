@@ -529,9 +529,19 @@ fun FeedView(
         targetMomentUserId = targetMomentUserId,
         onTargetMomentUserIdChange = { targetMomentUserId = it },
         showEditSheet = showEditSheet,
-        onShowEditSheetChange = { showEditSheet = it },
+        onShowEditSheetChange = {
+            showEditSheet = it
+            if (!it && !showDeleteAlert && !showShareSheet && !showGlobalContextMenu) {
+                selectedMomentForMenu = null
+            }
+        },
         showDeleteAlert = showDeleteAlert,
-        onShowDeleteAlertChange = { showDeleteAlert = it },
+        onShowDeleteAlertChange = {
+            showDeleteAlert = it
+            if (!it && !showEditSheet && !showShareSheet && !showGlobalContextMenu) {
+                selectedMomentForMenu = null
+            }
+        },
         selectedMomentForMenu = selectedMomentForMenu,
         selectedProfileRoute = selectedProfileRoute,
         onSelectedProfileRouteChange = { selectedProfileRoute = it },
@@ -749,7 +759,11 @@ fun FeedView(
                 onDismissShare = { showShareSheet = false },
                 onDismissContextMenu = {
                     showGlobalContextMenu = false
-                    selectedMomentForMenu = null
+                    // No vaciar selectedMomentForMenu si hay sheet/alert pendiente
+                    // (delete/edit necesitan el momento tras cerrar el menú).
+                    if (!showDeleteAlert && !showEditSheet && !showShareSheet) {
+                        selectedMomentForMenu = null
+                    }
                 },
                 onEdit = {
                     // iOS Overlays onEdit: editedContent = moment.content; showEditSheet = true
@@ -757,7 +771,10 @@ fun FeedView(
                     showEditSheet = true
                     showGlobalContextMenu = false
                 },
-                onDelete = { showDeleteAlert = true },
+                onDelete = {
+                    selectedMomentForMenu?.let { deleteMoment(it) }
+                    showGlobalContextMenu = false
+                },
                 onDismissEchoInvitation = {
                     pendingEchoInvitationRoute = null
                     showPendingEchoInvitation = false

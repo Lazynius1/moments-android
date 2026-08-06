@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
@@ -96,6 +97,7 @@ import java.util.Date
 /** Paridad iOS `ContextMenuViewState`. */
 enum class ContextMenuViewState {
     Main,
+    DeleteConfirm,
     HiddenLayerMetrics,
     HiddenLayerMetricDetail,
     Sharing,
@@ -148,6 +150,7 @@ fun ModernContextMenuOverlay(
     fun handleBack() {
         when (viewState) {
             ContextMenuViewState.Main -> dismiss()
+            ContextMenuViewState.DeleteConfirm -> viewState = ContextMenuViewState.Main
             ContextMenuViewState.HiddenLayerMetrics -> viewState = ContextMenuViewState.Main
             ContextMenuViewState.HiddenLayerMetricDetail -> viewState = ContextMenuViewState.HiddenLayerMetrics
             ContextMenuViewState.Sharing -> viewState = ContextMenuViewState.Main
@@ -196,7 +199,10 @@ fun ModernContextMenuOverlay(
 
     val scrimAlpha = when (viewState) {
         ContextMenuViewState.PreparingStory -> 0.4f
-        ContextMenuViewState.Main, ContextMenuViewState.Sharing -> 0.3f
+        ContextMenuViewState.Main,
+        ContextMenuViewState.DeleteConfirm,
+        ContextMenuViewState.Sharing,
+        -> 0.3f
         else -> 0.01f
     }
 
@@ -245,15 +251,15 @@ fun ModernContextMenuOverlay(
                             isLoadingHiddenLayerMetrics = isLoadingHiddenLayerMetrics,
                             hiddenLayerMetricsError = hiddenLayerMetricsError,
                             onEdit = {
-                                dismiss()
                                 onEdit()
+                                dismiss()
                             },
                             onOpenHiddenLayerMetrics = {
                                 viewState = ContextMenuViewState.HiddenLayerMetrics
                             },
                             onDelete = {
-                                dismiss()
-                                onDelete()
+                                // Confirmación in-tree (no AlertDialog anidado en Dialogs de detalle).
+                                viewState = ContextMenuViewState.DeleteConfirm
                             },
                             onShare = { viewState = ContextMenuViewState.Sharing },
                             onReport = {
@@ -261,6 +267,13 @@ fun ModernContextMenuOverlay(
                                 onReport()
                             },
                             onCancel = { dismiss() },
+                        )
+                        ContextMenuViewState.DeleteConfirm -> ContextMenuDeleteConfirmPanel(
+                            onConfirm = {
+                                onDelete()
+                                dismiss()
+                            },
+                            onCancel = { viewState = ContextMenuViewState.Main },
                         )
                         ContextMenuViewState.HiddenLayerMetrics -> HiddenLayerMetricsListPanel(
                             metrics = hiddenLayerMetrics,
@@ -467,6 +480,49 @@ fun ModernContextMenuContent(
             @Suppress("UNUSED_PARAMETER")
             val unusedCancel = onCancel
         }
+    }
+}
+
+/** Confirmación in-tree — evita AlertDialog anidado en Dialogs de detalle (no se muestra / no confirma). */
+@Composable
+private fun ContextMenuDeleteConfirmPanel(
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val isDark = isSystemInDarkTheme()
+    val primary = if (isDark) Color.White else Color.Black
+    val secondary = if (isDark) Color.White.copy(0.7f) else Color.Black.copy(0.6f)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            stringResource(R.string.context_menu_delete_title),
+            color = primary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            stringResource(R.string.context_menu_delete_message),
+            color = secondary,
+            fontSize = 14.sp,
+        )
+        ContextMenuButton(
+            icon = Icons.Filled.Delete,
+            title = stringResource(R.string.context_menu_delete_confirm),
+            subtitle = stringResource(R.string.context_menu_delete_moment_subtitle),
+            forceRedIcon = true,
+            onClick = onConfirm,
+        )
+        ContextMenuButton(
+            icon = Icons.Filled.Close,
+            title = stringResource(R.string.context_menu_delete_cancel),
+            subtitle = "",
+            forceRedIcon = false,
+            onClick = onCancel,
+        )
     }
 }
 

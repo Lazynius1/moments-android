@@ -155,7 +155,6 @@ fun ModernSavedMomentsDetailView(
     var showContextMenu by remember { mutableStateOf(false) }
     var contextMenuMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var showEditSheet by remember { mutableStateOf(false) }
-    var showDeleteAlert by remember { mutableStateOf(false) }
     var showShareSheet by remember { mutableStateOf(false) }
     var storyRoute by remember { mutableStateOf<StoryUserPresentationRoute?>(null) }
     var commentsMoment by remember { mutableStateOf<FeedMoment?>(null) }
@@ -462,8 +461,8 @@ fun ModernSavedMomentsDetailView(
                         showContextMenu = false
                     },
                     onDelete = {
-                        showDeleteAlert = true
                         showContextMenu = false
+                        deleteContextMoment()
                     },
                     onReport = {},
                     modifier = Modifier.fillMaxSize(),
@@ -536,29 +535,6 @@ fun ModernSavedMomentsDetailView(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-        }
-
-        if (showDeleteAlert) {
-            AlertDialog(
-                onDismissRequest = { showDeleteAlert = false },
-                title = { Text(stringResource(R.string.feed_actions_delete_title)) },
-                text = { Text(stringResource(R.string.feed_delete_confirm)) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showDeleteAlert = false
-                            deleteContextMoment()
-                        },
-                    ) {
-                        Text(stringResource(R.string.feed_actions_delete), color = Color.Red)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteAlert = false }) {
-                        Text(stringResource(R.string.feed_actions_cancel))
-                    }
-                },
-            )
         }
 
         if (showEditSheet) {

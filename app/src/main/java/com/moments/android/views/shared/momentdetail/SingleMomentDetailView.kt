@@ -108,7 +108,6 @@ fun SingleMomentDetailView(
 
     var showContextMenu by remember { mutableStateOf(false) }
     var showEditSheet by remember { mutableStateOf(false) }
-    var showDeleteAlert by remember { mutableStateOf(false) }
     var selectedForComments by remember { mutableStateOf(false) }
     var selectedHashtag by remember { mutableStateOf("") }
     var showExploreWithHashtag by remember { mutableStateOf(false) }
@@ -323,8 +322,8 @@ fun SingleMomentDetailView(
                     showContextMenu = false
                 },
                 onDelete = {
-                    showDeleteAlert = true
                     showContextMenu = false
+                    deleteMoment()
                 },
                 onReport = {},
                 modifier = Modifier.fillMaxSize(),
@@ -369,29 +368,6 @@ fun SingleMomentDetailView(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-        }
-
-        if (showDeleteAlert) {
-            AlertDialog(
-                onDismissRequest = { showDeleteAlert = false },
-                title = { Text(stringResource(R.string.feed_actions_delete_title)) },
-                text = { Text(stringResource(R.string.feed_delete_confirm)) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showDeleteAlert = false
-                            deleteMoment()
-                        },
-                    ) {
-                        Text(stringResource(R.string.feed_actions_delete), color = Color.Red)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteAlert = false }) {
-                        Text(stringResource(R.string.feed_actions_cancel))
-                    }
-                },
-            )
         }
 
         if (showEditSheet) {

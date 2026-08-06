@@ -31,7 +31,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -151,7 +150,6 @@ fun ModernMomentDetailView(
     var showContextMenu by remember { mutableStateOf(false) }
     var contextMenuMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var showEditSheet by remember { mutableStateOf(false) }
-    var showDeleteAlert by remember { mutableStateOf(false) }
     var showShareSheet by remember { mutableStateOf(false) }
     var storyRoute by remember { mutableStateOf<StoryUserPresentationRoute?>(null) }
     var commentsMoment by remember { mutableStateOf<FeedMoment?>(null) }
@@ -433,8 +431,8 @@ fun ModernMomentDetailView(
                         showContextMenu = false
                     },
                     onDelete = {
-                        showDeleteAlert = true
                         showContextMenu = false
+                        deleteContextMoment()
                     },
                     onReport = {},
                     modifier = Modifier.fillMaxSize(),
@@ -506,29 +504,6 @@ fun ModernMomentDetailView(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-        }
-
-        if (showDeleteAlert) {
-            AlertDialog(
-                onDismissRequest = { showDeleteAlert = false },
-                title = { Text(stringResource(R.string.feed_actions_delete_title)) },
-                text = { Text(stringResource(R.string.feed_delete_confirm)) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showDeleteAlert = false
-                            deleteContextMoment()
-                        },
-                    ) {
-                        Text(stringResource(R.string.feed_actions_delete), color = Color.Red)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteAlert = false }) {
-                        Text(stringResource(R.string.feed_actions_cancel))
-                    }
-                },
-            )
         }
 
         if (showEditSheet) {
