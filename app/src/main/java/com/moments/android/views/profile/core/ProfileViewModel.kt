@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -32,6 +33,7 @@ import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.feed.core.EditMomentPayload
 import com.moments.android.views.profile.core.sections.ProfileAvatarNoteMetrics
 import com.moments.android.widget.MomentsWidgetStore
 import java.util.Calendar
@@ -55,8 +57,14 @@ class ProfileViewModel(
     var following by mutableStateOf<List<AppUser>>(emptyList()); private set
     var followers by mutableStateOf<List<AppUser>>(emptyList()); private set
     var mutuals by mutableStateOf<List<AppUser>>(emptyList()); private set
-    var moments by mutableStateOf<List<Moment>>(emptyList()); private set
-    var taggedMoments by mutableStateOf<List<Moment>>(emptyList()); private set
+    /**
+     * [Moment.equals] solo compara `id` (paridad iOS Equatable). Con la policy
+     * estructural por defecto, `moments = map { copy(audience=…) }` no notifica
+     * (la lista “sigue igual”) y el editor reabre con datos viejos aunque Firestore
+     * ya tenga el cambio. iOS `@Published` siempre emite al asignar → neverEqual.
+     */
+    var moments by mutableStateOf(emptyList<Moment>(), neverEqualPolicy()); private set
+    var taggedMoments by mutableStateOf(emptyList<Moment>(), neverEqualPolicy()); private set
     var customListNamesById by mutableStateOf<Map<String, String>>(emptyMap()); private set
     var isLoading by mutableStateOf(true)
     var isLoadingMoments by mutableStateOf(true)
@@ -333,6 +341,34 @@ class ProfileViewModel(
                 )
             }
         }
+        persistMoments()
+    }
+
+    /** Paridad post-save de EditMoment: actualizar lista local ya (no esperar refresh). */
+    fun applyMomentEdit(momentId: String, payload: EditMomentPayload) {
+        val coord = if (payload.locationLatitude != null && payload.locationLongitude != null) {
+            Moment.LocationCoordinate(payload.locationLatitude, payload.locationLongitude)
+        } else {
+            null
+        }
+        moments = sortProfileMoments(
+            moments.map {
+                if (it.id != momentId) {
+                    it
+                } else {
+                    it.copy(
+                        content = payload.content,
+                        audience = payload.audience,
+                        customListId = payload.customListId,
+                        taggedUsers = payload.taggedUsers.ifEmpty { null },
+                        mentionedUsers = payload.mentionedUsers.ifEmpty { null },
+                        location = payload.locationName.ifBlank { null },
+                        locationCoordinate = coord,
+                        mediaItems = payload.mediaItems ?: it.mediaItems,
+                    )
+                }
+            },
+        )
         persistMoments()
     }
 

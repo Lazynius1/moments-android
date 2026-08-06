@@ -51,6 +51,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -80,8 +81,10 @@ import com.moments.android.services.firestore.fetchUserByUsername
 import com.moments.android.views.shared.OfflineBannerOverlay
 import com.moments.android.views.components.InAppBannerView
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.story.StoryRingAvatarView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 
 /** Pestañas principales — paridad iOS AppTab (home=0, nova=1, create=2, explore=3, profile=4). */
@@ -442,8 +445,8 @@ private fun MomentsCustomTabBar(
                     inactiveColor = inactiveColor,
                     onClick = { onSelectTab(3) },
                 )
-                    TabBarItem(
-                    icon = if (selectedTab == 4) Icons.Filled.Person else Icons.Outlined.Person,
+                // ≡ iOS MomentsFloatingTabBar perfil = foto + StorySegmentedRing
+                ProfileTabBarItem(
                     title = stringResource(R.string.tab_bar_profile),
                     isSelected = selectedTab == 4,
                     activeColor = activeColor,
@@ -494,6 +497,74 @@ private fun RowScope.TabBarItem(
             } else if (icon != null) {
                 Icon(
                     icon,
+                    contentDescription = null,
+                    tint = if (isSelected) activeColor else inactiveColor,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
+            if (showBadge) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 4.dp, y = (-2).dp)
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFF3B30)),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * ≡ iOS `FloatingTabProfileSegmentRenderer` en el tab Perfil:
+ * foto + [StoryRingAvatarView] (mismos aros/audiencias que el feed).
+ * Refresh al [CoordinatorNavigationEvent.StoryUploaded] (paridad `StoryUploaded`).
+ */
+@Composable
+private fun RowScope.ProfileTabBarItem(
+    title: String,
+    isSelected: Boolean,
+    activeColor: Color,
+    inactiveColor: Color,
+    showBadge: Boolean,
+    onClick: () -> Unit,
+) {
+    val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+    var ringRefreshTrigger by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(uid) {
+        NavigationEventBus.events
+            .filterIsInstance<CoordinatorNavigationEvent.StoryUploaded>()
+            .collect { ringRefreshTrigger += 1 }
+    }
+
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+            .semantics { contentDescription = title },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (uid.isNotEmpty()) {
+                // iOS tab: avatar 30 / line 2.2; Android iconos ~26 → 28 + aro cabe en 49dp.
+                StoryRingAvatarView(
+                    userId = uid,
+                    size = 28.dp,
+                    lineWidth = 2.2.dp,
+                    refreshTrigger = ringRefreshTrigger,
+                    isOwnStory = true,
+                    hapticsEnabled = false,
+                )
+            } else {
+                Icon(
+                    if (isSelected) Icons.Filled.Person else Icons.Outlined.Person,
                     contentDescription = null,
                     tint = if (isSelected) activeColor else inactiveColor,
                     modifier = Modifier.size(26.dp),

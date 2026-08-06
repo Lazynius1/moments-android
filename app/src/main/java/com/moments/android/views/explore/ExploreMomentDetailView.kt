@@ -70,7 +70,7 @@ import com.moments.android.views.feed.core.sections.ModernPostCardView
 import com.moments.android.views.feed.maps.LocationMapView
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.rememberAdaptiveColors
-import com.moments.android.views.profile.momentsview.EditMomentView
+import com.moments.android.views.profile.momentsview.EditMomentSheet
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
 import com.moments.android.views.settings.hasVideoMedia
 import com.moments.android.views.shared.ScreenshotProtectedView
@@ -446,12 +446,7 @@ fun ExploreMomentDetailView(
         if (showEditSheet) {
             val editTarget = contextMenuMoment
             if (editTarget != null) {
-                Dialog(
-                    onDismissRequest = { showEditSheet = false },
-                    properties = DialogProperties(usePlatformDefaultWidth = false),
-                ) {
-                    Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
-                        EditMomentView(
+                EditMomentSheet(
                             moment = editTarget,
                             onSave = { payload ->
                                 scope.launch {
@@ -494,8 +489,6 @@ fun ExploreMomentDetailView(
                             },
                             onDismiss = { showEditSheet = false },
                         )
-                    }
-                }
             }
         }
 

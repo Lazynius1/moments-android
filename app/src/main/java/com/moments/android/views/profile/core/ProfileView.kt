@@ -81,7 +81,7 @@ import com.moments.android.views.profile.core.sections.ProfileMomentZoomNavigati
 import com.moments.android.views.profile.core.sections.momentZoomDestination
 import com.moments.android.views.profile.editor.ModernEditProfileView
 import com.moments.android.views.profile.incognito.IncognitoModeSheet
-import com.moments.android.views.profile.momentsview.EditMomentView
+import com.moments.android.views.profile.momentsview.EditMomentSheet
 import com.moments.android.views.profile.userprofile.sections.ProfileImageViewer
 import com.moments.android.views.settings.QRCodeView
 import com.moments.android.views.shared.LocalActiveMomentZoomSourceId
@@ -311,7 +311,8 @@ fun ProfileView(
     var momentDestination by remember { mutableStateOf<ProfileMomentZoomDestination?>(null) }
     var openConnectionsRoute by remember { mutableStateOf<ProfileConnectionsRoute?>(null) }
 
-    val suppressTabBar = showSettings || showEditProfile || momentDestination != null
+    val suppressTabBar =
+        showSettings || showEditProfile || momentDestination != null || heroCoordinator.isInteractive
     LaunchedEffect(suppressTabBar) {
         onSuppressTabBarChange(suppressTabBar)
     }
@@ -356,7 +357,9 @@ fun ProfileView(
     }
 
     LaunchedEffect(heroCoordinator, viewModel) {
-        heroCoordinator.onEdit = { editingMoment = it }
+        heroCoordinator.onEdit = { moment ->
+            editingMoment = viewModel.moments.firstOrNull { it.id != null && it.id == moment.id } ?: moment
+        }
         heroCoordinator.onDelete = { pendingDeleteMoment = it }
         heroCoordinator.onArchive = { viewModel.archiveMomentLocally(it) }
         heroCoordinator.onPin = { moment, shouldPin, replaceOldest ->
@@ -509,21 +512,17 @@ fun ProfileView(
     }
 
     editingMoment?.let { moment ->
-        MomentsModalSheet(
-            onDismissRequest = { editingMoment = null },
-            largeOnly = true,
-        ) {
-            EditMomentView(
-                moment = moment.toExploreFeedMoment(),
-                onSave = { payload ->
-                    scope.launch {
-                        updateOwnMoment(firestore, viewModel, moment, payload)
-                        editingMoment = null
-                    }
-                },
-                onDismiss = { editingMoment = null },
-            )
-        }
+        EditMomentSheet(
+            moment = moment.toExploreFeedMoment(),
+            onSave = { payload ->
+                // Optimista ya: al reabrir editar no depende de refresh async.
+                moment.id?.let { viewModel.applyMomentEdit(it, payload) }
+                scope.launch {
+                    updateOwnMoment(firestore, viewModel, moment, payload)
+                }
+            },
+            onDismiss = { editingMoment = null },
+        )
     }
 
     // ≡ iOS `.sheet(item: $gridPreviewMoment)` + `.presentationDetents([.large])`
@@ -593,7 +592,11 @@ private suspend fun updateOwnMoment(
             },
             mediaItems = payload.mediaItems,
         )
+        // Reaplicar por si refresh anterior dejó algo stale; luego sync remoto.
+        viewModel.applyMomentEdit(momentId, payload)
         viewModel.refreshProfile()
+    }.onFailure {
+        android.util.Log.e("EditMoment", "updateMomentDetails failed", it)
     }
 }
 

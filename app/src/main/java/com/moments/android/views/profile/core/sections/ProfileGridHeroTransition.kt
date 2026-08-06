@@ -3,6 +3,7 @@ package com.moments.android.views.profile.core.sections
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -33,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,11 +49,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -59,6 +65,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.Moment
@@ -138,10 +147,14 @@ object ProfileGridHeroLayout {
     val thumbnailCornerRadius = FeedMomentCardLayout.mediaCornerRadius.value
     const val horizontalPaddingDp = 16f
     const val detailHeaderBlockHeightDp = 80f
-    const val menuSpacingDp = 14f
+    const val menuSpacingDp = 10f
     const val peekFooterHeightDp = 56f
     const val menuWidthDp = 240f
-    const val menuRowHeightDp = 46f
+    /**
+     * iOS estima 46pt/fila (padding vertical 13); en Android compactamos más
+     * para que el menú no se corte bajo el gesture/nav bar.
+     */
+    const val menuRowHeightDp = 36f
     const val pinConfirmHeightDp = 220f
     const val peekMinWidthOverHeight = 3f / 4f
     const val peekMaxWidthOverHeight = 16f / 9f
@@ -149,6 +162,10 @@ object ProfileGridHeroLayout {
     const val peekDismissMs = 310
     const val retractPeekSplit = 0.34f
     const val retractFadeStart = 0.74f
+    /** Margen vertical del stack card+menú (pts iOS → dp). */
+    const val peekStackVerticalMarginDp = 20f
+    /** Media mínima al encoger el hero para que quepa el menú (estilo IG). */
+    const val peekMinMediaHeightDp = 120f
 
     /** ≡ Animation.smooth — aproximación Compose. */
     val smoothEasing = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)
@@ -217,13 +234,39 @@ object ProfileGridHeroLayout {
         menuBlockHeightPx: Float,
         density: Float,
     ): Rect {
-        val width = cardWidth(containerSize.width, density)
-        val height = peekCardHeight(width, moment.aspectRatio, density)
-        val x = (containerSize.width - width) / 2f
+        val margin = peekStackVerticalMarginDp * density
+        val footer = peekFooterHeightDp * density
+        val spacing = menuSpacingDp * density
         val menuHeight = if (showPinConfirm) pinConfirmHeightDp * density else menuBlockHeightPx
-        val stackHeight = height + menuSpacingDp * density + menuHeight
-        val minCenter = safeTop + 20f * density + stackHeight / 2f
-        val maxCenter = containerSize.height - safeBottom - 20f * density - stackHeight / 2f
+        // Tab bar se oculta en peek (`ProfileView.suppressTabBar`); solo nav/gesture.
+        val bottomInset = safeBottom
+        val minStack =
+            peekMinMediaHeightDp * density + footer + spacing + menuHeight
+        val availableHeight = max(
+            containerSize.height - safeTop - bottomInset - margin * 2f,
+            minStack,
+        )
+
+        var width = cardWidth(containerSize.width, density)
+        var height = peekCardHeight(width, moment.aspectRatio, density)
+        var stackHeight = height + spacing + menuHeight
+
+        // Si card+menú no caben, encoger ancho/altura: el menú gana (como IG).
+        if (stackHeight > availableHeight) {
+            val maxCardHeight = max(
+                availableHeight - spacing - menuHeight,
+                peekMinMediaHeightDp * density + footer,
+            )
+            val maxMediaHeight = max(maxCardHeight - footer, peekMinMediaHeightDp * density)
+            val ratio = clampedPeekWidthOverHeight(moment.aspectRatio)
+            width = min(width, maxMediaHeight * ratio)
+            height = peekCardHeight(width, moment.aspectRatio, density)
+            stackHeight = height + spacing + menuHeight
+        }
+
+        val x = (containerSize.width - width) / 2f
+        val minCenter = safeTop + margin + stackHeight / 2f
+        val maxCenter = containerSize.height - bottomInset - margin - stackHeight / 2f
         val preferred = containerSize.height / 2f
         val centerY = when {
             minCenter > maxCenter -> containerSize.height / 2f
@@ -294,6 +337,10 @@ class ProfileGridHeroTransitionCoordinator {
     var menuKind by mutableStateOf(ProfileGridHeroMenuKind.OWNER); private set
     /** true = lift 460ms, false = dismiss 310ms. */
     var peekAnimatingOpen by mutableStateOf(true); private set
+    /** Snapshot pixelado del perfil (estilo IG) mientras el menú está abierto. */
+    var peekBackdrop by mutableStateOf<ImageBitmap?>(null); private set
+    /** Captura sincrónica del root antes de pintar el overlay. */
+    var capturePeekBackdrop: (() -> ImageBitmap?)? = null
 
     var onEdit: ((Moment) -> Unit)? = null
     var onDelete: ((Moment) -> Unit)? = null
@@ -355,6 +402,8 @@ class ProfileGridHeroTransitionCoordinator {
         expandProgress = 0f
         collapseProgress = 0f
         detailContentOpacity = 0f
+        // Capturar ANTES de pintar el overlay (fondo vivo del perfil).
+        peekBackdrop = capturePeekBackdrop?.invoke()
         phase = ProfileGridHeroPhase.MenuPeek(ProfileGridMomentMenuSelection(moment, index))
         GlobalVideoManager.pauseAllVideos()
         GlobalVideoManager.clearProfilePlaybackHandoffState()
@@ -378,6 +427,7 @@ class ProfileGridHeroTransitionCoordinator {
     fun finishDismissIfNeeded() {
         if (phase is ProfileGridHeroPhase.MenuPeek && peekProgressTarget == 0f && peekProgress < 0.02f) {
             phase = ProfileGridHeroPhase.Idle
+            peekBackdrop = null
             GlobalVideoManager.clearProfilePlaybackHandoffState()
         }
     }
@@ -479,6 +529,7 @@ class ProfileGridHeroTransitionCoordinator {
         isDismissingInteractively = false
         toastMessage = null
         menuKind = ProfileGridHeroMenuKind.OWNER
+        peekBackdrop = null
         GlobalVideoManager.clearProfilePlaybackHandoffState()
     }
 
@@ -698,6 +749,7 @@ fun ProfileGridHeroDetailLayer(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
+    val view = LocalView.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     var overlayOrigin by remember { mutableStateOf(Offset.Zero) }
@@ -705,6 +757,11 @@ fun ProfileGridHeroDetailLayer(
     var shareMoment by remember { mutableStateOf<Moment?>(null) }
     val dark = isSystemInDarkTheme()
     val pinnedToast = stringResource(R.string.context_menu_pin_moment)
+
+    DisposableEffect(view) {
+        coordinator.capturePeekBackdrop = { ProfileGridHeroPixelate.captureFrom(view) }
+        onDispose { coordinator.capturePeekBackdrop = null }
+    }
 
     val peekDuration = if (coordinator.peekAnimatingOpen) {
         ProfileGridHeroLayout.peekLiftMs
@@ -760,12 +817,36 @@ fun ProfileGridHeroDetailLayer(
         )
 
         if (coordinator.isInteractive) {
+            val scrimT = (coordinator.scrimPresentationOpacity / 0.30f).coerceIn(0f, 1f)
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = coordinator.scrimPresentationOpacity))
                     .clickable { coordinator.dismissMenu() },
-            )
+            ) {
+                coordinator.peekBackdrop?.let { bmp ->
+                    Image(
+                        bitmap = bmp,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { alpha = scrimT },
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Color.Black.copy(
+                                alpha = if (coordinator.peekBackdrop != null) {
+                                    0.28f * scrimT
+                                } else {
+                                    coordinator.scrimPresentationOpacity
+                                },
+                            ),
+                        ),
+                )
+            }
         }
 
         val densityPx = density.density
@@ -883,11 +964,15 @@ fun ProfileGridHeroDetailLayer(
                             },
                         )
                     }
-                    else -> OwnerActionsMenu(
-                        moment = selection.moment,
-                        moments = moments,
-                        coordinator = coordinator,
-                    )
+                    else -> {
+                        val live = moments.firstOrNull { it.id != null && it.id == selection.moment.id }
+                            ?: selection.moment
+                        OwnerActionsMenu(
+                            moment = live,
+                            moments = moments,
+                            coordinator = coordinator,
+                        )
+                    }
                 }
             }
         }
@@ -1071,19 +1156,20 @@ fun ProfileGridMenuRow(
     Row(
         modifier
             .fillMaxWidth()
+            .height(ProfileGridHeroLayout.menuRowHeightDp.dp)
             .clickable(onClick = action)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         icon?.let {
-            Icon(it, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(12.dp))
+            Icon(it, contentDescription = null, tint = tint, modifier = Modifier.size(17.dp))
+            Spacer(Modifier.width(8.dp))
         }
         Text(
             title,
             color = tint,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 15.sp,
+            fontSize = 13.sp,
             maxLines = 1,
             softWrap = false,
         )
@@ -1127,4 +1213,34 @@ fun Modifier.profileGridLiftedSource(
     return this
         .background(hole.copy(alpha = 1f - opacity))
         .graphicsLayer { alpha = opacity }
+}
+
+/**
+ * Fondo pixelado estilo IG para el peek del grid:
+ * downscale sin filtro + upscale → bloques, luego tinte oscuro en la UI.
+ */
+internal object ProfileGridHeroPixelate {
+    /** Tamaño de bloque en px de pantalla (~IG). */
+    private const val BLOCK_PX = 22
+
+    fun captureFrom(view: View): ImageBitmap? {
+        val root = view.rootView ?: return null
+        val width = root.width
+        val height = root.height
+        if (width <= 1 || height <= 1) return null
+        return try {
+            val src = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(src)
+            root.draw(canvas)
+            val tinyW = max(1, width / BLOCK_PX)
+            val tinyH = max(1, height / BLOCK_PX)
+            val tiny = Bitmap.createScaledBitmap(src, tinyW, tinyH, /* filter= */ false)
+            val pixelated = Bitmap.createScaledBitmap(tiny, width, height, /* filter= */ false)
+            src.recycle()
+            tiny.recycle()
+            pixelated.asImageBitmap()
+        } catch (_: Throwable) {
+            null
+        }
+    }
 }

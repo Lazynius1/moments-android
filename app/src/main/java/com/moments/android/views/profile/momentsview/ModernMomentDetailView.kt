@@ -509,12 +509,7 @@ fun ModernMomentDetailView(
         if (showEditSheet) {
             val editTarget = contextMenuMoment
             if (editTarget != null) {
-                Dialog(
-                    onDismissRequest = { showEditSheet = false },
-                    properties = DialogProperties(usePlatformDefaultWidth = false),
-                ) {
-                    Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
-                        EditMomentView(
+                EditMomentSheet(
                             moment = editTarget,
                             onSave = { payload ->
                                 scope.launch {
@@ -557,8 +552,6 @@ fun ModernMomentDetailView(
                             },
                             onDismiss = { showEditSheet = false },
                         )
-                    }
-                }
             }
         }
 

@@ -55,6 +55,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
 import com.moments.android.views.shared.MomentsModalSheet
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -202,8 +203,13 @@ private fun WelcomeScreen(
                         // true = ya tenía perfil completo → a la app.
                         // false = falta perfil → onboarding social (username/intereses).
                         if (signInWithGoogle(context)) onAuthenticated() else onNeedsSocialOnboarding()
+                    } catch (error: CancellationException) {
+                        throw error
                     } catch (error: Exception) {
-                        googleError = googleErrorMessage
+                        if (!isGoogleSignInUserCancellation(error)) {
+                            android.util.Log.e("LoginView", "Google sign-in failed", error)
+                            googleError = googleErrorMessage
+                        }
                     } finally {
                         isGoogleLoading = false
                     }
@@ -351,8 +357,13 @@ private fun LoginFormScreen(
                     scope.launch {
                         try {
                             if (signInWithGoogle(context)) onAuthenticated() else onNeedsSocialOnboarding()
+                        } catch (error: CancellationException) {
+                            throw error
                         } catch (error: Exception) {
-                            errorMessage = googleErrorMessage
+                            if (!isGoogleSignInUserCancellation(error)) {
+                                android.util.Log.e("LoginView", "Google sign-in failed", error)
+                                errorMessage = googleErrorMessage
+                            }
                         } finally {
                             isGoogleLoading = false
                         }

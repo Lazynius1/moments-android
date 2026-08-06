@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -76,9 +75,34 @@ import com.moments.android.views.shared.MomentsSheetHeader
 import kotlinx.coroutines.launch
 
 /**
+ * ≡ iOS `.sheet { EditMomentView }` + `.presentationDetents([.large])` (Feed).
+ * Profile iOS: `.sheet` sin detents (casi large). Android: [MomentsModalSheet] largeOnly.
+ */
+@Composable
+fun EditMomentSheet(
+    moment: FeedMoment,
+    onSave: (EditMomentPayload) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    MomentsModalSheet(
+        onDismissRequest = onDismiss,
+        largeOnly = true,
+    ) { dismiss ->
+        EditMomentView(
+            moment = moment,
+            onSave = onSave,
+            onDismiss = dismiss,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = true),
+        )
+    }
+}
+
+/**
  * Port de `EditMomentView.swift`.
- * Sheets: AudienceSelectionView / LocationPickerView / EditMomentPhotoTagSheet
- * vía MomentsModalSheet (iOS `.sheet` + detents).
+ * Pickers ≡ iOS `.sheet` anidados → [MomentsModalSheet] (no Dialog fullscreen).
+ * Audiencia: medium+large; ubicación/tags: large.
  */
 @Composable
 fun EditMomentView(
@@ -92,20 +116,20 @@ fun EditMomentView(
     val scope = rememberCoroutineScope()
     val firestore = remember { FirestoreService() }
 
-    var editedContent by remember { mutableStateOf(moment.content) }
-    var selectedAudience by remember {
+    var editedContent by remember(moment.id) { mutableStateOf(moment.content) }
+    var selectedAudience by remember(moment.id) {
         mutableStateOf(ContentAudience.from(moment.audience))
     }
-    var selectedListId by remember { mutableStateOf(moment.customListId) }
-    var selectedListName by remember { mutableStateOf<String?>(null) }
-    var customSelectedUsers by remember { mutableStateOf<List<String>>(emptyList()) }
-    var initialCustomSelectedUsers by remember { mutableStateOf<List<String>>(emptyList()) }
-    var taggedUsers by remember { mutableStateOf(moment.taggedUsers) }
+    var selectedListId by remember(moment.id) { mutableStateOf(moment.customListId) }
+    var selectedListName by remember(moment.id) { mutableStateOf<String?>(null) }
+    var customSelectedUsers by remember(moment.id) { mutableStateOf<List<String>>(emptyList()) }
+    var initialCustomSelectedUsers by remember(moment.id) { mutableStateOf<List<String>>(emptyList()) }
+    var taggedUsers by remember(moment.id) { mutableStateOf(moment.taggedUsers) }
     var editedMediaItems by remember(moment.id) {
         mutableStateOf(moment.mediaItems.map { it.toMediaItem() })
     }
-    var locationName by remember { mutableStateOf(moment.location.orEmpty()) }
-    var selectedLocation by remember {
+    var locationName by remember(moment.id) { mutableStateOf(moment.location.orEmpty()) }
+    var selectedLocation by remember(moment.id) {
         mutableStateOf(moment.locationCoordinate)
     }
     var isSaving by remember { mutableStateOf(false) }
@@ -193,8 +217,7 @@ fun EditMomentView(
     Box(
         modifier
             .fillMaxSize()
-            .background(bg)
-            .statusBarsPadding(),
+            .background(bg),
     ) {
         Column(Modifier.fillMaxSize()) {
             // Sheet Android: sin chevron; título pegado + Save trailing
@@ -381,11 +404,12 @@ fun EditMomentView(
         }
     }
 
+    // ≡ iOS `.sheet` anidados sobre EditMoment (detents medium+large / large).
     if (showingAudiencePicker) {
         MomentsModalSheet(
             onDismissRequest = { showingAudiencePicker = false },
             largeOnly = false,
-        ) {
+        ) { dismiss ->
             AudienceSelectionView(
                 selectedAudience = selectedAudience,
                 selectedListId = selectedListId,
@@ -395,41 +419,47 @@ fun EditMomentView(
                 onSelectedListIdChange = { selectedListId = it },
                 onSelectedListNameChange = { selectedListName = it },
                 onCustomSelectedUsersChange = { customSelectedUsers = it },
-                onDismiss = { showingAudiencePicker = false },
+                onDismiss = dismiss,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .weight(1f, fill = true),
             )
         }
     }
 
     if (showingLocationPicker) {
-        MomentsModalSheet(onDismissRequest = { showingLocationPicker = false }) {
+        MomentsModalSheet(
+            onDismissRequest = { showingLocationPicker = false },
+            largeOnly = true,
+        ) { dismiss ->
             LocationPickerView(
                 selectedLocation = selectedLocation,
                 locationName = locationName,
                 onSelectedLocationChange = { selectedLocation = it },
                 onLocationNameChange = { locationName = it },
-                onDismiss = { showingLocationPicker = false },
+                onDismiss = dismiss,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .weight(1f, fill = true),
             )
         }
     }
 
     if (showingTagPicker) {
-        MomentsModalSheet(onDismissRequest = { showingTagPicker = false }) {
+        MomentsModalSheet(
+            onDismissRequest = { showingTagPicker = false },
+            largeOnly = true,
+        ) { dismiss ->
             EditMomentPhotoTagSheet(
                 moment = moment,
                 mediaItems = editedMediaItems,
                 onMediaItemsChange = { editedMediaItems = it },
                 taggedUsers = taggedUsers,
                 onTaggedUsersChange = { taggedUsers = it },
-                onDismiss = { showingTagPicker = false },
+                onDismiss = dismiss,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .weight(1f, fill = true),
             )
         }
     }

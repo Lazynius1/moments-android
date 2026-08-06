@@ -34,3 +34,10 @@
 # ---------------------------------------------------------------------------
 -keep class com.moments.android.views.creator.StoryeditorKt { *; }
 -keep class com.moments.android.views.creator.HiddenLayersEditorViewKt { *; }
+
+# ---------------------------------------------------------------------------
+# Credential Manager / Google Sign-In — el idToken credential se instancia
+# por type string; R8 no debe eliminar las clases del provider.
+# ---------------------------------------------------------------------------
+-keep class com.google.android.libraries.identity.googleid.** { *; }
+-keep class androidx.credentials.** { *; }
