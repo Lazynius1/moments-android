@@ -97,7 +97,7 @@ import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.feed.sharing.ModernShareBottomSheet
 import com.moments.android.views.profile.core.sections.profileThumbnailUrl
-import com.moments.android.views.profile.momentsview.EditMomentView
+import com.moments.android.views.profile.momentsview.EditMomentSheet
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
 import com.moments.android.views.settings.hasVideoMedia
 import com.moments.android.views.shared.ScreenshotProtectedView
@@ -540,15 +540,7 @@ fun ModernSavedMomentsDetailView(
         if (showEditSheet) {
             val editTarget = contextMenuMoment
             if (editTarget != null) {
-                Dialog(
-                    onDismissRequest = { showEditSheet = false },
-                    properties = DialogProperties(
-                        usePlatformDefaultWidth = false,
-                        decorFitsSystemWindows = false,
-                    ),
-                ) {
-                    Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
-                        EditMomentView(
+                EditMomentSheet(
                             moment = editTarget,
                             onSave = { payload ->
                                 scope.launch {
@@ -591,8 +583,6 @@ fun ModernSavedMomentsDetailView(
                             },
                             onDismiss = { showEditSheet = false },
                         )
-                    }
-                }
             }
         }
 

@@ -65,7 +65,7 @@ import com.moments.android.views.feed.core.sections.ModernPostCardView
 import com.moments.android.views.feed.maps.LocationMapView
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.rememberAdaptiveColors
-import com.moments.android.views.profile.momentsview.EditMomentView
+import com.moments.android.views.profile.momentsview.EditMomentSheet
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.momentdetail.FeedPinnedTopChrome
@@ -371,12 +371,7 @@ fun SingleMomentDetailView(
         }
 
         if (showEditSheet) {
-            Dialog(
-                onDismissRequest = { showEditSheet = false },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
-            ) {
-                Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
-                    EditMomentView(
+            EditMomentSheet(
                         moment = currentMoment,
                         onSave = { payload ->
                             scope.launch {
@@ -415,8 +410,6 @@ fun SingleMomentDetailView(
                         },
                         onDismiss = { showEditSheet = false },
                     )
-                }
-            }
         }
 
         if (selectedForComments) {

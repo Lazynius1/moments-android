@@ -36,7 +36,7 @@ import com.moments.android.views.explore.ExploreView
 import com.moments.android.views.messaging.screens.MessagingView
 import com.moments.android.views.profile.core.sections.UserProfileZoomNavigationHost
 import com.moments.android.views.profile.core.sections.momentZoomDestination
-import com.moments.android.views.profile.momentsview.EditMomentView
+import com.moments.android.views.profile.momentsview.EditMomentSheet
 import com.moments.android.views.shared.MomentsContainerTransformOverlay
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.MomentsSharedTransitionLayout
@@ -260,21 +260,14 @@ fun FeedPresentations(
             }
         }
 
-        // sheet → EditMomentView
+        // ≡ iOS `.sheet { EditMomentView.presentationDetents([.large]) }`
         if (showEditSheet) {
             selectedMomentForMenu?.let { moment ->
-                Dialog(
-                    onDismissRequest = { onShowEditSheetChange(false) },
-                    properties = DialogProperties(usePlatformDefaultWidth = false),
-                ) {
-                    Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
-                        EditMomentView(
-                            moment = moment,
-                            onSave = { payload -> updateMoment(moment, payload) },
-                            onDismiss = { onShowEditSheetChange(false) },
-                        )
-                    }
-                }
+                EditMomentSheet(
+                    moment = moment,
+                    onSave = { payload -> updateMoment(moment, payload) },
+                    onDismiss = { onShowEditSheetChange(false) },
+                )
             }
         }
 
