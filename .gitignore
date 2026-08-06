@@ -26,3 +26,15 @@ keystore/
 # Capturas y ficheros de trabajo locales
 .tmp/
 .tmp-screenshots/
+feed_*_capture.png
+*.log
+
+# Docs / checklists de port (no son la app)
+docs/
+PORT_*.md
+IOS_PORT_CHECKLIST.md
+ANDROID_*_CHECKLIST.md
+ANDROID_SETTINGS_UI_STYLE.md
+ANDROID_UI_UX_REVIEW_CHECKLIST.md
+scripts/
+tools/
