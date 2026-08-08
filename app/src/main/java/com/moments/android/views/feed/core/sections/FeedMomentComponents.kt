@@ -105,7 +105,8 @@ import kotlinx.coroutines.withContext
 // Métricas compartidas — port de `FeedMomentCardLayout` (iOS).
 private val ListHorizontalPadding = FeedMomentCardLayout.listHorizontalPadding
 private val HeaderHorizontalPadding = FeedMomentCardLayout.headerHorizontalPadding
-private val HeaderVerticalPadding = 9.dp
+private val HeaderVerticalPaddingTop = 8.dp
+private val HeaderVerticalPaddingBottom = 4.dp
 private val ActionRowHorizontalPadding = FeedMomentCardLayout.actionRowHorizontalPadding
 private val PostAvatarSize = 44.dp
 private val HeaderIconHitSize = 36.dp
@@ -693,7 +694,7 @@ fun ModernPostCardView(
 
     Column(
         modifier.fillMaxWidth().padding(horizontal = ListHorizontalPadding),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         AnimatedVisibility(visible = !isImmersive, enter = fadeIn(), exit = fadeOut()) {
             PostHeader(
@@ -878,7 +879,11 @@ private fun PostHeader(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = HeaderHorizontalPadding, vertical = HeaderVerticalPadding),
+            .padding(
+                horizontal = HeaderHorizontalPadding,
+                top = HeaderVerticalPaddingTop,
+                bottom = HeaderVerticalPaddingBottom,
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

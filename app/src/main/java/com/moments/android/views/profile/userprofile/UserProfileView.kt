@@ -665,20 +665,26 @@ fun UserProfileView(
         }
     }
 
-    // Port de `.navigationDestination(item: $pendingChatContext)`.
+    // Port de `.navigationDestination(item: $pendingChatContext)` + ChatRecoveryGateView
+    // (igual que conversaciones: las solicitudes también requieren identidad de chat).
     pendingChatContext?.let { context ->
         val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
         Dialog(
             onDismissRequest = { pendingChatContext = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
         ) {
-            GlassmorphicChatView(
-                conversation = context.syntheticConversation(uid),
-                pendingChatContext = context,
-                onBack = { pendingChatContext = null },
-                onPendingChatAccepted = { pendingChatContext = null },
-                onPendingChatDismissed = { pendingChatContext = null },
-            )
+            ChatRecoveryGateView(onCancel = { pendingChatContext = null }) {
+                GlassmorphicChatView(
+                    conversation = context.syntheticConversation(uid),
+                    pendingChatContext = context,
+                    onBack = { pendingChatContext = null },
+                    onPendingChatAccepted = { pendingChatContext = null },
+                    onPendingChatDismissed = { pendingChatContext = null },
+                )
+            }
         }
     }
 }
