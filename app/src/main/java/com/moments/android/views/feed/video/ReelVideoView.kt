@@ -567,7 +567,7 @@ fun ReelVideoView(
                             vectorIcon = Icons.Filled.MoreHoriz,
                             count = null,
                             isActive = false,
-                            activeColor = Color.White,
+                            activeColor = chromePrimary,
                             onClick = { showContextMenu = !showContextMenu },
                         )
                     }
@@ -866,6 +866,11 @@ fun EnhancedReelActionButton(
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val isDark = isSystemInDarkTheme()
+    // Chrome glass Android es opaco (canvas); blanco fijo desaparece en light.
+    val chromeInk = if (isDark) Color.White else Color(0xFF0B1215)
+    val inactiveTint = chromeInk
+    val countBg = chromeInk.copy(alpha = 0.15f)
 
     Column(
         modifier,
@@ -900,13 +905,13 @@ fun EnhancedReelActionButton(
                 icon != null -> AttachmentIconView(
                     icon = icon,
                     preset = AttachmentIconPreset.REELS_SIDEBAR,
-                    tintColor = if (isActive) activeColor else Color.White,
+                    tintColor = if (isActive) activeColor else inactiveTint,
                     modifier = Modifier.scale(if (isActive) 1.1f else 1f),
                 )
                 vectorIcon != null -> Icon(
                     vectorIcon,
                     contentDescription = null,
-                    tint = if (isActive) activeColor else Color.White,
+                    tint = if (isActive) activeColor else inactiveTint,
                     modifier = Modifier
                         .size(24.dp)
                         .scale(if (isActive) 1.1f else 1f),
@@ -917,11 +922,11 @@ fun EnhancedReelActionButton(
         if (count != null && count > 0) {
             Text(
                 MomentsFormat.count(count, MomentsFormat.CountStyle.SOCIAL_METRIC),
-                color = Color.White,
+                color = chromeInk,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
-                    .background(Color.White.copy(0.15f), RoundedCornerShape(percent = 50))
+                    .background(countBg, RoundedCornerShape(percent = 50))
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }

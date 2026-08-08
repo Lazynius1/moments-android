@@ -65,6 +65,16 @@ enum class MomentCaptionPresentationStyle {
     Detail,
 }
 
+/** Port de `MomentCaptionText` — normalización para cards feed/reels. */
+object MomentCaptionText {
+    /** Estilo IG: colapsa saltos a espacios para que hashtags fluyan. */
+    fun flowing(content: String): String =
+        content
+            .replace(Regex("""\s*\n+\s*"""), " ")
+            .replace(Regex(""" {2,}"""), " ")
+            .trim()
+}
+
 private data class CaptionMediaPreviewContext(
     val authorId: String,
     val username: String,
@@ -201,16 +211,24 @@ fun MomentCaptionView(
     val hashtagColor = captionHashtagTextColor(isDark)
     val mentionColor = captionMentionTextColor
 
+    // Feed/Reels: flujo continuo (IG). Detail: respeta saltos del autor.
+    val cardContent = when (style) {
+        MomentCaptionPresentationStyle.Feed,
+        MomentCaptionPresentationStyle.Reels,
+        -> MomentCaptionText.flowing(trimmed)
+        MomentCaptionPresentationStyle.Detail -> trimmed
+    }
+
     val maxCharacters = when (style) {
         MomentCaptionPresentationStyle.Feed -> 120
         MomentCaptionPresentationStyle.Reels -> 90
         MomentCaptionPresentationStyle.Detail -> 180
     }
-    val needsExpansion = trimmed.length > maxCharacters || trimmed.count { it == '\n' } > 1
-    val previewContent = if (needsExpansion) {
-        trimmed.take(maxCharacters).trim() + "..."
+    val needsExpansion = cardContent.length > maxCharacters || trimmed.count { it == '\n' } > 1
+    val previewContent = if (needsExpansion && cardContent.length > maxCharacters) {
+        cardContent.take(maxCharacters).trim() + "..."
     } else {
-        trimmed
+        cardContent
     }
 
     val mediaPreviewContext = remember(moment, authorId, username, previewImageUrl, thumbnailUrl, previewVideoUrl, audience, isVideo) {
@@ -230,8 +248,8 @@ fun MomentCaptionView(
 
     if (style == MomentCaptionPresentationStyle.Reels) {
         ReelsCaptionBody(
-            content = trimmed,
-            needsMore = reelsNeedsMore(trimmed),
+            content = cardContent,
+            needsMore = reelsNeedsMore(cardContent),
             baseTextColor = baseColor,
             hashtagTextColor = hashtagColor,
             mentionTextColor = mentionColor,

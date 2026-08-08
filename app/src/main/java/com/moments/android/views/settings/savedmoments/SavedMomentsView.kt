@@ -414,7 +414,8 @@ fun SavedMomentsView(
                                             val isMutedRestriction =
                                                 isRestricted && viewModel.isMomentFromMutedUser(moment)
                                             ScreenshotProtectedView(
-                                                isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
+                                                isProtected = !isRestricted &&
+                                                    (moment.audience?.lowercase() ?: "") != "everyone",
                                             ) {
                                                 SavedMomentGridCard(
                                                     moment = moment,

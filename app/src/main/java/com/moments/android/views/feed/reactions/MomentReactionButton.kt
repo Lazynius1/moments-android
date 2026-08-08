@@ -1,6 +1,5 @@
 package com.moments.android.views.feed.reactions
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -8,16 +7,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +41,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -54,17 +49,21 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
 import com.moments.android.R
@@ -80,6 +79,7 @@ import com.moments.android.utilities.MomentsFormat
 import com.moments.android.utilities.MomentsPressDefaults
 import com.moments.android.utilities.MomentsPressSpec
 import com.moments.android.utilities.momentsPress
+import com.moments.android.views.components.RailCountBadge
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.cos
@@ -268,20 +268,17 @@ fun EpicReactionButton(
         stringResource(R.string.feed_reaction_accessibility_default, reactionCount)
     }
     val accessibilityHint = stringResource(R.string.feed_reaction_accessibility_hint)
+    val density = LocalDensity.current
+    val pickerPopupOffset = remember(pickerXOffset, density) {
+        IntOffset(
+            x = with(density) { pickerXOffset.dp.roundToPx() },
+            // iOS EpicReactionPickerView.offset(y: -90) sobre el botón.
+            y = with(density) { (-90).dp.roundToPx() },
+        )
+    }
 
+    // Layout fijo sizeDp (como iOS) — sin padding extra que desplace el rail.
     Box(modifier.size(sizeDp.dp)) {
-        if (showReactionPicker) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .offset((-500).dp, (-1000).dp)
-                    .size(1000.dp, 2000.dp)
-                    .pointerInput(Unit) {
-                        detectTapGestures { hidePickerWithAnimation() }
-                    },
-            )
-        }
-
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             if (showRipple) {
                 Box(
@@ -365,39 +362,49 @@ fun EpicReactionButton(
             }
 
             if (showCount && reactionCount > 0) {
-                Text(
-                    text = MomentsFormat.count(reactionCount, MomentsFormat.CountStyle.SOCIAL_METRIC),
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
+                // Hit amplio DENTRO del 44dp (no mueve el rail). Esquina = estadísticas.
+                Box(
+                    Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = 4.dp, y = (-4).dp)
-                        .clip(RoundedCornerShape(percent = 50))
-                        .background(currentReaction?.color ?: Color.Gray.copy(0.6f))
-                        .combinedClickable(
+                        .size(32.dp)
+                        .zIndex(2f)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
                             onClick = {
                                 HapticManager.shared.lightImpact()
                                 showReactionsSheet = true
                             },
-                        )
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        ),
+                )
+                RailCountBadge(
+                    text = MomentsFormat.count(reactionCount, MomentsFormat.CountStyle.SOCIAL_METRIC),
+                    background = currentReaction?.color ?: Color.Gray.copy(0.6f),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 4.dp, y = (-4).dp)
+                        .zIndex(3f),
                 )
             }
         }
 
-        AnimatedVisibility(
-            visible = showReactionPicker,
-            enter = scaleIn(initialScale = 0.3f) + fadeIn() + slideInVertically { it / 3 },
-            exit = scaleOut(targetScale = 0.8f) + fadeOut() + slideOutVertically { -it / 4 },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .offset(x = pickerXOffset.dp, y = (-90).dp),
-        ) {
-            EpicReactionPickerView(
-                onReactionSelected = { addReactionWithAnimation(it) },
-                onClose = { hidePickerWithAnimation() },
-            )
+        // Popup fuera del clip del rail chrome (iOS overlay no se clippea igual).
+        if (showReactionPicker) {
+            Popup(
+                alignment = Alignment.BottomCenter,
+                offset = pickerPopupOffset,
+                onDismissRequest = { hidePickerWithAnimation() },
+                properties = PopupProperties(
+                    focusable = true,
+                    dismissOnBackPress = true,
+                    dismissOnClickOutside = true,
+                ),
+            ) {
+                EpicReactionPickerView(
+                    onReactionSelected = { addReactionWithAnimation(it) },
+                    onClose = { hidePickerWithAnimation() },
+                )
+            }
         }
     }
 

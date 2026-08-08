@@ -235,21 +235,21 @@ fun LocationMomentCard(
         }
     }
 
-    Box(
-        modifier
-            .then(if (!isAvailable) Modifier.blur(20.dp) else Modifier),
-    ) {
-        if (layoutMode == LocationMomentCardLayout.Feed) {
-            Box(Modifier.padding(horizontal = 15.dp)) { cardContent() }
-        } else {
-            Column(
-                Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 15.dp)
-                    .fillMaxWidth()
-                    .height(availableHeight),
-            ) {
-                cardContent()
+    // ≡ iOS: card.blur(isAvailable ? 0 : 20).overlay { MomentUnavailableOverlay }
+    Box(modifier) {
+        Box(Modifier.then(if (!isAvailable) Modifier.blur(20.dp) else Modifier)) {
+            if (layoutMode == LocationMomentCardLayout.Feed) {
+                Box(Modifier.padding(horizontal = 15.dp)) { cardContent() }
+            } else {
+                Column(
+                    Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 15.dp)
+                        .fillMaxWidth()
+                        .height(availableHeight),
+                ) {
+                    cardContent()
+                }
             }
         }
         if (!isAvailable) {

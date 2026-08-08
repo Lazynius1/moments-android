@@ -84,6 +84,8 @@ import com.moments.android.views.profile.incognito.IncognitoModeSheet
 import com.moments.android.views.profile.momentsview.EditMomentSheet
 import com.moments.android.views.profile.userprofile.sections.ProfileImageViewer
 import com.moments.android.views.settings.QRCodeView
+import com.moments.android.views.settings.savedmoments.SavedMomentsView
+import com.moments.android.views.settings.savedmoments.SavedMomentsViewModel
 import com.moments.android.views.shared.LocalActiveMomentZoomSourceId
 import com.moments.android.views.shared.MomentsContainerTransformOverlay
 import com.moments.android.views.shared.MomentsModalSheet
@@ -279,14 +281,13 @@ data class ProfileViewActions(
 
 /**
  * Root Compose equivalente a `ProfileView`: dueño del `ProfileViewModel` y, como en iOS,
- * de sus propias hojas (ajustes, editor, QR, incógnito, foto de perfil e historias).
+ * de `SavedMomentsViewModel` + hojas (ajustes, editor, QR, incógnito, foto e historias).
  *
  * Puentes: temas de perfil 🚫; hero transition → [ProfileGridHeroDetailLayer];
  * grid preview editor → [ProfileGridPreviewEditorView] sheet large.
  */
 @Composable
 fun ProfileView(
-    savedState: ProfileSavedContentState = ProfileSavedContentState(),
     actions: ProfileViewActions = ProfileViewActions(),
     modifier: Modifier = Modifier,
     /** ≡ iOS `.toolbar(.hidden, for: .tabBar)` en Settings / edit / moment zoom. */
@@ -294,6 +295,8 @@ fun ProfileView(
 ) {
     val viewModel = remember { ProfileViewModel() }
     val storyViewModel = remember { StoryViewModel() }
+    // ≡ iOS `@StateObject private var savedMomentsViewModel = SavedMomentsViewModel()`
+    val savedMomentsViewModel = remember { SavedMomentsViewModel() }
     val heroCoordinator = remember { ProfileGridHeroTransitionCoordinator() }
     val scope = rememberCoroutineScope()
     val firestore = remember { FirestoreService() }
@@ -308,11 +311,24 @@ fun ProfileView(
     var showIncognito by remember { mutableStateOf(false) }
     var showProfileImage by remember { mutableStateOf(false) }
     var showStories by remember { mutableStateOf(false) }
+    var showSavedManager by remember { mutableStateOf(false) }
     var momentDestination by remember { mutableStateOf<ProfileMomentZoomDestination?>(null) }
     var openConnectionsRoute by remember { mutableStateOf<ProfileConnectionsRoute?>(null) }
 
+    val savedMoments = savedMomentsViewModel.moments
+    val savedLoading = savedMomentsViewModel.isLoading
+    // Lectura del SnapshotStateMap para recomposición al validar visibilidad.
+    val savedVisibility = savedMomentsViewModel.visibilityByMomentId.toMap()
+    val savedState = ProfileSavedContentState(
+        moments = savedMoments,
+        isLoading = savedLoading,
+        visibilityByMomentId = savedVisibility,
+        isMomentMuted = savedMomentsViewModel::isMomentFromMutedUser,
+    )
+
     val suppressTabBar =
-        showSettings || showEditProfile || momentDestination != null || heroCoordinator.isInteractive
+        showSettings || showEditProfile || showSavedManager ||
+            momentDestination != null || heroCoordinator.isInteractive
     LaunchedEffect(suppressTabBar) {
         onSuppressTabBarChange(suppressTabBar)
     }
@@ -341,6 +357,16 @@ fun ProfileView(
             if (event is CoordinatorNavigationEvent.ShowProfileVisits) {
                 openConnectionsRoute = ProfileConnectionsRoute.VISITS
             }
+        }
+    }
+
+    // ≡ iOS ProfileSavedContent.onAppear → loadSavedMoments si vacío
+    LaunchedEffect(profileTab) {
+        if (profileTab == ProfileTabType.SAVED &&
+            savedMomentsViewModel.moments.isEmpty() &&
+            !savedMomentsViewModel.isLoading
+        ) {
+            savedMomentsViewModel.loadSavedMoments()
         }
     }
 
@@ -389,7 +415,10 @@ fun ProfileView(
                     selectedTab = profileTab,
                     onSelectTab = { profileTab = it },
                     savedState = savedState,
-                    onOpenSavedManager = actions.onOpenSavedManager,
+                    onOpenSavedManager = {
+                        actions.onOpenSavedManager()
+                        showSavedManager = true
+                    },
                     onOpenMoment = { moments, index, feedKind ->
                         moments.getOrNull(index)?.let { moment ->
                             momentDestination = ProfileMomentZoomDestination(
@@ -401,8 +430,13 @@ fun ProfileView(
                             actions.onOpenMoment(moments, index, feedKind)
                         }
                     },
-                    onRefreshSavedVisibility = actions.onRefreshSavedVisibility,
-                    onRemoveSaved = actions.onRemoveSaved,
+                    onRefreshSavedVisibility = { moment, completion ->
+                        savedMomentsViewModel.refreshVisibilityForMoment(moment, completion)
+                    },
+                    onRemoveSaved = { momentId ->
+                        savedMomentsViewModel.removeMoment(momentId)
+                        actions.onRemoveSaved(momentId)
+                    },
                     onEditProfile = { actions.onEditProfile(); showEditProfile = true },
                     onShowStory = { actions.onShowStory(); showStories = true },
                     onShowProfileImage = { actions.onShowProfileImage(); showProfileImage = true },
@@ -414,6 +448,7 @@ fun ProfileView(
                     onMomentLongPress = { moment, index, _ ->
                         heroCoordinator.openMenu(moment, index)
                     },
+                    onRefreshSaved = { savedMomentsViewModel.loadSavedMoments() },
                     openConnectionsRoute = openConnectionsRoute,
                     onOpenConnectionsRouteConsumed = { openConnectionsRoute = null },
                 )
@@ -439,6 +474,19 @@ fun ProfileView(
                             .momentZoomDestination(ProfileOwnZoomSource.SETTINGS),
                     ) {
                         SettingsView(onNavigateBack = { showSettings = false })
+                    }
+                }
+
+                // ≡ ProfileSavedContent.navigationDestination → SavedMomentsView()
+                MomentsContainerTransformOverlay(visible = showSavedManager) {
+                    Box(Modifier.fillMaxSize()) {
+                        SavedMomentsView(
+                            onNavigateBack = {
+                                showSavedManager = false
+                                // ≡ iOS: al volver, refresh de la pestaña si hace falta
+                                savedMomentsViewModel.loadSavedMoments()
+                            },
+                        )
                     }
                 }
 

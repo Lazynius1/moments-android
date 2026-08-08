@@ -173,6 +173,7 @@ fun SuggestedUserCard(
 ) {
     val colors = rememberAdaptiveColors()
     val bgUrl = backgroundMoment?.previewImageURLString
+    val hasPhotoBg = !bgUrl.isNullOrBlank()
     val isPassive = buttonState == FollowButtonState.REQUEST_PENDING
 
     Box(
@@ -185,7 +186,7 @@ fun SuggestedUserCard(
             .border(0.8.dp, Color.White.copy(alpha = 0.24f), RoundedCornerShape(18.dp))
             .clickable(onClick = onTap),
     ) {
-        if (!bgUrl.isNullOrBlank()) {
+        if (hasPhotoBg) {
             AsyncImage(
                 model = bgUrl,
                 contentDescription = null,
@@ -204,11 +205,11 @@ fun SuggestedUserCard(
                     ),
             )
         } else {
+            // iOS defaultBackground: primary 6% sobre base negra (sin chrome opaco light).
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(colors.primary.copy(alpha = 0.06f))
-                    .momentsChromeGlass(RoundedCornerShape(18.dp), interactive = false),
+                    .background(colors.primary.copy(alpha = 0.06f)),
             )
         }
 
@@ -585,7 +586,11 @@ fun ExploreProfileImage(
     imagePath: String?,
     size: Dp,
     modifier: Modifier = Modifier,
+    onDarkPhoto: Boolean = true,
 ) {
+    val colors = rememberAdaptiveColors()
+    val stroke = if (onDarkPhoto) Color.White else colors.primary.copy(alpha = 0.28f)
+    val placeholderTint = if (onDarkPhoto) Color.White else colors.primary
     if (!imagePath.isNullOrBlank()) {
         AsyncImage(
             model = imagePath,
@@ -594,20 +599,21 @@ fun ExploreProfileImage(
             modifier = modifier
                 .size(size)
                 .clip(CircleShape)
-                .border(1.5.dp, Color.White, CircleShape),
+                .border(1.5.dp, stroke, CircleShape),
         )
     } else {
         Box(
             modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(Color.Gray.copy(alpha = 0.2f)),
+                .background(Color.Gray.copy(alpha = 0.2f))
+                .border(1.5.dp, stroke, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 Icons.Filled.Person,
                 contentDescription = null,
-                tint = Color.White,
+                tint = placeholderTint,
                 modifier = Modifier.size(size * 0.4f),
             )
         }

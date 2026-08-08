@@ -232,14 +232,21 @@ fun ActivityCommentMomentPreview(
     size: Dp,
     modifier: Modifier = Modifier,
 ) {
-    ScreenshotProtectedView(isProtected = isProtectedMoment(moment)) {
+    ScreenshotProtectedView(isProtected = isProtectedMoment(moment) && canView) {
         Box(
             modifier = modifier
                 .size(size)
                 .clip(RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            MomentPreviewContent(moment = moment, size = size)
+            // ≡ iOS ultraThinMaterial: en Compose blur del still (SurfaceView seguro no se difumina).
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .then(if (canView) Modifier else Modifier.blur(12.dp)),
+            ) {
+                MomentPreviewContent(moment = moment, size = size)
+            }
 
             if (moment?.isCarouselMoment == true && canView) {
                 Box(Modifier.fillMaxSize()) {
@@ -584,7 +591,7 @@ fun ActivityReactionMomentCard(
     overlayBadge: ActivityOverlayBadgeStyle = ActivityOverlayBadgeStyle.NONE,
     modifier: Modifier = Modifier,
 ) {
-    ScreenshotProtectedView(isProtected = isProtectedMoment(item.moment)) {
+    ScreenshotProtectedView(isProtected = isProtectedMoment(item.moment) && item.canView) {
         Box(
             modifier = modifier.size(size),
             contentAlignment = Alignment.TopStart,
