@@ -5,6 +5,7 @@ import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageSyncCursor
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.views.messaging.services.ChatService
+import com.moments.android.views.messaging.services.ChatSessionEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,12 +42,17 @@ object MessageIngestService {
      * mientras la identidad no estaba disponible quedaron persistidos ilegibles: sin tirar el
      * caché seguirían mostrándose así aunque ya haya clave buena. Al vaciarlo se vuelven a bajar
      * de Firestore y se descifran con la identidad restaurada.
+     *
+     * También invalida [ChatSessionEngine]: el preload del arranque puede haber materializado
+     * ViewModels con esos mensajes cifrados en memoria; sin esto el usuario abre el chat y sigue
+     * viendo ciphertext hasta reiniciar la app.
      */
     fun resetAfterIdentityRestore() {
         inFlightKeys.clear()
         recentlyIngestedKeys.clear()
         MessageSyncCursorStore.clearAll()
         LocalPersistenceService.clearAllChatCache()
+        ChatSessionEngine.invalidateAll()
     }
 
     suspend fun drainPendingQueue() {

@@ -20,6 +20,12 @@ object ChatRecoveryCrypto {
         return salt
     }
 
+    fun randomBytes(count: Int): ByteArray {
+        val bytes = ByteArray(count)
+        SecureRandom().nextBytes(bytes)
+        return bytes
+    }
+
     /**
      * Equivalente a `derivePINKey` → `SymmetricKey`. Devuelve bytes crudos (mismo material).
      * PIN de recuperación es siempre 6 dígitos ASCII → UTF-8 ≡ `PBEKeySpec` chars.
@@ -40,5 +46,20 @@ object ChatRecoveryCrypto {
         } catch (_: Exception) {
             throw EncryptionError.EncryptionFailed
         }
+    }
+
+    fun base64URLEncoded(data: ByteArray): String =
+        android.util.Base64.encodeToString(data, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
+            .trimEnd('=')
+
+    fun base64URLDecoded(string: String): ByteArray? {
+        var base64 = string.replace('-', '+').replace('_', '/')
+        val remainder = base64.length % 4
+        if (remainder > 0) {
+            base64 += "=".repeat(4 - remainder)
+        }
+        return runCatching {
+            android.util.Base64.decode(base64, android.util.Base64.DEFAULT)
+        }.getOrNull()
     }
 }

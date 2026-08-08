@@ -187,6 +187,50 @@ sealed interface ChatAccessState {
     data class Unavailable(val reason: String) : ChatAccessState
 }
 
+/** Port de `ChatRecoveryMigrationSession`. */
+data class ChatRecoveryMigrationSession(
+    val migrationId: String,
+    val qrPayload: String,
+    val expiresAt: Date,
+)
+
+/** Port de `ChatRecoveryMigrationPayload` (JSON keys deben coincidir con iOS Codable). */
+data class ChatRecoveryMigrationPayload(
+    val v: Int = 1,
+    val uid: String,
+    val keyId: String,
+    val privateKey: String,
+    val userKey: String? = null,
+) {
+    fun toJsonBytes(): ByteArray {
+        val json = org.json.JSONObject()
+            .put("v", v)
+            .put("uid", uid)
+            .put("keyId", keyId)
+            .put("privateKey", privateKey)
+        if (userKey != null) json.put("userKey", userKey)
+        return json.toString().toByteArray(Charsets.UTF_8)
+    }
+
+    companion object {
+        fun fromJsonBytes(bytes: ByteArray): ChatRecoveryMigrationPayload? = runCatching {
+            val json = org.json.JSONObject(bytes.toString(Charsets.UTF_8))
+            val userKey = if (json.has("userKey") && !json.isNull("userKey")) {
+                json.getString("userKey").takeIf { it.isNotEmpty() }
+            } else {
+                null
+            }
+            ChatRecoveryMigrationPayload(
+                v = json.optInt("v", 1),
+                uid = json.getString("uid"),
+                keyId = json.getString("keyId"),
+                privateKey = json.getString("privateKey"),
+                userKey = userKey,
+            )
+        }.getOrNull()
+    }
+}
+
 /** ≡ iOS Timestamp/Date en `init?(map:)`. */
 private fun anyToDate(value: Any?): Date? = when (value) {
     is Timestamp -> value.toDate()
