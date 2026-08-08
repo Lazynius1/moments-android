@@ -10,6 +10,11 @@ import com.moments.android.models.ChatAccessState
 import com.moments.android.models.ChatIdentityRecord
 import com.moments.android.models.ChatRecoveryAttemptState
 import com.moments.android.models.ChatRecoveryBundle
+import com.moments.android.models.ChatRecoveryMigrationPayload
+import com.moments.android.models.ChatRecoveryMigrationSession
+import com.google.firebase.Timestamp
+import android.net.Uri
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.moments.android.views.messaging.core.EncryptedChatMediaMetadata
 import com.moments.android.models.WrappedConversationKey
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +45,21 @@ object EncryptionService {
         object InvalidPIN : EncryptionError("invalid PIN")
         object PeerKeyUnavailable : EncryptionError("peer key unavailable")
         data class RecoveryLocked(val remainingSeconds: Double) : EncryptionError("recovery locked")
+        object MigrationExpired : EncryptionError("migration expired") {
+            override val message: String
+                get() = appContext?.getString(com.moments.android.R.string.chat_recovery_error_migration_expired)
+                    ?: "migration expired"
+        }
+        object MigrationConsumed : EncryptionError("migration consumed") {
+            override val message: String
+                get() = appContext?.getString(com.moments.android.R.string.chat_recovery_error_migration_consumed)
+                    ?: "migration consumed"
+        }
+        object MigrationInvalid : EncryptionError("migration invalid") {
+            override val message: String
+                get() = appContext?.getString(com.moments.android.R.string.chat_recovery_error_migration_invalid)
+                    ?: "migration invalid"
+        }
     }
 
     enum class EncryptionStatus {
@@ -68,6 +88,7 @@ object EncryptionService {
     private const val CHAT_KEY_FIELD = "chatKey"
     private const val CHAT_RECOVERY_COLLECTION = "chatRecovery"
     private const val CHAT_RECOVERY_DOC = "default"
+    private const val CHAT_RECOVERY_MIGRATIONS_COLLECTION = "chatRecoveryMigrations"
 
     @Volatile private var initialized = false
     @Volatile private var appContext: Context? = null
@@ -296,6 +317,9 @@ object EncryptionService {
             if (hasLocalIdentity && hasRecoveryBundle && !hasRecoveryMarker) {
                 deleteLocalChatIdentity(userId)
                 identityPrefs().edit().putBoolean(markerKey, true).apply()
+                if (tryRestoreFromDeviceVault(userId)) {
+                    return@withContext ChatAccessState.Available
+                }
                 return@withContext ChatAccessState.NeedsRestore
             }
             if (hasLocalIdentity) {
@@ -307,7 +331,11 @@ object EncryptionService {
                 }
             } else if (hasRecoveryBundle) {
                 identityPrefs().edit().putBoolean(markerKey, true).apply()
-                ChatAccessState.NeedsRestore
+                if (tryRestoreFromDeviceVault(userId)) {
+                    ChatAccessState.Available
+                } else {
+                    ChatAccessState.NeedsRestore
+                }
             } else {
                 ensureChatIdentity()
                 ChatAccessState.NeedsPinSetup
@@ -357,7 +385,7 @@ object EncryptionService {
         return "%d:%02d".format(minutes, seconds)
     }
 
-    suspend fun createRecoveryBundle(pin: String) = withContext(Dispatchers.IO) {
+    suspend fun createRecoveryBundle(pin: String, context: Context? = appContext) = withContext(Dispatchers.IO) {
         requireInitialized()
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: throw EncryptionError.KeyNotFound
         val normalizedPin = validateRecoveryPin(pin)
@@ -392,9 +420,226 @@ object EncryptionService {
         syncChatIdentityRecord(identity, userId)
         identityPrefs().edit().putBoolean(CHAT_RECOVERY_MARKER_PREFIX + userId, true).apply()
         clearRecoveryAttemptState(userId)
+        ChatRecoveryDeviceVault.savePIN(userId, normalizedPin, context ?: appContext)
     }
 
-    suspend fun restoreChatIdentity(pin: String) = withContext(Dispatchers.IO) {
+    suspend fun restoreChatIdentity(pin: String, context: Context? = appContext) = withContext(Dispatchers.IO) {
+        restoreChatIdentity(
+            pin = pin,
+            registerFailures = true,
+            saveToVault = true,
+            context = context ?: appContext,
+        )
+    }
+
+    /** Silent OS-vault restore (Keystore + Google Password Manager when Activity available). */
+    suspend fun tryRestoreFromDeviceVault(
+        userId: String? = FirebaseAuth.getInstance().currentUser?.uid,
+        context: Context? = appContext,
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (userId.isNullOrBlank()) return@withContext false
+        val pin = ChatRecoveryDeviceVault.loadPIN(userId, context ?: appContext) ?: return@withContext false
+        runCatching {
+            restoreChatIdentity(pin = pin, registerFailures = false, saveToVault = false, context = null)
+            MessageIngestService.resetAfterIdentityRestore()
+            true
+        }.getOrDefault(false)
+    }
+
+    suspend fun saveRecoveryPINToDeviceVault(pin: String, context: Context? = appContext) = withContext(Dispatchers.IO) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: throw EncryptionError.KeyNotFound
+        val normalizedPin = validateRecoveryPin(pin)
+        if (!verifyRecoveryPIN(normalizedPin)) throw EncryptionError.InvalidPIN
+        ChatRecoveryDeviceVault.savePIN(userId, normalizedPin, context ?: appContext)
+    }
+
+    fun clearRecoveryPINFromDeviceVault() {
+        ChatRecoveryDeviceVault.clearCurrentUser()
+    }
+
+    /** Wipe local identity and force a new PIN. Old ciphertext stays unreadable. */
+    suspend fun resetRecoveryLosingHistory() = withContext(Dispatchers.IO) {
+        requireInitialized()
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: throw EncryptionError.KeyNotFound
+        ChatRecoveryDeviceVault.clear(userId)
+        deleteLocalChatIdentity(userId)
+        deleteUserKeys(userId)
+        identityPrefs().edit()
+            .remove(CHAT_IDENTITY_KEY_ID_PREFIX + userId)
+            .remove(CHAT_RECOVERY_MARKER_PREFIX + userId)
+            .apply()
+        clearRecoveryAttemptState(userId)
+        purgeConversationKeys()
+        runCatching {
+            db.collection(USERS_COLLECTION)
+                .document(userId)
+                .collection(CHAT_RECOVERY_COLLECTION)
+                .document(CHAT_RECOVERY_DOC)
+                .delete()
+                .await()
+        }
+        ensureChatIdentity()
+        MessageIngestService.resetAfterIdentityRestore()
+    }
+
+    suspend fun beginDeviceMigration(): ChatRecoveryMigrationSession = withContext(Dispatchers.IO) {
+        requireInitialized()
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: throw EncryptionError.KeyNotFound
+        if (!hasLocalChatIdentity(userId)) throw EncryptionError.KeyNotFound
+        val privateKey = EncryptionKeyStore.retrieve(CHAT_IDENTITY_KEY_PREFIX + userId)
+            ?: throw EncryptionError.KeyNotFound
+        val publicKeyBase64 = Base64.encodeToString(
+            Curve25519Helper.publicKeyFromPrivate(privateKey),
+            Base64.NO_WRAP,
+        )
+        val keyId = resolveStableChatKeyId(userId, publicKeyBase64)
+        val userKeyBase64 = runCatching {
+            Base64.encodeToString(getUserKey(userId), Base64.NO_WRAP)
+        }.getOrNull()
+        val payload = ChatRecoveryMigrationPayload(
+            uid = userId,
+            keyId = keyId,
+            privateKey = Base64.encodeToString(privateKey, Base64.NO_WRAP),
+            userKey = userKeyBase64,
+        )
+        val migrationKey = ChatRecoveryCrypto.randomBytes(32)
+        val wrappedPayload = CryptoHelpers.aesGcmSeal(payload.toJsonBytes(), migrationKey)
+        val migrationId = UUID.randomUUID().toString()
+        val expiresAt = Date(System.currentTimeMillis() + 10 * 60 * 1000L)
+        val qrPayload =
+            "moments-migrate://v1?uid=$userId&id=$migrationId&k=${ChatRecoveryCrypto.base64URLEncoded(migrationKey)}"
+
+        db.collection(USERS_COLLECTION)
+            .document(userId)
+            .collection(CHAT_RECOVERY_MIGRATIONS_COLLECTION)
+            .document(migrationId)
+            .set(
+                mapOf(
+                    "migrationId" to migrationId,
+                    "keyId" to keyId,
+                    "scheme" to "aes-gcm-v1",
+                    "wrappedPayload" to Base64.encodeToString(wrappedPayload, Base64.NO_WRAP),
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "expiresAt" to Timestamp(expiresAt),
+                    "consumedAt" to null,
+                ),
+            )
+            .await()
+
+        ChatRecoveryMigrationSession(
+            migrationId = migrationId,
+            qrPayload = qrPayload,
+            expiresAt = expiresAt,
+        )
+    }
+
+    suspend fun completeDeviceMigration(qrOrCode: String) = withContext(Dispatchers.IO) {
+        requireInitialized()
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: throw EncryptionError.KeyNotFound
+        val parsed = parseMigrationPayload(qrOrCode) ?: throw EncryptionError.MigrationInvalid
+        if (parsed.uid != userId) throw EncryptionError.MigrationInvalid
+        val migrationKey = ChatRecoveryCrypto.base64URLDecoded(parsed.keyBase64URL)
+            ?.takeIf { it.size == 32 }
+            ?: throw EncryptionError.MigrationInvalid
+
+        val docRef = db.collection(USERS_COLLECTION)
+            .document(userId)
+            .collection(CHAT_RECOVERY_MIGRATIONS_COLLECTION)
+            .document(parsed.migrationId)
+
+        val snapshot = docRef.get().await()
+        val data = snapshot.data ?: throw EncryptionError.MigrationInvalid
+        if (data["consumedAt"] is Timestamp) throw EncryptionError.MigrationConsumed
+        val expiresAt = (data["expiresAt"] as? Timestamp)?.toDate()
+        if (expiresAt != null && expiresAt.time <= System.currentTimeMillis()) {
+            throw EncryptionError.MigrationExpired
+        }
+        val wrappedPayload = Base64.decode(
+            data["wrappedPayload"] as? String ?: throw EncryptionError.MigrationInvalid,
+            Base64.DEFAULT,
+        )
+        val opened = runCatching {
+            CryptoHelpers.aesGcmOpen(wrappedPayload, migrationKey)
+        }.getOrElse { throw EncryptionError.MigrationInvalid }
+        val payload = ChatRecoveryMigrationPayload.fromJsonBytes(opened)
+            ?: throw EncryptionError.MigrationInvalid
+        if (payload.uid != userId) throw EncryptionError.MigrationInvalid
+
+        try {
+            db.runTransaction { transaction ->
+                val latest = transaction.get(docRef)
+                val latestData = latest.data ?: throw FirebaseFirestoreException(
+                    "invalid",
+                    FirebaseFirestoreException.Code.ABORTED,
+                )
+                if (latestData["consumedAt"] is Timestamp) {
+                    throw FirebaseFirestoreException("consumed", FirebaseFirestoreException.Code.ABORTED)
+                }
+                val latestExpires = (latestData["expiresAt"] as? Timestamp)?.toDate()
+                if (latestExpires != null && latestExpires.time <= System.currentTimeMillis()) {
+                    throw FirebaseFirestoreException("expired", FirebaseFirestoreException.Code.ABORTED)
+                }
+                transaction.update(docRef, mapOf("consumedAt" to FieldValue.serverTimestamp()))
+                null
+            }.await()
+        } catch (e: FirebaseFirestoreException) {
+            when (e.message) {
+                "consumed" -> throw EncryptionError.MigrationConsumed
+                "expired" -> throw EncryptionError.MigrationExpired
+                else -> throw EncryptionError.MigrationInvalid
+            }
+        }
+
+        val privateKey = Base64.decode(payload.privateKey, Base64.DEFAULT)
+        if (privateKey.size != CURVE25519_PRIVATE_KEY_BYTES) throw EncryptionError.MigrationInvalid
+        EncryptionKeyStore.store(CHAT_IDENTITY_KEY_PREFIX + userId, privateKey)
+        val publicKeyBase64 = Base64.encodeToString(
+            Curve25519Helper.publicKeyFromPrivate(privateKey),
+            Base64.NO_WRAP,
+        )
+        val identity = ChatIdentityRecord(
+            keyId = resolveStableChatKeyId(userId, publicKeyBase64, payload.keyId),
+            publicKeyBase64 = publicKeyBase64,
+        )
+        syncChatIdentityRecord(identity, userId)
+        payload.userKey?.let { encoded ->
+            runCatching {
+                val userKey = Base64.decode(encoded, Base64.DEFAULT)
+                if (userKey.size == 32) {
+                    cacheUserKey(userId, userKey)
+                    EncryptionKeyStore.store(USER_KEYS_PREFIX + userId, userKey)
+                }
+            }
+        }
+        identityPrefs().edit().putBoolean(CHAT_RECOVERY_MARKER_PREFIX + userId, true).apply()
+        clearRecoveryAttemptState(userId)
+        purgeConversationKeys()
+        MessageIngestService.resetAfterIdentityRestore()
+    }
+
+    private data class ParsedMigrationLink(
+        val uid: String,
+        val migrationId: String,
+        val keyBase64URL: String,
+    )
+
+    private fun parseMigrationPayload(raw: String): ParsedMigrationLink? {
+        val trimmed = raw.trim()
+        val uri = Uri.parse(trimmed)
+        if (uri.scheme != "moments-migrate") return null
+        val uid = uri.getQueryParameter("uid") ?: return null
+        val id = uri.getQueryParameter("id") ?: return null
+        val key = uri.getQueryParameter("k") ?: return null
+        if (uid.isBlank() || id.isBlank() || key.isBlank()) return null
+        return ParsedMigrationLink(uid = uid, migrationId = id, keyBase64URL = key)
+    }
+
+    private suspend fun restoreChatIdentity(
+        pin: String,
+        registerFailures: Boolean,
+        saveToVault: Boolean,
+        context: Context? = appContext,
+    ) {
         requireInitialized()
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: throw EncryptionError.KeyNotFound
         val attempts = currentRecoveryAttemptState(userId)
@@ -411,18 +656,18 @@ object EncryptionService {
             restoreChatIdentityFromBundle(normalizedPin, bundle, userId)
             identityPrefs().edit().putBoolean(CHAT_RECOVERY_MARKER_PREFIX + userId, true).apply()
             clearRecoveryAttemptState(userId)
-            // Al cambiar de identidad, TODA clave de conversación derivada con la anterior es
-            // inservible. Si no se tiran, `getConversationKey` seguiría devolviendo la cacheada
-            // y los mensajes se seguirían viendo cifrados aun con la identidad correcta.
-            // (iOS no lo necesita porque su puerta de acceso impide llegar al chat sin identidad
-            // válida; en Android este estado sí es alcanzable al restaurar en un móvil ya usado.)
             purgeConversationKeys()
+            if (saveToVault) {
+                ChatRecoveryDeviceVault.savePIN(userId, normalizedPin, context)
+            }
         } catch (error: EncryptionError.RecoveryLocked) {
             throw error
         } catch (_: Exception) {
-            registerFailedRecoveryAttempt(userId)
-            val updated = currentRecoveryAttemptState(userId)
-            if (updated.isLocked) throw EncryptionError.RecoveryLocked(updated.remainingLockout)
+            if (registerFailures) {
+                registerFailedRecoveryAttempt(userId)
+                val updated = currentRecoveryAttemptState(userId)
+                if (updated.isLocked) throw EncryptionError.RecoveryLocked(updated.remainingLockout)
+            }
             throw EncryptionError.InvalidPIN
         }
     }

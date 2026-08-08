@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +57,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -72,6 +74,7 @@ import com.moments.android.models.ChatRecoveryAttemptState
 import com.moments.android.services.messaging.EncryptionService
 import com.moments.android.services.messaging.MessageIngestService
 import com.moments.android.views.messaging.services.ChatAccessCoordinator
+import com.moments.android.views.messaging.services.ChatSessionEngine
 import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -86,7 +89,7 @@ import kotlin.math.max
  * [MomentsModalSheet] (≡ `.sheet` iOS).
  */
 
-private data class ChatRecoveryPalette(val isDark: Boolean) {
+internal data class ChatRecoveryPalette(val isDark: Boolean) {
     val title = if (isDark) Color.White else Color.Black.copy(alpha = 0.88f)
     val body = if (isDark) Color.White.copy(alpha = 0.74f) else Color.Black.copy(alpha = 0.62f)
     val secondary = if (isDark) Color.White.copy(alpha = 0.56f) else Color.Black.copy(alpha = 0.46f)
@@ -127,7 +130,21 @@ fun ChatRecoveryGateView(
     when (val state = accessState) {
         ChatAccessState.Available -> content()
         ChatAccessState.NeedsPinSetup -> CreateChatPINView(onSuccess = reloadState, onCancel = onCancel)
-        ChatAccessState.NeedsRestore -> RestoreChatPINView(onSuccess = reloadState, onCancel = onCancel)
+        ChatAccessState.NeedsRestore -> {
+            val context = LocalContext.current
+            var triedPasswordManager by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                if (triedPasswordManager) return@LaunchedEffect
+                triedPasswordManager = true
+                val restored = EncryptionService.tryRestoreFromDeviceVault(context = context)
+                if (restored) {
+                    MessageIngestService.resetAfterIdentityRestore()
+                    ChatSessionEngine.invalidateAll()
+                    ChatAccessCoordinator.refreshAccess()
+                }
+            }
+            RestoreChatPINView(onSuccess = reloadState, onCancel = onCancel)
+        }
         is ChatAccessState.Unavailable -> ChatRecoveryStatusView(
             title = stringResource(R.string.chat_recovery_unavailable_title),
             message = state.reason,
@@ -163,6 +180,7 @@ fun CreateChatPINView(
     onCancel: (() -> Unit)? = null,
 ) {
     val palette = ChatRecoveryPalette(isSystemInDarkTheme())
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var pin by remember { mutableStateOf("") }
     var confirmPin by remember { mutableStateOf("") }
@@ -228,7 +246,7 @@ fun CreateChatPINView(
                         errorMessage = null
                         isSubmitting = true
                         scope.launch {
-                            val result = runCatching { EncryptionService.createRecoveryBundle(trimmed) }
+                            val result = runCatching { EncryptionService.createRecoveryBundle(trimmed, context) }
                             isSubmitting = false
                             result
                                 .onSuccess {
@@ -265,13 +283,18 @@ fun RestoreChatPINView(
     onCancel: (() -> Unit)? = null,
 ) {
     val palette = ChatRecoveryPalette(isSystemInDarkTheme())
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var pin by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
+    var isWiping by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var attemptState by remember { mutableStateOf(ChatRecoveryAttemptState()) }
     var currentTime by remember { mutableStateOf(Date()) }
     var activeField by remember { mutableStateOf(PinFieldKind.PRIMARY) }
+    var showForgotConfirm by remember { mutableStateOf(false) }
+    var showMigrateTarget by remember { mutableStateOf(false) }
+    var showSavePinAfterMigrate by remember { mutableStateOf(false) }
 
     val enterPin = stringResource(R.string.chat_recovery_error_enter_recovery_pin)
 
@@ -326,14 +349,14 @@ fun RestoreChatPINView(
         footer = {
             ChatRecoveryPrimaryButton(
                 title = when {
-                    isSubmitting -> stringResource(R.string.chat_recovery_action_restoring)
+                    isSubmitting || isWiping -> stringResource(R.string.chat_recovery_action_restoring)
                     countdownRemaining != null -> stringResource(
                         R.string.chat_recovery_action_try_again_in,
                         formattedLockoutDuration(countdownRemaining),
                     )
                     else -> stringResource(R.string.chat_recovery_action_restore_chats)
                 },
-                enabled = !isSubmitting && !attemptState.isLocked,
+                enabled = !isSubmitting && !isWiping && !attemptState.isLocked,
             ) {
                 refreshAttemptState()
                 if (attemptState.isLocked) return@ChatRecoveryPrimaryButton
@@ -344,13 +367,13 @@ fun RestoreChatPINView(
                     errorMessage = null
                     isSubmitting = true
                     scope.launch {
-                        val result = runCatching { EncryptionService.restoreChatIdentity(trimmed) }
+                        val result = runCatching { EncryptionService.restoreChatIdentity(trimmed, context) }
                         isSubmitting = false
                         refreshAttemptState()
                         result
                             .onSuccess {
-                                // Cache cifrado con identidad anterior → reset para re-bajar/descifrar.
                                 MessageIngestService.resetAfterIdentityRestore()
+                                ChatSessionEngine.invalidateAll()
                                 pin = ""
                                 onSuccess()
                             }
@@ -358,6 +381,31 @@ fun RestoreChatPINView(
                     }
                 }
             }
+
+            Text(
+                stringResource(R.string.chat_recovery_restore_from_other_device),
+                color = palette.mutedAction,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !isSubmitting && !isWiping) { showMigrateTarget = true }
+                    .padding(vertical = 6.dp),
+            )
+
+            Text(
+                stringResource(R.string.chat_recovery_forgot_action),
+                color = palette.error.copy(alpha = 0.9f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !isSubmitting && !isWiping) { showForgotConfirm = true }
+                    .padding(vertical = 6.dp),
+            )
+
             onCancel?.let { cancel ->
                 Text(
                     stringResource(R.string.chat_recovery_action_close),
@@ -373,6 +421,65 @@ fun RestoreChatPINView(
             }
         },
     )
+
+    if (showForgotConfirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showForgotConfirm = false },
+            title = { Text(stringResource(R.string.chat_recovery_forgot_title)) },
+            text = { Text(stringResource(R.string.chat_recovery_forgot_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showForgotConfirm = false
+                        isWiping = true
+                        errorMessage = null
+                        scope.launch {
+                            runCatching { EncryptionService.resetRecoveryLosingHistory() }
+                                .onSuccess {
+                                    MessageIngestService.resetAfterIdentityRestore()
+                                    ChatSessionEngine.invalidateAll()
+                                    ChatAccessCoordinator.refreshAccess()
+                                }
+                                .onFailure { errorMessage = it.message }
+                            isWiping = false
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.chat_recovery_forgot_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showForgotConfirm = false }) {
+                    Text(stringResource(R.string.chat_recovery_action_close))
+                }
+            },
+        )
+    }
+
+    if (showMigrateTarget) {
+        MomentsModalSheet(
+            onDismissRequest = { showMigrateTarget = false },
+            largeOnly = true,
+        ) {
+            ChatRecoveryMigrateTargetView(
+                onSuccess = {
+                    showMigrateTarget = false
+                    showSavePinAfterMigrate = true
+                    onSuccess()
+                },
+                onCancel = { showMigrateTarget = false },
+            )
+        }
+    }
+
+    if (showSavePinAfterMigrate) {
+        MomentsModalSheet(
+            onDismissRequest = { showSavePinAfterMigrate = false },
+            largeOnly = false,
+        ) {
+            ChatRecoverySavePINToVaultView(onDone = { showSavePinAfterMigrate = false })
+        }
+    }
 }
 
 /**
@@ -387,6 +494,7 @@ fun ChatRecoverySettingsView(
     val palette = ChatRecoveryPalette(isSystemInDarkTheme())
     val scope = rememberCoroutineScope()
     var showChangePin by remember { mutableStateOf(false) }
+    var showMigrate by remember { mutableStateOf(false) }
     var isRemovingLocalKey by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     val updated = stringResource(R.string.chat_recovery_settings_updated)
@@ -418,6 +526,16 @@ fun ChatRecoverySettingsView(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { showChangePin = true }
+                .padding(vertical = 10.dp),
+        )
+
+        Text(
+            stringResource(R.string.chat_recovery_settings_migrate),
+            color = palette.title,
+            fontSize = 15.sp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showMigrate = true }
                 .padding(vertical = 10.dp),
         )
 
@@ -476,6 +594,15 @@ fun ChatRecoverySettingsView(
                 },
                 onCancel = { showChangePin = false },
             )
+        }
+    }
+
+    if (showMigrate) {
+        MomentsModalSheet(
+            onDismissRequest = { showMigrate = false },
+            largeOnly = true,
+        ) {
+            ChatRecoveryMigrateSourceView(onClose = { showMigrate = false })
         }
     }
 }
@@ -555,7 +682,7 @@ fun ChatRecoveryStatusView(
 
 /** Port de `ChatRecoveryFormContainer`. Material iOS → fill sólido (base fill iOS). */
 @Composable
-private fun ChatRecoveryFormContainer(
+internal fun ChatRecoveryFormContainer(
     title: String,
     subtitle: String,
     form: @Composable () -> Unit,
@@ -683,7 +810,7 @@ private fun ChatRecoveryFormContainer(
 
 /** Port de `ChatRecoveryPINField` + `ChatRecoveryDigitCell`. */
 @Composable
-private fun ChatRecoveryPINField(
+internal fun ChatRecoveryPINField(
     title: String,
     subtitle: String,
     value: String,
@@ -773,7 +900,7 @@ private fun ChatRecoveryPINField(
 
 /** Port de `ChatRecoveryPrimaryButtonStyle` (siempre blanco → texto oscuro; press 0.99). */
 @Composable
-private fun ChatRecoveryPrimaryButton(
+internal fun ChatRecoveryPrimaryButton(
     title: String,
     enabled: Boolean,
     onClick: () -> Unit,
