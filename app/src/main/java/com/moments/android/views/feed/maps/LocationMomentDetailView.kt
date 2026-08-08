@@ -395,48 +395,70 @@ fun LocationMomentDetailView(
                     val availabilityKey = source?.mapAvailabilityKey ?: moment.id
                     val available = momentAvailability[availabilityKey] ?: true
                     val isProtected = (moment.audience?.lowercase() ?: "") != "everyone"
+                    val previewUrl = moment.thumbnailUrl?.takeIf { it.isNotBlank() }
+                        ?: moment.imagePath?.takeIf { it.isNotBlank() }
+                        ?: moment.visibleMediaItems.firstOrNull()?.thumbnailUrl?.takeIf { it.isNotBlank() }
+                        ?: moment.visibleMediaItems.firstOrNull()?.url?.takeIf { it.isNotBlank() }
                     Box(Modifier.fillMaxWidth()) {
-                        ScreenshotProtectedView(
-                            isProtected = isProtected,
-                            containsHardwareVideo = moment.hasHardwareVideo,
-                        ) {
-                            ModernPostCardView(
-                                moment = moment,
-                                availableHeight = feedCardHeightPx,
-                                onOpenProfile = { openUserProfile(moment.authorId) },
-                                onOpenHashtag = { tag ->
-                                    selectedHashtag = if (tag.startsWith("#")) tag else "#$tag"
-                                    showExploreWithHashtag = true
-                                },
-                                onOpenLocation = { _, _ -> },
-                                onOpenComments = { commentsMoment = moment },
-                                onShare = {
-                                    contextMenuMoment = moment
-                                    showContextMenu = true
-                                },
-                                onContextMenu = { tapped ->
-                                    contextMenuMoment = tapped
-                                    showContextMenu = true
-                                },
-                                onAuthorAvatarTap = { authorId, hasStory ->
-                                    handleAuthorAvatarTap(authorId, hasStory)
-                                },
-                                onPeek = { url, ratio, pressing ->
-                                    handlePeek(url, ratio, pressing, moment)
-                                },
-                                onTagTap = { userId -> openUserProfile(userId) },
-                                onNearEnd = { prefetchUpcoming(index) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .then(if (!available) Modifier.blur(14.dp) else Modifier),
-                            )
-                        }
+                        // ≡ iOS ModernPostCardView.blur(isAvailable ? 0 : 14).overlay { MomentUnavailableOverlay }
+                        // Compose blur no afecta ExoPlayer/SurfaceView seguro → still + blur si unavailable.
                         if (!available) {
-                            MomentUnavailableOverlay(
-                                compact = false,
-                                cornerRadius = 20.dp,
-                                modifier = Modifier.matchParentSize(),
-                            )
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(with(density) { feedCardHeightPx.toDp() })
+                                    .clip(RoundedCornerShape(20.dp)),
+                            ) {
+                                if (previewUrl != null) {
+                                    AsyncImage(
+                                        model = previewUrl,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize().blur(14.dp),
+                                    )
+                                } else {
+                                    Box(Modifier.fillMaxSize().background(Color.Black))
+                                }
+                                MomentUnavailableOverlay(
+                                    compact = false,
+                                    cornerRadius = 20.dp,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                        } else {
+                            ScreenshotProtectedView(
+                                isProtected = isProtected,
+                                containsHardwareVideo = moment.hasHardwareVideo,
+                            ) {
+                                ModernPostCardView(
+                                    moment = moment,
+                                    availableHeight = feedCardHeightPx,
+                                    onOpenProfile = { openUserProfile(moment.authorId) },
+                                    onOpenHashtag = { tag ->
+                                        selectedHashtag = if (tag.startsWith("#")) tag else "#$tag"
+                                        showExploreWithHashtag = true
+                                    },
+                                    onOpenLocation = { _, _ -> },
+                                    onOpenComments = { commentsMoment = moment },
+                                    onShare = {
+                                        contextMenuMoment = moment
+                                        showContextMenu = true
+                                    },
+                                    onContextMenu = { tapped ->
+                                        contextMenuMoment = tapped
+                                        showContextMenu = true
+                                    },
+                                    onAuthorAvatarTap = { authorId, hasStory ->
+                                        handleAuthorAvatarTap(authorId, hasStory)
+                                    },
+                                    onPeek = { url, ratio, pressing ->
+                                        handlePeek(url, ratio, pressing, moment)
+                                    },
+                                    onTagTap = { userId -> openUserProfile(userId) },
+                                    onNearEnd = { prefetchUpcoming(index) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
                         }
                     }
                 }

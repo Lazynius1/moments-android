@@ -99,7 +99,8 @@ object FeedMomentCardLayout {
     val listHorizontalPadding = 4.dp
     val headerHorizontalPadding = 8.dp
     val actionRowHorizontalPadding = 4.dp
-    val captionHorizontalPadding = 8.dp
+    /** Alineado con el borde del media (`actionRowHorizontalPadding`). */
+    val captionHorizontalPadding = 4.dp
     val mediaCornerRadius = MomentCarouselLayoutRules.mediaCornerRadius
     val storyCanvasCornerRadius = mediaCornerRadius
     val peekCornerRadius = mediaCornerRadius

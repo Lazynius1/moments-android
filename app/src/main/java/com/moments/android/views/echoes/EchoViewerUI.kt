@@ -406,32 +406,40 @@ private fun EchoPerspectiveMedia(
     modifier: Modifier,
 ) {
     val preview = thumbnailUrl?.takeIf { it.isNotBlank() } ?: mediaUrl
+    // ≡ iOS: perspectiveView.blur(isAvailable ? 0 : 20).overlay { unavailableOverlay }
+    // Compose blur no afecta SurfaceView/ExoPlayer → si unavailable, still frame en vez de vídeo.
     Box(modifier.background(Color.Black).clip(RoundedCornerShape(0)), contentAlignment = Alignment.Center) {
-        if (isHorizontal) {
-            AsyncImage(
-                model = preview,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(20.dp),
-                alpha = 0.6f,
-            )
-        }
-        if (mediaType == "video") {
-            StoryVideoPlayerView(
-                Uri.parse(mediaUrl),
-                if (isHorizontal) StoryVideoGravity.RESIZE_ASPECT else StoryVideoGravity.RESIZE_ASPECT_FILL,
-                isPlaying = isVideoPlaying,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            AsyncImage(
-                model = preview,
-                contentDescription = null,
-                contentScale = if (isHorizontal) ContentScale.Fit else ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .then(if (unavailable) Modifier.blur(20.dp) else Modifier),
+        ) {
+            if (isHorizontal) {
+                AsyncImage(
+                    model = preview,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(20.dp),
+                    alpha = 0.6f,
+                )
+            }
+            if (mediaType == "video" && !unavailable) {
+                StoryVideoPlayerView(
+                    Uri.parse(mediaUrl),
+                    if (isHorizontal) StoryVideoGravity.RESIZE_ASPECT else StoryVideoGravity.RESIZE_ASPECT_FILL,
+                    isPlaying = isVideoPlaying,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                AsyncImage(
+                    model = preview,
+                    contentDescription = null,
+                    contentScale = if (isHorizontal) ContentScale.Fit else ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
         if (unavailable) {
             Box(

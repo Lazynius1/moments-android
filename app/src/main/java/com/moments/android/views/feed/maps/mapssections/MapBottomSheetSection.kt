@@ -415,40 +415,45 @@ fun MapBottomSheetGridCell(
 ) {
     val colors = rememberAdaptiveColors()
     val hasMultipleMedia = (moment.mediaItems?.size ?: 0) > 1
+    // ≡ iOS: media.blur(isAvailable ? 0 : 14).overlay { MomentUnavailableOverlay }
     Box(
-        modifier
-            .then(if (isAvailable) Modifier else Modifier.blur(14.dp))
-            .background(Color.Gray.copy(alpha = 0.12f)),
+        modifier.background(Color.Gray.copy(alpha = 0.12f)),
     ) {
-        if (moment.mapHasVideoMedia) {
-            MapsVideoThumbnailView(moment = moment, cornerRadius = 0.dp, modifier = Modifier.fillMaxSize())
-        } else {
-            SubcomposeAsyncImage(
-                model = moment.mapPreferredImageUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                loading = {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            color = colors.accent,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                },
-            )
-        }
-        if (hasMultipleMedia) {
-            Icon(
-                Icons.Filled.Collections,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(6.dp)
-                    .size(14.dp),
-            )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .then(if (isAvailable) Modifier else Modifier.blur(14.dp)),
+        ) {
+            if (moment.mapHasVideoMedia) {
+                MapsVideoThumbnailView(moment = moment, cornerRadius = 0.dp, modifier = Modifier.fillMaxSize())
+            } else {
+                SubcomposeAsyncImage(
+                    model = moment.mapPreferredImageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    loading = {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(
+                                color = colors.accent,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    },
+                )
+            }
+            if (hasMultipleMedia && isAvailable) {
+                Icon(
+                    Icons.Filled.Collections,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(14.dp),
+                )
+            }
         }
         if (!isAvailable) {
             MomentUnavailableOverlay(compact = true, cornerRadius = 0.dp, modifier = Modifier.fillMaxSize())
@@ -515,10 +520,10 @@ fun ModernLocationMomentRow(
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
-    Column(
+    // ≡ iOS: VStack.blur(isAvailable ? 0 : 16).overlay { MomentUnavailableOverlay }
+    Box(
         modifier
             .fillMaxWidth()
-            .then(if (isAvailable) Modifier else Modifier.blur(16.dp))
             .shadow(10.dp, RoundedCornerShape(18.dp), clip = false)
             .clip(RoundedCornerShape(18.dp))
             .background(Color.White.copy(alpha = if (colors.isDark) 0.08f else 0.35f))
@@ -528,73 +533,79 @@ fun ModernLocationMomentRow(
                 indication = null,
             ) { onTap(moment) },
     ) {
-        Box(
+        Column(
             Modifier
                 .fillMaxWidth()
-                .height(180.dp)
-                .clip(RoundedCornerShape(18.dp)),
+                .then(if (isAvailable) Modifier else Modifier.blur(16.dp)),
         ) {
-            if (moment.mapHasVideoMedia) {
-                MapsVideoThumbnailView(moment = moment, cornerRadius = 18.dp, modifier = Modifier.fillMaxSize())
-            } else {
-                SubcomposeAsyncImage(
-                    model = moment.mapPreferredImageUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                    loading = {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = colors.accent, strokeWidth = 2.dp)
-                        }
-                    },
-                )
-            }
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(60.dp)
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))),
-                    ),
-            )
-            Row(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .height(180.dp)
+                    .clip(RoundedCornerShape(18.dp)),
             ) {
-                StoryRingAvatarView(userId = moment.authorId, size = 32.dp, lineWidth = 2.2.dp)
-                Column {
-                    LiveUsernameText(
-                        userId = moment.authorId,
-                        fallbackUsername = moment.username,
-                        prefix = "@",
-                        color = Color.White,
-                        style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
-                        maxLines = 1,
-                    )
-                    Text(
-                        MomentsFormat.relativeTime(from = moment.timestamp),
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 10.sp,
+                if (moment.mapHasVideoMedia) {
+                    MapsVideoThumbnailView(moment = moment, cornerRadius = 18.dp, modifier = Modifier.fillMaxSize())
+                } else {
+                    SubcomposeAsyncImage(
+                        model = moment.mapPreferredImageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                        loading = {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = colors.accent, strokeWidth = 2.dp)
+                            }
+                        },
                     )
                 }
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(60.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))),
+                        ),
+                )
+                Row(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    StoryRingAvatarView(userId = moment.authorId, size = 32.dp, lineWidth = 2.2.dp)
+                    Column {
+                        LiveUsernameText(
+                            userId = moment.authorId,
+                            fallbackUsername = moment.username,
+                            prefix = "@",
+                            color = Color.White,
+                            style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                            maxLines = 1,
+                        )
+                        Text(
+                            MomentsFormat.relativeTime(from = moment.timestamp),
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 10.sp,
+                        )
+                    }
+                }
             }
-            if (!isAvailable) {
-                MomentUnavailableOverlay(compact = false, cornerRadius = 18.dp, modifier = Modifier.fillMaxSize())
+            if (moment.content.isNotBlank()) {
+                Text(
+                    moment.content,
+                    color = colors.primary.copy(alpha = 0.9f),
+                    fontSize = 13.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                )
             }
         }
-        if (moment.content.isNotBlank()) {
-            Text(
-                moment.content,
-                color = colors.primary.copy(alpha = 0.9f),
-                fontSize = 13.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            )
+        if (!isAvailable) {
+            MomentUnavailableOverlay(compact = false, cornerRadius = 18.dp, modifier = Modifier.matchParentSize())
         }
     }
 }

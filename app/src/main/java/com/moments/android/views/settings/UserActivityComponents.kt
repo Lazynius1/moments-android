@@ -167,7 +167,7 @@ fun StripThumbCell(
         }
     }
 
-    ScreenshotProtectedView(isProtected = thumb.isProtected) {
+    ScreenshotProtectedView(isProtected = thumb.isProtected && thumb.canView) {
         Box(
             modifier = modifier
                 .size(size)

@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,6 +42,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +64,56 @@ import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 
 private val RailActionCircle = 44.dp
+/** Tamaño visual del contador (cápsula iOS ~padding 6/2 + font 10). */
+private val RailCountBadgeVisual = 20.dp
+
+/**
+ * Contador visual del rail (reacciones / comentarios).
+ * El hit amplio de estadísticas va aparte en [EpicReactionButton] para no desplazar el rail.
+ */
+@Composable
+fun RailCountBadge(
+    text: String,
+    background: Color,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
+    Box(
+        modifier
+            .height(RailCountBadgeVisual)
+            .widthIn(min = RailCountBadgeVisual)
+            .clip(RoundedCornerShape(percent = 50))
+            .background(background)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {
+                            HapticManager.shared.lightImpact()
+                            onClick()
+                        },
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            color = Color.White,
+            maxLines = 1,
+            style = TextStyle(
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 10.sp,
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
+            ),
+        )
+    }
+}
 
 /**
  * Port de `ModernActionButtons` (MomentRailComponents.swift) — Glow Rail.
@@ -92,65 +146,71 @@ fun ModernActionButtons(
             .padding(end = 16.dp, bottom = 16.dp),
         contentAlignment = Alignment.BottomEnd,
     ) {
-        Row(
-            Modifier
-                .graphicsLayer { alpha = immersiveAlpha }
-                .shadow(
-                    10.dp,
-                    RoundedCornerShape(percent = 50),
-                    clip = false,
-                    ambientColor = Color.Black.copy(alpha = 0.3f),
-                    spotColor = Color.Black.copy(alpha = 0.3f),
-                )
-                .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
-                .padding(6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            MomentReactionButton(
-                moment = moment,
-                showCount = showReactionCount,
+        // Glass en capa hermana (clip solo del chrome). El Row no se clippea:
+        // el picker de reacciones / badges pueden dibujar fuera (como iOS overlays).
+        Box(Modifier.graphicsLayer { alpha = immersiveAlpha }) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .shadow(
+                        10.dp,
+                        RoundedCornerShape(percent = 50),
+                        clip = false,
+                        ambientColor = Color.Black.copy(alpha = 0.3f),
+                        spotColor = Color.Black.copy(alpha = 0.3f),
+                    )
+                    .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true),
             )
-
-            if (!moment.disableComments) {
-                val active = commentCount > 0
-                RailIconButton(
-                    attachmentIcon = AttachmentIcon.COMMENTS,
-                    color = if (active) Color(0xFF007AFF) else colors.primary,
-                    secondaryColor = if (active) Color(0xFFAF52DE) else colors.secondary,
-                    isActive = active,
-                    count = commentCount.takeIf { it > 0 },
-                    onClick = onComment,
+            Row(
+                Modifier.padding(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MomentReactionButton(
+                    moment = moment,
+                    showCount = showReactionCount,
                 )
-            }
 
-            if (moment.allowSharing) {
-                if (isSaveLoading) {
-                    Box(Modifier.size(RailActionCircle), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            color = if (isDark) Color.White else Color.Black,
-                            strokeWidth = 2.dp,
-                        )
-                    }
-                } else {
+                if (!moment.disableComments) {
+                    val active = commentCount > 0
                     RailIconButton(
-                        attachmentIcon = AttachmentIcon.BOOKMARK,
-                        color = if (isSaved) Color(0xFFFFCC00) else colors.primary,
-                        secondaryColor = if (isSaved) Color(0xFFFF9500) else colors.secondary,
-                        isActive = isSaved,
-                        onClick = onSave,
+                        attachmentIcon = AttachmentIcon.COMMENTS,
+                        color = if (active) Color(0xFF007AFF) else colors.primary,
+                        secondaryColor = if (active) Color(0xFFAF52DE) else colors.secondary,
+                        isActive = active,
+                        count = commentCount.takeIf { it > 0 },
+                        onClick = onComment,
                     )
                 }
-            }
 
-            RailIconButton(
-                systemIcon = Icons.Filled.MoreHoriz,
-                color = colors.primary,
-                secondaryColor = colors.secondary,
-                isActive = false,
-                onClick = onContextMenu,
-            )
+                if (moment.allowSharing) {
+                    if (isSaveLoading) {
+                        Box(Modifier.size(RailActionCircle), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                color = if (isDark) Color.White else Color.Black,
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                    } else {
+                        RailIconButton(
+                            attachmentIcon = AttachmentIcon.BOOKMARK,
+                            color = if (isSaved) Color(0xFFFFCC00) else colors.primary,
+                            secondaryColor = if (isSaved) Color(0xFFFF9500) else colors.secondary,
+                            isActive = isSaved,
+                            onClick = onSave,
+                        )
+                    }
+                }
+
+                RailIconButton(
+                    systemIcon = Icons.Filled.MoreHoriz,
+                    color = colors.primary,
+                    secondaryColor = colors.secondary,
+                    isActive = false,
+                    onClick = onContextMenu,
+                )
+            }
         }
     }
 }
@@ -204,16 +264,10 @@ private fun RailIconButton(
             }
         }
         if (count != null && count > 0) {
-            Text(
+            RailCountBadge(
                 text = count.toString(),
-                color = Color.White,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .offset(x = 4.dp, y = (-4).dp)
-                    .clip(RoundedCornerShape(percent = 50))
-                    .background(if (isActive) color else Color.Gray.copy(alpha = 0.6f))
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                background = if (isActive) color else Color.Gray.copy(alpha = 0.6f),
+                modifier = Modifier.offset(x = 4.dp, y = (-4).dp),
             )
         }
     }

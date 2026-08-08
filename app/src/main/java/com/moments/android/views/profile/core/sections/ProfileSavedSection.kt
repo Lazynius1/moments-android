@@ -191,7 +191,8 @@ fun ProfileSavedContent(
                                     val index = rowIndex * 3 + colIndex
                                     val restricted = isMomentRestricted(moment, state)
                                     ScreenshotProtectedView(
-                                        isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
+                                        isProtected = !restricted &&
+                                            (moment.audience?.lowercase() ?: "") != "everyone",
                                     ) {
                                         ProfileSavedMomentThumbnail(
                                             moment = moment,
@@ -240,7 +241,8 @@ fun ProfileSavedContent(
                         recent.forEachIndexed { index, moment ->
                             val restricted = isMomentRestricted(moment, state)
                             ScreenshotProtectedView(
-                                isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
+                                isProtected = !restricted &&
+                                    (moment.audience?.lowercase() ?: "") != "everyone",
                             ) {
                                 ProfileSavedMomentThumbnail(
                                     moment = moment,
