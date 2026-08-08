@@ -879,11 +879,8 @@ private fun PostHeader(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(
-                horizontal = HeaderHorizontalPadding,
-                top = HeaderVerticalPaddingTop,
-                bottom = HeaderVerticalPaddingBottom,
-            ),
+            .padding(horizontal = HeaderHorizontalPadding)
+            .padding(top = HeaderVerticalPaddingTop, bottom = HeaderVerticalPaddingBottom),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
