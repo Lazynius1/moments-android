@@ -6,11 +6,12 @@
     <string name="upload_progress_status_processing">Traitement…</string>
     <string name="upload_progress_status_completed">Terminé</string>
     <string name="upload_progress_status_failed">Erreur</string>
+    <string name="upload_foreground_body">Maintien de l’envoi en arrière-plan</string>
     <string name="incognito_activity_title">Incognito</string>
     <string name="incognito_activity_active">Actif</string>
     <string name="incognito_activity_paused">En pause</string>
     <string name="incognito_activity_remaining">restantes</string>
     <string name="incognito_activity_subtitle">Votre activité ne laisse aucune trace</string>
-    <string name="incognito_activity_pause">Pause</string>
+    <string name="incognito_activity_pause">Mettre en pause</string>
     <string name="incognito_activity_resume">Reprendre</string>
 </resources>

@@ -6,6 +6,7 @@
     <string name="upload_progress_status_processing">Wird verarbeitet…</string>
     <string name="upload_progress_status_completed">Abgeschlossen</string>
     <string name="upload_progress_status_failed">Fehler</string>
+    <string name="upload_foreground_body">Upload läuft im Hintergrund weiter</string>
     <string name="incognito_activity_title">Inkognito</string>
     <string name="incognito_activity_active">Aktiv</string>
     <string name="incognito_activity_paused">Pausiert</string>

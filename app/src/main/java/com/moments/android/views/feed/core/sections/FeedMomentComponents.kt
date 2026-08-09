@@ -64,6 +64,7 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.content.FeedMediaItem
 import com.moments.android.services.content.FeedMoment
@@ -815,7 +816,12 @@ fun ModernPostCardView(
                                 AttachmentIconView(
                                     icon = AttachmentIcon.TAGGED,
                                     preset = AttachmentIconPreset.OVERLAY_TAGGED_GLASS,
-                                    tintColor = if (showTags) Color(0xFF007AFF) else Color.White,
+                                    // Chrome glass light = fill claro → blanco se pierde; contentColor adaptativo.
+                                    tintColor = if (showTags) {
+                                        Color(0xFF007AFF)
+                                    } else {
+                                        MomentsChromeGlass.contentColor(isDark)
+                                    },
                                 )
                             }
                         }

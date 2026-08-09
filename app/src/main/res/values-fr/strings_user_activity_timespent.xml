@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- TimeSpentDetailsView / TimeSpentCardView (iOS Localizable.strings). -->
 <resources>
-    <string name="user_activity_time_spent_details_title">Time on Moments</string>
-    <string name="user_activity_time_spent_details_subtitle">See how much time you spend on Moments each day. We use this data to help you manage your time.</string>
+    <string name="user_activity_time_spent_details_title">Temps sur Moments</string>
+    <string name="user_activity_time_spent_details_subtitle">Découvrez combien de temps vous passez sur Moments chaque jour. Nous utilisons ces données pour vous aider à gérer votre temps.</string>
     <string name="user_activity_time_spent_daily_limit_title">Limite quotidienne</string>
-    <string name="user_activity_time_spent_daily_limit_subtitle">Add a limit for the time you spend each day.</string>
+    <string name="user_activity_time_spent_daily_limit_subtitle">Ajoutez une limite pour le temps que vous passez chaque jour.</string>
     <string name="user_activity_time_spent_daily_limit_desc_title">Trouvez votre rythme</string>
     <string name="user_activity_time_spent_daily_limit_desc_body">Moments vous avertira lorsque vous atteindrez le temps que vous avez décidé de passer sur l’app chaque jour.</string>
     <string name="user_activity_time_spent_daily_limit_toggle">Rappel de limite quotidienne</string>
     <string name="user_activity_time_spent_daily_limit_picker_title">Durée limite</string>
-    <string name="user_activity_time_spent_rest_mode_title">Rest Mode</string>
-    <string name="user_activity_time_spent_rest_mode_subtitle">Choose the hours of the day you want to mute push notifications.</string>
+    <string name="user_activity_time_spent_rest_mode_title">Mode repos</string>
+    <string name="user_activity_time_spent_rest_mode_subtitle">Choisissez les heures de la journée pendant lesquelles vous souhaitez mettre en sourdine les notifications push.</string>
     <string name="user_activity_time_spent_rest_mode_desc_title">Le temps de faire une pause</string>
     <string name="user_activity_time_spent_rest_mode_desc_body">Coupez les notifications push de Moments pendant les heures choisies pour éviter les distractions.</string>
     <string name="user_activity_time_spent_nav_title">Temps passé</string>
-    <string name="user_activity_time_spent_card_title">Time on Moments</string>
-    <string name="user_activity_time_spent_average">Daily average</string>
+    <string name="user_activity_time_spent_card_title">Temps sur Moments</string>
+    <string name="user_activity_time_spent_average">Moyenne quotidienne</string>
 </resources>

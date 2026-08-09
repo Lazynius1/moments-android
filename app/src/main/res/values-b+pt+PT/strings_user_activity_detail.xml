@@ -54,4 +54,20 @@
     <string name="user_activity_archived_confirm_restore_title">Restaurar conteúdo arquivado</string>
     <string name="user_activity_archived_confirm_restore_message">Queres restaurar o conteúdo arquivado selecionado?</string>
     <string name="user_activity_archived_success_restore">Conteúdo arquivado restaurado</string>
+    <string name="user_activity_archived_processing_button">A restaurar…</string>
+    <string name="user_activity_select_all">Selecionar tudo</string>
+    <string name="user_activity_archived_processing_restore">A restaurar arquivados</string>
+    <string name="user_activity_echoes_active_count">%d ativos</string>
+    <string name="user_activity_echoes_count">%d Echoes</string>
+    <string name="user_activity_empty_archived_subtitle">Os teus momentos privados arquivados ficam guardados aqui, fora da vista pública.</string>
+    <string name="user_activity_empty_comments_subtitle">As tuas conversas, respostas a comentários e avaliações vão aparecer neste espaço.</string>
+    <string name="user_activity_empty_echoes_subtitle">Os Echoes ligam-te a amigos em comum por perto. Captura um momento para começares a ecoar!</string>
+    <string name="user_activity_empty_followers_subtitle">Acompanha pedidos de seguidores recentes, amigos em comum e ligações de perfil.</string>
+    <string name="user_activity_empty_moments_subtitle">As tuas publicações da grelha partilhada e capturas diárias vão aparecer aqui.</string>
+    <string name="user_activity_empty_reactions_subtitle">As interações e reações que deixas noutros momentos vão aparecer aqui.</string>
+    <string name="user_activity_empty_recently_deleted_subtitle">Os itens que elimines ficam guardados aqui durante 30 dias antes da eliminação permanente.</string>
+    <string name="user_activity_empty_reels_subtitle">Os teus reels de vídeo imersivos e clips curtos serão guardados neste separador.</string>
+    <string name="user_activity_empty_stickers_subtitle">Vê as perguntas interativas e respostas a sondagens a que respondeste.</string>
+    <string name="user_activity_empty_tags_subtitle">Quando amigos te mencionarem ou marcarem nos momentos deles, vão aparecer aqui.</string>
+    <string name="user_activity_empty_visits_subtitle">Vê os amigos e seguidores que visitaram o teu perfil recentemente.</string>
 </resources>

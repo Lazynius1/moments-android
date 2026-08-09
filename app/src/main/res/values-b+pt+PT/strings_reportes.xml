@@ -15,7 +15,7 @@
     <string name="appeal_detail_suspensionReason">Motivo da suspensão</string>
     <string name="appeal_detail_title">Detalhe do recurso</string>
     <string name="appeal_detail_yourMessage">A tua mensagem</string>
-    <string name="appeal_error_ok">OK</string>
+    <string name="appeal_error_ok">Concluir</string>
     <string name="appeal_error_submit">Erro ao enviar o recurso</string>
     <string name="appeal_error_title">Erro</string>
     <string name="appeal_error_unexpected">Erro inesperado</string>
@@ -91,8 +91,8 @@
     <string name="moderationReview_additionalInfo_placeholder">Opcional: acrescenta detalhes extra que nos possam ajudar a rever este caso.</string>
     <string name="moderationReview_contactEmail">Email de contacto</string>
     <string name="moderationReview_contactEmail_placeholder">tu@email.com</string>
-    <string name="moderationReview_context_moment">Moment</string>
-    <string name="moderationReview_context_story">Story</string>
+    <string name="moderationReview_context_moment">Momento</string>
+    <string name="moderationReview_context_story">História</string>
     <string name="moderationReview_helper">O teu conteúdo vai continuar assim enquanto o revemos. Se fizer sentido, poderemos restaurá-lo após uma revisão manual.</string>
     <string name="moderationReview_messagePlaceholder">Conta-nos o que achas que aconteceu e qualquer contexto útil para rever esta moderação.</string>
     <string name="moderationReview_messageTitle">Explica-nos porque achas que devemos rever isto</string>
@@ -137,7 +137,7 @@
     <string name="report_category_violence_subtitle">Conteúdo violento ou ofensivo</string>
     <string name="report_category_violence_title">Violência, ódio ou exploração</string>
     <string name="report_contentType_moment">momento</string>
-    <string name="report_contentType_story">story</string>
+    <string name="report_contentType_story">história</string>
     <string name="report_contentType_user">utilizador</string>
     <string name="report_details">Detalhes adicionais (opcional)</string>
     <string name="report_details_placeholder">Descreve o problema (opcional)...</string>

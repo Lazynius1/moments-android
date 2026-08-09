@@ -55,7 +55,7 @@
     <string name="data_export_error_title">Error</string>
     <string name="data_export_ok">OK</string>
     <string name="data_export_user_not_authenticated">User not authenticated</string>
-    <string name="data_export_submit_error_prefix">Error sending request: </string>
+    <string name="data_export_submit_error_prefix">Error sending request:</string>
     <string name="data_export_request_in_progress_title">Request in Progress</string>
     <string name="data_export_progress">Progress</string>
     <string name="data_export_status_label">Status:</string>

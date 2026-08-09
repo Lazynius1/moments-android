@@ -72,7 +72,7 @@
     <string name="appeal_status_requiresInfo">Cal informació</string>
     <string name="appeal_status_reviewing">En revisió</string>
     <string name="appeal_status_submitted">Enviat</string>
-    <string name="appeal_status_ticket">Ticket #%s</string>
+    <string name="appeal_status_ticket">Tiquet #%s</string>
     <string name="appeal_status_title">Les meves Apel·lacions</string>
     <string name="appeal_submitButton">Enviar Apel·lació</string>
     <string name="appeal_subtitle">Explica\'ns la teva situació i revisarem el teu cas detalladament</string>
@@ -92,7 +92,7 @@
     <string name="moderationReview_contactEmail">Correu de contacte</string>
     <string name="moderationReview_contactEmail_placeholder">tu@email.com</string>
     <string name="moderationReview_context_moment">Moment</string>
-    <string name="moderationReview_context_story">Story</string>
+    <string name="moderationReview_context_story">Història</string>
     <string name="moderationReview_helper">El teu contingut continuarà igual mentre el revisem. Si correspon, el podrem restaurar després d\'una revisió manual.</string>
     <string name="moderationReview_messagePlaceholder">Explica\'ns què creus que ha passat i qualsevol context útil per revisar aquesta moderació.</string>
     <string name="moderationReview_messageTitle">Explica\'ns per què creus que ho hauríem de revisar</string>

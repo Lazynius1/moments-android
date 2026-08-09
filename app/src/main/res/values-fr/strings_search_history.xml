@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explore_recent_searches_type_hashtag">Hashtag</string>
+    <string name="explore_recent_searches_type_text">Recherche textuelle</string>
+    <string name="user_activity_recent_searches_clear_all">Tout effacer</string>
+    <string name="user_activity_recent_searches_empty">Aucune recherche récente</string>
+</resources>

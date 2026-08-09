@@ -33,7 +33,7 @@
     <string name="user_activity_comments_confirm_delete_title">Kommentare löschen</string>
     <string name="user_activity_comments_confirm_delete_message">Möchtest du die ausgewählten Kommentare löschen?</string>
     <string name="user_activity_comments_success_delete">Kommentare gelöscht</string>
-    <string name="user_activity_stickers_selected_count">%d selected</string>
+    <string name="user_activity_stickers_selected_count">%d ausgewählt</string>
     <string name="user_activity_stickers_delete_single">Antwort löschen</string>
     <string name="user_activity_stickers_delete_multiple">Antworten löschen</string>
     <string name="user_activity_stickers_confirm_delete_title">Antworten löschen</string>
@@ -54,4 +54,20 @@
     <string name="user_activity_archived_confirm_restore_title">Archivierte Inhalte wiederherstellen</string>
     <string name="user_activity_archived_confirm_restore_message">Möchtest du die ausgewählten archivierten Inhalte wiederherstellen?</string>
     <string name="user_activity_archived_success_restore">Archivierte Inhalte wiederhergestellt</string>
+    <string name="user_activity_archived_processing_button">Wird wiederhergestellt…</string>
+    <string name="user_activity_select_all">Alle auswählen</string>
+    <string name="user_activity_archived_processing_restore">Archivierter Inhalt wird wiederhergestellt</string>
+    <string name="user_activity_echoes_active_count">%d aktiv</string>
+    <string name="user_activity_echoes_count">%d Echoes</string>
+    <string name="user_activity_empty_archived_subtitle">Deine privaten, archivierten Moments werden hier sicher außerhalb der öffentlichen Sicht aufbewahrt.</string>
+    <string name="user_activity_empty_comments_subtitle">Deine Unterhaltungen, Kommentarantworten und Bewertungen werden hier angezeigt.</string>
+    <string name="user_activity_empty_echoes_subtitle">Echoes verbinden dich mit gemeinsamen Freunden in der Nähe. Erstelle einen Moment, um mit dem Echoing zu beginnen!</string>
+    <string name="user_activity_empty_followers_subtitle">Verfolge aktuelle Follower-Anfragen, gemeinsame Freunde und Profilverbindungen.</string>
+    <string name="user_activity_empty_moments_subtitle">Deine geteilten Grid-Beiträge und täglichen Aufnahmen erscheinen hier.</string>
+    <string name="user_activity_empty_reactions_subtitle">Interaktionen und Reaktionen, die du auf anderen Moments hinterlässt, erscheinen hier.</string>
+    <string name="user_activity_empty_recently_deleted_subtitle">Gelöschte Elemente werden hier 30 Tage lang aufbewahrt, bevor sie endgültig gelöscht werden.</string>
+    <string name="user_activity_empty_reels_subtitle">Deine immersiven Video-Reels und kurzen Clips werden in diesem Tab gespeichert.</string>
+    <string name="user_activity_empty_stickers_subtitle">Sieh dir interaktive Fragen und Umfrageantworten an, auf die du reagiert hast.</string>
+    <string name="user_activity_empty_tags_subtitle">Wenn Freunde dich in ihren Moments erwähnen oder markieren, werden sie hier aufgelistet.</string>
+    <string name="user_activity_empty_visits_subtitle">Sieh, welche Freunde und Follower dein Profil kürzlich besucht haben.</string>
 </resources>

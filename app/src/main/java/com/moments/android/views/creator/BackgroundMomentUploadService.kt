@@ -251,6 +251,8 @@ object BackgroundMomentUploadService {
         trackProgress(uploadingMoment)
         startLiveActivity(uploadingMoment)
 
+        // ≡ iOS beginBackgroundTask("MomentUpload") — adquirir antes del launch.
+        UploadForegroundKeeper.acquire(ctx)
         val job = scope.launch {
             try {
                 if (shouldPersistAction) {
@@ -277,6 +279,7 @@ object BackgroundMomentUploadService {
                 }
             } finally {
                 runningUploadJobs.remove(uploadingMoment.tempId)
+                UploadForegroundKeeper.release(ctx)
             }
         }
         runningUploadJobs[uploadingMoment.tempId] = job

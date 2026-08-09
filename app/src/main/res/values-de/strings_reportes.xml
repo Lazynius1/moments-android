@@ -58,8 +58,8 @@
     <string name="appeal_requirements">Voraussetzungen</string>
     <string name="appeal_result_processed">Einspruch bearbeitet</string>
     <string name="appeal_sent_title">Einspruch gesendet!</string>
-    <string name="appeal_status_approved">Approved</string>
-    <string name="appeal_status_denied">Denied</string>
+    <string name="appeal_status_approved">Genehmigt</string>
+    <string name="appeal_status_denied">Abgelehnt</string>
     <string name="appeal_status_estimatedResponse">Voraussichtliche Antwort: %s</string>
     <string name="appeal_status_loading">Einsprüche werden geladen...</string>
     <string name="appeal_status_moderatorNotes">Hinweise des Moderationsteams: %s</string>
@@ -69,7 +69,7 @@
     <string name="appeal_status_percentage">%d%%</string>
     <string name="appeal_status_progress">Fortschritt</string>
     <string name="appeal_status_reason">Grund: %s</string>
-    <string name="appeal_status_requiresInfo">Needs information</string>
+    <string name="appeal_status_requiresInfo">Informationen erforderlich</string>
     <string name="appeal_status_reviewing">In Prüfung</string>
     <string name="appeal_status_submitted">Eingereicht</string>
     <string name="appeal_status_ticket">Ticket #%s</string>

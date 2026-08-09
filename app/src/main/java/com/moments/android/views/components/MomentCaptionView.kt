@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Moment
@@ -582,6 +583,7 @@ private fun MomentCaptionMediaPreview(
                     ),
             )
 
+            val chromeContent = MomentsChromeGlass.contentColor(isDark)
             Row(
                 Modifier
                     .align(Alignment.BottomStart)
@@ -595,7 +597,7 @@ private fun MomentCaptionMediaPreview(
                     Icon(
                         imageVector = Icons.Filled.PlayArrow,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = chromeContent,
                         modifier = Modifier.size(10.dp),
                     )
                 }
@@ -603,7 +605,8 @@ private fun MomentCaptionMediaPreview(
                 LiveUsernameText(
                     userId = context.authorId,
                     fallbackUsername = context.username,
-                    color = Color.White,
+                    // iOS fuerza white sobre media; en Android chrome light es opaco claro.
+                    color = chromeContent,
                     style = usernameStyle,
                     maxLines = 1,
                 )

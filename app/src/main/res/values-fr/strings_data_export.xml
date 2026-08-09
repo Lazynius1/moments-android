@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="data_export_status_label">Statut :</string>
+    <string name="data_export_format_csv_title">CSV</string>
+    <string name="data_export_format_json_title">JSON</string>
+    <string name="data_export_interactions_title">Interactions</string>
+    <string name="data_export_messages_title">Messages</string>
+    <string name="data_export_posts_title">Publications</string>
+    <string name="data_export_submit_error_prefix">Erreur lors de l\'envoi de la demande :</string>
+</resources>

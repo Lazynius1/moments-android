@@ -54,4 +54,20 @@
     <string name="user_activity_archived_confirm_restore_title">Ripristina contenuti archiviati</string>
     <string name="user_activity_archived_confirm_restore_message">Vuoi ripristinare i contenuti archiviati selezionati?</string>
     <string name="user_activity_archived_success_restore">Contenuti archiviati ripristinati</string>
+    <string name="user_activity_archived_processing_button">Ripristino…</string>
+    <string name="user_activity_select_all">Seleziona tutto</string>
+    <string name="user_activity_archived_processing_restore">Ripristino del contenuto archiviato</string>
+    <string name="user_activity_echoes_active_count">%d attivi</string>
+    <string name="user_activity_echoes_count">%d Echoes</string>
+    <string name="user_activity_empty_archived_subtitle">I tuoi moment privati e archiviati sono conservati qui in modo sicuro, lontano dalla vista pubblica.</string>
+    <string name="user_activity_empty_comments_subtitle">Le tue conversazioni, risposte ai commenti e recensioni appariranno in questo spazio.</string>
+    <string name="user_activity_empty_echoes_subtitle">Gli Echo ti collegano con amici in comune nelle vicinanze. Scatta un moment per iniziare a fare echo!</string>
+    <string name="user_activity_empty_followers_subtitle">Monitora le richieste di follow recenti, gli amici in comune e le connessioni di profilo.</string>
+    <string name="user_activity_empty_moments_subtitle">I tuoi post condivisi nella griglia e gli scatti quotidiani appariranno qui.</string>
+    <string name="user_activity_empty_reactions_subtitle">Le interazioni e le reazioni che lasci sui moment altrui appariranno qui.</string>
+    <string name="user_activity_empty_recently_deleted_subtitle">Gli elementi che elimini vengono conservati qui per 30 giorni prima dell\'eliminazione definitiva.</string>
+    <string name="user_activity_empty_reels_subtitle">I tuoi reel video immersivi e brevi clip verranno salvati in questa scheda.</string>
+    <string name="user_activity_empty_stickers_subtitle">Visualizza le domande interattive e le risposte ai sondaggi a cui hai risposto.</string>
+    <string name="user_activity_empty_tags_subtitle">Quando gli amici ti menzionano o ti taggano nei loro moment, appariranno qui.</string>
+    <string name="user_activity_empty_visits_subtitle">Guarda gli amici e i follower che hanno visitato di recente il tuo profilo.</string>
 </resources>

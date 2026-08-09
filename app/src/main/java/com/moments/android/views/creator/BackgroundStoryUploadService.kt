@@ -240,34 +240,41 @@ object BackgroundStoryUploadService {
         // Thumbnail ya disponible — reinicia notif de progreso (≡ Live Activity).
         startLiveActivity(uploadingStory)
 
+        // ≡ iOS beginBackgroundTask("StoryUpload") — adquirir antes del launch.
+        val ctx = appContext
+        if (ctx != null) UploadForegroundKeeper.acquire(ctx)
         uploadScope.launch {
-            if (shouldPersistAction) {
-                try {
-                    persistAction(uploadingStory)
-                } catch (t: Throwable) {
-                    uploadingStory.status = UploadStatus.Failed
-                    uploadingStory.errorMessage = t.message
-                    failAction(uploadingStory.tempId, t.message)
+            try {
+                if (shouldPersistAction) {
+                    try {
+                        persistAction(uploadingStory)
+                    } catch (t: Throwable) {
+                        uploadingStory.status = UploadStatus.Failed
+                        uploadingStory.errorMessage = t.message
+                        failAction(uploadingStory.tempId, t.message)
+                        deleteActionFiles(uploadingStory.tempId)
+                        isProcessing = false
+                        return@launch
+                    }
+                }
+                val action = LocalPersistenceService.loadAction(uploadingStory.tempId)
+                    ?: run {
+                        markStoryAsFailed(uploadingStory, "Missing persisted story upload action")
+                        return@launch
+                    }
+                resumeUpload(action)
+                isProcessing = false
+                if (uploadingStory.status == UploadStatus.Completed ||
+                    uploadingStory.status == UploadStatus.Moderated
+                ) {
+                    // finishSuccess ya borra outbox; reforzar cleanup de ficheros
                     deleteActionFiles(uploadingStory.tempId)
-                    isProcessing = false
-                    return@launch
                 }
-            }
-            val action = LocalPersistenceService.loadAction(uploadingStory.tempId)
-                ?: run {
-                    markStoryAsFailed(uploadingStory, "Missing persisted story upload action")
-                    return@launch
+                if (this@BackgroundStoryUploadService.uploadingStory?.tempId == uploadingStory.tempId) {
+                    this@BackgroundStoryUploadService.uploadingStory = null
                 }
-            resumeUpload(action)
-            isProcessing = false
-            if (uploadingStory.status == UploadStatus.Completed ||
-                uploadingStory.status == UploadStatus.Moderated
-            ) {
-                // finishSuccess ya borra outbox; reforzar cleanup de ficheros
-                deleteActionFiles(uploadingStory.tempId)
-            }
-            if (this@BackgroundStoryUploadService.uploadingStory?.tempId == uploadingStory.tempId) {
-                this@BackgroundStoryUploadService.uploadingStory = null
+            } finally {
+                if (ctx != null) UploadForegroundKeeper.release(ctx)
             }
         }
     }
@@ -391,21 +398,28 @@ object BackgroundStoryUploadService {
             continuationCustomListName = continuationCustomListName,
             expirationHours = expirationHours,
         ) ?: return null
+        // Bake/prepare también bajo FGS (ventana antes del outbox) — ≡ background task iOS.
+        val ctx = appContext
+        if (ctx != null) UploadForegroundKeeper.acquire(ctx)
         uploadScope.launch {
-            val media = try {
-                prepareMedia()
-            } catch (t: Throwable) {
-                markStoryAsFailed(story, t.message ?: "prepare failed")
-                StoryUploadProgressManager.cancelUpload()
-                onPrepareFailed?.invoke(t)
-                return@launch
+            try {
+                val media = try {
+                    prepareMedia()
+                } catch (t: Throwable) {
+                    markStoryAsFailed(story, t.message ?: "prepare failed")
+                    StoryUploadProgressManager.cancelUpload()
+                    onPrepareFailed?.invoke(t)
+                    return@launch
+                }
+                publishPreparedStoryInBackground(
+                    uploadingStory = story,
+                    preparedMedia = media,
+                    finalRenderedImage = null,
+                    shouldPersistAction = true,
+                )
+            } finally {
+                if (ctx != null) UploadForegroundKeeper.release(ctx)
             }
-            publishPreparedStoryInBackground(
-                uploadingStory = story,
-                preparedMedia = media,
-                finalRenderedImage = null,
-                shouldPersistAction = true,
-            )
         }
         return story.tempId
     }
@@ -574,6 +588,9 @@ object BackgroundStoryUploadService {
             return
         }
         LocalPersistenceService.updateActionStatus(action.id, CachedAction.ActionStatus.EXECUTING)
+        // OfflineSync / retry: FGS si aún no lo sostiene publishPrepared (refcount anida).
+        val ctx = appContext
+        if (ctx != null) UploadForegroundKeeper.acquire(ctx)
         try {
             val payload = UploadPayloadDecoder.decodeStoryPayload(action.payloadData)
                 ?: throw IllegalStateException("Invalid story upload payload")
@@ -593,6 +610,7 @@ object BackgroundStoryUploadService {
             failAction(action.id, e.message)
         } finally {
             inFlightActionIds.remove(action.id)
+            if (ctx != null) UploadForegroundKeeper.release(ctx)
         }
     }
 

@@ -6,6 +6,7 @@
     <string name="upload_progress_status_processing">Processant…</string>
     <string name="upload_progress_status_completed">Completat</string>
     <string name="upload_progress_status_failed">Error</string>
+    <string name="upload_foreground_body">Mantenint la pujada en segon pla</string>
     <string name="incognito_activity_title">Incògnit</string>
     <string name="incognito_activity_active">Actiu</string>
     <string name="incognito_activity_paused">Pausat</string>

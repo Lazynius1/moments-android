@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="login_activity_ip_unavailable">IP indisponível</string>
+    <string name="login_activity_load_error_prefix">Erro ao carregar sessões:</string>
+    <string name="login_activity_location_unavailable">Localização indisponível</string>
+    <string name="login_activity_logout_all_error_prefix">Erro ao encerrar sessões:</string>
+    <string name="login_activity_refresh_error_prefix">Erro ao atualizar sessões:</string>
+</resources>

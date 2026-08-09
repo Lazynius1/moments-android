@@ -54,4 +54,20 @@
     <string name="user_activity_archived_confirm_restore_title">Restaurar arxivats</string>
     <string name="user_activity_archived_confirm_restore_message">Vols restaurar el contingut arxivat seleccionat?</string>
     <string name="user_activity_archived_success_restore">Contingut arxivat restaurat</string>
+    <string name="user_activity_archived_processing_button">Restaurant…</string>
+    <string name="user_activity_select_all">Seleccionar-ho tot</string>
+    <string name="user_activity_archived_processing_restore">Restaurant arxivats</string>
+    <string name="user_activity_echoes_active_count">%d actius</string>
+    <string name="user_activity_echoes_count">%d Echoes</string>
+    <string name="user_activity_empty_archived_subtitle">Els teus moments privats arxivats es guarden aquí fora de la vista pública.</string>
+    <string name="user_activity_empty_comments_subtitle">Les teves converses, respostes a comentaris i ressenyes es mostraran en aquest espai.</string>
+    <string name="user_activity_empty_echoes_subtitle">Els Echoes et connecten amb amics mutus propers. Captura un moment per començar!</string>
+    <string name="user_activity_empty_followers_subtitle">Segueix sol·licituds recents, amics mutus i connexions de perfil.</string>
+    <string name="user_activity_empty_moments_subtitle">Les teves publicacions de la graella i captures diàries apareixeran aquí.</string>
+    <string name="user_activity_empty_reactions_subtitle">Les interaccions i reaccions que deixis en altres moments apareixeran aquí.</string>
+    <string name="user_activity_empty_recently_deleted_subtitle">El que elimines es guarda aquí 30 dies abans de l\'esborrat permanent.</string>
+    <string name="user_activity_empty_reels_subtitle">Els teus reels de vídeo immersius i clips curts es guardaran en aquesta pestanya.</string>
+    <string name="user_activity_empty_stickers_subtitle">Consulta les preguntes interactives i respostes a enquestes a què hagis respost.</string>
+    <string name="user_activity_empty_tags_subtitle">Quan amics et mencionin o t\'etiquetin en els seus moments, apareixeran aquí.</string>
+    <string name="user_activity_empty_visits_subtitle">Mira els amics i seguidors que han visitat el teu perfil recentment.</string>
 </resources>

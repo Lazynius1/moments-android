@@ -70,4 +70,5 @@
     <string name="user_activity_event_follow_clean">Folgt dir jetzt</string>
     <string name="user_activity_stickers_poll_context_prefix">Umfrage von</string>
     <string name="user_activity_stickers_question_context_prefix">Frage von</string>
+    <string name="user_activity_archived_header_title">Archivierte Momente</string>
 </resources>

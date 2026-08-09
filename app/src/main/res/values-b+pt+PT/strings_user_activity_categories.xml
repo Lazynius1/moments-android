@@ -70,4 +70,5 @@
     <string name="user_activity_event_follow_clean">Começou a seguir-te</string>
     <string name="user_activity_stickers_poll_context_prefix">Enquete de</string>
     <string name="user_activity_stickers_question_context_prefix">Pergunta de</string>
+    <string name="user_activity_archived_header_title">Moments arquivados</string>
 </resources>

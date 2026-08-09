@@ -32,7 +32,7 @@
     <string name="login_activity_location_unavailable">Ubicación no disponible</string>
     <string name="login_activity_ip_unavailable">IP no disponible</string>
     <string name="login_activity_error_not_authenticated">Usuario no autenticado</string>
-    <string name="login_activity_load_error_prefix">Error al cargar sesiones: </string>
-    <string name="login_activity_refresh_error_prefix">Error al actualizar sesiones: </string>
-    <string name="login_activity_logout_all_error_prefix">Error al cerrar sesiones: </string>
+    <string name="login_activity_load_error_prefix">Error al cargar sesiones:</string>
+    <string name="login_activity_refresh_error_prefix">Error al actualizar sesiones:</string>
+    <string name="login_activity_logout_all_error_prefix">Error al cerrar sesiones:</string>
 </resources>

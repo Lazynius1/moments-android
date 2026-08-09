@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="login_activity_ip_unavailable">IP nicht verfügbar</string>
+    <string name="login_activity_load_error_prefix">Fehler beim Laden der Sitzungen:</string>
+    <string name="login_activity_location_unavailable">Standort nicht verfügbar</string>
+    <string name="login_activity_logout_all_error_prefix">Fehler beim Beenden der Sitzungen:</string>
+    <string name="login_activity_refresh_error_prefix">Fehler beim Aktualisieren der Sitzungen:</string>
+</resources>

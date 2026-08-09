@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="data_export_ok">Concluir</string>
+    <string name="data_export_status_label">Estado:</string>
+    <string name="data_export_format_csv_title">CSV</string>
+    <string name="data_export_format_json_title">JSON</string>
+    <string name="data_export_submit_error_prefix">Erro ao enviar o pedido:</string>
+</resources>

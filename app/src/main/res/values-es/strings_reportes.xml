@@ -91,7 +91,7 @@
     <string name="moderationReview_additionalInfo_placeholder">Opcional: añade detalles extra que puedan ayudarnos a revisar este caso.</string>
     <string name="moderationReview_contactEmail">Email de contacto</string>
     <string name="moderationReview_contactEmail_placeholder">tu@email.com</string>
-    <string name="moderationReview_context_moment">Moment</string>
+    <string name="moderationReview_context_moment">Momento</string>
     <string name="moderationReview_context_story">Historia</string>
     <string name="moderationReview_helper">Tu contenido seguirá como está mientras lo revisamos. Si corresponde, podremos restaurarlo después de una revisión manual.</string>
     <string name="moderationReview_messagePlaceholder">Cuéntanos qué crees que ha pasado y cualquier contexto útil para revisar esta moderación.</string>

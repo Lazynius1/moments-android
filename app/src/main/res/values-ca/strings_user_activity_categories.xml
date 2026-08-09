@@ -70,4 +70,5 @@
     <string name="user_activity_event_follow_clean">Et va començar a seguir</string>
     <string name="user_activity_stickers_poll_context_prefix">Votació de</string>
     <string name="user_activity_stickers_question_context_prefix">Pregunta de</string>
+    <string name="user_activity_archived_header_title">Moments arxivats</string>
 </resources>

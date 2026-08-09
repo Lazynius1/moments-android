@@ -91,7 +91,7 @@
     <string name="moderationReview_additionalInfo_placeholder">Opcional: adicione detalhes extras que possam nos ajudar a revisar este caso.</string>
     <string name="moderationReview_contactEmail">Email de contato</string>
     <string name="moderationReview_contactEmail_placeholder">voce@email.com</string>
-    <string name="moderationReview_context_moment">Moment</string>
+    <string name="moderationReview_context_moment">Momento</string>
     <string name="moderationReview_context_story">Story</string>
     <string name="moderationReview_helper">Seu conteúdo continuará assim enquanto revisamos. Se fizer sentido, poderemos restaurá-lo após uma revisão manual.</string>
     <string name="moderationReview_messagePlaceholder">Conte o que você acha que aconteceu e qualquer contexto útil para revisar essa moderação.</string>
@@ -137,7 +137,7 @@
     <string name="report_category_violence_subtitle">Conteúdo violento ou ofensivo</string>
     <string name="report_category_violence_title">Violência, ódio ou exploração</string>
     <string name="report_contentType_moment">momento</string>
-    <string name="report_contentType_story">story</string>
+    <string name="report_contentType_story">história</string>
     <string name="report_contentType_user">usuario</string>
     <string name="report_details">Detalhes adicionais (opcional)</string>
     <string name="report_details_placeholder">Descreva o problema (opcional)...</string>

@@ -10,7 +10,7 @@
     <string name="user_activity_filters_type">Tipo</string>
     <string name="user_activity_account_history_type_join">Entrou no Moments</string>
     <string name="user_activity_account_history_type_username">Nome de usuário</string>
-    <string name="user_activity_account_history_type_bio">Bio</string>
+    <string name="user_activity_account_history_type_bio">Biografia</string>
     <string name="user_activity_account_history_type_website">Site</string>
     <string name="user_activity_account_history_type_privacy">Privacidade</string>
     <string name="user_activity_account_history_change_from">De:</string>
