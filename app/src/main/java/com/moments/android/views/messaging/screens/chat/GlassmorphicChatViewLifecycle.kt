@@ -185,9 +185,24 @@ class GlassmorphicChatLifecycleController(
     }
 
     fun presentViewOnceViewer(message: EnhancedMessage, isReplaySession: Boolean, otherParticipantDisplayName: String, currentUserName: String) {
+        val uid = viewModel.currentUserId
+        val live = viewModel.messagesById[message.id] ?: message
+        // ≡ iOS openViewOnceMessage / openReplay guards — no reabrir si ya se consumió.
+        if (!isReplaySession) {
+            val alreadyViewed = live.isViewed ||
+                live.hasBeenViewedBy(uid) ||
+                live.replayAvailableInCurrentChatSession
+            if (alreadyViewed) return
+        } else {
+            val canReplay = live.replayAvailableInCurrentChatSession || live.canReplayViewOnce(uid)
+            if (!canReplay || live.replayConsumedInCurrentChatSession || live.hasBeenReplayedBy(uid)) return
+        }
+        val hasMedia = !live.mediaUrl.isNullOrBlank() || !live.mediaObjectPath.isNullOrBlank()
+        if (!hasMedia) return
+
         viewOnceViewerPresentation = ViewOnceViewerPresentation(
-            message = message,
-            authorName = if (message.senderId == viewModel.currentUserId) currentUserName else otherParticipantDisplayName,
+            message = live,
+            authorName = if (live.senderId == viewModel.currentUserId) currentUserName else otherParticipantDisplayName,
             isReplaySession = isReplaySession,
         )
     }
@@ -197,16 +212,62 @@ class GlassmorphicChatLifecycleController(
     }
 
     fun handleViewOnceViewerViewed(presentation: ViewOnceViewerPresentation) {
-        val message = presentation.message
+        val message = viewModel.messagesById[presentation.message.id] ?: presentation.message
         val viewerId = viewModel.currentUserId
+        val viewedBy = (message.viewedBy.orEmpty() + viewerId).distinct()
+        // iOS muta EnhancedMessage (@ObservedObject) al instante; Compose necesita replace en el StateFlow.
         if (message.allowReplay == true && !presentation.isReplaySession) {
             viewOnceOperations.markReplayAvailable(message, viewerId)
+            viewModel.appendOrReplaceMessage(
+                message.copy(
+                    isViewed = true,
+                    viewedBy = viewedBy,
+                    replayAvailableInCurrentChatSession = true,
+                    replayConsumedInCurrentChatSession = false,
+                ),
+            )
+        } else {
+            viewModel.appendOrReplaceMessage(
+                message.copy(isViewed = true, viewedBy = viewedBy),
+            )
         }
         viewOnceOperations.markViewed(message.conversationId, message.id, viewerId)
     }
 
     fun handleViewOnceReplayConsumed(presentation: ViewOnceViewerPresentation) {
-        viewOnceOperations.markReplayConsumed(presentation.message, viewModel.currentUserId)
+        val message = viewModel.messagesById[presentation.message.id] ?: presentation.message
+        val viewerId = viewModel.currentUserId
+        viewOnceOperations.markReplayConsumed(message, viewerId)
+        viewModel.appendOrReplaceMessage(
+            message.copy(
+                replayAvailableInCurrentChatSession = false,
+                replayConsumedInCurrentChatSession = true,
+                replayedBy = (message.replayedBy.orEmpty() + viewerId).distinct(),
+            ),
+        )
+    }
+
+    /** Tras CF `consumeViewOnceMessage` OK — limpia media local (Firestore ya no trae paths). */
+    fun handleViewOnceMediaConsumed(messageId: String) {
+        val message = viewModel.messagesById[messageId] ?: return
+        viewModel.appendOrReplaceMessage(
+            message.copy(
+                isViewed = true,
+                mediaUrl = null,
+                thumbnailUrl = null,
+                mediaObjectPath = null,
+                thumbnailObjectPath = null,
+                mediaEncryption = null,
+                thumbnailEncryption = null,
+                textOverlayLive = null,
+                textOverlays = null,
+                stickers = null,
+                drawingData = null,
+                replayAvailableInCurrentChatSession = false,
+                replayConsumedInCurrentChatSession = message.allowReplay == true ||
+                    message.replayConsumedInCurrentChatSession,
+            ),
+        )
     }
 
     fun refreshOtherParticipantUsername() {

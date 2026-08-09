@@ -298,6 +298,8 @@ suspend fun ChatService.markViewOnceAsViewed(
         .document(conversationId)
         .collection("messages")
         .document(messageId)
+    // firestore.rules `onlyViewOnceFieldsUpdated` solo permite isViewed/viewedBy/replayedBy.
+    // Incluir `status` hace fallar el write (PERMISSION_DENIED) → CF replay ve viewedBy vacío.
     firestore.runTransaction { transaction ->
         val snapshot = transaction.get(messageRef)
         @Suppress("UNCHECKED_CAST")
@@ -308,7 +310,6 @@ suspend fun ChatService.markViewOnceAsViewed(
                 mapOf(
                     "viewedBy" to listOf(viewerId),
                     "isViewed" to true,
-                    "status" to MessageStatus.READ.raw,
                 ),
             )
         } else {
@@ -320,7 +321,6 @@ suspend fun ChatService.markViewOnceAsViewed(
                     mapOf(
                         "viewedBy" to list,
                         "isViewed" to true,
-                        "status" to MessageStatus.READ.raw,
                     ),
                 )
             }

@@ -149,10 +149,22 @@ private fun applySnapshotMetadata(message: EnhancedMessage, data: Map<String, An
         FirebaseAuth.getInstance().currentUser?.uid,
     )
 
-    return if (updated.isDeleted) {
+    // CF consumeViewOnceMessage borra campos de media sin poner isDeleted.
+    // Si el remoto ya no tiene media view-once, no conservar URLs/paths del cache local.
+    val remoteViewOnceMediaGone = updated.isViewOnce &&
+        (data["mediaObjectPath"] as? String).isNullOrBlank() &&
+        (data["mediaUrl"] as? String).isNullOrBlank() &&
+        (data["thumbnailObjectPath"] as? String).isNullOrBlank() &&
+        (data["thumbnailUrl"] as? String).isNullOrBlank()
+
+    return if (updated.isDeleted || remoteViewOnceMediaGone) {
         updated.copy(
             mediaUrl = null,
             thumbnailUrl = null,
+            mediaObjectPath = null,
+            thumbnailObjectPath = null,
+            mediaEncryption = null,
+            thumbnailEncryption = null,
             textOverlayLive = null,
             textOverlays = null,
             stickers = null,

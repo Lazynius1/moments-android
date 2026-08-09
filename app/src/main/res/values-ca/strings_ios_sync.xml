@@ -297,7 +297,6 @@
     <string name="chat_location_open_in_maps">Obre a Mapes</string>
     <string name="chat_location_permission_needed">Cal permís d\'ubicació.</string>
     <string name="chat_location_share_live">Comparteix ubicació en directe</string>
-    <string name="chat_media_download">Download</string>
     <string name="chat_menu_details">Configuracio de la conversa</string>
     <string name="chat_message_deleted">Aquest missatge va ser eliminat</string>
     <string name="chat_message_expired">Missatge caducat</string>
@@ -543,7 +542,6 @@
     <string name="creator_advanced_settings_title">Configuració avançada</string>
     <string name="creator_album_default">Àlbum</string>
     <string name="creator_album_elements_plural">%1$d elements</string>
-    <string name="creator_album_recents">Recents</string>
     <string name="creator_album_smart_favorites">Favorits</string>
     <string name="creator_album_smart_recently_added">Afegits recentment</string>
     <string name="creator_album_smart_screenshots">Captures de pantalla</string>
@@ -625,9 +623,7 @@
     <string name="data_export_estimated_completion">Estimat:</string>
     <string name="data_export_estimated_size">Mida estimada:</string>
     <string name="data_export_format_csv_description">Per a Excel/Fulls de càlcul</string>
-    <string name="data_export_format_csv_title">CSV</string>
     <string name="data_export_format_json_description">Llegible per màquines</string>
-    <string name="data_export_format_json_title">JSON</string>
     <string name="data_export_format_title">Format de Dades</string>
     <string name="data_export_interactions_description">M\'agrada, comentaris i reaccions</string>
     <string name="data_export_interactions_title">Interaccions</string>
@@ -711,7 +707,6 @@
     <string name="explore_moments_count">%1$d moments únics</string>
     <string name="explore_moments_title">Moments destacats</string>
     <string name="explore_private_profile_message">Aquest perfil és privat. Envia una sol·licitud de seguiment per veure el seu contingut.</string>
-    <string name="explore_recent_searches_type_hashtag">Hashtag</string>
     <string name="explore_recent_searches_type_location">Ubicació</string>
     <string name="explore_recent_searches_type_text">Cerca textual</string>
     <string name="explore_recent_searches_type_user">Usuari</string>
@@ -772,7 +767,6 @@
     <string name="hidden_layers_add_audio_cta">Afegeix àudio</string>
     <string name="hidden_layers_add_image">Imatge</string>
     <string name="hidden_layers_add_image_cta">Afegeix imatge</string>
-    <string name="hidden_layers_add_text">Text</string>
     <string name="hidden_layers_add_text_cta">Afegeix text</string>
     <string name="hidden_layers_audio_record">Gravar</string>
     <string name="hidden_layers_audio_stop">Aturar</string>
@@ -804,7 +798,6 @@
     <string name="hidden_layers_metrics_latest_people">Últimes persones</string>
     <string name="hidden_layers_metrics_latest_people_empty">Encara no hi ha activitat recent en aquesta capa.</string>
     <string name="hidden_layers_metrics_layer_audio">Àudio ocult</string>
-    <string name="hidden_layers_metrics_layer_image">Polaroid</string>
     <string name="hidden_layers_metrics_layer_text">Text ocult</string>
     <string name="hidden_layers_metrics_loading">Carregant l’activitat dels teus secrets…</string>
     <string name="hidden_layers_metrics_row_discoveries">%1$d descobriments</string>
@@ -1183,16 +1176,13 @@
     <string name="nova_attach_more_accessibility">Opcions de càmera</string>
     <string name="nova_attach_photos">Fotos</string>
     <string name="nova_attach_photos_permission">Permet l\'accés a les fotos a Configuració per triar imatges.</string>
-    <string name="nova_chat_encryption_notice">Messages are protected with end-to-end encryption. No one outside of this conversation can read them, not even Moments.</string>
     <string name="nova_confirm_active_hours_range">Horari: %1$s → %2$s</string>
     <string name="nova_confirm_approve">Confirmar</string>
     <string name="nova_confirm_audience_line">Audiència: %1$s</string>
     <string name="nova_confirm_awaiting">Esperant la teva confirmació…</string>
     <string name="nova_confirm_field_private_account">Compte privat</string>
     <string name="nova_confirm_field_show_admirers">Mostrar admiradors</string>
-    <string name="nova_confirm_field_show_followers">Show followers</string>
     <string name="nova_confirm_field_show_mutual_connections">Mostrar connexions mútues</string>
-    <string name="nova_confirm_field_show_mutuals">Show mutuals</string>
     <string name="nova_confirm_state_no">no</string>
     <string name="nova_confirm_state_yes">sí</string>
     <string name="nova_confirm_subtitle">Nova només farà això si ho aproves.</string>
@@ -1202,9 +1192,7 @@
     <string name="nova_easter_egg_primary_button">Increïble</string>
     <string name="nova_easter_egg_thanks_button">💝 Gràcies Álvaro</string>
     <string name="nova_easter_egg_title">Easter egg desbloquejat</string>
-    <string name="nova_error_generic">Something went wrong. Please try again.</string>
     <string name="nova_hello">Hola,</string>
-    <string name="nova_image_fallback_prompt">What\'s in this image?</string>
     <string name="nova_input_add_photo_accessibility">Afegir foto</string>
     <string name="nova_input_placeholder">Pregunta alguna cosa a Nova...</string>
     <string name="nova_input_send_accessibility">Enviar missatge</string>
@@ -1275,13 +1263,10 @@
     <string name="onboarding_title_step2">Personalitza el teu perfil</string>
     <string name="onboarding_title_step3">Així et veuran a Moments</string>
     <string name="online">En línia</string>
-    <string name="online_status_auto_change_away">10 min</string>
-    <string name="online_status_auto_change_offline">30 min</string>
     <string name="online_status_away">Absent</string>
     <string name="online_status_busy">Ocupat</string>
     <string name="online_status_days_ago">Fa %1$dd</string>
     <string name="online_status_hours_ago">Fa %1$dh</string>
-    <string name="online_status_invisible">Invisible</string>
     <string name="online_status_minutes_ago">Fa %1$d min</string>
     <string name="online_status_now">Ara</string>
     <string name="online_status_offline">Desconnectat</string>
@@ -1459,8 +1444,6 @@
     <string name="profile_saved_empty_title">Res Desat Encara</string>
     <string name="profile_saved_filter_all">Tot</string>
     <string name="profile_saved_filter_location">Ubicacio</string>
-    <string name="profile_saved_filter_text">Text</string>
-    <string name="profile_saved_filter_videos">Videos</string>
     <string name="profile_saved_open_all">Veure tot</string>
     <string name="profile_saved_recent">Recents</string>
     <string name="profile_stats_admirers">Seguidors</string>
@@ -1576,11 +1559,8 @@
     <string name="saved_moments_error_title">Error al carregar</string>
     <string name="saved_moments_filter_collection_all">Tots</string>
     <string name="saved_moments_filter_collection_location">Ubicacio</string>
-    <string name="saved_moments_filter_collection_multiple">Carousel</string>
-    <string name="saved_moments_filter_collection_text">Text</string>
     <string name="saved_moments_filter_media_all">Tot</string>
     <string name="saved_moments_filter_media_photos">Fotos</string>
-    <string name="saved_moments_filter_media_videos">Videos</string>
     <string name="saved_moments_in_collection">Guardats a la teva col·lecció</string>
     <string name="saved_moments_loading">Carregant moments guardats...</string>
     <string name="saved_moments_no_results_title">No hi ha resultats</string>
@@ -1699,7 +1679,6 @@
     <string name="settings_privacy_connections_hidden_count_singular">1 llista oculta</string>
     <string name="settings_privacy_control_description">Quan activis aquestes opcions, altres usuaris no podran veure aquestes llistes al teu perfil. Sempre podràs canviar aquestes configuracions.</string>
     <string name="settings_privacy_control_title">Control de Privadesa</string>
-    <string name="settings_privacy_hide_followers">Hide my followers</string>
     <string name="settings_privacy_hide_followers_description">Només tu podràs veure qui et segueix</string>
     <string name="settings_privacy_hide_following">Amagar la meva llista de seguits</string>
     <string name="settings_privacy_hide_following_description">Només tu podràs veure a qui segueixes</string>
@@ -1833,15 +1812,10 @@
     <string name="shared_activity_selection_reactions_delete_single">Eliminar reaccio</string>
     <string name="shared_activity_selection_tags_suppress">Suprimir</string>
     <string name="shared_activity_selection_tags_suppress_count">Suprimir (%1$d)</string>
-    <string name="shared_activity_subtitle">Check your activity with %1$s and manage your interactions.</string>
     <string name="shared_activity_tab_from_user">De %1$s</string>
     <string name="shared_activity_tab_your_comments">Els teus comentaris</string>
     <string name="shared_activity_tab_your_reactions">Les teves reaccions</string>
     <string name="shared_activity_tab_your_tags">Les teves etiquetes</string>
-    <string name="shared_activity_timeline_followed_you">%1$s started following you in %2$s</string>
-    <string name="shared_activity_timeline_you_followed">You started following %1$s in %2$s</string>
-    <string name="shared_activity_title">Shared activity</string>
-    <string name="shared_activity_you_and_user">You and %1$s</string>
     <string name="social_connections_categories_clear">Treure filtre</string>
     <string name="social_connections_categories_title">Categories</string>
     <string name="social_connections_category_least_interacted">Menys interacció</string>

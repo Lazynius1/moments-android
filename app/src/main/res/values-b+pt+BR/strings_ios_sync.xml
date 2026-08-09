@@ -40,7 +40,6 @@
     <string name="account_management_ok">OK</string>
     <string name="account_management_permanent_deletion">EXCLUSÃO PERMANENTE</string>
     <string name="account_management_profile_info">Seu perfil e informações pessoais</string>
-    <string name="account_management_required_text">DELETE MY ACCOUNT</string>
     <string name="account_management_saved_content">Arquivos e conteúdo salvo</string>
     <string name="account_management_section_title">Gerenciamento da conta</string>
     <string name="account_management_stories_moments">Todos os seus stories e momentos</string>
@@ -297,7 +296,6 @@
     <string name="chat_location_open_in_maps">Abrir no Mapas</string>
     <string name="chat_location_permission_needed">É necessária permissão de localização.</string>
     <string name="chat_location_share_live">Compartilhar localização ao vivo</string>
-    <string name="chat_media_download">Download</string>
     <string name="chat_menu_details">Configuracoes da conversa</string>
     <string name="chat_message_deleted">Esta mensagem foi excluída</string>
     <string name="chat_message_expired">Mensagem expirada</string>
@@ -443,7 +441,6 @@
     <string name="content_visibility_no_hidden_users_title">Você ainda não ocultou seu conteúdo de ninguém</string>
     <string name="content_visibility_post_audience_navigation">Público do post</string>
     <string name="content_visibility_posts_description">Controle quem pode ver seus posts</string>
-    <string name="content_visibility_posts_title">Posts</string>
     <string name="content_visibility_save">Salvar</string>
     <string name="content_visibility_search_results_section">Resultados da busca</string>
     <string name="content_visibility_stories_description">Controle quem pode ver seus stories</string>
@@ -625,9 +622,7 @@
     <string name="data_export_estimated_completion">Estimado:</string>
     <string name="data_export_estimated_size">Tamanho estimado:</string>
     <string name="data_export_format_csv_description">Para Excel/planilhas</string>
-    <string name="data_export_format_csv_title">CSV</string>
     <string name="data_export_format_json_description">Legível por máquina</string>
-    <string name="data_export_format_json_title">JSON</string>
     <string name="data_export_format_title">Formato dos dados</string>
     <string name="data_export_interactions_description">Curtidas, comentários e reações</string>
     <string name="data_export_interactions_title">Interações</string>
@@ -644,7 +639,6 @@
     <string name="data_export_pin_placeholder">PIN de 6 dígitos</string>
     <string name="data_export_pin_title">PIN de recuperação (opcional)</string>
     <string name="data_export_posts_description">Todos os seus posts, fotos e vídeos</string>
-    <string name="data_export_posts_title">Posts</string>
     <string name="data_export_privacy_bullet1">• Os dados serão enviados para o e-mail associado à sua conta</string>
     <string name="data_export_privacy_bullet2">• O link de download expirará em 7 dias</string>
     <string name="data_export_privacy_bullet3">• Você só pode fazer uma solicitação a cada 30 dias</string>
@@ -711,7 +705,6 @@
     <string name="explore_moments_count">%1$d momentos únicos</string>
     <string name="explore_moments_title">Momentos em destaque</string>
     <string name="explore_private_profile_message">Este perfil é privado. Envie uma solicitação para seguir e ver o conteúdo.</string>
-    <string name="explore_recent_searches_type_hashtag">Hashtag</string>
     <string name="explore_recent_searches_type_location">Localização</string>
     <string name="explore_recent_searches_type_text">Busca por texto</string>
     <string name="explore_recent_searches_type_user">Usuário</string>
@@ -804,7 +797,6 @@
     <string name="hidden_layers_metrics_latest_people">Pessoas mais recentes</string>
     <string name="hidden_layers_metrics_latest_people_empty">Ainda não há atividade recente nesta camada.</string>
     <string name="hidden_layers_metrics_layer_audio">Áudio oculto</string>
-    <string name="hidden_layers_metrics_layer_image">Polaroid</string>
     <string name="hidden_layers_metrics_layer_text">Texto oculto</string>
     <string name="hidden_layers_metrics_loading">Carregando atividade dos segredos...</string>
     <string name="hidden_layers_metrics_row_discoveries">%1$d descobertas</string>
@@ -1183,16 +1175,13 @@
     <string name="nova_attach_more_accessibility">Opções da câmera</string>
     <string name="nova_attach_photos">Fotos</string>
     <string name="nova_attach_photos_permission">Permita o acesso às fotos em Ajustes para escolher imagens.</string>
-    <string name="nova_chat_encryption_notice">Messages are protected with end-to-end encryption. No one outside of this conversation can read them, not even Moments.</string>
     <string name="nova_confirm_active_hours_range">Horário: %1$s -&gt; %2$s</string>
     <string name="nova_confirm_approve">Confirmar</string>
     <string name="nova_confirm_audience_line">Audiência: %1$s</string>
     <string name="nova_confirm_awaiting">Aguardando sua confirmação…</string>
     <string name="nova_confirm_field_private_account">Conta privada</string>
     <string name="nova_confirm_field_show_admirers">Mostrar admiradores</string>
-    <string name="nova_confirm_field_show_followers">Show followers</string>
     <string name="nova_confirm_field_show_mutual_connections">Mostrar conexões mútuas</string>
-    <string name="nova_confirm_field_show_mutuals">Show mutuals</string>
     <string name="nova_confirm_state_no">não</string>
     <string name="nova_confirm_state_yes">sim</string>
     <string name="nova_confirm_subtitle">A Nova só fará isso se você aprovar.</string>
@@ -1202,9 +1191,7 @@
     <string name="nova_easter_egg_primary_button">Incrível</string>
     <string name="nova_easter_egg_thanks_button">💝 Obrigado, Álvaro</string>
     <string name="nova_easter_egg_title">Easter egg desbloqueado</string>
-    <string name="nova_error_generic">Something went wrong. Please try again.</string>
     <string name="nova_hello">Olá,</string>
-    <string name="nova_image_fallback_prompt">What\'s in this image?</string>
     <string name="nova_input_add_photo_accessibility">Adicionar foto</string>
     <string name="nova_input_placeholder">Pergunte algo para a Nova...</string>
     <string name="nova_input_send_accessibility">Enviar mensagem</string>
@@ -1275,8 +1262,6 @@
     <string name="onboarding_title_step2">Personalize seu perfil</string>
     <string name="onboarding_title_step3">É assim que você vai aparecer no Moments</string>
     <string name="online">Online</string>
-    <string name="online_status_auto_change_away">10 min</string>
-    <string name="online_status_auto_change_offline">30 min</string>
     <string name="online_status_away">Ausente</string>
     <string name="online_status_busy">Ocupado</string>
     <string name="online_status_days_ago">há %1$dd</string>
@@ -1284,8 +1269,6 @@
     <string name="online_status_invisible">Invisível</string>
     <string name="online_status_minutes_ago">há %1$d min</string>
     <string name="online_status_now">Agora</string>
-    <string name="online_status_offline">Offline</string>
-    <string name="online_status_online">Online</string>
     <string name="online_status_unknown">Desconhecido</string>
     <string name="password_change_confirm_password">Confirmar nova senha</string>
     <string name="password_change_confirm_password_placeholder">Confirme sua nova senha</string>
@@ -1394,7 +1377,6 @@
     <string name="profile_editor_album_screenshots">Capturas de tela</string>
     <string name="profile_editor_album_select_title">Selecionar um álbum</string>
     <string name="profile_editor_allow_access">Permitir acesso</string>
-    <string name="profile_editor_bio">Bio</string>
     <string name="profile_editor_bio_placeholder">Conte algo sobre você...</string>
     <string name="profile_editor_cancel">Cancelar</string>
     <string name="profile_editor_category_albums">Álbuns</string>
@@ -1576,7 +1558,6 @@
     <string name="saved_moments_error_title">Erro ao carregar</string>
     <string name="saved_moments_filter_collection_all">Todos</string>
     <string name="saved_moments_filter_collection_location">Localização</string>
-    <string name="saved_moments_filter_collection_multiple">Carousel</string>
     <string name="saved_moments_filter_collection_text">Texto</string>
     <string name="saved_moments_filter_media_all">Todos</string>
     <string name="saved_moments_filter_media_photos">Fotos</string>
@@ -1670,7 +1651,6 @@
     <string name="settings_logout_alert_title">Sair?</string>
     <string name="settings_logout_button">Sair</string>
     <string name="settings_logout_confirm">Tem certeza de que deseja sair?</string>
-    <string name="settings_not_configured">Not set</string>
     <string name="settings_notifications">Notificações</string>
     <string name="settings_notifications_advanced_title">Configurações avançadas</string>
     <string name="settings_notifications_gentle_reminders_description">Pequenos lembretes para compartilhar algo de novo quando você tiver vontade.</string>
@@ -1701,7 +1681,6 @@
     <string name="settings_privacy_connections_hidden_count_singular">1 lista oculta</string>
     <string name="settings_privacy_control_description">Quando você ativa essas opções, outros usuários não poderão ver essas listas no seu perfil. Você pode mudar essas configurações quando quiser.</string>
     <string name="settings_privacy_control_title">Controle de privacidade</string>
-    <string name="settings_privacy_hide_followers">Hide my followers</string>
     <string name="settings_privacy_hide_followers_description">Só você pode ver quem te segue</string>
     <string name="settings_privacy_hide_following">Ocultar minha lista de seguindo</string>
     <string name="settings_privacy_hide_following_description">Só você pode ver quem você segue</string>
@@ -1763,7 +1742,6 @@
     <string name="settings_sections_privacy_policy">Política de Privacidade</string>
     <string name="settings_sections_push_notifications">Notificações push</string>
     <string name="settings_sections_push_notifications_subtitle">Posts, stories, comentários</string>
-    <string name="settings_sections_qr_code">QR Code</string>
     <string name="settings_sections_qr_code_subtitle">Compartilhe seu perfil</string>
     <string name="settings_sections_report_problem">Reportar um problema</string>
     <string name="settings_sections_report_problem_subtitle">Avise se algo não estiver funcionando</string>
@@ -1835,15 +1813,10 @@
     <string name="shared_activity_selection_reactions_delete_single">Excluir reacao</string>
     <string name="shared_activity_selection_tags_suppress">Suprimir</string>
     <string name="shared_activity_selection_tags_suppress_count">Suprimir (%1$d)</string>
-    <string name="shared_activity_subtitle">Check your activity with %1$s and manage your interactions.</string>
     <string name="shared_activity_tab_from_user">De %1$s</string>
     <string name="shared_activity_tab_your_comments">Seus comentários</string>
     <string name="shared_activity_tab_your_reactions">Suas reações</string>
     <string name="shared_activity_tab_your_tags">Suas marcações</string>
-    <string name="shared_activity_timeline_followed_you">%1$s started following you in %2$s</string>
-    <string name="shared_activity_timeline_you_followed">You started following %1$s in %2$s</string>
-    <string name="shared_activity_title">Shared activity</string>
-    <string name="shared_activity_you_and_user">You and %1$s</string>
     <string name="social_connections_categories_clear">Limpar filtro</string>
     <string name="social_connections_categories_title">Categorias</string>
     <string name="social_connections_category_least_interacted">Menos interagidos</string>

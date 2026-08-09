@@ -164,7 +164,6 @@
     <string name="blocked_users_close">Cerrar</string>
     <string name="camera_actions_cancel">Cancelar</string>
     <string name="camera_capture_photo">Foto</string>
-    <string name="camera_capture_video">Video</string>
     <string name="camera_ephemeral_delete_on_view">Se elimina al ver</string>
     <string name="camera_ephemeral_once_only">¡Solo una vez!</string>
     <string name="camera_mode_normal">FIJO</string>
@@ -216,7 +215,6 @@
     <string name="chat_gallery_selected_count">%1$d seleccionados</string>
     <string name="chat_gallery_tab_audio">Audios</string>
     <string name="chat_gallery_tab_docs">Docs</string>
-    <string name="chat_gallery_tab_media">Media</string>
     <string name="chat_gallery_title">Galería</string>
     <string name="chat_giphy_empty">Sin resultados</string>
     <string name="chat_giphy_recents">Recientes</string>
@@ -300,7 +298,6 @@
     <string name="chat_vanish_timer_7d">7 días</string>
     <string name="chat_vanish_timer_once_seen">Cuando todos los hayan visto</string>
     <string name="chat_view_once_auto_delete">Se borrará al cerrar</string>
-    <string name="chat_view_once_media">Media</string>
     <string name="chat_view_once_media_opened">Media visto</string>
     <string name="chat_view_once_photo">Foto</string>
     <string name="chat_view_once_photo_opened">Foto vista</string>
@@ -308,7 +305,6 @@
     <string name="chat_view_once_reply_placeholder">Enviar mensaje...</string>
     <string name="chat_view_once_reply_sent">Enviado</string>
     <string name="chat_view_once_tap_to_view">Toca para ver</string>
-    <string name="chat_view_once_video">Video</string>
     <string name="chat_view_once_video_opened">Video visto</string>
     <string name="chat_view_once_view_once">Ver una vez</string>
     <string name="chat_voice_record_accessibility">Grabar nota de voz</string>
@@ -339,7 +335,6 @@
     <string name="common_select_all">Seleccionar todo</string>
     <string name="common_text">Texto</string>
     <string name="common_user">Usuario</string>
-    <string name="common_video">Video</string>
     <string name="common_view_all">Ver todo</string>
     <string name="content_visibility_cancel">Cancelar</string>
     <string name="content_visibility_hide_content_navigation">Ocultar Contenido</string>
@@ -591,7 +586,6 @@
     <string name="hidden_layers_metrics_latest_people">Últimas personas</string>
     <string name="hidden_layers_metrics_latest_people_empty">Todavía no hay actividad reciente en esta capa.</string>
     <string name="hidden_layers_metrics_layer_audio">Audio oculto</string>
-    <string name="hidden_layers_metrics_layer_image">Polaroid</string>
     <string name="hidden_layers_metrics_layer_text">Texto oculto</string>
     <string name="hidden_layers_metrics_loading">Cargando actividad de tus secretos…</string>
     <string name="hidden_layers_metrics_row_discoveries">%1$d descubrimientos</string>
@@ -719,7 +713,6 @@
     <string name="message_requests_request_title">Solicitud de mensaje</string>
     <string name="message_requests_sent">Enviado %1$s</string>
     <string name="message_requests_title">Solicitudes de mensajes</string>
-    <string name="message_requests_video">Video</string>
     <string name="messages_count">%1$d</string>
     <string name="messaging_chat_empty_preview">Inicia un chat</string>
     <string name="messaging_conversation_not_found">Conversación no encontrada</string>
@@ -894,23 +887,6 @@
     <string name="nova_input_placeholder">Pregúntale algo a Nova...</string>
     <string name="nova_input_send_accessibility">Enviar mensaje</string>
     <string name="nova_introduction">Soy tu asistente personal inteligente. Puedo ayudarte a explorar tus intereses, sugerir conexiones o responder cualquier pregunta que tengas.</string>
-    <string name="nova_memory_clear_all">Borrar toda la memoria</string>
-    <string name="nova_memory_clear_all_confirm">¿Borrar toda la memoria?</string>
-    <string name="nova_memory_clear_all_message">Nova olvidará todo lo que sabe de ti. Esta acción no se puede deshacer.</string>
-    <string name="nova_memory_description">Gestiona lo que Nova sabe sobre ti</string>
-    <string name="nova_memory_edit_action">Editar</string>
-    <string name="nova_memory_edit_message">Ajusta este recuerdo para que Nova lo use mejor.</string>
-    <string name="nova_memory_edit_placeholder">Qué debería recordar Nova...</string>
-    <string name="nova_memory_edit_save">Guardar</string>
-    <string name="nova_memory_edit_title">Editar recuerdo</string>
-    <string name="nova_memory_empty">Nova aún no recuerda nada sobre ti</string>
-    <string name="nova_memory_empty_subtitle">Habla con Nova para que empiece a conocerte y recordarte.</string>
-    <string name="nova_memory_mark_important">Marcar como importante</string>
-    <string name="nova_memory_section_interest">Intereses</string>
-    <string name="nova_memory_section_preference">Preferencias</string>
-    <string name="nova_memory_section_professional">Trabajo/Estudios</string>
-    <string name="nova_memory_title">Memoria de Nova</string>
-    <string name="nova_memory_unmark_important">Quitar de importantes</string>
     <string name="nova_messages">mensajes</string>
     <string name="nova_name">Nova</string>
     <string name="nova_new_conversation">Nueva Conversación</string>
@@ -1096,7 +1072,6 @@
     <string name="profile_saved_filter_all">Todo</string>
     <string name="profile_saved_filter_location">Ubicacion</string>
     <string name="profile_saved_filter_text">Texto</string>
-    <string name="profile_saved_filter_videos">Videos</string>
     <string name="profile_saved_open_all">Ver todo</string>
     <string name="profile_saved_recent">Recientes</string>
     <string name="profile_stats_admirers">Seguidores</string>

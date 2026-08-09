@@ -210,7 +210,6 @@
     <string name="blocked_users_unknown_error">Si è verificato un errore sconosciuto</string>
     <string name="camera_actions_cancel">Annulla</string>
     <string name="camera_capture_photo">Foto</string>
-    <string name="camera_capture_video">Video</string>
     <string name="camera_ephemeral_delete_on_view">Si elimina alla visualizzazione</string>
     <string name="camera_ephemeral_once_only">Una sola volta!</string>
     <string name="camera_mode_normal">FISSO</string>
@@ -219,7 +218,6 @@
     <string name="camera_preview_send_ephemeral">Invia visualizzazione singola</string>
     <string name="chat_a11y_open_media">Tocca per aprire</string>
     <string name="chat_a11y_photo">Foto</string>
-    <string name="chat_a11y_video">Video</string>
     <string name="chat_action_edit">Modifica</string>
     <string name="chat_action_reply">Rispondi</string>
     <string name="chat_action_unstar">Rimuovi evidenziazione</string>
@@ -262,7 +260,6 @@
     <string name="chat_gallery_selected_count">%1$d selezionati</string>
     <string name="chat_gallery_tab_audio">Audio</string>
     <string name="chat_gallery_tab_docs">Documenti</string>
-    <string name="chat_gallery_tab_media">Media</string>
     <string name="chat_gallery_title">Galleria</string>
     <string name="chat_giphy_empty">Nessun risultato</string>
     <string name="chat_giphy_recents">Recenti</string>
@@ -297,7 +294,6 @@
     <string name="chat_location_open_in_maps">Apri in Mappe</string>
     <string name="chat_location_permission_needed">È necessaria l\'autorizzazione alla posizione.</string>
     <string name="chat_location_share_live">Condividi posizione in tempo reale</string>
-    <string name="chat_media_download">Download</string>
     <string name="chat_menu_details">Impostazioni della conversazione</string>
     <string name="chat_message_deleted">Questo messaggio è stato eliminato</string>
     <string name="chat_message_expired">Messaggio scaduto</string>
@@ -362,7 +358,6 @@
     <string name="chat_vanish_timer_7d">7 giorni</string>
     <string name="chat_vanish_timer_once_seen">Quando tutti li hanno visti</string>
     <string name="chat_view_once_auto_delete">Verrà eliminato alla chiusura</string>
-    <string name="chat_view_once_media">Media</string>
     <string name="chat_view_once_media_opened">Media visto</string>
     <string name="chat_view_once_photo">Foto</string>
     <string name="chat_view_once_photo_opened">Foto vista</string>
@@ -371,7 +366,6 @@
     <string name="chat_view_once_reply_sent">Inviato</string>
     <string name="chat_view_once_sent">Inviato</string>
     <string name="chat_view_once_tap_to_view">Tocca per vedere</string>
-    <string name="chat_view_once_video">Video</string>
     <string name="chat_view_once_video_opened">Video visto</string>
     <string name="chat_view_once_view_once">Visualizza una volta</string>
     <string name="chat_voice_record_accessibility">Registra messaggio vocale</string>
@@ -405,7 +399,6 @@
     <string name="common_text">Testo</string>
     <string name="common_understood">Capito</string>
     <string name="common_user">Utente</string>
-    <string name="common_video">Video</string>
     <string name="common_view_all">Vedi tutto</string>
     <string name="content_visibility_additional_restrictions">Restrizioni aggiuntive</string>
     <string name="content_visibility_audience_lists">Liste di pubblico</string>
@@ -541,7 +534,6 @@
     <string name="creator_add_text">Aggiungi testo</string>
     <string name="creator_advanced_settings">Impostazioni avanzate</string>
     <string name="creator_advanced_settings_title">Impostazioni avanzate</string>
-    <string name="creator_album_default">Album</string>
     <string name="creator_album_elements_plural">%1$d elementi</string>
     <string name="creator_album_recents">Recenti</string>
     <string name="creator_album_smart_favorites">Preferiti</string>
@@ -625,9 +617,7 @@
     <string name="data_export_estimated_completion">Stimato:</string>
     <string name="data_export_estimated_size">Dimensione stimata:</string>
     <string name="data_export_format_csv_description">Per Excel/Fogli di calcolo</string>
-    <string name="data_export_format_csv_title">CSV</string>
     <string name="data_export_format_json_description">Leggibile dalle macchine</string>
-    <string name="data_export_format_json_title">JSON</string>
     <string name="data_export_format_title">Formato dei dati</string>
     <string name="data_export_interactions_description">Mi piace, commenti e reazioni</string>
     <string name="data_export_interactions_title">Interazioni</string>
@@ -675,7 +665,6 @@
     <string name="data_export_user_not_authenticated">Utente non autenticato</string>
     <string name="data_export_what_includes_title">Cosa include il download?</string>
     <string name="deactivated_sleep_mode">Modalità pausa</string>
-    <string name="echo_info_privacy_title">Privacy</string>
     <string name="echo_participants_plural">%1$d persone</string>
     <string name="echo_participants_singular">%1$d persona</string>
     <string name="echo_status_active">Attivo</string>
@@ -711,7 +700,6 @@
     <string name="explore_moments_count">%1$d momenti unici</string>
     <string name="explore_moments_title">Momenti in evidenza</string>
     <string name="explore_private_profile_message">Questo profilo è privato. Invia una richiesta di follow per vedere i suoi contenuti.</string>
-    <string name="explore_recent_searches_type_hashtag">Hashtag</string>
     <string name="explore_recent_searches_type_location">Posizione</string>
     <string name="explore_recent_searches_type_text">Ricerca testuale</string>
     <string name="explore_recent_searches_type_user">Utente</string>
@@ -768,7 +756,6 @@
     <string name="follow_button_unfollow">Smetti di seguire</string>
     <string name="global_see_less">vedi meno</string>
     <string name="global_see_more">vedi altro</string>
-    <string name="hidden_layers_add_audio">Audio</string>
     <string name="hidden_layers_add_audio_cta">Aggiungi audio</string>
     <string name="hidden_layers_add_image">Immagine</string>
     <string name="hidden_layers_add_image_cta">Aggiungi immagine</string>
@@ -804,7 +791,6 @@
     <string name="hidden_layers_metrics_latest_people">Persone recenti</string>
     <string name="hidden_layers_metrics_latest_people_empty">Non c\'è ancora attività recente su questo livello.</string>
     <string name="hidden_layers_metrics_layer_audio">Audio nascosto</string>
-    <string name="hidden_layers_metrics_layer_image">Polaroid</string>
     <string name="hidden_layers_metrics_layer_text">Testo nascosto</string>
     <string name="hidden_layers_metrics_loading">Caricamento attività dei segreti…</string>
     <string name="hidden_layers_metrics_row_discoveries">%1$d scoperte</string>
@@ -976,7 +962,6 @@
     <string name="message_requests_request_title">Richiesta di messaggio</string>
     <string name="message_requests_sent">Inviato %1$s</string>
     <string name="message_requests_title">Richieste di messaggio</string>
-    <string name="message_requests_video">Video</string>
     <string name="messages_count">%1$d</string>
     <string name="messaging_chat_empty_preview">Inizia una chat</string>
     <string name="messaging_compose_placeholder">Scrivi un messaggio...</string>
@@ -1183,16 +1168,13 @@
     <string name="nova_attach_more_accessibility">Opzioni fotocamera</string>
     <string name="nova_attach_photos">Foto</string>
     <string name="nova_attach_photos_permission">Consenti l\'accesso alle foto in Impostazioni per selezionare immagini.</string>
-    <string name="nova_chat_encryption_notice">Messages are protected with end-to-end encryption. No one outside of this conversation can read them, not even Moments.</string>
     <string name="nova_confirm_active_hours_range">Orari: %1$s -&gt; %2$s</string>
     <string name="nova_confirm_approve">Conferma</string>
     <string name="nova_confirm_audience_line">Pubblico: %1$s</string>
     <string name="nova_confirm_awaiting">In attesa della tua conferma…</string>
     <string name="nova_confirm_field_private_account">Account privato</string>
     <string name="nova_confirm_field_show_admirers">Mostra ammiratori</string>
-    <string name="nova_confirm_field_show_followers">Show followers</string>
     <string name="nova_confirm_field_show_mutual_connections">Mostra connessioni reciproche</string>
-    <string name="nova_confirm_field_show_mutuals">Show mutuals</string>
     <string name="nova_confirm_state_no">no</string>
     <string name="nova_confirm_state_yes">sì</string>
     <string name="nova_confirm_subtitle">Nova farà questo solo se lo approvi.</string>
@@ -1202,9 +1184,7 @@
     <string name="nova_easter_egg_primary_button">Fantastico</string>
     <string name="nova_easter_egg_thanks_button">💝 Grazie, Álvaro</string>
     <string name="nova_easter_egg_title">Easter egg sbloccato</string>
-    <string name="nova_error_generic">Something went wrong. Please try again.</string>
     <string name="nova_hello">Ciao,</string>
-    <string name="nova_image_fallback_prompt">What\'s in this image?</string>
     <string name="nova_input_add_photo_accessibility">Aggiungi foto</string>
     <string name="nova_input_placeholder">Chiedi qualcosa a Nova...</string>
     <string name="nova_input_send_accessibility">Invia messaggio</string>
@@ -1275,8 +1255,6 @@
     <string name="onboarding_title_step2">Personalizza il profilo</string>
     <string name="onboarding_title_step3">Ecco come apparirai su Moments</string>
     <string name="online">Online</string>
-    <string name="online_status_auto_change_away">10 min</string>
-    <string name="online_status_auto_change_offline">30 min</string>
     <string name="online_status_away">Assente</string>
     <string name="online_status_busy">Occupato</string>
     <string name="online_status_days_ago">%1$d gg fa</string>
@@ -1284,8 +1262,6 @@
     <string name="online_status_invisible">Invisibile</string>
     <string name="online_status_minutes_ago">%1$d min fa</string>
     <string name="online_status_now">Adesso</string>
-    <string name="online_status_offline">Offline</string>
-    <string name="online_status_online">Online</string>
     <string name="online_status_unknown">Sconosciuto</string>
     <string name="password_change_confirm_password">Conferma nuova password</string>
     <string name="password_change_confirm_password_placeholder">Conferma la nuova password</string>
@@ -1655,7 +1631,6 @@
     <string name="settings_group_data">DATI</string>
     <string name="settings_group_identity">Identità e connessioni</string>
     <string name="settings_group_notifications">NOTIFICHE E PRESENZA</string>
-    <string name="settings_group_privacy">PRIVACY</string>
     <string name="settings_group_security">SICUREZZA</string>
     <string name="settings_group_support">SUPPORTO E LEGALE</string>
     <string name="settings_group_system">Sistema e supporto</string>
@@ -1701,7 +1676,6 @@
     <string name="settings_privacy_connections_hidden_count_singular">1 elenco nascosto</string>
     <string name="settings_privacy_control_description">Quando attivi queste opzioni, gli altri utenti non potranno vedere queste liste sul tuo profilo. Puoi sempre modificare queste impostazioni.</string>
     <string name="settings_privacy_control_title">Controllo privacy</string>
-    <string name="settings_privacy_hide_followers">Hide my followers</string>
     <string name="settings_privacy_hide_followers_description">Solo tu puoi vedere chi ti segue</string>
     <string name="settings_privacy_hide_following">Nascondi chi seguo</string>
     <string name="settings_privacy_hide_following_description">Solo tu puoi vedere chi segui</string>
@@ -1756,7 +1730,6 @@
     <string name="settings_sections_login_activity_subtitle">Controlla la tua attività recente</string>
     <string name="settings_sections_mute">Silenzia</string>
     <string name="settings_sections_mute_subtitle">Account, parole e frasi</string>
-    <string name="settings_sections_password">Password</string>
     <string name="settings_sections_password_subtitle">Cambia password</string>
     <string name="settings_sections_personal_info">Informazioni personali</string>
     <string name="settings_sections_personal_info_subtitle">Nome, telefono, email</string>
@@ -1835,15 +1808,10 @@
     <string name="shared_activity_selection_reactions_delete_single">Elimina reazione</string>
     <string name="shared_activity_selection_tags_suppress">Rimuovi</string>
     <string name="shared_activity_selection_tags_suppress_count">Rimuovi (%1$d)</string>
-    <string name="shared_activity_subtitle">Check your activity with %1$s and manage your interactions.</string>
     <string name="shared_activity_tab_from_user">Di %1$s</string>
     <string name="shared_activity_tab_your_comments">I tuoi commenti</string>
     <string name="shared_activity_tab_your_reactions">Le tue reazioni</string>
     <string name="shared_activity_tab_your_tags">I tuoi tag</string>
-    <string name="shared_activity_timeline_followed_you">%1$s started following you in %2$s</string>
-    <string name="shared_activity_timeline_you_followed">You started following %1$s in %2$s</string>
-    <string name="shared_activity_title">Shared activity</string>
-    <string name="shared_activity_you_and_user">You and %1$s</string>
     <string name="social_connections_categories_clear">Rimuovi filtro</string>
     <string name="social_connections_categories_title">Categorie</string>
     <string name="social_connections_category_least_interacted">Meno interagiti</string>

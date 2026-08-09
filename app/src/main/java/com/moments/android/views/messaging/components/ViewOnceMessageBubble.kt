@@ -67,12 +67,16 @@ fun ViewOnceMessageBubble(
     val uid = currentUserId ?: remember {
         FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
     }
-    // ≡ iOS replayAvailable / effectiveViewed
+    // ≡ iOS replayAvailable / effectiveViewed (+ hasBeenViewedBy: Compose no observa mutaciones in-place)
     val replayAvailable = message.allowReplay == true &&
         message.replayAvailableInCurrentChatSession &&
         !message.replayConsumedInCurrentChatSession &&
         !message.hasBeenReplayedBy(uid)
-    val effectiveViewed = message.isViewed || message.replayAvailableInCurrentChatSession
+    val mediaGone = message.mediaUrl.isNullOrBlank() && message.mediaObjectPath.isNullOrBlank()
+    val effectiveViewed = message.isViewed ||
+        message.hasBeenViewedBy(uid) ||
+        message.replayAvailableInCurrentChatSession ||
+        (mediaGone && message.viewedBy.orEmpty().isNotEmpty())
 
     if (isCurrentUser) {
         ViewOnceSentBubble(message = message, progress = progress, modifier = modifier)

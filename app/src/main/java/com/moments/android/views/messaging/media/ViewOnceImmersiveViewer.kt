@@ -51,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,9 +90,11 @@ import com.moments.android.views.creator.creatoruikit.creatorMomentsCaptureRect
 import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageType
+import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.messaging.services.ViewOnceConsumptionReason
 import com.moments.android.views.messaging.services.ViewOnceConsumptionService
 import com.moments.android.views.messaging.services.ViewOnceReplaySessionStore
+import com.moments.android.views.messaging.services.markViewOnceAsViewed
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.ScreenshotProtectionMode
@@ -102,6 +105,7 @@ import com.moments.android.views.story.storyviewer.StoryReactionsStrip
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -115,6 +119,7 @@ fun ViewOnceImmersiveViewer(
     onViewed: () -> Unit,
     isReplaySession: Boolean = false,
     onReplayConsumed: () -> Unit = {},
+    onMediaConsumed: () -> Unit = {},
     onSendReply: (String) -> Unit = {},
     onSendReaction: (String) -> Unit = {},
     onOpenCameraReply: () -> Unit = {},
@@ -123,6 +128,7 @@ fun ViewOnceImmersiveViewer(
 ) {
     val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
 
     var progress by remember { mutableFloatStateOf(0f) }
     var duration by remember { mutableFloatStateOf(5f) }
@@ -153,8 +159,8 @@ fun ViewOnceImmersiveViewer(
         didHandleDeletion = true
         // ≡ allowReplay && !isReplaySession → no consume (queda replay en sesión)
         if (message.allowReplay == true && !isReplaySession) return
+        val viewerId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
         if (isReplaySession) {
-            val viewerId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
             if (viewerId.isNotEmpty()) {
                 ViewOnceReplaySessionStore.markConsumed(message, viewerId)
                 if (!message.hasBeenReplayedBy(viewerId)) {
@@ -163,11 +169,25 @@ fun ViewOnceImmersiveViewer(
             }
             onReplayConsumed()
         }
-        ViewOnceConsumptionService.consume(
-            message.conversationId,
-            message.id,
-            if (isReplaySession) ViewOnceConsumptionReason.REPLAY else ViewOnceConsumptionReason.VIEW_ONCE,
-        ) { }
+        val reason = if (isReplaySession) {
+            ViewOnceConsumptionReason.REPLAY
+        } else {
+            ViewOnceConsumptionReason.VIEW_ONCE
+        }
+        // CF exige viewedBy/isViewed para replay; markViewed de la 1ª vista es async → await antes.
+        scope.launch(Dispatchers.IO) {
+            if (reason == ViewOnceConsumptionReason.REPLAY && viewerId.isNotEmpty()) {
+                ChatService.markViewOnceAsViewed(message.conversationId, message.id, viewerId)
+            }
+            val error = ViewOnceConsumptionService.consumeAwait(
+                message.conversationId,
+                message.id,
+                reason,
+            )
+            if (error == null) {
+                withContext(Dispatchers.Main.immediate) { onMediaConsumed() }
+            }
+        }
     }
 
     fun closeViewer() {

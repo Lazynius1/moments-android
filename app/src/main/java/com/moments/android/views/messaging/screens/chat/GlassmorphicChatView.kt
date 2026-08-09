@@ -378,6 +378,13 @@ fun GlassmorphicChatView(
                 markViewed = { conversationId, messageId, viewerId ->
                     kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                         ChatService.markViewOnceAsViewed(conversationId, messageId, viewerId)
+                            .onFailure {
+                                android.util.Log.e(
+                                    "ViewOnceConsume",
+                                    "markViewOnceAsViewed failed msg=$messageId",
+                                    it,
+                                )
+                            }
                     }
                 },
             ),
@@ -533,11 +540,24 @@ fun GlassmorphicChatView(
             val conversationId = session.conversationId
             if (conversationId.isNotBlank()) {
                 ViewOnceReplaySessionStore.drainAvailable(conversationId).forEach { pending ->
-                    ViewOnceConsumptionService.consume(
-                        pending.conversationId,
-                        pending.messageId,
-                        ViewOnceConsumptionReason.ABANDON_REPLAY,
-                    ) { }
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        // Misma carrera que replay: CF exige first view en Firestore.
+                        ChatService.markViewOnceAsViewed(
+                            pending.conversationId,
+                            pending.messageId,
+                            pending.viewerId,
+                        )
+                        val error = ViewOnceConsumptionService.consumeAwait(
+                            pending.conversationId,
+                            pending.messageId,
+                            ViewOnceConsumptionReason.ABANDON_REPLAY,
+                        )
+                        if (error == null) {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                                lifecycle.handleViewOnceMediaConsumed(pending.messageId)
+                            }
+                        }
+                    }
                 }
             }
             voice.resetVoiceRecordingInteraction()
@@ -1077,6 +1097,7 @@ fun GlassmorphicChatView(
             onViewed = { lifecycle.handleViewOnceViewerViewed(presentation) },
             isReplaySession = presentation.isReplaySession,
             onReplayConsumed = { lifecycle.handleViewOnceReplayConsumed(presentation) },
+            onMediaConsumed = { lifecycle.handleViewOnceMediaConsumed(presentation.message.id) },
             onSendReply = { session.sendTextMessage(it, presentation.message.id) },
             onSendReaction = { session.sendTextMessage(it, presentation.message.id) },
             onOpenCameraReply = { lifecycle.openCameraForReply(presentation.message.id) },

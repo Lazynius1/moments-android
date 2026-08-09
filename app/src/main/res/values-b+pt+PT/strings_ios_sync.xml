@@ -37,7 +37,6 @@
     <string name="account_management_identity_verified">Identidade verificada</string>
     <string name="account_management_irreversible">Esta ação é irreversível</string>
     <string name="account_management_notifications">Notificações e definições</string>
-    <string name="account_management_ok">OK</string>
     <string name="account_management_permanent_deletion">ELIMINAÇÃO PERMANENTE</string>
     <string name="account_management_profile_info">O teu perfil e informações pessoais</string>
     <string name="account_management_required_text">APAGAR A MINHA CONTA</string>
@@ -204,7 +203,6 @@
     <string name="blocked_users_empty">Não tens utilizadores bloqueados</string>
     <string name="blocked_users_error_title">Erro</string>
     <string name="blocked_users_not_authenticated">Utilizador não autenticado</string>
-    <string name="blocked_users_ok">OK</string>
     <string name="blocked_users_title">Utilizadores bloqueados</string>
     <string name="blocked_users_unblock">Desbloquear</string>
     <string name="blocked_users_unknown_error">Ocorreu um erro desconhecido</string>
@@ -297,7 +295,6 @@
     <string name="chat_location_open_in_maps">Abrir no Mapas</string>
     <string name="chat_location_permission_needed">É necessária permissão de localização.</string>
     <string name="chat_location_share_live">Partilhar localização em direto</string>
-    <string name="chat_media_download">Download</string>
     <string name="chat_menu_details">Definicoes da conversa</string>
     <string name="chat_message_deleted">Esta mensagem foi eliminada</string>
     <string name="chat_message_expired">Mensagem expirada</string>
@@ -625,9 +622,7 @@
     <string name="data_export_estimated_completion">Estimado:</string>
     <string name="data_export_estimated_size">Tamanho estimado:</string>
     <string name="data_export_format_csv_description">Para Excel/folhas de cálculo</string>
-    <string name="data_export_format_csv_title">CSV</string>
     <string name="data_export_format_json_description">Legível por máquina</string>
-    <string name="data_export_format_json_title">JSON</string>
     <string name="data_export_format_title">Formato dos dados</string>
     <string name="data_export_interactions_description">Gostos, comentários e reações</string>
     <string name="data_export_interactions_title">Interações</string>
@@ -637,7 +632,6 @@
     <string name="data_export_messages_description">Conversas e chats</string>
     <string name="data_export_messages_title">Mensagens</string>
     <string name="data_export_navigation_title">Transferir dados</string>
-    <string name="data_export_ok">OK</string>
     <string name="data_export_options_title">Opções de exportação</string>
     <string name="data_export_pin_description">As tuas conversas e chats da Nova estão encriptados de ponta a ponta. Introduz o teu PIN de recuperação para os incluir nesta exportação.</string>
     <string name="data_export_pin_incorrect">Esse PIN de recuperação não está correto.</string>
@@ -711,7 +705,6 @@
     <string name="explore_moments_count">%1$d Moments únicos</string>
     <string name="explore_moments_title">Moments em destaque</string>
     <string name="explore_private_profile_message">Este perfil é privado. Envia um pedido para seguir para veres o conteúdo.</string>
-    <string name="explore_recent_searches_type_hashtag">Hashtag</string>
     <string name="explore_recent_searches_type_location">Localização</string>
     <string name="explore_recent_searches_type_text">Busca por texto</string>
     <string name="explore_recent_searches_type_user">Usuário</string>
@@ -804,7 +797,6 @@
     <string name="hidden_layers_metrics_latest_people">Pessoas mais recentes</string>
     <string name="hidden_layers_metrics_latest_people_empty">Ainda não há atividade recente nesta camada.</string>
     <string name="hidden_layers_metrics_layer_audio">Áudio oculto</string>
-    <string name="hidden_layers_metrics_layer_image">Polaroid</string>
     <string name="hidden_layers_metrics_layer_text">Texto oculto</string>
     <string name="hidden_layers_metrics_loading">A carregar atividade dos segredos…</string>
     <string name="hidden_layers_metrics_row_discoveries">%1$d descobertas</string>
@@ -895,7 +887,6 @@
     <string name="login_activity_no_current_session">Ainda não foi registada nenhuma sessão atual neste dispositivo.</string>
     <string name="login_activity_no_other_sessions">Sem outras sessões ativas</string>
     <string name="login_activity_no_recent_activity">Sem atividade recente</string>
-    <string name="login_activity_ok">OK</string>
     <string name="login_activity_other_sessions">Outras sessões ativas</string>
     <string name="login_activity_recent_activity">Atividade recente</string>
     <string name="login_activity_security_tip1">Revê regularmente a tua atividade de início de sessão</string>
@@ -1183,16 +1174,13 @@
     <string name="nova_attach_more_accessibility">Opções da câmara</string>
     <string name="nova_attach_photos">Fotos</string>
     <string name="nova_attach_photos_permission">Permite o acesso às fotos em Definições para escolher imagens.</string>
-    <string name="nova_chat_encryption_notice">Messages are protected with end-to-end encryption. No one outside of this conversation can read them, not even Moments.</string>
     <string name="nova_confirm_active_hours_range">Horário: %1$s -&gt; %2$s</string>
     <string name="nova_confirm_approve">Confirmar</string>
     <string name="nova_confirm_audience_line">Audiência: %1$s</string>
     <string name="nova_confirm_awaiting">À espera da tua confirmação…</string>
     <string name="nova_confirm_field_private_account">Conta privada</string>
     <string name="nova_confirm_field_show_admirers">Mostrar admiradores</string>
-    <string name="nova_confirm_field_show_followers">Show followers</string>
     <string name="nova_confirm_field_show_mutual_connections">Mostrar ligações mútuas</string>
-    <string name="nova_confirm_field_show_mutuals">Show mutuals</string>
     <string name="nova_confirm_state_no">não</string>
     <string name="nova_confirm_state_yes">sim</string>
     <string name="nova_confirm_subtitle">A Nova só fará isto se aprovares.</string>
@@ -1202,9 +1190,7 @@
     <string name="nova_easter_egg_primary_button">Incrível</string>
     <string name="nova_easter_egg_thanks_button">💝 Obrigado Álvaro</string>
     <string name="nova_easter_egg_title">Easter egg desbloqueado</string>
-    <string name="nova_error_generic">Something went wrong. Please try again.</string>
     <string name="nova_hello">Olá,</string>
-    <string name="nova_image_fallback_prompt">What\'s in this image?</string>
     <string name="nova_input_add_photo_accessibility">Adicionar foto</string>
     <string name="nova_input_placeholder">Pergunta algo à Nova...</string>
     <string name="nova_input_send_accessibility">Enviar mensagem</string>
@@ -1275,8 +1261,6 @@
     <string name="onboarding_title_step2">Personaliza o teu perfil</string>
     <string name="onboarding_title_step3">É assim que vais aparecer no Moments</string>
     <string name="online">Online</string>
-    <string name="online_status_auto_change_away">10 min</string>
-    <string name="online_status_auto_change_offline">30 min</string>
     <string name="online_status_away">Ausente</string>
     <string name="online_status_busy">Ocupado</string>
     <string name="online_status_days_ago">há %1$dd</string>
@@ -1284,8 +1268,6 @@
     <string name="online_status_invisible">Invisível</string>
     <string name="online_status_minutes_ago">há %1$d min</string>
     <string name="online_status_now">Agora</string>
-    <string name="online_status_offline">Offline</string>
-    <string name="online_status_online">Online</string>
     <string name="online_status_unknown">Desconhecido</string>
     <string name="password_change_confirm_password">Confirmar nova palavra-passe</string>
     <string name="password_change_confirm_password_placeholder">Confirma a tua nova palavra-passe</string>
@@ -1683,7 +1665,6 @@
     <string name="settings_notifications_schedule_start">De</string>
     <string name="settings_notifications_schedule_title">Não incomodar</string>
     <string name="settings_notifications_types_title">Tipos de notificações</string>
-    <string name="settings_ok">OK</string>
     <string name="settings_online_status_change">Alterar estado</string>
     <string name="settings_online_status_current">Estado atual: %1$s</string>
     <string name="settings_online_status_info_auto">• O estado atualiza-se automaticamente</string>
@@ -1701,7 +1682,6 @@
     <string name="settings_privacy_connections_hidden_count_singular">1 lista oculta</string>
     <string name="settings_privacy_control_description">Quando ativares estas opções, os outros utilizadores não poderão ver estas listas no teu perfil. Podes sempre alterar estas definições.</string>
     <string name="settings_privacy_control_title">Controlo de privacidade</string>
-    <string name="settings_privacy_hide_followers">Hide my followers</string>
     <string name="settings_privacy_hide_followers_description">Só tu podes ver quem te segue</string>
     <string name="settings_privacy_hide_following">Ocultar a minha lista de seguidos</string>
     <string name="settings_privacy_hide_following_description">Só tu podes ver quem segues</string>
@@ -1835,15 +1815,10 @@
     <string name="shared_activity_selection_reactions_delete_single">Eliminar reacao</string>
     <string name="shared_activity_selection_tags_suppress">Suprimir</string>
     <string name="shared_activity_selection_tags_suppress_count">Suprimir (%1$d)</string>
-    <string name="shared_activity_subtitle">Check your activity with %1$s and manage your interactions.</string>
     <string name="shared_activity_tab_from_user">De %1$s</string>
     <string name="shared_activity_tab_your_comments">Os teus comentários</string>
     <string name="shared_activity_tab_your_reactions">As tuas reações</string>
     <string name="shared_activity_tab_your_tags">As tuas etiquetas</string>
-    <string name="shared_activity_timeline_followed_you">%1$s started following you in %2$s</string>
-    <string name="shared_activity_timeline_you_followed">You started following %1$s in %2$s</string>
-    <string name="shared_activity_title">Shared activity</string>
-    <string name="shared_activity_you_and_user">You and %1$s</string>
     <string name="social_connections_categories_clear">Remover filtro</string>
     <string name="social_connections_categories_title">Categorias</string>
     <string name="social_connections_category_least_interacted">Menos interagidos</string>

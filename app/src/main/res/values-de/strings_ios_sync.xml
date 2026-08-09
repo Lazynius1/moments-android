@@ -210,7 +210,6 @@
     <string name="blocked_users_unknown_error">Ein unbekannter Fehler ist aufgetreten</string>
     <string name="camera_actions_cancel">Abbrechen</string>
     <string name="camera_capture_photo">Foto</string>
-    <string name="camera_capture_video">Video</string>
     <string name="camera_ephemeral_delete_on_view">Wird nach dem Ansehen gelöscht</string>
     <string name="camera_ephemeral_once_only">Nur einmal!</string>
     <string name="camera_mode_normal">FIXIERT</string>
@@ -219,7 +218,6 @@
     <string name="camera_preview_send_ephemeral">Einmalansicht senden</string>
     <string name="chat_a11y_open_media">Zum Öffnen tippen</string>
     <string name="chat_a11y_photo">Foto</string>
-    <string name="chat_a11y_video">Video</string>
     <string name="chat_action_edit">Bearbeiten</string>
     <string name="chat_action_reply">Antworten</string>
     <string name="chat_action_unstar">Markierung entfernen</string>
@@ -297,7 +295,6 @@
     <string name="chat_location_open_in_maps">In Karten öffnen</string>
     <string name="chat_location_permission_needed">Standortberechtigung erforderlich.</string>
     <string name="chat_location_share_live">Live-Standort teilen</string>
-    <string name="chat_media_download">Download</string>
     <string name="chat_menu_details">Chat-Einstellungen</string>
     <string name="chat_message_deleted">Diese Nachricht wurde gelöscht</string>
     <string name="chat_message_expired">Nachricht abgelaufen</string>
@@ -371,7 +368,6 @@
     <string name="chat_view_once_reply_sent">Gesendet</string>
     <string name="chat_view_once_sent">Gesendet</string>
     <string name="chat_view_once_tap_to_view">Tippen zum Ansehen</string>
-    <string name="chat_view_once_video">Video</string>
     <string name="chat_view_once_video_opened">Video angesehen</string>
     <string name="chat_view_once_view_once">Einmal ansehen</string>
     <string name="chat_voice_record_accessibility">Sprachnachricht aufnehmen</string>
@@ -405,7 +401,6 @@
     <string name="common_text">Text</string>
     <string name="common_understood">Verstanden</string>
     <string name="common_user">Nutzer</string>
-    <string name="common_video">Video</string>
     <string name="common_view_all">Alle ansehen</string>
     <string name="content_visibility_additional_restrictions">Zusätzliche Einschränkungen</string>
     <string name="content_visibility_audience_lists">Zielgruppenlisten</string>
@@ -541,7 +536,6 @@
     <string name="creator_add_text">Text hinzufügen</string>
     <string name="creator_advanced_settings">Erweiterte Einstellungen</string>
     <string name="creator_advanced_settings_title">Erweiterte Einstellungen</string>
-    <string name="creator_album_default">Album</string>
     <string name="creator_album_elements_plural">%1$d Elemente</string>
     <string name="creator_album_recents">Zuletzt</string>
     <string name="creator_album_smart_favorites">Favoriten</string>
@@ -625,9 +619,7 @@
     <string name="data_export_estimated_completion">Voraussichtlich:</string>
     <string name="data_export_estimated_size">Geschätzte Größe:</string>
     <string name="data_export_format_csv_description">Für Excel/Tabellen</string>
-    <string name="data_export_format_csv_title">CSV</string>
     <string name="data_export_format_json_description">Maschinenlesbar</string>
-    <string name="data_export_format_json_title">JSON</string>
     <string name="data_export_format_title">Datenformat</string>
     <string name="data_export_interactions_description">Likes, Kommentare und Reaktionen</string>
     <string name="data_export_interactions_title">Interaktionen</string>
@@ -635,7 +627,6 @@
     <string name="data_export_media_only_size">Variiert je nach Fotos und Videos — kann in mehrere Dateien aufgeteilt werden</string>
     <string name="data_export_media_only_title">Nur Medien</string>
     <string name="data_export_messages_description">Unterhaltungen und Chats</string>
-    <string name="data_export_messages_title">Messages</string>
     <string name="data_export_navigation_title">Daten herunterladen</string>
     <string name="data_export_ok">OK</string>
     <string name="data_export_options_title">Exportoptionen</string>
@@ -711,7 +702,6 @@
     <string name="explore_moments_count">%1$d besondere Momente</string>
     <string name="explore_moments_title">Ausgewählte Momente</string>
     <string name="explore_private_profile_message">Dieses Profil ist privat. Sende eine Folgeanfrage, um die Inhalte zu sehen.</string>
-    <string name="explore_recent_searches_type_hashtag">Hashtag</string>
     <string name="explore_recent_searches_type_location">Ort</string>
     <string name="explore_recent_searches_type_text">Textsuche</string>
     <string name="explore_recent_searches_type_user">Nutzer</string>
@@ -768,11 +758,9 @@
     <string name="follow_button_unfollow">Nicht mehr folgen</string>
     <string name="global_see_less">weniger anzeigen</string>
     <string name="global_see_more">mehr anzeigen</string>
-    <string name="hidden_layers_add_audio">Audio</string>
     <string name="hidden_layers_add_audio_cta">Audio hinzufügen</string>
     <string name="hidden_layers_add_image">Bild</string>
     <string name="hidden_layers_add_image_cta">Bild hinzufügen</string>
-    <string name="hidden_layers_add_text">Text</string>
     <string name="hidden_layers_add_text_cta">Text hinzufügen</string>
     <string name="hidden_layers_audio_record">Aufnehmen</string>
     <string name="hidden_layers_audio_stop">Stopp</string>
@@ -976,7 +964,6 @@
     <string name="message_requests_request_title">Nachrichtenanfrage</string>
     <string name="message_requests_sent">Gesendet %1$s</string>
     <string name="message_requests_title">Nachrichtenanfragen</string>
-    <string name="message_requests_video">Video</string>
     <string name="messages_count">%1$d</string>
     <string name="messaging_chat_empty_preview">Chat starten</string>
     <string name="messaging_compose_placeholder">Schreibe eine Nachricht...</string>
@@ -1183,16 +1170,13 @@
     <string name="nova_attach_more_accessibility">Kameraoptionen</string>
     <string name="nova_attach_photos">Fotos</string>
     <string name="nova_attach_photos_permission">Erlaube in den Einstellungen den Zugriff auf Fotos, um Bilder auszuwählen.</string>
-    <string name="nova_chat_encryption_notice">Messages are protected with end-to-end encryption. No one outside of this conversation can read them, not even Moments.</string>
     <string name="nova_confirm_active_hours_range">Zeiten: %1$s -&gt; %2$s</string>
     <string name="nova_confirm_approve">Bestätigen</string>
     <string name="nova_confirm_audience_line">Sichtbarkeit: %1$s</string>
     <string name="nova_confirm_awaiting">Warte auf deine Bestätigung…</string>
     <string name="nova_confirm_field_private_account">Privates Konto</string>
     <string name="nova_confirm_field_show_admirers">Bewunderer anzeigen</string>
-    <string name="nova_confirm_field_show_followers">Show followers</string>
     <string name="nova_confirm_field_show_mutual_connections">Gemeinsame Verbindungen anzeigen</string>
-    <string name="nova_confirm_field_show_mutuals">Show mutuals</string>
     <string name="nova_confirm_state_no">nein</string>
     <string name="nova_confirm_state_yes">ja</string>
     <string name="nova_confirm_subtitle">Nova macht das nur, wenn du zustimmst.</string>
@@ -1202,9 +1186,7 @@
     <string name="nova_easter_egg_primary_button">Großartig</string>
     <string name="nova_easter_egg_thanks_button">💝 Danke, Álvaro</string>
     <string name="nova_easter_egg_title">Easter Egg freigeschaltet</string>
-    <string name="nova_error_generic">Something went wrong. Please try again.</string>
     <string name="nova_hello">Hallo,</string>
-    <string name="nova_image_fallback_prompt">What\'s in this image?</string>
     <string name="nova_input_add_photo_accessibility">Foto hinzufügen</string>
     <string name="nova_input_placeholder">Frag Nova etwas...</string>
     <string name="nova_input_send_accessibility">Nachricht senden</string>
@@ -1275,17 +1257,9 @@
     <string name="onboarding_title_step2">Profil personalisieren</string>
     <string name="onboarding_title_step3">So wirst du auf Moments erscheinen</string>
     <string name="online">Online</string>
-    <string name="online_status_auto_change_away">10 min</string>
-    <string name="online_status_auto_change_offline">30 min</string>
-    <string name="online_status_away">Away</string>
-    <string name="online_status_busy">Busy</string>
     <string name="online_status_days_ago">%1$dd ago</string>
     <string name="online_status_hours_ago">%1$dh ago</string>
-    <string name="online_status_invisible">Invisible</string>
     <string name="online_status_minutes_ago">%1$d min ago</string>
-    <string name="online_status_now">Now</string>
-    <string name="online_status_offline">Offline</string>
-    <string name="online_status_online">Online</string>
     <string name="online_status_unknown">Unbekannt</string>
     <string name="password_change_confirm_password">Neues Passwort bestätigen</string>
     <string name="password_change_confirm_password_placeholder">Bestätige dein neues Passwort</string>
@@ -1394,7 +1368,6 @@
     <string name="profile_editor_album_screenshots">Screenshots</string>
     <string name="profile_editor_album_select_title">Ein Album auswählen</string>
     <string name="profile_editor_allow_access">Zugriff erlauben</string>
-    <string name="profile_editor_bio">Bio</string>
     <string name="profile_editor_bio_placeholder">Erzähl uns etwas über dich...</string>
     <string name="profile_editor_cancel">Abbrechen</string>
     <string name="profile_editor_category_albums">Alben</string>
@@ -1437,7 +1410,6 @@
     <string name="profile_editor_uploading_photo">Profilfoto wird hochgeladen...</string>
     <string name="profile_editor_uploading_time">Das kann ein paar Sekunden dauern</string>
     <string name="profile_editor_username">Benutzername</string>
-    <string name="profile_editor_website">Website</string>
     <string name="profile_error_loading_image">Fehler beim Laden des Bildes</string>
     <string name="profile_error_title">Ups, etwas ist schiefgelaufen</string>
     <string name="profile_grid_preview_background_black">Schwarz</string>
@@ -1459,8 +1431,6 @@
     <string name="profile_saved_empty_title">Noch nichts gespeichert</string>
     <string name="profile_saved_filter_all">Alle</string>
     <string name="profile_saved_filter_location">Ort</string>
-    <string name="profile_saved_filter_text">Text</string>
-    <string name="profile_saved_filter_videos">Videos</string>
     <string name="profile_saved_open_all">Alle ansehen</string>
     <string name="profile_saved_recent">Zuletzt</string>
     <string name="profile_stats_admirers">Follower</string>
@@ -1576,11 +1546,8 @@
     <string name="saved_moments_error_title">Fehler beim Laden</string>
     <string name="saved_moments_filter_collection_all">Alle</string>
     <string name="saved_moments_filter_collection_location">Ort</string>
-    <string name="saved_moments_filter_collection_multiple">Carousel</string>
-    <string name="saved_moments_filter_collection_text">Text</string>
     <string name="saved_moments_filter_media_all">Alle</string>
     <string name="saved_moments_filter_media_photos">Fotos</string>
-    <string name="saved_moments_filter_media_videos">Videos</string>
     <string name="saved_moments_in_collection">In deiner Sammlung gespeichert</string>
     <string name="saved_moments_loading">Gespeicherte Momente werden geladen...</string>
     <string name="saved_moments_no_results_title">Keine Ergebnisse</string>
@@ -1647,10 +1614,8 @@
     <string name="settings_error_not_authenticated">Nutzer nicht authentifiziert</string>
     <string name="settings_error_title">Fehler</string>
     <string name="settings_error_unknown">Ein unbekannter Fehler ist aufgetreten</string>
-    <string name="settings_group_account">YOUR ACCOUNT</string>
     <string name="settings_group_activity">Inhalte &amp; Aktivität</string>
     <string name="settings_group_advanced">ERWEITERTE EINSTELLUNGEN</string>
-    <string name="settings_group_content">YOUR CONTENT &amp; ACTIVITY</string>
     <string name="settings_group_data">DATEN</string>
     <string name="settings_group_identity">Identität &amp; Vernetzung</string>
     <string name="settings_group_notifications">MITTEILUNGEN &amp; PRÄSENZ</string>
@@ -1669,7 +1634,6 @@
     <string name="settings_logout_alert_title">Abmelden?</string>
     <string name="settings_logout_button">Abmelden</string>
     <string name="settings_logout_confirm">Möchtest du dich wirklich abmelden?</string>
-    <string name="settings_not_configured">Not set</string>
     <string name="settings_notifications_advanced_title">Erweiterte Einstellungen</string>
     <string name="settings_notifications_gentle_reminders_description">Kleine Erinnerungen, wieder etwas zu teilen, wenn dir danach ist.</string>
     <string name="settings_notifications_gentle_reminders_title">Tägliche Erinnerungen</string>
@@ -1699,7 +1663,6 @@
     <string name="settings_privacy_connections_hidden_count_singular">1 ausgeblendete Liste</string>
     <string name="settings_privacy_control_description">Wenn du diese Optionen aktivierst, können andere Nutzer diese Listen in deinem Profil nicht sehen. Du kannst diese Einstellungen jederzeit ändern.</string>
     <string name="settings_privacy_control_title">Privatsphäre verwalten</string>
-    <string name="settings_privacy_hide_followers">Hide my followers</string>
     <string name="settings_privacy_hide_followers_description">Nur du kannst sehen, wer dir folgt</string>
     <string name="settings_privacy_hide_following">Wem ich folge verbergen</string>
     <string name="settings_privacy_hide_following_description">Nur du kannst sehen, wem du folgst</string>
@@ -1734,7 +1697,6 @@
     <string name="settings_sections_best_friends">Enge Freunde</string>
     <string name="settings_sections_best_friends_subtitle">Liste enger Freunde verwalten</string>
     <string name="settings_sections_blocked_accounts">Blockierte Konten</string>
-    <string name="settings_sections_blocked_accounts_subtitle">%1$d accounts</string>
     <string name="settings_sections_chat_storage">Chat-Speicher</string>
     <string name="settings_sections_chat_storage_subtitle">Medien-Cache und Download-Einstellungen</string>
     <string name="settings_sections_connections">Profil-Privatsphäre</string>
@@ -1745,7 +1707,6 @@
     <string name="settings_sections_download_data">Deine Daten herunterladen</string>
     <string name="settings_sections_download_data_subtitle">Eine Kopie deiner Daten anfordern</string>
     <string name="settings_sections_email_notifications">E-Mail-Benachrichtigungen</string>
-    <string name="settings_sections_email_notifications_subtitle">Activity summaries</string>
     <string name="settings_sections_help_center">Hilfecenter</string>
     <string name="settings_sections_help_center_subtitle">Antworten auf deine Fragen erhalten</string>
     <string name="settings_sections_highlighted_stories">Hervorgehobene Stories</string>
@@ -1764,12 +1725,10 @@
     <string name="settings_sections_qr_code">QR-Code</string>
     <string name="settings_sections_qr_code_subtitle">Teile dein Profil</string>
     <string name="settings_sections_report_problem">Problem melden</string>
-    <string name="settings_sections_report_problem_subtitle">Let us know if something isn\'t working</string>
     <string name="settings_sections_saved">Gespeichert</string>
     <string name="settings_sections_saved_subtitle">Momente, die du gespeichert hast</string>
     <string name="settings_sections_terms_of_use">Nutzungsbedingungen</string>
     <string name="settings_sections_your_activity">Deine Aktivität</string>
-    <string name="settings_sections_your_activity_subtitle">Time in app, interactions</string>
     <string name="settings_security_apple_id">Apple-ID</string>
     <string name="settings_security_apple_id_cannot_unlink_message">Das ist deine einzige Anmeldemethode. Füge zuerst eine echte E-Mail und ein Backup-Passwort hinzu.</string>
     <string name="settings_security_apple_id_cannot_unlink_title">Apple-ID kann nicht getrennt werden</string>
@@ -1833,15 +1792,10 @@
     <string name="shared_activity_selection_reactions_delete_single">Reaktion loeschen</string>
     <string name="shared_activity_selection_tags_suppress">Unterdruecken</string>
     <string name="shared_activity_selection_tags_suppress_count">Unterdruecken (%1$d)</string>
-    <string name="shared_activity_subtitle">Check your activity with %1$s and manage your interactions.</string>
     <string name="shared_activity_tab_from_user">Von %1$s</string>
     <string name="shared_activity_tab_your_comments">Deine Kommentare</string>
     <string name="shared_activity_tab_your_reactions">Deine Reaktionen</string>
     <string name="shared_activity_tab_your_tags">Deine Markierungen</string>
-    <string name="shared_activity_timeline_followed_you">%1$s started following you in %2$s</string>
-    <string name="shared_activity_timeline_you_followed">You started following %1$s in %2$s</string>
-    <string name="shared_activity_title">Shared activity</string>
-    <string name="shared_activity_you_and_user">You and %1$s</string>
     <string name="social_connections_categories_clear">Filter entfernen</string>
     <string name="social_connections_categories_title">Kategorien</string>
     <string name="social_connections_category_least_interacted">Wenigste Interaktion</string>
