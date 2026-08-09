@@ -1,5 +1,6 @@
 package com.moments.android.services.video
 
+import android.content.Context
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
@@ -20,6 +21,19 @@ object VideoAdaptivePlaybackConfig {
         VideoPlaybackTier.HIGH -> 5_000_000.0
     }
 }
+
+/**
+ * Factory única para feed/reels/pool: TrackSelector + LoadControl adaptativo (~2.5s).
+ * Evita ExoPlayer “pelados” que ignoran peak bitrate / buffer social.
+ */
+fun buildAdaptiveExoPlayer(
+    context: Context,
+    loadControl: DefaultLoadControl = VideoPlaybackSelector.createAdaptiveLoadControl(),
+): ExoPlayer =
+    ExoPlayer.Builder(context.applicationContext)
+        .setTrackSelector(DefaultTrackSelector(context.applicationContext))
+        .setLoadControl(loadControl)
+        .build()
 
 fun VideoPlaybackSelector.tierBelow(tier: VideoPlaybackTier): VideoPlaybackTier? = when (tier) {
     VideoPlaybackTier.HIGH -> VideoPlaybackTier.MEDIUM
@@ -118,10 +132,16 @@ class VideoAdaptiveTierController(
 }
 
 object VideoPlaybackRecovery {
+    /**
+     * Al bajar de tier: conserva posición, re-prepara y reanuda.
+     * [onTierDowngrade] se llama **antes** de setMediaItem para que la UI
+     * pueda mostrar de nuevo el poster (evitar flash negro).
+     */
     fun recoverFromStall(
         player: ExoPlayer,
         isPlaying: Boolean,
         adaptive: VideoAdaptiveTierController?,
+        onTierDowngrade: () -> Unit = {},
         onReplaceItem: (MediaItem) -> Unit,
     ) {
         if (!isPlaying) return
@@ -130,12 +150,17 @@ object VideoPlaybackRecovery {
 
         val newItem = adaptive?.handleStall()
         if (newItem != null) {
-            val resumeMs = player.currentPosition
+            val resumeMs = player.currentPosition.coerceAtLeast(0L)
+            val wasPlayWhenReady = player.playWhenReady || isPlaying
+            onTierDowngrade()
             onReplaceItem(newItem)
             player.setMediaItem(newItem)
             player.prepare()
-            player.seekTo(resumeMs)
-            player.play()
+            if (resumeMs > 0L) {
+                player.seekTo(resumeMs)
+            }
+            player.playWhenReady = wasPlayWhenReady
+            if (wasPlayWhenReady) player.play()
             return
         }
         player.play()

@@ -619,6 +619,7 @@ private fun FeedMediaItem.toMediaItem(): MediaItem = MediaItem(
     aspectRatio = aspectRatio,
     thumbnailUrl = thumbnailUrl,
     videoDuration = videoDuration,
+    videoVariants = videoVariants,
     tags = tags,
 )
 

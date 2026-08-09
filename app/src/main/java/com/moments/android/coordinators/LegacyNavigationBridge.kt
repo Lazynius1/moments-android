@@ -41,6 +41,10 @@ object LegacyNavigationBridge {
         AppRouter.navigate(AppRouter.Destination.ShowMessages)
     }
 
+    fun showNova() {
+        AppRouter.navigate(AppRouter.Destination.ShowNova)
+    }
+
     fun showNotifications() {
         AppRouter.navigate(AppRouter.Destination.ShowNotifications)
     }

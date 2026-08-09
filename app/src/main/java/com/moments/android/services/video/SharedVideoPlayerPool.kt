@@ -30,8 +30,9 @@ object SharedVideoPlayerPool {
             if (slots.isNotEmpty()) return
             repeat(POOL_SIZE) {
                 // iOS: AVPlayer() sin mute forzado — el caller (VideoPlayer) fija volume.
+                // Android: LoadControl + TrackSelector adaptativos (≡ MomentsVideoPlayer).
                 slots += Slot(
-                    player = ExoPlayer.Builder(context.applicationContext).build(),
+                    player = buildAdaptiveExoPlayer(context.applicationContext),
                 )
             }
         }

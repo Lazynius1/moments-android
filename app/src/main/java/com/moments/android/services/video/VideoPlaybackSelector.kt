@@ -109,11 +109,10 @@ object VideoPlaybackSelector {
             val n = normalizedUrlString(value) ?: return
             if (seen.add(n)) urls.add(n)
         }
+        // Siempre el tier elegido; low solo como fallback (nunca high si el tier es medium/low).
         append(primary)
-        if (variants != null) {
+        if (variants != null && tier != VideoPlaybackTier.LOW) {
             append(variants.url(VideoPlaybackTier.LOW))
-            if (tier != VideoPlaybackTier.LOW) append(variants.url(tier))
-            if (tier == VideoPlaybackTier.HIGH) append(variants.url(VideoPlaybackTier.HIGH))
         }
         return urls
     }

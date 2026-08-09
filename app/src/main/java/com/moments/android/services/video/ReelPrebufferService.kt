@@ -18,7 +18,7 @@ object ReelPrebufferService {
     fun initialize(context: Context) {
         if (warmPlayer != null) return
         appContext = context.applicationContext
-        warmPlayer = ExoPlayer.Builder(context.applicationContext).build().apply {
+        warmPlayer = buildAdaptiveExoPlayer(context.applicationContext).apply {
             volume = 0f
             playWhenReady = false
         }

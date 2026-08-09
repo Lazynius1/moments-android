@@ -60,10 +60,12 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import com.moments.android.R
+import com.moments.android.models.MediaItem
 import com.moments.android.services.content.FeedMediaItem
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.performance.VideoMomentsIndex
 import com.moments.android.services.video.GlobalVideoManager
+import com.moments.android.services.video.VideoPlaybackSelector
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.feed.FeedInk
 import com.moments.android.views.feed.video.FeedVideoPage
@@ -381,6 +383,13 @@ private fun CroppedVideoPlayer(
 ) {
     // iOS videoPosterURLString(for:) + item.thumbnailUrl fallback
     val posterUrl = GlobalVideoManager.videoPosterUrl(moment, item)
+        ?: item.thumbnailUrl
+        ?: moment.thumbnailUrl
+        ?: moment.imagePath
+    val domainMediaItem = remember(item) { item.toDomainMediaItem() }
+    val playbackUrl = remember(domainMediaItem) {
+        VideoPlaybackSelector.source(forItem = domainMediaItem)?.playbackUrl ?: item.url
+    }
     val totalDuration = item.videoDuration ?: moment.videoDuration
     // iOS mute overlay siempre si allowsVideoPlayback (código); comment dice hide immersive —
     // seguimos el código: visible cuando allowsVideoPlayback. FeedVideoPage hideMute en immersive
@@ -405,9 +414,10 @@ private fun CroppedVideoPlayer(
             usesBlurredFitLayout -> {
                 CarouselMediaBackdropView(item = item)
                 FeedVideoPage(
-                    url = item.url,
+                    url = playbackUrl,
                     thumbnailUrl = posterUrl,
                     consumerId = consumerId,
+                    mediaItem = domainMediaItem,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(vertical = 10.dp, horizontal = 6.dp),
@@ -432,9 +442,10 @@ private fun CroppedVideoPlayer(
             isReelsFormat -> {
                 // iOS: ModernVideoPlayer(allowsPauseInteraction: false) + clear Button(onTap)
                 FeedVideoPage(
-                    url = item.url,
+                    url = playbackUrl,
                     thumbnailUrl = posterUrl,
                     consumerId = consumerId,
+                    mediaItem = domainMediaItem,
                     modifier = Modifier.fillMaxSize(),
                     allowsPlayback = true,
                     allowsPauseInteraction = false,
@@ -496,9 +507,10 @@ private fun CroppedVideoPlayer(
             else -> {
                 // iOS horizontal videos branch
                 FeedVideoPage(
-                    url = item.url,
+                    url = playbackUrl,
                     thumbnailUrl = posterUrl,
                     consumerId = consumerId,
+                    mediaItem = domainMediaItem,
                     modifier = Modifier.fillMaxSize(),
                     allowsPlayback = true,
                     allowsPauseInteraction = true,
@@ -650,3 +662,15 @@ fun ModeratedMediaItemView(
         }
     }
 }
+
+/** FeedMediaItem → MediaItem de dominio (variants + poster) para adaptive playback. */
+private fun FeedMediaItem.toDomainMediaItem(): MediaItem = MediaItem(
+    id = id,
+    type = MediaItem.MediaType.from(type),
+    url = url,
+    aspectRatio = aspectRatio,
+    thumbnailUrl = thumbnailUrl,
+    videoDuration = videoDuration,
+    videoVariants = videoVariants,
+    tags = tags,
+)

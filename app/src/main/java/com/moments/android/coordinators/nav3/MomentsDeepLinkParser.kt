@@ -46,6 +46,7 @@ object MomentsDeepLinkParser {
                 // Username → requiere Firestore; TabBar DeepLinkHandler lo resuelve.
                 null
             host == "messages" -> MomentsNavKey.ShowMessages
+            host == "nova" -> MomentsNavKey.ShowNova
             host == "notifications" -> MomentsNavKey.ShowNotifications
             host == "stories" -> MomentsNavKey.ShowStories
             host == "echoes" || host == "echo" ->

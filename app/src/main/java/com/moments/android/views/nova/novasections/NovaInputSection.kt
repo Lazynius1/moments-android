@@ -92,13 +92,13 @@ object NovaInputBarLayout {
     val tabBarClearance: Dp = 74.dp
 
     fun bottomPadding(keyboardHeight: Dp, safeAreaBottom: Dp): Dp =
-        if (keyboardHeight > safeAreaBottom) {
+        if (keyboardHeight > 0.dp) {
             maxOf(
                 bottomPaddingWithoutKeyboard,
-                keyboardHeight - safeAreaBottom - tabBarClearance + bottomPaddingWithoutKeyboard,
+                keyboardHeight - safeAreaBottom + bottomPaddingWithoutKeyboard,
             )
         } else {
-            bottomPaddingWithoutKeyboard
+            safeAreaBottom + bottomPaddingWithoutKeyboard
         }
 
     fun attachmentSheetBottomInset(safeAreaBottom: Dp): Dp =
@@ -283,7 +283,7 @@ fun SmartSuggestionChips(
     agent: NovaAgent,
     @Suppress("UNUSED_PARAMETER") showSuggestedOptions: (Boolean) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         agent.welcomeSuggestions.forEach { suggestion ->
             val title = stringResource(suggestion.titleRes)
             val prompt = stringResource(suggestion.promptRes)
@@ -321,9 +321,9 @@ fun SmartSuggestionChip(
                 },
             )
             .clickable(onClick = action)
-            .padding(horizontal = 16.dp, vertical = if (isHero) 16.dp else 10.dp),
+            .padding(horizontal = 14.dp, vertical = if (isHero) 11.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(if (isHero) 12.dp else 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (isHero) 10.dp else 8.dp),
     ) {
         Icon(
             imageVector = suggestion.icon.iconVector(),

@@ -427,6 +427,8 @@ fun FeedVideoPage(
     allowsPauseInteraction: Boolean = true,
     showMute: Boolean = true,
     onTap: (() -> Unit)? = null,
+    mediaItem: MomentsMediaItem? = null,
+    moment: Moment? = null,
 ) {
     if (!allowsPlayback) {
         Box(modifier.fillMaxSize()) {
@@ -446,6 +448,8 @@ fun FeedVideoPage(
         chromeStyle = VideoPlaybackChromeStyle.SocialReels,
         allowsPauseInteraction = allowsPauseInteraction,
         posterUrl = thumbnailUrl,
+        mediaItem = mediaItem,
+        moment = moment,
         onExternalTap = onTap,
         showCroppedMuteButton = showMute,
     )
@@ -917,6 +921,9 @@ class VideoPlayerManager : RegisteredVideoPlayer {
             player = exo,
             isPlaying = isPlaying,
             adaptive = adaptiveController,
+            onTierDowngrade = {
+                isReadyToPlay = false
+            },
         ) { newItem ->
             activeItem = newItem
             VideoPlaybackSelector.configure(

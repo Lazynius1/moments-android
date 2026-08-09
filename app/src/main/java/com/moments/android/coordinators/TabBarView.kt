@@ -87,14 +87,14 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 
-/** Pestañas principales — paridad iOS AppTab (home=0, nova=1, create=2, explore=3, profile=4). */
+/** Pestañas principales — paridad iOS AppTab (home=0, messages=1, create=2, explore=3, profile=4). */
 enum class AppTab {
-    HOME, NOVA, CREATE, EXPLORE, PROFILE;
+    HOME, MESSAGES, CREATE, EXPLORE, PROFILE;
 
     companion object {
         fun fromIndex(index: Int): AppTab = when (index) {
             0 -> HOME
-            1 -> NOVA
+            1 -> MESSAGES
             2 -> CREATE
             3 -> EXPLORE
             4 -> PROFILE
@@ -103,7 +103,7 @@ enum class AppTab {
 
         fun toIndex(tab: AppTab): Int = when (tab) {
             HOME -> 0
-            NOVA -> 1
+            MESSAGES -> 1
             CREATE -> 2
             EXPLORE -> 3
             PROFILE -> 4
@@ -123,6 +123,7 @@ fun TabBarScreen(
     val mainViewModel = remember { MainViewModel.shared }
     val hasNewFeedContent by mainViewModel.hasNewFeedContent.collectAsState()
     val hasUnreadNotifications by mainViewModel.hasUnreadNotifications.collectAsState()
+    val unreadMessagesCount by com.moments.android.notifications.services.NotificationBadgeService.unreadMessagesCount.collectAsState()
 
     // Nav3 fase 2a/2b: back stacks por tab + DialogSceneStrategy overlays.
     val tabNavigationState = rememberMomentsTabNavigationState()
@@ -251,7 +252,9 @@ fun TabBarScreen(
                 CoordinatorNavigationEvent.OpenNotifications,
                 -> tabNavigator.push(MomentsNavKey.ShowNotifications)
                 is CoordinatorNavigationEvent.ShowMessages ->
-                    tabNavigator.push(MomentsNavKey.ShowMessages)
+                    tabNavigator.selectTab(MomentsTabNavKey.Messages)
+                is CoordinatorNavigationEvent.ShowNova ->
+                    tabNavigator.push(MomentsNavKey.ShowNova)
                 is CoordinatorNavigationEvent.ScrollFeedToTop -> Unit
                 is CoordinatorNavigationEvent.ReturnToFeedAfterMomentPublish -> {
                     tabNavigator.selectTab(MomentsTabNavKey.Feed)
@@ -323,6 +326,7 @@ fun TabBarScreen(
                             tabNavigator.push(MomentsNavKey.Creator)
                         },
                         showFeedBadge = hasNewFeedContent,
+                        showMessagesBadge = unreadMessagesCount > 0,
                         showProfileBadge = hasUnreadNotifications,
                     )
                 }
@@ -382,6 +386,7 @@ private fun MomentsCustomTabBar(
     onSelectTab: (Int) -> Unit,
     onOpenCreator: () -> Unit,
     showFeedBadge: Boolean,
+    showMessagesBadge: Boolean,
     showProfileBadge: Boolean,
 ) {
     val isDark = isSystemInDarkTheme()
@@ -424,11 +429,14 @@ private fun MomentsCustomTabBar(
                 )
                 TabBarItem(
                     icon = null,
-                    title = stringResource(R.string.tab_bar_nova),
+                    title = stringResource(R.string.messaging_title),
                     isSelected = selectedTab == 1,
                     activeColor = activeColor,
                     inactiveColor = inactiveColor,
-                    isNova = true,
+                    isMessages = true,
+                    showBadge = showMessagesBadge,
+                    // Fill + puntito IG cuando hay no leídos (outline si no).
+                    messagesFilled = showMessagesBadge,
                     onClick = { onSelectTab(1) },
                 )
                 CreateTabButton(
@@ -472,7 +480,8 @@ private fun RowScope.TabBarItem(
     isSelected: Boolean,
     activeColor: Color,
     inactiveColor: Color,
-    isNova: Boolean = false,
+    isMessages: Boolean = false,
+    messagesFilled: Boolean = false,
     showBadge: Boolean = false,
     onClick: () -> Unit,
 ) {
@@ -489,10 +498,11 @@ private fun RowScope.TabBarItem(
         contentAlignment = Alignment.Center,
     ) {
         Box {
-            if (isNova) {
-                NovaTabGlyph(
+            if (isMessages) {
+                MessagesTabGlyph(
                     size = 26.dp,
                     color = if (isSelected) activeColor else inactiveColor,
+                    filled = messagesFilled,
                 )
             } else if (icon != null) {
                 Icon(
@@ -505,8 +515,12 @@ private fun RowScope.TabBarItem(
             if (showBadge) {
                 Box(
                     Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = 4.dp, y = (-2).dp)
+                        // Mensajes: abajo-trailing (lejos de la punta). Home: top-trailing.
+                        .align(if (isMessages) Alignment.BottomEnd else Alignment.TopEnd)
+                        .offset(
+                            x = if (isMessages) 5.dp else 4.dp,
+                            y = if (isMessages) 3.dp else (-2).dp,
+                        )
                         .size(7.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFFF3B30)),
@@ -585,10 +599,16 @@ private fun RowScope.ProfileTabBarItem(
 }
 
 @Composable
-private fun NovaTabGlyph(size: androidx.compose.ui.unit.Dp, color: Color) {
-    // iOS NovaTabIcon (template) — tintamos el PNG importado de Assets.xcassets
+private fun MessagesTabGlyph(
+    size: androidx.compose.ui.unit.Dp,
+    color: Color,
+    filled: Boolean,
+) {
+    // Template PNG (~94% canvas) — outline / fill elegidos del set Codex.
     Image(
-        painter = painterResource(R.drawable.nova_tab_icon),
+        painter = painterResource(
+            if (filled) R.drawable.tab_paperplane_fill else R.drawable.tab_paperplane_outline,
+        ),
         contentDescription = null,
         modifier = Modifier.size(size),
         colorFilter = ColorFilter.tint(color),

@@ -117,7 +117,11 @@ import java.util.Date
 fun MessagingView(
     targetConversationId: String? = null,
     onTargetConversationIdConsumed: () -> Unit = {},
-    onDismiss: () -> Unit,
+    onDismiss: () -> Unit = {},
+    /** ≡ iOS `onDismiss == nil`: sin chevron; compose a la izquierda. */
+    embeddedInTab: Boolean = false,
+    /** ≡ iOS `momentsFloatingTabBarHidden` en GlassmorphicChatView. */
+    onSuppressTabBarChange: (Boolean) -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(0.dp),
     modifier: Modifier = Modifier,
 ) {
@@ -147,6 +151,15 @@ fun MessagingView(
     val outgoingPending by requestService.outgoingPendingRequests.collectAsState()
     val currentStatus by onlineStatusService.currentUserStatus.collectAsState()
     val pendingRequestCount = pendingRequests.size
+
+    // ≡ iOS: lista de conversaciones muestra tab bar; chat individual la oculta.
+    val suppressTabBar = viewModel.selectedConversation != null || pendingChatContext != null
+    LaunchedEffect(suppressTabBar) {
+        onSuppressTabBarChange(suppressTabBar)
+    }
+    DisposableEffect(Unit) {
+        onDispose { onSuppressTabBarChange(false) }
+    }
 
     LaunchedEffect(pendingRequestCount) {
         // ≡ MessagingView.updatePendingRequestCount → widget_pending_message_requests
@@ -330,6 +343,7 @@ fun MessagingView(
                 Column(Modifier.fillMaxSize()) {
                     MessagingToolbar(
                         onDismiss = onDismiss,
+                        embeddedInTab = embeddedInTab,
                         onCompose = { showingNewConversation = true },
                         onRequests = { showingRequests = true },
                         onStatus = { showingStatusSelector = true },
@@ -503,6 +517,7 @@ private fun MessagingDestinationHeader(title: String, onBack: () -> Unit) {
 @Composable
 private fun MessagingToolbar(
     onDismiss: () -> Unit,
+    embeddedInTab: Boolean = false,
     onCompose: () -> Unit,
     onRequests: () -> Unit,
     onStatus: () -> Unit,
@@ -518,8 +533,15 @@ private fun MessagingToolbar(
             .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onDismiss) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = colors.primary)
+        // ≡ iOS: tab → compose leading; overlay → chevron dismiss.
+        if (embeddedInTab) {
+            IconButton(onClick = onCompose) {
+                Icon(Icons.Filled.Create, stringResource(R.string.messaging_new_conversation), tint = colors.primary)
+            }
+        } else {
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = colors.primary)
+            }
         }
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -549,8 +571,10 @@ private fun MessagingToolbar(
                 Icon(Icons.Filled.KeyboardArrowDown, null, tint = colors.secondary, modifier = Modifier.size(10.dp))
             }
         }
-        IconButton(onClick = onCompose) {
-            Icon(Icons.Filled.Create, stringResource(R.string.messaging_new_conversation), tint = colors.primary)
+        if (!embeddedInTab) {
+            IconButton(onClick = onCompose) {
+                Icon(Icons.Filled.Create, stringResource(R.string.messaging_new_conversation), tint = colors.primary)
+            }
         }
         Box {
             IconButton(onClick = onRequests) {

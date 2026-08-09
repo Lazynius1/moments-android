@@ -306,12 +306,21 @@ fun ChatComposerChrome(
     val chatCanvas = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()).chatBackground.first()
     // Fondo opaco bajo el chrome + zona de nav/gesture. Sin esto, `navigationBarsPadding`
     // deja un hueco transparente y los mensajes se ven detrás de los botones Android.
+    // Teclado abierto: solo IME + 4.dp (evita corte en el borde del teclado). Cerrado: nav + 10.dp.
     val safeModifier = modifier
         .fillMaxWidth()
         .background(chatCanvas)
-        .navigationBarsPadding()
-        .imePadding()
-        .padding(bottom = 10.dp)
+        .then(
+            if (keyboardVisible) {
+                Modifier
+                    .imePadding()
+                    .padding(bottom = 4.dp)
+            } else {
+                Modifier
+                    .navigationBarsPadding()
+                    .padding(bottom = 10.dp)
+            },
+        )
     when {
         isOtherParticipantBlockedByCurrentUser -> BlockedByMeChatInputBar(onUnblock, safeModifier)
         isOtherParticipantUnavailable -> UnavailableChatInputBar(safeModifier)
@@ -390,7 +399,6 @@ fun ChatComposerChrome(
                 onFinishVoiceRecording = onFinishVoiceRecording,
                 onVoiceRecordingTrimChanged = onVoiceRecordingTrimChanged,
                 onLockChanged = onLockChanged,
-                modifier = if (keyboardVisible) Modifier.padding(bottom = 8.dp) else Modifier,
             )
         }
     }

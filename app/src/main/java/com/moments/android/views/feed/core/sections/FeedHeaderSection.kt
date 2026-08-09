@@ -102,7 +102,7 @@ fun FeedHeaderBar(
     onCreateStory: () -> Unit,
     onOpenStory: (FeedStoryUserState) -> Unit,
     onOpenActivity: () -> Unit,
-    onOpenMessages: () -> Unit,
+    onOpenNova: () -> Unit,
     onOpenEchoHistory: () -> Unit = {},
     onOpenEchoInvitation: (String) -> Unit = {},
     /** iOS `loadMoreRingUsersIfNeeded(visibleIndex:)` — índice en el tray completo (own = 0). */
@@ -111,7 +111,6 @@ fun FeedHeaderBar(
 ) {
     val headerBg = rememberAdaptiveColors().surfaceBackground
     val unreadNotifications by NotificationBadgeService.unreadNotificationsCount.collectAsState()
-    val unreadMessages by NotificationBadgeService.unreadMessagesCount.collectAsState()
     var echoMenuExpanded by remember { mutableStateOf(false) }
 
     // iOS: YourStory usa storyUsers.first si first.userId == currentUser
@@ -247,11 +246,8 @@ fun FeedHeaderBar(
                     onOpenActivity()
                 },
             )
-            ModernMessageButton(
-                hasMessage = unreadMessages > 0,
-                messageCount = unreadMessages,
-                onClick = onOpenMessages,
-            )
+            // Nova (antes mensajes): Mensajes vive en la tab bar — paridad iOS FeedHeaderBar.
+            ModernNovaButton(onClick = onOpenNova)
         }
     }
 }
@@ -266,7 +262,7 @@ fun FeedHeaderSection(
     onCreateStory: () -> Unit,
     onOpenStory: (FeedStoryUserState) -> Unit,
     onOpenActivity: () -> Unit,
-    onOpenMessages: () -> Unit,
+    onOpenNova: () -> Unit,
     modifier: Modifier = Modifier,
     pendingEchoes: List<Echo> = emptyList(),
     isLoadingMoreRing: Boolean = false,
@@ -285,7 +281,7 @@ fun FeedHeaderSection(
         onCreateStory = onCreateStory,
         onOpenStory = onOpenStory,
         onOpenActivity = onOpenActivity,
-        onOpenMessages = onOpenMessages,
+        onOpenNova = onOpenNova,
         onOpenEchoHistory = onOpenEchoHistory,
         onOpenEchoInvitation = onOpenEchoInvitation,
         onLoadMoreRing = onLoadMoreRing,

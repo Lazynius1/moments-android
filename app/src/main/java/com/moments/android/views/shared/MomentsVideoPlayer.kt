@@ -21,14 +21,13 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.moments.android.services.cache.VideoPreloader
 import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.services.video.VideoPlaybackSelector
+import com.moments.android.services.video.buildAdaptiveExoPlayer
 import com.moments.android.services.video.configure
-import com.moments.android.services.video.createAdaptiveLoadControl
 import com.moments.android.utilities.MomentsAudioSession
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -78,30 +77,27 @@ fun MomentsVideoPlayer(
     var pendingRecovery by remember(url) { mutableStateOf(false) }
 
     val player = remember(url, prioritizeSmoothPlayback) {
-        val loadControl = if (prioritizeSmoothPlayback) {
-            DefaultLoadControl.Builder()
+        val player = if (prioritizeSmoothPlayback) {
+            val loadControl = DefaultLoadControl.Builder()
                 .setBufferDurationsMs(8_000, 30_000, 1_500, 8_000)
                 .build()
+            buildAdaptiveExoPlayer(context, loadControl)
         } else {
-            VideoPlaybackSelector.createAdaptiveLoadControl()
+            buildAdaptiveExoPlayer(context)
         }
-        ExoPlayer.Builder(context)
-            .setTrackSelector(DefaultTrackSelector(context))
-            .setLoadControl(loadControl)
-            .build()
-            .apply {
-                repeatMode = if (isLooping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-                val mediaItem = VideoPreloader.getPlayerItem(url)
-                setMediaItem(mediaItem)
-                VideoPlaybackSelector.configure(
-                    this,
-                    tier = VideoPlaybackSelector.recommendedTier(),
-                )
-                prepare()
-                volume = if (isMuted) 0f else 1f
-                val autoplay = shouldAutoplay && (!respectsExternalPauseState || !isPaused)
-                playWhenReady = autoplay
-            }
+        player.apply {
+            repeatMode = if (isLooping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+            val mediaItem = VideoPreloader.getPlayerItem(url)
+            setMediaItem(mediaItem)
+            VideoPlaybackSelector.configure(
+                this,
+                tier = VideoPlaybackSelector.recommendedTier(),
+            )
+            prepare()
+            volume = if (isMuted) 0f else 1f
+            val autoplay = shouldAutoplay && (!respectsExternalPauseState || !isPaused)
+            playWhenReady = autoplay
+        }
     }
 
     DisposableEffect(player) {

@@ -27,6 +27,7 @@ sealed class CoordinatorNavigationEvent {
     data class NavigateToNotifications(val filter: String?) : CoordinatorNavigationEvent()
     data class ShowUserProfile(val userId: String) : CoordinatorNavigationEvent()
     data object ShowMessages : CoordinatorNavigationEvent()
+    data object ShowNova : CoordinatorNavigationEvent()
     data object ShowNotifications : CoordinatorNavigationEvent()
     /** Paridad iOS NotificationCenter `"OpenNotifications"`. */
     data object OpenNotifications : CoordinatorNavigationEvent()

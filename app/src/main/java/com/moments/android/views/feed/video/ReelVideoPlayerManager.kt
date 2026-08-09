@@ -250,6 +250,10 @@ class ReelVideoPlayerManager {
             player = exo,
             isPlaying = isPlaying,
             adaptive = adaptiveController,
+            onTierDowngrade = {
+                isLoaded = false
+                isBuffering = true
+            },
         ) { newItem ->
             playerItem = newItem
             teardownPlayerListener()

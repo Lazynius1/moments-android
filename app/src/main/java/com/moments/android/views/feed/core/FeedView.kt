@@ -660,9 +660,8 @@ fun FeedView(
                         // Solo TabBar host — no montar Dialog local en paralelo.
                         LegacyNavigationBridge.showNotifications()
                     },
-                    onOpenMessages = {
-                        // Lista general → TabBar. Conversación concreta sigue en Feed Dialog.
-                        LegacyNavigationBridge.showMessages()
+                    onOpenNova = {
+                        LegacyNavigationBridge.showNova()
                     },
                     onOpenEchoHistory = { showEchoHistory = true },
                     onOpenEchoInvitation = { echoId ->

@@ -100,7 +100,12 @@ class MomentsTabNavigator(val state: MomentsTabNavigationState) {
     fun openConversation(conversationId: String) {
         val id = conversationId.trim()
         if (id.isEmpty()) return
-        pushOnFeed(MomentsNavKey.Conversation(id))
+        // ≡ iOS: conversación sobre el tab Mensajes (no overlay del Feed).
+        selectTab(MomentsTabNavKey.Messages)
+        val stack = state.backStacks[MomentsTabNavKey.Messages] ?: return
+        val key = MomentsNavKey.Conversation(id)
+        if (stack.lastOrNull() == key) return
+        stack.add(key)
     }
 
     fun openStories(startAtUserId: String? = null) {
@@ -146,6 +151,15 @@ class MomentsTabNavigator(val state: MomentsTabNavigationState) {
         when (target) {
             MomentsNavKey.ScrollFeedToTop -> {
                 selectTab(MomentsTabNavKey.Feed)
+                return
+            }
+            MomentsNavKey.ShowMessages -> {
+                selectTab(MomentsTabNavKey.Messages)
+                return
+            }
+            MomentsNavKey.ShowNova -> {
+                selectTab(MomentsTabNavKey.Feed)
+                pushOnFeed(MomentsNavKey.ShowNova)
                 return
             }
             MomentsNavKey.OwnProfileTab -> {
@@ -262,7 +276,7 @@ fun rememberMomentsTabNavigationState(
 ): MomentsTabNavigationState {
     val topLevelRoute = remember { mutableStateOf(startRoute) }
     val feedStack = rememberNavBackStack(MomentsTabNavKey.Feed)
-    val novaStack = rememberNavBackStack(MomentsTabNavKey.Nova)
+    val messagesStack = rememberNavBackStack(MomentsTabNavKey.Messages)
     val exploreStack = rememberNavBackStack(MomentsTabNavKey.Explore)
     val profileStack = rememberNavBackStack(MomentsTabNavKey.Profile)
     return remember(startRoute) {
@@ -271,7 +285,7 @@ fun rememberMomentsTabNavigationState(
             topLevelRoute = topLevelRoute,
             backStacks = mapOf(
                 MomentsTabNavKey.Feed to feedStack,
-                MomentsTabNavKey.Nova to novaStack,
+                MomentsTabNavKey.Messages to messagesStack,
                 MomentsTabNavKey.Explore to exploreStack,
                 MomentsTabNavKey.Profile to profileStack,
             ),

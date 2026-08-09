@@ -162,7 +162,8 @@ private fun preloadUpcomingVideos(videos: List<VideoMoment>, index: Int) {
     VideoPreloader.preloadAssets(urls)
 
     val next = videos[index + 1]
-    val nextUrl = next.playbackUrl
+    // Misma URL de variant que usará el player al activar el reel.
+    val nextUrl = next.playbackUrl ?: next.preloadUrlStrings.firstOrNull()
     if (!nextUrl.isNullOrBlank()) {
         runCatching { ReelPrebufferService.prebuffer(nextUrl) }
     }

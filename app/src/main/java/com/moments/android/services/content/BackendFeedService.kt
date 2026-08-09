@@ -10,6 +10,7 @@ import com.moments.android.models.Moment
 import com.moments.android.models.StickerData
 import com.moments.android.models.Story
 import com.moments.android.models.StoryTextOverlayMetadata
+import com.moments.android.models.VideoVariants
 import com.moments.android.models.Point
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +38,8 @@ data class FeedMediaItem(
     val isHiddenByModeration: Boolean = false,
     val tags: List<com.moments.android.models.PhotoTag>? = null,
     val videoDuration: Double? = null,
+    /** Paridad iOS/CF `videoVariants` — low/medium/high MP4. */
+    val videoVariants: com.moments.android.models.VideoVariants? = null,
 ) {
     /** Paridad iOS `MediaItem.resolvedAspectRatioValue` (sin videoResolution en FeedMediaItem). */
     val resolvedAspectRatioValue: Float?
@@ -590,6 +593,13 @@ private fun JSONObject.toFeedMoment(): FeedMoment {
                         isHiddenByModeration = item.optString("moderationState") == "hidden",
                         tags = item.optJSONArray("tags")?.toPhotoTags(),
                         videoDuration = item.optDoubleOrNull("videoDuration"),
+                        videoVariants = item.optJSONObject("videoVariants")?.let { variants ->
+                            VideoVariants(
+                                low = variants.stringOrNull("low"),
+                                medium = variants.stringOrNull("medium"),
+                                high = variants.stringOrNull("high"),
+                            ).takeIf { it.low != null || it.medium != null || it.high != null }
+                        },
                     )
                 }
             }
@@ -666,6 +676,13 @@ private fun JSONObject.toMoment(): Moment {
                     videoDuration = item.optDoubleOrNull("videoDuration"),
                     videoFileSize = item.optLongOrNull("videoFileSize"),
                     videoResolution = item.stringOrNull("videoResolution"),
+                    videoVariants = item.optJSONObject("videoVariants")?.let { variants ->
+                        VideoVariants(
+                            low = variants.stringOrNull("low"),
+                            medium = variants.stringOrNull("medium"),
+                            high = variants.stringOrNull("high"),
+                        ).takeIf { it.low != null || it.medium != null || it.high != null }
+                    },
                     tags = item.optJSONArray("tags")?.toPhotoTags(),
                 )
             }

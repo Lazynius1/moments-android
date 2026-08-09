@@ -86,13 +86,19 @@ fun MomentsTabNavHost(
                     },
                 )
             }
-            MomentsTabNavKey.Nova -> NavEntry(key) {
+            MomentsTabNavKey.Messages -> NavEntry(key) {
+                // Solo bottom: el toolbar ya aplica statusBarsPadding (evitar doble hueco).
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .padding(padding),
+                        .padding(bottom = padding.calculateBottomPadding()),
                 ) {
-                    NovaView()
+                    // ≡ iOS tab MessagingView(onDismiss: nil) — sin chevron de cierre.
+                    MessagingView(
+                        onDismiss = {},
+                        embeddedInTab = true,
+                        onSuppressTabBarChange = onSuppressTabBarChange,
+                    )
                 }
             }
             MomentsTabNavKey.Explore -> NavEntry(key) {
@@ -146,10 +152,18 @@ fun MomentsTabNavHost(
                 }
             }
             MomentsNavKey.ShowMessages -> NavEntry(key, metadata = fullScreenDialog) {
-                Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
+                // Legacy overlay — preferir tab Messages; se mantiene por deep links antiguos.
+                Surface(modifier.fillMaxSize(), color = Color.Transparent) {
                     MessagingView(
                         onDismiss = { navigator.navigateUp() },
                     )
+                }
+            }
+            MomentsNavKey.ShowNova -> NavEntry(key, metadata = fullScreenDialog) {
+                Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
+                    // ≡ iOS navigationDestination(NovaView) — Back del sistema cierra.
+                    androidx.activity.compose.BackHandler { navigator.navigateUp() }
+                    NovaView()
                 }
             }
             is MomentsNavKey.Conversation -> NavEntry(key, metadata = fullScreenDialog) {

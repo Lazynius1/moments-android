@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * Rutas top-level del dock ≡ [com.moments.android.coordinators.AppTab]
- * (home=0, nova=1, create=2, explore=3, profile=4).
+ * (home=0, messages=1, create=2, explore=3, profile=4) — paridad iOS AppTab.
  *
  * Skill navigation-3 / multiple backstacks: cada tab navegable tiene su
  * [androidx.navigation3.runtime.NavBackStack] bajo NavDisplay.
@@ -20,8 +20,9 @@ sealed interface MomentsTabNavKey : NavKey {
         override val tabIndex: Int = 0
     }
 
+    /** Inbox de chats (antes Nova). Nova vive en el header del feed. */
     @Serializable
-    data object Nova : MomentsTabNavKey {
+    data object Messages : MomentsTabNavKey {
         override val tabIndex: Int = 1
     }
 
@@ -43,11 +44,11 @@ sealed interface MomentsTabNavKey : NavKey {
 
     companion object {
         /** Tabs con back stack Nav3 (Create = overlay). */
-        val navigableTabs: Set<MomentsTabNavKey> = setOf(Feed, Nova, Explore, Profile)
+        val navigableTabs: Set<MomentsTabNavKey> = setOf(Feed, Messages, Explore, Profile)
 
         fun fromTabIndex(index: Int): MomentsTabNavKey = when (index) {
             0 -> Feed
-            1 -> Nova
+            1 -> Messages
             2 -> Create
             3 -> Explore
             4 -> Profile

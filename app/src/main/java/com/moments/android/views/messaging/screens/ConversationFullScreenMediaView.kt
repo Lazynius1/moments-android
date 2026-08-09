@@ -326,6 +326,8 @@ fun ConversationFullScreenMediaView(
                                 videoUrl = item.originalUrl,
                                 isActive = active,
                                 primaryOverlay = primaryOverlay,
+                                // Expand nativo sale del FLAG_SECURE → solo media no protegida.
+                                allowExpand = !isScreenshotProtected(item),
                                 onExpand = {
                                     HapticManager.shared.lightImpact()
                                     expandedVideoUrl = item.originalUrl
@@ -434,13 +436,19 @@ fun ConversationFullScreenMediaView(
         )
     }
 
-    // ≡ iOS `showExpandedVideo` / ModalVideoPlayer
+    // ≡ iOS `showExpandedVideo` / ModalVideoPlayer — solo media no protegida.
     expandedVideoUrl?.let { url ->
-        NormalVideoPlayerView(
-            videoUrl = url,
-            onClose = { expandedVideoUrl = null },
-            modifier = Modifier.fillMaxSize(),
-        )
+        val protected = isScreenshotProtected(current)
+        if (protected) {
+            // No abrir expand fuera de FLAG_SECURE.
+            LaunchedEffect(url) { expandedVideoUrl = null }
+        } else {
+            NormalVideoPlayerView(
+                videoUrl = url,
+                onClose = { expandedVideoUrl = null },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 
@@ -453,6 +461,7 @@ private fun ConversationFullScreenVideoPage(
     videoUrl: String,
     isActive: Boolean,
     primaryOverlay: Color,
+    allowExpand: Boolean,
     onExpand: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -499,7 +508,7 @@ private fun ConversationFullScreenVideoPage(
             )
         }
 
-        // Mute + expand (arriba derecha)
+        // Mute + expand (arriba derecha). Expand solo si no es media protegida.
         Row(
             Modifier
                 .align(Alignment.TopEnd)
@@ -522,25 +531,27 @@ private fun ConversationFullScreenVideoPage(
                     modifier = Modifier.size(18.dp),
                 )
             }
-            Box(
-                Modifier
-                    .width(1.dp)
-                    .height(16.dp)
-                    .background(primaryOverlay.copy(alpha = 0.2f)),
-            )
-            IconButton(
-                onClick = {
-                    isPaused = true
-                    onExpand()
-                },
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    Icons.Default.Fullscreen,
-                    contentDescription = null,
-                    tint = primaryOverlay,
-                    modifier = Modifier.size(18.dp),
+            if (allowExpand) {
+                Box(
+                    Modifier
+                        .width(1.dp)
+                        .height(16.dp)
+                        .background(primaryOverlay.copy(alpha = 0.2f)),
                 )
+                IconButton(
+                    onClick = {
+                        isPaused = true
+                        onExpand()
+                    },
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Fullscreen,
+                        contentDescription = null,
+                        tint = primaryOverlay,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
 

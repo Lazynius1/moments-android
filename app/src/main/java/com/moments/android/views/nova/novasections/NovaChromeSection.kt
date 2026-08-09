@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -61,6 +63,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
@@ -282,98 +285,95 @@ fun ModernWelcomeSection(
     agent: NovaAgent,
     showSuggestedOptions: Boolean,
     onShowSuggestedOptionsChange: (Boolean) -> Unit = {},
+    /** Hueco bajo header + badge de encriptación (safeAreaTop incluido). */
+    topClearance: Dp = 132.dp,
+    /** Hueco sobre el input bar. */
+    bottomClearance: Dp = 88.dp,
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 24.dp)
+            .padding(top = topClearance, bottom = bottomClearance)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Spacer(Modifier.heightIn(min = 28.dp).weight(1f, fill = true))
+        Text(
+            text = stringResource(R.string.nova_welcome_eyebrow),
+            color = NovaColors.textSecondary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(NovaColors.materialBackground)
+                .border(1.dp, NovaColors.borderColor, CircleShape)
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+        )
 
         Column(
-            modifier = Modifier.widthIn(max = 380.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                text = stringResource(R.string.nova_welcome_eyebrow),
-                color = NovaColors.textSecondary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(NovaColors.materialBackground)
-                    .border(1.dp, NovaColors.borderColor, CircleShape)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                text = stringResource(R.string.nova_hello, agent.currentUserDisplayName),
+                color = NovaColors.textPrimary,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
             )
+            Text(
+                text = stringResource(R.string.nova_introduction),
+                color = NovaColors.textSecondary,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                lineHeight = 19.sp,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+        }
 
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+        Column(
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(NovaColors.materialBackground)
+                    .border(1.dp, NovaColors.borderColor, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = stringResource(R.string.nova_hello, agent.currentUserDisplayName),
-                    color = NovaColors.textPrimary,
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
+                Icon(
+                    imageVector = Icons.Default.Memory,
+                    contentDescription = null,
+                    tint = NovaColors.textSecondary,
+                    modifier = Modifier.size(14.dp),
                 )
                 Text(
-                    text = stringResource(R.string.nova_introduction),
+                    text = stringResource(R.string.nova_welcome_support),
                     color = NovaColors.textSecondary,
-                    fontSize = 16.sp,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 22.sp,
-                    modifier = Modifier.padding(horizontal = 8.dp),
+                    fontSize = 12.sp,
                 )
             }
 
-            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(NovaColors.materialBackground)
-                        .border(1.dp, NovaColors.borderColor, RoundedCornerShape(18.dp))
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Memory,
-                        contentDescription = null,
-                        tint = NovaColors.textSecondary,
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Text(
-                        text = stringResource(R.string.nova_welcome_support),
-                        color = NovaColors.textSecondary,
-                        fontSize = 13.sp,
-                    )
-                }
-
-                val interests = agent.userData?.interests.orEmpty()
-                if (interests.isNotEmpty()) {
-                    Text(
-                        text = interests.take(3).joinToString(" • "),
-                        color = NovaColors.textTertiary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-
-            if (showSuggestedOptions) {
-                SmartSuggestionChips(agent, onShowSuggestedOptionsChange)
+            val interests = agent.userData?.interests.orEmpty()
+            if (interests.isNotEmpty()) {
+                Text(
+                    text = interests.take(3).joinToString(" • "),
+                    color = NovaColors.textTertiary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                )
             }
         }
 
-        Spacer(Modifier.heightIn(min = 24.dp).weight(1f, fill = true))
+        if (showSuggestedOptions) {
+            SmartSuggestionChips(agent, onShowSuggestedOptionsChange)
+        }
     }
 }
 

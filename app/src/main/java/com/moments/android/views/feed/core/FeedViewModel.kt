@@ -950,6 +950,7 @@ class FeedViewModel {
                 aspectRatio = item.aspectRatio,
                 thumbnailUrl = item.thumbnailUrl,
                 videoDuration = item.videoDuration,
+                videoVariants = item.videoVariants,
                 tags = item.tags,
                 moderationState = if (item.isHiddenByModeration) {
                     MediaItem.ModerationState.HIDDEN
@@ -958,6 +959,9 @@ class FeedViewModel {
                 },
             )
         },
+        thumbnailUrl = thumbnailUrl,
+        imagePath = imagePath,
+        videoDuration = videoDuration,
     )
 
     /**
@@ -1012,6 +1016,7 @@ class FeedViewModel {
                 isHiddenByModeration = item.isHiddenByModeration,
                 tags = item.tags,
                 videoDuration = item.videoDuration,
+                videoVariants = item.videoVariants,
             )
         }
         return FeedMoment(

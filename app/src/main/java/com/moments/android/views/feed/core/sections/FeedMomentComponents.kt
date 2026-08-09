@@ -54,6 +54,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -345,6 +347,31 @@ fun ModernNotificationButton(
             contentDescription = stringResource(R.string.feed_activity),
             tint = if (hasNotification) Color.Red else colors.icon,
             modifier = Modifier.size(HeaderIconSize),
+        )
+    }
+}
+
+/** Port de botón Nova en FeedHeaderBar (antes ModernMessageButton). */
+@Composable
+fun ModernNovaButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = rememberFeedAdaptiveColors()
+    val interactionSource = remember { MutableInteractionSource() }
+    val label = stringResource(R.string.tab_bar_nova)
+
+    Box(
+        modifier
+            .size(HeaderIconHitSize)
+            .momentsPressIcon()
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        com.moments.android.views.nova.novacore.NovaBrandIcon(
+            size = HeaderIconSize,
+            color = colors.icon,
         )
     }
 }

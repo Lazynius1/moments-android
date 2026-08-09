@@ -28,6 +28,7 @@ object AppRouter {
         data class Echo(val echoId: String) : Destination()
         data class ShowUserProfile(val userId: String) : Destination()
         data object ShowMessages : Destination()
+        data object ShowNova : Destination()
         data object ShowNotifications : Destination()
         data object ShowProfileVisits : Destination()
         data object ShowStories : Destination()
@@ -117,7 +118,12 @@ object AppRouter {
                 NavigationEventBus.emit(CoordinatorNavigationEvent.ShowUserProfile(destination.userId))
             }
             Destination.ShowMessages -> {
-                NavigationEventBus.emit(CoordinatorNavigationEvent.ShowMessages)
+                // ≡ iOS selectedTab = messages
+                context.setSelectedTab(1)
+            }
+            Destination.ShowNova -> {
+                context.setSelectedTab(0)
+                NavigationEventBus.emit(CoordinatorNavigationEvent.ShowNova)
             }
             Destination.ShowNotifications -> {
                 NavigationEventBus.emit(CoordinatorNavigationEvent.ShowNotifications)
@@ -179,6 +185,7 @@ val AppRouter.Destination.legacyPendingNavigation: NotificationNavigationService
         is AppRouter.Destination.Echo -> NotificationNavigationService.PendingNavigation.Echo(echoId)
         is AppRouter.Destination.ShowUserProfile,
         AppRouter.Destination.ShowMessages,
+        AppRouter.Destination.ShowNova,
         AppRouter.Destination.ShowNotifications,
         AppRouter.Destination.ShowProfileVisits,
         AppRouter.Destination.ShowStories,

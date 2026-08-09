@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -175,6 +176,8 @@ private fun NovaSecureContent() {
                     agent = agent,
                     showSuggestedOptions = agent.showSuggestedOptions,
                     onShowSuggestedOptionsChange = agent::updateShowSuggestedOptions,
+                    topClearance = safeAreaTop + TopOverlayHeight + 12.dp,
+                    bottomClearance = BottomOverlayHeight + safeAreaBottom,
                 )
             } else {
                 val bottomPad = if (keyboardHeight > 0.dp) {
@@ -188,7 +191,7 @@ private fun NovaSecureContent() {
                     contentPadding = PaddingValues(
                         start = 20.dp,
                         end = 20.dp,
-                        top = TopOverlayHeight,
+                        top = safeAreaTop + TopOverlayHeight,
                         bottom = bottomPad,
                     ),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -230,12 +233,12 @@ private fun NovaSecureContent() {
                 modifier = Modifier.align(Alignment.TopCenter),
             )
 
-            // Header + encryption badge
+            // Header + encryption badge — debajo del status bar (edge-to-edge dialog).
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .padding(top = 2.dp),
+                    .padding(top = safeAreaTop + 2.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -248,15 +251,18 @@ private fun NovaSecureContent() {
                 NovaEncryptionBadge()
             }
 
-            // Input bar
+            // Input bar: cerrado = nav + 8; abierto = solo ime (pegado al teclado).
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(
-                        bottom = NovaInputBarLayout.bottomPadding(
-                            keyboardHeight = keyboardHeight,
-                            safeAreaBottom = safeAreaBottom,
-                        ),
+                    .then(
+                        if (keyboardHeight > 0.dp) {
+                            Modifier.windowInsetsPadding(WindowInsets.ime)
+                        } else {
+                            Modifier
+                                .windowInsetsPadding(WindowInsets.navigationBars)
+                                .padding(bottom = NovaInputBarLayout.bottomPaddingWithoutKeyboard)
+                        },
                     ),
             ) {
                 EnhancedInputBar(
@@ -270,7 +276,6 @@ private fun NovaSecureContent() {
                         }
                     },
                     onPlusBoundsChange = { plusButtonAnchor = it },
-                    modifier = if (keyboardHeight > safeAreaBottom) Modifier.padding(bottom = 8.dp) else Modifier,
                 )
             }
         }

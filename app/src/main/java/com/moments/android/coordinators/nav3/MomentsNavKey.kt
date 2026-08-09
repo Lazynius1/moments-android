@@ -50,6 +50,10 @@ sealed interface MomentsNavKey : NavKey {
     @Serializable
     data object ShowMessages : MomentsNavKey
 
+    /** Nova desde el header del feed (antes era tab 1). */
+    @Serializable
+    data object ShowNova : MomentsNavKey
+
     @Serializable
     data object ShowNotifications : MomentsNavKey
 
@@ -86,6 +90,7 @@ fun AppRouter.Destination.toMomentsNavKey(): MomentsNavKey = when (this) {
     is AppRouter.Destination.Echo -> MomentsNavKey.Echo(echoId)
     is AppRouter.Destination.ShowUserProfile -> MomentsNavKey.ShowUserProfile(userId)
     AppRouter.Destination.ShowMessages -> MomentsNavKey.ShowMessages
+    AppRouter.Destination.ShowNova -> MomentsNavKey.ShowNova
     AppRouter.Destination.ShowNotifications -> MomentsNavKey.ShowNotifications
     AppRouter.Destination.ShowProfileVisits -> MomentsNavKey.ShowProfileVisits
     AppRouter.Destination.ShowStories -> MomentsNavKey.ShowStories
@@ -109,6 +114,7 @@ fun MomentsNavKey.toAppRouterDestination(): AppRouter.Destination = when (this) 
     is MomentsNavKey.Echo -> AppRouter.Destination.Echo(echoId)
     is MomentsNavKey.ShowUserProfile -> AppRouter.Destination.ShowUserProfile(userId)
     MomentsNavKey.ShowMessages -> AppRouter.Destination.ShowMessages
+    MomentsNavKey.ShowNova -> AppRouter.Destination.ShowNova
     MomentsNavKey.ShowNotifications -> AppRouter.Destination.ShowNotifications
     MomentsNavKey.ShowProfileVisits -> AppRouter.Destination.ShowProfileVisits
     MomentsNavKey.ShowStories -> AppRouter.Destination.ShowStories

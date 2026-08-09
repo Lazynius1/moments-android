@@ -24,9 +24,10 @@ fun MomentsNavKey.deepLinkParent(): NavKey? = when (this) {
 
     is MomentsNavKey.Moment -> MomentsTabNavKey.Feed
 
-    /** Inbox debajo del Feed; la conversación encima del inbox. */
-    is MomentsNavKey.Conversation -> MomentsNavKey.ShowMessages
-    MomentsNavKey.ShowMessages -> MomentsTabNavKey.Feed
+    /** Conversación encima del tab Mensajes (paridad iOS). */
+    is MomentsNavKey.Conversation -> MomentsTabNavKey.Messages
+    MomentsNavKey.ShowMessages -> MomentsTabNavKey.Messages
+    MomentsNavKey.ShowNova -> MomentsTabNavKey.Feed
 
     MomentsNavKey.ShowNotifications,
     is MomentsNavKey.Notifications,
@@ -101,8 +102,9 @@ fun NavKey.toMomentsDeepLinkUri(): Uri? = when (this) {
     MomentsTabNavKey.Feed -> Uri.parse("moments://home")
     MomentsTabNavKey.Profile -> Uri.parse("moments://profile")
     MomentsTabNavKey.Explore -> Uri.parse("moments://explore")
-    MomentsTabNavKey.Nova -> Uri.parse("moments://nova")
+    MomentsTabNavKey.Messages -> Uri.parse("moments://messages")
     MomentsNavKey.ShowMessages -> Uri.parse("moments://messages")
+    MomentsNavKey.ShowNova -> Uri.parse("moments://nova")
     MomentsNavKey.ShowNotifications -> Uri.parse("moments://notifications")
     MomentsNavKey.ShowStories -> Uri.parse("moments://stories")
     is MomentsNavKey.Profile -> Uri.parse("moments://user/${userId}")
