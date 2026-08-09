@@ -132,11 +132,15 @@ class FirestoreService(
         refreshFollowingCacheIfStale()
         val cacheKey = "${currentUserId}_$targetUserId"
         followingCache[cacheKey]?.let { return it }
-        val snap = db.collection("users").document(currentUserId)
-            .collection("following").document(targetUserId).get().await()
-        val result = snap.exists()
-        followingCache[cacheKey] = result
-        return result
+        // iOS: getDocument { snapshot, error in if error != nil { completion(false) } }
+        // Offline sin soft-fail → RuntimeExecutionException al scrollear el feed.
+        return runCatching {
+            val snap = db.collection("users").document(currentUserId)
+                .collection("following").document(targetUserId).get().await()
+            val result = snap.exists()
+            followingCache[cacheKey] = result
+            result
+        }.getOrDefault(false)
     }
 
     /** True si `otherUserId` está en `users/{userId}/mutuals` (mantenida al follow mutuo). */

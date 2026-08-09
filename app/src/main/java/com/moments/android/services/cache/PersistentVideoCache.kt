@@ -1,6 +1,7 @@
 package com.moments.android.services.cache
 
 import android.content.Context
+import com.moments.android.services.network.NetworkMonitor
 import java.io.File
 import java.net.URL
 import java.security.MessageDigest
@@ -49,12 +50,18 @@ object PersistentVideoCache {
     fun downloadAndCache(url: URL) {
         val key = url.toString()
         if (cachedURL(key) != null) return
+        // iOS URLSession falla soft; aquí uncaught UnknownHostException mataba el proceso offline.
+        if (!NetworkMonitor.isConnected) return
         if (!activeDownloads.add(key)) return
         Thread {
             try {
                 val temp = File.createTempFile("video_", ".mp4", dir())
-                url.openStream().use { input -> temp.outputStream().use { input.copyTo(it) } }
-                saveToCache(temp, key)
+                runCatching {
+                    url.openStream().use { input -> temp.outputStream().use { input.copyTo(it) } }
+                    saveToCache(temp, key)
+                }.onFailure {
+                    temp.delete()
+                }
             } finally {
                 activeDownloads.remove(key)
             }

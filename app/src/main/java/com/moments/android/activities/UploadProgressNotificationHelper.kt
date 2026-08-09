@@ -9,17 +9,30 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.moments.android.MainActivity
 import com.moments.android.R
+import kotlin.random.Random
 
 /**
- * Equivalente Android de ActivityKit Live Activities para progreso de subida.
- * Usa una notificación ongoing con progreso determinado.
- * N/A: widget de Live Activity en pantalla de bloqueo/Dynamic Island (iOS only).
+ * Equivalente Android de ActivityKit Live Activities de subida
+ * (MomentUploadLiveActivity / GlowsyWidgetExtensionLiveActivity).
+ *
+ * Sin glass / Dynamic Island custom: Live Updates del sistema.
+ * - API 36+: ProgressStyle + promoted ongoing + largeIcon (miniatura)
+ * - &lt; 36: barra de progreso classic
+ *
+ * Diseño iOS → Android: thumb + título + % (teal marca) / emoji al completar.
  */
 object UploadProgressNotificationHelper {
-    private const val CHANNEL_ID = "moments_upload_progress"
+    // Canal nuevo: el anterior `moments_upload_progress` quedó en IMPORTANCE_LOW y OEMs
+    // (p.ej. Oppo) lo marcan unimportant → no se ve Live Update / banner.
+    private const val CHANNEL_ID = "moments_upload_live_v2"
     private const val CHANNEL_NAME = "Upload progress"
+    private const val LEGACY_CHANNEL_ID = "moments_upload_progress"
+    private const val LIVE_UPDATE_API = 36
+
+    private val completionEmojis = listOf("😊", "😄", "✨", "🎉", "👍", "💫", "❤️", "🥳", "😎", "🔥")
 
     fun showMomentUpload(
         context: Context,
@@ -28,21 +41,27 @@ object UploadProgressNotificationHelper {
     ) {
         ensureChannel(context)
         val preview = attributes.previewImageFileName?.let { LiveActivityThumbnailStore.load(context, it) }
+        val ongoing = state.status != MomentUploadActivityAttributes.ContentState.STATUS_COMPLETED &&
+            state.status != MomentUploadActivityAttributes.ContentState.STATUS_FAILED
+        val completedEmoji = if (state.status == MomentUploadActivityAttributes.ContentState.STATUS_COMPLETED) {
+            completionEmojis[Random.nextInt(completionEmojis.size)]
+        } else {
+            null
+        }
         val notification = buildNotification(
             context = context,
             notificationId = momentNotificationId(attributes.momentId),
             title = context.getString(R.string.upload_progress_moment_title),
-            body = uploadStatusText(context, state.status, state.percentage),
+            body = uploadStatusText(context, state.status, state.percentage, completedEmoji),
             progress = state.percentage,
             indeterminate = state.status == MomentUploadActivityAttributes.ContentState.STATUS_PROCESSING,
             largeIcon = preview,
-            ongoing = state.status != MomentUploadActivityAttributes.ContentState.STATUS_COMPLETED &&
-                state.status != MomentUploadActivityAttributes.ContentState.STATUS_FAILED,
+            ongoing = ongoing,
+            chipText = chipText(context, state.status, state.percentage, completedEmoji),
+            completed = state.status == MomentUploadActivityAttributes.ContentState.STATUS_COMPLETED,
         )
         notify(context, momentNotificationId(attributes.momentId), notification)
-        if (state.status == MomentUploadActivityAttributes.ContentState.STATUS_COMPLETED ||
-            state.status == MomentUploadActivityAttributes.ContentState.STATUS_FAILED
-        ) {
+        if (!ongoing) {
             attributes.previewImageFileName?.let { LiveActivityThumbnailStore.remove(context, attributes.momentId) }
         }
     }
@@ -54,21 +73,27 @@ object UploadProgressNotificationHelper {
     ) {
         ensureChannel(context)
         val preview = attributes.previewImageFileName?.let { LiveActivityThumbnailStore.load(context, it) }
+        val ongoing = state.status != StoryUploadActivityAttributes.ContentState.STATUS_COMPLETED &&
+            state.status != StoryUploadActivityAttributes.ContentState.STATUS_FAILED
+        val completedEmoji = if (state.status == StoryUploadActivityAttributes.ContentState.STATUS_COMPLETED) {
+            completionEmojis[Random.nextInt(completionEmojis.size)]
+        } else {
+            null
+        }
         val notification = buildNotification(
             context = context,
             notificationId = storyNotificationId(attributes.storyId),
             title = context.getString(R.string.upload_progress_story_title),
-            body = uploadStatusText(context, state.status, state.percentage),
+            body = uploadStatusText(context, state.status, state.percentage, completedEmoji),
             progress = state.percentage,
             indeterminate = state.status == StoryUploadActivityAttributes.ContentState.STATUS_PROCESSING,
             largeIcon = preview,
-            ongoing = state.status != StoryUploadActivityAttributes.ContentState.STATUS_COMPLETED &&
-                state.status != StoryUploadActivityAttributes.ContentState.STATUS_FAILED,
+            ongoing = ongoing,
+            chipText = chipText(context, state.status, state.percentage, completedEmoji),
+            completed = state.status == StoryUploadActivityAttributes.ContentState.STATUS_COMPLETED,
         )
         notify(context, storyNotificationId(attributes.storyId), notification)
-        if (state.status == StoryUploadActivityAttributes.ContentState.STATUS_COMPLETED ||
-            state.status == StoryUploadActivityAttributes.ContentState.STATUS_FAILED
-        ) {
+        if (!ongoing) {
             attributes.previewImageFileName?.let { LiveActivityThumbnailStore.remove(context, attributes.storyId) }
         }
     }
@@ -86,25 +111,64 @@ object UploadProgressNotificationHelper {
     private fun momentNotificationId(momentId: String): Int = "moment_upload_$momentId".hashCode()
     private fun storyNotificationId(storyId: String): Int = "story_upload_$storyId".hashCode()
 
-    private fun uploadStatusText(context: Context, status: String, percentage: Int): String = when (status) {
+    private fun uploadStatusText(
+        context: Context,
+        status: String,
+        percentage: Int,
+        completedEmoji: String?,
+    ): String = when (status) {
         MomentUploadActivityAttributes.ContentState.STATUS_UPLOADING ->
             context.getString(R.string.upload_progress_status_uploading, percentage)
         MomentUploadActivityAttributes.ContentState.STATUS_PROCESSING ->
             context.getString(R.string.upload_progress_status_processing)
         MomentUploadActivityAttributes.ContentState.STATUS_COMPLETED ->
-            context.getString(R.string.upload_progress_status_completed)
+            listOfNotNull(
+                completedEmoji,
+                context.getString(R.string.upload_progress_status_completed),
+            ).joinToString(" ")
         MomentUploadActivityAttributes.ContentState.STATUS_FAILED ->
             context.getString(R.string.upload_progress_status_failed)
         else -> context.getString(R.string.upload_progress_status_uploading, percentage)
     }
 
+    /** Chip status bar ≡ compact trailing iOS (`42%` / emoji). */
+    private fun chipText(
+        context: Context,
+        status: String,
+        percentage: Int,
+        completedEmoji: String?,
+    ): String = when (status) {
+        MomentUploadActivityAttributes.ContentState.STATUS_PROCESSING ->
+            context.getString(R.string.upload_progress_status_processing)
+        MomentUploadActivityAttributes.ContentState.STATUS_COMPLETED ->
+            completedEmoji ?: context.getString(R.string.upload_progress_status_completed)
+        MomentUploadActivityAttributes.ContentState.STATUS_FAILED ->
+            context.getString(R.string.upload_progress_status_failed)
+        else -> "${percentage.coerceIn(0, 100)}%"
+    }
+
     private fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (manager.getNotificationChannel(CHANNEL_ID) != null) return
+        // Limpiar canal legacy silenciado.
+        if (manager.getNotificationChannel(LEGACY_CHANNEL_ID) != null) {
+            manager.deleteNotificationChannel(LEGACY_CHANNEL_ID)
+        }
+        val existing = manager.getNotificationChannel(CHANNEL_ID)
+        if (existing != null) {
+            if (existing.importance < NotificationManager.IMPORTANCE_DEFAULT) {
+                manager.deleteNotificationChannel(CHANNEL_ID)
+            } else {
+                return
+            }
+        }
+        // DEFAULT (no LOW): requisito práctico para Live Updates / chip en OEM Android 16.
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW).apply {
+            NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT).apply {
                 setShowBadge(false)
+                description = "Upload progress (Live Updates on Android 16+)"
+                setSound(null, null)
+                enableVibration(false)
             },
         )
     }
@@ -118,6 +182,8 @@ object UploadProgressNotificationHelper {
         indeterminate: Boolean,
         largeIcon: Bitmap?,
         ongoing: Boolean,
+        chipText: String,
+        completed: Boolean,
     ): Notification {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -128,18 +194,45 @@ object UploadProgressNotificationHelper {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        val clamped = progress.coerceIn(0, 100)
+        // Teal marca ≡ MomentsBrand.teal del anillo iOS (sin gradiente glass).
+        val accent = context.getColor(R.color.widget_brand_teal)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            // Silueta blanca Moments (mismo que push / chat) — no icono genérico del sistema.
             .setSmallIcon(R.drawable.ic_stat_moments)
-            .setColor(context.getColor(R.color.notification_accent))
+            .setColor(accent)
             .setContentTitle(title)
             .setContentText(body)
             .setContentIntent(pendingIntent)
             .setOnlyAlertOnce(true)
             .setOngoing(ongoing)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setAutoCancel(!ongoing)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setShortCriticalText(chipText)
+            .setRequestPromotedOngoing(ongoing)
+
         if (indeterminate) builder.setProgress(0, 0, true)
-        else builder.setProgress(100, progress.coerceIn(0, 100), false)
+        else if (!completed) builder.setProgress(100, clamped, false)
+        else builder.setProgress(0, 0, false)
+
+        if (Build.VERSION.SDK_INT >= LIVE_UPDATE_API && ongoing) {
+            val style = NotificationCompat.ProgressStyle()
+                .setStyledByProgress(true)
+                .addProgressSegment(
+                    NotificationCompat.ProgressStyle.Segment(100).setColor(accent),
+                )
+                .setProgressTrackerIcon(
+                    IconCompat.createWithResource(context, R.drawable.ic_stat_moments),
+                )
+            if (indeterminate) {
+                style.setProgressIndeterminate(true)
+            } else {
+                style.setProgress(clamped)
+            }
+            builder.setStyle(style)
+        }
+
         largeIcon?.let { builder.setLargeIcon(it) }
         return builder.build()
     }

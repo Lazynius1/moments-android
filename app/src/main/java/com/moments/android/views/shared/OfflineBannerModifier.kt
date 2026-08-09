@@ -1,10 +1,10 @@
 package com.moments.android.views.shared
 
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SignalWifiOff
 import androidx.compose.material3.Icon
@@ -34,13 +36,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.moments.android.R
 import com.moments.android.coordinators.CoordinatorNavigationEvent
@@ -55,7 +58,9 @@ import kotlinx.coroutines.launch
 
 /**
  * Port de `OfflineBannerModifier.swift` / `CollapsibleOfflineBanner`.
- * Overlay colapsable (expandido → orb) debajo del header (~92 dp bajo safe area).
+ *
+ * Tipografía: [legacyPoppinsSize] devuelve **px** → usar `.toSp()` con [LocalDensity]
+ * (nunca `.sp` directo; eso infla el texto ~density× y pisa “Modo”/“offline”).
  */
 @Composable
 fun OfflineBannerOverlay(
@@ -82,6 +87,7 @@ fun CollapsibleOfflineBanner(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     var collapseJob by remember { mutableStateOf<Job?>(null) }
     val context = LocalContext.current
+    val density = LocalDensity.current
 
     fun cancelCollapse() {
         collapseJob?.cancel()
@@ -131,77 +137,102 @@ fun CollapsibleOfflineBanner(modifier: Modifier = Modifier) {
 
     if (connected) return
 
-    Box(modifier.fillMaxWidth().padding(horizontal = 16.dp), contentAlignment = Alignment.TopCenter) {
-        AnimatedContent(
-            targetState = isExpanded,
-            transitionSpec = {
-                (fadeIn() + scaleIn(initialScale = 0.92f)) togetherWith fadeOut()
-            },
-            label = "collapsibleOfflineBanner",
-        ) { expanded ->
-            if (expanded) {
-                Row(
-                    Modifier
-                        .shadow(18.dp, CircleShape, clip = false, ambientColor = Color.Red.copy(0.22f), spotColor = Color.Red.copy(0.22f))
-                        .momentsChromeGlass(CircleShape, interactive = false)
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+    val capsule = RoundedCornerShape(percent = 50)
+    val glow = Color.Red.copy(alpha = 0.22f)
+    val titleSp = with(density) { legacyPoppinsSize(context, 15).toSp() }
+    val bodySp = with(density) { legacyPoppinsSize(context, 11).toSp() }
+
+    Box(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = fadeIn() + scaleIn(initialScale = 0.92f),
+            exit = fadeOut() + scaleOut(targetScale = 0.92f),
+        ) {
+            // ≡ iOS: icon | texto (flex) | Reintentar (ancho intrínseco, nunca truncado).
+            // Padding vertical 8 (antes 10) → cápsula menos “gorda”.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .shadow(18.dp, capsule, clip = false, ambientColor = glow, spotColor = glow)
+                    .momentsChromeGlass(capsule, interactive = false)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    Icons.Filled.SignalWifiOff,
+                    contentDescription = null,
+                    tint = LocalContentColor.current,
+                    modifier = Modifier.size(18.dp),
+                )
+                Column(
+                    Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
                 ) {
-                    Icon(
-                        Icons.Filled.SignalWifiOff,
-                        contentDescription = null,
-                        tint = LocalContentColor.current,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            stringResource(R.string.network_offline_title),
-                            color = LocalContentColor.current,
-                            fontSize = legacyPoppinsSize(context, 15).sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            stringResource(R.string.offline_banner_message),
-                            color = LocalContentColor.current.copy(alpha = 0.72f),
-                            fontSize = legacyPoppinsSize(context, 11).sp,
-                            maxLines = 2,
-                        )
-                    }
                     Text(
-                        stringResource(R.string.network_offline_retry),
+                        stringResource(R.string.network_offline_title),
                         color = LocalContentColor.current,
-                        fontSize = legacyPoppinsSize(context, 11).sp,
+                        fontSize = titleSp,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .clickable(onClick = ::retrySync)
-                            .padding(horizontal = 6.dp, vertical = 8.dp)
-                            .semantics {
-                                contentDescription = context.getString(R.string.network_offline_retry)
-                            },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        stringResource(R.string.offline_banner_message),
+                        color = LocalContentColor.current.copy(alpha = 0.72f),
+                        fontSize = bodySp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = bodySp * 1.25f,
                     )
                 }
-            } else {
-                val expandHint = stringResource(R.string.offline_banner_expand_hint)
-                Box(
-                    Modifier
-                        .shadow(14.dp, CircleShape, clip = false, ambientColor = Color.Red.copy(0.22f), spotColor = Color.Red.copy(0.22f))
-                        .size(44.dp)
-                        .momentsChromeGlass(CircleShape, interactive = true)
-                        .clickable(onClick = ::expandFromCompact)
+                Text(
+                    stringResource(R.string.network_offline_retry),
+                    color = LocalContentColor.current,
+                    fontSize = bodySp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier
+                        .wrapContentWidth(unbounded = false)
+                        .clickable(onClick = ::retrySync)
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
                         .semantics {
-                            contentDescription =
-                                context.getString(R.string.network_offline_title) + ". " + expandHint
+                            contentDescription = context.getString(R.string.network_offline_retry)
                         },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.SignalWifiOff,
-                        contentDescription = null,
-                        tint = LocalContentColor.current,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = !isExpanded,
+            enter = fadeIn() + scaleIn(initialScale = 0.92f),
+            exit = fadeOut(),
+        ) {
+            val expandHint = stringResource(R.string.offline_banner_expand_hint)
+            Box(
+                Modifier
+                    .shadow(14.dp, CircleShape, clip = false, ambientColor = glow, spotColor = glow)
+                    .size(44.dp)
+                    .momentsChromeGlass(CircleShape, interactive = true)
+                    .clickable(onClick = ::expandFromCompact)
+                    .semantics {
+                        contentDescription =
+                            context.getString(R.string.network_offline_title) + ". " + expandHint
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.SignalWifiOff,
+                    contentDescription = null,
+                    tint = LocalContentColor.current,
+                    modifier = Modifier.size(16.dp),
+                )
             }
         }
     }

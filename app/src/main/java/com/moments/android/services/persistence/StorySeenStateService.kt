@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.Source
+import com.moments.android.services.network.NetworkMonitor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -108,12 +110,20 @@ object StorySeenStateService {
             inFlight[key] = mutableListOf(completion)
         }
 
+        // Offline: nunca llamar task.result si el Task falló — crashea con
+        // RuntimeExecutionException ("Failed to get document because the client is offline").
+        // Preferir cache local y, si hay red, leer remota; si falla, seguir con local.
+        val source = if (NetworkMonitor.isConnected) Source.DEFAULT else Source.CACHE
         FirebaseFirestore.getInstance()
             .collection("users").document(viewerId)
             .collection("storySeen").document(authorId)
-            .get()
+            .get(source)
             .addOnCompleteListener { task ->
-                val remoteDate = (task.result?.get("lastSeenAt") as? Timestamp)?.toDate()
+                val remoteDate = if (task.isSuccessful) {
+                    (task.result?.get("lastSeenAt") as? Timestamp)?.toDate()
+                } else {
+                    null
+                }
                 val callbacks: List<(Date?) -> Unit>
                 val effective: Date?
                 synchronized(lock) {

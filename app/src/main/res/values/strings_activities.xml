@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-<!-- Activities upload progress (ActivityKit → Android notification) -->
+<!-- Live Activities → Android Live Updates (uploads + incognito) -->
     <string name="upload_progress_moment_title">Uploading moment</string>
     <string name="upload_progress_story_title">Uploading story</string>
     <string name="upload_progress_status_uploading">Uploading… %d%%</string>
     <string name="upload_progress_status_processing">Processing…</string>
-    <string name="upload_progress_status_completed">Upload complete</string>
-    <string name="upload_progress_status_failed">Upload failed</string>
+    <string name="upload_progress_status_completed">Completed</string>
+    <string name="upload_progress_status_failed">Error</string>
+    <string name="incognito_activity_title">Incognito</string>
+    <string name="incognito_activity_active">Active</string>
+    <string name="incognito_activity_paused">Paused</string>
+    <string name="incognito_activity_remaining">left</string>
+    <string name="incognito_activity_subtitle">Your activity leaves no trace</string>
+    <string name="incognito_activity_pause">Pause</string>
+    <string name="incognito_activity_resume">Resume</string>
 </resources>

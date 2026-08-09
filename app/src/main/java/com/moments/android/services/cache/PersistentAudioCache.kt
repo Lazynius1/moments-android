@@ -1,6 +1,7 @@
 package com.moments.android.services.cache
 
 import android.content.Context
+import com.moments.android.services.network.NetworkMonitor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -46,17 +47,24 @@ object PersistentAudioCache {
 
     suspend fun localURL(forRemote: URL): File = withContext(Dispatchers.IO) {
         cachedURL(forRemote.toString())?.let { return@withContext it }
+        if (!NetworkMonitor.isConnected) error("offline")
         val connection = forRemote.openConnection()
         val temp = File.createTempFile("audio_", ".m4a", dir())
-        connection.getInputStream().use { input ->
-            temp.outputStream().use { output -> input.copyTo(output) }
+        runCatching {
+            connection.getInputStream().use { input ->
+                temp.outputStream().use { output -> input.copyTo(output) }
+            }
+            saveToCache(temp, forRemote.toString())
+            File(dir(), filename(forRemote.toString()))
+        }.getOrElse {
+            temp.delete()
+            throw it
         }
-        saveToCache(temp, forRemote.toString())
-        File(dir(), filename(forRemote.toString()))
     }
 
     fun downloadAndCache(url: URL) {
         if (cachedURL(url.toString()) != null) return
+        if (!NetworkMonitor.isConnected) return
         Thread {
             runCatching {
                 val temp = File.createTempFile("audio_", ".m4a", dir())

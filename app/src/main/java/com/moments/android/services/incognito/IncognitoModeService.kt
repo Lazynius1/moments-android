@@ -3,6 +3,7 @@ package com.moments.android.services.incognito
 import android.content.Context
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
+import com.moments.android.activities.IncognitoLiveUpdateNotificationHelper
 import com.moments.android.extensions.optStringOrNull
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.utilities.HapticManager
@@ -28,7 +29,7 @@ import kotlin.math.ceil
 /**
  * Port de IncognitoModeService.swift.
  * SharedPreferences sustituye UserDefaults; StateFlow sustituye @Published.
- * Live Activity / WidgetCenter / Haptics omitidos (iOS-only).
+ * Live Activity → [IncognitoLiveUpdateNotificationHelper] (Live Updates API 36+).
  */
 object IncognitoModeService {
 
@@ -129,7 +130,10 @@ object IncognitoModeService {
         _isActive.value = false
         sessionExpectedEndTime = null
         syncMirror(lastUpdatedAt = Date())
-        scope.launch { perform(Action.PAUSE) }
+        scope.launch {
+            endLiveActivity()
+            perform(Action.PAUSE)
+        }
     }
 
     fun resume() {
@@ -155,6 +159,7 @@ object IncognitoModeService {
             ?.remove(SharedPrefsKeys.MIRRORED_IS_ACTIVE)
             ?.remove(SharedPrefsKeys.MIRRORED_REMAINING_SECONDS)
             ?.apply()
+        scope.launch { endLiveActivity() }
     }
 
     private suspend fun perform(action: Action) {
@@ -279,6 +284,7 @@ object IncognitoModeService {
         }
         syncMirror(state.lastUpdatedAt)
         updatePresentationTimer()
+        scope.launch { syncLiveActivity() }
     }
 
     private fun resolvedRemainingSeconds(state: RemoteState): Int {
@@ -307,11 +313,34 @@ object IncognitoModeService {
                     sessionExpectedEndTime = null
                     _lastErrorState.value = LastErrorState.EXHAUSTED
                     syncMirror(Date())
+                    endLiveActivity()
                     break
                 }
                 delay(1_000)
             }
         }
+    }
+
+    /** ≡ syncLiveActivity() iOS — Live Update mientras Incognito está activo. */
+    private suspend fun syncLiveActivity() {
+        val ctx = appContext ?: return
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId == null || !_isLoaded.value || _remainingSeconds.value <= 0 || !_isActive.value) {
+            endLiveActivity()
+            return
+        }
+        IncognitoLiveUpdateNotificationHelper.showOrUpdate(
+            context = ctx,
+            userId = userId,
+            remainingSeconds = _remainingSeconds.value,
+            isActive = _isActive.value,
+            expectedEndTimeMillis = sessionExpectedEndTime?.time,
+        )
+    }
+
+    private suspend fun endLiveActivity() {
+        val ctx = appContext ?: return
+        IncognitoLiveUpdateNotificationHelper.cancel(ctx)
     }
 
     private fun hydrateFromMirror() {
@@ -334,6 +363,7 @@ object IncognitoModeService {
             sessionExpectedEndTime = mirrored.sessionExpectedEndTime
             lastKnownTimezoneIdentifier = mirrored.timezoneIdentifier
             updatePresentationTimer()
+            scope.launch { syncLiveActivity() }
         }
     }
 

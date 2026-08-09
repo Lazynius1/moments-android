@@ -117,7 +117,7 @@ class UploadingStory(
 
 /**
  * Port de `BackgroundStoryUploadService.swift` (`Views/Creator`).
- * ActivityKit → notificación ongoing ([UploadProgressNotificationHelper]).
+ * ActivityKit → [UploadProgressNotificationHelper] (Live Updates API 36+ / ongoing fallback).
  */
 object BackgroundStoryUploadService {
 

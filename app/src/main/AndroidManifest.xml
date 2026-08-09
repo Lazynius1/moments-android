@@ -2,6 +2,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Android 16+: Live Updates (notificaciones promovidas / ProgressStyle). No es runtime. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <!-- AdMob / Android 13+: requerido si declaras uso de Advertising ID en Play Console. -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -78,5 +80,13 @@
         <receiver
             android:name=".services.messaging.ChatNotificationReplyReceiver"
             android:exported="false" />
+        <!-- ≡ PauseIncognitoIntent — acción Pause de Live Update Incognito -->
+        <receiver
+            android:name=".services.incognito.PauseIncognitoReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.moments.android.action.PAUSE_INCOGNITO_LIVE" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

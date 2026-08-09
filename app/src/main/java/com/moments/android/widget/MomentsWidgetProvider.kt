@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Home screen widget Moments (small + medium) — paridad UI de GlowsyWidgetExtension iOS.
- * Live Activities / Control Widget iOS 18 → N/A en Android.
+ * Control Widget iOS 18 → N/A. Uploads: Live Updates vía UploadProgressNotificationHelper (API 36+).
  */
 class MomentsWidgetProvider : AppWidgetProvider() {
 

@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-<!-- Activities upload progress (ActivityKit → Android notification) -->
-    <string name="upload_progress_moment_title">A enviar moment</string>
+    <string name="upload_progress_moment_title">A enviar momento</string>
     <string name="upload_progress_story_title">A enviar story</string>
     <string name="upload_progress_status_uploading">A enviar… %d%%</string>
     <string name="upload_progress_status_processing">A processar…</string>
-    <string name="upload_progress_status_completed">Envio concluído</string>
-    <string name="upload_progress_status_failed">Falha no envio</string>
+    <string name="upload_progress_status_completed">Concluído</string>
+    <string name="upload_progress_status_failed">Erro</string>
+    <string name="incognito_activity_title">Incógnito</string>
+    <string name="incognito_activity_active">Ativo</string>
+    <string name="incognito_activity_paused">Em pausa</string>
+    <string name="incognito_activity_remaining">restantes</string>
+    <string name="incognito_activity_subtitle">A tua atividade não deixa rasto</string>
+    <string name="incognito_activity_pause">Pausar</string>
+    <string name="incognito_activity_resume">Retomar</string>
 </resources>

@@ -109,13 +109,11 @@ fun FeedView(
     val storyRingCoordinator = remember { FeedStoryRingCoordinator(appContext = context.applicationContext) }
     val firestoreService = remember { FirestoreService() }
     val uploadService = BackgroundMomentUploadService
-    val networkMonitor = NetworkMonitor
     val badgeService = NotificationBadgeService
     val notificationSummaryService = NotificationSummaryService
     val notificationGate = remember { PermissionPrimerGate(PermissionPrimerGate.Kind.NOTIFICATIONS) }
     val unreadNotifications by badgeService.unreadNotificationsCount.collectAsState()
     val unreadMessages by badgeService.unreadMessagesCount.collectAsState()
-    val isConnected by networkMonitor.isConnectedFlow.collectAsState()
 
     // MARK: - Feed type + layout insets
     val (selectedFeedType, setFeedType) = rememberFeedType()
@@ -717,7 +715,7 @@ fun FeedView(
                     .zIndex(998f),
             )
 
-            // SlowConnectionBanner + AppErrorBanner
+            // AppErrorBanner (sin banner de slow/offline aquí — offline va por OfflineBannerOverlay)
             Column(
                 Modifier
                     .align(Alignment.TopCenter)
@@ -727,12 +725,6 @@ fun FeedView(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (!isConnected || networkMonitor.isSlowConnection) {
-                    SlowConnectionBanner(
-                        isOffline = !isConnected,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
-                }
                 viewModel.errorMessage?.let { msg ->
                     AppErrorBanner(
                         message = if (msg == "feed_error") stringResource(R.string.feed_error) else msg,
@@ -802,18 +794,4 @@ fun FeedView(
             )
         }
     }
-}
-
-@Composable
-private fun SlowConnectionBanner(isOffline: Boolean, modifier: Modifier = Modifier) {
-    Text(
-        text = stringResource(
-            if (isOffline) R.string.feed_offline_banner else R.string.feed_slow_connection_banner,
-        ),
-        color = Color.White,
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Color(0xFFCC5500), RoundedCornerShape(10.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-    )
 }

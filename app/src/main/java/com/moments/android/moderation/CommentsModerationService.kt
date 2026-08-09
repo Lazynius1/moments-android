@@ -201,8 +201,8 @@ class CommentsModerationService private constructor() {
             return@suspendCancellableCoroutine
         }
         user.getIdToken(false).addOnCompleteListener { task ->
-            val token = task.result?.token
-            if (task.isSuccessful && !token.isNullOrEmpty()) {
+            val token = if (task.isSuccessful) task.result?.token else null
+            if (!token.isNullOrEmpty()) {
                 cont.resume(token)
             } else {
                 cont.resumeWith(Result.failure(CommentsModerationError.NotAuthenticated))

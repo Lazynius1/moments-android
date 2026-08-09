@@ -138,6 +138,7 @@ object PrivacyService {
 
         if (checkMutualBlocks(viewerId, moment.authorId)) return false
 
+        // isFollowing ya soft-fail → false offline (como iOS).
         if (!firestoreService.isFollowing(viewerId, moment.authorId)) return false
 
         return runCatching {
@@ -322,6 +323,7 @@ object PrivacyService {
     suspend fun getFollowButtonState(viewerId: String, targetUserId: String): FollowButtonState {
         if (viewerId == targetUserId) return FollowButtonState.OWN_PROFILE
         if (checkMutualBlocks(viewerId, targetUserId)) return FollowButtonState.BLOCKED
+        // iOS: isFollowing / pending request fallan soft (false) → canFollow por defecto.
         if (firestoreService.isFollowing(viewerId, targetUserId)) return FollowButtonState.FOLLOWING
         if (checkPendingFollowRequest(viewerId, targetUserId)) {
             return FollowButtonState.REQUEST_PENDING_CANCELLABLE
@@ -345,13 +347,16 @@ object PrivacyService {
     }
 
     private suspend fun checkPendingFollowRequest(senderId: String, recipientId: String): Boolean {
-        val snap = db.collection("users").document(senderId).collection("sentFollowRequests")
-            .whereEqualTo("recipientId", recipientId)
-            .whereEqualTo("status", FollowRequestStatus.PENDING.raw)
-            .limit(1)
-            .get()
-            .await()
-        return snap.documents.isNotEmpty()
+        // iOS: getDocuments { if error != nil { completion(false) } }
+        return runCatching {
+            val snap = db.collection("users").document(senderId).collection("sentFollowRequests")
+                .whereEqualTo("recipientId", recipientId)
+                .whereEqualTo("status", FollowRequestStatus.PENDING.raw)
+                .limit(1)
+                .get()
+                .await()
+            snap.documents.isNotEmpty()
+        }.getOrDefault(false)
     }
 
     suspend fun saveCustomAudienceForMoment(
