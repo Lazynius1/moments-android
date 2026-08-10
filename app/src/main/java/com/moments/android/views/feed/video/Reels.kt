@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -122,7 +123,7 @@ fun ReelsViewer(
         ) { index ->
             val video = videos[index]
             val isCurrent = pagerState.currentPage == index
-            // Solo montar ±1 como iOS
+            // Solo montar player ±1 como iOS; el resto muestra poster (nunca negro vacío).
             if (abs(index - pagerState.currentPage) <= 1) {
                 ReelVideoView(
                     video = video,
@@ -132,7 +133,10 @@ fun ReelsViewer(
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                Box(Modifier.fillMaxSize().background(Color.Black))
+                ReelsPosterPage(
+                    posterUrl = video.posterUrlString,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }
@@ -150,6 +154,21 @@ fun ReelsViewer(
     // Evitar unused
     @Suppress("UNUSED_VARIABLE")
     val _scope = scope
+}
+
+/** ≡ iOS `ReelsPosterPage` — placeholder continuo al pasar reels. */
+@Composable
+private fun ReelsPosterPage(
+    posterUrl: String?,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier.background(Color.Black)) {
+        VideoPosterOverlay(
+            posterUrl = posterUrl,
+            isReadyToPlay = false,
+            contentScale = ContentScale.Fit,
+        )
+    }
 }
 
 /** ≡ iOS `preloadUpcomingVideos(from:)` — próximos 2 + ReelPrebufferService. */

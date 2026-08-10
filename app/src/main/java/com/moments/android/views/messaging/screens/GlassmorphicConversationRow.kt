@@ -204,7 +204,8 @@ fun GlassmorphicConversationRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (showsUnavailablePreview) {
-            Box(Modifier.clickable(onClick = onOpenProfile)) {
+            // ≡ IG / iOS: sin historia → abrir conversación
+            Box(Modifier.clickable(onClick = onTap)) {
                 ProfileUnavailableAvatar(size = 56.dp)
             }
         } else {
@@ -215,12 +216,11 @@ fun GlassmorphicConversationRow(
                 isOwnStory = false,
                 hapticsEnabled = true,
                 onTap = { hasStory ->
-                    if (isBlockedByCurrentUser) {
-                        onOpenProfile()
-                    } else if (hasStory) {
+                    if (hasStory && !isBlockedByCurrentUser) {
                         onOpenStory(conversation.otherParticipantId)
                     } else {
-                        onOpenProfile()
+                        // ≡ IG / iOS: sin historia → abrir el chat
+                        onTap()
                     }
                 },
             )
@@ -230,7 +230,7 @@ fun GlassmorphicConversationRow(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = if (listInteraction == null) Modifier.clickable(onClick = onOpenProfile) else Modifier,
+                modifier = if (listInteraction == null) Modifier.clickable(onClick = onTap) else Modifier,
             ) {
                 Text(
                     displayUsername,

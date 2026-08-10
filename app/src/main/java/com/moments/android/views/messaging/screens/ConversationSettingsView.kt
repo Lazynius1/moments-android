@@ -67,8 +67,12 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.moments.android.views.profile.userprofile.UserProfileView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -775,6 +779,8 @@ fun ConversationSettingsView(
     var selectedMedia by remember { mutableStateOf<SharedMedia?>(null) }
     var pendingJumpMessageId by remember { mutableStateOf<String?>(null) }
     var clearConversationConfirm by remember { mutableStateOf(false) }
+    // ≡ iOS showingUserProfile → navigationDestination UserProfileView
+    var showingUserProfile by remember { mutableStateOf(false) }
     LaunchedEffect(conversation.id) { model.loadConversationData(conversation, context) }
 
     Box(modifier.fillMaxSize()) {
@@ -843,7 +849,12 @@ fun ConversationSettingsView(
                     liveUsername = model.liveOtherParticipantUsername,
                     colors = colors,
                     notificationsEnabled = model.notificationsEnabled,
-                    onProfile = onProfile,
+                    onProfile = {
+                        val userId = conversation.otherParticipantId.trim()
+                        if (userId.isNotEmpty()) {
+                            showingUserProfile = true
+                        }
+                    },
                     onSearch = onSearchRequested,
                     onToggleMute = { model.toggleNotifications() },
                 )
@@ -941,6 +952,26 @@ fun ConversationSettingsView(
                     completion(Result.success(Unit))
                 },
             )
+        }
+
+        if (showingUserProfile) {
+            val profileUserId = conversation.otherParticipantId.trim()
+            if (profileUserId.isNotEmpty()) {
+                Dialog(
+                    onDismissRequest = { showingUserProfile = false },
+                    properties = DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        decorFitsSystemWindows = false,
+                    ),
+                ) {
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        UserProfileView(
+                            userId = profileUserId,
+                            onDismiss = { showingUserProfile = false },
+                        )
+                    }
+                }
+            }
         }
     }
 

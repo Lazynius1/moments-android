@@ -38,6 +38,19 @@ data class VideoMoment(
             if (fromSource.isNotEmpty()) return fromSource
             return if (videoUrl.isEmpty()) emptyList() else listOf(videoUrl)
         }
+
+    /**
+     * ≡ iOS `VideoMoment.posterURLString` — thumbnail → imagePath
+     * (y thumbnail del mediaItem de carrusel si existe).
+     */
+    val posterUrlString: String?
+        get() {
+            moment.mediaItems?.getOrNull(mediaIndex)?.thumbnailUrl
+                ?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            moment.thumbnailUrl?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            moment.imagePath?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+            return null
+        }
 }
 
 /**

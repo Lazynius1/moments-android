@@ -1,11 +1,6 @@
 package com.moments.android.views.feed.video
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -62,13 +57,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -86,7 +79,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.media3.ui.AspectRatioFrameLayout
-import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
@@ -305,6 +297,9 @@ fun ReelVideoView(
 
     Box(modifier.background(Color.Black)) {
         val exo = playerManager.player
+        val posterContentScale =
+            if (resizeMode == AspectRatioFrameLayout.RESIZE_MODE_FIT) ContentScale.Fit else ContentScale.Crop
+
         if (exo != null) {
             VideoPlayerRepresentable(
                 player = exo,
@@ -314,13 +309,15 @@ fun ReelVideoView(
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            ReelLoadingPlaceholder(
-                isLoaded = playerManager.isLoaded,
-                isBuffering = playerManager.isBuffering,
-                imagePath = video.moment.imagePath,
-                onStartBuffering = { playerManager.isBuffering = true },
-            )
+            Box(Modifier.fillMaxSize().background(Color.Black))
         }
+
+        // ≡ iOS VideoPosterOverlay hasta readyToPlay (también en el reel adyacente al swipe).
+        VideoPosterOverlay(
+            posterUrl = video.posterUrlString,
+            isReadyToPlay = playerManager.isLoaded && exo != null,
+            contentScale = posterContentScale,
+        )
 
         // Capa de gestos (tap play/pause, double-tap feel)
         Box(
@@ -769,84 +766,6 @@ fun ReelVideoView(
                 startWithUserId = storyUid,
                 onDismiss = { storyRouteUserId = null },
             )
-        }
-    }
-}
-
-@Composable
-private fun ReelLoadingPlaceholder(
-    isLoaded: Boolean,
-    isBuffering: Boolean,
-    imagePath: String?,
-    onStartBuffering: () -> Unit,
-) {
-    LaunchedEffect(Unit) { onStartBuffering() }
-    val infinite = rememberInfiniteTransition(label = "reelLoad")
-    val rotation by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Restart),
-        label = "spin",
-    )
-
-    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-        if (!imagePath.isNullOrBlank()) {
-            AsyncImage(
-                model = imagePath,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(3.dp),
-                alpha = 0.2f,
-            )
-        }
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            Box(Modifier.size(50.dp), contentAlignment = Alignment.Center) {
-                Canvas(Modifier.fillMaxSize()) {
-                    drawCircle(
-                        color = Color.White.copy(0.2f),
-                        style = Stroke(width = 2.dp.toPx()),
-                    )
-                }
-                Canvas(
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { rotationZ = rotation },
-                ) {
-                    drawArc(
-                        brush = Brush.linearGradient(listOf(Color.White, Color.White.copy(0.3f))),
-                        startAngle = -90f,
-                        sweepAngle = 288f,
-                        useCenter = false,
-                        style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
-                    )
-                }
-            }
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    stringResource(
-                        if (isLoaded) R.string.feed_reels_video_starting
-                        else R.string.feed_reels_video_loading,
-                    ),
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-                if (isBuffering) {
-                    Text(
-                        stringResource(R.string.feed_reels_video_optimizing),
-                        color = Color.White.copy(0.6f),
-                        fontSize = 12.sp,
-                    )
-                }
-            }
         }
     }
 }

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.Forum
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -68,6 +69,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
@@ -103,6 +106,7 @@ import com.moments.android.views.messaging.screens.chat.GlassmorphicChatView
 import com.moments.android.views.messaging.services.ChatDraftEvent
 import com.moments.android.views.messaging.services.ChatDraftEvents
 import com.moments.android.views.messaging.services.ConversationMuteEvents
+import com.moments.android.views.profile.userprofile.UserProfileView
 import com.moments.android.views.story.StoriesView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -146,6 +150,14 @@ fun MessagingView(
     var actionToastMessage by remember { mutableStateOf<String?>(null) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     var storyUserId by remember { mutableStateOf<String?>(null) }
+    // ≡ iOS MessagingView.profileRoute → UserProfileView
+    var profileUserId by remember { mutableStateOf<String?>(null) }
+
+    fun openConversationProfile(userId: String) {
+        val trimmed = userId.trim()
+        if (trimmed.isEmpty()) return
+        profileUserId = trimmed
+    }
 
     val pendingRequests by requestService.pendingRequests.collectAsState()
     val outgoingPending by requestService.outgoingPendingRequests.collectAsState()
@@ -222,6 +234,24 @@ fun MessagingView(
         }
     }
 
+    // ≡ iOS .navigationDestination(item: $profileRoute) — overlay sin destruir el chat/settings
+    profileUserId?.let { userId ->
+        Dialog(
+            onDismissRequest = { profileUserId = null },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                UserProfileView(
+                    userId = userId,
+                    onDismiss = { profileUserId = null },
+                )
+            }
+        }
+    }
+
     when {
         storyUserId != null -> {
             BackHandler { storyUserId = null }
@@ -274,6 +304,8 @@ fun MessagingView(
                     showingArchived = false
                     viewModel.openConversation(it)
                 },
+                onOpenProfile = { openConversationProfile(it) },
+                onOpenStory = { storyUserId = it },
                 onMarkUnread = { viewModel.markConversationAsUnread(it) },
                 onPin = { viewModel.togglePinned(it) },
                 onMute = { viewModel.toggleMuted(it) },
@@ -289,6 +321,7 @@ fun MessagingView(
                     conversation = ctx.syntheticConversation(uid.orEmpty()),
                     pendingChatContext = ctx,
                     onBack = { pendingChatContext = null },
+                    onProfile = { openConversationProfile(it) },
                     onPendingChatAccepted = { conversationId ->
                         val currentUserId = uid.orEmpty()
                         if (currentUserId.isEmpty()) {
@@ -332,6 +365,7 @@ fun MessagingView(
                 GlassmorphicChatView(
                     conversation = selected,
                     onBack = { viewModel.closeChat() },
+                    onProfile = { openConversationProfile(it) },
                     onStory = { route ->
                         when (route) {
                             is ChatStoryRoute.UserStories -> storyUserId = route.userId

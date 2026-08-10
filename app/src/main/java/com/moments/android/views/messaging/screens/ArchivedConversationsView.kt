@@ -57,6 +57,7 @@ fun ArchivedConversationsView(
     onBack: () -> Unit,
     onOpenConversation: (Conversation) -> Unit,
     onOpenProfile: (String) -> Unit = {},
+    onOpenStory: (String) -> Unit = {},
     onMarkUnread: (Conversation) -> Unit = { viewModel.markConversationAsUnread(it) },
     onPin: (Conversation) -> Unit = { viewModel.togglePinned(it) },
     onMute: (Conversation) -> Unit = { viewModel.toggleMuted(it) },
@@ -125,6 +126,10 @@ fun ArchivedConversationsView(
                                 if (trimmed.isNotEmpty()) onOpenProfile(trimmed)
                             },
                             onTap = { onOpenConversation(conversation) },
+                            onOpenStory = { userId ->
+                                val trimmed = userId.trim()
+                                if (trimmed.isNotEmpty()) onOpenStory(trimmed)
+                            },
                             isMenuSelected = selected,
                             listInteraction = ConversationListInteraction(
                                 onTap = { onOpenConversation(conversation) },
