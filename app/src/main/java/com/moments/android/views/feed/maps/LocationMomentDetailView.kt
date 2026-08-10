@@ -69,7 +69,7 @@ import com.moments.android.services.firestore.deleteMoment
 import com.moments.android.services.firestore.loadSavedMoments
 import com.moments.android.services.performance.FeedVisibilityCoordinator
 import com.moments.android.services.performance.VideoMomentsIndex
-import com.moments.android.services.performance.toFeedReelsVideoMoments
+import com.moments.android.services.performance.toFeedVideoMoments
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.video.GlobalVideoManager
@@ -317,7 +317,7 @@ fun LocationMomentDetailView(
     }
 
     // iOS reelsVideos: moments.videoMoments (lista visible de la superficie)
-    val reelsVideos = remember(feedMoments) { feedMoments.toFeedReelsVideoMoments() }
+    val reelsVideos = remember(feedMoments) { feedMoments.toFeedVideoMoments() }
 
     DisposableEffect(Unit) {
         onDispose {

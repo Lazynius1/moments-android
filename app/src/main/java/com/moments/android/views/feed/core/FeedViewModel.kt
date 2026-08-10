@@ -21,7 +21,7 @@ import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.performance.VideoMoment
 import com.moments.android.services.performance.VideoMomentsIndex
 import com.moments.android.services.performance.toIndexMoment
-import com.moments.android.services.performance.toFeedReelsVideoMoments
+import com.moments.android.services.performance.toFeedVideoMoments
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.services.social.AffinityTracker
@@ -180,8 +180,8 @@ class FeedViewModel {
         VideoMomentsIndex.rebuild(moments.map { it.toIndexMoment() })
     }
 
-    /** iOS `feedReelsVideos = viewModel.moments.reelsVideoMoments` — sesión Reels del feed. */
-    fun reelsVideosForFeed(): List<VideoMoment> = moments.toFeedReelsVideoMoments()
+    /** iOS `feedReelsVideos = viewModel.moments.videoMoments` — sesión Reels del feed. */
+    fun reelsVideosForFeed(): List<VideoMoment> = moments.toFeedVideoMoments()
 
     /** iOS VideoPlaybackSelector.shared.preloadURLStrings(from:maxMoments:) */
     fun videoPreloadUrls(from: List<FeedMoment>, maxMoments: Int = 4): List<String> =

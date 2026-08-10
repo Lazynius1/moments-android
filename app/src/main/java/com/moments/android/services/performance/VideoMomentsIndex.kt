@@ -74,10 +74,6 @@ fun List<Moment>.toVideoMoments(): List<VideoMoment> = mapNotNull { moment ->
     VideoMoment(moment, mediaIndex)
 }
 
-/** ≡ iOS `moments.reelsVideoMoments` — solo 9:16. */
-fun List<Moment>.toReelsVideoMoments(): List<VideoMoment> =
-    toVideoMoments().filter { it.moment.isReelsAspectFormat() }
-
 /**
  * Conversión FeedMoment → Moment para sesión Reels / preloader
  * (antes privada en FeedViewModel).
@@ -126,9 +122,6 @@ fun FeedMoment.toIndexMoment(): Moment = Moment(
 fun List<FeedMoment>.toFeedVideoMoments(): List<VideoMoment> =
     map { it.toIndexMoment() }.toVideoMoments()
 
-/** ≡ iOS `moments.reelsVideoMoments` sobre lista de feed. */
-fun List<FeedMoment>.toFeedReelsVideoMoments(): List<VideoMoment> =
-    map { it.toIndexMoment() }.toReelsVideoMoments()
-
+/** ≡ iOS `CroppedVideoPlayer.isReelsFormat` (chrome del card; no filtra la sesión Reels). */
 fun FeedMoment.isReelsAspectFormat(displayRatio: Float? = null): Boolean =
     toIndexMoment().isReelsAspectFormat(displayRatio)

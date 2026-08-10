@@ -354,8 +354,8 @@ data class Moment(
         }
 
     /**
-     * ≡ iOS `Moment.isReelsAspectFormat`.
-     * Solo **9:16** abre ReelsViewer; 4:5 / 1:1 / 16:9 = vídeo normal en el card.
+     * ≡ iOS `CroppedVideoPlayer.isReelsFormat` — chrome del vídeo en el card (badge / layout).
+     * No decide si se abre ReelsViewer (iOS abre cualquier vídeo).
      */
     fun isReelsAspectFormat(displayRatio: Float? = null): Boolean {
         val tagged = aspectRatio?.trim()

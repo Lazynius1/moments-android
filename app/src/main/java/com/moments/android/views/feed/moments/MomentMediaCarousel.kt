@@ -117,18 +117,15 @@ fun MomentMediaCarousel(
     var showReelsViewer by remember { mutableStateOf(false) }
     var reelsStartSeconds by remember { mutableFloatStateOf(0f) }
     var reelsHandoffItem by remember { mutableStateOf<FeedMediaItem?>(null) }
-    // iOS MediaItemView.resolvedReelsVideos / resolvedReelsStartIndex — solo 9:16
-    val resolvedReelsVideos = remember(reelsVideos, moment.id, moment.mediaItems, canvasAspectRatio) {
-        val surface = if (reelsVideos.isNotEmpty()) {
+    // iOS MediaItemView.resolvedReelsVideos / resolvedReelsStartIndex — todos los vídeos
+    val resolvedReelsVideos = remember(reelsVideos, moment.id, moment.mediaItems) {
+        if (reelsVideos.isNotEmpty()) {
             reelsVideos
-        } else if (moment.isReelsAspectFormat(canvasAspectRatio)) {
+        } else {
             val alone = moment.toIndexMoment()
             val url = alone.previewVideoURLString ?: alone.videoUrl
             if (!url.isNullOrBlank()) listOf(VideoMoment(alone)) else emptyList()
-        } else {
-            emptyList()
         }
-        surface.filter { it.moment.isReelsAspectFormat() }
     }
     val resolvedReelsStartIndex = remember(resolvedReelsVideos, moment.id) {
         resolvedReelsVideos.indexOfFirst { it.moment.id == moment.id }.takeIf { it >= 0 } ?: 0
@@ -215,17 +212,15 @@ fun MomentMediaCarousel(
                     allowsVideoPlayback = allowsVideoPlayback,
                     onTagTap = onTagTap,
                     onOpenReels = {
-                        // iOS: solo 9:16 abre ReelsViewer
-                        if (moment.isReelsAspectFormat(canvasAspectRatio)) {
-                            val handoffMedia = if (isCarousel) item else null
-                            GlobalVideoManager.capturePlaybackPosition(pageConsumerId)
-                            GlobalVideoManager.markReelsFeedHandoff(moment, handoffMedia)
-                            GlobalVideoManager.pauseAllVideos()
-                            onImmersiveChange(true)
-                            reelsHandoffItem = handoffMedia
-                            reelsStartSeconds = GlobalVideoManager.playbackPosition(pageConsumerId).toFloat()
-                            showReelsViewer = true
-                        }
+                        // iOS MediaItemView.openReelsViewer — cualquier vídeo
+                        val handoffMedia = if (isCarousel) item else null
+                        GlobalVideoManager.capturePlaybackPosition(pageConsumerId)
+                        GlobalVideoManager.markReelsFeedHandoff(moment, handoffMedia)
+                        GlobalVideoManager.pauseAllVideos()
+                        onImmersiveChange(true)
+                        reelsHandoffItem = handoffMedia
+                        reelsStartSeconds = GlobalVideoManager.playbackPosition(pageConsumerId).toFloat()
+                        showReelsViewer = true
                     },
                 )
             }
@@ -282,7 +277,7 @@ private fun MediaItemView(
         MomentCarouselLayoutRules.presentationMode(resolvedItemAspectRatio, canvasAspectRatio) ==
         MomentCarouselPresentationMode.FitWithBlur
     val tags = item.tags.orEmpty()
-    // iOS CroppedVideoPlayer.isReelsFormat → Moment.isReelsAspectFormat (solo 9:16)
+    // iOS CroppedVideoPlayer.isReelsFormat (chrome del card; no filtra apertura)
     val isReelsFormat = moment.isReelsAspectFormat(canvasAspectRatio)
 
     // iOS isVisible + opacity/scale appear (solo si !prefersUnifiedCarouselFrame)
