@@ -117,6 +117,32 @@ private fun snapshotNeedsFullHydrate(data: Map<String, Any?>, cached: EnhancedMe
     }
 
     if (data["content"] != null && remoteEditedAt != null) return true
+
+    // Ubicación en vivo: cache viejo / reuse sin estos campos deja la bubble como fija.
+    val remoteIsLive = data["isLiveLocation"] as? Boolean
+    if (remoteIsLive != cached.isLiveLocation) return true
+
+    val remoteLiveExpiresAt = (data["liveLocationExpiresAt"] as? Timestamp)?.toDate()
+    if (remoteLiveExpiresAt != cached.liveLocationExpiresAt) return true
+
+    val remoteLiveStoppedAt = (data["liveLocationStoppedAt"] as? Timestamp)?.toDate()
+    if (remoteLiveStoppedAt != cached.liveLocationStoppedAt) return true
+
+    val remoteLiveDuration = data["liveLocationDuration"] as? String
+    if (remoteLiveDuration != cached.liveLocationDuration) return true
+
+    val remoteLiveSessionId = data["liveLocationSessionId"] as? String
+    if (remoteLiveSessionId != cached.liveLocationSessionId) return true
+
+    val remoteLocationUpdatedAt = (data["locationUpdatedAt"] as? Timestamp)?.toDate()
+    if (remoteLocationUpdatedAt != cached.locationUpdatedAt) return true
+
+    val remoteLocationName = data["locationName"] as? String
+    if (remoteLocationName != cached.locationName) return true
+
+    val remoteLocationAddress = data["locationAddress"] as? String
+    if (remoteLocationAddress != cached.locationAddress) return true
+
     return false
 }
 

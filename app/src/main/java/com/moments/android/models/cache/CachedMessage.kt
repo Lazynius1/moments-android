@@ -39,6 +39,15 @@ data class CachedMessage(
     val mediaHeight: Int? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    /** Ubicación (fija + en vivo). Paridad iOS: sin esto toEnhancedMessage pierde el live. */
+    val locationName: String? = null,
+    val locationAddress: String? = null,
+    val isLiveLocation: Boolean? = null,
+    val liveLocationExpiresAt: Date? = null,
+    val liveLocationDuration: String? = null,
+    val liveLocationStoppedAt: Date? = null,
+    val liveLocationSessionId: String? = null,
+    val locationUpdatedAt: Date? = null,
     val timestamp: Date,
     val statusString: String,
     val isRead: Boolean,
@@ -87,6 +96,14 @@ data class CachedMessage(
             mediaHeight = mediaHeight,
             latitude = latitude,
             longitude = longitude,
+            locationName = locationName,
+            locationAddress = locationAddress,
+            isLiveLocation = isLiveLocation,
+            liveLocationExpiresAt = liveLocationExpiresAt,
+            liveLocationDuration = liveLocationDuration,
+            liveLocationStoppedAt = liveLocationStoppedAt,
+            liveLocationSessionId = liveLocationSessionId,
+            locationUpdatedAt = locationUpdatedAt,
             timestamp = timestamp,
             status = status,
             isRead = isRead,
@@ -135,6 +152,14 @@ data class CachedMessage(
             mediaHeight == other.mediaHeight &&
             latitude == other.latitude &&
             longitude == other.longitude &&
+            locationName == other.locationName &&
+            locationAddress == other.locationAddress &&
+            isLiveLocation == other.isLiveLocation &&
+            liveLocationExpiresAt == other.liveLocationExpiresAt &&
+            liveLocationDuration == other.liveLocationDuration &&
+            liveLocationStoppedAt == other.liveLocationStoppedAt &&
+            liveLocationSessionId == other.liveLocationSessionId &&
+            locationUpdatedAt == other.locationUpdatedAt &&
             timestamp == other.timestamp &&
             statusString == other.statusString &&
             isRead == other.isRead &&
@@ -180,6 +205,14 @@ data class CachedMessage(
         result = 31 * result + (mediaHeight ?: 0)
         result = 31 * result + (latitude?.hashCode() ?: 0)
         result = 31 * result + (longitude?.hashCode() ?: 0)
+        result = 31 * result + (locationName?.hashCode() ?: 0)
+        result = 31 * result + (locationAddress?.hashCode() ?: 0)
+        result = 31 * result + (isLiveLocation?.hashCode() ?: 0)
+        result = 31 * result + (liveLocationExpiresAt?.hashCode() ?: 0)
+        result = 31 * result + (liveLocationDuration?.hashCode() ?: 0)
+        result = 31 * result + (liveLocationStoppedAt?.hashCode() ?: 0)
+        result = 31 * result + (liveLocationSessionId?.hashCode() ?: 0)
+        result = 31 * result + (locationUpdatedAt?.hashCode() ?: 0)
         result = 31 * result + timestamp.hashCode()
         result = 31 * result + statusString.hashCode()
         result = 31 * result + isRead.hashCode()
@@ -244,6 +277,14 @@ data class CachedMessage(
             mediaHeight = message.mediaHeight,
             latitude = message.latitude,
             longitude = message.longitude,
+            locationName = message.locationName,
+            locationAddress = message.locationAddress,
+            isLiveLocation = message.isLiveLocation,
+            liveLocationExpiresAt = message.liveLocationExpiresAt,
+            liveLocationDuration = message.liveLocationDuration,
+            liveLocationStoppedAt = message.liveLocationStoppedAt,
+            liveLocationSessionId = message.liveLocationSessionId,
+            locationUpdatedAt = message.locationUpdatedAt,
             timestamp = message.timestamp,
             statusString = message.status.raw,
             isRead = message.isRead,

@@ -583,13 +583,35 @@ open class EnhancedChatViewModel(
                     reactions = chatService.mergeLegacyAndLiveReactions(existing.reactions, current.reactions),
                 )
             }
-            if (existing.liveLocationStoppedAt != null && current.liveLocationStoppedAt == null) {
-                current = current.copy(liveLocationStoppedAt = existing.liveLocationStoppedAt)
-            }
+            // Conservar estado live local si el snapshot/cache llega incompleto.
+            current = preserveLiveLocationFields(from = existing, into = current)
             merged[index] = current
         }
 
         return merged.sortedWith(messageTimelineComparator)
+    }
+
+    /** No pisar flags live / stop optimista con un mensaje cacheado sin esos campos. */
+    private fun preserveLiveLocationFields(from: EnhancedMessage, into: EnhancedMessage): EnhancedMessage {
+        var current = into
+        if (from.isLiveLocation == true && current.isLiveLocation != true) {
+            current = current.copy(
+                isLiveLocation = from.isLiveLocation,
+                liveLocationExpiresAt = current.liveLocationExpiresAt ?: from.liveLocationExpiresAt,
+                liveLocationDuration = current.liveLocationDuration ?: from.liveLocationDuration,
+                liveLocationSessionId = current.liveLocationSessionId ?: from.liveLocationSessionId,
+            )
+        }
+        if (from.liveLocationStoppedAt != null && current.liveLocationStoppedAt == null) {
+            current = current.copy(liveLocationStoppedAt = from.liveLocationStoppedAt)
+        }
+        if (from.liveLocationExpiresAt != null && current.liveLocationExpiresAt == null) {
+            current = current.copy(liveLocationExpiresAt = from.liveLocationExpiresAt)
+        }
+        if (from.locationUpdatedAt != null && current.locationUpdatedAt == null) {
+            current = current.copy(locationUpdatedAt = from.locationUpdatedAt)
+        }
+        return current
     }
 
     private fun withPreservedLocalReadState(incoming: EnhancedMessage): EnhancedMessage {
@@ -676,11 +698,9 @@ open class EnhancedChatViewModel(
             if (cached != null) {
                 val vanished = ((preserved.vanishedFor) + cached.vanishedFor).distinct()
                 if (vanished != preserved.vanishedFor) preserved = preserved.copy(vanishedFor = vanished)
-                // No pisar un stop optimista: el serverTimestamp puede llegar null un frame
+                // No pisar un stop / live optimista: el serverTimestamp puede llegar null un frame
                 // y el listener borraría liveLocationStoppedAt → UI “sigue en vivo”.
-                if (cached.liveLocationStoppedAt != null && preserved.liveLocationStoppedAt == null) {
-                    preserved = preserved.copy(liveLocationStoppedAt = cached.liveLocationStoppedAt)
-                }
+                preserved = preserveLiveLocationFields(from = cached, into = preserved)
             }
             if (preserved.id in optimisticallyHiddenVanishIds && currentUserId !in preserved.vanishedFor) {
                 preserved = preserved.copy(vanishedFor = preserved.vanishedFor + currentUserId)

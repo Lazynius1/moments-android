@@ -19,6 +19,7 @@ import com.moments.android.views.messaging.models.LiveLocationDuration
 import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.messaging.services.LiveLocationSharingService
 import com.moments.android.views.messaging.services.sendViewOnceMessage
+import com.moments.android.services.persistence.LocalPersistenceService
 import java.util.Date
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
@@ -261,6 +262,9 @@ fun MomentsChatViewModel.stopLiveLocation(messageId: String) {
     LiveLocationSharingService.stopSharing(messageId, conversationId)
     val stoppedAt = Date()
     messages.value.firstOrNull { it.id == messageId }?.let { message ->
-        appendOrReplaceMessage(message.copy(liveLocationStoppedAt = stoppedAt))
+        val updated = message.copy(liveLocationStoppedAt = stoppedAt)
+        appendOrReplaceMessage(updated)
+        // Persistir stop optimista: si no, local-first puede reutilizar cache sin stoppedAt.
+        LocalPersistenceService.saveMessages(listOf(updated), conversationId, sync = false)
     }
 }

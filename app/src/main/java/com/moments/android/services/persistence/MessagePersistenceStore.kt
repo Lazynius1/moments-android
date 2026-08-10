@@ -425,6 +425,14 @@ object MessagePersistenceStore {
             isRead = existing.isRead || new.isRead,
             vanishedFor = (existing.vanishedFor + new.vanishedFor).distinct(),
             vanishExpiresAt = new.vanishExpiresAt ?: existing.vanishExpiresAt,
+            isLiveLocation = new.isLiveLocation ?: existing.isLiveLocation,
+            liveLocationExpiresAt = new.liveLocationExpiresAt ?: existing.liveLocationExpiresAt,
+            liveLocationDuration = new.liveLocationDuration ?: existing.liveLocationDuration,
+            liveLocationStoppedAt = new.liveLocationStoppedAt ?: existing.liveLocationStoppedAt,
+            liveLocationSessionId = new.liveLocationSessionId ?: existing.liveLocationSessionId,
+            locationUpdatedAt = new.locationUpdatedAt ?: existing.locationUpdatedAt,
+            locationName = new.locationName ?: existing.locationName,
+            locationAddress = new.locationAddress ?: existing.locationAddress,
         )
     }
 
