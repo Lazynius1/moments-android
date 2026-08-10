@@ -354,6 +354,21 @@ data class Moment(
         }
 
     /**
+     * ≡ iOS `Moment.isReelsAspectFormat`.
+     * Solo **9:16** abre ReelsViewer; 4:5 / 1:1 / 16:9 = vídeo normal en el card.
+     */
+    fun isReelsAspectFormat(displayRatio: Float? = null): Boolean {
+        val tagged = aspectRatio?.trim()
+        when (tagged) {
+            "9:16" -> return true
+            "4:5", "1:1", "16:9" -> return false
+        }
+        val ratio = resolvedAspectRatioValue ?: displayRatio
+        if (ratio == null || !ratio.isFinite() || ratio <= 0f) return false
+        return ratio in 0.50f..0.62f
+    }
+
+    /**
      * Vídeo con ExoPlayer/SurfaceView. No envolver en `ScreenshotProtectionMode.ContentSurface`
      * (el blit a SurfaceView seguro provoca parpadeos).
      */

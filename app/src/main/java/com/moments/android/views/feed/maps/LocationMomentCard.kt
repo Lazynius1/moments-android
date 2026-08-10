@@ -44,6 +44,7 @@ import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.extensions.timeAgoDisplay
 import com.moments.android.models.Moment
+import com.moments.android.services.performance.toReelsVideoMoments
 import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.views.components.LiveUsernameText
 import com.moments.android.views.components.MomentCaptionPresentationStyle
@@ -90,6 +91,7 @@ fun LocationMomentCard(
     val density = LocalDensity.current
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.toFloat()
     val feedMoment = remember(moment) { moment.toFeedMomentForMap() }
+    val reelsVideos = remember(moment) { listOf(moment).toReelsVideoMoments() }
     var detectedAspectRatio by remember(moment.id) {
         mutableFloatStateOf(moment.resolvedAspectRatioValue?.takeIf { it > 0f } ?: 1f)
     }
@@ -156,6 +158,7 @@ fun LocationMomentCard(
                         isImmersive = isImmersive,
                         onImmersiveChange = { isImmersive = it },
                         onPageChange = { currentImageIndex = it },
+                        reelsVideos = reelsVideos,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(cardHeight)

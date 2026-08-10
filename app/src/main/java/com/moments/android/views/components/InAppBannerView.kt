@@ -20,10 +20,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,6 +41,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -51,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -68,6 +72,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
+import com.moments.android.extensions.MomentsChromeGlass
+import com.moments.android.extensions.MomentsGlassStyle
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
@@ -123,7 +129,8 @@ fun InAppBannerView(modifier: Modifier = Modifier) {
             ) + fadeOut(),
         ) {
             notification?.let { current ->
-                Box(Modifier.padding(top = 10.dp)) {
+                // iOS: padding(.top, 8)
+                Box(Modifier.padding(top = 8.dp)) {
                     if (isQuickReplyExpanded && current.type == NotificationType.MESSAGE) {
                         InAppMessageQuickReplyPanel(
                             notification = current,
@@ -156,8 +163,9 @@ private fun CompactInAppBanner(
     val isSystem = isSystemBanner(notification)
     val accent = if (isSystem) Color(0xFFFF9500) else colorFor(notification.type)
     val lines = bannerTextLines(copy, notification)
-    val headlineSp = with(density) { legacyPoppinsSize(context, 14).toSp() }
-    val detailSp = with(density) { legacyPoppinsSize(context, 13).toSp() }
+    // iOS: legacyPoppinsSize(13/12)
+    val headlineSp = with(density) { legacyPoppinsSize(context, 13).toSp() }
+    val detailSp = with(density) { legacyPoppinsSize(context, 12).toSp() }
 
     var contentPreviewImage by remember(notification.id) { mutableStateOf<String?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
@@ -169,103 +177,136 @@ private fun CompactInAppBanner(
         contentPreviewImage = loadPreviewImage(notification)
     }
 
-    val gradientBorder = Brush.linearGradient(
+    // iOS: wash sutil (sin borde gradient gordo)
+    val accentWash = Brush.linearGradient(
         colors = listOf(
-            accent.copy(alpha = 0.6f),
-            accent.copy(alpha = 0.1f),
-            accent.copy(alpha = 0.6f),
+            accent.copy(alpha = 0.18f),
+            accent.copy(alpha = 0.08f),
+            Color.Transparent,
         ),
     )
 
-    Row(
+    // Mismo gestos de siempre; tamaño + look tipo iOS SToasts.
+    Box(
         modifier = Modifier
-            .padding(horizontal = 12.dp)
-            .offset { IntOffset(0, dragOffsetY.roundToInt()) }
             .fillMaxWidth()
-            .momentsChromeGlass(BannerCapsule, interactive = false)
-            // iOS: overlay Capsule stroke gradient (blur 0.5 solo del stroke)
-            .border(1.5.dp, gradientBorder, BannerCapsule)
-            .pointerInput(notification.id) {
-                detectVerticalDragGestures(
-                    onVerticalDrag = { _, dragAmount ->
-                        // iOS: solo arrastre hacia arriba (translation.height < 0)
-                        if (dragAmount < 0f) dragOffsetY += dragAmount
-                    },
-                    onDragEnd = {
-                        if (dragOffsetY < -20f) {
+            .padding(horizontal = 20.dp),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Box(
+            modifier = Modifier
+                .widthIn(max = 310.dp)
+                .fillMaxWidth()
+                .offset { IntOffset(0, dragOffsetY.roundToInt()) }
+                .shadow(
+                    elevation = 8.dp,
+                    shape = BannerCapsule,
+                    ambientColor = Color.Black.copy(alpha = 0.08f),
+                    spotColor = Color.Black.copy(alpha = 0.08f),
+                )
+                .momentsChromeGlass(
+                    shape = BannerCapsule,
+                    interactive = false,
+                    style = MomentsGlassStyle.NATIVE,
+                )
+                .pointerInput(notification.id) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { _, dragAmount ->
+                            if (dragAmount < 0f) dragOffsetY += dragAmount
+                        },
+                        onDragEnd = {
+                            if (dragOffsetY < -20f) {
+                                onCollapseQuickReply()
+                                InAppNotificationService.dismissManually()
+                            }
+                            dragOffsetY = 0f
+                        },
+                        onDragCancel = { dragOffsetY = 0f },
+                    )
+                }
+                .pointerInput(notification.id, notification.conversationId) {
+                    detectTapGestures(
+                        onLongPress = {
+                            if (notification.type == NotificationType.MESSAGE &&
+                                !notification.conversationId.isNullOrBlank()
+                            ) {
+                                suppressTapUntilMs = System.currentTimeMillis() + 600L
+                                onExpandQuickReply()
+                                HapticManager.shared.mediumImpact()
+                            }
+                        },
+                        onTap = {
+                            if (System.currentTimeMillis() < suppressTapUntilMs) return@detectTapGestures
                             onCollapseQuickReply()
                             InAppNotificationService.dismissManually()
-                        }
-                        dragOffsetY = 0f
-                    },
-                    onDragCancel = { dragOffsetY = 0f },
-                )
-            }
-            .pointerInput(notification.id, notification.conversationId) {
-                detectTapGestures(
-                    onLongPress = {
-                        if (notification.type == NotificationType.MESSAGE &&
-                            !notification.conversationId.isNullOrBlank()
-                        ) {
-                            suppressTapUntilMs = System.currentTimeMillis() + 600L
-                            onExpandQuickReply()
-                            HapticManager.shared.mediumImpact()
-                        }
-                    },
-                    onTap = {
-                        if (System.currentTimeMillis() < suppressTapUntilMs) return@detectTapGestures
-                        onCollapseQuickReply()
-                        InAppNotificationService.dismissManually()
-                        // iOS: route en el siguiente ciclo tras dismiss
-                        scope.launch {
-                            routeBannerTap(notification, context)
-                        }
-                    },
-                )
-            }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        BannerAvatar(notification = notification, isSystem = isSystem, isDark = isDark)
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
+                            scope.launch {
+                                routeBannerTap(notification, context)
+                            }
+                        },
+                    )
+                },
         ) {
-            lines.headline?.let { headline ->
-                Text(
-                    text = headline,
-                    color = LocalContentColor.current,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = headlineSp,
-                    maxLines = 1,
-                )
-            }
-            when {
-                lines.detail != null -> Text(
-                    text = lines.detail,
-                    color = LocalContentColor.current.copy(alpha = 0.72f),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = detailSp,
-                    maxLines = 2,
-                )
-                isSystemModerationBanner(notification) -> Text(
-                    text = moderationBannerText(notification),
-                    color = LocalContentColor.current.copy(alpha = 0.92f * 0.72f),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = detailSp,
-                    maxLines = 2,
-                )
+            // Wash encima del fill AdaptiveColors (paridad iOS).
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .clip(BannerCapsule)
+                    .background(accentWash),
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // iOS: .primary/.secondary sobre glass — Android fuerza contentColor del chrome.
+                CompositionLocalProvider(
+                    LocalContentColor provides MomentsChromeGlass.contentColor(isDark),
+                ) {
+                    BannerAvatar(notification = notification, isSystem = isSystem, isDark = isDark)
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        lines.headline?.let { headline ->
+                            Text(
+                                text = headline,
+                                color = LocalContentColor.current,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = headlineSp,
+                                maxLines = 1,
+                            )
+                        }
+                        when {
+                            lines.detail != null -> Text(
+                                text = lines.detail,
+                                color = LocalContentColor.current.copy(alpha = 0.72f),
+                                fontWeight = FontWeight.Medium,
+                                fontSize = detailSp,
+                                maxLines = 2,
+                            )
+                            isSystemModerationBanner(notification) -> Text(
+                                text = moderationBannerText(notification),
+                                color = LocalContentColor.current.copy(alpha = 0.92f * 0.72f),
+                                fontWeight = FontWeight.Medium,
+                                fontSize = detailSp,
+                                maxLines = 2,
+                            )
+                        }
+                    }
+
+                    BannerTrailingIcon(
+                        notification = notification,
+                        isSystem = isSystem,
+                        accentColor = accent,
+                        contentPreviewImage = contentPreviewImage,
+                    )
+                }
             }
         }
-
-        BannerTrailingIcon(
-            notification = notification,
-            isSystem = isSystem,
-            accentColor = accent,
-            contentPreviewImage = contentPreviewImage,
-        )
     }
 }
 
@@ -308,7 +349,7 @@ private fun BannerAvatar(
         AsyncProfileImageView(
             userId = notification.senderId,
             modifier = Modifier
-                .size(42.dp)
+                .size(34.dp)
                 .clip(CircleShape)
                 .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape),
         )
@@ -320,7 +361,7 @@ private fun SystemBannerAvatar(notification: MomentsNotification, isDark: Boolea
     if (isSystemModerationBanner(notification)) {
         Box(
             modifier = Modifier
-                .size(42.dp)
+                .size(34.dp)
                 .clip(CircleShape)
                 .background(if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.08f))
                 .border(
@@ -335,14 +376,14 @@ private fun SystemBannerAvatar(notification: MomentsNotification, isDark: Boolea
                     if (isDark) R.drawable.splash_logo_light else R.drawable.splash_logo_dark,
                 ),
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(20.dp),
                 contentScale = ContentScale.Fit,
             )
         }
     } else {
         Box(
             modifier = Modifier
-                .size(42.dp)
+                .size(34.dp)
                 .clip(CircleShape)
                 .background(Color(0xFFFF9500).copy(alpha = 0.16f))
                 .border(1.dp, Color(0xFFFF9500).copy(alpha = 0.35f), CircleShape),
@@ -352,7 +393,7 @@ private fun SystemBannerAvatar(notification: MomentsNotification, isDark: Boolea
                 imageVector = Icons.Filled.HourglassFull,
                 contentDescription = null,
                 tint = Color(0xFFFF9500),
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(15.dp),
             )
         }
     }
@@ -371,9 +412,9 @@ private fun BannerTrailingIcon(
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+                .size(30.dp)
+                .clip(RoundedCornerShape(7.dp))
+                .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(7.dp)),
         )
         return
     }
@@ -383,7 +424,7 @@ private fun BannerTrailingIcon(
     } else {
         accentColor
     }
-    Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
         if (!isSystemTimeLimitBanner(notification) &&
             !isSystemModerationBanner(notification) &&
             notification.type == NotificationType.PHOTO_TAG
@@ -398,7 +439,7 @@ private fun BannerTrailingIcon(
                 imageVector = trailingSystemIcon(notification),
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(14.dp),
             )
         }
     }

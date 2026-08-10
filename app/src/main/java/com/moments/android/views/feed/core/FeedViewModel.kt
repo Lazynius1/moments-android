@@ -18,7 +18,10 @@ import com.moments.android.services.content.ForYouDiscoveryService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchUserProfile
 import com.moments.android.services.network.NetworkMonitor
+import com.moments.android.services.performance.VideoMoment
 import com.moments.android.services.performance.VideoMomentsIndex
+import com.moments.android.services.performance.toIndexMoment
+import com.moments.android.services.performance.toFeedReelsVideoMoments
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.services.social.AffinityTracker
@@ -176,6 +179,9 @@ class FeedViewModel {
     fun rebuildVideoMomentsIndex() {
         VideoMomentsIndex.rebuild(moments.map { it.toIndexMoment() })
     }
+
+    /** iOS `feedReelsVideos = viewModel.moments.reelsVideoMoments` — sesión Reels del feed. */
+    fun reelsVideosForFeed(): List<VideoMoment> = moments.toFeedReelsVideoMoments()
 
     /** iOS VideoPlaybackSelector.shared.preloadURLStrings(from:maxMoments:) */
     fun videoPreloadUrls(from: List<FeedMoment>, maxMoments: Int = 4): List<String> =
@@ -938,30 +944,6 @@ class FeedViewModel {
         aspectRatio = aspectRatio,
         timestamp = Date(timestamp),
         isArchived = isArchived,
-    )
-
-    /** Conversión para VideoMomentsIndex / preloader (incluye media). */
-    private fun FeedMoment.toIndexMoment(): Moment = toPrivacyMoment().copy(
-        mediaItems = mediaItems.map { item ->
-            MediaItem(
-                id = item.id,
-                type = MediaItem.MediaType.from(item.type),
-                url = item.url,
-                aspectRatio = item.aspectRatio,
-                thumbnailUrl = item.thumbnailUrl,
-                videoDuration = item.videoDuration,
-                videoVariants = item.videoVariants,
-                tags = item.tags,
-                moderationState = if (item.isHiddenByModeration) {
-                    MediaItem.ModerationState.HIDDEN
-                } else {
-                    null
-                },
-            )
-        },
-        thumbnailUrl = thumbnailUrl,
-        imagePath = imagePath,
-        videoDuration = videoDuration,
     )
 
     /**

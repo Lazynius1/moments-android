@@ -62,6 +62,7 @@ import com.moments.android.services.firestore.deleteMoment
 import com.moments.android.services.firestore.loadSavedMoments
 import com.moments.android.services.performance.FeedVisibilityCoordinator
 import com.moments.android.services.performance.VideoMomentsIndex
+import com.moments.android.services.performance.toReelsVideoMoments
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.video.VideoPlaybackSelector
@@ -244,6 +245,9 @@ fun ExploreMomentDetailView(
         VideoMomentsIndex.rebuild(domainMoments)
     }
 
+    // iOS reelsVideos: moments.videoMoments
+    val reelsVideos = remember(domainMoments) { domainMoments.toReelsVideoMoments() }
+
     LaunchedEffect(listState) {
         snapshotFlow {
             listState.layoutInfo.visibleItemsInfo
@@ -356,6 +360,7 @@ fun ExploreMomentDetailView(
                                 contextMenuMoment = tapped
                                 showContextMenu = true
                             },
+                            reelsVideos = reelsVideos,
                             onAuthorAvatarTap = { authorId, hasStory ->
                                 handleAuthorAvatarTap(authorId, hasStory)
                             },

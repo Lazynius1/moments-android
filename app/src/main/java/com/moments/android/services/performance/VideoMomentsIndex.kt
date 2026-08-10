@@ -2,7 +2,9 @@ package com.moments.android.services.performance
 
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Moment
+import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.video.videoPlaybackSource
+import java.util.Date
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,6 +41,10 @@ data class VideoMoment(
 }
 
 /**
+ * Índice ligero de momentos con vídeo (prefetch / legacy).
+ * La presentación de Reels **no** depende de este singleton: cada superficie
+ * pasa su propia lista `reelsVideos` (feed / perfil / explore / saved / maps).
+ *
  * Port de `VideoMomentsIndex.swift` + `Array.videoMoments` (Reels.swift).
  */
 object VideoMomentsIndex {
@@ -67,3 +73,62 @@ fun List<Moment>.toVideoMoments(): List<VideoMoment> = mapNotNull { moment ->
         ?: 0
     VideoMoment(moment, mediaIndex)
 }
+
+/** ≡ iOS `moments.reelsVideoMoments` — solo 9:16. */
+fun List<Moment>.toReelsVideoMoments(): List<VideoMoment> =
+    toVideoMoments().filter { it.moment.isReelsAspectFormat() }
+
+/**
+ * Conversión FeedMoment → Moment para sesión Reels / preloader
+ * (antes privada en FeedViewModel).
+ */
+fun FeedMoment.toIndexMoment(): Moment = Moment(
+    id = id,
+    authorId = authorId,
+    username = username,
+    content = content,
+    audience = audience,
+    customListId = customListId,
+    hasHiddenLayers = hasHiddenLayers,
+    hiddenLayerCount = hiddenLayerCount,
+    commentCount = commentCount,
+    hideLikeCounts = hideLikeCounts,
+    disableComments = disableComments,
+    profileImagePath = profileImagePath,
+    location = location,
+    locationCoordinate = locationCoordinate,
+    aspectRatio = aspectRatio,
+    timestamp = Date(timestamp),
+    isArchived = isArchived,
+    mediaItems = mediaItems.map { item ->
+        MediaItem(
+            id = item.id,
+            type = MediaItem.MediaType.from(item.type),
+            url = item.url,
+            aspectRatio = item.aspectRatio,
+            thumbnailUrl = item.thumbnailUrl,
+            videoDuration = item.videoDuration,
+            videoVariants = item.videoVariants,
+            tags = item.tags,
+            moderationState = if (item.isHiddenByModeration) {
+                MediaItem.ModerationState.HIDDEN
+            } else {
+                null
+            },
+        )
+    },
+    thumbnailUrl = thumbnailUrl,
+    imagePath = imagePath,
+    videoDuration = videoDuration,
+)
+
+/** ≡ iOS `moments.videoMoments` sobre lista de feed. */
+fun List<FeedMoment>.toFeedVideoMoments(): List<VideoMoment> =
+    map { it.toIndexMoment() }.toVideoMoments()
+
+/** ≡ iOS `moments.reelsVideoMoments` sobre lista de feed. */
+fun List<FeedMoment>.toFeedReelsVideoMoments(): List<VideoMoment> =
+    map { it.toIndexMoment() }.toReelsVideoMoments()
+
+fun FeedMoment.isReelsAspectFormat(displayRatio: Float? = null): Boolean =
+    toIndexMoment().isReelsAspectFormat(displayRatio)

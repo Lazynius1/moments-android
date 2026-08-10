@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -574,6 +575,9 @@ fun ChatLocationDetailView(
                 .clip(bottomShape)
                 .momentsChromeGlass(bottomShape, interactive = false)
                 .background(cardBg.copy(alpha = 0.92f))
+                // Dialog edge-to-edge (`decorFitsSystemWindows = false`): sin esto la
+                // tarjeta queda bajo la barra de navegación / botones del sistema.
+                .navigationBarsPadding()
                 .padding(horizontal = 18.dp)
                 .padding(top = 18.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),

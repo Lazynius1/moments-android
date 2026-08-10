@@ -78,7 +78,7 @@ import com.moments.android.R
 import com.moments.android.models.Moment
 import com.moments.android.models.Story
 import com.moments.android.services.performance.VideoMoment
-import com.moments.android.services.performance.toVideoMoments
+import com.moments.android.services.performance.toReelsVideoMoments
 import com.moments.android.views.components.EchoesIconGradients
 import com.moments.android.views.components.EchoesIconMetrics
 import com.moments.android.views.components.EchoesIconView
@@ -362,7 +362,8 @@ fun ActivityInteractionDetailView(
     }
 
     fun openActivityReels(moment: Moment, pool: List<Moment>) {
-        val videos = pool.toVideoMoments()
+        if (!moment.isReelsAspectFormat()) return
+        val videos = pool.toReelsVideoMoments()
         if (videos.isEmpty()) return
         val startIndex = videos.indexOfFirst { it.moment.id == moment.id }.coerceAtLeast(0)
         reelsPresentation = ActivityReelsPresentation(videos = videos, startIndex = startIndex)

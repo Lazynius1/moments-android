@@ -530,6 +530,8 @@ fun ModernPostCardView(
     /** ≡ `ModernSavedDetailMomentCard`: `isSaved: .constant(true)` + `onSave` → quitar de guardados. */
     forceSaved: Boolean = false,
     onForcedUnsave: (() -> Unit)? = null,
+    /** Sesión Reels de la superficie (iOS `ModernPostCardView.reelsVideos`). */
+    reelsVideos: List<com.moments.android.services.performance.VideoMoment> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
@@ -775,6 +777,7 @@ fun ModernPostCardView(
                         moment = moment,
                         consumerId = "feed_${moment.id}",
                         mediaItemsOverride = mediaItems,
+                        reelsVideos = reelsVideos,
                         modifier = Modifier
                             .fillMaxWidth()
                             .shadow(

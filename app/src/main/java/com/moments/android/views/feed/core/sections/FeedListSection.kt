@@ -179,6 +179,11 @@ fun FeedListSection(
         viewModel.rebuildVideoMomentsIndex()
     }
 
+    // iOS feedReelsVideos = viewModel.moments.videoMoments
+    val feedReelsVideos = remember(viewModel.moments) {
+        viewModel.reelsVideosForFeed()
+    }
+
     LaunchedEffect(Unit) {
         NavigationEventBus.events.collectLatest { event ->
             if (event is CoordinatorNavigationEvent.ScrollFeedToTop) {
@@ -271,6 +276,7 @@ fun FeedListSection(
                                     },
                                     onAuthorAvatarTap = onAuthorAvatarTap,
                                     availableHeight = availableHeightPx,
+                                    reelsVideos = feedReelsVideos,
                                 )
                             }
                             if ((index + 1) % adInterval == 0 && index < viewModel.moments.lastIndex) {
