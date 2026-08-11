@@ -15,6 +15,8 @@ fun Moment.toExploreFeedMoment(): FeedMoment {
             isHiddenByModeration = item.isHiddenByModeration,
             tags = item.tags,
             videoDuration = item.videoDuration,
+            videoVariants = item.videoVariants,
+            hlsMasterUrl = item.hlsMasterUrl,
         )
     }.ifEmpty {
         buildList {

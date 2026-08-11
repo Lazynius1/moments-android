@@ -47,11 +47,9 @@ fun VideoPlaybackSelector.playbackUrl(
     tier: VideoPlaybackTier,
 ): String? {
     if (item.type != MomentMediaItem.MediaType.VIDEO) return null
-    val fallback = source(forItem = item, moment = moment)?.playbackUrl
-    val tierString = item.videoVariants?.url(tier)
-        ?: fallback
-        ?: item.url
-    return normalizedUrlString(tierString) ?: tierString
+    // MP4 por tier (downgrade manual). HLS se resuelve vía `source(forItem:)`.
+    val mp4Fallback = item.videoVariants?.url(tier) ?: item.url
+    return normalizedUrlString(mp4Fallback) ?: mp4Fallback
 }
 
 /**
@@ -89,7 +87,9 @@ fun VideoPlaybackSelector.makeConfiguredPlayerItem(
     tier: VideoPlaybackTier? = null,
 ): MediaItem? {
     val resolvedTier = tier ?: recommendedTier()
-    val url = playbackUrl(item, moment, resolvedTier) ?: return null
+    val url = source(forItem = item, moment = moment)?.playbackUrl
+        ?: playbackUrl(item, moment, resolvedTier)
+        ?: return null
     return VideoPreloader.getPlayerItem(url)
 }
 
@@ -109,7 +109,10 @@ class VideoAdaptiveTierController(
 
     val hasVariants: Boolean
         get() {
-            val variants = mediaItem?.videoVariants ?: return false
+            val media = mediaItem ?: return false
+            // Con HLS el ABR es nativo; no forzar switch a MP4 por stall.
+            if (!media.hlsMasterUrl.isNullOrBlank()) return false
+            val variants = media.videoVariants ?: return false
             return variants.low != null || variants.medium != null || variants.high != null
         }
 

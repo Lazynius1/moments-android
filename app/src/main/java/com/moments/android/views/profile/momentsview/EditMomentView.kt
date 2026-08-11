@@ -620,6 +620,7 @@ private fun FeedMediaItem.toMediaItem(): MediaItem = MediaItem(
     thumbnailUrl = thumbnailUrl,
     videoDuration = videoDuration,
     videoVariants = videoVariants,
+    hlsMasterUrl = hlsMasterUrl,
     tags = tags,
 )
 

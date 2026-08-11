@@ -40,6 +40,8 @@ data class FeedMediaItem(
     val videoDuration: Double? = null,
     /** Paridad iOS/CF `videoVariants` — low/medium/high MP4. */
     val videoVariants: com.moments.android.models.VideoVariants? = null,
+    /** Paridad iOS/CF `hlsMasterUrl` — master ABR. */
+    val hlsMasterUrl: String? = null,
 ) {
     /** Paridad iOS `MediaItem.resolvedAspectRatioValue` (sin videoResolution en FeedMediaItem). */
     val resolvedAspectRatioValue: Float?
@@ -600,6 +602,7 @@ private fun JSONObject.toFeedMoment(): FeedMoment {
                                 high = variants.stringOrNull("high"),
                             ).takeIf { it.low != null || it.medium != null || it.high != null }
                         },
+                        hlsMasterUrl = item.stringOrNull("hlsMasterUrl"),
                     )
                 }
             }
@@ -683,6 +686,7 @@ private fun JSONObject.toMoment(): Moment {
                             high = variants.stringOrNull("high"),
                         ).takeIf { it.low != null || it.medium != null || it.high != null }
                     },
+                    hlsMasterUrl = item.stringOrNull("hlsMasterUrl"),
                     tags = item.optJSONArray("tags")?.toPhotoTags(),
                 )
             }

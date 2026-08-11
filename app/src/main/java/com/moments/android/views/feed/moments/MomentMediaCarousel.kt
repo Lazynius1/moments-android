@@ -687,5 +687,6 @@ private fun FeedMediaItem.toDomainMediaItem(): MediaItem = MediaItem(
     thumbnailUrl = thumbnailUrl,
     videoDuration = videoDuration,
     videoVariants = videoVariants,
+    hlsMasterUrl = hlsMasterUrl,
     tags = tags,
 )

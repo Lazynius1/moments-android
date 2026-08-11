@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -200,7 +202,10 @@ fun MediaEditingView(
         }
     }
 
-    Box(modifier.fillMaxSize().background(screenBackground)) {
+    // ≡ MediaEditingView.swift: header fijo + preview ≤ 60% contenedor + bottom fijo.
+    // No usar fillMaxHeight(0.6f) sobre el Column completo: desborda y tapa el header.
+    BoxWithConstraints(modifier.fillMaxSize().background(screenBackground)) {
+        val previewMaxHeight = maxHeight * 0.6f
         Column(Modifier.fillMaxSize()) {
             Box(
                 Modifier
@@ -283,57 +288,61 @@ fun MediaEditingView(
                 }
             }
 
-            Spacer(Modifier.weight(1f))
-
             Box(
                 Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.6f),
+                    .weight(1f)
+                    .fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
-                if (showingFilterToolbar && previewBitmap != null && pagerState.currentPage == currentMediaIndex) {
-                    Image(
-                        bitmap = previewBitmap!!.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 10.dp)
-                            .clip(RoundedCornerShape(12.dp)),
-                    )
-                } else {
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 10.dp),
-                        userScrollEnabled = !showingFilterToolbar,
-                    ) { page ->
-                        AsyncImage(
-                            model = selectedMediaItems[page].uri,
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = previewMaxHeight)
+                        .fillMaxHeight(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (showingFilterToolbar && previewBitmap != null && pagerState.currentPage == currentMediaIndex) {
+                        Image(
+                            bitmap = previewBitmap!!.asImageBitmap(),
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 10.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                        )
+                    } else {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            userScrollEnabled = !showingFilterToolbar,
+                        ) { page ->
+                            AsyncImage(
+                                model = selectedMediaItems[page].uri,
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                            )
+                        }
+                    }
+                    if (!showingFilterToolbar &&
+                        (recommended != CreatorAspectRatio.SQUARE || current.aspectRatio != recommended)
+                    ) {
+                        Text(
+                            stringResource(R.string.creator_recommended_dimensions),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 12.dp)
+                                .background(Color.Black.copy(0.45f), RoundedCornerShape(50))
+                                .border(0.5.dp, Color.White.copy(0.2f), RoundedCornerShape(50))
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
                         )
                     }
                 }
-                if (!showingFilterToolbar &&
-                    (recommended != CreatorAspectRatio.SQUARE || current.aspectRatio != recommended)
-                ) {
-                    Text(
-                        stringResource(R.string.creator_recommended_dimensions),
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 12.dp)
-                            .background(Color.Black.copy(0.45f), RoundedCornerShape(50))
-                            .border(0.5.dp, Color.White.copy(0.2f), RoundedCornerShape(50))
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                    )
-                }
             }
-
-            Spacer(Modifier.weight(1f))
 
             Column(
                 Modifier

@@ -118,6 +118,7 @@ fun FeedMoment.toIndexMoment(): Moment = Moment(
             thumbnailUrl = item.thumbnailUrl,
             videoDuration = item.videoDuration,
             videoVariants = item.videoVariants,
+            hlsMasterUrl = item.hlsMasterUrl,
             tags = item.tags,
             moderationState = if (item.isHiddenByModeration) {
                 MediaItem.ModerationState.HIDDEN

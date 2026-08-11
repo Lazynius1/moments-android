@@ -999,6 +999,7 @@ class FeedViewModel {
                 tags = item.tags,
                 videoDuration = item.videoDuration,
                 videoVariants = item.videoVariants,
+                hlsMasterUrl = item.hlsMasterUrl,
             )
         }
         return FeedMoment(
@@ -1230,7 +1231,20 @@ class FeedViewModel {
                                         .put("type", item.type)
                                         .put("url", item.url)
                                         .put("thumbnailUrl", item.thumbnailUrl)
-                                        .put("aspectRatio", item.aspectRatio),
+                                        .put("aspectRatio", item.aspectRatio)
+                                        .put("hlsMasterUrl", item.hlsMasterUrl)
+                                        .also { obj ->
+                                            item.videoVariants?.let { v ->
+                                                obj.put(
+                                                    "videoVariants",
+                                                    JSONObject().also { vo ->
+                                                        v.low?.let { vo.put("low", it) }
+                                                        v.medium?.let { vo.put("medium", it) }
+                                                        v.high?.let { vo.put("high", it) }
+                                                    },
+                                                )
+                                            }
+                                        },
                                 )
                             }
                         },
@@ -1269,6 +1283,14 @@ class FeedViewModel {
                                         thumbnailUrl = m.optString("thumbnailUrl").ifBlank { null },
                                         aspectRatio = m.optString("aspectRatio").ifBlank { null },
                                         isHiddenByModeration = m.optString("moderationState") == "hidden",
+                                        hlsMasterUrl = m.optString("hlsMasterUrl").ifBlank { null },
+                                        videoVariants = m.optJSONObject("videoVariants")?.let { variants ->
+                                            com.moments.android.models.VideoVariants(
+                                                low = variants.optString("low").ifBlank { null },
+                                                medium = variants.optString("medium").ifBlank { null },
+                                                high = variants.optString("high").ifBlank { null },
+                                            ).takeIf { it.low != null || it.medium != null || it.high != null }
+                                        },
                                     ),
                                 )
                             }

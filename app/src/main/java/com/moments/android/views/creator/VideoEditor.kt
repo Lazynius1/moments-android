@@ -350,20 +350,22 @@ fun SocialVideoEditorView(
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            // Preview canvas
-            Box(
+            // Preview canvas ≡ resolvedVideoPreviewHeight + aspectRatio(.fit) dentro del espacio restante
+            BoxWithConstraints(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 12.dp)
+                    .padding(vertical = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {
+                val ratio = format.aspectRatio.coerceAtLeast(0.01f)
+                val fittedWidth = minOf(maxWidth, maxHeight * ratio)
+                val fittedHeight = fittedWidth / ratio
                 Box(
                     Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(format.aspectRatio)
+                        .width(fittedWidth)
+                        .height(fittedHeight)
                         .clip(RoundedCornerShape(20.dp))
                         .background(Color.Black)
                         .border(1.dp, chromeStroke, RoundedCornerShape(20.dp)),
@@ -409,8 +411,6 @@ fun SocialVideoEditorView(
                     ) { volume = if (volume > 0f) 0f else 1f }
                 }
             }
-
-            Spacer(Modifier.height(8.dp))
 
             Column(Modifier.background(workspaceBg)) {
                 if (videos.size > 1) {

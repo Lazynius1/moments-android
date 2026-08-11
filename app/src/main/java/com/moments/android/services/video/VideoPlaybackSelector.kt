@@ -7,11 +7,13 @@ import com.moments.android.models.VideoVariants
 import com.moments.android.services.network.NetworkMonitor
 import java.net.URI
 
-/** Port de VideoPlaybackSelector.swift — ABR manual low/medium/high MP4. */
+/** Port de VideoPlaybackSelector.swift — HLS master si existe; si no, ABR manual MP4. */
 data class VideoPlaybackSource(
     val playbackUrl: String,
     val tier: VideoPlaybackTier?,
     val preheatUrlStrings: List<String>,
+    val isHls: Boolean = false,
+    val fallbackMp4Url: String? = null,
 )
 
 object VideoPlaybackSelector {
@@ -21,11 +23,27 @@ object VideoPlaybackSelector {
         val fallbackUrl = resolvedFallbackUrl(forItem, moment) ?: return null
         val tier = recommendedTier()
         val tierUrlString = forItem.videoVariants?.url(tier) ?: fallbackUrl
-        val playbackUrl = normalizedUrlString(tierUrlString) ?: tierUrlString
+        val mp4Url = normalizedUrlString(tierUrlString) ?: tierUrlString
+
+        val hlsRaw = forItem.hlsMasterUrl?.trim()?.takeIf { it.isNotEmpty() }
+        if (hlsRaw != null) {
+            val hlsUrl = normalizedUrlString(hlsRaw) ?: hlsRaw
+            return VideoPlaybackSource(
+                playbackUrl = hlsUrl,
+                tier = tier,
+                // Prefetch del master: ExoPlayer solo baja los primeros segmentos.
+                preheatUrlStrings = listOf(hlsUrl),
+                isHls = true,
+                fallbackMp4Url = mp4Url,
+            )
+        }
+
         return VideoPlaybackSource(
-            playbackUrl = playbackUrl,
+            playbackUrl = mp4Url,
             tier = tier,
             preheatUrlStrings = preheatStrings(forItem.videoVariants, tierUrlString, tier),
+            isHls = false,
+            fallbackMp4Url = null,
         )
     }
 
@@ -119,6 +137,3 @@ object VideoPlaybackSelector {
 }
 
 fun Moment.videoPlaybackSource(): VideoPlaybackSource? = VideoPlaybackSelector.source(forMoment = this)
-
-fun Moment.videoPosterUrlString(forItem: MediaItem): String? =
-    VideoPlaybackSelector.posterUrlString(forItem, this)

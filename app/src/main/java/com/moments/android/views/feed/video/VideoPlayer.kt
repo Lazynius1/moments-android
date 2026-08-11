@@ -124,6 +124,7 @@ fun ModernVideoPlayer(
     var setupRetries by remember(videoId) { mutableIntStateOf(0) }
     var setupGeneration by remember(videoId) { mutableIntStateOf(0) }
     var hasLoadError by remember(videoId) { mutableStateOf(false) }
+    var preferMp4Fallback by remember(videoId) { mutableStateOf(false) }
 
     val activeMomentId by FeedVisibilityCoordinator.activeVideoMomentIdFlow.collectAsState()
     val soundEnabled by GlobalVideoManager.userHasEnabledSoundInSession.collectAsState()
@@ -184,6 +185,11 @@ fun ModernVideoPlayer(
             hasLoadError = true
             return
         }
+        val playbackUrl = if (preferMp4Fallback) {
+            source.fallbackMp4Url ?: source.playbackUrl
+        } else {
+            source.playbackUrl
+        }
         hasLoadError = false
         setupGeneration += 1
 
@@ -201,7 +207,7 @@ fun ModernVideoPlayer(
 
         SharedVideoPlayerPool.initialize(context)
         playerManager.setupPlayer(
-            url = source.playbackUrl,
+            url = playbackUrl,
             consumerId = videoId,
             startAtSeconds = startAt,
             reuseExistingItem = reuse,
@@ -220,6 +226,7 @@ fun ModernVideoPlayer(
     fun forceReloadPlayer() {
         hasLoadError = false
         setupRetries = 0
+        preferMp4Fallback = false
         hasSetupPlayer = false
         playerManager.cleanup(releaseFromPool = true)
         setupPlayer()
@@ -256,6 +263,7 @@ fun ModernVideoPlayer(
             hasSetupPlayer = false
             hasLoadError = false
             setupRetries = 0
+            preferMp4Fallback = false
             setupGeneration += 1
         }
     }
@@ -272,6 +280,14 @@ fun ModernVideoPlayer(
         if (!isVisible || gen != setupGeneration) return@LaunchedEffect
         if (playerManager.player == null) return@LaunchedEffect
         if (playerManager.isReadyToPlay || playerManager.currentTime > 0.05) return@LaunchedEffect
+        val source = resolvedPlaybackSource()
+        if (!preferMp4Fallback && source?.isHls == true && !source.fallbackMp4Url.isNullOrBlank()) {
+            preferMp4Fallback = true
+            hasSetupPlayer = false
+            playerManager.cleanup(releaseFromPool = true)
+            setupPlayer()
+            return@LaunchedEffect
+        }
         if (setupRetries < 2) {
             setupRetries += 1
             hasSetupPlayer = false

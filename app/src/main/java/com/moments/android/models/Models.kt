@@ -189,6 +189,8 @@ data class MediaItem(
     val videoProcessingStatus: VideoProcessingStatus? = null,
     val originalVideoUrl: String? = null,
     val videoVariants: VideoVariants? = null,
+    /** Master playlist HLS (ABR nativo). Preferido sobre MP4 cuando existe. */
+    val hlsMasterUrl: String? = null,
     val tags: List<PhotoTag>? = null,
     val moderationState: ModerationState? = null,
     val moderationReason: String? = null,
@@ -230,6 +232,7 @@ data class MediaItem(
             videoProcessingStatus = VideoProcessingStatus.from(data["videoProcessingStatus"] as? String),
             originalVideoUrl = data["originalVideoUrl"] as? String,
             videoVariants = VideoVariants.from(data["videoVariants"] as? Map<String, Any?>),
+            hlsMasterUrl = data["hlsMasterUrl"] as? String,
             tags = (data["tags"] as? List<*>)?.mapNotNull { (it as? Map<String, Any?>)?.let(PhotoTag::from) },
             moderationState = ModerationState.from(data["moderationState"] as? String),
             moderationReason = data["moderationReason"] as? String,
@@ -1395,6 +1398,7 @@ fun MediaItem.toMap(): Map<String, Any> = buildMap {
     videoProcessingStatus?.let { put("videoProcessingStatus", it.raw) }
     originalVideoUrl?.let { put("originalVideoUrl", it) }
     videoVariants?.let { put("videoVariants", it.toMap()) }
+    hlsMasterUrl?.let { put("hlsMasterUrl", it) }
     tags?.let { put("tags", it.map { t -> t.toMap() }) }
     moderationState?.let { put("moderationState", it.raw) }
     moderationReason?.let { put("moderationReason", it) }
