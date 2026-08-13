@@ -16,8 +16,6 @@ import androidx.camera.core.Camera
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
-import androidx.camera.core.UseCaseGroup
-import androidx.camera.core.ViewPort
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
@@ -265,6 +263,13 @@ fun StoryCameraView(
     var videoCapture by remember {
         mutableStateOf(MomentsCameraController.createVideoCapture())
     }
+    val compatibilityVideoCapture = remember {
+        val recorder = Recorder.Builder()
+            .setQualitySelector(QualitySelector.from(Quality.HD))
+            .build()
+        VideoCapture.withOutput(recorder)
+    }
+    var forceCompatibilitySession by remember { mutableStateOf(false) }
     var previewSize by remember { mutableStateOf(0 to 0) }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     LaunchedEffect(Unit) {
@@ -290,7 +295,13 @@ fun StoryCameraView(
         imageCapture.flashMode = flashMode
     }
 
-    LaunchedEffect(hasCameraPermission, lensFacing, previewView, previewSize) {
+    LaunchedEffect(
+        hasCameraPermission,
+        lensFacing,
+        previewView,
+        previewSize,
+        forceCompatibilitySession,
+    ) {
         val view = previewView ?: return@LaunchedEffect
         if (!hasCameraPermission) return@LaunchedEffect
         val (previewWidth, previewHeight) = previewSize
@@ -307,36 +318,56 @@ fun StoryCameraView(
         val selector = CameraSelector.Builder()
             .requireLensFacing(lensFacing)
             .build()
+        val useCompatibilitySession = forceCompatibilitySession ||
+            MomentsCameraController.requiresCompatibilitySession()
         val selectedCameraInfo = selector.filter(provider.availableCameraInfos).firstOrNull()
-        val stabilizationSupported = selectedCameraInfo?.let {
+        val stabilizationSupported = !useCompatibilitySession && selectedCameraInfo?.let {
             MomentsCameraController.supportsVideoStabilization(it)
         } == true
-        val activeVideoCapture = MomentsCameraController.createVideoCapture(
-            stabilizationSupported = stabilizationSupported,
-        ).also {
+        val activeVideoCapture = if (useCompatibilitySession) {
+            compatibilityVideoCapture
+        } else {
+            MomentsCameraController.createVideoCapture(
+                stabilizationSupported = stabilizationSupported,
+            )
+        }.also {
             it.targetRotation = rotation
             videoCapture = it
         }
-        val preview = MomentsCameraController.createPreview(rotation, stabilizationSupported).also {
-            it.surfaceProvider = view.surfaceProvider
-        }
-        val useCases = MomentsCameraController.createUseCaseGroup(
-            preview = preview,
-            imageCapture = imageCapture,
-            videoCapture = activeVideoCapture,
-            viewportWidth = previewWidth,
-            viewportHeight = previewHeight,
-            targetRotation = rotation,
-        )
-        runCatching {
+        val preview = if (useCompatibilitySession) {
+            Preview.Builder().setTargetRotation(rotation).build()
+        } else {
+            MomentsCameraController.createPreview(rotation, stabilizationSupported)
+        }.also { it.surfaceProvider = view.surfaceProvider }
+
+        val bindResult = runCatching {
             provider.unbindAll()
-            boundCamera = provider.bindToLifecycle(
-                lifecycleOwner,
-                selector,
-                useCases,
-            )
+            boundCamera = if (useCompatibilitySession) {
+                provider.bindToLifecycle(
+                    lifecycleOwner,
+                    selector,
+                    preview,
+                    imageCapture,
+                    activeVideoCapture,
+                )
+            } else {
+                val useCases = MomentsCameraController.createUseCaseGroup(
+                    preview = preview,
+                    imageCapture = imageCapture,
+                    videoCapture = activeVideoCapture,
+                    viewportWidth = previewWidth,
+                    viewportHeight = previewHeight,
+                    targetRotation = rotation,
+                )
+                provider.bindToLifecycle(lifecycleOwner, selector, useCases)
+            }
             boundCamera?.cameraControl?.setZoomRatio(zoomLevel)
-            boundCamera?.let(MomentsCameraController::enableLowLightBoostWhenAvailable)
+            if (!useCompatibilitySession) {
+                boundCamera?.let(MomentsCameraController::enableLowLightBoostWhenAvailable)
+            }
+        }
+        if (bindResult.isFailure && !useCompatibilitySession) {
+            forceCompatibilitySession = true
         }
     }
 

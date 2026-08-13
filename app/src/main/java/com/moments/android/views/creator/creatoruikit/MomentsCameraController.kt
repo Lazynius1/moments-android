@@ -1,5 +1,6 @@
 package com.moments.android.views.creator.creatoruikit
 
+import android.os.Build
 import android.util.Rational
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraInfo
@@ -16,6 +17,15 @@ import androidx.camera.video.VideoCapture
 
 /** Shared CameraX policy for Creator, Stories and attachment capture. */
 object MomentsCameraController {
+    /**
+     * Some camera HALs accept the modern Preview + ImageCapture + VideoCapture session but never
+     * produce preview frames. CameraX therefore cannot report the incompatibility through bind().
+     * Keep narrowly-scoped device quirks here instead of weakening the modern path for everyone.
+     */
+    fun requiresCompatibilitySession(): Boolean =
+        Build.VERSION.SDK_INT == Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+            Build.DEVICE.equals("lisa", ignoreCase = true)
+
     fun createVideoCapture(
         qualities: List<Quality> = listOf(Quality.FHD, Quality.HD),
         stabilizationSupported: Boolean = false,

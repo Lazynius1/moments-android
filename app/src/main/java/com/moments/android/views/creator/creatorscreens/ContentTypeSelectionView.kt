@@ -75,8 +75,10 @@ import com.moments.android.views.creator.creatoruikit.BackgroundCameraView
 import com.moments.android.views.creator.creatoruikit.StopBackgroundCameraSession
 import com.moments.android.views.permission.shared.PermissionPrimerGate
 import com.moments.android.views.permission.shared.PermissionPrimerGateHost
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 /**
@@ -132,7 +134,11 @@ fun ContentTypeSelectionView(
     )
 
     fun reloadRecentPhotos() {
-        recentImageUris = loadRecentImageUris(context, limit = 4)
+        scope.launch {
+            recentImageUris = withContext(Dispatchers.IO) {
+                loadRecentImageUris(context.applicationContext, limit = 4)
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -453,25 +459,42 @@ private fun FloatingRecentImage(uri: Uri, index: Int) {
 }
 
 private fun loadRecentImageUris(context: android.content.Context, limit: Int): List<Uri> {
-    val permission = if (Build.VERSION.SDK_INT >= 33) {
-        Manifest.permission.READ_MEDIA_IMAGES
-    } else {
-        Manifest.permission.READ_EXTERNAL_STORAGE
+    fun hasPermission(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+    val hasImageAccess = when {
+        Build.VERSION.SDK_INT >= 34 ->
+            hasPermission(Manifest.permission.READ_MEDIA_IMAGES) ||
+                hasPermission(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+        Build.VERSION.SDK_INT >= 33 -> hasPermission(Manifest.permission.READ_MEDIA_IMAGES)
+        else -> hasPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
-    if (ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+    if (!hasImageAccess) {
         return emptyList()
     }
     val uris = mutableListOf<Uri>()
     val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-    val projection = arrayOf(MediaStore.Images.Media._ID)
+    val projection = arrayOf(
+        MediaStore.Images.Media._ID,
+        MediaStore.Images.Media.SIZE,
+    )
+    val selection = if (Build.VERSION.SDK_INT >= 29) {
+        "${MediaStore.Images.Media.IS_PENDING}=0 AND ${MediaStore.Images.Media.SIZE}>0"
+    } else {
+        "${MediaStore.Images.Media.SIZE}>0"
+    }
     val sort = "${MediaStore.Images.Media.DATE_ADDED} DESC"
-    context.contentResolver.query(collection, projection, null, null, sort)?.use { cursor ->
-        val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-        var count = 0
-        while (cursor.moveToNext() && count < limit) {
-            val id = cursor.getLong(idCol)
-            uris += ContentUris.withAppendedId(collection, id)
-            count++
+    runCatching {
+        context.contentResolver.query(collection, projection, selection, null, sort)?.use { cursor ->
+            val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+            while (cursor.moveToNext() && uris.size < limit) {
+                val uri = ContentUris.withAppendedId(collection, cursor.getLong(idCol))
+                // MIUI can leave stale MediaStore rows whose backing file is no longer readable.
+                val readable = runCatching {
+                    context.contentResolver.openFileDescriptor(uri, "r")?.use { true } == true
+                }.getOrDefault(false)
+                if (readable) uris += uri
+            }
         }
     }
     return uris
