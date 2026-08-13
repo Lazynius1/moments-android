@@ -102,6 +102,8 @@ import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.moments.android.R
+import com.moments.android.adaptive.AdaptiveContentWidths
+import com.moments.android.adaptive.LocalAdaptiveWindowState
 import com.moments.android.coordinators.CoordinatorNavigationEvent
 import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.extensions.MomentsChromeGlass
@@ -199,6 +201,7 @@ fun StoryViewerScreen(
     highlightTitle: String? = null,
     modifier: Modifier = Modifier,
 ) {
+    val adaptiveWindow = LocalAdaptiveWindowState.current
     val context = LocalContext.current
     val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
@@ -877,7 +880,7 @@ fun StoryViewerScreen(
         null -> ""
     }
 
-    val canvasBg = adaptive.surfaceBackground
+    val canvasBg = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     val replyPlaceholder = when {
         !authorAllowsMessages -> stringResource(R.string.stories_replies_disabled_placeholder)
         isVanishActiveWithAuthor -> stringResource(R.string.chat_input_vanish_placeholder)
@@ -915,12 +918,26 @@ fun StoryViewerScreen(
                 safeAreaTopPx = topInset,
                 safeAreaBottomPx = bottomInset,
                 density = density,
+                bottomChromeReserve = when {
+                    !adaptiveWindow.usesLargeStoryLayout -> 20.dp
+                    screenW > screenH -> 70.dp
+                    else -> 60.dp
+                },
+                maxCanvasWidth = if (adaptiveWindow.usesLargeStoryLayout) {
+                    AdaptiveContentWidths.StoryViewerMax
+                } else {
+                    AdaptiveContentWidths.StoryMax
+                },
             )
             val bottomChromeHeight = with(density) {
                 (screenH - bottomInset - captureRect.bottom).coerceAtLeast(0f).toDp()
             }
             // IG-like: encima de nav + buffer (~25dp). Antes 8dp quedaba demasiado pegado.
-            val replyBottomPadding = if (isKeyboardVisible) 6.dp else 25.dp
+            val replyBottomPadding = when {
+                isKeyboardVisible -> 6.dp
+                adaptiveWindow.usesLargeStoryLayout -> 8.dp
+                else -> 25.dp
+            }
             val canvasRect = Rect(captureRect.left, captureRect.top, captureRect.right, captureRect.bottom)
             val corner = storyViewerCanvasCornerRadius
             val regions = deckGestureGate?.interactionRegions.orEmpty()
@@ -1051,7 +1068,7 @@ fun StoryViewerScreen(
                         height = with(density) { captureRect.height.toDp() },
                     )
                     .clip(RoundedCornerShape(corner))
-                    .background(Color.Black),
+                    .background(canvasBg),
             ) {
                 ScreenshotProtectedView(
                     isProtected = !isEveryoneStoryAudience,
@@ -1167,12 +1184,24 @@ fun StoryViewerScreen(
                 var headerH by remember { mutableIntStateOf(with(density) { 40.dp.roundToPx() }) }
 
                 Box(
-                    Modifier
-                        .offset {
-                            IntOffset(0, (progressCenterY - progressH / 2f).roundToInt())
-                        }
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
+                    (if (adaptiveWindow.usesLargeStoryLayout) {
+                        Modifier
+                            .offset {
+                                IntOffset(
+                                    captureRect.left.roundToInt(),
+                                    (progressCenterY - progressH / 2f).roundToInt(),
+                                )
+                            }
+                            .width(with(density) { captureRect.width.toDp() })
+                            .padding(horizontal = 8.dp)
+                    } else {
+                        Modifier
+                            .offset {
+                                IntOffset(0, (progressCenterY - progressH / 2f).roundToInt())
+                            }
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                    })
                         .onSizeChanged { progressH = it.height },
                 ) {
                     StorySegmentProgressChrome(
@@ -1283,11 +1312,20 @@ fun StoryViewerScreen(
                     Box(
                         Modifier
                             .offset {
-                                IntOffset(0, captureRect.bottom.roundToInt())
+                                IntOffset(
+                                    if (adaptiveWindow.usesLargeStoryLayout) captureRect.left.roundToInt() else 0,
+                                    captureRect.bottom.roundToInt(),
+                                )
                             }
-                            .fillMaxWidth()
+                            .then(
+                                if (adaptiveWindow.usesLargeStoryLayout) {
+                                    Modifier.width(with(density) { captureRect.width.toDp() })
+                                } else {
+                                    Modifier.fillMaxWidth()
+                                },
+                            )
                             .height(bottomChromeHeight)
-                            .padding(horizontal = 32.dp),
+                            .padding(horizontal = if (adaptiveWindow.usesLargeStoryLayout) 8.dp else 32.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         StoryOwnStoryBottomBar(
@@ -1304,6 +1342,7 @@ fun StoryViewerScreen(
                                 pauseStoryPlayback()
                                 showStoryShareSheet = true
                             },
+                            compact = adaptiveWindow.usesLargeStoryLayout,
                         )
                     }
                 } else {
@@ -1311,12 +1350,20 @@ fun StoryViewerScreen(
                     Column(
                         Modifier
                             .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
+                            .then(
+                                if (adaptiveWindow.usesLargeStoryLayout) {
+                                    Modifier.width(with(density) { captureRect.width.toDp() })
+                                } else {
+                                    Modifier.fillMaxWidth()
+                                },
+                            )
                             .imePadding()
                             .navigationBarsPadding()
-                            .padding(horizontal = 16.dp)
+                            .padding(horizontal = if (adaptiveWindow.usesLargeStoryLayout) 8.dp else 16.dp)
                             .padding(bottom = replyBottomPadding),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(
+                            if (adaptiveWindow.usesLargeStoryLayout) 6.dp else 12.dp,
+                        ),
                     ) {
                         if (showReactions && authorAllowsReactions) {
                             StoryReactionsStrip(
@@ -1338,7 +1385,9 @@ fun StoryViewerScreen(
                                         (!authorAllowsMessages && (authorAllowsReactions || authorAllowsEphemeralPhotos))
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(
+                                        if (adaptiveWindow.usesLargeStoryLayout) 6.dp else 10.dp,
+                                    ),
                                 ) {
                                     if (showsReplyComposer) {
                                         // ≡ HStack + padding(h:16, v:14) + Capsule chrome (iOS)
@@ -1374,7 +1423,10 @@ fun StoryViewerScreen(
                                                         Modifier
                                                     },
                                                 )
-                                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                                                .padding(
+                                                    horizontal = if (adaptiveWindow.usesLargeStoryLayout) 12.dp else 16.dp,
+                                                    vertical = if (adaptiveWindow.usesLargeStoryLayout) 7.dp else 10.dp,
+                                                ),
                                             verticalAlignment = Alignment.CenterVertically,
                                         ) {
                                             if (authorAllowsMessages) {
@@ -1441,7 +1493,8 @@ fun StoryViewerScreen(
                                     ) {
                                         if (authorAllowsReactions && (messageText.isEmpty() || !authorAllowsMessages)) {
                                             StoryViewerReplyActionButton(
-                                                glass = replyIconsGlass,
+                                                    glass = replyIconsGlass,
+                                                    compact = adaptiveWindow.usesLargeStoryLayout,
                                                 onClick = {
                                                     // ≡ MotionPolicy.withOptionalAnimation(Spring.toggle)
                                                     showReactions = !showReactions
@@ -1471,7 +1524,8 @@ fun StoryViewerScreen(
                                         }
                                         if (authorAllowsEphemeralPhotos) {
                                             StoryViewerReplyActionButton(
-                                                glass = replyIconsGlass,
+                                                    glass = replyIconsGlass,
+                                                    compact = adaptiveWindow.usesLargeStoryLayout,
                                                 onClick = {
                                                     pauseStoryPlayback()
                                                     showEphemeralPicker = true
@@ -1488,6 +1542,7 @@ fun StoryViewerScreen(
                                         if (messageText.isNotEmpty() && authorAllowsMessages) {
                                             StoryViewerReplyActionButton(
                                                 glass = replyIconsGlass,
+                                                compact = adaptiveWindow.usesLargeStoryLayout,
                                                 onClick = ::sendMessageAction,
                                             ) {
                                                 Icon(
@@ -1501,6 +1556,7 @@ fun StoryViewerScreen(
                                         if (isEveryoneStoryAudience && messageText.isEmpty()) {
                                             StoryViewerReplyActionButton(
                                                 glass = replyIconsGlass,
+                                                compact = adaptiveWindow.usesLargeStoryLayout,
                                                 onClick = {
                                                     pauseStoryPlayback()
                                                     showStoryShareSheet = true
@@ -1918,13 +1974,14 @@ private fun ChainActionsPanel(
 @Composable
 private fun StoryViewerReplyActionButton(
     glass: Boolean,
+    compact: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     Box(
         modifier
-            .size(40.dp)
+            .size(if (compact) 34.dp else 40.dp)
             .then(
                 if (glass) {
                     Modifier.momentsChromeGlass(CircleShape, interactive = true)

@@ -102,10 +102,12 @@ class UploadingStory(
     val storyVideoMode: StoryVideoMode = StoryVideoMode.NORMAL,
     tempId: String? = null,
     plannedStoryId: String? = null,
-) {
-    val id: String = UUID.randomUUID().toString()
-    val tempId: String = tempId ?: "temp_story_${UUID.randomUUID()}"
+) : PendingPublication {
+    override val operationId: String = UUID.randomUUID().toString()
+    val id: String get() = operationId
+    override val tempId: String = tempId ?: "temp_story_${UUID.randomUUID()}"
     val plannedStoryId: String = plannedStoryId ?: UUID.randomUUID().toString()
+    override val plannedRemoteId: String get() = plannedStoryId
     val createdAt: Date = Date()
 
     var uploadProgress by mutableDoubleStateOf(0.0)

@@ -403,6 +403,20 @@ private fun pickerSecondary() =
     if (isSystemInDarkTheme()) Color.White.copy(0.55f) else Color.Black.copy(0.55f)
 
 private fun hasPhotosPermission(context: android.content.Context): Boolean {
+    if (android.os.Build.VERSION.SDK_INT >= 34) {
+        val selected = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val full = listOf(
+            android.Manifest.permission.READ_MEDIA_IMAGES,
+            android.Manifest.permission.READ_MEDIA_VIDEO,
+        ).all {
+            androidx.core.content.ContextCompat.checkSelfPermission(context, it) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        return selected || full
+    }
     val perms = if (android.os.Build.VERSION.SDK_INT >= 33) {
         arrayOf(
             android.Manifest.permission.READ_MEDIA_IMAGES,

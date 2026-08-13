@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.moments.android.MainActivity
@@ -19,7 +20,9 @@ import com.moments.android.R
  * Equivalente Android de `UIApplication.beginBackgroundTask` en
  * `BackgroundStoryUploadService` / `BackgroundMomentUploadService` (iOS).
  *
- * Mantiene el proceso vivo con FGS `dataSync` mientras hay subidas (prepare/bake incluido).
+ * Mantiene el proceso vivo con FGS `dataSync` mientras hay una publicación en curso.
+ * No declara `mediaProcessing`: ese tipo no corresponde a la transferencia de red y
+ * declarar ambos tipos para cada subida ampliaba innecesariamente la superficie de Play.
  * La recuperación tras kill sigue siendo el outbox + [com.moments.android.services.network.OfflineSyncService].
  */
 class UploadForegroundService : Service() {
@@ -40,6 +43,12 @@ class UploadForegroundService : Service() {
         return START_STICKY
     }
 
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        Log.w(TAG, "Foreground upload timed out; startId=$startId type=$fgsType")
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf(startId)
+    }
+
     override fun onDestroy() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
@@ -49,6 +58,7 @@ class UploadForegroundService : Service() {
         const val ACTION_START = "com.moments.android.action.UPLOAD_FGS_START"
         const val NOTIFICATION_ID = 0x4D4F5531 // "MOU1"
         private const val CHANNEL_ID = "moments_upload_live_v2"
+        private const val TAG = "MomentsUploadFgs"
 
         fun buildNotification(context: Context): Notification {
             ensureChannel(context)
@@ -113,8 +123,9 @@ object UploadForegroundKeeper {
                         UploadForegroundService.ACTION_START,
                     )
                     ContextCompat.startForegroundService(app, intent)
-                } catch (_: Throwable) {
+                } catch (error: Throwable) {
                     // Sin FGS el outbox sigue siendo la red de seguridad al reabrir.
+                    Log.e("MomentsUploadFgs", "Unable to start upload foreground service", error)
                     refs = 0
                 }
             }

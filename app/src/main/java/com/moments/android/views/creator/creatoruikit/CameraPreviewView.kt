@@ -93,10 +93,7 @@ fun CameraPreviewView(
         } else {
             listOf(Quality.HD, Quality.SD)
         }
-        val recorder = Recorder.Builder()
-            .setQualitySelector(QualitySelector.fromOrderedList(qualities))
-            .build()
-        VideoCapture.withOutput(recorder)
+        MomentsCameraController.createVideoCapture(qualities = qualities)
     }
 
     var previewView by remember { mutableStateOf<PreviewView?>(null) }

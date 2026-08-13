@@ -58,6 +58,7 @@ import com.moments.android.views.feed.uploads.UploadStatus
 import com.moments.android.utilities.momentsPress
 import com.moments.android.views.story.StoryRingLayout
 import com.moments.android.views.story.StorySegmentedRing
+import com.moments.android.views.story.storyRingGapMask
 import kotlin.math.min
 
 data class FeedStoryUserState(
@@ -261,7 +262,7 @@ fun FeedStoryRingAvatar(
     val outerSize = StoryRingLayout.outerFrameSize(avatarSize, resolvedLineWidth)
 
     Box(modifier.size(outerSize), contentAlignment = Alignment.Center) {
-        // iOS siempre monta StorySegmentedRing; el Canvas no dibuja si !hasStory
+        // iOS: ring.mask(StoryRingLayout.ringGapMask) → anillo fuera con hueco.
         StorySegmentedRing(
             storyCount = storyCount,
             hasStory = hasStory,
@@ -272,6 +273,7 @@ fun FeedStoryRingAvatar(
             ringSize = StoryRingLayout.ringStrokeDiameter(avatarSize, resolvedLineWidth),
             lineWidth = resolvedLineWidth,
             hapticsEnabled = hapticsEnabled,
+            modifier = Modifier.storyRingGapMask(avatarSize = avatarSize),
         )
 
         Box(

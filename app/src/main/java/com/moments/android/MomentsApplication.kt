@@ -26,6 +26,7 @@ import com.moments.android.services.messaging.MessageSyncCursorStore
 import com.moments.android.services.messaging.OnlineStatusService
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.network.OfflineSyncService
+import com.moments.android.services.network.OfflineSyncWorker
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.persistence.StorySeenStateService
 import com.moments.android.services.performance.MotionPolicy
@@ -119,6 +120,7 @@ class MomentsApplication : Application() {
         com.moments.android.views.messaging.services.EphemeralCleanupManager.startCleanupSystem()
         // LocalFirstMessaging / ChatCache ya inicializados arriba (antes de CacheManager)
         OfflineSyncService.enableAutomaticSync()
+        OfflineSyncWorker.schedule(this)
         NotificationService.initialize(this)
         NotificationBadgeService.initialize(this)
         InAppNotificationService.startListening()

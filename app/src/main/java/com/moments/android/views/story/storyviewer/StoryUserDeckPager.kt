@@ -3,6 +3,7 @@ package com.moments.android.views.story.storyviewer
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.blur
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -18,6 +19,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -34,6 +36,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.moments.android.services.performance.MotionPolicy
+import com.moments.android.adaptive.LocalAdaptiveWindowState
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.story.StoryDeckGestureGate
 import kotlinx.coroutines.delay
@@ -64,6 +67,7 @@ fun StoryUserDeckPager(
     val scope = rememberCoroutineScope()
     val view = LocalView.current
     val density = LocalDensity.current
+    val adaptiveWindow = LocalAdaptiveWindowState.current
     val gestureCoordinator = remember { StoryGestureCoordinator() }
     val dragOffset = remember { Animatable(0f) }
     var isDraggingDeck by remember { mutableStateOf(false) }
@@ -236,7 +240,7 @@ fun StoryUserDeckPager(
                         .fillMaxSize()
                         .offset { IntOffset(pageX.roundToInt(), 0) }
                         .zIndex(if (role == StoryDeckPageRole.CENTER) 1f else 0f)
-                        .deckPassPageVisual(progress),
+                        .deckPassPageVisual(progress, blurAdjacent = adaptiveWindow.usesLargeStoryLayout),
                 ) {
                     content(ids[index], role, isDraggingDeck)
                     if (role != StoryDeckPageRole.CENTER) {
@@ -261,13 +265,22 @@ fun StoryUserDeckPager(
     }
 }
 
-private fun Modifier.deckPassPageVisual(progress: Float): Modifier {
+private fun Modifier.deckPassPageVisual(progress: Float, blurAdjacent: Boolean): Modifier {
     val magnitude = abs(progress).coerceAtMost(1f)
     if (magnitude < 0.001f) return this
     val scale = (1f - magnitude * 0.06f).coerceAtLeast(0.94f)
     val alpha = (1f - magnitude * 0.48f).coerceAtLeast(0.52f)
-    // No `Modifier.blur`: en Android randeriza negro sobre ExoPlayer/AsyncImage.
-    return graphicsLayer {
+    // El player usa TextureView, así que el RenderEffect puede desenfocar la página
+    // completa sin convertir el vídeo lateral en una superficie negra.
+    val visual = if (blurAdjacent) {
+        blur(
+            radius = (magnitude * 18f).dp,
+            edgeTreatment = BlurredEdgeTreatment.Unbounded,
+        )
+    } else {
+        this
+    }
+    return visual.graphicsLayer {
         scaleX = scale
         scaleY = scale
         this.alpha = alpha

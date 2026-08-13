@@ -101,10 +101,12 @@ class UploadingMoment(
     val hiddenLayers: List<HiddenLayerDraft> = emptyList(),
     tempId: String? = null,
     plannedMomentId: String? = null,
-) {
-    val id: String = UUID.randomUUID().toString()
-    val tempId: String = tempId ?: "temp_${UUID.randomUUID()}"
+) : PendingPublication {
+    override val operationId: String = UUID.randomUUID().toString()
+    val id: String get() = operationId
+    override val tempId: String = tempId ?: "temp_${UUID.randomUUID()}"
     val plannedMomentId: String = plannedMomentId ?: UUID.randomUUID().toString()
+    override val plannedRemoteId: String get() = plannedMomentId
     val createdAt: Date = Date()
 
     var uploadProgress by mutableDoubleStateOf(0.0)

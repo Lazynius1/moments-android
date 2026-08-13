@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
@@ -25,6 +26,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.width
 import com.moments.android.coordinators.nav3.MomentsDeepLinkParser
 import com.moments.android.coordinators.nav3.MomentsNavKey
 import com.moments.android.coordinators.nav3.MomentsTabNavHost
@@ -42,8 +45,14 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
 import com.moments.android.icons.MomentsIcons
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldLayout
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
+import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -82,6 +91,7 @@ import com.moments.android.views.shared.OfflineBannerOverlay
 import com.moments.android.views.components.InAppBannerView
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.story.StoryRingAvatarView
+import com.moments.android.adaptive.LocalAdaptiveWindowState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterIsInstance
@@ -138,6 +148,7 @@ fun TabBarScreen(
     var echoInvitationRoute by remember { mutableStateOf<String?>(null) }
     // ≡ iOS `.toolbar(.hidden, for: .tabBar)` desde Settings / edit / moment zoom
     var suppressTabBar by remember { mutableStateOf(false) }
+    val adaptiveWindow = LocalAdaptiveWindowState.current
 
     val scope = rememberCoroutineScope()
     val firestoreService = remember { FirestoreService() }
@@ -294,53 +305,155 @@ fun TabBarScreen(
         )
     }
 
+    fun selectTab(index: Int) {
+        if (index == AppTab.toIndex(AppTab.HOME) && selectedTab == index) {
+            HapticManager.shared.lightImpact()
+            NavigationEventBus.emit(CoordinatorNavigationEvent.ScrollFeedToTop)
+        } else if (index == AppTab.toIndex(AppTab.CREATE)) {
+            HapticManager.shared.mediumImpact()
+            isCreatingStory = true
+            tabNavigator.push(MomentsNavKey.Creator)
+        } else {
+            HapticManager.shared.selection()
+            tabNavigator.selectTabIndex(index)
+        }
+    }
+
+    val navigationVisible = !suppressTabBar && !tabNavigator.shouldHideTabBarForPush()
+    val navigationSuiteState = rememberNavigationSuiteScaffoldState()
+    LaunchedEffect(navigationVisible, adaptiveWindow.isCompactHandset) {
+        if (!adaptiveWindow.isCompactHandset) {
+            if (navigationVisible) navigationSuiteState.show() else navigationSuiteState.hide()
+        }
+    }
+    val navContent: @Composable (PaddingValues) -> Unit = { padding ->
+        MomentsTabNavHost(
+            navigationState = tabNavigationState,
+            navigator = tabNavigator,
+            padding = padding,
+            isCreatingStory = isCreatingStory,
+            onIsCreatingStoryChange = { isCreatingStory = it },
+            openCreatorInStoryMode = openCreatorInStoryMode,
+            onOpenCreatorInStoryModeChange = { openCreatorInStoryMode = it },
+            onSuppressTabBarChange = { suppressTabBar = it },
+        )
+    }
+
     Box(Modifier.fillMaxSize()) {
         // Skill edge-to-edge: bottom insets los consume el tab bar (navigationBarsPadding).
         // Top/horizontal → contentPadding del Scaffold; no doble-padear el dock.
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = MaterialTheme.colorScheme.background,
-            contentWindowInsets = WindowInsets.safeDrawing.only(
-                WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
-            ),
-            bottomBar = {
-                // Push Profile (Nav3) oculta dock; overlays DialogScene ya cubren encima.
-                if (!suppressTabBar && !tabNavigator.shouldHideTabBarForPush()) {
-                    MomentsCustomTabBar(
-                        selectedTab = selectedTab,
-                        onSelectTab = { index ->
-                            if (index == AppTab.toIndex(AppTab.HOME) && selectedTab == index) {
-                                HapticManager.shared.lightImpact()
-                                NavigationEventBus.emit(CoordinatorNavigationEvent.ScrollFeedToTop)
-                            } else if (index == AppTab.toIndex(AppTab.CREATE)) {
-                                HapticManager.shared.mediumImpact()
-                                isCreatingStory = true
-                                tabNavigator.push(MomentsNavKey.Creator)
-                            } else {
-                                HapticManager.shared.selection()
-                                tabNavigator.selectTabIndex(index)
+        if (adaptiveWindow.isCompactHandset) {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                containerColor = MaterialTheme.colorScheme.background,
+                contentWindowInsets = WindowInsets.safeDrawing.only(
+                    WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
+                ),
+                bottomBar = {
+                    if (navigationVisible) {
+                        MomentsCustomTabBar(
+                            selectedTab = selectedTab,
+                            onSelectTab = ::selectTab,
+                            onOpenCreator = { selectTab(AppTab.toIndex(AppTab.CREATE)) },
+                            showFeedBadge = hasNewFeedContent,
+                            showMessagesBadge = unreadMessagesCount > 0,
+                            showProfileBadge = hasUnreadNotifications,
+                        )
+                    }
+                },
+                content = navContent,
+            )
+        } else {
+            val showRailLabels = adaptiveWindow.height > adaptiveWindow.width
+            val railActiveColor = if (isSystemInDarkTheme()) Color.White else MomentsGlassButtonTint.dark
+            val railInactiveColor = railActiveColor.copy(alpha = 0.55f)
+            val railItemColors = NavigationRailItemDefaults.colors(
+                selectedIconColor = railActiveColor,
+                selectedTextColor = railActiveColor,
+                unselectedIconColor = railInactiveColor,
+                unselectedTextColor = railInactiveColor,
+                indicatorColor = Color.Transparent,
+            )
+            NavigationSuiteScaffoldLayout(
+                navigationSuiteType = NavigationSuiteType.NavigationRail,
+                state = navigationSuiteState,
+                navigationSuite = {
+                    Surface(color = MaterialTheme.colorScheme.background) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(80.dp)
+                            .windowInsetsPadding(
+                                WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical),
+                            )
+                            .padding(vertical = 12.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                    NavigationRailItem(
+                        selected = selectedTab == 0,
+                        onClick = { selectTab(0) },
+                        icon = {
+                            RailIcon(showBadge = hasNewFeedContent) {
+                                Icon(if (selectedTab == 0) Icons.Filled.Home else Icons.Outlined.Home, null)
                             }
                         },
-                        onOpenCreator = {
-                            HapticManager.shared.mediumImpact()
-                            tabNavigator.push(MomentsNavKey.Creator)
-                        },
-                        showFeedBadge = hasNewFeedContent,
-                        showMessagesBadge = unreadMessagesCount > 0,
-                        showProfileBadge = hasUnreadNotifications,
+                        label = if (showRailLabels) ({ Text(stringResource(R.string.tab_bar_home)) }) else null,
+                        alwaysShowLabel = showRailLabels,
+                        colors = railItemColors,
                     )
-                }
-            },
-        ) { padding ->
-            MomentsTabNavHost(
-                navigationState = tabNavigationState,
-                navigator = tabNavigator,
-                padding = padding,
-                isCreatingStory = isCreatingStory,
-                onIsCreatingStoryChange = { isCreatingStory = it },
-                openCreatorInStoryMode = openCreatorInStoryMode,
-                onOpenCreatorInStoryModeChange = { openCreatorInStoryMode = it },
-                onSuppressTabBarChange = { suppressTabBar = it },
+                    NavigationRailItem(
+                        selected = selectedTab == 1,
+                        onClick = { selectTab(1) },
+                        icon = {
+                            RailIcon(showBadge = unreadMessagesCount > 0) {
+                                MessagesTabGlyph(
+                                    size = 26.dp,
+                                    color = LocalContentColor.current,
+                                    filled = unreadMessagesCount > 0,
+                                )
+                            }
+                        },
+                        label = if (showRailLabels) ({ Text(stringResource(R.string.messaging_title)) }) else null,
+                        alwaysShowLabel = showRailLabels,
+                        colors = railItemColors,
+                    )
+                    NavigationRailItem(
+                        selected = false,
+                        onClick = { selectTab(2) },
+                        icon = {
+                            Icon(
+                                MomentsIcons.CameraAperture,
+                                contentDescription = null,
+                                modifier = Modifier.size(30.dp),
+                            )
+                        },
+                        label = if (showRailLabels) ({ Text(stringResource(R.string.tab_bar_create)) }) else null,
+                        alwaysShowLabel = showRailLabels,
+                        colors = railItemColors,
+                    )
+                    NavigationRailItem(
+                        selected = selectedTab == 3,
+                        onClick = { selectTab(3) },
+                        icon = { Icon(if (selectedTab == 3) Icons.Filled.Search else Icons.Outlined.Search, null) },
+                        label = if (showRailLabels) ({ Text(stringResource(R.string.tab_bar_explore)) }) else null,
+                        alwaysShowLabel = showRailLabels,
+                        colors = railItemColors,
+                    )
+                    NavigationRailItem(
+                        selected = selectedTab == 4,
+                        onClick = { selectTab(4) },
+                        icon = {
+                            RailProfileIcon(showBadge = hasUnreadNotifications)
+                        },
+                        label = if (showRailLabels) ({ Text(stringResource(R.string.tab_bar_profile)) }) else null,
+                        alwaysShowLabel = showRailLabels,
+                        colors = railItemColors,
+                    )
+                    }
+                    }
+                },
+                content = { navContent(PaddingValues.Zero) },
             )
         }
 
@@ -373,6 +486,46 @@ fun TabBarScreen(
             )
         }
     }
+}
+
+@Composable
+private fun RailIcon(showBadge: Boolean, content: @Composable () -> Unit) {
+    Box {
+        content()
+        if (showBadge) {
+            RedNavigationBadge(Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-2).dp))
+        }
+    }
+}
+
+@Composable
+private fun RailProfileIcon(showBadge: Boolean) {
+    val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+    var ringRefreshTrigger by remember { mutableIntStateOf(0) }
+    LaunchedEffect(uid) {
+        NavigationEventBus.events
+            .filterIsInstance<CoordinatorNavigationEvent.StoryUploaded>()
+            .collect { ringRefreshTrigger += 1 }
+    }
+    RailIcon(showBadge = showBadge) {
+        if (uid.isNotEmpty()) {
+            StoryRingAvatarView(
+                userId = uid,
+                size = 28.dp,
+                lineWidth = 2.2.dp,
+                refreshTrigger = ringRefreshTrigger,
+                isOwnStory = true,
+                hapticsEnabled = false,
+            )
+        } else {
+            Icon(Icons.Outlined.Person, contentDescription = null, modifier = Modifier.size(26.dp))
+        }
+    }
+}
+
+@Composable
+private fun RedNavigationBadge(modifier: Modifier = Modifier) {
+    Box(modifier.size(7.dp).clip(CircleShape).background(Color(0xFFFF3B30)))
 }
 
 /**

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -35,6 +36,7 @@ import com.moments.android.views.profile.core.ProfileView
 import com.moments.android.views.profile.userprofile.UserProfileView
 import com.moments.android.views.story.StoriesView
 import com.moments.android.views.story.StoryChainView
+import com.moments.android.adaptive.AdaptiveContentWidths
 
 /**
  * Host Nav3 del dock — skill `navigation-3` fase 2a/2b.
@@ -69,22 +71,29 @@ fun MomentsTabNavHost(
     val provider: (NavKey) -> NavEntry<NavKey> = { key ->
         when (key) {
             MomentsTabNavKey.Feed -> NavEntry(key) {
-                FeedView(
-                    padding = padding,
-                    showCreatorView = showCreatorView,
-                    onSuppressTabBarChange = onSuppressTabBarChange,
-                    onShowCreatorViewChange = { visible ->
-                        if (visible) {
-                            onIsCreatingStoryChange(true)
-                            navigator.push(MomentsNavKey.Creator)
-                        } else {
-                            // popIfTop: no tumbar otro destino si Creator no está arriba.
-                            navigator.popIfTop(MomentsNavKey.Creator)
-                            onOpenCreatorInStoryModeChange(false)
-                            onIsCreatingStoryChange(false)
-                        }
-                    },
-                )
+                Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
+                    Box(
+                        Modifier
+                            .widthIn(max = AdaptiveContentWidths.FeedMax)
+                            .fillMaxSize(),
+                    ) {
+                        FeedView(
+                            padding = padding,
+                            showCreatorView = showCreatorView,
+                            onSuppressTabBarChange = onSuppressTabBarChange,
+                            onShowCreatorViewChange = { visible ->
+                                if (visible) {
+                                    onIsCreatingStoryChange(true)
+                                    navigator.push(MomentsNavKey.Creator)
+                                } else {
+                                    navigator.popIfTop(MomentsNavKey.Creator)
+                                    onOpenCreatorInStoryModeChange(false)
+                                    onIsCreatingStoryChange(false)
+                                }
+                            },
+                        )
+                    }
+                }
             }
             MomentsTabNavKey.Messages -> NavEntry(key) {
                 // Solo bottom: el toolbar ya aplica statusBarsPadding (evitar doble hueco).

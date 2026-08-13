@@ -48,6 +48,7 @@ import com.moments.android.notifications.core.NotificationsViewModel
 import com.moments.android.notifications.core.normalizedCommentPreview
 import com.moments.android.notifications.core.uniqueSenderIds
 import com.moments.android.notifications.row.EnhancedNotificationRowFollow.resolveSenderUsername
+import com.moments.android.views.story.StoryRingLayout
 import com.moments.android.notifications.row.EnhancedNotificationRowMessages.messageForGroup
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.feed.FeedCanvas
@@ -92,7 +93,11 @@ fun EnhancedNotificationRow(
     val leadingInset = if (displaySenderIds.size > 1) {
         NotificationRowMetrics.stackedRowWidthDp.dp + 16.dp
     } else {
-        NotificationRowMetrics.AVATAR_SIZE_DP.dp + 16.dp
+        // StoryRingAvatarView usa outerFrameSize (foto + gap + stroke), no solo 48.
+        StoryRingLayout.outerFrameSize(
+            NotificationRowMetrics.AVATAR_SIZE_DP.dp,
+            2.5.dp,
+        ) + 16.dp
     }
     val unreadLabel = stringResource(R.string.notifications_unread_indicator)
     val message = remember(group, isDark, senderUsernameOverride) {

@@ -1144,11 +1144,13 @@ private fun MapMomentStackedPlaceholder(
     )
 }
 
-/** ≡ iOS `MapStoryPin` (DiscoverMapView.swift). */
+/** ≡ iOS `MapStoryPin` — thumb 46 + StorySegmentedRing overlay ringSize 54. */
 @Composable
 fun MapStoryPin(story: MapStoryPreview, modifier: Modifier = Modifier) {
     val ringSize = 54.dp
     val thumbSize = 46.dp
+    val ringLineWidth = 3.dp
+    val outerSize = ringSize + ringLineWidth + 2.dp
     val viewerId = FirebaseAuth.getInstance().currentUser?.uid
     val isOwnStory = story.authorId == viewerId
     var snapshot by remember(story.authorId) {
@@ -1182,7 +1184,7 @@ fun MapStoryPin(story: MapStoryPreview, modifier: Modifier = Modifier) {
         }
     }
 
-    Box(modifier.size(ringSize), contentAlignment = Alignment.Center) {
+    Box(modifier.size(outerSize), contentAlignment = Alignment.Center) {
         if (!story.previewUrl.isNullOrBlank()) {
             AsyncImage(
                 model = story.previewUrl,
@@ -1211,7 +1213,7 @@ fun MapStoryPin(story: MapStoryPreview, modifier: Modifier = Modifier) {
             storyAudiences = snapshot.storyAudiences,
             isOwnStory = isOwnStory,
             ringSize = ringSize,
-            lineWidth = 3.dp,
+            lineWidth = ringLineWidth,
             hapticsEnabled = false,
         )
     }

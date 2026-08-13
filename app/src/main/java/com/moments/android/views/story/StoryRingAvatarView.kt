@@ -176,7 +176,7 @@ fun StoryRingAvatarView(
  * ≡ iOS `StoryRingLayout.ringGapMask` / `StoryRingGapCutoutMask`.
  * Even-odd: rect − elipse → el aro no pinta el hueco transparente alrededor del avatar.
  */
-private fun Modifier.storyRingGapMask(avatarSize: Dp): Modifier =
+fun Modifier.storyRingGapMask(avatarSize: Dp): Modifier =
     drawWithCache {
         val innerDiameter = (avatarSize + StoryRingLayout.ringGap * 2).toPx()
         val bounds = size

@@ -1,14 +1,13 @@
 package com.moments.android.views.creator.creatorscreens
-import android.Manifest
 import android.content.ContentUris
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.os.Build
 import android.provider.MediaStore
-import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,7 +61,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.MomentsChromeGlass
@@ -77,6 +75,8 @@ import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.permission.shared.PermissionPrimerGate
 import com.moments.android.views.permission.shared.PermissionPrimerGateHost
+import com.moments.android.views.permission.shared.PhotoLibraryAccess
+import com.moments.android.views.permission.shared.photoLibraryAccess
 import com.moments.android.views.permissions.CameraAccessBoundary
 import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.Dispatchers
@@ -114,6 +114,55 @@ fun MediaSelectionView(
     var showingVideoTooLongAlert by remember { mutableStateOf(false) }
     var rejectedVideoDuration by remember { mutableStateOf(0.0) }
 
+    fun usePickerUris(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        val media = uris.take(10).map { uri ->
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+            val isVideo = context.contentResolver.getType(uri)?.startsWith("video/") == true
+            val duration = if (isVideo) {
+                runCatching {
+                    MediaMetadataRetriever().let { retriever ->
+                        try {
+                            retriever.setDataSource(context, uri)
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                ?.toDoubleOrNull()?.div(1000.0)
+                        } finally {
+                            retriever.release()
+                        }
+                    }
+                }.getOrNull()
+            } else null
+            CreatorMedia(
+                id = uri.toString(),
+                uri = uri,
+                isVideo = isVideo,
+                durationSeconds = duration,
+                aspectRatio = detectAspectRatio(context, uri, isVideo),
+                recommendedAspectRatio = detectAspectRatio(context, uri, isVideo),
+            )
+        }
+        onSelectedMediaItemsChange(media)
+        val hasImages = media.any { !it.isVideo }
+        val hasVideos = media.any { it.isVideo }
+        onCurrentFlowChange(
+            when {
+                hasVideos && !hasImages -> CreatorFlow.VIDEO_EDITING
+                hasImages && !hasVideos -> CreatorFlow.MEDIA_EDITING
+                else -> CreatorFlow.CAPTION_AND_DETAILS
+            },
+        )
+    }
+
+    val systemPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(10),
+        onResult = ::usePickerUris,
+    )
+
     fun loadLibrary(album: CreatorAlbumInfo? = selectedAlbum) {
         scope.launch {
             isLoadingLibrary = true
@@ -137,26 +186,21 @@ fun MediaSelectionView(
         }
     }
 
-    // ≡ requestPhotoLibraryAccess + PermissionPrimerGate
+    // El Photo Picker es permissionless y solo se abre tras una acción explícita.
+    // La galería MediaStore interna conserva su flujo de permiso/primer separado.
     LaunchedEffect(Unit) {
-        val perms = galleryPermissions()
-        val allGranted = perms.all {
-            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-        }
-        if (allGranted) {
+        if (photoLibraryAccess(context) != PhotoLibraryAccess.DENIED) {
             loadLibrary()
         } else {
-            photosGate.requestAccess(context) { loadLibrary() }
+            permissionDenied = true
+            isLoadingLibrary = false
         }
     }
 
     var wasPhotosGatePresenting by remember { mutableStateOf(false) }
     LaunchedEffect(photosGate.isPresenting) {
         if (wasPhotosGatePresenting && !photosGate.isPresenting && !permissionGranted) {
-            val granted = galleryPermissions().any {
-                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-            }
-            if (!granted) {
+            if (photoLibraryAccess(context) == PhotoLibraryAccess.DENIED) {
                 permissionDenied = true
                 isLoadingLibrary = false
             }
@@ -473,23 +517,28 @@ fun MediaSelectionView(
                     Spacer(Modifier.height(16.dp))
                     TextButton(
                         onClick = {
-                            context.startActivity(
-                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                    data = Uri.fromParts("package", context.packageName, null)
-                                },
+                            systemPicker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
                             )
+                        },
+                    ) {
+                        Text(stringResource(R.string.creator_select_from_gallery), color = contentColor)
+                    }
+                    TextButton(
+                        onClick = {
+                            photosGate.requestAccess(context) { loadLibrary() }
                         },
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
                             .background(Brush.horizontalGradient(listOf(Color.Blue, Color(0xFF9C27B0), Color(0xFFE91E63)))),
                     ) {
-                        Text(stringResource(R.string.creator_permissions_open_settings), color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.creator_allow_gallery_access), color = Color.White, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
             else -> {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
+                    columns = GridCells.Adaptive(120.dp),
                     modifier = Modifier
                         .fillMaxSize()
                         .weight(1f)
@@ -585,13 +634,6 @@ private data class GalleryAsset(
     val durationSeconds: Double?,
     val bucketId: String?,
 )
-
-private fun galleryPermissions(): Array<String> =
-    if (Build.VERSION.SDK_INT >= 33) {
-        arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
-    } else {
-        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-    }
 
 private fun loadAlbums(context: android.content.Context): List<CreatorAlbumInfo> {
     val recentsTitle = context.getString(R.string.creator_album_recents)

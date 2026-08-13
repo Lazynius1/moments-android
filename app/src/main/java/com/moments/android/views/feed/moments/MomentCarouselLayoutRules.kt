@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.moments.android.adaptive.AdaptiveContentWidths
 
 /** Port de `MomentCarouselLayoutRules.swift`. */
 enum class MomentCarouselPresentationMode {
@@ -113,7 +114,11 @@ object FeedMomentCardLayout {
 
     /** iOS `mediaContentWidth` = screenWidth - listHorizontalPadding * 2. */
     fun mediaContentWidth(screenWidthDp: Float): Float =
-        maxOf(screenWidthDp - listHorizontalPadding.value * 2f, 1f)
+        maxOf(
+            minOf(screenWidthDp, AdaptiveContentWidths.FeedMax.value) -
+                listHorizontalPadding.value * 2f,
+            1f,
+        )
 
     @Composable
     fun mediaContentWidth(): Float {

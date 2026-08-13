@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
@@ -47,6 +48,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -82,7 +84,6 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
-import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.coordinators.CoordinatorNavigationEvent
 import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.extensions.momentsChromeGlass
@@ -92,7 +93,9 @@ import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.content.FeedMediaItem
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.firestore.checkIfSaved
 import com.moments.android.services.firestore.deleteMoment
+import com.moments.android.services.firestore.toggleSaveMoment
 import com.moments.android.services.performance.VideoMoment
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.PrivacyService
@@ -113,6 +116,7 @@ import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
 import com.moments.android.views.story.StoriesView
 import com.moments.android.views.story.StorySegmentedRing
+import com.moments.android.coordinators.AsyncProfileImageView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -154,8 +158,11 @@ fun ReelVideoView(
     var isDraggingProgress by remember { mutableStateOf(false) }
     var wasPlayingBeforeDrag by remember { mutableStateOf(false) }
     var isReelCaptionExpanded by remember { mutableStateOf(false) }
+    var isSaved by remember(video.moment.id) { mutableStateOf(false) }
+    var isSaveLoading by remember { mutableStateOf(false) }
     var scrubProgress by remember { mutableDoubleStateOf(0.0) }
     var progressBarWidthPx by remember { mutableFloatStateOf(0f) }
+    val savedMomentIds by firestore.savedMomentIds.collectAsState()
 
     val chromePrimary = if (isDark) Color.White else Color(0xFF0B1215)
     val chromeSecondary = if (isDark) Color.White.copy(0.78f) else Color(0xFF0B1215).copy(0.72f)
@@ -265,6 +272,32 @@ fun ReelVideoView(
         }
     }
 
+    fun checkIfSaved() {
+        val userId = uid ?: return
+        val momentId = video.moment.id ?: return
+        if (savedMomentIds.isNotEmpty()) {
+            isSaved = savedMomentIds.contains(momentId)
+            return
+        }
+        scope.launch {
+            runCatching { firestore.checkIfSaved(userId, momentId) }
+                .onSuccess { isSaved = it }
+        }
+    }
+
+    fun toggleSave() {
+        val userId = uid ?: return
+        val momentId = video.moment.id ?: return
+        if (isSaveLoading) return
+        isSaved = !isSaved
+        isSaveLoading = true
+        scope.launch {
+            val error = runCatching { firestore.toggleSaveMoment(userId, momentId) }.exceptionOrNull()
+            isSaveLoading = false
+            if (error != null) isSaved = !isSaved
+        }
+    }
+
     fun openProfile() {
         val authorId = video.moment.authorId
         if (authorId.isBlank()) return
@@ -282,8 +315,16 @@ fun ReelVideoView(
             loadCommentCount()
             checkUserStories()
             refreshAuthorUsername()
+            checkIfSaved()
         } else {
             playerManager.pause()
+        }
+    }
+
+    LaunchedEffect(savedMomentIds, video.moment.id) {
+        val momentId = video.moment.id ?: return@LaunchedEffect
+        if (savedMomentIds.isNotEmpty()) {
+            isSaved = savedMomentIds.contains(momentId)
         }
     }
 
@@ -348,6 +389,61 @@ fun ReelVideoView(
             )
         }
 
+        // Al pausar: mute (pequeño) + play centrado — ≡ iOS Reels.swift.
+        AnimatedVisibility(
+            visible = playerManager.player != null &&
+                !playerManager.isPlaying &&
+                !isDraggingProgress,
+            enter = fadeIn() + scaleIn(initialScale = 0.92f),
+            exit = fadeOut() + scaleOut(targetScale = 0.92f),
+            modifier = Modifier.align(Alignment.Center),
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Box(
+                    Modifier
+                        .size(28.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clickable {
+                            HapticManager.shared.lightImpact()
+                            playerManager.toggleMute()
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        if (playerManager.isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                        contentDescription = stringResource(
+                            if (playerManager.isMuted) R.string.feed_video_unmute
+                            else R.string.feed_video_mute,
+                        ),
+                        tint = chromePrimary,
+                        modifier = Modifier.size(12.dp),
+                    )
+                }
+                Box(
+                    Modifier
+                        .size(64.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clickable {
+                            HapticManager.shared.lightImpact()
+                            playerManager.play()
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = stringResource(R.string.feed_video_play),
+                        tint = chromePrimary,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .offset(x = 1.dp),
+                    )
+                }
+            }
+        }
+
         // Chrome overlay
         Column(Modifier.fillMaxSize()) {
             Row(
@@ -358,39 +454,17 @@ fun ReelVideoView(
                     .padding(top = 4.dp),
                 horizontalArrangement = Arrangement.End,
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(
-                        Modifier
-                            .size(38.dp)
-                            .momentsChromeGlass(CircleShape, interactive = true)
-                            .clickable {
-                                HapticManager.shared.mediumImpact()
-                                onClose()
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Filled.Close, null, tint = chromePrimary, modifier = Modifier.size(16.dp))
-                    }
-                    Box(
-                        Modifier
-                            .size(38.dp)
-                            .momentsChromeGlass(CircleShape, interactive = true)
-                            .clickable {
-                                HapticManager.shared.lightImpact()
-                                playerManager.toggleMute()
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            if (playerManager.isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
-                            contentDescription = stringResource(
-                                if (playerManager.isMuted) R.string.feed_video_unmute
-                                else R.string.feed_video_mute,
-                            ),
-                            tint = chromePrimary,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
+                Box(
+                    Modifier
+                        .size(38.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clickable {
+                            HapticManager.shared.mediumImpact()
+                            onClose()
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Close, null, tint = chromePrimary, modifier = Modifier.size(16.dp))
                 }
             }
 
@@ -419,16 +493,22 @@ fun ReelVideoView(
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     Column(
-                        Modifier.weight(1f),
+                        Modifier
+                            .weight(1f)
+                            .padding(bottom = 6.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            // ≡ iOS Reels: foto 42 + StorySegmentedRing overlay (sin hueco).
+                            val reelAvatarSize = 42.dp
+                            val reelRingLine = 2.5.dp
+                            val reelRingOuter = reelAvatarSize + reelRingLine + 2.dp
                             Box(
                                 Modifier
-                                    .size(42.dp)
+                                    .size(reelRingOuter)
                                     .clickable {
                                         if (video.moment.authorId.isBlank()) return@clickable
                                         if (hasStory) {
@@ -437,11 +517,12 @@ fun ReelVideoView(
                                             openProfile()
                                         }
                                     },
+                                contentAlignment = Alignment.Center,
                             ) {
                                 AsyncProfileImageView(
                                     userId = video.moment.authorId,
                                     modifier = Modifier
-                                        .fillMaxSize()
+                                        .size(reelAvatarSize)
                                         .clip(CircleShape),
                                 )
                                 StorySegmentedRing(
@@ -451,9 +532,8 @@ fun ReelVideoView(
                                     storyViewedStatus = storyViewedStatus,
                                     storyAudiences = storyAudiences,
                                     isOwnStory = video.moment.authorId == uid,
-                                    ringSize = 42.dp,
-                                    lineWidth = 2.5.dp,
-                                    modifier = Modifier.fillMaxSize(),
+                                    ringSize = reelAvatarSize,
+                                    lineWidth = reelRingLine,
                                 )
                             }
 
@@ -523,9 +603,10 @@ fun ReelVideoView(
                     }
 
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(bottom = 6.dp),
+                        // ≡ iOS: actions `.padding(.bottom, bottomChromeClearance + 18)`
+                        modifier = Modifier.padding(bottom = 18.dp),
                     ) {
                         EpicReactionButton(
                             moment = feedMoment,
@@ -546,18 +627,14 @@ fun ReelVideoView(
                             )
                         }
 
-                        val aud = video.moment.audience?.trim()?.lowercase().orEmpty()
-                        val isEveryone = aud.isEmpty() || aud == "everyone"
-                        if (video.moment.allowSharing && isEveryone) {
-                            EnhancedReelActionButton(
-                                icon = AttachmentIcon.SHARE,
-                                vectorIcon = null,
-                                count = null,
-                                isActive = false,
-                                activeColor = Color(0xFF34C759),
-                                onClick = { showShareSheet = true },
-                            )
-                        }
+                        EnhancedReelActionButton(
+                            icon = AttachmentIcon.BOOKMARK,
+                            vectorIcon = null,
+                            count = null,
+                            isActive = isSaved,
+                            activeColor = Color(0xFFFFCC00),
+                            onClick = { toggleSave() },
+                        )
 
                         EnhancedReelActionButton(
                             icon = null,

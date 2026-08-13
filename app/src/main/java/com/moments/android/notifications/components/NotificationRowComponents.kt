@@ -18,7 +18,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,6 +31,7 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.notifications.core.NotificationRowMetrics
+import com.moments.android.views.story.StoryRingAvatarView
 
 /**
  * Port de NotificationRowComponents.swift —
@@ -33,6 +39,9 @@ import com.moments.android.notifications.core.NotificationRowMetrics
  *
  * [NotificationMomentThumbnail] es helper Android usado por Previews/Trailing
  * (en iOS el thumb de momento va inline en EnhancedNotificationRow+Trailing).
+ *
+ * Single avatar: [StoryRingAvatarView] (aro fuera + hueco), igual que inbox/mensajes.
+ * Stacked: [reversedMask] cutout (sin stroke de color), como iOS.
  */
 
 /** ≡ NotificationLeadingAvatarView — uno grande o dos solapados (atrás izq, delante der). */
@@ -45,54 +54,70 @@ fun NotificationLeadingAvatarView(
     @Suppress("UNUSED_PARAMETER")
     profilePaths: Map<String, String?> = emptyMap(),
 ) {
-    val ringStroke = if (isDark) Color.Black else Color.White
     val frontId = senderIds.firstOrNull() ?: return
     val backId = senderIds.getOrNull(1)
 
     if (backId != null) {
-        val size = NotificationRowMetrics.STACKED_AVATAR_SIZE_DP.dp
+        val avatarSize = NotificationRowMetrics.STACKED_AVATAR_SIZE_DP.dp
         val overlap = NotificationRowMetrics.stackedOverlapDp.dp
+        // iOS: Circle frame = stackedAvatarSize + 3 (hueco ~1.5pt alrededor del de delante)
+        val cutoutDiameter = avatarSize + 3.dp
         Box(
             modifier = Modifier.size(
                 NotificationRowMetrics.stackedRowWidthDp.dp,
                 NotificationRowMetrics.STACKED_AVATAR_SIZE_DP.dp,
             ),
         ) {
-            // Atrás (izquierda) — tap secundario
+            // Atrás (izquierda) — ≡ iOS reversedMask (destinationOut), sin stroke de color
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .size(size)
+                    .size(avatarSize)
                     .zIndex(0f)
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        // Centro del mask iOS: mid del avatar + offset(x: size - overlap)
+                        val cutCenter = Offset(
+                            x = center.x + (avatarSize - overlap).toPx(),
+                            y = center.y,
+                        )
+                        drawCircle(
+                            color = Color.Black,
+                            radius = cutoutDiameter.toPx() / 2f,
+                            center = cutCenter,
+                            blendMode = BlendMode.Clear,
+                        )
+                    }
                     .clip(CircleShape)
                     .clickable { onSecondaryTap?.invoke() },
             ) {
                 AsyncProfileImageView(userId = backId, modifier = Modifier.matchParentSize())
             }
-            // Delante (derecha) — overlap ≡ HStack(spacing: -stackedOverlap)
+            // Delante (derecha) — solo clipShape, sin border (iOS)
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .offset(x = size - overlap)
-                    .size(size)
+                    .offset(x = avatarSize - overlap)
+                    .size(avatarSize)
                     .zIndex(1f)
                     .clip(CircleShape)
-                    .border(2.dp, ringStroke, CircleShape)
                     .clickable(onClick = onPrimaryTap),
             ) {
                 AsyncProfileImageView(userId = frontId, modifier = Modifier.matchParentSize())
             }
         }
     } else {
-        Box(
-            modifier = Modifier
-                .size(NotificationRowMetrics.AVATAR_SIZE_DP.dp)
-                .clip(CircleShape)
-                .border(2.dp, ringStroke, CircleShape)
-                .clickable(onClick = onPrimaryTap),
-        ) {
-            AsyncProfileImageView(userId = frontId, modifier = Modifier.matchParentSize())
-        }
+        // Aro fuera con hueco (StoryRingLayout.ringGapMask), como GlassmorphicConversationRow.
+        StoryRingAvatarView(
+            userId = frontId,
+            size = NotificationRowMetrics.AVATAR_SIZE_DP.dp,
+            lineWidth = 2.5.dp,
+            showBaseStroke = true,
+            baseStrokeColor = if (isDark) Color.White.copy(alpha = 0.16f) else Color.Black.copy(alpha = 0.1f),
+            baseStrokeWidth = 1.dp,
+            onTap = { onPrimaryTap() },
+        )
     }
 }
 

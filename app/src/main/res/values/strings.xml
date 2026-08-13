@@ -1044,9 +1044,11 @@
     <string name="creator_camera">Camera</string>
     <string name="creator_gallery_loading">Loading gallery...</string>
     <string name="creator_gallery_permission">We need access to your gallery to select photos and videos</string>
+    <string name="creator_select_from_gallery">Select photos</string>
     <string name="creator_permissions_instructions_title">To grant permissions:</string>
     <string name="creator_permissions_instructions_path">Go to Settings > Apps > Moments > Permissions</string>
     <string name="creator_permissions_open_settings">Open Settings</string>
+    <string name="creator_allow_gallery_access">Allow gallery access</string>
     <string name="creator_album_select">Select album</string>
     <string name="creator_album_recents">Recents</string>
     <string name="creator_album_default">Album</string>
@@ -1454,6 +1456,7 @@
     <string name="chat_attachment_sticker">Sticker</string>
     <string name="chat_attachment_location">Location</string>
     <string name="chat_attachment_photos_permission">Allow photo and video access to choose attachments.</string>
+    <string name="chat_attachment_allow_library">Allow gallery access</string>
     <string name="chat_attachment_all_photos">All photos</string>
     <string name="chat_attachment_send_one">Send</string>
     <string name="chat_attachment_send_many">Send (%1$d)</string>

@@ -6,6 +6,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
+import com.moments.android.adaptive.AdaptiveContentWidths
 import kotlin.math.round
 
 /**
@@ -48,7 +49,11 @@ fun creatorMomentsCaptureRect(
     val sideInsetPx = with(density) { CREATOR_MOMENTS_CAPTURE_SIDE_INSET.toPx() }
     val topOffsetPx = with(density) { CREATOR_MOMENTS_CAPTURE_TOP_OFFSET.toPx() }
     val bottomSlackPx = with(density) { CREATOR_MOMENTS_CAPTURE_BOTTOM_SLACK.toPx() }
-    val availableWidth = (inSize.width - sideInsetPx * 2f).coerceAtLeast(0f)
+    val maxAdaptiveWidthPx = with(density) { AdaptiveContentWidths.StoryMax.toPx() }
+    val availableWidth = minOf(
+        (inSize.width - sideInsetPx * 2f).coerceAtLeast(0f),
+        maxAdaptiveWidthPx,
+    )
     val desiredHeight = availableWidth / CREATOR_MOMENTS_CAPTURE_ASPECT_RATIO
     val maximumHeight = (inSize.height - topOffsetPx - bottomInsetPx - bottomSlackPx).coerceAtLeast(0f)
     val height = minOf(desiredHeight, maximumHeight)
@@ -84,7 +89,29 @@ fun storyViewerCaptureRect(
     safeAreaTopPx: Float,
     safeAreaBottomPx: Float,
     density: Density,
+    bottomChromeReserve: Dp = CREATOR_MOMENTS_CAPTURE_BOTTOM_SLACK,
+    maxCanvasWidth: Dp = AdaptiveContentWidths.StoryMax,
 ): Rect {
-    val base = creatorMomentsCaptureRect(inSize, safeAreaTopPx, safeAreaBottomPx, density)
-    return Rect(base.left, base.top + safeAreaTopPx, base.right, base.bottom + safeAreaTopPx)
+    val sideInsetPx = with(density) { CREATOR_MOMENTS_CAPTURE_SIDE_INSET.toPx() }
+    val topOffsetPx = with(density) { CREATOR_MOMENTS_CAPTURE_TOP_OFFSET.toPx() }
+    val bottomReservePx = with(density) { bottomChromeReserve.toPx() }
+    val maxAdaptiveWidthPx = with(density) { maxCanvasWidth.toPx() }
+    val availableWidth = minOf(
+        (inSize.width - sideInsetPx * 2f).coerceAtLeast(0f),
+        maxAdaptiveWidthPx,
+    )
+    val top = safeAreaTopPx + topOffsetPx
+    // El inset superior forma parte del viewport. Antes se sumaba después de calcular
+    // la altura y el canvas podía terminar fuera del área útil en landscape.
+    val maximumHeight = (
+        inSize.height - top - safeAreaBottomPx - bottomReservePx
+        ).coerceAtLeast(0f)
+    val height = minOf(availableWidth / CREATOR_MOMENTS_CAPTURE_ASPECT_RATIO, maximumHeight)
+    val width = height * CREATOR_MOMENTS_CAPTURE_ASPECT_RATIO
+    return Rect(
+        left = (inSize.width - width) / 2f,
+        top = top,
+        right = (inSize.width + width) / 2f,
+        bottom = top + height,
+    )
 }

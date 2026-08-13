@@ -24,6 +24,8 @@ places = "5.3.0"
 kotlinxSerializationJson = "1.11.0"
 zxing = "3.5.3"
 mapboxMaps = "11.27.0"
+windowManager = "1.5.1"
+workManager = "2.11.2"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -40,6 +42,9 @@ androidx-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
 androidx-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 androidx-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 androidx-material3 = { module = "androidx.compose.material3:material3" }
+androidx-material3-adaptive-navigation-suite = { module = "androidx.compose.material3:material3-adaptive-navigation-suite" }
+androidx-window = { module = "androidx.window:window", version.ref = "windowManager" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-auth = { module = "com.google.firebase:firebase-auth" }

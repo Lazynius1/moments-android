@@ -25,7 +25,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.coordinators.TabBarScreen
 import com.moments.android.notifications.services.NotificationBadgeService
@@ -72,13 +74,16 @@ fun MomentsApp(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
+    // Activity-scoped: survives rotation, folding and uiMode recreation without
+    // replaying the launch gate. A real process restart still gets fresh state.
+    val launchState: MomentsAppLaunchState = viewModel()
     val prefs = remember {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
-    var showSplash by remember { mutableStateOf(true) }
-    var showWhatsNew by remember { mutableStateOf(false) }
-    var didPostLaunchInit by remember { mutableStateOf(false) }
+    var showSplash by launchState.showSplash
+    var showWhatsNew by launchState.showWhatsNew
+    var didPostLaunchInit by launchState.didPostLaunchInit
     // ≡ iOS `shouldShowMainApp = authService.isLoggedIn && authState == .authenticated`.
     // Ojo: NO basta con `FirebaseAuth.currentUser != null` — tras un login social nuevo
     // la sesión de Firebase existe pero el perfil de Firestore todavía no, y entrar así
@@ -88,9 +93,10 @@ fun MomentsApp(
     // El registro por correo escribe el perfil por su cuenta y avisa con `onAuthenticated`
     // antes de que el listener de AuthService llegue a hidratar la sesión; se respeta ese
     // aviso para no rebotar al login en ese hueco.
-    var manuallyAuthenticated by remember { mutableStateOf(false) }
+    var manuallyAuthenticated by launchState.manuallyAuthenticated
     val signedIn = hasProfileSession || manuallyAuthenticated
-    var accountState by remember { mutableStateOf<AccountState>(AccountState.Loading) }
+    var accountState by launchState.accountState
+    var validatedAccountUid by launchState.validatedAccountUid
 
     val incognitoActive by IncognitoModeService.isActive.collectAsState()
 
@@ -114,11 +120,15 @@ fun MomentsApp(
         onDispose { FirebaseAuth.getInstance().removeAuthStateListener(listener) }
     }
 
-    LaunchedEffect(signedIn) {
-        if (signedIn) {
+    val signedInUid = FirebaseAuth.getInstance().currentUser?.uid
+    LaunchedEffect(signedIn, signedInUid) {
+        if (!signedIn) {
             accountState = AccountState.Loading
-            val uid = FirebaseAuth.getInstance().currentUser?.uid
-            accountState = if (uid != null) resolveAccountState(uid) else AccountState.Active
+            validatedAccountUid = null
+        } else if (signedInUid != null && validatedAccountUid != signedInUid) {
+            accountState = AccountState.Loading
+            accountState = resolveAccountState(signedInUid)
+            validatedAccountUid = signedInUid
         }
     }
 
@@ -265,6 +275,20 @@ private fun AccountLoading() {
     Box(Modifier.fillMaxSize().background(Surface), contentAlignment = Alignment.Center) {
         MomentsCircularProgressIndicator()
     }
+}
+
+/**
+ * Estado de la puerta de arranque retenido únicamente durante la vida lógica de
+ * la Activity. Android conserva el ViewModel al recrearla por orientación o
+ * uiMode, pero lo descarta si el proceso realmente termina.
+ */
+internal class MomentsAppLaunchState : ViewModel() {
+    val showSplash = mutableStateOf(true)
+    val showWhatsNew = mutableStateOf(false)
+    val didPostLaunchInit = mutableStateOf(false)
+    val manuallyAuthenticated = mutableStateOf(false)
+    val accountState = mutableStateOf<AccountState>(AccountState.Loading)
+    val validatedAccountUid = mutableStateOf<String?>(null)
 }
 
 private const val PREFS_NAME = "moments_app"

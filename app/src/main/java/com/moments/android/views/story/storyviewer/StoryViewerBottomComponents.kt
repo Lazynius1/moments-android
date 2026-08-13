@@ -71,7 +71,6 @@ import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchCustomListDetails
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MomentsFormat
-import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
 import com.moments.android.views.creator.audienceselector.ContentAudience
 import com.moments.android.views.feed.rememberAdaptiveColors
@@ -264,6 +263,7 @@ fun StoryOwnStoryBottomBar(
     onReactionsActivity: () -> Unit,
     showsShare: Boolean = false,
     onShare: () -> Unit = {},
+    compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val adaptive = rememberAdaptiveColors()
@@ -337,7 +337,7 @@ fun StoryOwnStoryBottomBar(
         modifier
             .fillMaxWidth()
             .padding(horizontal = 2.dp)
-            .padding(top = 4.dp),
+            .padding(top = if (compact) 0.dp else 4.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
         // Activity
@@ -348,13 +348,13 @@ fun StoryOwnStoryBottomBar(
                 .semantics { contentDescription = activityA11y }
                 .padding(horizontal = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 6.dp),
         ) {
             if (recentViewers.isNotEmpty()) {
                 // ≡ HStack(spacing: -8) + reversedMask círculo solapado
                 val density = LocalDensity.current
                 Row(
-                    Modifier.height(32.dp),
+                    Modifier.height(if (compact) 28.dp else 32.dp),
                     horizontalArrangement = Arrangement.spacedBy((-8).dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -387,7 +387,7 @@ fun StoryOwnStoryBottomBar(
                     contentDescription = null,
                     tint = messageColor,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(if (compact) 28.dp else 36.dp)
                         .then(
                             if (labelShadow != null) {
                                 Modifier.shadow(4.dp, ambientColor = Color.Black.copy(0.5f), spotColor = Color.Black.copy(0.5f))
@@ -401,7 +401,7 @@ fun StoryOwnStoryBottomBar(
                 stringResource(R.string.stories_own_bottom_activity),
                 color = messageColor,
                 fontWeight = FontWeight.Medium,
-                fontSize = 12.sp,
+                fontSize = if (compact) 10.sp else 12.sp,
                 maxLines = 1,
                 style = labelStyle,
             )
@@ -414,19 +414,25 @@ fun StoryOwnStoryBottomBar(
                 .semantics { contentDescription = audienceA11y }
                 .padding(horizontal = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 6.dp),
         ) {
-            AudienceIconView(
-                audience = displayAudience,
-                size = AudienceIconMetrics.storyBottomBar,
-                tintColor = messageColor,
-                modifier = Modifier.size(36.dp),
-            )
+            // Mantener el slot alineado con Actividad, pero con un símbolo de
+            // audiencia ópticamente más discreto que el avatar/estado vecino.
+            Box(
+                modifier = Modifier.height(if (compact) 28.dp else 32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                AudienceIconView(
+                    audience = displayAudience,
+                    size = if (compact) 22.dp else 26.dp,
+                    tintColor = messageColor,
+                )
+            }
             Text(
                 audienceTitle,
                 color = messageColor,
                 fontWeight = FontWeight.Medium,
-                fontSize = 12.sp,
+                fontSize = if (compact) 10.sp else 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = 88.dp),
@@ -436,7 +442,7 @@ fun StoryOwnStoryBottomBar(
             Text(
                 durationLabel,
                 color = messageColor.copy(0.92f),
-                fontSize = 11.sp,
+                fontSize = if (compact) 9.sp else 11.sp,
                 maxLines = 1,
                 style = labelStyle,
             )
@@ -449,19 +455,21 @@ fun StoryOwnStoryBottomBar(
                     .clickable(onClick = onShare)
                     .padding(horizontal = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 6.dp),
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Send,
                     contentDescription = stringResource(R.string.stories_own_bottom_share),
                     tint = messageColor,
-                    modifier = Modifier.size(22.dp).height(32.dp),
+                    modifier = Modifier
+                        .size(if (compact) 19.dp else 22.dp)
+                        .height(if (compact) 28.dp else 32.dp),
                 )
                 Text(
                     stringResource(R.string.stories_own_bottom_share),
                     color = messageColor,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 12.sp,
+                    fontSize = if (compact) 10.sp else 12.sp,
                     maxLines = 1,
                     style = labelStyle,
                 )
@@ -476,10 +484,10 @@ fun StoryOwnStoryBottomBar(
                     .semantics { contentDescription = reactionsA11y }
                     .padding(horizontal = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 6.dp),
             ) {
                 Box(
-                    Modifier.height(32.dp),
+                    Modifier.height(if (compact) 28.dp else 32.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     when {
@@ -508,7 +516,7 @@ fun StoryOwnStoryBottomBar(
                     MomentsFormat.count(reactionCount, MomentsFormat.CountStyle.SOCIAL_METRIC),
                     color = messageColor,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 12.sp,
+                    fontSize = if (compact) 10.sp else 12.sp,
                     style = labelStyle,
                 )
             }

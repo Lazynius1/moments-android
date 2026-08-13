@@ -74,6 +74,7 @@ fun GlassmorphicChatToolbar(
     storyRing: StoryRingSnapshot,
     hasTypingUsers: Boolean,
     presence: PresenceDisplay?,
+    showBackButton: Boolean = true,
     callbacks: ChatToolbarCallbacks,
     modifier: Modifier = Modifier,
 ) {
@@ -88,17 +89,18 @@ fun GlassmorphicChatToolbar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // ≡ iOS ProfileChromeIconButton(.navigationBack) — solo chevron, sin glass standalone
-        ProfileChromeIconButton(
-            icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-            onClick = callbacks.onBack,
-            foregroundColor = adaptiveColors.primary,
-            preset = MomentsGlassButtonPreset.NAVIGATION_BACK,
-            standaloneGlass = false,
-            contentDescriptionKey = com.moments.android.extensions.ChromeIconDescription.BACK,
-        )
+        if (showBackButton) {
+            ProfileChromeIconButton(
+                icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                onClick = callbacks.onBack,
+                foregroundColor = adaptiveColors.primary,
+                preset = MomentsGlassButtonPreset.NAVIGATION_BACK,
+                standaloneGlass = false,
+                contentDescriptionKey = com.moments.android.extensions.ChromeIconDescription.BACK,
+            )
+        }
         // ≡ iOS chatToolbarAvatar: AsyncProfileImageView + StorySegmentedRing overlay.
-        // iOS `.overlay` no recorta el stroke (padding lineWidth/2+1); el Box debe
-        // caber outerSize del anillo o solo se ve la mitad interior encima de la foto.
+        // iOS `.overlay` no recorta; el Box deja sitio al stroke (lineWidth/2+1).
         val headerAvatarSize = 40.dp
         val headerRingLineWidth = 2.7.dp
         val headerRingOuter = headerAvatarSize + headerRingLineWidth + 2.dp

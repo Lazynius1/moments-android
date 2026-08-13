@@ -138,6 +138,7 @@ fun GlassmorphicChatView(
     },
     pendingChatContext: PendingChatContext? = null,
     onBack: () -> Unit,
+    showBackButton: Boolean = true,
     onProfile: (String) -> Unit = {},
     onStory: (ChatStoryRoute) -> Unit = {},
     onSettings: () -> Unit = {},
@@ -980,6 +981,7 @@ fun GlassmorphicChatView(
             storyRing = lifecycle.storyRing,
             hasTypingUsers = typingUsers.isNotEmpty(),
             presence = lifecycle.presenceDisplay,
+            showBackButton = showBackButton,
             callbacks = ChatToolbarCallbacks(
                 onBack = onBack,
                 onProfile = { onProfile(conversation.otherParticipantId) },

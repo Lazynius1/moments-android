@@ -24,7 +24,9 @@ import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.views.components.rememberMomentsSkeletonColor
 import com.moments.android.views.components.shimmer
+import com.moments.android.views.story.StoryRingLayout
 import com.moments.android.views.story.StorySegmentedRing
+import com.moments.android.views.story.storyRingGapMask
 
 /**
  * Port de `StoryRingTraySkeleton.swift` — mismas medidas que RealStoryCircle / YourStoryCircle.
@@ -63,7 +65,9 @@ fun StoryRingTraySkeletonCell(
                 ringSize = StoryRingLayout.ringStrokeDiameter(avatarSize, ringLineWidth),
                 lineWidth = ringLineWidth,
                 hapticsEnabled = false,
-                modifier = Modifier.alpha(if (isOwnStory) 1f else 0.55f),
+                modifier = Modifier
+                    .alpha(if (isOwnStory) 1f else 0.55f)
+                    .storyRingGapMask(avatarSize = avatarSize),
             )
 
             if (!userId.isNullOrBlank()) {

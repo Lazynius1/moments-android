@@ -6,6 +6,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
@@ -274,7 +276,12 @@ class MomentsTabNavigator(val state: MomentsTabNavigationState) {
 fun rememberMomentsTabNavigationState(
     startRoute: MomentsTabNavKey = MomentsTabNavKey.Feed,
 ): MomentsTabNavigationState {
-    val topLevelRoute = remember { mutableStateOf(startRoute) }
+    val topLevelRoute = rememberSaveable(
+        saver = Saver<MutableState<MomentsTabNavKey>, Int>(
+            save = { it.value.tabIndex },
+            restore = { mutableStateOf(MomentsTabNavKey.fromTabIndex(it)) },
+        ),
+    ) { mutableStateOf(startRoute) }
     val feedStack = rememberNavBackStack(MomentsTabNavKey.Feed)
     val messagesStack = rememberNavBackStack(MomentsTabNavKey.Messages)
     val exploreStack = rememberNavBackStack(MomentsTabNavKey.Explore)

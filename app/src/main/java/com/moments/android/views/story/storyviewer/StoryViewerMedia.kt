@@ -3,6 +3,7 @@ package com.moments.android.views.story.storyviewer
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -79,6 +81,8 @@ fun GlassmorphicStoryVideoPlayer(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val viewerSurface = if (isSystemInDarkTheme()) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+    val viewerSurfaceArgb = viewerSurface.toArgb()
     // ≡ VideoPreloader.shared.getPlayerItem(for:)
     val player = remember(url, shouldLoop) {
         ExoPlayer.Builder(context).build().apply {
@@ -143,6 +147,8 @@ fun GlassmorphicStoryVideoPlayer(
             (LayoutInflater.from(viewContext)
                 .inflate(R.layout.story_player_view, null, false) as PlayerView).apply {
                 useController = false
+                setBackgroundColor(viewerSurfaceArgb)
+                setShutterBackgroundColor(viewerSurfaceArgb)
                 resizeMode = if (contentScaleFit) {
                     AspectRatioFrameLayout.RESIZE_MODE_FIT
                 } else {
@@ -156,6 +162,8 @@ fun GlassmorphicStoryVideoPlayer(
             }
         },
         update = { view ->
+            view.setBackgroundColor(viewerSurfaceArgb)
+            view.setShutterBackgroundColor(viewerSurfaceArgb)
             view.resizeMode = if (contentScaleFit) {
                 AspectRatioFrameLayout.RESIZE_MODE_FIT
             } else {
@@ -183,8 +191,11 @@ fun StoryViewerMedia(
 ) {
     val media = story.mediaItem
     val corner = storyViewerCanvasCornerRadius
+    val isDark = isSystemInDarkTheme()
+    val viewerSurface = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+    val unavailableContent = if (isDark) Color.White else Color(0xFF0B1215)
 
-    BoxWithConstraints(modifier.fillMaxSize().background(Color.Black)) {
+    BoxWithConstraints(modifier.fillMaxSize().background(viewerSurface)) {
         val canvasW = constraints.maxWidth.toFloat().coerceAtLeast(1f)
         val canvasH = constraints.maxHeight.toFloat().coerceAtLeast(1f)
         val canvasAspect = canvasW / canvasH
@@ -255,9 +266,9 @@ fun StoryViewerMedia(
                         .background(
                             Brush.linearGradient(
                                 listOf(
-                                    Color.Black.copy(0.85f),
-                                    Color.Black.copy(0.6f),
-                                    Color.Black.copy(0.4f),
+                                    viewerSurface,
+                                    unavailableContent.copy(alpha = if (isDark) 0.10f else 0.04f),
+                                    viewerSurface,
                                 ),
                             ),
                         ),
@@ -270,12 +281,12 @@ fun StoryViewerMedia(
                         Icon(
                             Icons.Filled.PhotoLibrary,
                             contentDescription = null,
-                            tint = Color.White.copy(0.6f),
+                            tint = unavailableContent.copy(0.6f),
                             modifier = Modifier.size(40.dp),
                         )
                         Text(
                             stringResource(R.string.stories_content_unavailable),
-                            color = Color.White.copy(0.8f),
+                            color = unavailableContent.copy(0.8f),
                             fontWeight = FontWeight.Medium,
                             fontSize = 16.sp,
                         )

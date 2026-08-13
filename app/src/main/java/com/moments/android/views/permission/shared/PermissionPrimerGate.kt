@@ -105,11 +105,7 @@ class PermissionPrimerGate(val kind: Kind) {
             emptyArray()
         }
         // ≡ PHPhotoLibrary .readWrite
-        Kind.PHOTOS -> if (Build.VERSION.SDK_INT >= 33) {
-            arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
-        } else {
-            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-        }
+        Kind.PHOTOS -> photoLibraryPermissions()
         // ≡ PHPhotoLibrary .addOnly — API 29+ MediaStore insert sin runtime perm.
         Kind.PHOTOS_SAVE -> if (Build.VERSION.SDK_INT >= 29) {
             emptyArray()
@@ -120,6 +116,9 @@ class PermissionPrimerGate(val kind: Kind) {
 
     private fun isAuthorized(context: Context): Boolean {
         val perms = permissions()
+        if (kind == Kind.PHOTOS) {
+            return photoLibraryAccess(context) != PhotoLibraryAccess.DENIED
+        }
         if (kind == Kind.NOTIFICATIONS) {
             val runtimeOk = perms.isEmpty() || perms.all {
                 ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED

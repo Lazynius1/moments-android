@@ -49,9 +49,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -66,6 +66,7 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.adaptive.LocalAdaptiveWindowState
 import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.content.FeedMediaItem
@@ -537,7 +538,7 @@ fun ModernPostCardView(
     val isDark = isSystemInDarkTheme()
     val density = LocalDensity.current
     val context = LocalContext.current
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val adaptiveWindow = LocalAdaptiveWindowState.current
     val scope = rememberCoroutineScope()
     val firestore = remember { FirestoreService() }
     var followState by remember(moment.authorId) { mutableStateOf(FollowButtonState.CAN_FOLLOW) }
@@ -567,18 +568,23 @@ fun ModernPostCardView(
     var aspectRatioType by remember(moment.id) {
         mutableStateOf(classifyAspectRatio(detectedAspectRatio))
     }
+    var postWidthPx by remember(moment.id) { mutableFloatStateOf(0f) }
     val currentMedia = mediaItems.getOrNull(currentImageIndex)
     val currentTags = currentMedia?.tags.orEmpty()
 
     // iOS calculateCardHeight / refreshCardHeight
-    val cardHeightDp = availableHeight?.let { availPx ->
+    val cardHeightDp = availableHeight?.takeIf { postWidthPx > 0f }?.let { availPx ->
         with(density) {
-            val maxWidthPx = (screenWidthDp.dp.toPx() -
+            val maxWidthPx = (postWidthPx -
                 (ListHorizontalPadding * 2 + ActionRowHorizontalPadding * 2).toPx())
                 .coerceAtLeast(1f)
             val ideal = maxWidthPx / detectedAspectRatio.coerceAtLeast(0.01f)
-            val capped = min(ideal, availPx * 0.95f).coerceAtLeast(150f)
-            max(capped, 200f).toDp()
+            val resolved = if (adaptiveWindow.isLargeScreen) {
+                ideal
+            } else {
+                min(ideal, availPx * 0.95f)
+            }
+            max(resolved.coerceAtLeast(150f), 200f).toDp()
         }
     }
 
@@ -723,7 +729,10 @@ fun ModernPostCardView(
     }
 
     Column(
-        modifier.fillMaxWidth().padding(horizontal = ListHorizontalPadding),
+        modifier
+            .fillMaxWidth()
+            .onSizeChanged { postWidthPx = it.width.toFloat() }
+            .padding(horizontal = ListHorizontalPadding),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         AnimatedVisibility(visible = !isImmersive, enter = fadeIn(), exit = fadeOut()) {

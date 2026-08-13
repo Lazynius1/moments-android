@@ -308,10 +308,14 @@ private fun ProfileHeaderAvatar(
     val dark = isSystemInDarkTheme()
     val material = if (dark) Color(0xFF182429) else Color(0xFFEAF0F2)
     val tertiary = Color(0xFF84939A)
+    val avatarSize = 96.dp
+    val ringLineWidth = 3.dp
+    // ≡ iOS overlay: ringSize == avatar; Box deja sitio al stroke (no recortar).
+    val outerSize = avatarSize + ringLineWidth + 2.dp
 
     Box(
         modifier = Modifier
-            .size(96.dp)
+            .size(outerSize)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -319,12 +323,12 @@ private fun ProfileHeaderAvatar(
             AsyncImage(
                 model = user.profileImagePath,
                 contentDescription = stringResource(R.string.profile_header_avatar),
-                modifier = Modifier.size(96.dp).clip(CircleShape),
+                modifier = Modifier.size(avatarSize).clip(CircleShape),
                 contentScale = ContentScale.Crop,
             )
         } else {
             Box(
-                modifier = Modifier.size(96.dp).clip(CircleShape).background(material),
+                modifier = Modifier.size(avatarSize).clip(CircleShape).background(material),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -335,8 +339,6 @@ private fun ProfileHeaderAvatar(
                 )
             }
         }
-        // Anillo ≡ iOS overlay(avatarBorderOverlay) cuando hasActiveStory
-        // (storyCount 0 → stroke transparente hasta que carguen las stories)
         if (hasActiveStory) {
             StorySegmentedRing(
                 storyCount = storyCount,
@@ -345,8 +347,8 @@ private fun ProfileHeaderAvatar(
                 storyViewedStatus = List(storyCount.coerceAtLeast(0)) { true },
                 storyAudiences = storyAudiences,
                 isOwnStory = true,
-                ringSize = 96.dp,
-                lineWidth = 3.dp,
+                ringSize = avatarSize,
+                lineWidth = ringLineWidth,
             )
         }
     }

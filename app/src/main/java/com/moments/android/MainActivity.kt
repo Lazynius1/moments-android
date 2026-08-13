@@ -1,7 +1,6 @@
 package com.moments.android
 
 import android.content.Intent
-import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -21,6 +20,9 @@ import com.moments.android.notifications.services.NotificationBadgeService
 import com.moments.android.notifications.services.NotificationNavigationService
 import com.moments.android.views.shared.MomentsTheme
 import com.moments.android.views.shared.MomentsSystemBarsHost
+import com.moments.android.adaptive.AdaptiveWindowProvider
+import com.moments.android.adaptive.ApplyMomentsOrientationPolicy
+import com.moments.android.adaptive.LocalAdaptiveWindowState
 
 /**
  * Deep links desde push + edge-to-edge (skill `edge-to-edge`).
@@ -35,8 +37,6 @@ class MainActivity : ComponentActivity() {
     private var pendingDeepLinkNewTask by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // ≡ iOS INFOPLIST_KEY_UISupportedInterfaceOrientations = Portrait only
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         super.onCreate(savedInstanceState)
         // Skill: enableEdgeToEdge before setContent; transparent bars (auto light/dark icons).
         enableEdgeToEdge(
@@ -57,26 +57,30 @@ class MainActivity : ComponentActivity() {
         handlePushIntent(intent)
         setContent {
             MomentsTheme {
-                val darkTheme = isSystemInDarkTheme()
-                SideEffect {
-                    // Re-sync icon contrast when theme flips (auto already handles; enforce contrast off).
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        window.isNavigationBarContrastEnforced = false
+                AdaptiveWindowProvider {
+                    val adaptiveWindow = LocalAdaptiveWindowState.current
+                    ApplyMomentsOrientationPolicy(this@MainActivity, adaptiveWindow)
+                    val darkTheme = isSystemInDarkTheme()
+                    SideEffect {
+                        // Re-sync icon contrast when theme flips (auto already handles; enforce contrast off).
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            window.isNavigationBarContrastEnforced = false
+                        }
+                        WindowCompat.getInsetsController(window, window.decorView).apply {
+                            isAppearanceLightStatusBars = !darkTheme
+                            isAppearanceLightNavigationBars = !darkTheme
+                        }
                     }
-                    WindowCompat.getInsetsController(window, window.decorView).apply {
-                        isAppearanceLightStatusBars = !darkTheme
-                        isAppearanceLightNavigationBars = !darkTheme
+                    MomentsSystemBarsHost {
+                        MomentsApp(
+                            deepLinkUri = pendingDeepLink,
+                            deepLinkFromNewTask = pendingDeepLinkNewTask,
+                            onDeepLinkHandled = {
+                                pendingDeepLink = null
+                                pendingDeepLinkNewTask = false
+                            },
+                        )
                     }
-                }
-                MomentsSystemBarsHost {
-                    MomentsApp(
-                        deepLinkUri = pendingDeepLink,
-                        deepLinkFromNewTask = pendingDeepLinkNewTask,
-                        onDeepLinkHandled = {
-                            pendingDeepLink = null
-                            pendingDeepLinkNewTask = false
-                        },
-                    )
                 }
             }
         }

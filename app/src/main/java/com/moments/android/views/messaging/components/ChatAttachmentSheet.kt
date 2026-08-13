@@ -1,11 +1,9 @@
 package com.moments.android.views.messaging.components
 
-import android.Manifest
 import android.content.ContentUris
 import android.content.Context
-import android.content.pm.PackageManager
+import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -92,7 +90,6 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
@@ -107,6 +104,8 @@ import com.moments.android.views.messaging.models.ChatStickerAsset
 import com.moments.android.views.messaging.models.LiveLocationDuration
 import com.moments.android.views.permission.shared.PermissionPrimerGate
 import com.moments.android.views.permission.shared.PermissionPrimerGateHost
+import com.moments.android.views.permission.shared.PhotoLibraryAccess
+import com.moments.android.views.permission.shared.photoLibraryAccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -173,17 +172,8 @@ private fun chatDeviceSheetCornerRadius(screenWidth: Dp): Dp = when {
     else -> ChatAttachmentSheetMetrics.cornerRadius
 }
 
-private fun attachmentGalleryPermissions(): Array<String> =
-    if (Build.VERSION.SDK_INT >= 33) {
-        arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
-    } else {
-        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-    }
-
 private fun hasAttachmentGalleryPermission(context: Context): Boolean =
-    attachmentGalleryPermissions().all {
-        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-    }
+    photoLibraryAccess(context) != PhotoLibraryAccess.DENIED
 
 data class ChatAttachmentMediaAsset(
     val id: String,
@@ -638,15 +628,24 @@ private fun ChatAttachmentMediaGridSheet(
     val nativePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(ChatInputBarLayout.maxMediaSelectionCount),
     ) { uris ->
+        uris.forEach { uri ->
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+        }
         if (uris.isNotEmpty()) onPickerUris(uris.take(ChatInputBarLayout.maxMediaSelectionCount))
     }
 
-    // ≡ requestPhotoLibraryAccess + PermissionPrimerGate(.photos)
+    // El picker del sistema se abre desde "Todas las fotos", no al montar el sheet.
     LaunchedEffect(Unit) {
         if (hasAttachmentGalleryPermission(context)) {
             loadLibrary()
         } else {
-            photosGate.requestAccess(context) { loadLibrary() }
+            permissionDenied = true
+            isLoading = false
         }
     }
 
@@ -666,9 +665,12 @@ private fun ChatAttachmentMediaGridSheet(
             isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = accentColor)
             }
-            permissionDenied -> ChatAttachmentPermissionPrompt(R.string.chat_attachment_photos_permission)
+            permissionDenied -> ChatAttachmentPermissionPrompt(
+                messageRes = R.string.chat_attachment_photos_permission,
+                onRequestAccess = { photosGate.requestAccess(context) { loadLibrary() } },
+            )
             else -> LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
+                columns = GridCells.Adaptive(120.dp),
                 contentPadding = PaddingValues(bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -864,13 +866,24 @@ private fun ChatAttachmentPillButton(
 }
 
 @Composable
-private fun ChatAttachmentPermissionPrompt(messageRes: Int) {
+private fun ChatAttachmentPermissionPrompt(messageRes: Int, onRequestAccess: () -> Unit) {
     val isDark = isSystemInDarkTheme()
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+    Column(
+        Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Text(
             stringResource(messageRes),
             color = if (isDark) androidx.compose.ui.graphics.Color.White.copy(alpha = .7f) else androidx.compose.ui.graphics.Color.Black.copy(alpha = .6f),
             fontSize = 15.sp,
+        )
+        Spacer(Modifier.height(16.dp))
+        ChatAttachmentPillButton(
+            titleRes = R.string.chat_attachment_allow_library,
+            tint = null,
+            disabled = false,
+            onClick = onRequestAccess,
         )
     }
 }

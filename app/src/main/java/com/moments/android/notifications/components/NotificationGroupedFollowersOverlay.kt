@@ -54,6 +54,7 @@ import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.views.components.MomentRowButton
 import com.moments.android.views.components.VerifiedBadgeView
 import com.moments.android.views.story.StoryRingAvatarView
+import com.moments.android.views.story.StoryRingLayout
 import kotlinx.coroutines.launch
 import kotlin.coroutines.resume
 
@@ -64,7 +65,10 @@ data class GroupedFollowerItem(
 )
 
 private object GroupedFollowersLayout {
-    val rowHeight = 52.dp
+    /** Foto 44 + aro fuera; no usar 52 fijo o Compose recorta el stroke. */
+    val avatarSize = 44.dp
+    val avatarLineWidth = 2.2.dp
+    val rowHeight = StoryRingLayout.outerFrameSize(avatarSize, avatarLineWidth)
     val rowSpacing = 6.dp
     const val maxVisibleRows = 10
 }
@@ -295,8 +299,8 @@ private fun FollowerRow(
     ) {
         StoryRingAvatarView(
             userId = item.id,
-            size = 44.dp,
-            lineWidth = 2.2.dp,
+            size = GroupedFollowersLayout.avatarSize,
+            lineWidth = GroupedFollowersLayout.avatarLineWidth,
             showBaseStroke = true,
             baseStrokeColor = if (isDark) Color.White.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.14f),
             baseStrokeWidth = 0.9.dp,

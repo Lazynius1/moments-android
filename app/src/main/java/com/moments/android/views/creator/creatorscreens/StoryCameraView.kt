@@ -16,6 +16,8 @@ import androidx.camera.core.Camera
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
+import androidx.camera.core.ViewPort
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
@@ -98,6 +100,9 @@ import com.moments.android.views.creator.creatoruikit.CREATOR_MOMENTS_CAPTURE_AS
 import com.moments.android.views.creator.creatoruikit.creatorMomentsCaptureRect
 import com.moments.android.views.creator.creatoruikit.storyMediaFromUri
 import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
+import com.moments.android.views.creator.creatoruikit.MomentsCameraController
+import com.moments.android.adaptive.LocalAdaptiveWindowState
+import com.moments.android.adaptive.MomentsFoldPosture
 import com.moments.android.views.permissions.CameraAccessBoundary
 import kotlinx.coroutines.delay
 import java.io.File
@@ -257,12 +262,10 @@ fun StoryCameraView(
             .setTargetRotation(Surface.ROTATION_0)
             .build()
     }
-    val videoCapture = remember {
-        val recorder = Recorder.Builder()
-            .setQualitySelector(QualitySelector.from(Quality.HD))
-            .build()
-        VideoCapture.withOutput(recorder)
+    var videoCapture by remember {
+        mutableStateOf(MomentsCameraController.createVideoCapture())
     }
+    var previewSize by remember { mutableStateOf(0 to 0) }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     LaunchedEffect(Unit) {
         cameraKit.prepareLenses()
@@ -287,9 +290,11 @@ fun StoryCameraView(
         imageCapture.flashMode = flashMode
     }
 
-    LaunchedEffect(hasCameraPermission, lensFacing, previewView) {
+    LaunchedEffect(hasCameraPermission, lensFacing, previewView, previewSize) {
         val view = previewView ?: return@LaunchedEffect
         if (!hasCameraPermission) return@LaunchedEffect
+        val (previewWidth, previewHeight) = previewSize
+        if (previewWidth <= 0 || previewHeight <= 0) return@LaunchedEffect
         val provider = cameraProvider ?: suspendCoroutine { cont ->
             val future = ProcessCameraProvider.getInstance(context)
             future.addListener(
@@ -297,27 +302,41 @@ fun StoryCameraView(
                 ContextCompat.getMainExecutor(context),
             )
         }.also { cameraProvider = it }
-        val preview = Preview.Builder()
-            .setTargetRotation(view.display?.rotation ?: Surface.ROTATION_0)
-            .build()
-            .also {
-            it.surfaceProvider = view.surfaceProvider
-        }
-        imageCapture.targetRotation = view.display?.rotation ?: Surface.ROTATION_0
-        videoCapture.targetRotation = view.display?.rotation ?: Surface.ROTATION_0
+        val rotation = view.display?.rotation ?: Surface.ROTATION_0
+        imageCapture.targetRotation = rotation
         val selector = CameraSelector.Builder()
             .requireLensFacing(lensFacing)
             .build()
+        val selectedCameraInfo = selector.filter(provider.availableCameraInfos).firstOrNull()
+        val stabilizationSupported = selectedCameraInfo?.let {
+            MomentsCameraController.supportsVideoStabilization(it)
+        } == true
+        val activeVideoCapture = MomentsCameraController.createVideoCapture(
+            stabilizationSupported = stabilizationSupported,
+        ).also {
+            it.targetRotation = rotation
+            videoCapture = it
+        }
+        val preview = MomentsCameraController.createPreview(rotation, stabilizationSupported).also {
+            it.surfaceProvider = view.surfaceProvider
+        }
+        val useCases = MomentsCameraController.createUseCaseGroup(
+            preview = preview,
+            imageCapture = imageCapture,
+            videoCapture = activeVideoCapture,
+            viewportWidth = previewWidth,
+            viewportHeight = previewHeight,
+            targetRotation = rotation,
+        )
         runCatching {
             provider.unbindAll()
             boundCamera = provider.bindToLifecycle(
                 lifecycleOwner,
                 selector,
-                preview,
-                imageCapture,
-                videoCapture,
+                useCases,
             )
             boundCamera?.cameraControl?.setZoomRatio(zoomLevel)
+            boundCamera?.let(MomentsCameraController::enableLowLightBoostWhenAvailable)
         }
     }
 
@@ -453,6 +472,7 @@ fun StoryCameraView(
 
         BoxWithConstraints(modifier.fillMaxSize().background(canvas)) {
             val density = LocalDensity.current
+            val adaptiveWindow = LocalAdaptiveWindowState.current
             val bottomInsetPx = WindowInsets.navigationBars.getBottom(density).toFloat()
             // ≡ iOS points → dp (antes px crudos → galería/flip pegados al shutter)
             val controlGapBelowCanvasPx = with(density) { 104.dp.toPx() }
@@ -466,10 +486,25 @@ fun StoryCameraView(
             val sideButtonHalfHeightPx = with(density) { 24.dp.toPx() } // 48.dp / 2
             val aaHalfSizePx = with(density) { 24.dp.toPx() }
 
+            val hinge = adaptiveWindow.hingeBounds
+            val cameraRegion = when (adaptiveWindow.foldPosture) {
+                MomentsFoldPosture.Tabletop -> Size(
+                    constraints.maxWidth.toFloat(),
+                    hinge?.let { with(density) { it.top.toPx() } } ?: constraints.maxHeight.toFloat(),
+                )
+                MomentsFoldPosture.Book -> Size(
+                    hinge?.let { with(density) { it.left.toPx() } } ?: constraints.maxWidth.toFloat(),
+                    constraints.maxHeight.toFloat(),
+                )
+                MomentsFoldPosture.Flat -> Size(
+                    constraints.maxWidth.toFloat(),
+                    constraints.maxHeight.toFloat(),
+                )
+            }
             val captureRect = creatorMomentsCaptureRect(
-                inSize = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()),
+                inSize = cameraRegion,
                 topInsetPx = 0f,
-                bottomInsetPx = bottomInsetPx,
+                bottomInsetPx = if (adaptiveWindow.foldPosture == MomentsFoldPosture.Tabletop) 0f else bottomInsetPx,
                 density = density,
             )
             val corner = storyViewerCanvasCornerRadius
@@ -506,6 +541,13 @@ fun StoryCameraView(
                             )
                             scaleType = PreviewView.ScaleType.FILL_CENTER
                             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                            addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                                val next = (right - left) to (bottom - top)
+                                val previous = (oldRight - oldLeft) to (oldBottom - oldTop)
+                                if (next.first > 0 && next.second > 0 && next != previous) {
+                                    previewSize = next
+                                }
+                            }
                         }.also { previewView = it }
                     },
                     modifier = Modifier

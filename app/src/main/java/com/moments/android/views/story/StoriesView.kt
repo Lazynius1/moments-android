@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -42,12 +43,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.adaptive.LocalAdaptiveWindowState
 import com.moments.android.ad.AdMobConfiguration
 import com.moments.android.ad.PlusStatusHelper
 import com.moments.android.ad.StoryNativeAdView
@@ -62,6 +65,9 @@ import com.moments.android.views.story.storyviewer.GlassmorphicEmptyState
 import com.moments.android.views.story.storyviewer.StoryDeckPageRole
 import com.moments.android.views.story.storyviewer.StoryUserDeckPager
 import com.moments.android.views.story.storyviewer.StoryViewerScreen
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Image
 import kotlinx.coroutines.async
@@ -93,11 +99,32 @@ fun StoriesView(
     highlightTitle: String? = null,
 ) {
     val context = LocalContext.current
+    val hostView = LocalView.current
     val configuration = LocalConfiguration.current
+    val adaptiveWindow = LocalAdaptiveWindowState.current
     val viewModel = remember { StoryViewModel() }
     val firestore = remember { FirestoreService() }
     val scope = rememberCoroutineScope()
     val deckGestureGate = remember { StoryDeckGestureGate() }
+
+    // El visor adaptado aprovecha el espacio extra ocultando solo la status bar.
+    // En móvil conservamos la barra y su safe area, igual que el visor original.
+    DisposableEffect(hostView, adaptiveWindow.usesLargeStoryLayout) {
+        val window = context.findActivity()?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, hostView) }
+        if (adaptiveWindow.usesLargeStoryLayout) {
+            controller?.hide(WindowInsetsCompat.Type.statusBars())
+            controller?.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            controller?.show(WindowInsetsCompat.Type.statusBars())
+        }
+        onDispose {
+            if (adaptiveWindow.usesLargeStoryLayout) {
+                controller?.show(WindowInsetsCompat.Type.statusBars())
+            }
+        }
+    }
 
     // ≡ @State locales de StoriesView.swift (no solo el VM)
     var hostUserIds by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -646,12 +673,14 @@ fun StoriesView(
     }
     val goPreviousState = rememberUpdatedState(goPrevious)
 
+    val storySurface = if (isSystemInDarkTheme()) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     CompositionLocalProvider(LocalStoryDeckGestureGate provides deckGestureGate) {
-        Box(
-            modifier
-                .fillMaxSize()
-                .background(Color.Black),
-        ) {
+        Box(modifier.fillMaxSize().background(storySurface)) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(storySurface),
+            ) {
             val errorText = hostErrorMessage ?: viewModel.errorMessage
             // Orden ≡ body de StoriesView.swift
             when {
@@ -819,6 +848,7 @@ fun StoriesView(
                         )
                     }
                 }
+            }
             }
         }
     }
