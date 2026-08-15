@@ -205,6 +205,7 @@ class ConversationSettingsViewModel(
     private val hydratingMediaIds = mutableSetOf<String>()
     private val refreshingMetadataIds = mutableSetOf<String>()
     private val firestoreService = FirestoreService()
+    private var privacyMutationVersion = 0L
 
     fun openSharedGallery(tab: ClusterGalleryTab = ClusterGalleryTab.MEDIA) {
         sharedGalleryInitialTab = tab
@@ -252,6 +253,7 @@ class ConversationSettingsViewModel(
     private fun loadPrivacySettings(context: android.content.Context?) {
         val conversationId = conversation?.id ?: return
         if (currentUserId.isBlank()) return
+        val requestVersion = privacyMutationVersion
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
             val globalEnabled = runCatching {
                 firestoreService.fetchUsersAsync(listOf(currentUserId)).firstOrNull()?.showReadReceipts
@@ -260,6 +262,9 @@ class ConversationSettingsViewModel(
                 FirebaseFirestore.getInstance().collection("conversations").document(conversationId).get().await().data
             }.getOrNull()
             withContext(Dispatchers.Main) {
+                if (requestVersion != privacyMutationVersion || conversation?.id != conversationId) {
+                    return@withContext
+                }
                 if (convData != null) {
                     @Suppress("UNCHECKED_CAST")
                     val mutedByUserIds = convData["mutedByUserIds"] as? List<String> ?: emptyList()
@@ -272,6 +277,8 @@ class ConversationSettingsViewModel(
                     @Suppress("UNCHECKED_CAST")
                     val receiptPrefs = convData["readReceiptPreferences"] as? Map<String, Boolean>
                     readReceiptsEnabled = receiptPrefs?.get(currentUserId) ?: globalEnabled
+                    context?.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE)
+                        ?.edit()?.putBoolean("chat_read_receipts_enabled_$conversationId", readReceiptsEnabled)?.apply()
 
                     @Suppress("UNCHECKED_CAST")
                     val forwardingPrefs = convData["forwardingPreferences"] as? Map<String, Boolean>
@@ -418,15 +425,34 @@ class ConversationSettingsViewModel(
     }
 
     /** ≡ iOS `toggleReadReceipts`. */
-    fun toggleReadReceipts(context: android.content.Context) {
+    fun toggleReadReceipts(context: android.content.Context, previousValue: Boolean) {
         val id = conversation?.id ?: return
         if (currentUserId.isBlank()) return
-        context.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE).edit()
+        privacyMutationVersion += 1L
+        val preferences = context.getSharedPreferences("conversation_settings", android.content.Context.MODE_PRIVATE)
+        preferences.edit()
             .putBoolean("chat_read_receipts_enabled_$id", readReceiptsEnabled)
             .putBoolean("read_receipts_$id", readReceiptsEnabled)
             .apply()
-        FirebaseFirestore.getInstance().collection("conversations").document(id)
-            .update("readReceiptPreferences.$currentUserId", readReceiptsEnabled)
+        val requestedValue = readReceiptsEnabled
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            val error = runCatching {
+                FirebaseFirestore.getInstance().collection("conversations").document(id)
+                    .update("readReceiptPreferences.$currentUserId", requestedValue)
+                    .await()
+            }.exceptionOrNull()
+            if (error != null) {
+                preferences.edit()
+                    .putBoolean("chat_read_receipts_enabled_$id", previousValue)
+                    .putBoolean("read_receipts_$id", previousValue)
+                    .apply()
+                withContext(Dispatchers.Main) {
+                    if (conversation?.id == id && readReceiptsEnabled == requestedValue) {
+                        readReceiptsEnabled = previousValue
+                    }
+                }
+            }
+        }
     }
 
     /** ≡ iOS `toggleForwarding`. */
@@ -1605,8 +1631,9 @@ private fun ConversationChatPreferencesView(
                 checked = model.readReceiptsEnabled,
                 colors = colors,
             ) {
+                val previousValue = model.readReceiptsEnabled
                 model.readReceiptsEnabled = it
-                model.toggleReadReceipts(context)
+                model.toggleReadReceipts(context, previousValue)
             }
             PreferenceDivider(colors)
             PreferenceToggleRow(

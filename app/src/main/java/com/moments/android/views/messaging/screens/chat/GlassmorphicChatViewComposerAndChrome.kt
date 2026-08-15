@@ -56,6 +56,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.messaging.components.ChatMessageBubbleCallbacks
 import com.moments.android.views.messaging.components.ChatMessageMenuSelection
+import com.moments.android.views.messaging.components.ChatMessageLiftSnapshot
 import com.moments.android.views.messaging.components.ChatNoticeTimelineRow
 import com.moments.android.views.messaging.components.ChatRequestInviteNotice
 import com.moments.android.views.messaging.components.GlassmorphicClusterRow
@@ -530,21 +531,35 @@ class ChatMessagePresentationState {
     /** ≡ iOS `chatListController.frameInWindow(forRowId:)`. */
     var rowFrameProvider: ((String) -> Rect?)? = null
 
-    fun presentMessageOptions(message: EnhancedMessage, rowId: String, currentUserId: String, cluster: List<EnhancedMessage>? = null) {
-        val frame = rowFrameProvider?.invoke(rowId) ?: Rect.Zero
+    fun presentMessageOptions(
+        message: EnhancedMessage,
+        rowId: String,
+        currentUserId: String,
+        cluster: List<EnhancedMessage>? = null,
+        snapshot: ChatMessageLiftSnapshot? = null,
+    ) {
+        val frame = snapshot?.frame?.takeIf { it.width > 0f && it.height > 0f }
+            ?: rowFrameProvider?.invoke(rowId)
+            ?: Rect.Zero
         // ≡ iOS guard anchorFrame.width > 0, height > 0
         if (frame.width <= 0f || frame.height <= 0f) return
         menuSelection = ChatMessageMenuSelection(
             rowId = rowId,
             message = message,
             anchorFrame = frame,
-            anchorCornerRadius = ChatBubbleAnchorMetrics.cornerRadiusFor(message),
+            anchorCornerRadius = snapshot?.cornerRadius ?: ChatBubbleAnchorMetrics.cornerRadiusFor(message),
             isOutgoing = message.senderId == currentUserId,
+            liftedImage = snapshot?.image,
             clusterMessages = cluster,
         )
     }
 
     fun clearMessageOptions() { menuSelection = null }
+    fun updateMenuLiftOffset(rowId: String, offsetY: Float) {
+        val current = menuSelection ?: return
+        if (current.rowId != rowId || current.liftOffsetY == offsetY) return
+        menuSelection = current.copy(liftOffsetY = offsetY)
+    }
     fun isBubbleFlashing(messageId: String): Boolean = messageId in flashingMessageIds
     fun beginBubbleFlash(messageId: String) { flashingMessageIds = flashingMessageIds + messageId }
     fun endBubbleFlash(messageId: String) { flashingMessageIds = flashingMessageIds - messageId }
@@ -637,8 +652,8 @@ fun GlassmorphicChatMessageItem(
                         onMessageViewed = { messageId ->
                             viewModel.messagesById[messageId]?.let(viewModel::markEphemeralAsViewed)
                         },
-                        onLongPress = {
-                            presentationState.presentMessageOptions(message, rowId, viewModel.currentUserId)
+                        onLongPress = { snapshot ->
+                            presentationState.presentMessageOptions(message, rowId, viewModel.currentUserId, snapshot = snapshot)
                             callbacks.onLongPress(message, rowId, null)
                         },
                         onViewOnceOpen = callbacks.onViewOnceOpen,
@@ -683,18 +698,18 @@ fun GlassmorphicChatMessageItem(
                 isStarred = anchor?.let { it.isStarred(viewModel.currentUserId) || viewModel.isStarred(it.id) } == true,
                 isMenuSelected = menuSelected,
                 isBubbleFlashing = presentationState.isMessageItemHighlighted(item),
-                onLongPress = { message ->
-                    presentationState.presentMessageOptions(message, rowId, viewModel.currentUserId, cluster.takeIf { it.size > 1 })
+                onLongPress = { message, snapshot ->
+                    presentationState.presentMessageOptions(
+                        message,
+                        rowId,
+                        viewModel.currentUserId,
+                        cluster.takeIf { it.size > 1 },
+                        snapshot,
+                    )
                     callbacks.onLongPress(message, rowId, cluster.takeIf { it.size > 1 })
                 },
                 modifier = modifier.combinedClickable(
                     onClick = {},
-                    onLongClick = {
-                        cluster.firstOrNull()?.let {
-                            presentationState.presentMessageOptions(it, rowId, viewModel.currentUserId, cluster.takeIf { messages -> messages.size > 1 })
-                            callbacks.onLongPress(it, rowId, cluster.takeIf { messages -> messages.size > 1 })
-                        }
-                    },
                 ).pointerInput(item.id) {
                     detectTapGestures(onDoubleTap = {
                         cluster.firstOrNull()?.let { message -> viewModel.addReaction(message, quickReactionEmoji); pulse(message.id); HapticManager.shared.lightImpact() }

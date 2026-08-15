@@ -243,6 +243,8 @@ data class EnhancedMessage(
     var allowReplay: Boolean? = null,
     var replayedBy: List<String>? = null,
     var readBy: List<String>? = null,
+    /** Hora real de lectura por usuario; ausente cuando los acuses están desactivados. */
+    var readAtBy: Map<String, Date>? = null,
     var starredBy: List<String>? = null,
     var isForwarded: Boolean? = null,
     var isVanishModeMessage: Boolean = false,
@@ -306,6 +308,11 @@ data class EnhancedMessage(
         allowReplay?.let { put("allowReplay", it) }
         replayedBy?.let { put("replayedBy", JSONArray(it)) }
         readBy?.let { put("readBy", JSONArray(it)) }
+        readAtBy?.let { values ->
+            put("readAtBy", JSONObject().apply {
+                values.forEach { (userId, date) -> put(userId, date.time) }
+            })
+        }
         starredBy?.let { put("starredBy", JSONArray(it)) }
         isForwarded?.let { put("isForwarded", it) }
         put("isVanishModeMessage", isVanishModeMessage)
@@ -609,6 +616,9 @@ data class EnhancedMessage(
             allowReplay = obj.optBoolean("allowReplay").takeIf { obj.has("allowReplay") },
             replayedBy = obj.optJSONArray("replayedBy")?.let { array -> (0 until array.length()).map(array::getString) },
             readBy = obj.optJSONArray("readBy")?.let { array -> (0 until array.length()).map(array::getString) },
+            readAtBy = obj.optJSONObject("readAtBy")?.let { payload ->
+                payload.keys().asSequence().associateWith { userId -> Date(payload.getLong(userId)) }
+            },
             starredBy = obj.optJSONArray("starredBy")?.let { array -> (0 until array.length()).map(array::getString) },
             isForwarded = obj.optBoolean("isForwarded").takeIf { obj.has("isForwarded") },
             isVanishModeMessage = obj.optBoolean("isVanishModeMessage"),

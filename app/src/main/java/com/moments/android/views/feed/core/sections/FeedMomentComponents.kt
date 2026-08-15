@@ -536,6 +536,7 @@ fun ModernPostCardView(
     modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
+    val colors = rememberFeedAdaptiveColors()
     val density = LocalDensity.current
     val context = LocalContext.current
     val adaptiveWindow = LocalAdaptiveWindowState.current
@@ -884,22 +885,35 @@ fun ModernPostCardView(
 
         // iOS siempre monta MomentCaptionView(style: .feed) — vacío = no-op interno
         AnimatedVisibility(visible = !isImmersive, enter = fadeIn(), exit = fadeOut()) {
-            MomentCaptionView(
-                content = moment.content,
-                onHashtagTap = onOpenHashtag,
-                style = com.moments.android.views.components.MomentCaptionPresentationStyle.Feed,
-                authorId = moment.authorId,
-                username = moment.username,
-                audience = moment.audience,
-                previewImageUrl = moment.visibleMediaItems.firstOrNull()?.let { item ->
-                    when (item.type.lowercase()) {
-                        "video" -> item.thumbnailUrl?.trim()?.takeIf { it.isNotEmpty() }
-                            ?: item.url.trim().takeIf { it.isNotEmpty() }
-                        else -> item.url.trim().takeIf { it.isNotEmpty() }
-                    }
-                },
-                isVideo = moment.visibleMediaItems.firstOrNull()?.type?.equals("video", ignoreCase = true),
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                MomentCaptionView(
+                    content = moment.content,
+                    onHashtagTap = onOpenHashtag,
+                    style = com.moments.android.views.components.MomentCaptionPresentationStyle.Feed,
+                    authorId = moment.authorId,
+                    username = moment.username,
+                    audience = moment.audience,
+                    previewImageUrl = moment.visibleMediaItems.firstOrNull()?.let { item ->
+                        when (item.type.lowercase()) {
+                            "video" -> item.thumbnailUrl?.trim()?.takeIf { it.isNotEmpty() }
+                                ?: item.url.trim().takeIf { it.isNotEmpty() }
+                            else -> item.url.trim().takeIf { it.isNotEmpty() }
+                        }
+                    },
+                    isVideo = moment.visibleMediaItems.firstOrNull()?.type?.equals("video", ignoreCase = true),
+                )
+
+                Text(
+                    text = relativeTime(moment.timestamp),
+                    color = colors.tertiary,
+                    fontSize = with(density) { legacyPoppinsSize(context, 11).toSp() },
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier
+                        .padding(horizontal = FeedMomentCardLayout.captionHorizontalPadding)
+                        .padding(bottom = 6.dp),
+                )
+            }
         }
     }
 }
@@ -964,16 +978,6 @@ private fun PostHeader(
                     VerifiedBadgeView(userId = moment.authorId, size = 14.dp)
                 }
 
-                Text(
-                    text = "·",
-                    color = colors.tertiary,
-                    fontSize = with(density) { legacyPoppinsSize(context, 11).toSp() },
-                )
-                Text(
-                    text = relativeTime(moment.timestamp),
-                    color = colors.tertiary,
-                    fontSize = with(density) { legacyPoppinsSize(context, 11).toSp() },
-                )
             }
 
             moment.location?.takeIf { it.isNotBlank() }?.let { location ->

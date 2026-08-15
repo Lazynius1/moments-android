@@ -371,7 +371,7 @@ fun ChatTimestampRevealGutter(
 }
 
 /**
- * Port de `chatMessageLongPress`: 0.42s, max drift 18pt, heavy haptic.
+ * Port de `chatMessageLongPress`: 0.32s, max drift 18pt, heavy haptic.
  */
 fun Modifier.chatMessageLongPress(
     onPressingChanged: ((Boolean) -> Unit)? = null,
@@ -382,7 +382,7 @@ fun Modifier.chatMessageLongPress(
         onPressingChanged?.invoke(true)
         val origin = down.position
         var cancelled = false
-        val timedOut = withTimeoutOrNull(420L) {
+        val timedOut = withTimeoutOrNull(320L) {
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Main)
                 val change = event.changes.firstOrNull { it.id == down.id } ?: run {

@@ -640,6 +640,7 @@ object ChatService {
         message.replayedBy?.let { data["replayedBy"] = it }
         if (message.isViewOnce) data["isViewOnce"] = true
         message.readBy?.let { data["readBy"] = it }
+        message.readAtBy?.let { values -> data["readAtBy"] = values.mapValues { Timestamp(it.value) } }
         message.starredBy?.takeIf { it.isNotEmpty() }?.let { data["starredBy"] = it }
         if (message.isForwarded == true) data["isForwarded"] = true
         if (message.isVanishModeMessage) data["isVanishModeMessage"] = true
@@ -1058,6 +1059,7 @@ object ChatService {
             if (finalEnabled) {
                 update["isRead"] = true
                 update["status"] = MessageStatus.READ.raw
+                update["readAtBy.$readerId"] = FieldValue.serverTimestamp()
             }
             batch.update(conversationRef.collection("messages").document(messageId), update)
         }

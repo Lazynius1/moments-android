@@ -415,6 +415,8 @@ object MessagePersistenceStore {
                 thumbnailEncryption = null,
                 audioWaveform = null,
                 isRead = existing.isRead || new.isRead,
+                readBy = new.readBy ?: existing.readBy,
+                readAtBy = (existing.readAtBy.orEmpty() + new.readAtBy.orEmpty()).takeIf { it.isNotEmpty() },
                 vanishedFor = (existing.vanishedFor + new.vanishedFor).distinct(),
                 vanishExpiresAt = new.vanishExpiresAt ?: existing.vanishExpiresAt,
             )
@@ -423,6 +425,8 @@ object MessagePersistenceStore {
             mediaUrl = existing.mediaUrl?.takeIf { isLocalFilePresent(it) } ?: new.mediaUrl,
             thumbnailUrl = existing.thumbnailUrl?.takeIf { isLocalFilePresent(it) } ?: new.thumbnailUrl,
             isRead = existing.isRead || new.isRead,
+            readBy = new.readBy ?: existing.readBy,
+            readAtBy = (existing.readAtBy.orEmpty() + new.readAtBy.orEmpty()).takeIf { it.isNotEmpty() },
             vanishedFor = (existing.vanishedFor + new.vanishedFor).distinct(),
             vanishExpiresAt = new.vanishExpiresAt ?: existing.vanishExpiresAt,
             isLiveLocation = new.isLiveLocation ?: existing.isLiveLocation,

@@ -160,6 +160,14 @@ private fun applySnapshotMetadata(message: EnhancedMessage, data: Map<String, An
         allowReplay = data["allowReplay"] as? Boolean ?: message.allowReplay,
         replayedBy = stringList("replayedBy") ?: message.replayedBy,
         readBy = stringList("readBy") ?: message.readBy,
+        readAtBy = (data["readAtBy"] as? Map<*, *>)
+            ?.mapNotNull { (userId, value) ->
+                val id = userId as? String ?: return@mapNotNull null
+                val date = (value as? Timestamp)?.toDate() ?: return@mapNotNull null
+                id to date
+            }
+            ?.toMap()
+            ?: message.readAtBy,
         starredBy = stringList("starredBy") ?: message.starredBy,
         isForwarded = data["isForwarded"] as? Boolean ?: message.isForwarded,
         vanishedFor = stringList("vanishedFor") ?: message.vanishedFor,

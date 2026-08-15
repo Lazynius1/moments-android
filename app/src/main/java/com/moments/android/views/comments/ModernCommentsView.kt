@@ -159,6 +159,7 @@ fun ModernCommentsView(
 
     var showDeleteAlert by remember { mutableStateOf(false) }
     var commentToDelete by remember { mutableStateOf<Comment?>(null) }
+    val maxCommentNestingLevel = 4
     var expandedComments by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     var commentsListener by remember { mutableStateOf<ListenerRegistration?>(null) }
@@ -181,7 +182,31 @@ fun ModernCommentsView(
     }
 
     fun nestedFor(parentId: String): List<Comment> =
-        filteredComments.filter { it.parentCommentId == parentId }.sortedBy { it.timestamp }
+        if (parentId.isEmpty()) {
+            emptyList()
+        } else {
+            filteredComments.filter { it.parentCommentId == parentId }.sortedBy { it.timestamp }
+        }
+
+    fun nestingDepth(commentId: String): Int {
+        var depth = 0
+        var currentId: String? = commentId
+        val visited = mutableSetOf<String>()
+        while (!currentId.isNullOrEmpty() && currentId !in visited) {
+            visited += currentId
+            val parentId = comments.firstOrNull { it.id == currentId }?.parentCommentId
+            if (parentId.isNullOrEmpty()) break
+            depth += 1
+            currentId = parentId
+        }
+        return depth
+    }
+
+    fun canReply(to: Comment): Boolean {
+        val id = to.id ?: return false
+        if (id.isEmpty()) return false
+        return nestingDepth(id) < maxCommentNestingLevel
+    }
 
     fun setupMuteSettingsListener() {
         val uid = currentUid
@@ -276,6 +301,9 @@ fun ModernCommentsView(
     fun addComment(content: String, parentCommentId: String?, mentions: List<CommentMentionEntity>) {
         val uid = currentUid ?: return
         val momentId = moment.id.takeIf { it.isNotBlank() } ?: return
+        if (!parentCommentId.isNullOrEmpty() && nestingDepth(parentCommentId) >= maxCommentNestingLevel) {
+            return
+        }
         val pendingId = UUID.randomUUID().toString()
         val pending = Comment(
             id = pendingId,
@@ -495,13 +523,12 @@ fun ModernCommentsView(
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             items(rootComments, key = { it.id ?: it.hashCode().toString() }) { comment ->
-                                val id = comment.id.orEmpty()
                                 EnhancedModernCommentRow(
                                     comment = comment,
                                     currentUid = currentUid,
                                     momentAuthorId = moment.authorId,
-                                    nestedComments = nestedFor(id),
-                                    isExpanded = expandedComments.contains(id),
+                                    nestedCommentsProvider = { parentId -> nestedFor(parentId) },
+                                    isCommentExpanded = { id -> id in expandedComments },
                                     onToggleExpand = { commentId ->
                                         expandedComments = if (commentId in expandedComments) {
                                             expandedComments - commentId
@@ -510,7 +537,9 @@ fun ModernCommentsView(
                                         }
                                     },
                                     onLike = { toggleLike(it) },
-                                    onReply = { replyToComment = it },
+                                    onReply = {
+                                        if (canReply(it)) replyToComment = it
+                                    },
                                     onEdit = {
                                         editingCommentId = it.id
                                         editingCommentContent = it.content
@@ -531,6 +560,7 @@ fun ModernCommentsView(
                                     temporarilyRevealedCommentIds = temporarilyRevealedCommentIds,
                                     onRevealTemporarily = { revealMutedCommentTemporarily(it) },
                                     nestingLevel = 0,
+                                    maxNestingLevel = maxCommentNestingLevel,
                                 )
                             }
                         }

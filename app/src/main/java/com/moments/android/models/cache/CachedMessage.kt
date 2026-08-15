@@ -66,6 +66,8 @@ data class CachedMessage(
     val stickersData: ByteArray? = null,
     val drawingData: ByteArray? = null,
     val viewedBy: List<String>? = null,
+    val readBy: List<String>? = null,
+    val readAtByData: ByteArray? = null,
     val lastSyncedAt: Date = Date(),
     val isVanishModeMessage: Boolean = false,
     val vanishedFor: List<String> = emptyList(),
@@ -123,6 +125,8 @@ data class CachedMessage(
             stickers = decodeStickers(stickersData),
             drawingData = drawingData,
             viewedBy = viewedBy,
+            readBy = readBy,
+            readAtBy = decodeDateMap(readAtByData),
             isVanishModeMessage = isVanishModeMessage,
             vanishedFor = vanishedFor,
             vanishExpiresAt = vanishExpiresAt,
@@ -178,6 +182,8 @@ data class CachedMessage(
             Arrays.equals(stickersData, other.stickersData) &&
             Arrays.equals(drawingData, other.drawingData) &&
             viewedBy == other.viewedBy &&
+            readBy == other.readBy &&
+            Arrays.equals(readAtByData, other.readAtByData) &&
             lastSyncedAt == other.lastSyncedAt &&
             isVanishModeMessage == other.isVanishModeMessage &&
             vanishedFor == other.vanishedFor &&
@@ -231,6 +237,8 @@ data class CachedMessage(
         result = 31 * result + (stickersData?.let { Arrays.hashCode(it) } ?: 0)
         result = 31 * result + (drawingData?.let { Arrays.hashCode(it) } ?: 0)
         result = 31 * result + (viewedBy?.hashCode() ?: 0)
+        result = 31 * result + (readBy?.hashCode() ?: 0)
+        result = 31 * result + (readAtByData?.let { Arrays.hashCode(it) } ?: 0)
         result = 31 * result + lastSyncedAt.hashCode()
         result = 31 * result + isVanishModeMessage.hashCode()
         result = 31 * result + vanishedFor.hashCode()
@@ -303,6 +311,8 @@ data class CachedMessage(
             stickersData = encodeStickers(message.stickers),
             drawingData = message.drawingData,
             viewedBy = message.viewedBy,
+            readBy = message.readBy,
+            readAtByData = encodeDateMap(message.readAtBy),
             lastSyncedAt = Date(),
             isVanishModeMessage = message.isVanishModeMessage,
             vanishedFor = message.vanishedFor,
@@ -326,6 +336,21 @@ data class CachedMessage(
 
         private fun encodeStringMap(map: Map<String, String>?): ByteArray? =
             map?.let { JSONObject(it).toString().toByteArray() }
+
+        private fun encodeDateMap(map: Map<String, Date>?): ByteArray? =
+            map?.let { values ->
+                JSONObject().apply {
+                    values.forEach { (userId, date) -> put(userId, date.time) }
+                }.toString().toByteArray()
+            }
+
+        private fun decodeDateMap(data: ByteArray?): Map<String, Date>? {
+            if (data == null) return null
+            return runCatching {
+                val payload = JSONObject(String(data))
+                payload.keys().asSequence().associateWith { userId -> Date(payload.getLong(userId)) }
+            }.getOrNull()
+        }
 
         private fun decodeStringMap(data: ByteArray?): Map<String, String>? {
             if (data == null) return null

@@ -323,6 +323,13 @@ suspend fun ChatService.buildEnhancedMessage(
         allowReplay = data["allowReplay"] as? Boolean,
         replayedBy = stringList("replayedBy"),
         readBy = stringList("readBy"),
+        readAtBy = (data["readAtBy"] as? Map<*, *>)
+            ?.mapNotNull { (userId, value) ->
+                val id = userId as? String ?: return@mapNotNull null
+                val date = (value as? Timestamp)?.toDate() ?: return@mapNotNull null
+                id to date
+            }
+            ?.toMap(),
         starredBy = stringList("starredBy"),
         isForwarded = data["isForwarded"] as? Boolean,
         isVanishModeMessage = data["isVanishModeMessage"] as? Boolean ?: false,

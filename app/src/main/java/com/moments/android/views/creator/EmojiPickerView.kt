@@ -439,6 +439,19 @@ private fun isSkinToneSupported(emoji: String): Boolean {
 
 private val EmojiPickerCategories: List<EmojiCategory> by lazy { buildEmojiCategories() }
 
+/** Catálogo compartido por el sheet y el selector inline del menú contextual. */
+internal fun emojiPickerCatalog(): List<String> = EmojiPickerCategories
+    .flatMap(EmojiCategory::emojis)
+    .distinct()
+
+internal fun emojiSupportsSkinTone(emoji: String): Boolean = isSkinToneSupported(emoji)
+
+internal fun emojiWithoutSkinTone(emoji: String): String = buildString {
+    emoji.codePoints().forEach { codePoint ->
+        if (codePoint !in 0x1F3FB..0x1F3FF) appendCodePoint(codePoint)
+    }
+}
+
 private fun buildEmojiCategories(): List<EmojiCategory> {
     val reactionEmojis = listOf(
         "😍", "🔥", "😂", "🥹", "❤️", "👏", "🙌", "🎉", "🤔", "💯", "✨", "👀",
