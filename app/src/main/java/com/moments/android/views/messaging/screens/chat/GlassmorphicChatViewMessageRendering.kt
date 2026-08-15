@@ -1,5 +1,7 @@
 package com.moments.android.views.messaging.screens.chat
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,11 +22,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -40,8 +42,6 @@ import com.moments.android.views.messaging.components.ChatConversationIntroRow
 import com.moments.android.views.messaging.components.ChatFailedMessageRetryAction
 import com.moments.android.views.messaging.components.ChatGlassmorphicBackground
 import com.moments.android.views.messaging.components.ChatHistoryStartHeader
-import com.moments.android.views.messaging.components.ChatMessageContextMenuOverlay
-import com.moments.android.views.messaging.components.ChatMessageMenuCallbacks
 import com.moments.android.views.messaging.components.ChatRequestDisclaimerRow
 import com.moments.android.views.messaging.components.ChatTimestampRevealState
 import com.moments.android.views.messaging.components.GlassmorphicDateHeader
@@ -55,7 +55,6 @@ import com.moments.android.views.messaging.core.ChatRenderRow
 import com.moments.android.views.messaging.core.EnhancedChatViewModel
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageItem
-import kotlinx.coroutines.launch
 
 /** Port de `GlassmorphicChatView+MessageRendering.swift`. */
 data class ChatMessageRenderingCallbacks(
@@ -118,20 +117,30 @@ fun GlassmorphicChatRenderRow(
             row.date,
             modifier.chatMenuDimmedWhenOpen(menuOpen).padding(vertical = 10.dp),
         )
-        is ChatRenderRow.Message -> Column(
-            modifier.chatMenuDimmedUnlessSelected(selectedRowId == row.id, menuOpen),
-        ) {
-            // ≡ iOS: unread divider con padding h18/v6 antes del mensaje (mismo VStack).
-            callbacks.onUnreadDivider(row)
-            GlassmorphicChatMessageItem(
-                row.item,
-                viewModel.messages.value,
-                viewModel,
-                messagePresentation,
-                callbacks.renderer,
-                quickReactionEmoji,
-                timestampRevealState,
+        is ChatRenderRow.Message -> {
+            val selected = selectedRowId == row.id
+            val menuLiftOffsetY by animateFloatAsState(
+                targetValue = if (selected) messagePresentation.menuSelection?.liftOffsetY ?: 0f else 0f,
+                animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
+                label = "chatMessageMenuLift",
             )
+            Column(
+                modifier
+                    .graphicsLayer { translationY = menuLiftOffsetY }
+                    .chatMenuDimmedUnlessSelected(selected, menuOpen),
+            ) {
+                // ≡ iOS: unread divider con padding h18/v6 antes del mensaje (mismo VStack).
+                callbacks.onUnreadDivider(row)
+                GlassmorphicChatMessageItem(
+                    row.item,
+                    viewModel.messages.value,
+                    viewModel,
+                    messagePresentation,
+                    callbacks.renderer,
+                    quickReactionEmoji,
+                    timestampRevealState,
+                )
+            }
         }
         is ChatRenderRow.Buzz -> ChatBuzzTimelineEventRow(
             callbacks.buzzText(row.event),
@@ -204,12 +213,9 @@ fun GlassmorphicChatRootContent(
     onComposerHeightChange: (androidx.compose.ui.unit.Dp) -> Unit = {},
     content: @Composable () -> Unit,
     composer: @Composable () -> Unit,
-    callbacks: ChatMessageRenderingCallbacks,
     modifier: Modifier = Modifier,
 ) {
-    val forwardingPreferences by viewModel.forwardingPreferences.collectAsState()
     val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
     // ≡ iOS environment(\.chatFailedMessageRetryAction)
     val failedRetry = remember(viewModel) {
         ChatFailedMessageRetryAction(
@@ -219,7 +225,12 @@ fun GlassmorphicChatRootContent(
     }
     CompositionLocalProvider(LocalChatFailedMessageRetryAction provides failedRetry) {
         Box(modifier.fillMaxSize().background(adaptiveColors.chatBackground.first())) {
-            ChatGlassmorphicBackground(adaptiveColors, Modifier.fillMaxSize())
+            ChatGlassmorphicBackground(
+                adaptiveColors,
+                // La incoming bubble es translúcida: modificar el fondo bajo ella
+                // también modificaría su color aparente durante el long press.
+                Modifier.fillMaxSize(),
+            )
             Box(Modifier.fillMaxSize()) { content() }
             // Android: sin ChatBottomWallpaperEdgeFade (iOS lo necesita por el chrome; aquí tapa mensajes).
             Box(
@@ -235,32 +246,6 @@ fun GlassmorphicChatRootContent(
             buzzToastText?.let { text ->
                 ChatBuzzToast(text, Modifier.align(Alignment.TopCenter).padding(top = 10.dp, start = 18.dp, end = 18.dp))
             }
-            ChatMessageContextMenuOverlay(
-                selection = messagePresentation.menuSelection,
-                currentUserId = viewModel.currentUserId,
-                forwardingPreferences = forwardingPreferences,
-                starredMessageIds = callbacks.starredMessageIds,
-                callbacks = ChatMessageMenuCallbacks(
-                    onDeleteForEveryone = viewModel::deleteMessageForEveryone,
-                    onDeleteForMe = viewModel::deleteMessageForMe,
-                    onEdit = callbacks.onEditingStarted,
-                    onReply = callbacks.renderer.onReply,
-                    onCopy = callbacks.onCopy,
-                    onForward = callbacks.onForward,
-                    onToggleStar = { message ->
-                        viewModel.toggleStar(message)
-                        callbacks.onToggleStar(message)
-                    },
-                    onReaction = { message, emoji ->
-                        viewModel.addReaction(message, emoji)
-                        // ≡ iOS pulseBubbleHighlight(message.id)
-                        scope.launch { messagePresentation.pulseBubbleHighlight(message.id) }
-                    },
-                    onMoreReactions = callbacks.onMoreReactions,
-                ),
-                onDismiss = messagePresentation::clearMessageOptions,
-                modifier = Modifier.fillMaxSize(),
-            )
         }
     }
 }
