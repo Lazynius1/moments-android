@@ -19,8 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,9 +45,6 @@ import com.moments.android.views.messaging.services.ChatNavigationIntentStore
 import com.moments.android.views.messaging.services.ChatSessionEngine
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -86,8 +81,6 @@ import com.moments.android.views.messaging.components.ChatComposerChromeMetrics
 import com.moments.android.views.messaging.components.ChatFloatingNavigationOverlay
 import com.moments.android.views.messaging.components.ChatFloatingNavigationState
 import com.moments.android.views.messaging.components.ChatMessageForwardSheet
-import com.moments.android.views.messaging.components.ChatMessageContextMenuOverlay
-import com.moments.android.views.messaging.components.ChatMessageMenuCallbacks
 import com.moments.android.views.messaging.components.ChatVanishTimerSheet
 import com.moments.android.views.messaging.components.GlassmorphicTypingIndicator
 import com.moments.android.views.messaging.components.GlassmorphicUnreadDivider
@@ -209,7 +202,6 @@ fun GlassmorphicChatView(
     var showingMomentError by remember { mutableStateOf(false) }
     var storyUnavailableReason by remember { mutableStateOf<SharedStoryAccessDenialReason?>(null) }
     val vanishMessageTimer by session.vanishMessageTimer.collectAsState()
-    val forwardingPreferences by session.forwardingPreferences.collectAsState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
@@ -726,6 +718,37 @@ fun GlassmorphicChatView(
         isSearchVisible = search.isSearchVisible,
         composerHeight = scroll.lastComposerHeight ?: ChatComposerChromeMetrics.estimatedComposerChromeHeight,
         onComposerHeightChange = scroll::handleComposerHeightChange,
+        callbacks = ChatMessageRenderingCallbacks(
+            renderer = renderer,
+            buzzText = { event ->
+                if (event.senderId == session.currentUserId) context.getString(R.string.chat_buzz_sent)
+                else context.getString(R.string.chat_buzz_received, displayName)
+            },
+            onReplyCancelled = { replyingTo = null },
+            onEditCancelled = { editingMessage = null; messageText = "" },
+            onEditingStarted = { message ->
+                editingMessage = message
+                replyingTo = null
+                messageText = message.content.orEmpty()
+            },
+            onCopy = { message ->
+                val text = message.content.orEmpty()
+                if (text.isNotBlank()) {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("message", text))
+                }
+            },
+            onForward = { message -> forwardingMessage = message },
+            onMoreReactions = { message -> reactionPickerMessage = message },
+            onToggleStar = { message ->
+                starredMessageIds = if (message.id in starredMessageIds) {
+                    starredMessageIds - message.id
+                } else {
+                    starredMessageIds + message.id
+                }
+            },
+            starredMessageIds = starredMessageIds,
+        ),
         modifier = modifier.chatBuzzShakeEffect(buzzShakeProgress, 24.dp),
         content = {
             Box(Modifier.fillMaxSize()) {
@@ -761,20 +784,10 @@ fun GlassmorphicChatView(
                             val menuOpen = messagePresentation.menuSelection != null
                             val selected = messagePresentation.menuSelection?.rowId == rowId
                             val highlighted = messagePresentation.isMessageItemHighlighted(item)
-                            val menuLiftOffsetY by animateFloatAsState(
-                                targetValue = if (selected) {
-                                    messagePresentation.menuSelection?.liftOffsetY ?: 0f
-                                } else {
-                                    0f
-                                },
-                                animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
-                                label = "chatMessageMenuLift",
-                            )
                             Column(
                                 Modifier
                                     .fillMaxWidth()
                                     .zIndex(if (selected || highlighted) 100f else 0f)
-                                    .graphicsLayer { translationY = menuLiftOffsetY }
                                     .chatMenuDimmedUnlessSelected(selected, menuOpen),
                             ) {
                                 if (unreadDivider.shouldShowBefore(messageIds(item), canLoadMore)) {
@@ -956,10 +969,6 @@ fun GlassmorphicChatView(
                 onSearchClear = search::clearSearchQueryKeepingMode,
                 onSearchSubmit = search::scrollToCurrentSearchMatch,
             ),
-            modifier = Modifier.blur(
-                radius = if (messagePresentation.menuSelection != null) 9.dp else 0.dp,
-                edgeTreatment = BlurredEdgeTreatment.Unbounded,
-            ),
         )
     } else {
         GlassmorphicChatToolbar(
@@ -988,53 +997,8 @@ fun GlassmorphicChatView(
                 onSearchClear = search::clearSearchQueryKeepingMode,
                 onSearchSubmit = search::scrollToCurrentSearchMatch,
             ),
-            modifier = Modifier.blur(
-                radius = if (messagePresentation.menuSelection != null) 9.dp else 0.dp,
-                edgeTreatment = BlurredEdgeTreatment.Unbounded,
-            ),
         )
     }
-
-    ChatMessageContextMenuOverlay(
-        selection = messagePresentation.menuSelection,
-        currentUserId = session.currentUserId,
-        forwardingPreferences = forwardingPreferences,
-        starredMessageIds = starredMessageIds,
-        callbacks = ChatMessageMenuCallbacks(
-            onDeleteForEveryone = session::deleteMessageForEveryone,
-            onDeleteForMe = session::deleteMessageForMe,
-            onEdit = { message ->
-                editingMessage = message
-                replyingTo = null
-                messageText = message.content.orEmpty()
-            },
-            onReply = renderer.onReply,
-            onCopy = { message ->
-                val text = message.content.orEmpty()
-                if (text.isNotBlank()) {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("message", text))
-                }
-            },
-            onForward = { message -> forwardingMessage = message },
-            onToggleStar = { message ->
-                session.toggleStar(message)
-                starredMessageIds = if (message.id in starredMessageIds) {
-                    starredMessageIds - message.id
-                } else {
-                    starredMessageIds + message.id
-                }
-            },
-            onReaction = { message, emoji ->
-                session.addReaction(message, emoji)
-                scope.launch { messagePresentation.pulseBubbleHighlight(message.id) }
-            },
-            onMoreReactions = { message -> reactionPickerMessage = message },
-            onLiftOffsetChanged = messagePresentation::updateMenuLiftOffset,
-        ),
-        onDismiss = messagePresentation::clearMessageOptions,
-        modifier = Modifier.fillMaxSize().zIndex(1_000f),
-    )
 
     // ≡ navigationDestination(showingConversationSettings)
     if (showingConversationSettings) {

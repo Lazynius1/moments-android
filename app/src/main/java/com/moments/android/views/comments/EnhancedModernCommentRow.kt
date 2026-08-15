@@ -74,8 +74,8 @@ fun EnhancedModernCommentRow(
     comment: Comment,
     currentUid: String?,
     momentAuthorId: String,
-    nestedCommentsProvider: (String) -> List<Comment>,
-    isCommentExpanded: (String) -> Boolean,
+    nestedComments: List<Comment>,
+    isExpanded: Boolean,
     onToggleExpand: (String) -> Unit,
     onLike: (Comment) -> Unit,
     onReply: (Comment) -> Unit,
@@ -87,14 +87,11 @@ fun EnhancedModernCommentRow(
     temporarilyRevealedCommentIds: Set<String>,
     onRevealTemporarily: (String) -> Unit,
     nestingLevel: Int,
-    maxNestingLevel: Int = 4,
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
     val isDark = isSystemInDarkTheme()
     val commentId = comment.id.orEmpty()
-    val nestedComments = nestedCommentsProvider(commentId)
-    val isExpanded = commentId.isNotEmpty() && isCommentExpanded(commentId)
     val isMutedWordMasked = commentId.isNotEmpty() && commentId in maskedCommentIds
     val isTemporarilyRevealed = commentId.isNotEmpty() && commentId in temporarilyRevealedCommentIds
     val isMaskApplied = isMutedWordMasked && !isTemporarilyRevealed
@@ -122,10 +119,10 @@ fun EnhancedModernCommentRow(
         2 -> 32.dp
         else -> 28.dp
     }
-    val indentationWidth = (nestingLevel.coerceAtMost(maxNestingLevel) * 16).dp
+    val indentationWidth = (nestingLevel.coerceAtMost(4) * 16).dp
     val shouldShowConnectorLine = nestingLevel > 0
     val mentionColor = if (isDark) Color(0xFF85C7FF) else Color(0xFF0D6BF2)
-    val shouldShowNested = nestedComments.isNotEmpty() && nestingLevel < maxNestingLevel && isExpanded
+    val maxNesting = 4
 
     Column(
         modifier
@@ -352,7 +349,7 @@ fun EnhancedModernCommentRow(
                                 Text("$likeCount", fontSize = 12.sp, color = colors.primary)
                             }
                         }
-                        if (nestingLevel < maxNestingLevel) {
+                        if (nestingLevel < maxNesting) {
                             CommentActionChip(active = false, activeColor = colors.primary, onClick = { onReply(comment) }) {
                                 Icon(Icons.AutoMirrored.Filled.Reply, null, Modifier.size(14.dp), tint = colors.primary)
                                 Spacer(Modifier.width(4.dp))
@@ -360,7 +357,8 @@ fun EnhancedModernCommentRow(
                             }
                         }
                     }
-                    if (nestedComments.isNotEmpty() && nestingLevel < maxNestingLevel) {
+                    // ≡ iOS: expand visible aunque haya mute mask
+                    if (nestedComments.isNotEmpty() && nestingLevel == 0) {
                         CommentActionChip(
                             active = isExpanded,
                             activeColor = colors.primary,
@@ -389,15 +387,15 @@ fun EnhancedModernCommentRow(
         }
         }
 
-        if (shouldShowNested) {
+        if (isExpanded && nestedComments.isNotEmpty() && nestingLevel < maxNesting) {
             Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 nestedComments.forEach { nested ->
                     EnhancedModernCommentRow(
                         comment = nested,
                         currentUid = currentUid,
                         momentAuthorId = momentAuthorId,
-                        nestedCommentsProvider = nestedCommentsProvider,
-                        isCommentExpanded = isCommentExpanded,
+                        nestedComments = emptyList(),
+                        isExpanded = false,
                         onToggleExpand = onToggleExpand,
                         onLike = onLike,
                         onReply = onReply,
@@ -409,9 +407,34 @@ fun EnhancedModernCommentRow(
                         temporarilyRevealedCommentIds = temporarilyRevealedCommentIds,
                         onRevealTemporarily = onRevealTemporarily,
                         nestingLevel = nestingLevel + 1,
-                        maxNestingLevel = maxNestingLevel,
                     )
                 }
+            }
+        }
+
+        // ≡ iOS stub `viewMoreReplies` (acción vacía también en Swift)
+        if (nestingLevel >= maxNesting && nestedComments.isNotEmpty()) {
+            Row(
+                Modifier
+                    .padding(start = indentationWidth + 50.dp, top = 8.dp)
+                    .background(Color(0xFF007AFF).copy(0.05f), RoundedCornerShape(50))
+                    .clickable { /* iOS: navegar a hilo — stub vacío */ }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    Icons.Filled.SubdirectoryArrowRight,
+                    contentDescription = null,
+                    tint = Color(0xFFAF52DE),
+                    modifier = Modifier.size(12.dp),
+                )
+                Text(
+                    stringResource(R.string.modern_comments_view_more_replies, nestedComments.size),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFFAF52DE),
+                )
             }
         }
     }

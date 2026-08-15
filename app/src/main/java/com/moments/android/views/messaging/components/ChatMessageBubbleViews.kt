@@ -86,7 +86,7 @@ data class ChatMessageBubbleCallbacks(
     val onOpenMedia: (EnhancedMessage) -> Unit = {},
     val onStopLiveLocation: ((String) -> Unit)? = null,
     val onHydrateMedia: ((EnhancedMessage) -> Unit)? = null,
-    val onLongPress: ((ChatMessageLiftSnapshot) -> Unit)? = null,
+    val onLongPress: (() -> Unit)? = null,
     val onViewOnceOpen: ((EnhancedMessage, Boolean) -> Unit)? = null,
     val onRetryFailed: ((EnhancedMessage) -> Unit)? = null,
 )
@@ -129,6 +129,7 @@ fun GlassmorphicMessageRow(
         }
     }
     val cornerRadius = ChatBubbleAnchorMetrics.cornerRadiusFor(message)
+    var isPressing by remember { mutableStateOf(false) }
     val canRetry = isCurrentUser &&
         message.status == MessageStatus.FAILED &&
         callbacks.onRetryFailed != null
@@ -196,7 +197,7 @@ fun GlassmorphicMessageRow(
                         isOutgoing = isCurrentUser,
                         cornerRadius = cornerRadius,
                         isFlashing = isBubbleFlashing,
-                        onLongPress = callbacks.onLongPress,
+                        isPressing = isPressing,
                     ) {
                         val bubble: @Composable () -> Unit = {
                             GlassmorphicMessageBubble(
@@ -211,6 +212,9 @@ fun GlassmorphicMessageRow(
                                 isDownloadingMedia = isDownloadingMedia,
                                 isStarred = isStarred,
                                 callbacks = callbacks,
+                                modifier = Modifier.chatMessageLongPress(
+                                    onPressingChanged = { isPressing = it },
+                                ) { callbacks.onLongPress?.invoke() },
                             )
                         }
                         if (message.isVanishModeMessage) {

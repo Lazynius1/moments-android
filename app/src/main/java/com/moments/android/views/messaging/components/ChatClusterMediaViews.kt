@@ -99,7 +99,7 @@ fun GlassmorphicClusterRow(
     isStarred: Boolean = false,
     isMenuSelected: Boolean = false,
     isBubbleFlashing: Boolean = false,
-    onLongPress: ((EnhancedMessage, ChatMessageLiftSnapshot) -> Unit)? = null,
+    onLongPress: ((EnhancedMessage) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (messages.isEmpty()) return
@@ -245,7 +245,7 @@ fun MediaGridBubble(
     onHydrateMedia: ((EnhancedMessage) -> Unit)? = null,
     displayReactions: (String) -> Map<String, List<String>>? = { null },
     onReaction: (EnhancedMessage, String) -> Unit = { _, _ -> },
-    onLongPress: ((EnhancedMessage, ChatMessageLiftSnapshot) -> Unit)? = null,
+    onLongPress: ((EnhancedMessage) -> Unit)? = null,
     isMenuSelected: Boolean = false,
     isBubbleFlashing: Boolean = false,
     onReply: () -> Unit = {},
@@ -304,9 +304,6 @@ fun MediaGridBubble(
                 isMenuSelected = isMenuSelected,
                 isOutgoing = isCurrentUser,
                 isFlashing = isBubbleFlashing,
-                onLongPress = { snapshot ->
-                    onLongPress?.invoke(active.firstOrNull() ?: front, snapshot)
-                },
             ) {
                 val grid: @Composable () -> Unit = {
                     Box(
@@ -319,7 +316,12 @@ fun MediaGridBubble(
                             )
                             .size(ClusterMediaLayout.frontWidth, ClusterMediaLayout.frontHeight)
                             .semantics { contentDescription = "$a11yLabel. $a11yHint" }
-                            .combinedClickable(onClick = { onOpenCluster(active) }),
+                            .combinedClickable(
+                                onClick = { onOpenCluster(active) },
+                                onLongClick = {
+                                    onLongPress?.invoke(active.firstOrNull() ?: front)
+                                },
+                            ),
                     ) {
                         // Dorso → frente (índice 0 = frontal)
                         visible.asReversed().forEachIndexed { reversedIndex, message ->
