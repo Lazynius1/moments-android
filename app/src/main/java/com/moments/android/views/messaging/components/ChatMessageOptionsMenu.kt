@@ -117,7 +117,7 @@ data class ChatMessageMenuSelection(
     val isOutgoing: Boolean,
     val liftedImage: ImageBitmap? = null,
     val clusterMessages: List<EnhancedMessage>? = null,
-    /** Desplazamiento vertical Telegram-style de la fila viva seleccionada. */
+    /** Desplazamiento vertical de la fila viva seleccionada al abrir el menú. */
     val liftOffsetY: Float = 0f,
 )
 
@@ -452,8 +452,8 @@ fun ChatMessageContextMenuOverlay(
                 },
         )
 
-        // Telegram mantiene un único popup: al desplegar el catálogo, las acciones
-        // dejan de existir también para hit-testing (no basta con alpha = 0).
+        // Un solo popup a la vez: con el catálogo de reacciones abierto, las
+        // acciones no reciben hits (no basta con alpha = 0).
         if (!item.message.isDeleted && rowCount > 0 && !reactionsExpanded) {
             Column(
                 Modifier
@@ -955,9 +955,8 @@ private fun menuLayout(
     }
 
     val centerX = clampCenterX(scaled.center.x, max(reactionsBarEstimatedWidth, menuEstimatedWidth))
-    // Telegram iOS extrae el mensaje con `keepInPlace = false` y encaja el bloque
-    // reacciones + mensaje + acciones en el viewport. Android adopta la misma regla
-    // para mantener paridad y desplaza la fila viva, no una copia de la bubble.
+    // Encaja reacciones + mensaje + acciones en el viewport desplazando la fila
+    // viva (no una copia de la burbuja).
     val minimumMessageTop = topMarginPx + reactionsBarHeight + stackGap
     val maximumMessageTop = containerHeight - bottomMarginPx - menuHeight - stackGap - scaled.height
     val targetMessageTop = if (maximumMessageTop >= minimumMessageTop) {
