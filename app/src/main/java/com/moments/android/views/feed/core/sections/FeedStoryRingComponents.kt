@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -36,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -43,6 +45,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -56,6 +60,7 @@ import com.moments.android.views.creator.BackgroundStoryUploadService
 import com.moments.android.views.feed.FeedInk
 import com.moments.android.views.feed.uploads.UploadStatus
 import com.moments.android.utilities.momentsPress
+import com.moments.android.views.messaging.components.chatMessagePressClassifier
 import com.moments.android.views.story.StoryRingLayout
 import com.moments.android.views.story.StorySegmentedRing
 import com.moments.android.views.story.storyRingGapMask
@@ -167,6 +172,7 @@ fun UserStoryRing(
     viewedStatuses: List<Boolean>,
     storyAudiences: List<String?> = emptyList(),
     onClick: () -> Unit,
+    onLongPress: ((Rect) -> Unit)? = null,
 ) {
     // iOS RealStoryCircle: AsyncProfileImageView(userId:) + LiveUsernameContent
     val labelColor = if (isSystemInDarkTheme()) {
@@ -174,13 +180,43 @@ fun UserStoryRing(
     } else {
         Color.Black.copy(alpha = 0.76f)
     }
+    var isPressing by remember { mutableStateOf(false) }
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressing) 0.94f else 1f,
+        animationSpec = tween(120),
+        label = "storyRingPressScale",
+    )
+    val pressAlpha by animateFloatAsState(
+        targetValue = if (isPressing) 0.88f else 1f,
+        animationSpec = tween(120),
+        label = "storyRingPressAlpha",
+    )
+    val capture = remember { FeedStoryCircleAnchorCapture() }
+    capture.onTap = onClick
+    capture.onLongPress = onLongPress
+    capture.onPressingChanged = { isPressing = it }
+    val pressClassifier = remember {
+        Modifier.chatMessagePressClassifier(
+            onPressingChanged = { capture.onPressingChanged(it) },
+            onTap = { capture.onTap() },
+            onLongPress = { capture.onLongPress?.invoke(capture.globalFrame) },
+        )
+    }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
         modifier = Modifier
             .width(64.dp)
-            .momentsPress(scale = 0.94f)
-            .clickable(onClick = onClick),
+            .onGloballyPositioned { capture.globalFrame = it.boundsInWindow() }
+            .then(
+                if (onLongPress == null) {
+                    Modifier
+                        .momentsPress(scale = 0.94f)
+                        .clickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         FeedStoryRingAvatar(
             avatarSize = StoryRingLayout.feedHeaderAvatarSize,
@@ -199,6 +235,13 @@ fun UserStoryRing(
                     modifier = Modifier.fillMaxSize(),
                 )
             },
+            modifier = Modifier
+                .graphicsLayer {
+                    scaleX = pressScale
+                    scaleY = pressScale
+                    alpha = pressAlpha
+                }
+                .then(if (onLongPress != null) pressClassifier else Modifier),
         )
         com.moments.android.views.components.LiveUsernameContent(
             userId = userId,
@@ -216,6 +259,14 @@ fun UserStoryRing(
             )
         }
     }
+}
+
+/** Frame en coordenadas de ventana, leído en el long-press (no un State que se queda en Zero). */
+private class FeedStoryCircleAnchorCapture {
+    var globalFrame: Rect = Rect.Zero
+    var onTap: () -> Unit = {}
+    var onLongPress: ((Rect) -> Unit)? = null
+    var onPressingChanged: (Boolean) -> Unit = {}
 }
 
 /** Compat: call sites sin userId (usa imageUrl / inicial). */

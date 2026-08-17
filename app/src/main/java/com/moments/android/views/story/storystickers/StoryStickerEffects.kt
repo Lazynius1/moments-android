@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -48,6 +49,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import com.moments.android.services.performance.MotionPolicy
@@ -366,19 +369,47 @@ private fun FloatingHeartParticleView(
 fun StickerVideoPlayer(
     url: String,
     modifier: Modifier = Modifier,
+    isMuted: Boolean = true,
+    onDurationMs: ((Long) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val durationCallback by rememberUpdatedState(onDurationMs)
     val player = remember(url) {
         ExoPlayer.Builder(context.applicationContext).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(url)))
             repeatMode = Player.REPEAT_MODE_ONE
-            volume = 0f
+            volume = if (isMuted) 0f else 1f
             playWhenReady = true
             prepare()
         }
     }
+    LaunchedEffect(player, isMuted) {
+        player.volume = if (isMuted) 0f else 1f
+    }
     DisposableEffect(player) {
-        onDispose { player.release() }
+        var reported = false
+        val handler = Handler(Looper.getMainLooper())
+        fun emitDuration() {
+            val duration = player.duration
+            if (reported || duration <= 0L) return
+            reported = true
+            durationCallback?.invoke(duration)
+        }
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) emitDuration()
+            }
+        }
+        player.addListener(listener)
+        // ≡ iOS: no emitir durante el update; si ya está READY, posponer al siguiente loop.
+        if (player.playbackState == Player.STATE_READY) {
+            handler.post { emitDuration() }
+        }
+        onDispose {
+            handler.removeCallbacksAndMessages(null)
+            player.removeListener(listener)
+            player.release()
+        }
     }
     AndroidView(
         factory = { viewContext ->

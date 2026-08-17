@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -101,6 +102,7 @@ fun FeedHeaderBar(
     currentUserId: String? = null,
     onCreateStory: () -> Unit,
     onOpenStory: (FeedStoryUserState) -> Unit,
+    onPreviewStory: (String, Rect) -> Unit = { _, _ -> },
     onOpenActivity: () -> Unit,
     onOpenNova: () -> Unit,
     onOpenEchoHistory: () -> Unit = {},
@@ -198,6 +200,9 @@ fun FeedHeaderBar(
                         onClick = {
                             if (user.userId.isNotEmpty()) onOpenStory(user)
                         },
+                        onLongPress = { frame ->
+                            if (user.userId.isNotEmpty()) onPreviewStory(user.userId, frame)
+                        },
                     )
                 }
                 if (isLoadingMoreRing) {
@@ -261,6 +266,7 @@ fun FeedHeaderSection(
     currentUserId: String? = null,
     onCreateStory: () -> Unit,
     onOpenStory: (FeedStoryUserState) -> Unit,
+    onPreviewStory: (String, Rect) -> Unit = { _, _ -> },
     onOpenActivity: () -> Unit,
     onOpenNova: () -> Unit,
     modifier: Modifier = Modifier,
@@ -280,6 +286,7 @@ fun FeedHeaderSection(
         currentUserId = currentUserId,
         onCreateStory = onCreateStory,
         onOpenStory = onOpenStory,
+        onPreviewStory = onPreviewStory,
         onOpenActivity = onOpenActivity,
         onOpenNova = onOpenNova,
         onOpenEchoHistory = onOpenEchoHistory,

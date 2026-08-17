@@ -72,6 +72,10 @@ class FeedStoryRingCoordinator(
         cachedStoriesTimestampMs = System.currentTimeMillis()
     }
 
+    fun removeMutedUser(userId: String) {
+        storyUsers = storyUsers.filter { it.userId != userId }
+    }
+
     fun prefetchTopStoryUsers(excluding: String?, scope: CoroutineScope) {
         prefetchJob?.cancel()
         prefetchJob = scope.launch {

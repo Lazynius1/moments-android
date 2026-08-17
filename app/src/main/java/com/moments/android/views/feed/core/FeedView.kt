@@ -71,6 +71,8 @@ import com.moments.android.views.feed.core.sections.FeedHeaderSection
 import com.moments.android.views.feed.core.sections.FeedListSection
 import com.moments.android.views.feed.core.sections.FeedOverlaysSection
 import com.moments.android.views.feed.stories.FeedStoryRingCoordinator
+import com.moments.android.views.feed.stories.FeedStoryRingPreviewOverlay
+import com.moments.android.views.feed.stories.FeedStoryRingPreviewSelection
 import com.moments.android.views.feed.uploads.FloatingMomentUploadOverlay
 import com.moments.android.views.messaging.core.MessagingViewModel
 import com.moments.android.views.permission.shared.PermissionPrimerGate
@@ -186,6 +188,7 @@ fun FeedView(
     var peekAspectRatio by remember { mutableFloatStateOf(1f) }
     var isPeeking by remember { mutableStateOf(false) }
     var peekIsProtected by remember { mutableStateOf(false) }
+    var storyRingPreviewSelection by remember { mutableStateOf<FeedStoryRingPreviewSelection?>(null) }
 
     var targetConversationId by remember { mutableStateOf<String?>(null) }
     var targetMomentId by remember { mutableStateOf<String?>(null) }
@@ -656,6 +659,12 @@ fun FeedView(
                     currentUserId = viewModel.viewerId,
                     onCreateStory = { onShowCreatorViewChange(true) },
                     onOpenStory = { user -> openStoryViewer(user.userId) },
+                    onPreviewStory = { userId, frame ->
+                        storyRingPreviewSelection = FeedStoryRingPreviewSelection(
+                            userId = userId,
+                            anchorFrame = frame,
+                        )
+                    },
                     onOpenActivity = {
                         // Solo TabBar host — no montar Dialog local en paralelo.
                         LegacyNavigationBridge.showNotifications()
@@ -779,6 +788,17 @@ fun FeedView(
                     selectedPendingEchoId = ""
                 },
                 onDismissNotificationSummary = { showNotificationSummary = false },
+            )
+
+            FeedStoryRingPreviewOverlay(
+                selection = storyRingPreviewSelection,
+                onSelectionChange = { storyRingPreviewSelection = it },
+                onOpenStory = { openStoryViewer(it) },
+                onOpenProfile = { openUserProfile(it) },
+                onMuted = { storyRingCoordinator.removeMutedUser(it) },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(1600f),
             )
 
             // ≡ .permissionPrimerGate(notificationGate)
