@@ -56,6 +56,10 @@ object GlobalVideoManager {
     private val _userHasEnabledSoundInSession = MutableStateFlow(false)
     val userHasEnabledSoundInSession: StateFlow<Boolean> = _userHasEnabledSoundInSession.asStateFlow()
 
+    /** Overlay encima del feed: los posts no deben seguir sonando ni reanudarse por visibilidad. */
+    private val _isPlaybackHeld = MutableStateFlow(false)
+    val isPlaybackHeld: StateFlow<Boolean> = _isPlaybackHeld.asStateFlow()
+
     @Volatile private var initialized = false
     private var appContext: Context? = null
     private var lastMusicVolume: Int = -1
@@ -104,6 +108,7 @@ object GlobalVideoManager {
     // MARK: - Play / pause
 
     fun playVideo(playerId: String) {
+        if (_isPlaybackHeld.value) return
         val currentActive = _activeVideoId.value
         if (currentActive != null && currentActive != playerId) {
             pausePlayer(currentActive)
@@ -124,6 +129,17 @@ object GlobalVideoManager {
         allPlayers.values.forEach { it.pauseVideo() }
         // Fallback pool (players aún no registrados vía VideoPlayerManager)
         runCatching { SharedVideoPlayerPool.pauseAll() }
+    }
+
+    /** Overlay u otra UI encima del feed: pausa el post activo y evita que la visibilidad lo reanude. */
+    fun beginPlaybackHold() {
+        _isPlaybackHeld.value = true
+        pauseAllVideos()
+    }
+
+    fun endPlaybackHold() {
+        if (!_isPlaybackHeld.value) return
+        _isPlaybackHeld.value = false
     }
 
     // MARK: - Mute de sesión

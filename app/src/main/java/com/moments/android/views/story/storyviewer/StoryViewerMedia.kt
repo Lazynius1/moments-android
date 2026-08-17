@@ -78,11 +78,13 @@ fun GlassmorphicStoryVideoPlayer(
     onVideoComplete: () -> Unit,
     /** ≡ iOS `isHorizontalVideo` / resizeMode según presentation. */
     contentScaleFit: Boolean = false,
+    initialSeekMs: Long = 0L,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val viewerSurface = if (isSystemInDarkTheme()) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     val viewerSurfaceArgb = viewerSurface.toArgb()
+    val capturedSeekMs = remember(url) { initialSeekMs }
     // ≡ VideoPreloader.shared.getPlayerItem(for:)
     val player = remember(url, shouldLoop) {
         ExoPlayer.Builder(context).build().apply {
@@ -98,9 +100,14 @@ fun GlassmorphicStoryVideoPlayer(
         // ≡ setupObservers: reset progreso
         onProgressUpdate(0f)
         onReadyToPlayChanged(false)
+        var didSeek = false
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 onReadyToPlayChanged(playbackState == Player.STATE_READY)
+                if (playbackState == Player.STATE_READY && capturedSeekMs > 50L && !didSeek) {
+                    didSeek = true
+                    player.seekTo(capturedSeekMs)
+                }
                 if (playbackState == Player.STATE_ENDED && !shouldLoop) {
                     onProgressUpdate(0f)
                     onVideoComplete()
@@ -187,6 +194,7 @@ fun StoryViewerMedia(
     onVideoProgress: (Float) -> Unit = {},
     onVideoComplete: () -> Unit = {},
     onReadyToPlayChanged: (Boolean) -> Unit = {},
+    initialSeekMs: Long = 0L,
     modifier: Modifier = Modifier,
 ) {
     val media = story.mediaItem
@@ -224,6 +232,7 @@ fun StoryViewerMedia(
                         onProgressUpdate = onVideoProgress,
                         onVideoComplete = onVideoComplete,
                         contentScaleFit = videoFit,
+                        initialSeekMs = initialSeekMs,
                         modifier = Modifier.fillMaxSize(),
                     )
                     VideoPosterOverlay(

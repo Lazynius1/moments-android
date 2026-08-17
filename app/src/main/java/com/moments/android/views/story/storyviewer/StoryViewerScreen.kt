@@ -199,6 +199,7 @@ fun StoryViewerScreen(
     gestureGate: StoryDeckGestureGate? = null,
     isDeckPageActive: Boolean = true,
     highlightTitle: String? = null,
+    initialElapsed: Double = 0.0,
     modifier: Modifier = Modifier,
 ) {
     val adaptiveWindow = LocalAdaptiveWindowState.current
@@ -246,6 +247,7 @@ fun StoryViewerScreen(
     var successMessageText by remember { mutableStateOf<String?>(null) }
     var suppressNavigationTapUntil by remember { mutableLongStateOf(0L) }
     var lastPreparedStoryId by remember { mutableStateOf<String?>(null) }
+    var didApplyInitialElapsed by remember { mutableStateOf(false) }
     var chainStories by remember { mutableStateOf<List<Story>>(emptyList()) }
     var menuAutoResumeJob by remember { mutableStateOf<Job?>(null) }
     var holdPauseJob by remember { mutableStateOf<Job?>(null) }
@@ -780,7 +782,11 @@ fun StoryViewerScreen(
             isStoryVideoReady = false
             textMotionReplayToken += 1
             storyStickers = resolvedStoryStickers(story)
-            playbackCoordinator.prepareStory(story) { onNextState.value() }
+            playbackCoordinator.prepareStory(
+                story,
+                if (didApplyInitialElapsed) 0.0 else initialElapsed,
+            ) { onNextState.value() }
+            didApplyInitialElapsed = true
             markStoryAsViewedIfNeeded()
             val allStories = storyViewModel?.stories?.get(story.authorId).orEmpty()
             if (allStories.isNotEmpty()) {
@@ -1086,6 +1092,7 @@ fun StoryViewerScreen(
                             if (playbackCoordinator.canAdvanceAfterVideoComplete()) onNextState.value()
                         },
                         onReadyToPlayChanged = { isStoryVideoReady = it },
+                        initialSeekMs = ((if (didApplyInitialElapsed) 0.0 else initialElapsed) * 1000.0).toLong(),
                         modifier = Modifier.fillMaxSize(),
                     )
                     StoryMediaOverlayRendererView(

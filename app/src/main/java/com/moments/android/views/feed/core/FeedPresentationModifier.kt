@@ -144,6 +144,8 @@ fun FeedPresentations(
                 StoriesView(
                     startAtUserId = route.userId,
                     ringNavigationUserIds = storyRingNavigationUserIds,
+                    startStoryId = route.startStoryId,
+                    startElapsed = route.startElapsed,
                     onDismiss = { onSelectedStoryRouteChange(null) },
                     modifier = Modifier
                         .fillMaxSize()

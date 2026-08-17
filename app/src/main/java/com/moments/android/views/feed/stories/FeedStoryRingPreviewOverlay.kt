@@ -1,5 +1,6 @@
 package com.moments.android.views.feed.stories
 
+import android.os.SystemClock
 import android.media.AudioAttributes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -33,6 +34,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,6 +51,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
@@ -108,13 +111,14 @@ private const val VideoPreviewMinimumDurationMs = 2_000L
 fun FeedStoryRingPreviewOverlay(
     selection: FeedStoryRingPreviewSelection?,
     onSelectionChange: (FeedStoryRingPreviewSelection?) -> Unit,
-    onOpenStory: (String) -> Unit,
+    onOpenStory: (String, String?, Double) -> Unit,
     onOpenProfile: (String) -> Unit,
     onMuted: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
     val density = LocalDensity.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val soundEnabledInSession by GlobalVideoManager.userHasEnabledSoundInSession.collectAsState()
     val primaryTextColor = MomentsChromeGlass.contentColor(isDark)
@@ -133,6 +137,8 @@ fun FeedStoryRingPreviewOverlay(
     var successMessage by remember { mutableStateOf<String?>(null) }
     var resolvedUsername by remember { mutableStateOf("") }
     var overlayWindowBounds by remember { mutableStateOf(Rect.Zero) }
+    var previewSegmentStartedAtMs by remember { mutableStateOf<Long?>(null) }
+    var previewElapsedBeforePauseMs by remember { mutableLongStateOf(0L) }
 
     val reduceMotion = MotionPolicy.reduceMotion
     val presentedAlpha by animateFloatAsState(
@@ -146,6 +152,42 @@ fun FeedStoryRingPreviewOverlay(
         label = "storyRingPreviewScale",
     )
 
+    fun resetPreviewSegmentClock() {
+        previewElapsedBeforePauseMs = 0L
+        previewSegmentStartedAtMs = null
+    }
+
+    fun markPreviewSegmentStart() {
+        previewElapsedBeforePauseMs = 0L
+        previewSegmentStartedAtMs = SystemClock.elapsedRealtime()
+    }
+
+    fun pausePreviewSegmentClock() {
+        var elapsed = previewElapsedBeforePauseMs
+        previewSegmentStartedAtMs?.let { elapsed += SystemClock.elapsedRealtime() - it }
+        previewElapsedBeforePauseMs = elapsed.coerceAtLeast(0L)
+        previewSegmentStartedAtMs = null
+    }
+
+    fun resumePreviewSegmentClock() {
+        if (previewSegmentStartedAtMs != null) return
+        previewSegmentStartedAtMs = SystemClock.elapsedRealtime()
+    }
+
+    fun currentPreviewElapsedSeconds(): Double {
+        var elapsed = previewElapsedBeforePauseMs
+        previewSegmentStartedAtMs?.let { elapsed += SystemClock.elapsedRealtime() - it }
+        return elapsed.coerceAtLeast(0L) / 1000.0
+    }
+
+    fun beginPreviewSegmentClockIfNeeded() {
+        if (previewStory?.mediaItem?.type == MediaItem.MediaType.VIDEO) {
+            resetPreviewSegmentClock()
+        } else {
+            markPreviewSegmentStart()
+        }
+    }
+
     fun resetPreviewPlayback() {
         previewStories = emptyList()
         previewIndex = 0
@@ -153,6 +195,7 @@ fun FeedStoryRingPreviewOverlay(
         previewStory = null
         videoDurationMs = null
         isPreviewVideoReady = false
+        resetPreviewSegmentClock()
     }
 
     fun applyPreviewStories(stories: List<Story>) {
@@ -162,12 +205,14 @@ fun FeedStoryRingPreviewOverlay(
         previewStories = stories
         if (previewStories.isEmpty()) {
             previewStory = null
+            resetPreviewSegmentClock()
             return
         }
         previewIndex = min(previewIndex, previewStories.lastIndex)
         previewStory = previewStories[previewIndex]
         videoDurationMs = null
         isPreviewVideoReady = false
+        beginPreviewSegmentClockIfNeeded()
     }
 
     fun advancePreview() {
@@ -177,6 +222,7 @@ fun FeedStoryRingPreviewOverlay(
         previewStory = previewStories[previewIndex]
         videoDurationMs = null
         isPreviewVideoReady = false
+        beginPreviewSegmentClockIfNeeded()
     }
 
     suspend fun filterVisibleStories(stories: List<Story>, viewerId: String): List<Story> {
@@ -219,7 +265,7 @@ fun FeedStoryRingPreviewOverlay(
 
     fun preparePreviewAudioIfNeeded() {
         if (!soundEnabledInSession) return
-        GlobalVideoManager.pauseAllVideos()
+        MomentsAudioSession.initialize(context)
         scope.launch {
             MomentsAudioSession.activate(
                 usage = AudioAttributes.USAGE_MEDIA,
@@ -231,18 +277,21 @@ fun FeedStoryRingPreviewOverlay(
     LaunchedEffect(selection?.userId) {
         val userId = selection?.userId
         if (userId == null) {
+            GlobalVideoManager.endPlaybackHold()
             isPresented = false
             resetPreviewPlayback()
             showMuteConfirmation = false
             successMessage = null
             return@LaunchedEffect
         }
+        GlobalVideoManager.beginPlaybackHold()
         dismissGeneration += 1
         isPresented = false
         showMuteConfirmation = false
         successMessage = null
         resetPreviewPlayback()
         loadPreview(userId)
+        preparePreviewAudioIfNeeded()
         isPresented = true
     }
 
@@ -264,6 +313,14 @@ fun FeedStoryRingPreviewOverlay(
         }
         delay(duration)
         advancePreview()
+    }
+
+    LaunchedEffect(showMuteConfirmation) {
+        if (showMuteConfirmation) {
+            pausePreviewSegmentClock()
+        } else if (selection != null && isPresented && previewElapsedBeforePauseMs > 0L) {
+            resumePreviewSegmentClock()
+        }
     }
 
     LaunchedEffect(soundEnabledInSession, previewStory?.mediaItem?.type) {
@@ -323,12 +380,17 @@ fun FeedStoryRingPreviewOverlay(
                 previewShape = previewShape,
                 isPresented = isPresented,
                 isDark = isDark,
-                onOpen = { dismissOverlay { onOpenStory(selection.userId) } },
+                onOpen = {
+                    val storyId = previewStory?.id
+                    val elapsed = currentPreviewElapsedSeconds()
+                    dismissOverlay { onOpenStory(selection.userId, storyId, elapsed) }
+                },
                 onVideoAppear = { preparePreviewAudioIfNeeded() },
                 isPreviewVideoReady = isPreviewVideoReady,
                 onVideoDurationMs = {
                     isPreviewVideoReady = true
                     videoDurationMs = it
+                    markPreviewSegmentStart()
                 },
             )
             Spacer(Modifier.height(10.dp))

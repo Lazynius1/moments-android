@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -54,6 +56,7 @@ import android.os.Looper
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import com.moments.android.services.performance.MotionPolicy
+import com.moments.android.utilities.MomentsAudioSession
 import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -376,6 +379,13 @@ fun StickerVideoPlayer(
     val durationCallback by rememberUpdatedState(onDurationMs)
     val player = remember(url) {
         ExoPlayer.Builder(context.applicationContext).build().apply {
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                /* handleAudioFocus= */ true,
+            )
             setMediaItem(MediaItem.fromUri(Uri.parse(url)))
             repeatMode = Player.REPEAT_MODE_ONE
             volume = if (isMuted) 0f else 1f
@@ -385,6 +395,13 @@ fun StickerVideoPlayer(
     }
     LaunchedEffect(player, isMuted) {
         player.volume = if (isMuted) 0f else 1f
+        if (!isMuted) {
+            MomentsAudioSession.initialize(context)
+            MomentsAudioSession.activate(
+                usage = android.media.AudioAttributes.USAGE_MEDIA,
+                contentType = android.media.AudioAttributes.CONTENT_TYPE_MOVIE,
+            )
+        }
     }
     DisposableEffect(player) {
         var reported = false

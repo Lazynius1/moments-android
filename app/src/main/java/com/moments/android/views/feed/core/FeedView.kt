@@ -214,10 +214,14 @@ fun FeedView(
         storyRingNavigationUserIds = storyRingCoordinator.ringNavigationUserIds
     }
 
-    fun openStoryViewer(userId: String) {
+    fun openStoryViewer(userId: String, startStoryId: String? = null, startElapsed: Double = 0.0) {
         if (userId.isEmpty()) return
         syncStoryRingNavigationOrder()
-        selectedStoryRoute = StoryUserPresentationRoute(userId)
+        selectedStoryRoute = StoryUserPresentationRoute(
+            userId = userId,
+            startStoryId = startStoryId,
+            startElapsed = startElapsed,
+        )
     }
 
     fun openUserProfile(userId: String) {
@@ -793,7 +797,9 @@ fun FeedView(
             FeedStoryRingPreviewOverlay(
                 selection = storyRingPreviewSelection,
                 onSelectionChange = { storyRingPreviewSelection = it },
-                onOpenStory = { openStoryViewer(it) },
+                onOpenStory = { userId, storyId, elapsed ->
+                    openStoryViewer(userId, storyId, elapsed)
+                },
                 onOpenProfile = { openUserProfile(it) },
                 onMuted = { storyRingCoordinator.removeMutedUser(it) },
                 modifier = Modifier

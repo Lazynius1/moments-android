@@ -128,6 +128,7 @@ fun ModernVideoPlayer(
 
     val activeMomentId by FeedVisibilityCoordinator.activeVideoMomentIdFlow.collectAsState()
     val soundEnabled by GlobalVideoManager.userHasEnabledSoundInSession.collectAsState()
+    val isPlaybackHeld by GlobalVideoManager.isPlaybackHeld.collectAsState()
 
     // Sync mute UI con sesión si el manager aún no está registrado
     LaunchedEffect(soundEnabled) {
@@ -153,6 +154,10 @@ fun ModernVideoPlayer(
     }
 
     fun applyActivationMode(activeId: String?) {
+        if (GlobalVideoManager.isPlaybackHeld.value) {
+            GlobalVideoManager.pauseVideo(videoId)
+            return
+        }
         when (activationMode) {
             VideoPlaybackActivationMode.FeedVisibility -> updatePlaybackForVisibility(activeId)
             VideoPlaybackActivationMode.AlwaysWhenVisible -> {
@@ -268,7 +273,7 @@ fun ModernVideoPlayer(
         }
     }
 
-    LaunchedEffect(activeMomentId, isVisible, activationMode) {
+    LaunchedEffect(activeMomentId, isVisible, activationMode, isPlaybackHeld) {
         applyActivationMode(activeMomentId)
     }
 

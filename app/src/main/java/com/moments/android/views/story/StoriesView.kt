@@ -92,6 +92,8 @@ fun StoriesView(
     startAtUserId: String? = null,
     ringNavigationUserIds: List<String> = emptyList(),
     startWithUserId: String? = null,
+    startStoryId: String? = null,
+    startElapsed: Double = 0.0,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     explicitStories: List<Story>? = null,
@@ -142,6 +144,9 @@ fun StoriesView(
     var loadingOverlayState by remember { mutableStateOf<StoryLoadingOverlayState>(StoryLoadingOverlayState.Loading) }
     var pendingUnseenResolveUserId by remember { mutableStateOf<String?>(null) }
     var hasResolvedInitialViewerPosition by remember { mutableStateOf(false) }
+    var handoffStoryId by remember { mutableStateOf(startStoryId.orEmpty()) }
+    var handoffElapsed by remember { mutableStateOf(startElapsed) }
+    var didConsumeHandoffIndex by remember { mutableStateOf(false) }
     var initialTargetUserId by remember {
         mutableStateOf(
             if (startWithUserId.isNullOrBlank()) {
@@ -200,6 +205,13 @@ fun StoriesView(
     }
 
     suspend fun firstUnseenStoryIndex(stories: List<Story>, authorId: String): Int {
+        if (!didConsumeHandoffIndex && handoffStoryId.isNotEmpty()) {
+            val handoffIndex = stories.indexOfFirst { it.id == handoffStoryId }
+            if (handoffIndex >= 0) {
+                didConsumeHandoffIndex = true
+                return handoffIndex
+            }
+        }
         val viewerId = FirebaseAuth.getInstance().currentUser?.uid ?: return 0
         if (stories.isEmpty()) return 0
         return coroutineScope {
@@ -761,6 +773,8 @@ fun StoriesView(
                             showingReportSheet = showingReportSheet,
                             showingBlockConfirmation = showingBlockConfirmation,
                             gestureGate = deckGestureGate,
+                            handoffStoryId = handoffStoryId,
+                            handoffElapsed = handoffElapsed,
                             onNext = {
                                 val stories = viewModel.storiesFor(pageUserId)
                                 val idx = if (pageUserId == currentUserId) {
@@ -812,6 +826,8 @@ fun StoriesView(
                         showingReportSheet = showingReportSheet,
                         showingBlockConfirmation = showingBlockConfirmation,
                         gestureGate = deckGestureGate,
+                        handoffStoryId = handoffStoryId,
+                        handoffElapsed = handoffElapsed,
                         onNext = {
                             // ≡ isInChainMode ? story.authorId : userId
                             handleStoryNext(
@@ -897,6 +913,8 @@ private fun StoryViewerPageContent(
     showingReportSheet: Boolean,
     showingBlockConfirmation: Boolean,
     gestureGate: StoryDeckGestureGate,
+    handoffStoryId: String = "",
+    handoffElapsed: Double = 0.0,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onDismiss: () -> Unit,
@@ -937,6 +955,7 @@ private fun StoryViewerPageContent(
         onStoryDeleted = { onStoryDeleted(pageStory) },
         onOpenChainStory = onOpenChainStory,
         highlightTitle = highlightTitle,
+        initialElapsed = if (pageStory.id == handoffStoryId) handoffElapsed else 0.0,
         modifier = Modifier.fillMaxSize(),
     )
 }

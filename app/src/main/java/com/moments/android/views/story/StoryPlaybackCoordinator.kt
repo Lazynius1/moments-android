@@ -78,8 +78,13 @@ class StoryPlaybackCoordinator(
         }
     }
 
-    fun prepareStory(story: Story, onImageComplete: () -> Unit) {
-        progress = 0f
+    fun prepareStory(story: Story, initialElapsed: Double = 0.0, onImageComplete: () -> Unit) {
+        val duration = if (story.duration > 0) story.duration else defaultStoryDuration
+        progress = if (initialElapsed > 0 && duration > 0) {
+            (initialElapsed / duration).toFloat().coerceIn(0f, 0.99f)
+        } else {
+            0f
+        }
         isPaused = false
         currentStoryId = story.id
         if (story.mediaItem.type == MediaItem.MediaType.IMAGE) {

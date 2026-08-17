@@ -22,6 +22,10 @@ data class FeedEchoInvitationRoute(val echoId: String) {
 }
 
 /** Port 1:1 de `StoryUserPresentationRoute`. */
-data class StoryUserPresentationRoute(val userId: String) {
+data class StoryUserPresentationRoute(
+    val userId: String,
+    val startStoryId: String? = null,
+    val startElapsed: Double = 0.0,
+) {
     val id: String get() = userId
 }
