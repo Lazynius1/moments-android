@@ -517,6 +517,7 @@ data class ChatMessageRendererCallbacks(
     val onMomentNavigation: (EnhancedMessage) -> Unit = {},
     val onStoryNavigation: (EnhancedMessage) -> Unit = {},
     val onViewOnceOpen: (EnhancedMessage, Boolean) -> Unit = { _, _ -> },
+    val onOpenLocation: (EnhancedMessage) -> Unit = {},
     val onHydrateMedia: (EnhancedMessage) -> Unit = {},
     val onStopLiveLocation: (String) -> Unit = {},
     val onLongPress: (EnhancedMessage, String, List<EnhancedMessage>?) -> Unit = { _, _, _ -> },
@@ -623,7 +624,7 @@ fun GlassmorphicChatMessageItem(
             } else {
                 GlassmorphicMessageRow(
                     message = message,
-                    displayReactions = if (menuSelected) null else viewModel.displayReactions(message.id),
+                    displayReactions = viewModel.displayReactions(message.id),
                     isCurrentUser = message.senderId == viewModel.currentUserId,
                     showAvatar = callbacks.shouldShowAvatar(message, messages),
                     groupPosition = callbacks.groupPosition(message, messages),
@@ -657,6 +658,7 @@ fun GlassmorphicChatMessageItem(
                             callbacks.onLongPress(message, rowId, null)
                         },
                         onViewOnceOpen = callbacks.onViewOnceOpen,
+                        onOpenLocation = callbacks.onOpenLocation,
                         onRetryFailed = { failed ->
                             if (viewModel.canRetryMessage(failed)) viewModel.retryFailedMessage(failed)
                         },
@@ -689,7 +691,7 @@ fun GlassmorphicChatMessageItem(
                 onAvatarTap = callbacks.onAvatarTap,
                 onReply = { callbacks.onClusterReply(cluster) },
                 onReplyTap = callbacks.onReplyTap,
-                displayReactions = { id -> if (menuSelected) null else viewModel.displayReactions(id) },
+                displayReactions = { id -> viewModel.displayReactions(id) },
                 onReaction = { message, emoji ->
                     viewModel.addReaction(message, emoji)
                     pulse(message.id)

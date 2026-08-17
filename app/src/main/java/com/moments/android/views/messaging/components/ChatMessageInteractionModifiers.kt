@@ -51,6 +51,8 @@ import androidx.compose.ui.zIndex
 import com.moments.android.R
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageType
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlinx.coroutines.coroutineScope
@@ -371,17 +373,20 @@ fun ChatTimestampRevealGutter(
 }
 
 /**
- * Port de `chatMessageLongPress`: 0.32s, max drift 18pt, heavy haptic.
+ * Port de `chatMessagePressClassifier`: 0.32s, max drift 18pt.
+ * Soltar antes = tap; al cumplir el umbral se consume el pulso para que no abra el cuerpo.
  */
-fun Modifier.chatMessageLongPress(
+fun Modifier.chatMessagePressClassifier(
     onPressingChanged: ((Boolean) -> Unit)? = null,
+    onTap: (() -> Unit)? = null,
     onLongPress: () -> Unit,
-): Modifier = pointerInput(onPressingChanged, onLongPress) {
+): Modifier = pointerInput(onPressingChanged, onTap, onLongPress) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         onPressingChanged?.invoke(true)
         val origin = down.position
         var cancelled = false
+        var liftedEarly = false
         val timedOut = withTimeoutOrNull(320L) {
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Main)
@@ -390,7 +395,8 @@ fun Modifier.chatMessageLongPress(
                     return@withTimeoutOrNull Unit
                 }
                 if (change.changedToUp()) {
-                    cancelled = true
+                    liftedEarly = true
+                    change.consume()
                     return@withTimeoutOrNull Unit
                 }
                 val dx = change.position.x - origin.x
@@ -407,9 +413,100 @@ fun Modifier.chatMessageLongPress(
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Main)
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                change.consume()
                 if (change.changedToUp()) break
             }
+        } else if (liftedEarly) {
+            onTap?.invoke()
         }
         onPressingChanged?.invoke(false)
+    }
+}
+
+/**
+ * Port de `chatMessageLongPress`: 0.32s, max drift 18pt, heavy haptic.
+ */
+fun Modifier.chatMessageLongPress(
+    onPressingChanged: ((Boolean) -> Unit)? = null,
+    onLongPress: () -> Unit,
+): Modifier = chatMessagePressClassifier(
+    onPressingChanged = onPressingChanged,
+    onTap = null,
+    onLongPress = onLongPress,
+)
+
+/** Port de `ChatMessageBodyOpen`. */
+object ChatMessageBodyOpen {
+    fun viewOnceReplayAvailable(message: EnhancedMessage, currentUserId: String): Boolean =
+        message.allowReplay == true &&
+            message.replayAvailableInCurrentChatSession &&
+            !message.replayConsumedInCurrentChatSession &&
+            !message.hasBeenReplayedBy(currentUserId)
+
+    fun viewOnceEffectiveViewed(message: EnhancedMessage): Boolean =
+        message.isViewed || message.replayAvailableInCurrentChatSession
+
+    fun isOpenable(message: EnhancedMessage, isCurrentUser: Boolean, currentUserId: String): Boolean {
+        if (message.isDeleted) return false
+        return when (message.type) {
+            MessageType.IMAGE, MessageType.VIDEO, MessageType.LOCATION,
+            MessageType.SHARED_MOMENT, MessageType.SHARED_STORY, MessageType.EPHEMERAL,
+            -> true
+            MessageType.VIEW_ONCE_IMAGE, MessageType.VIEW_ONCE_VIDEO -> {
+                if (isCurrentUser) false
+                else if (viewOnceEffectiveViewed(message)) {
+                    viewOnceReplayAvailable(message, currentUserId)
+                } else {
+                    true
+                }
+            }
+            else -> false
+        }
+    }
+
+    fun open(
+        message: EnhancedMessage,
+        isCurrentUser: Boolean,
+        currentUserId: String,
+        cluster: List<EnhancedMessage>? = null,
+        onOpenMedia: (EnhancedMessage) -> Unit,
+        onOpenCluster: ((List<EnhancedMessage>) -> Unit)? = null,
+        onMomentNavigation: ((EnhancedMessage) -> Unit)?,
+        onStoryNavigation: ((EnhancedMessage) -> Unit)?,
+        onViewOnceOpen: ((EnhancedMessage, Boolean) -> Unit)?,
+        onOpenLocation: ((EnhancedMessage) -> Unit)?,
+        onHydrateMedia: ((EnhancedMessage) -> Unit)?,
+        onMessageViewed: ((String) -> Unit)?,
+    ) {
+        if (cluster != null && cluster.size > 1) {
+            onOpenCluster?.invoke(cluster)
+            return
+        }
+        if (message.isDeleted) return
+        when (message.type) {
+            MessageType.IMAGE, MessageType.VIDEO -> onOpenMedia(message)
+            MessageType.LOCATION -> onOpenLocation?.invoke(message)
+            MessageType.SHARED_MOMENT -> onMomentNavigation?.invoke(message)
+            MessageType.SHARED_STORY -> onStoryNavigation?.invoke(message)
+            MessageType.VIEW_ONCE_IMAGE, MessageType.VIEW_ONCE_VIDEO -> {
+                if (isCurrentUser) return
+                val viewed = viewOnceEffectiveViewed(message)
+                if (viewed) {
+                    if (!viewOnceReplayAvailable(message, currentUserId)) return
+                    onViewOnceOpen?.invoke(message, true)
+                } else {
+                    onViewOnceOpen?.invoke(message, false)
+                }
+            }
+            MessageType.EPHEMERAL -> {
+                if (!message.isViewed) {
+                    onHydrateMedia?.invoke(message)
+                    onMessageViewed?.invoke(message.id)
+                } else {
+                    onOpenMedia(message)
+                }
+            }
+            else -> Unit
+        }
     }
 }

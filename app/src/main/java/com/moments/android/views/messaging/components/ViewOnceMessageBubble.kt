@@ -60,7 +60,6 @@ fun ViewOnceMessageBubble(
     isCurrentUser: Boolean,
     @Suppress("UNUSED_PARAMETER") otherParticipantName: String,
     progress: Double?,
-    onOpenViewer: ((replay: Boolean) -> Unit)? = null,
     currentUserId: String? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -86,17 +85,11 @@ fun ViewOnceMessageBubble(
     // iOS apila unread/replay/opened con opacity; Compose muestra el estado activo.
     when {
         effectiveViewed && replayAvailable -> ViewOnceReplayBubble(
-            onTap = {
-                if (replayAvailable) onOpenViewer?.invoke(true)
-            },
             modifier = modifier,
         )
         effectiveViewed -> ViewOnceOpenedBubble(modifier = modifier)
         else -> ViewOnceUnreadBubble(
             message = message,
-            onTap = {
-                if (!effectiveViewed) onOpenViewer?.invoke(false)
-            },
             modifier = modifier,
         )
     }
@@ -168,7 +161,6 @@ private fun ViewOnceGlyph(icon: ImageVector, tint: Color, size: Dp = 12.dp) {
 @Composable
 private fun ViewOnceUnreadBubble(
     message: EnhancedMessage,
-    onTap: () -> Unit,
     modifier: Modifier,
 ) {
     val colors = AdaptiveColors(isSystemInDarkTheme())
@@ -186,18 +178,16 @@ private fun ViewOnceUnreadBubble(
         },
         label = stringResource(message.viewOnceTypeRes),
         showsUnreadDot = true,
-        onTap = onTap,
         modifier = modifier,
     )
 }
 
 @Composable
-private fun ViewOnceReplayBubble(onTap: () -> Unit, modifier: Modifier) {
+private fun ViewOnceReplayBubble(modifier: Modifier) {
     val colors = AdaptiveColors(isSystemInDarkTheme())
     ViewOncePillBubble(
         glyph = { ViewOnceGlyph(Icons.Filled.Replay, colors.messageTextColor, size = 12.dp) },
         label = stringResource(R.string.chat_view_once_tap_to_replay),
-        onTap = onTap,
         modifier = modifier,
     )
 }

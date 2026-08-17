@@ -8,7 +8,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,7 +28,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,11 +51,8 @@ import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.messaging.core.EnhancedMessage
-import com.moments.android.views.messaging.services.ChatService
-import com.moments.android.views.messaging.services.markEphemeralAsViewed
 import java.util.Date
 import kotlin.math.max
-import kotlinx.coroutines.launch
 
 /**
  * Port de `Views/Messaging/Components/ChatEphemeralMessageViews.swift`.
@@ -109,12 +104,11 @@ fun ChatEphemeralMessageContent(
     message: EnhancedMessage,
     layout: ChatEphemeralLayout,
     onHydrateMedia: ((EnhancedMessage) -> Unit)? = null,
-    onOpenMedia: ((EnhancedMessage) -> Unit)? = null,
-    onMarkViewed: ((EnhancedMessage) -> Unit)? = null,
+    @Suppress("UNUSED_PARAMETER") onOpenMedia: ((EnhancedMessage) -> Unit)? = null,
+    @Suppress("UNUSED_PARAMETER") onMarkViewed: ((EnhancedMessage) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var showContent by remember(message.id) { mutableStateOf(message.isViewed) }
-    val scope = rememberCoroutineScope()
     val valid = message.expirationDate?.after(Date()) ?: true
     val preview = message.thumbnailUrl ?: message.mediaUrl
     val resolvedMediaUrl = message.mediaUrl?.takeIf { it.isNotBlank() }
@@ -143,27 +137,13 @@ fun ChatEphemeralMessageContent(
                 previewImageUrl = preview,
                 expirationDate = message.expirationDate,
                 modifier = modifier,
-            ) {
-                // ≡ iOS MotionPolicy.withOptionalAnimation(Spring.toggle) { showContent = true }
-                showContent = true
-                onHydrateMedia?.invoke(message)
-                if (!message.isViewed) {
-                    if (onMarkViewed != null) {
-                        onMarkViewed(message)
-                    } else {
-                        // ≡ iOS `ChatService().markEphemeralAsViewed` en el componente
-                        scope.launch {
-                            ChatService.markEphemeralAsViewed(message.conversationId, message.id)
-                        }
-                    }
-                }
-            }
+            )
             EphemeralBranch.IMAGE -> ChatEphemeralImageCard(
                 layout = layout,
                 imageUrl = checkNotNull(resolvedMediaUrl),
                 expirationDate = message.expirationDate,
                 modifier = modifier,
-            ) { onOpenMedia?.invoke(message) }
+            )
             EphemeralBranch.RESOLVING -> ChatEphemeralResolvingCard(layout, modifier)
         }
     }
@@ -196,7 +176,6 @@ fun ChatEphemeralTapCard(
     previewImageUrl: String?,
     expirationDate: Date?,
     modifier: Modifier = Modifier,
-    onTap: () -> Unit,
 ) {
     val shape = RoundedCornerShape(layout.cornerRadius)
     val isDark = isSystemInDarkTheme()
@@ -209,8 +188,7 @@ fun ChatEphemeralTapCard(
             .size(layout.width, layout.height)
             .clip(shape)
             .border(1.5.dp, ephemeralAccentBorder, shape)
-            .semantics { contentDescription = "$a11yMedia. $a11yHint" }
-            .clickable(onClick = onTap),
+            .semantics { contentDescription = "$a11yMedia. $a11yHint" },
     ) {
         if (canUsePreview) {
             AsyncImage(
@@ -279,7 +257,6 @@ fun ChatEphemeralImageCard(
     imageUrl: String,
     expirationDate: Date?,
     modifier: Modifier = Modifier,
-    onTap: () -> Unit,
 ) {
     val shape = RoundedCornerShape(layout.cornerRadius)
     val a11yPhoto = stringResource(R.string.chat_view_once_photo)
@@ -289,8 +266,7 @@ fun ChatEphemeralImageCard(
             .size(layout.width, layout.height)
             .clip(shape)
             .border(1.dp, ephemeralAccent.copy(alpha = 0.45f), shape)
-            .semantics { contentDescription = "$a11yPhoto. $a11yHint" }
-            .clickable(onClick = onTap),
+            .semantics { contentDescription = "$a11yPhoto. $a11yHint" },
     ) {
         AsyncImage(
             model = imageUrl,

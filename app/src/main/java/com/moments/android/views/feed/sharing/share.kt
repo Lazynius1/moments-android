@@ -1848,7 +1848,7 @@ fun SharedDMUnavailablePreviewCard(
 fun SharedMomentMessageBubble(
     message: EnhancedMessage,
     isCurrentUser: Boolean,
-    onTap: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onTap: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var canViewMoment by remember(message.id) { mutableStateOf<Boolean?>(null) }
@@ -1890,9 +1890,7 @@ fun SharedMomentMessageBubble(
             )
             canViewMoment == true && message.sharedMomentData != null -> {
                 Box(
-                    Modifier
-                        .clickable(onClick = onTap)
-                        .padding(vertical = 4.dp),
+                    Modifier.padding(vertical = 4.dp),
                 ) {
                     MomentBubbleContent(
                         content = null,

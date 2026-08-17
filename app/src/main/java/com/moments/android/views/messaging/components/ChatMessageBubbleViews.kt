@@ -88,8 +88,28 @@ data class ChatMessageBubbleCallbacks(
     val onHydrateMedia: ((EnhancedMessage) -> Unit)? = null,
     val onLongPress: ((ChatMessageLiftSnapshot) -> Unit)? = null,
     val onViewOnceOpen: ((EnhancedMessage, Boolean) -> Unit)? = null,
+    val onOpenLocation: ((EnhancedMessage) -> Unit)? = null,
     val onRetryFailed: ((EnhancedMessage) -> Unit)? = null,
 )
+
+private fun openMessageBody(
+    message: EnhancedMessage,
+    isCurrentUser: Boolean,
+    callbacks: ChatMessageBubbleCallbacks,
+) {
+    ChatMessageBodyOpen.open(
+        message = message,
+        isCurrentUser = isCurrentUser,
+        currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
+        onOpenMedia = callbacks.onOpenMedia,
+        onMomentNavigation = callbacks.onMomentNavigation,
+        onStoryNavigation = callbacks.onStoryNavigation,
+        onViewOnceOpen = callbacks.onViewOnceOpen,
+        onOpenLocation = callbacks.onOpenLocation,
+        onHydrateMedia = callbacks.onHydrateMedia,
+        onMessageViewed = callbacks.onMessageViewed,
+    )
+}
 
 @Composable
 fun GlassmorphicMessageRow(
@@ -196,6 +216,17 @@ fun GlassmorphicMessageRow(
                         isOutgoing = isCurrentUser,
                         cornerRadius = cornerRadius,
                         isFlashing = isBubbleFlashing,
+                        onTap = if (
+                            ChatMessageBodyOpen.isOpenable(
+                                message,
+                                isCurrentUser,
+                                FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
+                            )
+                        ) {
+                            { openMessageBody(message, isCurrentUser, callbacks) }
+                        } else {
+                            null
+                        },
                         onLongPress = callbacks.onLongPress,
                     ) {
                         val bubble: @Composable () -> Unit = {
@@ -361,7 +392,6 @@ fun GlassmorphicMessageBubble(
                         otherParticipantName = otherParticipantName,
                         progress = progress,
                         currentUserId = currentUserId,
-                        onOpenViewer = { replay -> callbacks.onViewOnceOpen?.invoke(message, replay) },
                     )
                 }
             MessageType.EPHEMERAL -> AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
@@ -476,7 +506,6 @@ private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Bool
             downloadProgress = downloadProgress,
             downloadSizeLabel = message.formattedDownloadSize,
             progress = progress,
-            onTap = { callbacks.onOpenMedia(message) },
             modifier = mediaModifier,
         )
     } else {
@@ -492,7 +521,6 @@ private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Bool
             downloadProgress = downloadProgress,
             downloadSizeLabel = message.formattedDownloadSize,
             progress = progress,
-            onTap = { callbacks.onOpenMedia(message) },
             modifier = mediaModifier,
         )
     }

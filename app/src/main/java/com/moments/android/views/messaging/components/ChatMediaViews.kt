@@ -163,7 +163,7 @@ fun GlassmorphicImageMessage(
     downloadProgress: Double? = null,
     downloadSizeLabel: String? = null,
     progress: Double?,
-    onTap: () -> Unit,
+    onTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     downsamplingSize: DpSize? = ChatMediaBubbleDownsample,
 ) {
@@ -177,7 +177,7 @@ fun GlassmorphicImageMessage(
             .border(0.5.dp, Color.White.copy(alpha = 0.2f), mediaCorner)
             .shadow(10.dp, mediaCorner, ambientColor = Color.Black.copy(0.3f), spotColor = Color.Black.copy(0.3f))
             .semantics { contentDescription = "$a11yPhoto. $a11yHint" }
-            .clickable(onClick = onTap),
+            .then(if (onTap != null) Modifier.clickable(onClick = onTap) else Modifier),
     ) {
         when {
             isDownloadingMedia -> {
@@ -242,7 +242,7 @@ fun GlassmorphicVideoMessage(
     downloadProgress: Double? = null,
     downloadSizeLabel: String? = null,
     progress: Double?,
-    onTap: () -> Unit,
+    onTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     downsamplingSize: DpSize? = ChatMediaBubbleDownsample,
 ) {
@@ -258,7 +258,7 @@ fun GlassmorphicVideoMessage(
             .border(0.5.dp, Color.White.copy(alpha = 0.2f), mediaCorner)
             .shadow(10.dp, mediaCorner, ambientColor = Color.Black.copy(0.3f), spotColor = Color.Black.copy(0.3f))
             .semantics { contentDescription = "$a11yVideo. $a11yHint" }
-            .clickable(onClick = onTap),
+            .then(if (onTap != null) Modifier.clickable(onClick = onTap) else Modifier),
     ) {
         when {
             isDownloadingMedia -> {

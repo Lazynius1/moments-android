@@ -88,6 +88,8 @@ import com.moments.android.views.messaging.components.ChatFloatingNavigationStat
 import com.moments.android.views.messaging.components.ChatMessageForwardSheet
 import com.moments.android.views.messaging.components.ChatMessageContextMenuOverlay
 import com.moments.android.views.messaging.components.ChatMessageMenuCallbacks
+import com.moments.android.views.messaging.components.ChatMessageBodyOpen
+import com.moments.android.views.messaging.components.ChatLocationDetailView
 import com.moments.android.views.messaging.components.ChatVanishTimerSheet
 import com.moments.android.views.messaging.components.GlassmorphicTypingIndicator
 import com.moments.android.views.messaging.components.GlassmorphicUnreadDivider
@@ -197,6 +199,7 @@ fun GlassmorphicChatView(
     var showingUserReportSheet by remember { mutableStateOf(false) }
     var selectedChatMedia by remember { mutableStateOf<SharedMedia?>(null) }
     var selectedChatMediaItems by remember { mutableStateOf<List<SharedMedia>>(emptyList()) }
+    var locationDetailMessage by remember { mutableStateOf<EnhancedMessage?>(null) }
     var clusterForReply by remember { mutableStateOf<List<EnhancedMessage>?>(null) }
     var clusterGallerySelection by remember { mutableStateOf<ClusterGallerySelection?>(null) }
     var deferredJumpToMessageId by remember { mutableStateOf<String?>(null) }
@@ -650,6 +653,7 @@ fun GlassmorphicChatView(
             }
         },
         onViewOnceOpen = { message, replay -> lifecycle.presentViewOnceViewer(message, replay, displayName, currentUserName) },
+        onOpenLocation = { message -> locationDetailMessage = message },
         onHydrateMedia = session::hydrateMediaIfNeeded,
         onStopLiveLocation = session::stopLiveLocation,
         onChangeVanishTimer = { showVanishTimerSheet = true },
@@ -711,6 +715,9 @@ fun GlassmorphicChatView(
     BackHandler(enabled = clusterGallerySelection != null) {
         clusterGallerySelection = null
     }
+    BackHandler(enabled = locationDetailMessage != null) {
+        locationDetailMessage = null
+    }
     BackHandler(enabled = selectedMoment != null) {
         selectedMoment = null
     }
@@ -767,7 +774,11 @@ fun GlassmorphicChatView(
                                 } else {
                                     0f
                                 },
-                                animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
+                                animationSpec = if (selected) {
+                                    spring(dampingRatio = 0.84f, stiffness = 224f)
+                                } else {
+                                    tween(durationMillis = 260)
+                                },
                                 label = "chatMessageMenuLift",
                             )
                             Column(
@@ -1031,10 +1042,61 @@ fun GlassmorphicChatView(
             },
             onMoreReactions = { message -> reactionPickerMessage = message },
             onLiftOffsetChanged = messagePresentation::updateMenuLiftOffset,
+            onOpenMessage = { message, cluster ->
+                ChatMessageBodyOpen.open(
+                    message = message,
+                    isCurrentUser = message.senderId == session.currentUserId,
+                    currentUserId = session.currentUserId,
+                    cluster = cluster,
+                    onOpenMedia = renderer.onOpenMedia,
+                    onOpenCluster = renderer.onOpenCluster,
+                    onMomentNavigation = renderer.onMomentNavigation,
+                    onStoryNavigation = renderer.onStoryNavigation,
+                    onViewOnceOpen = renderer.onViewOnceOpen,
+                    onOpenLocation = renderer.onOpenLocation,
+                    onHydrateMedia = renderer.onHydrateMedia,
+                    onMessageViewed = { messageId ->
+                        session.messagesById[messageId]?.let(session::markEphemeralAsViewed)
+                    },
+                )
+            },
         ),
         onDismiss = messagePresentation::clearMessageOptions,
         modifier = Modifier.fillMaxSize().zIndex(1_000f),
     )
+
+    locationDetailMessage?.let { message ->
+        val payload = message.latitude?.let { lat ->
+            message.longitude?.let { lng ->
+                com.moments.android.views.messaging.models.ChatLocationPayload(
+                    lat = lat,
+                    lng = lng,
+                    name = message.locationName,
+                    address = message.locationAddress,
+                )
+            }
+        } ?: com.moments.android.views.messaging.models.ChatLocationPayload.decode(message.content.orEmpty())
+        if (payload != null) {
+            Dialog(
+                onDismissRequest = { locationDetailMessage = null },
+                properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+            ) {
+                ChatLocationDetailView(
+                    payload = payload,
+                    isLive = message.isLiveLocationMessage,
+                    isLiveActive = message.isLiveLocationActive,
+                    expiresAt = message.liveLocationExpiresAt,
+                    canStopLive = message.senderId == session.currentUserId &&
+                        message.isLiveLocationMessage &&
+                        message.isLiveLocationActive,
+                    senderId = message.senderId,
+                    onClose = { locationDetailMessage = null },
+                    onStopLive = { session.stopLiveLocation(message.id) },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+    }
 
     // ≡ navigationDestination(showingConversationSettings)
     if (showingConversationSettings) {

@@ -261,7 +261,7 @@ fun StoryShareRecipientsPanel(
 fun SharedStoryMessageBubble(
     message: EnhancedMessage,
     isCurrentUser: Boolean,
-    onTap: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onTap: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var canViewStory by remember(message.id) { mutableStateOf<Boolean?>(null) }
@@ -311,9 +311,7 @@ fun SharedStoryMessageBubble(
             )
             canViewStory == true && message.sharedStoryData != null -> {
                 Box(
-                    Modifier
-                        .clickable(onClick = onTap)
-                        .padding(vertical = 4.dp),
+                    Modifier.padding(vertical = 4.dp),
                 ) {
                     StoryBubbleContent(
                         sharedStoryData = message.sharedStoryData!!,

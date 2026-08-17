@@ -63,8 +63,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.MapSnapshotOptions
@@ -154,7 +152,6 @@ fun ChatLocationMessageBubble(
     onStopLive: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    var showDetail by remember { mutableStateOf(false) }
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val isDark = isSystemInDarkTheme()
     val canStopLive = isCurrentUser && isLive && isLiveActive && onStopLive != null
@@ -197,7 +194,7 @@ fun ChatLocationMessageBubble(
                 bubbleShape,
             ),
     ) {
-        Column(Modifier.clickable { showDetail = true }) {
+        Column(Modifier.fillMaxWidth()) {
             Box(Modifier.fillMaxWidth().height(mapHeight)) {
                 ChatLocationBubbleMapThumbnail(
                     latitude = payload.lat,
@@ -273,25 +270,6 @@ fun ChatLocationMessageBubble(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-        }
-    }
-
-    if (showDetail) {
-        Dialog(
-            onDismissRequest = { showDetail = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-        ) {
-            ChatLocationDetailView(
-                payload = payload,
-                isLive = isLive,
-                isLiveActive = isLiveActive,
-                expiresAt = expiresAt,
-                canStopLive = canStopLive,
-                senderId = senderId,
-                onClose = { showDetail = false },
-                onStopLive = onStopLive,
-                modifier = Modifier.fillMaxSize(),
-            )
         }
     }
 }

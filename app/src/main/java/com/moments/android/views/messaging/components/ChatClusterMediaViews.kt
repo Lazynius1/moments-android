@@ -304,6 +304,7 @@ fun MediaGridBubble(
                 isMenuSelected = isMenuSelected,
                 isOutgoing = isCurrentUser,
                 isFlashing = isBubbleFlashing,
+                onTap = { onOpenCluster(active) },
                 onLongPress = { snapshot ->
                     onLongPress?.invoke(active.firstOrNull() ?: front, snapshot)
                 },
@@ -318,8 +319,7 @@ fun MediaGridBubble(
                                 bottom = ClusterMediaLayout.fanBottomPadding,
                             )
                             .size(ClusterMediaLayout.frontWidth, ClusterMediaLayout.frontHeight)
-                            .semantics { contentDescription = "$a11yLabel. $a11yHint" }
-                            .combinedClickable(onClick = { onOpenCluster(active) }),
+                            .semantics { contentDescription = "$a11yLabel. $a11yHint" },
                     ) {
                         // Dorso → frente (índice 0 = frontal)
                         visible.asReversed().forEachIndexed { reversedIndex, message ->

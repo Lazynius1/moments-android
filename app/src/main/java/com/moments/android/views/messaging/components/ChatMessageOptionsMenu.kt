@@ -58,6 +58,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -128,8 +129,8 @@ data class ChatMessageLiftSnapshot(
 )
 
 object ChatBubbleAnchorMetrics {
-    const val menuSelectionScale = 1.03f
-    const val highlightScale = menuSelectionScale
+    const val menuSelectionScale = 1.07f
+    const val highlightScale = 1.03f
     const val highlightDurationMillis = 1500L
     const val pressScale = 0.97f
     const val clusterCornerRadius = 16f
@@ -183,6 +184,7 @@ data class ChatMessageMenuCallbacks(
     val onReaction: (EnhancedMessage, String) -> Unit = { _, _ -> },
     val onMoreReactions: (EnhancedMessage) -> Unit = {},
     val onLiftOffsetChanged: (String, Float) -> Unit = { _, _ -> },
+    val onOpenMessage: (EnhancedMessage, List<EnhancedMessage>?) -> Unit = { _, _ -> },
 )
 
 private data class ChatMessageMenuLayout(
@@ -191,6 +193,22 @@ private data class ChatMessageMenuLayout(
     val menuCenter: Offset,
     val reactionsAreAbove: Boolean,
 )
+
+private fun liftedMessageHitRect(
+    anchor: Rect,
+    offsetY: Float,
+    scale: Float,
+    isOutgoing: Boolean,
+): Rect {
+    val pivotX = if (isOutgoing) anchor.right else anchor.left
+    val pivotY = anchor.bottom
+    return Rect(
+        left = pivotX + (anchor.left - pivotX) * scale,
+        top = pivotY + (anchor.top - pivotY) * scale + offsetY,
+        right = pivotX + (anchor.right - pivotX) * scale,
+        bottom = pivotY + (anchor.bottom - pivotY) * scale + offsetY,
+    )
+}
 
 /** Publica color outgoing; sin medición de layout (≡ iOS `ChatMessageRowChrome`). */
 @Composable
@@ -209,6 +227,7 @@ fun ChatMessageBubbleChrome(
     isOutgoing: Boolean,
     cornerRadius: Float = 16f,
     isFlashing: Boolean = false,
+    onTap: (() -> Unit)? = null,
     onLongPress: ((ChatMessageLiftSnapshot) -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
@@ -217,44 +236,51 @@ fun ChatMessageBubbleChrome(
     var bubbleFrame by remember { mutableStateOf(Rect.Zero) }
     val lifted = isMenuSelected || isFlashing
     val selectionScale = when {
-        lifted -> ChatBubbleAnchorMetrics.highlightScale
+        isMenuSelected -> ChatBubbleAnchorMetrics.menuSelectionScale
+        isFlashing -> ChatBubbleAnchorMetrics.highlightScale
         isPressing -> ChatBubbleAnchorMetrics.pressScale
         else -> 1f
     }
     // iOS: spring.press para menú/flash; easeOut 0.12 para press.
     val animatedScale by animateFloatAsState(
         targetValue = selectionScale,
-        animationSpec = if (isPressing && !lifted) {
-            tween(durationMillis = 120)
-        } else {
-            spring(
+        animationSpec = when {
+            isPressing && !lifted -> tween(durationMillis = 120)
+            isMenuSelected -> spring(dampingRatio = 0.84f, stiffness = 224f)
+            else -> spring(
                 dampingRatio = MotionPolicy.Spring.PRESS_DAMPING.toFloat(),
-                // response 0.28 → (2π/r)² ≈ 500
                 stiffness = 500f,
             )
         },
         label = "bubbleChromeScale",
     )
     val highlightTint = (if (dark) Color.White else Color.Black).copy(alpha = 0.12f)
+    val longPressHandler = onLongPress
     Box(
         Modifier
             .zIndex(if (lifted) 1f else 0f)
             .onGloballyPositioned { bubbleFrame = it.boundsInWindow() }
-            .then(if (onLongPress != null) {
-                Modifier.chatMessageLongPress(
-                    onPressingChanged = { isPressing = it },
-                    onLongPress = {
-                        isPressing = false
-                        onLongPress(
-                            ChatMessageLiftSnapshot(
-                                frame = bubbleFrame,
-                                cornerRadius = cornerRadius,
-                                image = null,
-                            ),
-                        )
-                    },
-                )
-            } else Modifier)
+            .then(
+                if (longPressHandler != null || onTap != null) {
+                    Modifier.chatMessagePressClassifier(
+                        onPressingChanged = { isPressing = it },
+                        onTap = onTap,
+                        onLongPress = {
+                            if (longPressHandler == null) return@chatMessagePressClassifier
+                            isPressing = false
+                            longPressHandler(
+                                ChatMessageLiftSnapshot(
+                                    frame = bubbleFrame,
+                                    cornerRadius = cornerRadius,
+                                    image = null,
+                                ),
+                            )
+                        },
+                    )
+                } else {
+                    Modifier
+                },
+            )
             .graphicsLayer {
                 scaleX = animatedScale
                 scaleY = animatedScale
@@ -313,7 +339,11 @@ fun ChatMessageContextMenuOverlay(
     var reactionsExpanded by remember(item.rowId) { mutableStateOf(false) }
     val presentationProgress by animateFloatAsState(
         targetValue = if (presented) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
+        animationSpec = if (presented) {
+            spring(dampingRatio = 0.84f, stiffness = 224f)
+        } else {
+            tween(durationMillis = 260)
+        },
         label = "messageContextPresentation",
     )
 
@@ -322,7 +352,7 @@ fun ChatMessageContextMenuOverlay(
     fun dismissThen(action: () -> Unit = {}) {
         presented = false
         scope.launch {
-            if (!MotionPolicy.reduceMotion) delay(170L)
+            if (!MotionPolicy.reduceMotion) delay(260L)
             onDismiss()
             action()
         }
@@ -378,6 +408,7 @@ fun ChatMessageContextMenuOverlay(
                     horizontalInset = 16.dp.toPx(),
                     reactionsBarEstimatedWidth = 300.dp.toPx(),
                     menuEstimatedWidth = 218.dp.toPx(),
+                    extraMessageLift = 18.dp.toPx(),
                 )
             }
         }
@@ -407,12 +438,32 @@ fun ChatMessageContextMenuOverlay(
             callbacks.onLiftOffsetChanged(item.rowId, layout.messageOffsetY)
         }
 
-        // La atenuación se pinta debajo del contenido del chat. Aquí no hay
-        // snapshot, máscara ni recorte: la única forma visible es nuestra bubble viva.
+        val presentedOffsetY = layout.messageOffsetY * presentationProgress
+        val liftScale = 1f + (ChatBubbleAnchorMetrics.menuSelectionScale - 1f) * presentationProgress
+        val liftedHitRect = liftedMessageHitRect(
+            anchor = localSelection.anchorFrame,
+            offsetY = presentedOffsetY,
+            scale = liftScale,
+            isOutgoing = localSelection.isOutgoing,
+        )
+        val latestHitRect = rememberUpdatedState(liftedHitRect)
+        val latestOnOpen = rememberUpdatedState(callbacks.onOpenMessage)
+        val openMessage = item.message
+        val openCluster = item.clusterMessages
+
+        // Dimmer: tap fuera de la burbuja cierra; tap en la burbuja elevada abre.
         Box(
             Modifier
                 .fillMaxSize()
-                .clickable { dismissThen() },
+                .pointerInput(item.rowId) {
+                    detectTapGestures { offset ->
+                        if (latestHitRect.value.contains(offset)) {
+                            dismissThen { latestOnOpen.value(openMessage, openCluster) }
+                        } else {
+                            dismissThen()
+                        }
+                    }
+                },
         )
 
         val maxPanelWidth = (containerW - metrics.horizontalInset * 2f).coerceAtLeast(0f)
@@ -860,7 +911,9 @@ private fun MenuRow(
             }
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
         Text(
             stringResource(title),
             color = color,
@@ -870,7 +923,6 @@ private fun MenuRow(
             softWrap = false,
         )
         Spacer(Modifier.weight(1f))
-        Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
     }
 }
 
@@ -902,6 +954,7 @@ private data class MenuLayoutMetrics(
     val horizontalInset: Float,
     val reactionsBarEstimatedWidth: Float,
     val menuEstimatedWidth: Float,
+    val extraMessageLift: Float,
 )
 
 private fun menuLayout(
@@ -960,7 +1013,7 @@ private fun menuLayout(
     val minimumMessageTop = topMarginPx + reactionsBarHeight + stackGap
     val maximumMessageTop = containerHeight - bottomMarginPx - menuHeight - stackGap - scaled.height
     val targetMessageTop = if (maximumMessageTop >= minimumMessageTop) {
-        scaled.top.coerceIn(minimumMessageTop, maximumMessageTop)
+        (scaled.top - metrics.extraMessageLift).coerceIn(minimumMessageTop, maximumMessageTop)
     } else {
         minimumMessageTop
     }
