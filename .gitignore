@@ -15,6 +15,7 @@ local.properties
 *.keystore
 keystore.properties
 keystore/
+app/google-services.json
 
 .kotlin/
 *.hprof
