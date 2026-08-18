@@ -24,8 +24,8 @@ android {
         minSdk = 26
         targetSdk = 37
         // Subir versionCode en cada AAB que subas a Play.
-        versionCode = 7
-        versionName = "1.0.6"
+        versionCode = 8
+        versionName = "1.0.7"
         // Snap Camera Kit ≡ iOS Info.plist SCCameraKit* + SnapCameraKit.plist (vacío = no configurado).
         buildConfigField("String", "SC_CAMERA_KIT_API_TOKEN", "\"\"")
         buildConfigField("String", "SC_CAMERA_KIT_CLIENT_ID", "\"\"")

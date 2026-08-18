@@ -527,7 +527,7 @@ fun ModernPostCardView(
     onContextMenu: (FeedMoment) -> Unit = {},
     onNearEnd: () -> Unit = {},
     onAuthorAvatarTap: ((authorId: String, hasStory: Boolean) -> Unit)? = null,
-    onAuthorAvatarLongPress: ((authorId: String, Rect) -> Unit)? = null,
+    onAuthorAvatarLongPress: ((authorId: String, avatarFrame: Rect, postFrame: Rect) -> Unit)? = null,
     onPeek: ((imageUrl: String, ratio: Float, isPressing: Boolean) -> Unit)? = null,
     onTagTap: ((String) -> Unit)? = null,
     authorHasStory: Boolean = false,
@@ -576,6 +576,7 @@ fun ModernPostCardView(
         mutableStateOf(classifyAspectRatio(detectedAspectRatio))
     }
     var postWidthPx by remember(moment.id) { mutableFloatStateOf(0f) }
+    var postFrameInWindow by remember(moment.id) { mutableStateOf(Rect.Zero) }
     val currentMedia = mediaItems.getOrNull(currentImageIndex)
     val currentTags = currentMedia?.tags.orEmpty()
 
@@ -738,6 +739,7 @@ fun ModernPostCardView(
     Column(
         modifier
             .fillMaxWidth()
+            .onGloballyPositioned { postFrameInWindow = it.boundsInWindow() }
             .onSizeChanged { postWidthPx = it.width.toFloat() }
             .padding(horizontal = ListHorizontalPadding),
         verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -766,7 +768,11 @@ fun ModernPostCardView(
                         else -> onOpenProfile()
                     }
                 },
-                onAuthorAvatarLongPress = onAuthorAvatarLongPress,
+                onAuthorAvatarLongPress = onAuthorAvatarLongPress?.let { callback ->
+                    { authorId, avatarFrame ->
+                        callback(authorId, avatarFrame, postFrameInWindow)
+                    }
+                },
             )
         }
 
@@ -1005,7 +1011,24 @@ private fun PostHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                val usernameInteraction = remember { MutableInteractionSource() }
+                val usernameModifier = if (onAuthorAvatarLongPress != null) {
+                    Modifier.chatMessagePressClassifier(
+                        onTap = onOpenProfile,
+                        onLongPress = {
+                            val authorId = moment.authorId.trim()
+                            if (authorId.isNotEmpty()) {
+                                onAuthorAvatarLongPress.invoke(authorId, capture.globalFrame)
+                            }
+                        },
+                    )
+                } else {
+                    val usernameInteraction = remember { MutableInteractionSource() }
+                    Modifier.clickable(
+                        interactionSource = usernameInteraction,
+                        indication = null,
+                        onClick = onOpenProfile,
+                    )
+                }
                 Text(
                     text = displayUsername,
                     color = colors.primary,
@@ -1014,11 +1037,7 @@ private fun PostHeader(
                     maxLines = 1,
                     modifier = Modifier
                         .momentsPressIcon()
-                        .clickable(
-                            interactionSource = usernameInteraction,
-                            indication = null,
-                            onClick = onOpenProfile,
-                        ),
+                        .then(usernameModifier),
                 )
 
                 // iOS: CurrentUserVerifiedBadge vs VerifiedBadgeView

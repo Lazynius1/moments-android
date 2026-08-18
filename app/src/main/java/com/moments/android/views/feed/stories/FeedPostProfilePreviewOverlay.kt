@@ -1,5 +1,6 @@
 package com.moments.android.views.feed.stories
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -98,6 +99,7 @@ data class FeedPostProfilePreviewSelection(
     val userId: String,
     val momentId: String,
     val anchorFrame: Rect,
+    val postFrame: Rect,
 )
 
 /**
@@ -122,6 +124,7 @@ fun FeedPostProfilePreviewOverlay(
 
     var isPresented by remember { mutableStateOf(false) }
     var dismissGeneration by remember { mutableIntStateOf(0) }
+    var cardSurfaceAlpha by remember { mutableFloatStateOf(1f) }
     var showUnfollowConfirmation by remember { mutableStateOf(false) }
     var unfollowViewModel by remember { mutableStateOf<UserProfileViewModel?>(null) }
     var overlayWindowBounds by remember { mutableStateOf(Rect.Zero) }
@@ -138,30 +141,30 @@ fun FeedPostProfilePreviewOverlay(
         },
         label = "postProfilePreviewAlpha",
     )
-    val presentedScale by animateFloatAsState(
-        targetValue = if (isPresented) 1f else 0.92f,
-        animationSpec = if (reduceMotion) {
-            tween(0)
-        } else if (isPresented) {
-            spring(dampingRatio = 0.84f, stiffness = 380f)
-        } else {
-            tween(260)
-        },
-        label = "postProfilePreviewScale",
-    )
 
     fun dismissOverlay(then: (() -> Unit)? = null) {
         dismissGeneration += 1
         val generation = dismissGeneration
         showUnfollowConfirmation = false
         unfollowViewModel = null
-        onPresentedChange(false)
+        cardSurfaceAlpha = 1f
         isPresented = false
+        scope.launch {
+            if (!reduceMotion) {
+                delay(120)
+                if (generation != dismissGeneration) return@launch
+                cardSurfaceAlpha = 0f
+            } else {
+                cardSurfaceAlpha = 0f
+            }
+        }
         val delayMs = if (reduceMotion) 0L else 260L
         scope.launch {
             delay(delayMs)
             if (generation != dismissGeneration) return@launch
+            onPresentedChange(false)
             onSelectionChange(null)
+            cardSurfaceAlpha = 1f
             then?.invoke()
         }
     }
@@ -223,9 +226,11 @@ fun FeedPostProfilePreviewOverlay(
         }
         GlobalVideoManager.beginPlaybackHold()
         dismissGeneration += 1
+        cardSurfaceAlpha = 1f
         isPresented = false
         showUnfollowConfirmation = false
         unfollowViewModel = null
+        delay(1)
         isPresented = true
     }
 
@@ -240,8 +245,17 @@ fun FeedPostProfilePreviewOverlay(
             topInsetPx = topInsetPx,
         )
     }
+    val cardSurfaceAlphaAnimated by animateFloatAsState(
+        targetValue = cardSurfaceAlpha,
+        animationSpec = if (reduceMotion) {
+            tween(0)
+        } else {
+            tween(durationMillis = 140, easing = FastOutSlowInEasing)
+        },
+        label = "postProfilePreviewCardHandoffAlpha",
+    )
     val centerX by animateFloatAsState(
-        targetValue = if (isPresented) layout.targetCenter.x else layout.naturalCenter.x,
+        targetValue = if (isPresented) layout.targetCenter.x else layout.morphCenter.x,
         animationSpec = if (reduceMotion) {
             tween(0)
         } else if (isPresented) {
@@ -252,7 +266,7 @@ fun FeedPostProfilePreviewOverlay(
         label = "postProfilePreviewCenterX",
     )
     val centerY by animateFloatAsState(
-        targetValue = if (isPresented) layout.targetCenter.y else layout.naturalCenter.y,
+        targetValue = if (isPresented) layout.targetCenter.y else layout.morphCenter.y,
         animationSpec = if (reduceMotion) {
             tween(0)
         } else if (isPresented) {
@@ -261,6 +275,17 @@ fun FeedPostProfilePreviewOverlay(
             tween(260)
         },
         label = "postProfilePreviewCenterY",
+    )
+    val presentedScale by animateFloatAsState(
+        targetValue = if (isPresented) 1f else layout.morphScale,
+        animationSpec = if (reduceMotion) {
+            tween(0)
+        } else if (isPresented) {
+            spring(dampingRatio = 0.84f, stiffness = 380f)
+        } else {
+            tween(260)
+        },
+        label = "postProfilePreviewScale",
     )
 
     val cardWidth = with(density) { layout.cardWidthPx.toDp() }
@@ -293,8 +318,8 @@ fun FeedPostProfilePreviewOverlay(
                 cardShape = cardShape,
                 isDark = isDark,
                 isPresented = isPresented,
-                presentedAlpha = presentedAlpha,
                 presentedScale = presentedScale,
+                cardSurfaceAlpha = cardSurfaceAlphaAnimated,
                 centerX = centerX,
                 centerY = centerY,
                 onOpenProfile = {
@@ -336,8 +361,8 @@ private fun FeedPostProfilePreviewCard(
     cardShape: RoundedCornerShape,
     isDark: Boolean,
     isPresented: Boolean,
-    presentedAlpha: Float,
     presentedScale: Float,
+    cardSurfaceAlpha: Float,
     centerX: Float,
     centerY: Float,
     onOpenProfile: () -> Unit,
@@ -377,7 +402,7 @@ private fun FeedPostProfilePreviewCard(
                 )
             }
             .graphicsLayer {
-                alpha = presentedAlpha
+                alpha = cardSurfaceAlpha
                 scaleX = presentedScale
                 scaleY = presentedScale
                 transformOrigin = TransformOrigin.Center
@@ -713,7 +738,8 @@ private data class ProfilePreviewLayout(
     val cardWidthPx: Float,
     val contentWidthPx: Float,
     val gridCellSizePx: Float,
-    val naturalCenter: Offset,
+    val morphCenter: Offset,
+    val morphScale: Float,
     val targetCenter: Offset,
 )
 
@@ -736,6 +762,12 @@ private fun previewLayout(
         selection.anchorFrame.right - overlayGlobal.left,
         selection.anchorFrame.bottom - overlayGlobal.top,
     )
+    val post = Rect(
+        selection.postFrame.left - overlayGlobal.left,
+        selection.postFrame.top - overlayGlobal.top,
+        selection.postFrame.right - overlayGlobal.left,
+        selection.postFrame.bottom - overlayGlobal.top,
+    )
 
     val cardWidth = max(with(density) { 300.dp.toPx() }, overlayWidth - horizontalInsetPx * 2f)
     val contentWidth = cardWidth - cardPaddingPx * 2f
@@ -747,8 +779,22 @@ private fun previewLayout(
 
     val minCenterX = horizontalInsetPx + cardWidth / 2f
     val maxCenterX = max(minCenterX, overlayWidth - horizontalInsetPx - cardWidth / 2f)
-    val naturalCenterX = min(max(anchor.center.x, minCenterX), maxCenterX)
-    val naturalCenterY = anchor.bottom + avatarGapPx + cardHeight / 2f
+    val avatarFallbackCenterX = min(max(anchor.center.x, minCenterX), maxCenterX)
+    val avatarFallbackCenterY = anchor.bottom + avatarGapPx + cardHeight / 2f
+
+    val hasMorph = post.width > 1f && post.height > 1f
+    val morphCenter: Offset
+    val morphScale: Float
+    if (hasMorph) {
+        morphCenter = post.center
+        morphScale = min(
+            max(min(post.width / cardWidth, post.height / cardHeight), 0.01f),
+            1f,
+        )
+    } else {
+        morphCenter = Offset(avatarFallbackCenterX, avatarFallbackCenterY)
+        morphScale = 0.92f
+    }
 
     val safeMidY = topInsetPx + (overlayHeight - topInsetPx) / 2f
     val minCenterY = topInsetPx + cardHeight / 2f + with(density) { 12.dp.toPx() }
@@ -760,7 +806,8 @@ private fun previewLayout(
         cardWidthPx = cardWidth,
         contentWidthPx = contentWidth,
         gridCellSizePx = gridCellSize,
-        naturalCenter = Offset(naturalCenterX, naturalCenterY),
+        morphCenter = morphCenter,
+        morphScale = morphScale,
         targetCenter = Offset(targetCenterX, targetCenterY),
     )
 }

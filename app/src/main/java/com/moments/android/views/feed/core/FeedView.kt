@@ -636,12 +636,13 @@ fun FeedView(
                             openUserProfile(authorId)
                         }
                     },
-                    onAuthorAvatarLongPress = { userId, momentId, frame ->
+                    onAuthorAvatarLongPress = { userId, momentId, avatarFrame, postFrame ->
                         hiddenPostPreviewMomentId = momentId
                         postProfilePreviewSelection = FeedPostProfilePreviewSelection(
                             userId = userId,
                             momentId = momentId,
-                            anchorFrame = frame,
+                            anchorFrame = avatarFrame,
+                            postFrame = postFrame,
                         )
                     },
                     hiddenMomentId = hiddenPostPreviewMomentId,
