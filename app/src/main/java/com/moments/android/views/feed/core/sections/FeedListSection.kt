@@ -1,5 +1,8 @@
 package com.moments.android.views.feed.core.sections
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -66,7 +70,8 @@ fun FeedListSection(
     onPeek: ((imageUrl: String, ratio: Float, isPressing: Boolean) -> Unit)? = null,
     onContextMenu: (FeedMoment) -> Unit = {},
     onAuthorAvatarTap: ((authorId: String, hasStory: Boolean) -> Unit)? = null,
-    onAuthorAvatarLongPress: ((authorId: String, Rect) -> Unit)? = null,
+    onAuthorAvatarLongPress: ((authorId: String, momentId: String, Rect) -> Unit)? = null,
+    hiddenMomentId: String? = null,
     // iOS feedHeaderHeight / feedSelectorHeight (no hardcode 88/35)
     feedHeaderHeight: Dp = 88.dp,
     feedSelectorHeight: Dp = 35.dp,
@@ -250,37 +255,52 @@ fun FeedListSection(
                     ) { index, moment ->
                         val isProtected = (moment.audience?.lowercase() ?: "") != "everyone"
                         val adInterval = if (selectedFeedType == FeedType.ForYou) 3 else 5
+                        val isHiddenForPreview =
+                            !hiddenMomentId.isNullOrEmpty() && moment.id == hiddenMomentId
+                        val hideAlpha by animateFloatAsState(
+                            targetValue = if (isHiddenForPreview) 0f else 1f,
+                            animationSpec = when {
+                                MotionPolicy.reduceMotion -> tween(0)
+                                isHiddenForPreview -> spring(dampingRatio = 0.84f, stiffness = 380f)
+                                else -> tween(260)
+                            },
+                            label = "hiddenPostPreviewAlpha",
+                        )
                         LaunchedEffect(moment.id) { prefetchUpcoming(index) }
                         Column(Modifier.fillMaxWidth()) {
-                            ScreenshotProtectedView(
-                                isProtected = isProtected,
-                                containsHardwareVideo = moment.hasHardwareVideo,
-                            ) {
-                                ModernPostCardView(
-                                    moment = moment,
-                                    onOpenProfile = { onOpenUserProfile(moment.authorId) },
-                                    onOpenHashtag = onOpenHashtag,
-                                    onOpenLocation = { name, coordinate ->
-                                        onOpenLocation(name, coordinate)
-                                    },
-                                    onOpenComments = { onOpenComments(moment) },
-                                    onShare = { onShare(moment) },
-                                    onContextMenu = onContextMenu,
-                                    // iOS onTagTap: onOpenUserProfile
-                                    onTagTap = onOpenUserProfile,
-                                    onPeek = { url, ratio, pressing ->
-                                        onPeek?.invoke(url, ratio, pressing)
-                                    },
-                                    onNearEnd = {
-                                        if (moment.id == viewModel.moments.lastOrNull()?.id) {
-                                            onLoadMore()
-                                        }
-                                    },
-                                    onAuthorAvatarTap = onAuthorAvatarTap,
-                                    onAuthorAvatarLongPress = onAuthorAvatarLongPress,
-                                    availableHeight = availableHeightPx,
-                                    reelsVideos = feedReelsVideos,
-                                )
+                            Box(Modifier.graphicsLayer { alpha = hideAlpha }) {
+                                ScreenshotProtectedView(
+                                    isProtected = isProtected,
+                                    containsHardwareVideo = moment.hasHardwareVideo,
+                                ) {
+                                    ModernPostCardView(
+                                        moment = moment,
+                                        onOpenProfile = { onOpenUserProfile(moment.authorId) },
+                                        onOpenHashtag = onOpenHashtag,
+                                        onOpenLocation = { name, coordinate ->
+                                            onOpenLocation(name, coordinate)
+                                        },
+                                        onOpenComments = { onOpenComments(moment) },
+                                        onShare = { onShare(moment) },
+                                        onContextMenu = onContextMenu,
+                                        // iOS onTagTap: onOpenUserProfile
+                                        onTagTap = onOpenUserProfile,
+                                        onPeek = { url, ratio, pressing ->
+                                            onPeek?.invoke(url, ratio, pressing)
+                                        },
+                                        onNearEnd = {
+                                            if (moment.id == viewModel.moments.lastOrNull()?.id) {
+                                                onLoadMore()
+                                            }
+                                        },
+                                        onAuthorAvatarTap = onAuthorAvatarTap,
+                                        onAuthorAvatarLongPress = onAuthorAvatarLongPress?.let { callback ->
+                                            { userId, frame -> callback(userId, moment.id, frame) }
+                                        },
+                                        availableHeight = availableHeightPx,
+                                        reelsVideos = feedReelsVideos,
+                                    )
+                                }
                             }
                             if ((index + 1) % adInterval == 0 && index < viewModel.moments.lastIndex) {
                                 SmartNativeAdView(modifier = Modifier.padding(vertical = 4.dp))

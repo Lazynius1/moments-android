@@ -84,6 +84,7 @@ import com.moments.android.views.profile.core.sections.ProfileAvatarNoteView
 import com.moments.android.views.profile.userprofile.UserProfileColors
 import com.moments.android.views.profile.userprofile.UserProfileViewModel
 import com.moments.android.views.settings.hasVideoMedia
+import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.story.StoryRingAvatarView
 import com.moments.android.views.story.storyviewer.GlassmorphicStoryConfirmationDialog
 import kotlinx.coroutines.delay
@@ -95,6 +96,7 @@ import kotlin.math.roundToInt
 /** ≡ iOS `FeedPostProfilePreviewSelection`. */
 data class FeedPostProfilePreviewSelection(
     val userId: String,
+    val momentId: String,
     val anchorFrame: Rect,
 )
 
@@ -109,6 +111,7 @@ fun FeedPostProfilePreviewOverlay(
     messagingViewModel: MessagingViewModel,
     onOpenProfile: (String) -> Unit,
     onPresentMessages: () -> Unit,
+    onPresentedChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
@@ -152,6 +155,7 @@ fun FeedPostProfilePreviewOverlay(
         val generation = dismissGeneration
         showUnfollowConfirmation = false
         unfollowViewModel = null
+        onPresentedChange(false)
         isPresented = false
         val delayMs = if (reduceMotion) 0L else 260L
         scope.launch {
@@ -211,6 +215,7 @@ fun FeedPostProfilePreviewOverlay(
         val userId = selection?.userId
         if (userId == null) {
             GlobalVideoManager.endPlaybackHold()
+            onPresentedChange(false)
             isPresented = false
             showUnfollowConfirmation = false
             unfollowViewModel = null
@@ -497,10 +502,18 @@ private fun FeedPostProfilePreviewCard(
                     previewMoments.chunked(4).forEach { rowMoments ->
                         Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                             rowMoments.forEach { moment ->
-                                FeedPostProfilePreviewMomentThumb(
-                                    moment = moment,
-                                    size = gridCellSize,
-                                )
+                                // ≡ ProfileMomentsBentoGrid: el host seguro va dentro de un frame fijo.
+                                Box(Modifier.size(gridCellSize)) {
+                                    ScreenshotProtectedView(
+                                        isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
+                                        fillsContainer = true,
+                                    ) {
+                                        FeedPostProfilePreviewMomentThumb(
+                                            moment = moment,
+                                            size = gridCellSize,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

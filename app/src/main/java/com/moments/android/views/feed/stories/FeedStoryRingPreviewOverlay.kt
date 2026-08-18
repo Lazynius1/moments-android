@@ -81,6 +81,8 @@ import com.moments.android.views.feed.video.VideoPosterOverlay
 import com.moments.android.views.story.StoryRepository
 import com.moments.android.views.story.StoryRevealStickerOverlay
 import com.moments.android.views.story.storystickers.StickerVideoPlayer
+import com.moments.android.views.shared.ScreenshotProtectedView
+import com.moments.android.views.shared.ScreenshotProtectionMode
 import com.moments.android.views.story.storyviewer.GlassmorphicStoryConfirmationDialog
 import com.moments.android.views.story.storyviewer.GlassmorphicSuccessMessage
 import com.moments.android.views.story.storyviewer.StoryMediaOverlayRendererView
@@ -494,72 +496,85 @@ private fun PreviewCard(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        if (previewStory == null) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(28.dp),
-                strokeWidth = 2.dp,
-                color = Color.White,
-            )
-        }
-        val media = previewStory?.mediaItem
-        if (media?.type == MediaItem.MediaType.IMAGE && media.url.isNotBlank()) {
-            AsyncImage(
-                model = media.url,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .width(width)
-                    .height(height),
-            )
-        }
-        if (media?.type == MediaItem.MediaType.VIDEO) {
-            VideoPosterOverlay(
-                posterUrl = media.thumbnailUrl,
-                isReadyToPlay = isPreviewVideoReady,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .width(width)
-                    .height(height),
-            )
-            val videoUrl = media.url
-            if (videoUrl.isNotBlank()) {
-                LaunchedEffect(previewStory?.id, previewCycle) {
-                    onVideoAppear()
+        ScreenshotProtectedView(
+            isProtected = (previewStory?.audience?.lowercase() ?: "") != "everyone",
+            fillsContainer = true,
+            cornerRadius = 26.dp,
+            // ≡ StoryViewerScreen: vídeo en preview → FLAG_SECURE, no ContentSurface.
+            mode = ScreenshotProtectionMode.WindowFlag,
+        ) {
+            Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (previewStory == null) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White,
+                    )
                 }
-                key("${previewStory?.id ?: "empty"}-$previewCycle") {
-                    StickerVideoPlayer(
-                        url = videoUrl,
-                        isMuted = !soundEnabledInSession,
-                        onDurationMs = onVideoDurationMs,
+                val media = previewStory?.mediaItem
+                if (media?.type == MediaItem.MediaType.IMAGE && media.url.isNotBlank()) {
+                    AsyncImage(
+                        model = media.url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .width(width)
                             .height(height),
                     )
                 }
+                if (media?.type == MediaItem.MediaType.VIDEO) {
+                    VideoPosterOverlay(
+                        posterUrl = media.thumbnailUrl,
+                        isReadyToPlay = isPreviewVideoReady,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .width(width)
+                            .height(height),
+                    )
+                    val videoUrl = media.url
+                    if (videoUrl.isNotBlank()) {
+                        LaunchedEffect(previewStory?.id, previewCycle) {
+                            onVideoAppear()
+                        }
+                        key("${previewStory?.id ?: "empty"}-$previewCycle") {
+                            StickerVideoPlayer(
+                                url = videoUrl,
+                                isMuted = !soundEnabledInSession,
+                                onDurationMs = onVideoDurationMs,
+                                modifier = Modifier
+                                    .width(width)
+                                    .height(height),
+                            )
+                        }
+                    }
+                }
+                previewStory?.let { story ->
+                    val stickers = remember(story.id, story.stickers) {
+                        story.stickers.orEmpty().filter { it.moderationState != "hidden" }
+                    }
+                    StoryMediaOverlayRendererView(
+                        textOverlays = story.resolvedTextOverlays,
+                        stickers = stickers,
+                        drawingData = null,
+                        storyId = story.id.orEmpty(),
+                        userId = story.authorId,
+                        reportsDeckInteractionExclusion = false,
+                        allowsStickerHitTesting = false,
+                        modifier = Modifier.matchParentSize(),
+                    )
+                    StoryRevealStickerOverlay(
+                        storyId = story.id.orEmpty(),
+                        stickers = stickers,
+                        reportsDeckInteractionExclusion = false,
+                        onPauseStory = {},
+                        onResumeStory = {},
+                        modifier = Modifier.matchParentSize(),
+                    )
+                }
             }
-        }
-        previewStory?.let { story ->
-            val stickers = remember(story.id, story.stickers) {
-                story.stickers.orEmpty().filter { it.moderationState != "hidden" }
-            }
-            StoryMediaOverlayRendererView(
-                textOverlays = story.resolvedTextOverlays,
-                stickers = stickers,
-                drawingData = null,
-                storyId = story.id.orEmpty(),
-                userId = story.authorId,
-                reportsDeckInteractionExclusion = false,
-                allowsStickerHitTesting = false,
-                modifier = Modifier.matchParentSize(),
-            )
-            StoryRevealStickerOverlay(
-                storyId = story.id.orEmpty(),
-                stickers = stickers,
-                reportsDeckInteractionExclusion = false,
-                onPauseStory = {},
-                onResumeStory = {},
-                modifier = Modifier.matchParentSize(),
-            )
         }
         // iOS StickerVideoPlayer.allowsHitTesting(false): el tap abre el visor, no el player.
         Box(

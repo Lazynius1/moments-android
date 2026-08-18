@@ -192,6 +192,7 @@ fun FeedView(
     var peekIsProtected by remember { mutableStateOf(false) }
     var storyRingPreviewSelection by remember { mutableStateOf<FeedStoryRingPreviewSelection?>(null) }
     var postProfilePreviewSelection by remember { mutableStateOf<FeedPostProfilePreviewSelection?>(null) }
+    var hiddenPostPreviewMomentId by remember { mutableStateOf<String?>(null) }
 
     var targetConversationId by remember { mutableStateOf<String?>(null) }
     var targetMomentId by remember { mutableStateOf<String?>(null) }
@@ -635,12 +636,15 @@ fun FeedView(
                             openUserProfile(authorId)
                         }
                     },
-                    onAuthorAvatarLongPress = { userId, frame ->
+                    onAuthorAvatarLongPress = { userId, momentId, frame ->
+                        hiddenPostPreviewMomentId = momentId
                         postProfilePreviewSelection = FeedPostProfilePreviewSelection(
                             userId = userId,
+                            momentId = momentId,
                             anchorFrame = frame,
                         )
                     },
+                    hiddenMomentId = hiddenPostPreviewMomentId,
                     onPeek = { url, ratio, pressing ->
                         if (pressing && url.isNotBlank()) {
                             peekImageURL = url
@@ -823,6 +827,9 @@ fun FeedView(
                 messagingViewModel = messagingViewModel,
                 onOpenProfile = { openUserProfile(it) },
                 onPresentMessages = { showMessages = true },
+                onPresentedChange = { presented ->
+                    if (!presented) hiddenPostPreviewMomentId = null
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(1601f),
