@@ -22,6 +22,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -65,6 +66,7 @@ fun FeedListSection(
     onPeek: ((imageUrl: String, ratio: Float, isPressing: Boolean) -> Unit)? = null,
     onContextMenu: (FeedMoment) -> Unit = {},
     onAuthorAvatarTap: ((authorId: String, hasStory: Boolean) -> Unit)? = null,
+    onAuthorAvatarLongPress: ((authorId: String, Rect) -> Unit)? = null,
     // iOS feedHeaderHeight / feedSelectorHeight (no hardcode 88/35)
     feedHeaderHeight: Dp = 88.dp,
     feedSelectorHeight: Dp = 35.dp,
@@ -275,6 +277,7 @@ fun FeedListSection(
                                         }
                                     },
                                     onAuthorAvatarTap = onAuthorAvatarTap,
+                                    onAuthorAvatarLongPress = onAuthorAvatarLongPress,
                                     availableHeight = availableHeightPx,
                                     reelsVideos = feedReelsVideos,
                                 )

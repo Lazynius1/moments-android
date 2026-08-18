@@ -70,6 +70,8 @@ import com.moments.android.views.feed.core.sections.FeedFloatingSelector
 import com.moments.android.views.feed.core.sections.FeedHeaderSection
 import com.moments.android.views.feed.core.sections.FeedListSection
 import com.moments.android.views.feed.core.sections.FeedOverlaysSection
+import com.moments.android.views.feed.stories.FeedPostProfilePreviewOverlay
+import com.moments.android.views.feed.stories.FeedPostProfilePreviewSelection
 import com.moments.android.views.feed.stories.FeedStoryRingCoordinator
 import com.moments.android.views.feed.stories.FeedStoryRingPreviewOverlay
 import com.moments.android.views.feed.stories.FeedStoryRingPreviewSelection
@@ -189,6 +191,7 @@ fun FeedView(
     var isPeeking by remember { mutableStateOf(false) }
     var peekIsProtected by remember { mutableStateOf(false) }
     var storyRingPreviewSelection by remember { mutableStateOf<FeedStoryRingPreviewSelection?>(null) }
+    var postProfilePreviewSelection by remember { mutableStateOf<FeedPostProfilePreviewSelection?>(null) }
 
     var targetConversationId by remember { mutableStateOf<String?>(null) }
     var targetMomentId by remember { mutableStateOf<String?>(null) }
@@ -555,6 +558,7 @@ fun FeedView(
         onShowEchoHistoryChange = { showEchoHistory = it },
         targetConversationId = targetConversationId,
         onTargetConversationIdChange = { targetConversationId = it },
+        messagingViewModel = messagingViewModel,
         firestoreService = firestoreService,
         updateMoment = { moment, payload -> updateMoment(moment, payload) },
         deleteMoment = { deleteMoment(it) },
@@ -630,6 +634,12 @@ fun FeedView(
                         } else {
                             openUserProfile(authorId)
                         }
+                    },
+                    onAuthorAvatarLongPress = { userId, frame ->
+                        postProfilePreviewSelection = FeedPostProfilePreviewSelection(
+                            userId = userId,
+                            anchorFrame = frame,
+                        )
                     },
                     onPeek = { url, ratio, pressing ->
                         if (pressing && url.isNotBlank()) {
@@ -805,6 +815,17 @@ fun FeedView(
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(1600f),
+            )
+
+            FeedPostProfilePreviewOverlay(
+                selection = postProfilePreviewSelection,
+                onSelectionChange = { postProfilePreviewSelection = it },
+                messagingViewModel = messagingViewModel,
+                onOpenProfile = { openUserProfile(it) },
+                onPresentMessages = { showMessages = true },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(1601f),
             )
 
             // ≡ .permissionPrimerGate(notificationGate)

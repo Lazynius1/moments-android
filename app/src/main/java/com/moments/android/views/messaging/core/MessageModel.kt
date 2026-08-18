@@ -1020,6 +1020,14 @@ data class AcceptMessageRequestResult(
     val messageId: String,
 )
 
+/** ≡ iOS `MessagingPresentationRoute`. */
+sealed class MessagingPresentationRoute {
+    data class Conversation(
+        val conversation: com.moments.android.views.messaging.core.Conversation,
+    ) : MessagingPresentationRoute()
+    data class PendingChat(val context: PendingChatContext) : MessagingPresentationRoute()
+}
+
 /** Tipos de `Views/Messaging/Core/MessageModel.swift` consumidos por el chrome del chat. */
 data class PendingChatContext(
     val otherUserId: String,

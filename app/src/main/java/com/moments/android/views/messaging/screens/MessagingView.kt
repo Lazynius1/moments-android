@@ -102,6 +102,7 @@ import com.moments.android.views.messaging.components.OnlineStatusSelectorView
 import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.GlobalMessageSearchResult
 import com.moments.android.views.messaging.core.MessageRequest
+import com.moments.android.views.messaging.core.MessagingPresentationRoute
 import com.moments.android.views.messaging.core.MessagingViewModel
 import com.moments.android.views.messaging.core.PendingChatContext
 import com.moments.android.views.messaging.core.PendingChatContextFactory
@@ -132,11 +133,13 @@ fun MessagingView(
     /** ≡ iOS `momentsFloatingTabBarHidden` en GlassmorphicChatView. */
     onSuppressTabBarChange: (Boolean) -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    /** ≡ EnvironmentObject iOS: el feed reutiliza el mismo VM para `presentationRoute`. */
+    messagingViewModel: MessagingViewModel? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
     val context = LocalContext.current
-    val viewModel = remember { MessagingViewModel() }
+    val viewModel = messagingViewModel ?: remember { MessagingViewModel() }
     val requestService = remember { MessageRequestService() }
     val onlineStatusService = remember { OnlineStatusService.shared }
     val scope = rememberCoroutineScope()
@@ -197,12 +200,25 @@ fun MessagingView(
         }
     }
 
+    fun consumePresentationRoute() {
+        val route = viewModel.presentationRoute ?: return
+        viewModel.presentationRoute = null
+        when (route) {
+            is MessagingPresentationRoute.Conversation -> viewModel.openConversation(route.conversation)
+            is MessagingPresentationRoute.PendingChat -> pendingChatContext = route.context
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.start(targetConversationId)
         uid?.let {
             requestService.listenToPendingRequests(it)
             requestService.listenToOutgoingPendingRequests(it)
         }
+        consumePresentationRoute()
+    }
+    LaunchedEffect(viewModel.presentationRoute) {
+        consumePresentationRoute()
     }
     LaunchedEffect(targetConversationId) {
         if (!targetConversationId.isNullOrBlank()) {

@@ -94,6 +94,7 @@ class UserProfileViewModel(
     private var targetVisibleFollowingIds: Set<String> = emptySet()
     private var targetVisibleFollowerIds: Set<String> = emptySet()
     private var lastSuggestionsSignature: String? = null
+    private var momentsFetchLimit: Int = 50
     private val recentUnfollows = mutableSetOf<String>()
     private val lastUnfollowTime = mutableMapOf<String, Date>()
 
@@ -129,7 +130,8 @@ class UserProfileViewModel(
 
     // MARK: - Carga principal
 
-    fun fetchProfile() {
+    fun fetchProfile(momentsLimit: Int = 50) {
+        momentsFetchLimit = maxOf(1, momentsLimit)
         val current = currentUserId ?: run { isLoading = false; return }
         isLoading = true
         isProfileUnavailable = false
@@ -153,7 +155,9 @@ class UserProfileViewModel(
                 }
             }
             val cachedMoments = LocalPersistenceService.loadProfileMoments(userId, current)
-            if (cachedMoments.isNotEmpty() && moments.isEmpty()) moments = cachedMoments
+            if (cachedMoments.isNotEmpty() && moments.isEmpty()) {
+                moments = cachedMoments.take(momentsFetchLimit)
+            }
 
             val (cachedFollowers, cachedFollowing, cachedMutuals) = LocalPersistenceService.loadConnections(userId)
             if (cachedFollowers.isNotEmpty() || cachedFollowing.isNotEmpty() || cachedMutuals.isNotEmpty()) {
@@ -402,19 +406,26 @@ class UserProfileViewModel(
 
     suspend fun fetchMoments() {
         val current = currentUserId ?: run { isLoadingMoments = false; return }
-        val backend = BackendFeedService.fetchProfileMoments(targetUserId = userId, limit = 50)
+        val backend = BackendFeedService.fetchProfileMoments(
+            targetUserId = userId,
+            limit = momentsFetchLimit,
+        )
         if (backend != null) {
             moments = backend.moments
             isLoadingMoments = false
-            LocalPersistenceService.saveProfileMoments(backend.moments, userId, current, sync = true)
+            if (momentsFetchLimit >= 50) {
+                LocalPersistenceService.saveProfileMoments(backend.moments, userId, current, sync = true)
+            }
             return
         }
         // Fallback: visibilidad por-momento vía repositorio (equivale a filterMomentsForAudience en iOS).
         runCatching { firestoreService.fetchMomentsWithVisibility(userId, current) }
             .onSuccess { filtered ->
-                moments = filtered
+                moments = filtered.take(momentsFetchLimit)
                 isLoadingMoments = false
-                LocalPersistenceService.saveProfileMoments(filtered, userId, current, sync = true)
+                if (momentsFetchLimit >= 50) {
+                    LocalPersistenceService.saveProfileMoments(filtered, userId, current, sync = true)
+                }
             }
             .onFailure { isLoadingMoments = false }
     }
@@ -433,6 +444,19 @@ class UserProfileViewModel(
             followButtonState = reconciled
             isFollowing = reconciled == FollowButtonState.FOLLOWING
             FollowStateStore.setState(reconciled, userId)
+        }
+    }
+
+    fun refreshMutualRelationship() {
+        val current = currentUserId
+        if (current == null || current == userId) {
+            isMutualRelationship = false
+            return
+        }
+        viewModelScope.launch {
+            isMutualRelationship = runCatching {
+                PrivacyService.checkMutualConnection(current, userId)
+            }.getOrDefault(false)
         }
     }
 

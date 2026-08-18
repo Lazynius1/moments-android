@@ -84,6 +84,7 @@ fun StoryRingAvatarView(
     baseStrokeColor: Color = Color.White.copy(alpha = 0.2f),
     baseStrokeWidth: Dp = 1.dp,
     onTap: ((hasStory: Boolean) -> Unit)? = null,
+    onHasStoryChange: ((Boolean) -> Unit)? = null,
 ) {
     val viewerId = FirebaseAuth.getInstance().currentUser?.uid
     val resolvedIsOwnStory = isOwnStory ?: (viewerId != null && viewerId == userId)
@@ -125,6 +126,10 @@ fun StoryRingAvatarView(
             allowOwnStories = allowOwnStories,
             forceRefresh = true,
         )
+    }
+
+    LaunchedEffect(snapshot.hasStory) {
+        onHasStoryChange?.invoke(snapshot.hasStory)
     }
 
     val interaction = remember { MutableInteractionSource() }

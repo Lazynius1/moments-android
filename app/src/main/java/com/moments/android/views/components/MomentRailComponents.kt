@@ -51,6 +51,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.content.FeedMoment
+import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MomentsPressDefaults
@@ -286,14 +287,18 @@ fun ModernFollowButton(
     isLoading: Boolean,
     onClick: () -> Unit,
     style: ModernFollowButtonStyle = ModernFollowButtonStyle.STANDARD,
+    isMutual: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
     val context = LocalContext.current
     val density = LocalDensity.current
     val isCompact = style == ModernFollowButtonStyle.COMPACT
+    val showsMutuals = isMutual && state == FollowButtonState.FOLLOWING
     val fontSize = if (isCompact) 11 else 14
-    val title = when (state) {
+    val title = if (showsMutuals) {
+        stringResource(R.string.audience_type_mutuals)
+    } else when (state) {
         FollowButtonState.FOLLOWING -> stringResource(R.string.user_profile_following)
         FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
         FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
@@ -334,12 +339,20 @@ fun ModernFollowButton(
                 strokeWidth = 1.5.dp,
             )
         } else {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = colors.primary,
-                modifier = Modifier.size(if (isCompact) 11.dp else 14.dp),
-            )
+            if (showsMutuals) {
+                AudienceIconView(
+                    audience = ContentAudience.MUTUALS,
+                    size = if (isCompact) 11.dp else 13.dp,
+                    tintColor = colors.primary,
+                )
+            } else {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.size(if (isCompact) 11.dp else 14.dp),
+                )
+            }
             Text(
                 text = title,
                 color = colors.primary,

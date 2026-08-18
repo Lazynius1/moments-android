@@ -3,6 +3,7 @@ package com.moments.android.views.feed.core.sections
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
@@ -49,6 +50,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
@@ -97,6 +101,7 @@ import com.moments.android.views.feed.uploads.StoryUploadProgressManager
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
+import com.moments.android.views.messaging.components.chatMessagePressClassifier
 import com.moments.android.views.story.StoriesView
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
@@ -522,6 +527,7 @@ fun ModernPostCardView(
     onContextMenu: (FeedMoment) -> Unit = {},
     onNearEnd: () -> Unit = {},
     onAuthorAvatarTap: ((authorId: String, hasStory: Boolean) -> Unit)? = null,
+    onAuthorAvatarLongPress: ((authorId: String, Rect) -> Unit)? = null,
     onPeek: ((imageUrl: String, ratio: Float, isPressing: Boolean) -> Unit)? = null,
     onTagTap: ((String) -> Unit)? = null,
     authorHasStory: Boolean = false,
@@ -760,6 +766,7 @@ fun ModernPostCardView(
                         else -> onOpenProfile()
                     }
                 },
+                onAuthorAvatarLongPress = onAuthorAvatarLongPress,
             )
         }
 
@@ -929,11 +936,40 @@ private fun PostHeader(
     onOpenProfile: () -> Unit,
     onOpenLocation: (String, com.moments.android.models.Moment.LocationCoordinate?) -> Unit,
     onAuthorAvatarTap: (hasStory: Boolean) -> Unit,
+    onAuthorAvatarLongPress: ((authorId: String, Rect) -> Unit)? = null,
 ) {
     val colors = rememberFeedAdaptiveColors()
     val context = LocalContext.current
     val density = LocalDensity.current
     val viewerId = FirebaseAuth.getInstance().currentUser?.uid
+    var isAuthorAvatarPressing by remember { mutableStateOf(false) }
+    val pressScale by animateFloatAsState(
+        targetValue = if (isAuthorAvatarPressing) 0.94f else 1f,
+        animationSpec = tween(120),
+        label = "authorAvatarPressScale",
+    )
+    val pressAlpha by animateFloatAsState(
+        targetValue = if (isAuthorAvatarPressing) 0.88f else 1f,
+        animationSpec = tween(120),
+        label = "authorAvatarPressAlpha",
+    )
+    val capture = remember { FeedAuthorAvatarAnchorCapture() }
+    capture.onTap = onAuthorAvatarTap
+    capture.onLongPress = onAuthorAvatarLongPress
+    capture.onPressingChanged = { isAuthorAvatarPressing = it }
+    val pressClassifier = remember {
+        Modifier.chatMessagePressClassifier(
+            onPressingChanged = { capture.onPressingChanged(it) },
+            onTap = { capture.onTap(capture.hasStory) },
+            onLongPress = {
+                val authorId = capture.authorId.trim()
+                if (authorId.isNotEmpty()) {
+                    capture.onLongPress?.invoke(authorId, capture.globalFrame)
+                }
+            },
+        )
+    }
+    capture.authorId = moment.authorId
 
     Row(
         Modifier
@@ -943,12 +979,26 @@ private fun PostHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // iOS postHeaderView: StoryRingAvatarView(userId:size:onTap:)
-        com.moments.android.views.story.StoryRingAvatarView(
-            userId = moment.authorId,
-            size = PostAvatarSize,
-            onTap = onAuthorAvatarTap,
-        )
+        // iOS postHeaderView: StoryRingAvatarView + FeedStoryCirclePressModifier
+        Box(
+            modifier = Modifier
+                .onGloballyPositioned { coords ->
+                    capture.globalFrame = coords.boundsInWindow()
+                }
+                .graphicsLayer {
+                    scaleX = pressScale
+                    scaleY = pressScale
+                    alpha = pressAlpha
+                }
+                .then(if (onAuthorAvatarLongPress != null) pressClassifier else Modifier),
+        ) {
+            com.moments.android.views.story.StoryRingAvatarView(
+                userId = moment.authorId,
+                size = PostAvatarSize,
+                onTap = if (onAuthorAvatarLongPress == null) onAuthorAvatarTap else null,
+                onHasStoryChange = { capture.hasStory = it },
+            )
+        }
 
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(
@@ -1032,6 +1082,16 @@ private fun relativeTime(timestamp: Long): String {
             "${TimeUnit.MILLISECONDS.toDays(elapsed)} ${stringResource(R.string.time_day)}"
         else -> "${TimeUnit.MILLISECONDS.toDays(elapsed) / 7} ${stringResource(R.string.time_week)}"
     }
+}
+
+/** Frame en coordenadas de ventana, leído en el long-press (≡ iOS `FeedStoryCircleAnchorCapture`). */
+private class FeedAuthorAvatarAnchorCapture {
+    var globalFrame: Rect = Rect.Zero
+    var authorId: String = ""
+    var hasStory: Boolean = false
+    var onTap: (Boolean) -> Unit = {}
+    var onLongPress: ((String, Rect) -> Unit)? = null
+    var onPressingChanged: (Boolean) -> Unit = {}
 }
 
 /** Port de `StoryProgressCircle` (FeedMomentComponents.swift). */

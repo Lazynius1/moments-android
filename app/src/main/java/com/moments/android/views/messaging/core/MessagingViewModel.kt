@@ -59,6 +59,7 @@ class MessagingViewModel(
     var selectedConversation by mutableStateOf<Conversation?>(null); private set
     var errorMessage by mutableStateOf<String?>(null); private set
     var requiresMessageRequest by mutableStateOf(false); private set
+    var presentationRoute by mutableStateOf<MessagingPresentationRoute?>(null)
 
     var filteredConversations by mutableStateOf<List<Conversation>>(emptyList()); private set
     var searchedUsers by mutableStateOf<List<AppUser>>(emptyList()); private set

@@ -33,6 +33,7 @@ import com.moments.android.views.echoes.EchoHistoryView
 import com.moments.android.views.feed.core.sections.FeedMomentDetailRoute
 import com.moments.android.views.feed.maps.LocationMapView
 import com.moments.android.views.explore.ExploreView
+import com.moments.android.views.messaging.core.MessagingViewModel
 import com.moments.android.views.messaging.screens.MessagingView
 import com.moments.android.views.profile.core.sections.UserProfileZoomNavigationHost
 import com.moments.android.views.profile.core.sections.momentZoomDestination
@@ -91,6 +92,7 @@ fun FeedPresentations(
     onShowEchoHistoryChange: (Boolean) -> Unit,
     targetConversationId: String?,
     onTargetConversationIdChange: (String?) -> Unit,
+    messagingViewModel: MessagingViewModel? = null,
     @Suppress("UNUSED_PARAMETER") firestoreService: FirestoreService,
     updateMoment: (FeedMoment, EditMomentPayload) -> Unit,
     deleteMoment: (FeedMoment) -> Unit,
@@ -132,6 +134,7 @@ fun FeedPresentations(
                         targetConversationId = targetConversationId,
                         onTargetConversationIdConsumed = { onTargetConversationIdChange(null) },
                         onDismiss = { onShowMessagesChange(false) },
+                        messagingViewModel = messagingViewModel,
                     )
                 }
             }
