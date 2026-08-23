@@ -277,9 +277,14 @@ fun EpicReactionButton(
         )
     }
 
-    // Layout fijo sizeDp (como iOS) — sin padding extra que desplace el rail.
+    // Igual que iOS: círculo de 44dp y badge superpuesto visualmente en la esquina.
+    // El badge se pinta por encima y captura sus propios toques; el corazón recibe el resto.
     Box(modifier.size(sizeDp.dp)) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
             if (showRipple) {
                 Box(
                     Modifier
@@ -362,7 +367,7 @@ fun EpicReactionButton(
             }
 
             if (showCount && reactionCount > 0) {
-                // Hit amplio DENTRO del 44dp (no mueve el rail). Esquina = estadísticas.
+                // Igual que en iOS: pequeño badge superpuesto e interactivo.
                 Box(
                     Modifier
                         .align(Alignment.TopEnd)
@@ -473,14 +478,9 @@ private fun FloatingReactionItemView(
         label = "floatY",
     )
 
-    Text(
-        text = reaction.filledIcon,
-        fontSize = 32.sp,
-        style = TextStyle(
-            shadow = Shadow(color = Color.Black.copy(0.18f), blurRadius = 3f),
-        ),
+    Box(
         modifier = Modifier
-            .offset(y = floatY.dp)
+            .size(40.dp)
             .momentsPress(
                 MomentsPressSpec(scale = 0.82f, haptic = MomentsPressDefaults.PressHaptic.NONE),
             )
@@ -489,9 +489,18 @@ private fun FloatingReactionItemView(
                     HapticManager.shared.lightImpact()
                     onClick()
                 },
-            )
-            .padding(2.dp),
-    )
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = reaction.filledIcon,
+            fontSize = 26.sp,
+            style = TextStyle(
+                shadow = Shadow(color = Color.Black.copy(0.18f), blurRadius = 3f),
+            ),
+            modifier = Modifier.offset(y = floatY.dp),
+        )
+    }
 }
 
 /** Port de `EpicReactionPickerView`. */
