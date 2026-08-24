@@ -28,6 +28,9 @@ import com.moments.android.services.social.StoryRingCacheService
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.messaging.services.uploadMedia
+import com.moments.android.services.messaging.DirectMessageRoute
+import com.moments.android.services.messaging.MessageRequestInteractionContext
+import com.moments.android.services.messaging.MessageRequestService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -75,6 +78,7 @@ class StoryViewModel(
         private set
 
     private val storyRepository = StoryRepository(firestore)
+    private val messageRequestService = MessageRequestService()
     private val playbackCoordinator = StoryPlaybackCoordinator(MomentsApplication.instance)
     private var isFirstFetch = true
     private val authorReelJobs = mutableMapOf<String, Job>()
@@ -348,38 +352,71 @@ class StoryViewModel(
         }
     }
 
-    fun sendMessage(toUserId: String, storyId: String, message: String, completion: (Boolean) -> Unit) {
+    fun sendMessage(toUserId: String, storyId: String, message: String, completion: (Result<Unit>) -> Unit) {
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
         if (currentUserId == null) {
-            completion(false)
+            completion(Result.failure(IllegalStateException(localized(R.string.messaging_error_not_authenticated))))
+            return
+        }
+        val trimmed = message.trim()
+        if (trimmed.isEmpty()) {
+            completion(Result.failure(IllegalArgumentException(localized(R.string.messaging_error_empty_message))))
             return
         }
         viewModelScope.launch {
-            val conversationId = runCatching {
-                getOrCreateConversation(currentUserId, toUserId)
-            }.getOrNull()
-            if (conversationId == null) {
-                completion(false)
-                return@launch
-            }
             val storyReply = storyRepository.fetchStoryReplyData(toUserId, storyId)
             if (storyReply == null) {
-                completion(false)
+                completion(Result.failure(IllegalStateException(localized(R.string.story_context_menu_action_failed))))
                 return@launch
             }
-            val vanishActive = runCatching {
-                firestore.db.collection("conversations").document(conversationId).get().await()
-                    .getBoolean("vanishModeActive") ?: false
-            }.getOrDefault(false)
-            val ok = ChatService.sendStoryReplyMessage(
-                conversationId = conversationId,
-                senderId = currentUserId,
-                content = "💬 $message",
-                storyReplyData = storyReply.payload,
-                isVanishModeMessage = vanishActive,
-            ).isSuccess
-            completion(ok)
+            val interaction = MessageRequestInteractionContext(
+                kind = MessageRequestInteractionContext.Kind.STORY_MESSAGE,
+                storyId = storyId,
+                storyOwnerId = toUserId,
+            )
+            val result = runCatching {
+                when (val route = messageRequestService.resolveRoute(toUserId, interaction)) {
+                    is DirectMessageRoute.OutgoingRequest -> {
+                        messageRequestService.appendRequestMessage(
+                            receiverId = toUserId,
+                            text = "💬 $trimmed",
+                            interaction = interaction,
+                        )
+                    }
+                    is DirectMessageRoute.Conversation -> sendAcceptedStoryReply(
+                        route.id, currentUserId, "💬 $trimmed", storyReply.payload,
+                    )
+                    is DirectMessageRoute.ConversationDraft -> {
+                        val conversationId = messageRequestService.activateConversationDraft(toUserId, route.threadId)
+                        sendAcceptedStoryReply(conversationId, currentUserId, "💬 $trimmed", storyReply.payload)
+                    }
+                    is DirectMessageRoute.IncomingRequest -> {
+                        val accepted = messageRequestService.acceptIncomingThread(route.threadId)
+                        sendAcceptedStoryReply(accepted.conversationId, currentUserId, "💬 $trimmed", storyReply.payload)
+                    }
+                }
+            }.map { Unit }
+            completion(result)
         }
+    }
+
+    private suspend fun sendAcceptedStoryReply(
+        conversationId: String,
+        senderId: String,
+        content: String,
+        storyReplyData: Map<String, String>,
+    ) {
+        val vanishActive = runCatching {
+            firestore.db.collection("conversations").document(conversationId).get().await()
+                .getBoolean("vanishModeActive") ?: false
+        }.getOrDefault(false)
+        ChatService.sendStoryReplyMessage(
+            conversationId = conversationId,
+            senderId = senderId,
+            content = content,
+            storyReplyData = storyReplyData,
+            isVanishModeMessage = vanishActive,
+        ).getOrThrow()
     }
 
     // MARK: - Vanish mode en respuestas de historia
@@ -416,31 +453,47 @@ class StoryViewModel(
         toUserId: String,
         storyId: String,
         imageJpeg: ByteArray,
-        completion: (Boolean) -> Unit,
+        completion: (Result<Unit>) -> Unit,
     ) {
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
         if (currentUserId == null || imageJpeg.isEmpty()) {
-            completion(false)
+            completion(Result.failure(IllegalStateException(localized(R.string.messaging_error_not_authenticated))))
             return
         }
         viewModelScope.launch {
             val storyReply = storyRepository.fetchStoryReplyData(toUserId, storyId)
             if (storyReply == null) {
-                completion(false)
+                completion(Result.failure(IllegalStateException(localized(R.string.story_context_menu_action_failed))))
                 return@launch
             }
-            val canSend = ChatService.canSendMessage(currentUserId, toUserId).getOrNull() == true
-            if (!canSend) {
-                completion(false)
+            val interaction = MessageRequestInteractionContext(
+                kind = MessageRequestInteractionContext.Kind.STORY_EPHEMERAL,
+                storyId = storyId,
+                storyOwnerId = toUserId,
+            )
+            val route = runCatching { messageRequestService.resolveRoute(toUserId, interaction) }
+                .getOrElse { completion(Result.failure(it)); return@launch }
+            if (route is DirectMessageRoute.OutgoingRequest) {
+                completion(runCatching {
+                    messageRequestService.appendEphemeralMedia(
+                        receiverId = toUserId,
+                        data = imageJpeg,
+                        isVideo = false,
+                        allowReplay = true,
+                        interaction = interaction,
+                        expiresAt = Date(Date().time + 24L * 60L * 60L * 1000L),
+                    )
+                }.map { Unit })
                 return@launch
             }
             val conversationId = runCatching {
-                getOrCreateConversation(currentUserId, toUserId)
-            }.getOrNull()
-            if (conversationId == null) {
-                completion(false)
-                return@launch
-            }
+                when (route) {
+                    is DirectMessageRoute.Conversation -> route.id
+                    is DirectMessageRoute.ConversationDraft -> messageRequestService.activateConversationDraft(toUserId, route.threadId)
+                    is DirectMessageRoute.IncomingRequest -> messageRequestService.acceptIncomingThread(route.threadId).conversationId
+                    is DirectMessageRoute.OutgoingRequest -> error("unreachable")
+                }
+            }.getOrElse { completion(Result.failure(it)); return@launch }
             val messageId = UUID.randomUUID().toString()
             val upload = ChatService.uploadMedia(
                 data = imageJpeg,
@@ -449,10 +502,10 @@ class StoryViewModel(
                 messageId = messageId,
             ).getOrNull()
             if (upload == null) {
-                completion(false)
+                completion(Result.failure(IllegalStateException(localized(R.string.messaging_error_service_unavailable))))
                 return@launch
             }
-            val ok = ChatService.sendEphemeralMessage(
+            val result = ChatService.sendEphemeralMessage(
                 conversationId = conversationId,
                 senderId = currentUserId,
                 content = localized(R.string.stories_ephemeral_reply_content),
@@ -465,8 +518,8 @@ class StoryViewModel(
                 expirationHours = 24,
                 storyReplyData = storyReply.payload,
                 messageId = messageId,
-            ).isSuccess
-            completion(ok)
+            ).map { Unit }
+            completion(result)
         }
     }
 
@@ -554,45 +607,6 @@ class StoryViewModel(
             }.exceptionOrNull()
             completion(err)
         }
-    }
-
-    // MARK: - Private Helpers (getOrCreateConversation — sin mutual gate, paridad iOS StoryViewModel)
-
-    private suspend fun getOrCreateConversation(senderId: String, receiverId: String): String {
-        require(senderId.isNotEmpty() && receiverId.isNotEmpty()) {
-            localized(R.string.stories_error_invalid_user_ids)
-        }
-        val snap = firestore.db.collection("conversations")
-            .whereArrayContains("participants", senderId)
-            .get().await()
-        val existing = snap.documents.firstOrNull { doc ->
-            @Suppress("UNCHECKED_CAST")
-            val participants = doc.get("participants") as? List<String> ?: emptyList()
-            receiverId in participants
-        }
-        if (existing != null) return existing.id
-        return createNewConversation(senderId, receiverId)
-    }
-
-    private suspend fun createNewConversation(senderId: String, receiverId: String): String {
-        val participants = listOf(senderId, receiverId)
-        val readStatus = participants.associateWith { it == senderId }
-        val user = firestore.fetchUserProfile(receiverId)
-        val conversationRef = firestore.db.collection("conversations").document()
-        val conversationId = conversationRef.id
-        conversationRef.set(
-            mapOf(
-                "id" to conversationId,
-                "participants" to participants,
-                "lastMessage" to "",
-                "timestamp" to Timestamp.now(),
-                "readStatus" to readStatus,
-                "otherParticipantId" to receiverId,
-                "otherParticipantUsername" to user.username,
-                "otherParticipantProfileImagePath" to (user.profileImagePath ?: ""),
-            ),
-        ).await()
-        return conversationId
     }
 
     fun sendReaction(toUserId: String, storyId: String, reaction: String) {

@@ -20,8 +20,11 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,8 +55,11 @@ import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.components.LiveUsernameContent
 import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.services.ChatService
-import com.moments.android.views.messaging.services.getOrCreateConversation
+import com.moments.android.services.messaging.DirectMessageRoute
+import com.moments.android.services.messaging.MessageRequestInteractionContext
+import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.views.messaging.services.sendSharedStoryMessage
 import com.moments.android.views.story.StoryRepository
 import kotlinx.coroutines.launch
@@ -221,6 +227,7 @@ fun StoryShareRecipientsPanel(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var deliveryFeedback by remember { mutableStateOf<String?>(null) }
 
     LiveUsernameContent(userId = story.authorId, fallbackUsername = story.username) { username ->
         ShareRecipientsPickerSheet(
@@ -228,27 +235,68 @@ fun StoryShareRecipientsPanel(
             subtitle = stringResource(R.string.share_story_by, username),
             showsBackButton = false,
             onDismiss = onDismiss,
-            onSend = { selectedUsers, conversations ->
+            onSend = { selectedUsers, _ ->
                 val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@ShareRecipientsPickerSheet
                 if (story.id.isNullOrBlank()) return@ShareRecipientsPickerSheet
                 val freshUsername = UserCacheService.getCachedUser(story.authorId)?.username
                     ?: story.username
                 val shareText = context.getString(R.string.share_story_by, freshUsername)
                 scope.launch {
+                    val coordinator = MessageRequestService()
+                    val failures = mutableListOf<String>()
                     selectedUsers.forEach { userId ->
-                        val existing = conversations.firstOrNull { it.otherParticipantId == userId }
-                        val conversationId = existing?.id?.takeIf { it.isNotBlank() }
-                            ?: ChatService.getOrCreateConversation(uid, userId).getOrNull()
-                            ?: return@forEach
-                        ChatService.sendSharedStoryMessage(
-                            conversationId = conversationId,
-                            senderId = uid,
-                            story = story,
-                            shareText = shareText,
-                        )
+                        if (userId.isBlank()) {
+                            failures += context.getString(R.string.messaging_error_invalid_recipient)
+                            return@forEach
+                        }
+                        runCatching {
+                            val interaction = MessageRequestInteractionContext(
+                                kind = MessageRequestInteractionContext.Kind.SHARE_STORY,
+                                storyId = story.id,
+                                storyOwnerId = story.authorId,
+                                sharedContentId = story.id,
+                                sharedContentOwnerId = story.authorId,
+                            )
+                            when (val route = coordinator.resolveRoute(userId, interaction)) {
+                                is DirectMessageRoute.Conversation -> route.id
+                                is DirectMessageRoute.ConversationDraft -> coordinator.activateConversationDraft(userId, route.threadId)
+                                is DirectMessageRoute.IncomingRequest -> coordinator.acceptIncomingThread(route.threadId).conversationId
+                                is DirectMessageRoute.OutgoingRequest -> {
+                                    coordinator.appendRequestMessage(
+                                        receiverId = userId,
+                                        text = shareText,
+                                        messageType = MessageType.SHARED_STORY,
+                                        interaction = interaction,
+                                    )
+                                    null
+                                }
+                            }?.let { conversationId ->
+                                ChatService.sendSharedStoryMessage(
+                                    conversationId = conversationId,
+                                    senderId = uid,
+                                    story = story,
+                                    shareText = shareText,
+                                ).getOrThrow()
+                            }
+                        }.onFailure { failures += it.localizedMessage ?: context.getString(R.string.common_error) }
                     }
-                    HapticManager.shared.success()
-                    onDismiss()
+                    if (selectedUsers.isNotEmpty() && failures.isEmpty()) {
+                        HapticManager.shared.success()
+                        onDismiss()
+                    } else {
+                        deliveryFeedback = failures.firstOrNull() ?: context.getString(R.string.common_error)
+                    }
+                }
+            },
+        )
+    }
+    deliveryFeedback?.let { message ->
+        AlertDialog(
+            onDismissRequest = { deliveryFeedback = null },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { deliveryFeedback = null }) {
+                    Text(stringResource(R.string.common_ok))
                 }
             },
         )
@@ -265,6 +313,7 @@ fun SharedStoryMessageBubble(
     modifier: Modifier = Modifier,
 ) {
     var canViewStory by remember(message.id) { mutableStateOf<Boolean?>(null) }
+    var displayData by remember(message.id) { mutableStateOf(message.sharedStoryData) }
     var denialReason by remember(message.id) {
         mutableStateOf<SharedStoryAccessDenialReason?>(null)
     }
@@ -272,6 +321,7 @@ fun SharedStoryMessageBubble(
 
     LaunchedEffect(message.id, message.sharedStoryData) {
         val data = message.sharedStoryData
+        displayData = data
         val storyId = data?.get("storyId")
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
         if (data == null || storyId.isNullOrBlank() || currentUserId.isNullOrBlank()) {
@@ -290,6 +340,17 @@ fun SharedStoryMessageBubble(
         )
         when (result) {
             is SharedStoryAccessOutcome.Allowed -> {
+                val story = result.story
+                val author = UserCacheService.getCachedUser(story.authorId)?.username ?: story.username
+                displayData = data + mapOf(
+                    "storyId" to story.id.orEmpty(),
+                    "storyAuthor" to author,
+                    "storyAuthorId" to story.authorId,
+                    "storyPreviewUrl" to storyPreviewUrl(story),
+                    "storyMediaType" to storyMediaTypeString(story),
+                    "storyExpiration" to (story.expirationDate.time / 1000.0).toString(),
+                    "storyTimestamp" to (story.timestamp.time / 1000.0).toString(),
+                )
                 canViewStory = true
                 denialReason = null
             }
@@ -309,19 +370,19 @@ fun SharedStoryMessageBubble(
                     .widthIn(max = 280.dp)
                     .padding(vertical = 4.dp),
             )
-            canViewStory == true && message.sharedStoryData != null -> {
+            canViewStory == true && displayData != null -> {
                 Box(
                     Modifier.padding(vertical = 4.dp),
                 ) {
                     StoryBubbleContent(
-                        sharedStoryData = message.sharedStoryData!!,
+                        sharedStoryData = displayData!!,
                         isCurrentUser = isCurrentUser,
                     )
                 }
             }
             else -> BlockedStoryBubble(
                 reason = denialReason ?: SharedStoryAccessDenialReason.Restricted,
-                sharedStoryData = message.sharedStoryData,
+                sharedStoryData = displayData,
                 modifier = Modifier
                     .widthIn(max = 280.dp)
                     .padding(vertical = 4.dp),

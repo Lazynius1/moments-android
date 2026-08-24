@@ -58,6 +58,9 @@ data class ChatMessageListCallbacks(
     val renderHeader: @Composable (ChatRenderRow.Header) -> Unit = {},
     val renderBuzz: @Composable (ChatRenderRow.Buzz) -> Unit = {},
     val renderTyping: @Composable () -> Unit = {},
+    val renderPendingRequest: @Composable (PendingChatTimelineMessage) -> Unit = {},
+    val renderIncomingRequestActions: @Composable (Boolean) -> Unit = {},
+    val renderOutgoingRequestControls: @Composable (Int, Boolean) -> Unit = { _, _ -> },
 )
 
 @Stable
@@ -86,7 +89,9 @@ fun chatListRows(
     baseRows: List<ChatRenderRow>,
     pendingChatContext: PendingChatContext?,
     conversationIntroContext: PendingChatContext?,
-    pendingTimelineMessage: PendingChatTimelineMessage?,
+    pendingTimelineMessages: List<PendingChatTimelineMessage>,
+    requestLoading: Boolean,
+    pendingChatCanType: Boolean,
     canLoadMore: Boolean,
     hasCompletedInitialScroll: Boolean,
     hasTypingUsers: Boolean,
@@ -95,11 +100,30 @@ fun chatListRows(
     val pending = pendingChatContext != null
     if (pending || (!canLoadMore && (hasCompletedInitialScroll || rows.isEmpty()))) {
         if (!pending) rows.add(0, ChatRenderRow.HistoryStart)
-        if (pendingChatContext?.status !in setOf(PendingChatContext.Status.OUTGOING_REQUEST_DRAFT, PendingChatContext.Status.OUTGOING_REQUEST_BLOCKED, null)) {
+        if (pendingChatContext?.status !in setOf(
+                PendingChatContext.Status.OUTGOING_REQUEST_DRAFT,
+                PendingChatContext.Status.OUTGOING_REQUEST_BLOCKED,
+                PendingChatContext.Status.INCOMING_REQUEST_PENDING,
+                null,
+            )
+        ) {
             rows.add(0, ChatRenderRow.RequestDisclaimer(pendingChatContext))
         }
         rows.add(0, ChatRenderRow.ConversationIntro(pendingChatContext ?: conversationIntroContext))
-        pendingTimelineMessage?.let { rows.add(minOf(3, rows.size), ChatRenderRow.PendingRequestMessage(it)) }
+        pendingTimelineMessages.forEachIndexed { index, message ->
+            rows.add(minOf(3 + index, rows.size), ChatRenderRow.PendingRequestMessage(message))
+        }
+        if (pendingChatContext?.direction == PendingChatContext.Direction.OUTGOING &&
+            pendingChatContext.status in setOf(
+                PendingChatContext.Status.OUTGOING_REQUEST_DRAFT,
+                PendingChatContext.Status.OUTGOING_REQUEST_SENT,
+            )
+        ) {
+            rows += ChatRenderRow.OutgoingRequestControls(
+                messageCount = pendingChatContext.request?.messageCount ?: pendingTimelineMessages.size,
+                limitReached = pendingChatContext.status == PendingChatContext.Status.OUTGOING_REQUEST_SENT && !pendingChatCanType,
+            )
+        }
     }
     if (hasTypingUsers) rows += ChatRenderRow.Typing
     return rows
@@ -161,6 +185,8 @@ fun GlassmorphicChatMessageList(
     callbacks: ChatMessageListCallbacks,
     /** ≡ iOS `composerBottomInset` → contentInset.bottom (LazyColumn reverseLayout: contentPadding.bottom). */
     composerChromeHeight: Dp = ChatComposerChromeMetrics.estimatedComposerChromeHeight,
+    /** Separación visual entre la última fila y el compositor. */
+    composerGap: Dp = ChatComposerChromeMetrics.messageListGap,
     /** ≡ iOS `isVanishGestureEnabled` */
     isVanishGestureEnabled: Boolean = true,
     /** ≡ iOS `.environment(\.chatSearchHighlightTerm, …)`. */
@@ -177,7 +203,7 @@ fun GlassmorphicChatMessageList(
         callbacks.onAtBottomChanged(listController.isAtBottom)
     }
     val vanishModeActive by viewModel.vanishModeActive.collectAsState()
-    val listBottomInset = ChatComposerChromeMetrics.listBottomInset(composerChromeHeight)
+    val listBottomInset = composerChromeHeight + composerGap
     CompositionLocalProvider(
         LocalChatSearchHighlightTerm provides searchHighlightTerm,
         LocalChatSearchActiveMessageId provides searchActiveMessageId,
@@ -223,10 +249,9 @@ fun GlassmorphicChatMessageList(
                             requestDisclaimerRes(row.context), adaptiveColors,
                             Modifier.chatMenuDimmedWhenOpen(menuOpen).padding(horizontal = 14.dp, vertical = 8.dp),
                         )
-                        is ChatRenderRow.PendingRequestMessage -> PendingRequestMessageRow(
-                            row.message, adaptiveColors,
-                            Modifier.chatMenuDimmedWhenOpen(menuOpen).padding(horizontal = 14.dp, vertical = 8.dp),
-                        )
+                        is ChatRenderRow.PendingRequestMessage -> callbacks.renderPendingRequest(row.message)
+                        is ChatRenderRow.IncomingRequestActions -> callbacks.renderIncomingRequestActions(row.isLoading)
+                        is ChatRenderRow.OutgoingRequestControls -> callbacks.renderOutgoingRequestControls(row.messageCount, row.limitReached)
                         is ChatRenderRow.HistoryStart -> ChatHistoryStartHeader(
                             adaptiveColors,
                             Modifier.chatMenuDimmedWhenOpen(menuOpen),

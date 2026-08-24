@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.VisibilityOff
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -44,6 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +67,7 @@ import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.searchUsers
+import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
 import com.moments.android.views.creator.audienceselector.AudienceSelectionView
@@ -77,6 +80,7 @@ import com.moments.android.views.settings.sections.SettingsSubsectionGroup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 
 /**
  * Port 1:1 de `ContentVisibilityView.swift` (853 líneas):
@@ -95,6 +99,7 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
     var showingStoryInteractions by remember { mutableStateOf(false) }
     var showingCustomLists by remember { mutableStateOf(false) }
     var showingHiddenFrom by remember { mutableStateOf(false) }
+    var showingHiddenWords by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadSettings { isLoading = false }
@@ -167,6 +172,44 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
                                     )
                                     Text(
                                         stringResource(interactionSummaryRes(viewModel)),
+                                        fontSize = 13.sp,
+                                        color = Color.Gray,
+                                    )
+                                }
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    null,
+                                    tint = Color.Gray,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                            HorizontalDivider(
+                                Modifier.padding(start = SettingsDividerStart),
+                                color = primary.copy(alpha = 0.2f),
+                            )
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showingHiddenWords = true }
+                                    .padding(horizontal = 16.dp, vertical = 11.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            ) {
+                                Icon(
+                                    Icons.Filled.TextFields,
+                                    null,
+                                    tint = primary,
+                                    modifier = Modifier.width(28.dp),
+                                )
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        stringResource(R.string.message_requests_hidden_words_title),
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = primary,
+                                    )
+                                    Text(
+                                        stringResource(R.string.message_requests_hidden_words_description),
                                         fontSize = 13.sp,
                                         color = Color.Gray,
                                     )
@@ -330,6 +373,15 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
                 viewModel = viewModel,
                 onDismiss = dismiss,
             )
+        }
+    }
+
+    if (showingHiddenWords) {
+        MomentsModalSheet(
+            onDismissRequest = { showingHiddenWords = false },
+            largeOnly = false,
+        ) { dismiss ->
+            HiddenWordsSettingsView(onDismiss = dismiss)
         }
     }
 }
@@ -657,6 +709,145 @@ private fun InteractionToggleRow(
                 checkedTrackColor = SettingsProfileColors.toggleTint,
             ),
         )
+    }
+}
+
+// MARK: - Hidden words
+
+@Composable
+private fun HiddenWordsSettingsView(onDismiss: () -> Unit) {
+    val isDark = isSystemInDarkTheme()
+    val primary = if (isDark) Color.White else Color.Black
+    val surface = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f)
+    val service = remember { MessageRequestService() }
+    val scope = rememberCoroutineScope()
+    var automaticFilterEnabled by remember { mutableStateOf(true) }
+    var wordsText by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(true) }
+    var isSaving by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        runCatching { service.loadHiddenWordsPreferences() }
+            .onSuccess { preferences ->
+                automaticFilterEnabled = preferences.first
+                wordsText = preferences.second.joinToString("\n")
+            }
+            .onFailure { errorMessage = it.localizedMessage }
+        isLoading = false
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.message_requests_hidden_words_title),
+                modifier = Modifier.weight(1f),
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = primary,
+            )
+            TextButton(
+                enabled = !isLoading && !isSaving,
+                onClick = {
+                    val words = wordsText
+                        .split(',', '\n')
+                        .map(String::trim)
+                        .filter(String::isNotEmpty)
+                    isSaving = true
+                    errorMessage = null
+                    scope.launch {
+                        runCatching { service.saveHiddenWords(words, automaticFilterEnabled) }
+                            .onSuccess { onDismiss() }
+                            .onFailure {
+                                errorMessage = it.localizedMessage
+                                isSaving = false
+                            }
+                    }
+                },
+            ) {
+                Text(
+                    stringResource(R.string.content_visibility_save),
+                    fontWeight = FontWeight.SemiBold,
+                    color = SettingsProfileColors.accent(isDark),
+                )
+            }
+        }
+
+        if (isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                MomentsCircularProgressIndicator()
+            }
+            return@Column
+        }
+
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.message_requests_hidden_words_automatic),
+                        modifier = Modifier.weight(1f),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = primary,
+                    )
+                    Switch(
+                        checked = automaticFilterEnabled,
+                        onCheckedChange = { automaticFilterEnabled = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = SettingsProfileColors.toggleTint,
+                        ),
+                    )
+                }
+                Text(
+                    stringResource(R.string.message_requests_hidden_words_automatic_description),
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                )
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    stringResource(R.string.message_requests_hidden_words_custom),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = primary,
+                )
+                BasicTextField(
+                    value = wordsText,
+                    onValueChange = { wordsText = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .background(surface, RoundedCornerShape(14.dp))
+                        .padding(14.dp),
+                    textStyle = TextStyle(fontSize = 15.sp, color = primary),
+                    cursorBrush = SolidColor(SettingsProfileColors.accent(isDark)),
+                )
+                Text(
+                    stringResource(R.string.message_requests_hidden_words_custom_description),
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                )
+            }
+
+            errorMessage?.takeIf(String::isNotBlank)?.let { message ->
+                Text(message, fontSize = 13.sp, color = Color.Red)
+            }
+        }
     }
 }
 

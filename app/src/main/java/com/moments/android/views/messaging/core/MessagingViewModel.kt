@@ -17,14 +17,13 @@ import com.moments.android.services.firestore.fetchNewConversationSuggestions
 import com.moments.android.services.firestore.searchUsersUncapped
 import com.moments.android.services.messaging.LocalFirstMessagingSettings
 import com.moments.android.services.messaging.MessageCatchUpService
+import com.moments.android.services.messaging.DirectMessageRoute
+import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.views.messaging.services.ChatDraftStore
 import com.moments.android.views.messaging.services.ChatScrollStateStore
 import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.messaging.services.ChatSessionEngine
-import com.moments.android.views.messaging.services.areMutualFollowers
-import com.moments.android.views.messaging.services.findExistingConversation
-import com.moments.android.views.messaging.services.getOrCreateConversation
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -74,6 +73,7 @@ class MessagingViewModel(
     private var activeSearchQuery: String = ""
     private var activeUserSearchQuery: String = ""
     private val locallyReadConversationIds = mutableSetOf<String>()
+    private val messageRequestService = MessageRequestService()
     private var targetWaitJob: Job? = null
 
     private val currentUserId: String? get() = FirebaseAuth.getInstance().currentUser?.uid
@@ -426,9 +426,9 @@ class MessagingViewModel(
     /**
      * Port de `startConversation(with:from:initialMessage:completion:)`.
      *
-     * Sin mensaje inicial no se crea documento en Firestore: se abre un borrador local y solo se
-     * persiste al enviar el primero. Si no hay conversación previa ni follow mutuo, marca
-     * [requiresMessageRequest] y devuelve null — la UI abre entonces el chat en modo solicitud.
+     * El coordinador autoritativo devuelve conversación, borrador, solicitud saliente o solicitud
+     * entrante. La UI consume [presentationRoute]; [requiresMessageRequest] queda solo como puente
+     * temporal para componentes legacy.
      */
     fun startConversation(
         user: AppUser,
@@ -437,134 +437,106 @@ class MessagingViewModel(
         completion: (Conversation?) -> Unit = {},
     ) {
         requiresMessageRequest = false
-        val trimmedInitial = initialMessage?.trim().orEmpty()
-
-        val existing = conversations.firstOrNull { it.otherParticipantId == user.id && it.id != null }
-        if (existing != null) {
-            if (trimmedInitial.isEmpty()) {
-                selectedConversation = existing
-                completion(existing)
-                return
-            }
-            val conversationId = existing.id
-            if (conversationId == null) {
-                errorMessage = localized(R.string.messaging_error_start_conversation_failed)
-                completion(null)
-                return
-            }
-            viewModelScope.launch {
-                runCatching {
-                    ChatService.sendTextMessage(conversationId, fromUserId, trimmedInitial)
-                }.onSuccess {
-                    val updated = existing.copy(timestamp = Date())
-                    selectedConversation = updated
-                    conversations = conversations.map { if (it.id == conversationId) updated else it }
-                    fetchConversations(fromUserId)
-                    errorMessage = null
-                    requiresMessageRequest = false
-                    completion(updated)
-                }.onFailure { error ->
-                    errorMessage = localized(R.string.messaging_error_send_message, error.message.orEmpty())
-                    requiresMessageRequest = false
-                    completion(null)
-                }
-            }
-            return
-        }
-
+        val trimmed = initialMessage?.trim().orEmpty()
         viewModelScope.launch {
-            val canSend = ChatService.canSendMessage(fromUserId, user.id).getOrDefault(false)
-            if (!canSend) {
-                errorMessage = localized(R.string.messaging_error_cannot_start)
+            runCatching {
+                when (val route = messageRequestService.resolveRoute(user.id, reserve = trimmed.isNotEmpty())) {
+                    is DirectMessageRoute.Conversation -> {
+                        if (trimmed.isNotEmpty()) ChatService.sendTextMessage(route.id, fromUserId, trimmed).getOrThrow()
+                        val conversation = directConversation(route.id, user, fromUserId, trimmed)
+                        selectedConversation = conversation
+                        presentationRoute = MessagingPresentationRoute.Conversation(conversation)
+                        completion(conversation)
+                    }
+                    is DirectMessageRoute.ConversationDraft -> {
+                        val conversationId = if (trimmed.isEmpty()) null else {
+                            messageRequestService.activateConversationDraft(user.id, route.threadId).also { id ->
+                                ChatService.sendTextMessage(id, fromUserId, trimmed).getOrThrow()
+                            }
+                        }
+                        val conversation = directConversation(conversationId, user, fromUserId, trimmed)
+                        selectedConversation = conversation
+                        presentationRoute = MessagingPresentationRoute.Conversation(conversation)
+                        completion(conversation)
+                    }
+                    is DirectMessageRoute.OutgoingRequest -> {
+                        val sent = if (trimmed.isEmpty()) null else {
+                            messageRequestService.appendRequestMessage(user.id, trimmed)
+                        }
+                        val count = sent?.messageCount ?: route.messageCount
+                        val threadId = sent?.threadId ?: route.threadId
+                        val request = if (count > 0) {
+                            runCatching { messageRequestService.loadOutgoingRequest(threadId, user.id) }.getOrNull()
+                                ?: MessageRequest(
+                                    id = threadId,
+                                    senderId = fromUserId,
+                                    receiverId = user.id,
+                                    message = trimmed,
+                                    messageType = MessageType.TEXT,
+                                    messages = sent?.let { result ->
+                                        listOf(
+                                            MessageRequestMessage(
+                                                id = result.messageId,
+                                                senderId = fromUserId,
+                                                content = trimmed,
+                                                timestamp = Date(),
+                                                type = MessageType.TEXT,
+                                                sequence = result.messageCount,
+                                            ),
+                                        )
+                                    }.orEmpty(),
+                                    messageCount = count,
+                                    schemaVersion = 2,
+                                )
+                        } else null
+                        presentationRoute = MessagingPresentationRoute.PendingChat(
+                            PendingChatContext.outgoing(
+                                user = user,
+                                status = if (count > 0) PendingChatContext.Status.OUTGOING_REQUEST_SENT else PendingChatContext.Status.OUTGOING_REQUEST_DRAFT,
+                                initialText = trimmed.ifEmpty { request?.message.orEmpty() },
+                                request = request,
+                            ),
+                        )
+                        completion(null)
+                    }
+                    is DirectMessageRoute.IncomingRequest -> {
+                        if (trimmed.isEmpty()) {
+                            val request = messageRequestService.loadIncomingRequest(route.threadId)
+                            presentationRoute = MessagingPresentationRoute.PendingChat(
+                                PendingChatContextFactory.incoming(request, fromUserId),
+                            )
+                            completion(null)
+                        } else {
+                            val accepted = messageRequestService.acceptIncomingThread(route.threadId)
+                            ChatService.sendTextMessage(accepted.conversationId, fromUserId, trimmed).getOrThrow()
+                            val conversation = directConversation(accepted.conversationId, user, fromUserId, trimmed)
+                            selectedConversation = conversation
+                            presentationRoute = MessagingPresentationRoute.Conversation(conversation)
+                            completion(conversation)
+                        }
+                    }
+                }
+            }.onSuccess {
+                errorMessage = null
+                requiresMessageRequest = false
+            }.onFailure { error ->
+                errorMessage = error.localizedMessage
                 requiresMessageRequest = false
                 completion(null)
-                return@launch
             }
-
-            if (trimmedInitial.isEmpty()) {
-                // Si ya existe conversación (aunque esté "borrada" o no cargada en la lista local)
-                // se abre directa: no se exige solicitud nueva.
-                val existingId = ChatService.findExistingConversation(fromUserId, user.id).getOrNull()
-                if (existingId != null) {
-                    val conversation = Conversation(
-                        id = existingId,
-                        participants = listOf(fromUserId, user.id).sorted(),
-                        lastMessage = "",
-                        timestamp = Date(),
-                        readStatus = mapOf(fromUserId to true, user.id to false),
-                        otherParticipantId = user.id,
-                        otherParticipantUsername = user.username,
-                        otherParticipantProfileImagePath = user.profileImagePath,
-                    )
-                    selectedConversation = conversation
-                    errorMessage = null
-                    requiresMessageRequest = false
-                    completion(conversation)
-                    return@launch
-                }
-
-                // Sin conversación previa: follow mutuo → borrador local; si no → solicitud.
-                val mutual = runCatching { ChatService.areMutualFollowers(fromUserId, user.id) }.getOrDefault(false)
-                if (mutual) {
-                    val draft = Conversation(
-                        id = null,
-                        participants = listOf(fromUserId, user.id).sorted(),
-                        lastMessage = "",
-                        timestamp = Date(),
-                        readStatus = mapOf(fromUserId to true, user.id to false),
-                        otherParticipantId = user.id,
-                        otherParticipantUsername = user.username,
-                        otherParticipantProfileImagePath = user.profileImagePath,
-                    )
-                    selectedConversation = draft
-                    errorMessage = null
-                    requiresMessageRequest = false
-                    completion(draft)
-                } else {
-                    errorMessage = localized(R.string.messaging_error_message_request_required)
-                    requiresMessageRequest = true
-                    completion(null)
-                }
-                return@launch
-            }
-
-            ChatService.getOrCreateConversation(fromUserId, user.id, initialMessage)
-                .onSuccess { conversationId ->
-                    val conversation = Conversation(
-                        id = conversationId,
-                        participants = listOf(fromUserId, user.id).sorted(),
-                        lastMessage = trimmedInitial,
-                        timestamp = Date(),
-                        readStatus = mapOf(fromUserId to true, user.id to false),
-                        otherParticipantId = user.id,
-                        otherParticipantUsername = user.username,
-                        otherParticipantProfileImagePath = user.profileImagePath,
-                    )
-                    selectedConversation = conversation
-                    if (conversations.none { it.id == conversationId }) {
-                        conversations = listOf(conversation) + conversations
-                    }
-                    fetchConversations(fromUserId)
-                    errorMessage = null
-                    requiresMessageRequest = false
-                    completion(conversation)
-                }
-                .onFailure { error ->
-                    // El backend rechaza por falta de follow mutuo → hace falta solicitud.
-                    val message = error.message.orEmpty().lowercase()
-                    if (message.contains("403") || message.contains("mutual") ||
-                        message.contains("no siguen mutuamente") || message.contains("solicitud")
-                    ) {
-                        errorMessage = localized(R.string.messaging_error_message_request_required)
-                        requiresMessageRequest = true
-                    } else {
-                        errorMessage = localized(R.string.messaging_error_create_conversation, error.message.orEmpty())
-                        requiresMessageRequest = false
-                    }
-                    completion(null)
-                }
         }
     }
+
+    private fun directConversation(id: String?, user: AppUser, currentUserId: String, lastMessage: String) = Conversation(
+        id = id,
+        participants = listOf(currentUserId, user.id).sorted(),
+        lastMessage = lastMessage,
+        timestamp = Date(),
+        readStatus = mapOf(currentUserId to true, user.id to false),
+        otherParticipantId = user.id,
+        otherParticipantUsername = user.username,
+        otherParticipantProfileImagePath = user.profileImagePath,
+    )
 
     // MARK: - Acciones sobre conversaciones
 

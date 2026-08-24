@@ -248,8 +248,8 @@ private fun relationshipText(context: PendingChatContext): String {
             stringResource(R.string.chat_intro_relationship_viewer_follows_since, username, yearString(context.viewerFollowedAt))
         context.viewerFollowsOther == true -> stringResource(R.string.chat_intro_relationship_viewer_follows, username)
         context.otherFollowsViewer == true && context.otherFollowedViewerAt != null ->
-            stringResource(R.string.chat_intro_relationship_other_follows_since, username, yearString(context.otherFollowedViewerAt))
-        context.otherFollowsViewer == true -> stringResource(R.string.chat_intro_relationship_other_follows, username)
+            stringResource(R.string.chat_intro_relationship_other_follows_viewer_since, username, yearString(context.otherFollowedViewerAt))
+        context.otherFollowsViewer == true -> stringResource(R.string.chat_intro_relationship_other_follows_viewer, username)
         else -> stringResource(R.string.chat_intro_relationship_not_mutual)
     }
 }
@@ -260,6 +260,7 @@ private fun yearString(date: Date): String = Calendar.getInstance().apply { time
 fun ChatRequestInviteNotice(
     displayName: String,
     username: String,
+    messageCount: Int = 0,
     adaptiveColors: com.moments.android.views.feed.AdaptiveColors,
     modifier: Modifier = Modifier,
 ) {
@@ -274,6 +275,7 @@ fun ChatRequestInviteNotice(
         androidx.compose.foundation.layout.Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(stringResource(R.string.chat_request_invite_title, displayName, username), color = adaptiveColors.primary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             Text(stringResource(R.string.chat_request_invite_body), color = adaptiveColors.secondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text("$messageCount/5", color = adaptiveColors.secondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

@@ -113,6 +113,15 @@ fun GlassmorphicChatRenderRow(
             adaptiveColors,
             modifier.chatMenuDimmedWhenOpen(menuOpen).padding(horizontal = 14.dp, vertical = 4.dp),
         )
+        is ChatRenderRow.IncomingRequestActions -> IncomingRequestActionBar(
+            isLoading = row.isLoading,
+            onAccept = {},
+            onDelete = {},
+            onBlock = {},
+            onReport = {},
+            modifier = modifier,
+        )
+        is ChatRenderRow.OutgoingRequestControls -> Unit
         is ChatRenderRow.Header -> GlassmorphicDateHeader(
             row.date,
             modifier.chatMenuDimmedWhenOpen(menuOpen).padding(vertical = 10.dp),

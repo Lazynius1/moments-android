@@ -1683,12 +1683,26 @@ open class EnhancedChatViewModel(
         scope.launch { chatService.editMessage(conversationId, message.id, newContent).onFailure { _error.value = it.message } }
     }
 
-    fun forwardTextMessage(message: EnhancedMessage, toUserIds: Set<String>) {
+    fun forwardTextMessage(
+        message: EnhancedMessage,
+        toUserIds: Set<String>,
+        completion: (List<com.moments.android.views.messaging.services.MessageRecipientDeliveryResult>) -> Unit = {},
+    ) {
         if (conversationId.isBlank() || !ChatMessagePolicy.canForward(message, currentUserId, _forwardingPreferences.value) || toUserIds.isEmpty()) return
         val encryptedContent = message.content ?: return
         scope.launch {
-            val plaintext = chatService.decryptMessageContent(encryptedContent, conversationId)
-            chatService.forwardTextMessage(plaintext, toUserIds, currentUserId).onFailure { _error.value = it.message }
+            runCatching {
+                val plaintext = chatService.decryptMessageContent(encryptedContent, conversationId)
+                chatService.forwardTextMessage(plaintext, toUserIds, currentUserId)
+            }.onSuccess { results ->
+                results.firstOrNull { !it.isSuccess }?.error?.let { _error.value = it.message }
+                completion(results)
+            }.onFailure { error ->
+                _error.value = error.message
+                completion(toUserIds.map { recipientId ->
+                    com.moments.android.views.messaging.services.MessageRecipientDeliveryResult(recipientId, error)
+                })
+            }
         }
     }
 

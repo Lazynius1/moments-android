@@ -18,6 +18,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Message
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -50,6 +52,7 @@ import com.moments.android.utilities.momentsEmptyStateAppear
 import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.core.MessageRequest
+import com.moments.android.views.messaging.core.MessageRequestFolder
 
 /**
  * Port de `Views/Messaging/Screens/MessageRequestsView.swift`.
@@ -68,7 +71,15 @@ fun MessageRequestsView(
     val requestService = service ?: ownedService
     val ownsListeners = service == null
     val requests by requestService.pendingRequests.collectAsState()
+    val oldRequests by requestService.oldRequests.collectAsState()
+    val hiddenRequests by requestService.hiddenRequests.collectAsState()
+    var selectedFolder by remember { mutableStateOf(MessageRequestFolder.NORMAL) }
     var actionRequest by remember { mutableStateOf<MessageRequest?>(null) }
+    val displayedRequests = when (selectedFolder) {
+        MessageRequestFolder.NORMAL -> requests
+        MessageRequestFolder.OLD -> oldRequests
+        MessageRequestFolder.HIDDEN -> hiddenRequests
+    }
 
     DisposableEffect(requestService, ownsListeners) {
         FirebaseAuth.getInstance().currentUser?.uid?.let(requestService::listenToPendingRequests)
@@ -82,11 +93,12 @@ fun MessageRequestsView(
             .fillMaxSize()
             .background(colors.surfaceBackground),
     ) {
-        if (requests.isNotEmpty()) {
+        MessageRequestFolderPicker(selectedFolder) { selectedFolder = it }
+        if (selectedFolder == MessageRequestFolder.NORMAL && requests.isNotEmpty()) {
             RequestCountHeader(count = requests.size, colors = colors)
         }
-        if (requests.isEmpty()) {
-            MessageRequestsEmptyState(colors = colors, modifier = Modifier.weight(1f))
+        if (displayedRequests.isEmpty()) {
+            MessageRequestsEmptyState(selectedFolder, colors, modifier = Modifier.weight(1f))
         } else {
             LazyColumn(
                 Modifier
@@ -94,7 +106,7 @@ fun MessageRequestsView(
                     .padding(top = 2.dp, bottom = 24.dp),
             ) {
                 items(
-                    requests,
+                    displayedRequests,
                     key = { it.id ?: "${it.senderId}_${it.timestamp.time}" },
                 ) { request ->
                     RequestListRow(
@@ -122,7 +134,47 @@ fun MessageRequestsView(
                 requestService.blockUser(request) { }
                 actionRequest = null
             },
+            onReport = {
+                requestService.reportRequest(request) { }
+                actionRequest = null
+            },
+            onMove = {
+                requestService.moveRequest(
+                    request,
+                    if (selectedFolder == MessageRequestFolder.HIDDEN) MessageRequestFolder.NORMAL else MessageRequestFolder.HIDDEN,
+                ) { }
+                actionRequest = null
+            },
+            moveToRequests = selectedFolder == MessageRequestFolder.HIDDEN,
         )
+    }
+}
+
+@Composable
+private fun MessageRequestFolderPicker(
+    selected: MessageRequestFolder,
+    onSelect: (MessageRequestFolder) -> Unit,
+) {
+    val colors = rememberAdaptiveColors()
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        listOf(
+            MessageRequestFolder.NORMAL to R.string.message_requests_folder_requests,
+            MessageRequestFolder.OLD to R.string.message_requests_folder_old,
+            MessageRequestFolder.HIDDEN to R.string.message_requests_folder_hidden,
+        ).forEach { (folder, title) ->
+            val active = folder == selected
+            Box(
+                Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                    .background(if (active) colors.primary.copy(alpha = .12f) else colors.secondary.copy(alpha = .06f))
+                    .clickable { onSelect(folder) }.padding(vertical = 9.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(stringResource(title), color = if (active) colors.primary else colors.secondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            }
+        }
     }
 }
 
@@ -148,6 +200,7 @@ private fun RequestCountHeader(count: Int, colors: AdaptiveColors) {
 
 @Composable
 private fun MessageRequestsEmptyState(
+    folder: MessageRequestFolder,
     colors: AdaptiveColors,
     modifier: Modifier = Modifier,
 ) {
@@ -161,20 +214,32 @@ private fun MessageRequestsEmptyState(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Icon(
-            Icons.Outlined.Message,
+            when (folder) {
+                MessageRequestFolder.NORMAL -> Icons.Outlined.Message
+                MessageRequestFolder.OLD -> Icons.Outlined.Archive
+                MessageRequestFolder.HIDDEN -> Icons.Outlined.VisibilityOff
+            },
             contentDescription = null,
             tint = colors.secondary.copy(alpha = 0.72f),
             modifier = Modifier.size(28.dp),
         )
         Text(
-            stringResource(R.string.message_requests_empty_title),
+            stringResource(when (folder) {
+                MessageRequestFolder.NORMAL -> R.string.message_requests_empty_title
+                MessageRequestFolder.OLD -> R.string.message_requests_old_empty_title
+                MessageRequestFolder.HIDDEN -> R.string.message_requests_hidden_empty_title
+            }),
             color = colors.primary,
             fontWeight = FontWeight.SemiBold,
             fontSize = 16.sp,
             textAlign = TextAlign.Center,
         )
         Text(
-            stringResource(R.string.message_requests_empty_description),
+            stringResource(when (folder) {
+                MessageRequestFolder.NORMAL -> R.string.message_requests_empty_description
+                MessageRequestFolder.OLD -> R.string.message_requests_old_empty_description
+                MessageRequestFolder.HIDDEN -> R.string.message_requests_hidden_empty_description
+            }),
             color = colors.secondary,
             fontWeight = FontWeight.Medium,
             fontSize = 13.sp,
@@ -190,6 +255,9 @@ private fun MessageRequestActionDialog(
     onAccept: () -> Unit,
     onDelete: () -> Unit,
     onBlock: () -> Unit,
+    onReport: () -> Unit,
+    onMove: () -> Unit,
+    moveToRequests: Boolean,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -205,6 +273,12 @@ private fun MessageRequestActionDialog(
                         stringResource(R.string.message_requests_delete),
                         color = androidx.compose.ui.graphics.Color(0xFFFF3B30),
                     )
+                }
+                TextButton(onClick = onMove) {
+                    Text(stringResource(if (moveToRequests) R.string.message_requests_move_to_requests else R.string.message_requests_move_to_hidden))
+                }
+                TextButton(onClick = onReport) {
+                    Text(stringResource(R.string.message_requests_report), color = androidx.compose.ui.graphics.Color(0xFFFF3B30))
                 }
                 TextButton(onClick = onBlock) {
                     Text(
@@ -230,7 +304,7 @@ fun RequestListRow(
 ) {
     val colors = rememberAdaptiveColors()
     val context = LocalContext.current
-    val relativeTime = MomentsFormat.relativeTime(from = request.timestamp)
+    val relativeTime = MomentsFormat.relativeTime(from = request.lastActivityAt)
 
     Row(
         modifier
@@ -283,6 +357,12 @@ fun RequestListRow(
                     fontSize = 14.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${request.messageCount}/5",
+                    color = colors.secondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
             Text(

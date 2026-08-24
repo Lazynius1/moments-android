@@ -199,6 +199,10 @@ fun FeedPostProfilePreviewOverlay(
                         onPresentMessages()
                         return@launch
                     }
+                    if (messagingViewModel.presentationRoute != null) {
+                        onPresentMessages()
+                        return@launch
+                    }
                     if (!messagingViewModel.requiresMessageRequest) return@launch
                     val context = PendingChatContextFactory.outgoing(
                         user = user,

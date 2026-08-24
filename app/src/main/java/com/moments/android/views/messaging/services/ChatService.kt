@@ -30,6 +30,8 @@ import com.moments.android.services.firestore.shouldQueueFirestoreOutbox
 import com.moments.android.services.incognito.IncognitoModeService
 import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.messaging.EncryptionService
+import com.moments.android.services.messaging.DirectMessageRoute
+import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.messaging.LocalFirstMessagingSettings
 import com.moments.android.services.messaging.VanishMessageTimer
 import com.moments.android.services.persistence.LocalPersistenceService
@@ -369,12 +371,18 @@ object ChatService {
     fun isConversationArchived(conversationId: String, userId: String = ""): Boolean =
         archivedConversationIds.contains(conversationId)
 
-    /** ≡ `materializeConversation(with:from:)` — encuentra o crea con E2E. */
+    /** Materializa un borrador exclusivamente mediante el coordinador autoritativo V2. */
     suspend fun materializeConversation(otherUserId: String, currentUserId: String): Result<String> = runCatching {
         require(otherUserId.isNotBlank() && currentUserId.isNotBlank())
-        val existing = findExistingConversation(currentUserId, otherUserId).getOrThrow()
-        if (existing != null) return@runCatching existing
-        createBidirectionalConversation(currentUserId, otherUserId).getOrThrow()
+        val coordinator = MessageRequestService()
+        when (val route = coordinator.resolveRoute(otherUserId)) {
+            is DirectMessageRoute.Conversation -> route.id
+            is DirectMessageRoute.ConversationDraft ->
+                coordinator.activateConversationDraft(otherUserId, route.threadId)
+            is DirectMessageRoute.IncomingRequest ->
+                coordinator.acceptIncomingThread(route.threadId).conversationId
+            is DirectMessageRoute.OutgoingRequest -> throw MessageRequestRequiredException()
+        }
     }
 
     suspend fun decryptMessageContent(content: String, conversationId: String): String =

@@ -62,8 +62,10 @@ import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -148,8 +150,12 @@ import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.messaging.components.GlassmorphicAvatar
 import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.messaging.services.sendSharedMomentMessage
+import com.moments.android.services.messaging.DirectMessageRoute
+import com.moments.android.services.messaging.MessageRequestInteractionContext
+import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.views.story.StoryRingAvatarView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -832,6 +838,7 @@ fun ModernShareSheet(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val author = UserCacheService.getCachedUser(moment.authorId)?.username ?: moment.username
+    var deliveryFeedback by remember { mutableStateOf<String?>(null) }
 
     ShareRecipientsPickerSheet(
         title = stringResource(R.string.share_send_to),
@@ -839,7 +846,7 @@ fun ModernShareSheet(
         showsBackButton = true,
         onBack = onBack,
         onDismiss = onDismiss,
-        onSend = { selectedUsers, conversations ->
+        onSend = { selectedUsers, _ ->
             val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return@ShareRecipientsPickerSheet
             if (moment.id.isBlank()) return@ShareRecipientsPickerSheet
             val freshUsername = UserCacheService.getCachedUser(moment.authorId)?.username ?: moment.username
@@ -847,23 +854,59 @@ fun ModernShareSheet(
             val momentUrl = buildMomentShareUrl(moment)
             val momentModel = moment.toShareMoment()
             scope.launch {
+                val coordinator = MessageRequestService()
+                val failures = mutableListOf<String>()
                 for (userId in selectedUsers) {
-                    val existingConv = conversations.firstOrNull { it.otherParticipantId == userId }
-                    runCatching {
-                        ChatService.sendSharedMomentMessage(
-                            conversationId = existingConv?.id.orEmpty(),
-                            senderId = currentUserId,
-                            moment = momentModel,
-                            shareText = shareText,
-                            momentUrl = momentUrl,
-                        )
+                    if (userId.isBlank()) {
+                        failures += context.getString(R.string.messaging_error_invalid_recipient)
+                        continue
                     }
+                    runCatching {
+                        val interaction = MessageRequestInteractionContext(
+                            kind = MessageRequestInteractionContext.Kind.SHARE_MOMENT,
+                            sharedContentId = moment.id,
+                            sharedContentOwnerId = moment.authorId,
+                        )
+                        when (val route = coordinator.resolveRoute(userId, interaction)) {
+                            is DirectMessageRoute.Conversation -> route.id
+                            is DirectMessageRoute.ConversationDraft -> coordinator.activateConversationDraft(userId, route.threadId)
+                            is DirectMessageRoute.IncomingRequest -> coordinator.acceptIncomingThread(route.threadId).conversationId
+                            is DirectMessageRoute.OutgoingRequest -> {
+                                coordinator.appendRequestMessage(
+                                    receiverId = userId,
+                                    text = shareText,
+                                    messageType = MessageType.SHARED_MOMENT,
+                                    interaction = interaction,
+                                )
+                                null
+                            }
+                        }?.let { conversationId ->
+                            ChatService.sendSharedMomentMessage(
+                                conversationId = conversationId,
+                                senderId = currentUserId,
+                                moment = momentModel,
+                                shareText = shareText,
+                                momentUrl = momentUrl,
+                            ).getOrThrow()
+                        }
+                    }.onFailure { failures += it.localizedMessage ?: context.getString(R.string.common_error) }
                 }
-                HapticManager.shared.success()
-                onDismiss()
+                if (selectedUsers.isNotEmpty() && failures.isEmpty()) {
+                    HapticManager.shared.success()
+                    onDismiss()
+                } else {
+                    deliveryFeedback = failures.firstOrNull() ?: context.getString(R.string.common_error)
+                }
             }
         },
     )
+    deliveryFeedback?.let { message ->
+        AlertDialog(
+            onDismissRequest = { deliveryFeedback = null },
+            text = { Text(message) },
+            confirmButton = { TextButton(onClick = { deliveryFeedback = null }) { Text(stringResource(R.string.common_ok)) } },
+        )
+    }
 }
 
 private fun FeedMoment.toShareMoment(): Moment = Moment(
@@ -1853,10 +1896,12 @@ fun SharedMomentMessageBubble(
 ) {
     var canViewMoment by remember(message.id) { mutableStateOf<Boolean?>(null) }
     var isLoading by remember(message.id) { mutableStateOf(true) }
+    var displayData by remember(message.id) { mutableStateOf(message.sharedMomentData) }
     val firestore = remember { FirestoreService() }
 
     LaunchedEffect(message.id, message.sharedMomentData) {
         val data = message.sharedMomentData
+        displayData = data
         val momentId = data?.get("momentId")
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
         if (data == null || momentId.isNullOrBlank() || currentUserId.isNullOrBlank()) {
@@ -1866,7 +1911,23 @@ fun SharedMomentMessageBubble(
         }
         val authorId = data["momentAuthorId"]?.takeIf { it.isNotBlank() } ?: message.senderId
         if (authorId == currentUserId) {
-            canViewMoment = true
+            val ownMoment = runCatching { firestore.fetchMoment(momentId, authorId) }.getOrNull()
+            if (ownMoment != null) {
+                val author = UserCacheService.getCachedUser(ownMoment.authorId)?.username ?: ownMoment.username
+                displayData = data + mapOf(
+                    "momentId" to ownMoment.id.orEmpty(),
+                    "momentAuthor" to author,
+                    "momentAuthorId" to ownMoment.authorId,
+                    "momentContent" to ownMoment.content,
+                    "momentImageUrl" to (ownMoment.thumbnailUrl ?: ownMoment.imagePath).orEmpty(),
+                    "momentAspectRatio" to (ownMoment.aspectRatio ?: "1:1"),
+                    "momentVideoUrl" to ownMoment.videoUrl.orEmpty(),
+                    "momentTimestamp" to (ownMoment.timestamp.time / 1000.0).toString(),
+                )
+                canViewMoment = true
+            } else {
+                canViewMoment = false
+            }
             isLoading = false
             return@LaunchedEffect
         }
@@ -1877,6 +1938,19 @@ fun SharedMomentMessageBubble(
             return@LaunchedEffect
         }
         canViewMoment = PrivacyService.canUserViewMomentEnhanced(moment, currentUserId)
+        if (canViewMoment == true) {
+            val author = UserCacheService.getCachedUser(moment.authorId)?.username ?: moment.username
+            displayData = data + mapOf(
+                "momentId" to moment.id.orEmpty(),
+                "momentAuthor" to author,
+                "momentAuthorId" to moment.authorId,
+                "momentContent" to moment.content,
+                "momentImageUrl" to (moment.thumbnailUrl ?: moment.imagePath).orEmpty(),
+                "momentAspectRatio" to (moment.aspectRatio ?: "1:1"),
+                "momentVideoUrl" to moment.videoUrl.orEmpty(),
+                "momentTimestamp" to (moment.timestamp.time / 1000.0).toString(),
+            )
+        }
         isLoading = false
     }
 
@@ -1888,19 +1962,19 @@ fun SharedMomentMessageBubble(
                     .widthIn(max = 280.dp)
                     .padding(vertical = 4.dp),
             )
-            canViewMoment == true && message.sharedMomentData != null -> {
+            canViewMoment == true && displayData != null -> {
                 Box(
                     Modifier.padding(vertical = 4.dp),
                 ) {
                     MomentBubbleContent(
                         content = null,
-                        sharedMomentData = message.sharedMomentData!!,
+                        sharedMomentData = displayData!!,
                         isCurrentUser = isCurrentUser,
                     )
                 }
             }
             else -> BlockedMomentBubble(
-                sharedMomentData = message.sharedMomentData,
+                sharedMomentData = displayData,
                 modifier = Modifier
                     .widthIn(max = 280.dp)
                     .padding(vertical = 4.dp),

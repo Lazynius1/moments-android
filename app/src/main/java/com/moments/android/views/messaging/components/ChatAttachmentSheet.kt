@@ -325,6 +325,7 @@ fun ChatAttachmentMenuPopover(
     isPresented: ChatAttachmentSheetKind?,
     anchorBounds: IntRect?,
     canSendBuzz: Boolean,
+    ephemeralOnly: Boolean = false,
     onDismiss: () -> Unit,
     onOpenCamera: () -> Unit,
     onSendBuzz: () -> Unit,
@@ -383,6 +384,7 @@ fun ChatAttachmentMenuPopover(
                 val y = max(0f, localTop - gapPx - cardHeight)
                 ChatAttachmentMenuPopoverCard(
                     canSendBuzz = canSendBuzz,
+                    ephemeralOnly = ephemeralOnly,
                     onOpenCamera = {
                         onDismiss()
                         onOpenCamera()
@@ -408,6 +410,7 @@ fun ChatAttachmentMenuPopover(
 @Composable
 private fun ChatAttachmentMenuPopoverCard(
     canSendBuzz: Boolean,
+    ephemeralOnly: Boolean,
     onOpenCamera: () -> Unit,
     onSendBuzz: () -> Unit,
     onSheetSelected: (ChatAttachmentSheetKind) -> Unit,
@@ -426,20 +429,22 @@ private fun ChatAttachmentMenuPopoverCard(
             .padding(vertical = 10.dp, horizontal = 12.dp),
     ) {
         ChatAttachmentMenuRow(AttachmentIcon.CAMERA, R.string.chat_attachment_camera, textColor, circleFill, onOpenCamera)
-        ChatAttachmentMenuRow(AttachmentIcon.PHOTOS, R.string.chat_attachment_photos, textColor, circleFill, onClick = { onSheetSelected(ChatAttachmentSheetKind.PHOTOS) })
-        if (canSendBuzz) {
-            ChatAttachmentMenuRow(AttachmentIcon.BUZZ, R.string.chat_attachment_buzz, textColor, circleFill, onSendBuzz)
+        if (!ephemeralOnly) {
+            ChatAttachmentMenuRow(AttachmentIcon.PHOTOS, R.string.chat_attachment_photos, textColor, circleFill, onClick = { onSheetSelected(ChatAttachmentSheetKind.PHOTOS) })
+            if (canSendBuzz) {
+                ChatAttachmentMenuRow(AttachmentIcon.BUZZ, R.string.chat_attachment_buzz, textColor, circleFill, onSendBuzz)
+            }
+            ChatAttachmentMenuRow(AttachmentIcon.GIF, R.string.chat_attachment_gif, textColor, circleFill, onClick = { onSheetSelected(ChatAttachmentSheetKind.GIF) })
+            ChatAttachmentMenuRow(
+                icon = null,
+                customIconRes = R.drawable.moments_sticker_tool,
+                titleRes = R.string.chat_attachment_sticker,
+                textColor = textColor,
+                circleFill = circleFill,
+                onClick = { onSheetSelected(ChatAttachmentSheetKind.STICKER) },
+            )
+            ChatAttachmentMenuRow(AttachmentIcon.LOCATION, R.string.chat_attachment_location, textColor, circleFill, onClick = { onSheetSelected(ChatAttachmentSheetKind.LOCATION) })
         }
-        ChatAttachmentMenuRow(AttachmentIcon.GIF, R.string.chat_attachment_gif, textColor, circleFill, onClick = { onSheetSelected(ChatAttachmentSheetKind.GIF) })
-        ChatAttachmentMenuRow(
-            icon = null,
-            customIconRes = R.drawable.moments_sticker_tool,
-            titleRes = R.string.chat_attachment_sticker,
-            textColor = textColor,
-            circleFill = circleFill,
-            onClick = { onSheetSelected(ChatAttachmentSheetKind.STICKER) },
-        )
-        ChatAttachmentMenuRow(AttachmentIcon.LOCATION, R.string.chat_attachment_location, textColor, circleFill, onClick = { onSheetSelected(ChatAttachmentSheetKind.LOCATION) })
     }
 }
 

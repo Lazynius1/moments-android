@@ -203,6 +203,7 @@ fun MessagingView(
     fun consumePresentationRoute() {
         val route = viewModel.presentationRoute ?: return
         viewModel.presentationRoute = null
+        showingNewConversation = false
         when (route) {
             is MessagingPresentationRoute.Conversation -> viewModel.openConversation(route.conversation)
             is MessagingPresentationRoute.PendingChat -> pendingChatContext = route.context

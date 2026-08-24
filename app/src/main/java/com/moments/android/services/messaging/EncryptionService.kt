@@ -760,10 +760,16 @@ object EncryptionService {
     suspend fun decryptChatMessage(encryptedText: String, conversationId: String): String? {
         if (!isEncryptionEnabled) return encryptedText
         return runCatching {
-            requireInitialized()
-            val key = getConversationKey(conversationId)
-            decryptText(encryptedText, key)
+            decryptChatMessageStrict(encryptedText, conversationId)
         }.getOrDefault(encryptedText)
+    }
+
+    /** Solicitudes V2: nunca representa el ciphertext como contenido del usuario. */
+    suspend fun decryptChatMessageStrict(encryptedText: String, conversationId: String): String {
+        requireInitialized()
+        if (!isEncryptionEnabled) throw EncryptionError.DecryptionFailed
+        val key = getConversationKey(conversationId)
+        return decryptText(encryptedText, key)
     }
 
     // MARK: - Internals
@@ -814,13 +820,35 @@ object EncryptionService {
             val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
                 ?: throw EncryptionError.KeyNotFound
 
-            val snapshot = db.collection("conversations").document(conversationId).get().await()
-            val data = snapshot.data ?: throw EncryptionError.KeyNotFound
+            // Antes de aceptar, una ruta puede devolver permission-denied. Cada
+            // lectura debe fallar de forma independiente para poder probar las otras.
+            var data = runCatching {
+                db.collection("conversations").document(conversationId).get().await().data
+            }.getOrNull()
+            if (data == null) {
+                data = runCatching {
+                    db.collection("users").document(currentUserId)
+                        .collection("messageRequestOutbox").document(conversationId).get().await().data
+                }.getOrNull()
+            }
+            if (data == null) {
+                data = runCatching {
+                    db.collection("messageRequests").document(conversationId).get().await().data
+                }.getOrNull()
+            }
+            data ?: throw EncryptionError.KeyNotFound
 
             val wrappedKeys = data["wrappedKeys"] as? Map<String, Any>
             val wrappedKeyMap = wrappedKeys?.get(currentUserId) as? Map<String, Any>
             if (wrappedKeyMap != null) {
                 val wrapped = WrappedConversationKey.from(wrappedKeyMap)
+                    ?: throw EncryptionError.DecryptionFailed
+                return@withContext unwrapConversationKey(wrapped, currentUserId)
+            }
+
+            val outboxWrappedKey = data["wrappedKey"] as? Map<String, Any>
+            if (outboxWrappedKey != null) {
+                val wrapped = WrappedConversationKey.from(outboxWrappedKey)
                     ?: throw EncryptionError.DecryptionFailed
                 return@withContext unwrapConversationKey(wrapped, currentUserId)
             }
@@ -913,6 +941,20 @@ object EncryptionService {
             wrappedKeys[participantId] = wrapped.asFirestoreData()
         }
         return wrappedKeys
+    }
+
+    suspend fun prepareMessageRequestKey(
+        threadId: String,
+        participantIds: List<String>,
+        wrappedBy: String,
+    ): Map<String, Map<String, Any>> {
+        if (threadId.isBlank() || participantIds.size != 2) throw EncryptionError.InvalidInput
+        val key = CryptoHelpers.randomBytes(32)
+        val wrapped = buildWrappedConversationKeys(participantIds, key, wrappedBy)
+        if (wrapped.size != participantIds.size) throw EncryptionError.PeerKeyUnavailable
+        conversationKeyCache[threadId] = key
+        EncryptionKeyStore.store(CONVERSATION_KEYS_PREFIX + threadId, key)
+        return wrapped
     }
 
     /**

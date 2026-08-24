@@ -63,6 +63,7 @@ import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.messaging.components.ChatRecoveryGateView
 import com.moments.android.views.messaging.core.Conversation
+import com.moments.android.views.messaging.core.MessagingPresentationRoute
 import com.moments.android.views.messaging.core.MessagingViewModel
 import com.moments.android.views.messaging.core.PendingChatContext
 import com.moments.android.views.messaging.core.PendingChatContextFactory
@@ -379,16 +380,26 @@ fun UserProfileView(
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return@openMessage
         val targetUser = viewModel.userProfile ?: return@openMessage
         messagingViewModel.startConversation(targetUser, currentUserId) { conversation ->
-            if (conversation != null) {
-                targetConversation = conversation
-            } else if (messagingViewModel.requiresMessageRequest) {
-                scope.launch {
-                    pendingChatContext = PendingChatContextFactory.outgoing(
-                        user = targetUser,
-                        currentUserId = currentUserId,
-                        followersCountOverride = viewModel.followers.size,
-                        momentsCountOverride = viewModel.moments.size,
-                    )
+            when (val route = messagingViewModel.presentationRoute) {
+                is MessagingPresentationRoute.Conversation -> {
+                    messagingViewModel.presentationRoute = null
+                    targetConversation = route.conversation
+                }
+                is MessagingPresentationRoute.PendingChat -> {
+                    messagingViewModel.presentationRoute = null
+                    pendingChatContext = route.context
+                }
+                null -> if (conversation != null) {
+                    targetConversation = conversation
+                } else if (messagingViewModel.requiresMessageRequest) {
+                    scope.launch {
+                        pendingChatContext = PendingChatContextFactory.outgoing(
+                            user = targetUser,
+                            currentUserId = currentUserId,
+                            followersCountOverride = viewModel.followers.size,
+                            momentsCountOverride = viewModel.moments.size,
+                        )
+                    }
                 }
             }
         }

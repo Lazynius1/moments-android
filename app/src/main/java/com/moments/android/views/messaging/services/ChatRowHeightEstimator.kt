@@ -67,6 +67,8 @@ object ChatRowHeightEstimator {
                     maxOf(46.dp, textHeight(text, bubbleWidth, minAvailableWidth = 80f) + 6.dp)
                 }
             }
+            is ChatRenderRow.IncomingRequestActions -> 178.dp
+            is ChatRenderRow.OutgoingRequestControls -> 82.dp
             is ChatRenderRow.Header -> headerHeight
             is ChatRenderRow.Buzz -> buzzHeight
             ChatRenderRow.Typing -> typingHeight

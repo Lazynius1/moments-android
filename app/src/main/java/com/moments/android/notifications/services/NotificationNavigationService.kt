@@ -88,6 +88,7 @@ object NotificationNavigationService {
                 }
                 navigateToConversation(conversationId)
             }
+            "messageRequestV2" -> AppRouter.navigate(AppRouter.Destination.ShowMessages)
             "chat_buzz" -> {
                 val conversationId = userInfo["conversationId"] as? String ?: return
                 val buzzEventId = firstString(userInfo, listOf("buzzEventId"))
@@ -178,6 +179,7 @@ object NotificationNavigationService {
         "follow_request" -> "followRequest"
         "new_message" -> "message"
         "message_reaction" -> "messageReaction"
+        "message_request_v2" -> "messageRequestV2"
         "chat_buzz" -> "chat_buzz"
         "photo_tag" -> "photoTag"
         "media_moderation" -> "mediaModeration"

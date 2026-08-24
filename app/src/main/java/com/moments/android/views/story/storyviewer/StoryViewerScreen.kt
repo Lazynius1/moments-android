@@ -604,13 +604,13 @@ fun StoryViewerScreen(
         messageText = ""
         isTextFieldFocused = false
         focusManager.clearFocus()
-        storyViewModel?.sendMessage(story.authorId, storyId, text) { ok ->
-            if (ok) {
+        storyViewModel?.sendMessage(story.authorId, storyId, text) { result ->
+            result.onSuccess {
                 onSendMessage(text)
                 showSuccess(context.getString(R.string.stories_message_sent))
-            } else {
+            }.onFailure { error ->
                 messageText = text
-                showSuccess(context.getString(R.string.story_context_menu_action_failed))
+                showSuccess(error.localizedMessage ?: context.getString(R.string.story_context_menu_action_failed))
             }
         } ?: run {
             onSendMessage(text)
@@ -708,12 +708,12 @@ fun StoryViewerScreen(
                 resumeStoryPlayback()
                 return@launch
             }
-            storyViewModel?.sendEphemeralMoment(story.authorId, storyId, bytes) { ok ->
-                showSuccess(
-                    context.getString(
-                        if (ok) R.string.stories_moment_sent else R.string.story_context_menu_action_failed,
-                    ),
-                )
+            storyViewModel?.sendEphemeralMoment(story.authorId, storyId, bytes) { result ->
+                result.onSuccess {
+                    showSuccess(context.getString(R.string.stories_moment_sent))
+                }.onFailure { error ->
+                    showSuccess(error.localizedMessage ?: context.getString(R.string.story_context_menu_action_failed))
+                }
                 scope.launch {
                     delay(500)
                     resumeStoryPlayback()

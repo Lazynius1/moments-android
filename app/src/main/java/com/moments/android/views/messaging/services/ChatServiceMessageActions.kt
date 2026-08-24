@@ -7,9 +7,9 @@ import com.moments.android.views.messaging.core.MessageStatus
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.core.conversationPreview
 import com.moments.android.services.messaging.EncryptionService
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
+import com.moments.android.services.messaging.DirectMessageRoute
+import com.moments.android.services.messaging.MessageRequestInteractionContext
+import com.moments.android.services.messaging.MessageRequestService
 import kotlinx.coroutines.tasks.await
 import java.util.Date
 import java.util.UUID
@@ -101,23 +101,46 @@ suspend fun ChatService.forwardTextMessage(
     sentMessage
 }
 
+data class MessageRecipientDeliveryResult(
+    val recipientId: String,
+    val error: Throwable? = null,
+) {
+    val isSuccess: Boolean get() = error == null
+}
+
 suspend fun ChatService.forwardTextMessage(
     plaintext: String,
     toUserIds: Set<String>,
     senderId: String,
-): Result<Unit> = runCatching {
-    if (toUserIds.isEmpty()) return@runCatching
-    // ≡ DispatchGroup: paralelo; último error gana.
-    coroutineScope {
-        val results = toUserIds.map { userId ->
-            async {
-                runCatching {
-                    val conversationId = getOrCreateConversation(senderId, userId).getOrThrow()
-                    forwardTextMessage(plaintext, conversationId, senderId).getOrThrow()
+): List<MessageRecipientDeliveryResult> {
+    if (toUserIds.isEmpty()) return emptyList()
+    val coordinator = MessageRequestService()
+    return toUserIds.sorted().map { userId ->
+        if (userId.isBlank()) {
+            return@map MessageRecipientDeliveryResult(
+                recipientId = userId,
+                error = IllegalArgumentException(
+                    MomentsApplication.instance?.getString(com.moments.android.R.string.messaging_error_invalid_recipient).orEmpty(),
+                ),
+            )
+        }
+        val result = runCatching {
+            val interaction = MessageRequestInteractionContext(
+                kind = MessageRequestInteractionContext.Kind.FORWARD_TEXT,
+            )
+            when (val route = coordinator.resolveRoute(userId, interaction)) {
+                is DirectMessageRoute.Conversation -> route.id
+                is DirectMessageRoute.ConversationDraft -> coordinator.activateConversationDraft(userId, route.threadId)
+                is DirectMessageRoute.IncomingRequest -> coordinator.acceptIncomingThread(route.threadId).conversationId
+                is DirectMessageRoute.OutgoingRequest -> {
+                    coordinator.appendRequestMessage(userId, plaintext, interaction = interaction)
+                    null
                 }
+            }?.let { conversationId ->
+                forwardTextMessage(plaintext, conversationId, senderId).getOrThrow()
             }
-        }.awaitAll()
-        results.firstOrNull { it.isFailure }?.getOrThrow()
+        }
+        MessageRecipientDeliveryResult(userId, result.exceptionOrNull())
     }
 }
 

@@ -36,6 +36,14 @@ sealed interface ChatRenderRow {
         override val id: String get() = "row:pending-request:${message.id}"
     }
 
+    data class IncomingRequestActions(val isLoading: Boolean) : ChatRenderRow {
+        override val id: String = "row:synthetic:incoming-request-actions"
+    }
+
+    data class OutgoingRequestControls(val messageCount: Int, val limitReached: Boolean) : ChatRenderRow {
+        override val id: String = "row:synthetic:outgoing-request-controls"
+    }
+
     data class Header(val date: Date) : ChatRenderRow {
         // ≡ iOS `date.timeIntervalSince1970` (segundos, no ms).
         override val id: String get() = "row:header:${date.time / 1000.0}"

@@ -317,10 +317,14 @@ private fun isLikelyHistoryPrepend(oldIds: List<String>, newIds: List<String>): 
 }
 
 fun chatRenderRowVisualSignature(row: ChatRenderRow): Int = when (row) {
-    is ChatRenderRow.ConversationIntro -> 31 * 5 + (row.context?.id?.hashCode() ?: 0)
+    // El contexto se enriquece de forma asíncrona con estadísticas, verificación y
+    // relación. Usar solo el id dejaba la primera versión vacía fijada en LazyColumn.
+    is ChatRenderRow.ConversationIntro -> 31 * 5 + (row.context?.hashCode() ?: 0)
     is ChatRenderRow.RequestDisclaimer -> 31 * 6 + (row.context?.id?.hashCode() ?: 0) + (row.context?.status?.hashCode() ?: 0)
     is ChatRenderRow.PendingRequestMessage ->
         31 * 7 + row.message.id.hashCode() + row.message.text.hashCode() + row.message.isOutgoing.hashCode()
+    is ChatRenderRow.IncomingRequestActions -> 31 * 8 + row.isLoading.hashCode()
+    is ChatRenderRow.OutgoingRequestControls -> 31 * 9 + row.messageCount + row.limitReached.hashCode()
     is ChatRenderRow.Header -> 31 * 0 + (row.date.time / 1000L).toInt()
     is ChatRenderRow.Message -> 31 * 1 + messageItemVisualSignature(row.item)
     is ChatRenderRow.Buzz ->

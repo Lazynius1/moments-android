@@ -41,6 +41,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,8 +51,11 @@ import com.moments.android.views.messaging.core.AcceptMessageRequestResult
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageStatus
 import com.moments.android.views.messaging.core.MessageType
+import com.moments.android.views.messaging.core.MessageRequest
+import com.moments.android.views.messaging.core.MessageRequestMessage
 import com.moments.android.views.messaging.core.PendingChatContext
 import com.moments.android.views.messaging.core.PendingChatTimelineMessage
+import com.moments.android.services.messaging.MessageRequestSendResult
 import androidx.compose.foundation.gestures.detectTapGestures
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.messaging.components.ChatMessageBubbleCallbacks
@@ -146,11 +150,12 @@ fun sendReplyToSharedMedia(
 }
 
 data class PendingMessageRequestOperations(
-    val send: (receiverId: String, text: String, completion: (Result<Unit>) -> Unit) -> Unit = { _, _, completion -> completion(Result.failure(UnsupportedOperationException())) },
+    val send: (receiverId: String, text: String, completion: (Result<MessageRequestSendResult>) -> Unit) -> Unit = { _, _, completion -> completion(Result.failure(UnsupportedOperationException())) },
     val accept: (requestId: String, completion: (Result<AcceptMessageRequestResult>) -> Unit) -> Unit = { _, completion -> completion(Result.failure(UnsupportedOperationException())) },
     val cancel: (requestId: String, completion: (Result<Unit>) -> Unit) -> Unit = { _, completion -> completion(Result.failure(UnsupportedOperationException())) },
     val reject: (requestId: String, completion: (Result<Unit>) -> Unit) -> Unit = { _, completion -> completion(Result.failure(UnsupportedOperationException())) },
     val block: (requestId: String, completion: (Result<Unit>) -> Unit) -> Unit = { _, completion -> completion(Result.failure(UnsupportedOperationException())) },
+    val report: (requestId: String, completion: (Result<Unit>) -> Unit) -> Unit = { _, completion -> completion(Result.failure(UnsupportedOperationException())) },
 )
 
 @Stable
@@ -170,14 +175,39 @@ class ChatComposerAndChromeController(
     /** ≡ iOS `pendingMessageRequestService.isLoading`. */
     var isRequestLoading by mutableStateOf(false)
 
+    private var pendingRequestMessages by mutableStateOf(
+        pendingChatContext?.request?.messages.orEmpty(),
+    )
+    private var pendingRequestThreadId by mutableStateOf(pendingChatContext?.request?.id)
+    private var pendingRequestMessageCount by mutableStateOf(
+        pendingChatContext?.request?.messageCount ?: pendingChatContext?.request?.messages?.size ?: 0,
+    )
+
     val isPendingChat: Boolean get() = pendingChatContext != null
-    val pendingChatCanType: Boolean get() = pendingChatContext?.status == PendingChatContext.Status.OUTGOING_REQUEST_DRAFT
-    val pendingChatTimelineMessage: PendingChatTimelineMessage?
+    val pendingChatCanType: Boolean
         get() {
-            val context = pendingChatContext ?: return null
-            context.request?.let { return PendingChatTimelineMessage.from(it, currentUserId) }
+            val context = pendingChatContext ?: return false
+            return context.direction == PendingChatContext.Direction.OUTGOING &&
+                context.status in setOf(
+                    PendingChatContext.Status.OUTGOING_REQUEST_DRAFT,
+                    PendingChatContext.Status.OUTGOING_REQUEST_SENT,
+                ) && pendingRequestMessageCount < 5
+        }
+    val pendingChatTimelineMessages: List<PendingChatTimelineMessage>
+        get() {
+            val context = pendingChatContext ?: return emptyList()
+            val threadId = pendingRequestThreadId ?: context.request?.id ?: "pending:${context.otherUserId}"
+            if (pendingRequestMessages.isNotEmpty()) {
+                return pendingRequestMessages.map { PendingChatTimelineMessage.from(it, threadId, currentUserId) }
+            }
+            context.request?.messages?.takeIf { it.isNotEmpty() }?.let { values ->
+                return values.map { PendingChatTimelineMessage.from(it, threadId, currentUserId) }
+            }
+            context.request?.let { return listOf(PendingChatTimelineMessage.from(it, currentUserId)) }
             val text = context.initialText?.trim().orEmpty()
-            return text.takeIf { it.isNotEmpty() }?.let { PendingChatTimelineMessage.outgoingText(it, context.otherUserId) }
+            return if (context.status == PendingChatContext.Status.OUTGOING_REQUEST_SENT && text.isNotEmpty()) {
+                listOf(PendingChatTimelineMessage.outgoingText(text, context.otherUserId))
+            } else emptyList()
         }
 
     fun updatePendingContext(context: PendingChatContext?) {
@@ -191,22 +221,62 @@ class ChatComposerAndChromeController(
     ) {
         val context = pendingChatContext ?: return
         val trimmed = text.trim()
-        if (trimmed.isEmpty() || context.status != PendingChatContext.Status.OUTGOING_REQUEST_DRAFT) return
+        if (trimmed.isEmpty() || !pendingChatCanType) return
         requestOperations.send(context.otherUserId, trimmed) { result ->
-            result.onSuccess {
-                pendingChatContext = context.copy(status = PendingChatContext.Status.OUTGOING_REQUEST_SENT, initialText = trimmed)
+            result.onSuccess { sent ->
+                recordPendingRequestSend(sent, trimmed, MessageType.TEXT)
                 onTextChanged("")
                 onDraftCleared()
                 onDidSend()
             }.onFailure { error ->
-                // iOS treats the duplicate-request response as an already sent request.
-                if (error.message?.contains("409") == true) {
-                    pendingChatContext = context.copy(status = PendingChatContext.Status.OUTGOING_REQUEST_SENT, initialText = null)
-                    onTextChanged("")
-                    onDidSend()
-                } else onError(error)
+                onError(error)
             }
         }
+    }
+
+    fun recordPendingRequestSend(
+        sent: MessageRequestSendResult,
+        text: String,
+        type: MessageType,
+    ) {
+        val context = pendingChatContext ?: return
+        pendingRequestThreadId = sent.threadId
+        pendingRequestMessageCount = sent.messageCount
+        pendingRequestMessages = pendingRequestMessages + MessageRequestMessage(
+            id = sent.messageId,
+            senderId = currentUserId,
+            content = text,
+            timestamp = Date(),
+            type = type,
+            sequence = sent.messageCount,
+            mediaUrl = sent.mediaUrl,
+            mediaEncryption = sent.mediaEncryption,
+            expirationDate = sent.expirationDate,
+            isViewOnce = type.isViewOnce,
+            allowReplay = sent.allowReplay,
+        )
+        val request = context.request?.copy(
+            messages = pendingRequestMessages,
+            message = text,
+            messageType = type,
+            messageCount = sent.messageCount,
+            lastActivityAt = Date(),
+        ) ?: MessageRequest(
+            id = sent.threadId,
+            senderId = currentUserId,
+            receiverId = context.otherUserId,
+            message = text,
+            status = MessageRequest.RequestStatus.PENDING,
+            messageType = type,
+            messages = pendingRequestMessages,
+            messageCount = sent.messageCount,
+            schemaVersion = 2,
+        )
+        pendingChatContext = context.copy(
+            request = request,
+            status = PendingChatContext.Status.OUTGOING_REQUEST_SENT,
+            initialText = text,
+        )
     }
 
     fun acceptPendingMessageRequest(replyText: String?, onTextChanged: (String) -> Unit, onReplyAfterAcceptance: (String, String) -> Unit) {
@@ -252,6 +322,11 @@ class ChatComposerAndChromeController(
         val requestId = pendingChatContext?.request?.id ?: return
         requestOperations.block(requestId) { result -> result.onSuccess { onDismissed() }.onFailure(onError) }
     }
+
+    fun reportPendingMessageRequest() {
+        val requestId = pendingChatContext?.request?.id ?: return
+        requestOperations.report(requestId) { result -> result.onSuccess { onDismissed() }.onFailure(onError) }
+    }
 }
 
 @Composable
@@ -262,9 +337,9 @@ fun rememberChatComposerAndChromeController(
     onAccepted: (String) -> Unit = {},
     onDismissed: () -> Unit = {},
     onError: (Throwable) -> Unit = {},
-): ChatComposerAndChromeController = remember(requestOperations, onDraftCleared, onAccepted, onDismissed, onError) {
+): ChatComposerAndChromeController = remember(pendingChatContext?.id, requestOperations, onDraftCleared, onAccepted, onDismissed, onError) {
     ChatComposerAndChromeController(pendingChatContext, requestOperations, onDraftCleared, onAccepted, onDismissed, onError)
-}.also { it.updatePendingContext(pendingChatContext) }
+}
 
 @Composable
 fun ChatComposerChrome(
@@ -325,27 +400,12 @@ fun ChatComposerChrome(
     when {
         isOtherParticipantBlockedByCurrentUser -> BlockedByMeChatInputBar(onUnblock, safeModifier)
         isOtherParticipantUnavailable -> UnavailableChatInputBar(safeModifier)
-        context?.status == PendingChatContext.Status.OUTGOING_REQUEST_SENT -> PendingRequestSentInputBar(
-            onCancel = { controller.cancelPendingMessageRequest(messageText, onMessageTextChange) },
-            modifier = safeModifier,
-        )
+        context?.status == PendingChatContext.Status.OUTGOING_REQUEST_SENT && !controller.pendingChatCanType -> Box(safeModifier) {}
         context?.status == PendingChatContext.Status.OUTGOING_REQUEST_BLOCKED -> RequestsClosedInputBar(
             displayName = context.otherUsername.ifBlank { otherParticipantDisplayName },
             modifier = safeModifier,
         )
         else -> Column(safeModifier) {
-            if (context?.status == PendingChatContext.Status.INCOMING_REQUEST_PENDING) {
-                IncomingRequestActionBar(
-                    isLoading = controller.isRequestLoading,
-                    onAccept = { controller.acceptPendingMessageRequest(null, onMessageTextChange, onReplyAfterAcceptance) },
-                    onDelete = controller::deletePendingMessageRequest,
-                    onBlock = controller::blockPendingMessageRequest,
-                    onReport = onReport,
-                )
-            }
-            if (controller.pendingChatCanType && context != null) {
-                ChatRequestInviteNotice(context.otherUsername, context.otherUsername, com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()))
-            }
             // ≡ iOS `replyBarSection` encima del input
             ChatReplyAndEditingBar(
                 replyingTo = replyingTo,
@@ -369,7 +429,8 @@ fun ChatComposerChrome(
                 isPreparingVoiceRecordingPreview = isPreparingVoiceRecordingPreview,
                 voiceGestureState = voiceGestureState,
                 isVanishModeActive = vanishModeActive,
-                allowsAttachments = !controller.isPendingChat,
+                allowsAttachments = !controller.isPendingChat || controller.pendingChatCanType,
+                allowsVoiceRecording = !controller.isPendingChat,
                 isAttachmentMenuOpen = isAttachmentMenuOpen,
                 onSend = {
                     val outgoing = messageText.trim()
@@ -413,7 +474,7 @@ fun RequestsClosedInputBar(displayName: String, modifier: Modifier = Modifier) =
 )
 
 @Composable
-fun PendingRequestSentInputBar(onCancel: () -> Unit, modifier: Modifier = Modifier) {
+fun PendingRequestSentInputBar(limitReached: Boolean = false, onCancel: () -> Unit, modifier: Modifier = Modifier) {
     val dark = isSystemInDarkTheme()
     Row(
         modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp).clip(RoundedCornerShape(28.dp)).momentsChromeGlass(RoundedCornerShape(28.dp), interactive = false).padding(horizontal = 14.dp, vertical = 10.dp),
@@ -421,7 +482,13 @@ fun PendingRequestSentInputBar(onCancel: () -> Unit, modifier: Modifier = Modifi
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Icon(Icons.Default.Send, null, tint = if (dark) Color.White.copy(.7f) else Color.Black.copy(.58f), modifier = Modifier.size(17.dp))
-        Text(stringResource(R.string.chat_request_sent_input), modifier = Modifier.weight(1f), color = if (dark) Color.White.copy(.7f) else Color.Black.copy(.58f), fontSize = 14.sp, maxLines = 2)
+        Text(
+            stringResource(if (limitReached) R.string.message_requests_limit_reached else R.string.chat_request_sent_input),
+            modifier = Modifier.weight(1f),
+            color = if (dark) Color.White.copy(.7f) else Color.Black.copy(.58f),
+            fontSize = 14.sp,
+            maxLines = 2,
+        )
         Text(
             stringResource(R.string.chat_request_sent_cancel),
             modifier = Modifier.clip(CircleShape).momentsChromeGlass(CircleShape, interactive = true).combinedClickable(onClick = onCancel).padding(horizontal = 12.dp, vertical = 8.dp),
@@ -435,7 +502,7 @@ fun PendingRequestSentInputBar(onCancel: () -> Unit, modifier: Modifier = Modifi
 @Composable
 fun IncomingRequestActionBar(isLoading: Boolean, onAccept: () -> Unit, onDelete: () -> Unit, onBlock: () -> Unit, onReport: () -> Unit, modifier: Modifier = Modifier) {
     val dark = isSystemInDarkTheme()
-    Column(modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             Modifier.fillMaxWidth().clip(CircleShape).background(if (dark) Color.White else Color.Black).combinedClickable(enabled = !isLoading, onClick = onAccept).padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.Center,
@@ -463,6 +530,7 @@ private fun ChatRequestSecondaryButton(textRes: Int, onClick: () -> Unit, modifi
         fontSize = 14.sp,
         fontWeight = FontWeight.SemiBold,
         maxLines = 1,
+        textAlign = TextAlign.Center,
         overflow = TextOverflow.Ellipsis,
     )
 }

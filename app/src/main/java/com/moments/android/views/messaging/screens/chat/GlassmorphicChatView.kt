@@ -3,8 +3,11 @@ package com.moments.android.views.messaging.screens.chat
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,8 +28,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.moments.android.models.Moment
@@ -58,6 +66,12 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.moments.android.views.messaging.components.GlassmorphicDateHeader
+import com.moments.android.views.messaging.components.GlassmorphicMessageRow
+import com.moments.android.views.messaging.components.ChatMessageBubbleCallbacks
+import com.moments.android.views.messaging.components.ChatMessageGroupPosition
+import com.moments.android.views.messaging.components.ChatRequestDisclaimerRow
+import com.moments.android.views.messaging.components.ChatRequestInviteNotice
+import com.moments.android.views.messaging.components.NormalVideoPlayerView
 import com.moments.android.views.messaging.components.chatMenuDimmedUnlessSelected
 import com.moments.android.views.messaging.components.chatMenuDimmedWhenOpen
 import com.moments.android.R
@@ -108,12 +122,17 @@ import com.moments.android.views.messaging.screens.ConversationSettingsView
 import com.moments.android.views.messaging.services.ChatDraftStore
 import com.moments.android.views.messaging.services.ChatScrollTarget
 import com.moments.android.views.messaging.services.ChatService
+import com.moments.android.views.messaging.services.ChatEncryptedMediaResolver
 import com.moments.android.views.messaging.services.ViewOnceConsumptionReason
 import com.moments.android.views.messaging.services.ViewOnceConsumptionService
 import com.moments.android.views.messaging.services.ViewOnceReplaySessionStore
 import com.moments.android.views.messaging.services.cleanupConsumedViewOnceMessages
 import com.moments.android.views.messaging.services.markViewOnceAsViewed
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.ScreenshotProtectedView
+import com.moments.android.views.shared.ScreenshotProtectionMode
+import coil.compose.AsyncImage
+import java.io.File
 import java.util.Date
 import java.util.UUID
 import android.content.ClipData
@@ -136,6 +155,12 @@ sealed class ChatStoryRoute {
         override val id: String get() = story.id?.takeIf { it.isNotBlank() } ?: story.hashCode().toString()
     }
 }
+
+private data class PendingRequestMediaPresentation(
+    val messageId: String,
+    val localUrl: String,
+    val isVideo: Boolean,
+)
 
 @Composable
 fun GlassmorphicChatView(
@@ -199,6 +224,9 @@ fun GlassmorphicChatView(
     var showingUserReportSheet by remember { mutableStateOf(false) }
     var selectedChatMedia by remember { mutableStateOf<SharedMedia?>(null) }
     var selectedChatMediaItems by remember { mutableStateOf<List<SharedMedia>>(emptyList()) }
+    var pendingRequestMediaPresentation by remember {
+        mutableStateOf<PendingRequestMediaPresentation?>(null)
+    }
     var locationDetailMessage by remember { mutableStateOf<EnhancedMessage?>(null) }
     var clusterForReply by remember { mutableStateOf<List<EnhancedMessage>?>(null) }
     var clusterGallerySelection by remember { mutableStateOf<ClusterGallerySelection?>(null) }
@@ -242,12 +270,14 @@ fun GlassmorphicChatView(
 
         PendingMessageRequestOperations(
             send = { receiverId, text, completion ->
-                messageRequestService.sendMessageRequest(receiverId, text, onComplete = completion)
+                scope.launch {
+                    completion(runCatching { messageRequestService.appendRequestMessage(receiverId, text) })
+                }
             },
             accept = { requestId, completion ->
                 val request = resolveRequest(requestId)
                 if (request == null) {
-                    completion(Result.failure(IllegalStateException("Missing message request")))
+                    completion(Result.failure(IllegalStateException(context.getString(R.string.message_requests_accept_error_not_available))))
                 } else {
                     messageRequestService.acceptRequest(request, completion)
                 }
@@ -255,7 +285,7 @@ fun GlassmorphicChatView(
             cancel = { requestId, completion ->
                 val request = resolveRequest(requestId)
                 if (request == null) {
-                    completion(Result.failure(IllegalStateException("Missing message request")))
+                    completion(Result.failure(IllegalStateException(context.getString(R.string.message_requests_accept_error_not_available))))
                 } else {
                     messageRequestService.cancelRequest(request, completion)
                 }
@@ -263,7 +293,7 @@ fun GlassmorphicChatView(
             reject = { requestId, completion ->
                 val request = resolveRequest(requestId)
                 if (request == null) {
-                    completion(Result.failure(IllegalStateException("Missing message request")))
+                    completion(Result.failure(IllegalStateException(context.getString(R.string.message_requests_accept_error_not_available))))
                 } else {
                     messageRequestService.rejectRequest(request, completion)
                 }
@@ -271,9 +301,17 @@ fun GlassmorphicChatView(
             block = { requestId, completion ->
                 val request = resolveRequest(requestId)
                 if (request == null) {
-                    completion(Result.failure(IllegalStateException("Missing message request")))
+                    completion(Result.failure(IllegalStateException(context.getString(R.string.message_requests_accept_error_not_available))))
                 } else {
                     messageRequestService.blockUser(request, completion)
+                }
+            },
+            report = { requestId, completion ->
+                val request = resolveRequest(requestId)
+                if (request == null) {
+                    completion(Result.failure(IllegalStateException(context.getString(R.string.message_requests_accept_error_not_available))))
+                } else {
+                    messageRequestService.reportRequest(request, completion)
                 }
             },
         )
@@ -458,6 +496,34 @@ fun GlassmorphicChatView(
         selectedChatMedia = selected
     }
 
+    fun openPendingRequestMedia(pending: com.moments.android.views.messaging.core.PendingChatTimelineMessage) {
+        val message = pending.asEnhancedMessage(session.currentUserId)
+        if (message.isExpired) {
+            buzzToastText = context.getString(R.string.message_requests_media_unavailable)
+            return
+        }
+        scope.launch {
+            runCatching {
+                val resolved = ChatEncryptedMediaResolver.resolveForMessage(message, forceDownload = true)
+                    ?: error(context.getString(R.string.message_requests_media_unavailable))
+                val localUrl = resolved.mediaUrl
+                    ?: error(context.getString(R.string.message_requests_media_unavailable))
+                if ((composer.pendingChatContext ?: pendingChatContext)?.direction == PendingChatContext.Direction.INCOMING) {
+                    messageRequestService.consumePendingEphemeral(pending.threadId, pending.sourceMessageId)
+                }
+                pendingRequestMediaPresentation = PendingRequestMediaPresentation(
+                    messageId = pending.sourceMessageId,
+                    localUrl = localUrl,
+                    isVideo = message.type == MessageType.VIEW_ONCE_VIDEO ||
+                        message.mediaEncryption?.contentType?.startsWith("video/") == true,
+                )
+            }.onFailure { error ->
+                buzzToastText = error.localizedMessage
+                    ?: context.getString(R.string.message_requests_media_unavailable)
+            }
+        }
+    }
+
     fun sendReplyToOpenedMedia(media: SharedMedia, text: String, completion: (Result<Unit>) -> Unit) {
         sendReplyToSharedMedia(session, media, text, completion)
     }
@@ -584,7 +650,9 @@ fun GlassmorphicChatView(
         session.chatRenderRows,
         effectivePendingContext,
         conversationIntroContext,
-        composer.pendingChatTimelineMessage,
+        composer.pendingChatTimelineMessages,
+        requestLoading,
+        composer.pendingChatCanType,
         canLoadMore,
         messages,
         scroll.hasCompletedInitialScroll,
@@ -594,7 +662,9 @@ fun GlassmorphicChatView(
             baseRows = session.chatRenderRows,
             pendingChatContext = effectivePendingContext,
             conversationIntroContext = conversationIntroContext,
-            pendingTimelineMessage = composer.pendingChatTimelineMessage,
+            pendingTimelineMessages = composer.pendingChatTimelineMessages,
+            requestLoading = requestLoading,
+            pendingChatCanType = composer.pendingChatCanType,
             canLoadMore = canLoadMore,
             hasCompletedInitialScroll = scroll.hasCompletedInitialScroll,
             hasTypingUsers = typingUsers.isNotEmpty(),
@@ -746,7 +816,11 @@ fun GlassmorphicChatView(
                     fallbackUserId = conversation.otherParticipantId,
                     composerChromeHeight = scroll.lastComposerHeight
                         ?: ChatComposerChromeMetrics.estimatedComposerChromeHeight,
-                    isVanishGestureEnabled = scroll.hasCompletedInitialScroll && !search.isSearchVisible,
+                    composerGap = if (
+                        effectivePendingContext?.status == PendingChatContext.Status.INCOMING_REQUEST_PENDING
+                    ) 2.dp else ChatComposerChromeMetrics.messageListGap,
+                    isVanishGestureEnabled = effectivePendingContext == null &&
+                        scroll.hasCompletedInitialScroll && !search.isSearchVisible,
                     searchHighlightTerm = search.activeSearchHighlightTerm,
                     searchActiveMessageId = search.currentSearchMatchId,
                     elevatedRowId = messagePresentation.menuSelection?.rowId,
@@ -828,6 +902,78 @@ fun GlassmorphicChatView(
                                     .padding(horizontal = 16.dp),
                             )
                         },
+                        renderPendingRequest = { pending ->
+                            val pendingMessages = composer.pendingChatTimelineMessages
+                            val index = pendingMessages.indexOfFirst { it.id == pending.id }
+                            val previousMatches = index > 0 && pendingMessages[index - 1].isOutgoing == pending.isOutgoing
+                            val nextMatches = index >= 0 && index < pendingMessages.lastIndex &&
+                                pendingMessages[index + 1].isOutgoing == pending.isOutgoing
+                            val groupPosition = when {
+                                !previousMatches && !nextMatches -> ChatMessageGroupPosition.SINGLE
+                                !previousMatches && nextMatches -> ChatMessageGroupPosition.FIRST
+                                previousMatches && nextMatches -> ChatMessageGroupPosition.MIDDLE
+                                else -> ChatMessageGroupPosition.LAST
+                            }
+                            val showAvatar = !pending.isOutgoing &&
+                                (index == pendingMessages.lastIndex || !nextMatches)
+                            val adapted = pending.asEnhancedMessage(session.currentUserId)
+                            GlassmorphicMessageRow(
+                                message = adapted,
+                                isCurrentUser = pending.isOutgoing,
+                                showAvatar = showAvatar,
+                                groupPosition = groupPosition,
+                                otherUserId = effectivePendingContext?.otherUserId,
+                                isOtherParticipantUnavailable = lifecycle.isOtherParticipantUnavailable,
+                                otherParticipantName = effectivePendingContext?.otherUsername ?: displayName,
+                                showSeenLabel = false,
+                                timestampRevealState = listController.timestampRevealState,
+                                callbacks = ChatMessageBubbleCallbacks(
+                                    onAvatarTap = { onProfile(effectivePendingContext?.otherUserId ?: conversation.otherParticipantId) },
+                                    onMomentNavigation = renderer.onMomentNavigation,
+                                    onStoryNavigation = renderer.onStoryNavigation,
+                                    onOpenMedia = { openPendingRequestMedia(pending) },
+                                    onViewOnceOpen = { _, _ -> openPendingRequestMedia(pending) },
+                                    onLongPress = null,
+                                    onMessageViewed = null,
+                                    onHydrateMedia = null,
+                                ),
+                            )
+                        },
+                        renderIncomingRequestActions = { loading ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 14.dp, top = 10.dp, end = 14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                ChatRequestDisclaimerRow(
+                                    R.string.chat_request_disclaimer_incoming,
+                                    colors,
+                                )
+                                IncomingRequestActionBar(
+                                    isLoading = loading,
+                                    onAccept = { composer.acceptPendingMessageRequest(null, { messageText = it }, { _, _ -> }) },
+                                    onDelete = composer::deletePendingMessageRequest,
+                                    onBlock = composer::blockPendingMessageRequest,
+                                    onReport = composer::reportPendingMessageRequest,
+                                )
+                            }
+                        },
+                        renderOutgoingRequestControls = { count, limitReached ->
+                            if (limitReached) {
+                                PendingRequestSentInputBar(
+                                    limitReached = true,
+                                    onCancel = { composer.cancelPendingMessageRequest(messageText) { messageText = it } },
+                                )
+                            } else {
+                                ChatRequestInviteNotice(
+                                    displayName = effectivePendingContext?.otherUsername ?: displayName,
+                                    username = effectivePendingContext?.otherUsername ?: displayName,
+                                    messageCount = count,
+                                    adaptiveColors = colors,
+                                )
+                            }
+                        },
                     ),
                 )
                 val navigation = ChatFloatingNavigationState.resolve(
@@ -885,17 +1031,38 @@ fun GlassmorphicChatView(
             }
         },
         composer = {
-            ChatComposerChrome(
-                controller = composer,
-                messageText = messageText,
-                onMessageTextChange = { text ->
-                    messageText = text
-                    // ≡ iOS onChange(messageText): no persistir draft mientras editas
-                    if (editingMessage == null) {
-                        ChatDraftStore.setDraft(context, text, draftStorageKey)
+            Column(Modifier.fillMaxWidth()) {
+                if (effectivePendingContext?.status == PendingChatContext.Status.INCOMING_REQUEST_PENDING) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 14.dp, top = 10.dp, end = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        ChatRequestDisclaimerRow(
+                            R.string.chat_request_disclaimer_incoming,
+                            colors,
+                        )
+                        IncomingRequestActionBar(
+                            isLoading = requestLoading,
+                            onAccept = { composer.acceptPendingMessageRequest(null, { messageText = it }, { _, _ -> }) },
+                            onDelete = composer::deletePendingMessageRequest,
+                            onBlock = composer::blockPendingMessageRequest,
+                            onReport = composer::reportPendingMessageRequest,
+                        )
                     }
-                    session.setTyping(text.isNotBlank())
-                },
+                }
+                ChatComposerChrome(
+                    controller = composer,
+                    messageText = messageText,
+                    onMessageTextChange = { text ->
+                        messageText = text
+                        // ≡ iOS onChange(messageText): no persistir draft mientras editas
+                        if (editingMessage == null) {
+                            ChatDraftStore.setDraft(context, text, draftStorageKey)
+                        }
+                        session.setTyping(text.isNotBlank())
+                    },
                 isOtherParticipantBlockedByCurrentUser = lifecycle.isOtherParticipantBlockedByCurrentUser,
                 isOtherParticipantUnavailable = lifecycle.isOtherParticipantUnavailable,
                 otherParticipantDisplayName = displayName,
@@ -951,8 +1118,9 @@ fun GlassmorphicChatView(
                         ChatSessionEngine.session(accepted).sendTextMessage(text, replyTo = null)
                     }
                 },
-                viewModel = session,
-            )
+                    viewModel = session,
+                )
+            }
         },
     )
 
@@ -1137,7 +1305,8 @@ fun GlassmorphicChatView(
     ChatAttachmentMenuPopover(
         isPresented = attachmentSheet,
         anchorBounds = plusButtonAnchorBounds,
-        canSendBuzz = session.canSendBuzz,
+        canSendBuzz = !composer.isPendingChat && session.canSendBuzz,
+        ephemeralOnly = composer.isPendingChat,
         onDismiss = { attachmentSheet = null },
         onOpenCamera = {
             attachmentSheet = null
@@ -1180,12 +1349,41 @@ fun GlassmorphicChatView(
             otherUserId = conversation.otherParticipantId,
             otherUsername = displayName,
             onSend = { data, type, mode, payload ->
-                lifecycle.handleCameraCapture(
-                    data = data,
-                    mediaType = if (type == CameraPickerMediaType.IMAGE) ChatCameraCapturedMediaType.IMAGE else ChatCameraCapturedMediaType.VIDEO,
-                    mode = mode,
-                    overlayPayload = payload,
-                )
+                val pending = composer.pendingChatContext
+                if (pending != null && composer.pendingChatCanType) {
+                    scope.launch {
+                        runCatching {
+                            val expiresAt = if (mode == com.moments.android.views.messaging.media.ChatMediaSendMode.KEEP_IN_CHAT) {
+                                Date(Date().time + 24L * 60L * 60L * 1000L)
+                            } else null
+                            val sent = messageRequestService.appendEphemeralMedia(
+                                receiverId = pending.otherUserId,
+                                data = data,
+                                isVideo = type == CameraPickerMediaType.VIDEO,
+                                allowReplay = mode == com.moments.android.views.messaging.media.ChatMediaSendMode.ALLOW_REPLAY,
+                                expiresAt = expiresAt,
+                            )
+                            val messageType = if (expiresAt != null) MessageType.EPHEMERAL
+                            else if (type == CameraPickerMediaType.VIDEO) MessageType.VIEW_ONCE_VIDEO
+                            else MessageType.VIEW_ONCE_IMAGE
+                            composer.recordPendingRequestSend(
+                                sent,
+                                if (type == CameraPickerMediaType.VIDEO) "🎥" else "📷",
+                                messageType,
+                            )
+                        }.onFailure { error ->
+                            buzzToastText = error.localizedMessage ?: context.getString(R.string.common_error)
+                        }
+                    }
+                    lifecycle.dismissCamera()
+                } else {
+                    lifecycle.handleCameraCapture(
+                        data = data,
+                        mediaType = if (type == CameraPickerMediaType.IMAGE) ChatCameraCapturedMediaType.IMAGE else ChatCameraCapturedMediaType.VIDEO,
+                        mode = mode,
+                        overlayPayload = payload,
+                    )
+                }
             },
             onDismiss = lifecycle::dismissCamera,
         )
@@ -1232,8 +1430,15 @@ fun GlassmorphicChatView(
                 message = message,
                 onDismiss = { forwardingMessage = null },
                 onForward = { userIds ->
-                    session.forwardTextMessage(message, userIds)
-                    forwardingMessage = null
+                    session.forwardTextMessage(message, userIds) { results ->
+                        val failure = results.firstOrNull { !it.isSuccess }
+                        if (failure == null && results.isNotEmpty()) {
+                            forwardingMessage = null
+                        } else {
+                            buzzToastText = failure?.error?.localizedMessage
+                                ?: context.getString(R.string.common_error)
+                        }
+                    }
                 },
             )
         }
@@ -1241,6 +1446,48 @@ fun GlassmorphicChatView(
 
 
     // ≡ selectedChatMedia / ConversationFullScreenMediaView
+    pendingRequestMediaPresentation?.let { presentation ->
+        fun dismissPendingMedia() {
+            val uri = Uri.parse(presentation.localUrl)
+            if (uri.scheme == "file") uri.path?.let { path -> runCatching { File(path).delete() } }
+            pendingRequestMediaPresentation = null
+        }
+        Dialog(
+            onDismissRequest = ::dismissPendingMedia,
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            ScreenshotProtectedView(
+                isProtected = true,
+                fillsContainer = true,
+                mode = ScreenshotProtectionMode.WindowFlag,
+                containsHardwareVideo = presentation.isVideo,
+            ) {
+                if (presentation.isVideo) {
+                    NormalVideoPlayerView(
+                        videoUrl = presentation.localUrl,
+                        onClose = ::dismissPendingMedia,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
+                        AsyncImage(
+                            model = presentation.localUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        IconButton(
+                            onClick = ::dismissPendingMedia,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(18.dp),
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.common_close), tint = androidx.compose.ui.graphics.Color.White)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     selectedChatMedia?.let { media ->
         ConversationFullScreenMediaView(
             media = media,

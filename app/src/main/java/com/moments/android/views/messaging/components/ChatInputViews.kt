@@ -101,6 +101,7 @@ fun GlassmorphicInputBar(
     voiceGestureState: VoiceRecordingGestureState,
     isVanishModeActive: Boolean = false,
     allowsAttachments: Boolean = true,
+    allowsVoiceRecording: Boolean = true,
     isAttachmentMenuOpen: Boolean = false,
     onSend: () -> Unit,
     onOpenAttachments: () -> Unit,
@@ -252,7 +253,7 @@ fun GlassmorphicInputBar(
                         accent = composerAccent,
                         onClick = ::sendCurrentContent,
                     )
-                    allowsAttachments -> VoiceRecordingGestureButton(
+                    allowsAttachments && allowsVoiceRecording -> VoiceRecordingGestureButton(
                         tint = colors.mediaIconColor,
                         isRecording = isRecordingVoice,
                         activeInteractionId = recordingInteractionId,

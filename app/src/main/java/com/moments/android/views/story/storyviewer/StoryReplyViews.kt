@@ -61,6 +61,8 @@ import com.moments.android.views.feed.sharing.SharedDMPreviewBottomGradient
 import com.moments.android.views.feed.sharing.SharedStoryAccessDenialReason
 import com.moments.android.views.feed.sharing.SharedStoryAccessEvaluator
 import com.moments.android.views.feed.sharing.SharedStoryAccessOutcome
+import com.moments.android.views.feed.sharing.storyMediaTypeString
+import com.moments.android.views.feed.sharing.storyPreviewUrl
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
@@ -277,9 +279,11 @@ fun StoryReplyGatedThumbnailView(
     var canViewStory by remember { mutableStateOf(false) }
     var denialReason by remember { mutableStateOf(SharedStoryAccessDenialReason.Expired) }
     var isLoading by remember { mutableStateOf(true) }
+    var displayData by remember(storyReplyData) { mutableStateOf(storyReplyData) }
 
     LaunchedEffect(storyReplyData, messageSenderId, otherParticipantId) {
         isLoading = true
+        displayData = storyReplyData
         val storyId = storyReplyData["storyId"].orEmpty()
         val viewerId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
         if (storyId.isEmpty() || viewerId.isEmpty()) {
@@ -305,6 +309,17 @@ fun StoryReplyGatedThumbnailView(
             )
         ) {
             is SharedStoryAccessOutcome.Allowed -> {
+                val story = result.story
+                displayData = storyReplyData + mapOf(
+                    "storyId" to story.id.orEmpty(),
+                    "storyAuthor" to story.username,
+                    "storyAuthorId" to story.authorId,
+                    "storyPreviewUrl" to storyPreviewUrl(story),
+                    "storyMediaUrl" to story.mediaItem.url,
+                    "storyMediaType" to storyMediaTypeString(story),
+                    "storyExpiration" to (story.expirationDate.time / 1000.0).toString(),
+                    "storyTimestamp" to (story.timestamp.time / 1000.0).toString(),
+                )
                 canViewStory = true
                 denialReason = SharedStoryAccessDenialReason.Expired
             }
@@ -319,8 +334,8 @@ fun StoryReplyGatedThumbnailView(
     Box(modifier) {
         when {
             isLoading -> StoryReplyThumbnailSkeleton()
-            canViewStory -> StoryReplyThumbnailView(storyReplyData)
-            else -> StoryReplyUnavailableThumbnail(denialReason, storyReplyData)
+            canViewStory -> StoryReplyThumbnailView(displayData)
+            else -> StoryReplyUnavailableThumbnail(denialReason, displayData)
         }
     }
 }

@@ -9,6 +9,8 @@ import com.moments.android.models.Story
 import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.messaging.EncryptionService
+import com.moments.android.services.messaging.DirectMessageRoute
+import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.views.feed.sharing.storyMediaTypeString
 import com.moments.android.views.feed.sharing.storyPreviewUrl
 import com.moments.android.views.messaging.media.ChatMediaOverlayPayload
@@ -47,15 +49,19 @@ suspend fun ChatService.getOrCreateConversation(
     user2Id: String,
     initialMessage: String? = null,
 ): Result<String> = runCatching {
-    val existing = findExistingConversation(user1Id, user2Id).getOrThrow()
-    if (existing != null) {
-        val trimmed = initialMessage?.trim().orEmpty()
-        if (trimmed.isNotEmpty()) {
-            sendTextMessage(existing, user1Id, trimmed).getOrThrow()
-        }
-        return@runCatching existing
+    val coordinator = MessageRequestService()
+    val conversationId = when (val route = coordinator.resolveRoute(user2Id)) {
+        is DirectMessageRoute.Conversation -> route.id
+        is DirectMessageRoute.ConversationDraft ->
+            coordinator.activateConversationDraft(user2Id, route.threadId)
+        is DirectMessageRoute.IncomingRequest ->
+            coordinator.acceptIncomingThread(route.threadId).conversationId
+        is DirectMessageRoute.OutgoingRequest -> throw MessageRequestRequiredException()
     }
-    checkMutualFollowAndCreateConversation(user1Id, user2Id, initialMessage)
+    initialMessage?.trim()?.takeIf(String::isNotEmpty)?.let { message ->
+        sendTextMessage(conversationId, user1Id, message).getOrThrow()
+    }
+    conversationId
 }
 
 private suspend fun ChatService.checkMutualFollowAndCreateConversation(

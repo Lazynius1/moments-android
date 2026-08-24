@@ -20,7 +20,9 @@ import com.moments.android.MainActivity
 import com.moments.android.R
 import com.moments.android.services.messaging.ChatCommunicationIntentDonor
 import com.moments.android.services.messaging.MessageIngestService
+import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.messaging.SharedChatDecryptor
+import com.moments.android.views.messaging.core.MessageRequestFolder
 import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.shared.ChatPreviewPrivacy
 import kotlinx.coroutines.CoroutineScope
@@ -52,6 +54,10 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         super.onMessageReceived(message)
         val userInfo = message.data.mapValues { it.value as Any? }
         if (userInfo.isEmpty()) return
+        if ((userInfo["type"] as? String)?.lowercase() == "message_request_v2") {
+            scope.launch { handleMessageRequestPush(message, userInfo) }
+            return
+        }
 
         scope.launch { handleBackgroundSideEffects(userInfo) }
         NotificationPresentationCoordinator.present(userInfo, NotificationPresentationSource.PUSH)
@@ -66,6 +72,24 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
             scope.launch { showSystemNotificationIfNeeded(message, userInfo) }
         }
         NotificationBadgeService.setupListeners()
+    }
+
+    private suspend fun handleMessageRequestPush(
+        message: RemoteMessage,
+        userInfo: Map<String, Any?>,
+    ) {
+        val threadId = userInfo["threadId"] as? String ?: return
+        val shouldPresent = runCatching {
+            val service = MessageRequestService()
+            service.loadHiddenWordsPreferences()
+            service.loadIncomingRequest(threadId).folder != MessageRequestFolder.HIDDEN
+        }.getOrDefault(true)
+        if (!shouldPresent) {
+            Log.d(TAG, "Suppressed locally hidden message request")
+            return
+        }
+        NotificationBadgeService.setupListeners()
+        if (!isAppInForeground()) showSystemNotificationIfNeeded(message, userInfo)
     }
 
     private fun isAppInForeground(): Boolean =
@@ -171,6 +195,13 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
     ): ResolvedContent {
         val genericBody = getString(R.string.notification_message_single_default)
         val type = (userInfo["type"] as? String)?.lowercase()
+
+        if (type == "message_request_v2") {
+            return ResolvedContent(
+                getString(R.string.app_name),
+                getString(R.string.notification_message_request_generic),
+            )
+        }
 
         if (type == "message_reaction") {
             return resolveChatReactionPreview(suppliedTitle, suppliedBody, userInfo)

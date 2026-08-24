@@ -18,6 +18,7 @@ import com.moments.android.services.content.BackendFeedService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.messaging.ChatMediaDownloadPolicy
+import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.messaging.VanishMessageTimer
 import com.moments.android.utilities.MomentsFormat
 import kotlinx.coroutines.tasks.await
@@ -909,6 +910,36 @@ object ChatMessagePolicy {
         participants.filter { it != currentUserId }.all { buzzPreferences?.get(it) != false }
 }
 
+enum class MessageRequestFolder(val raw: String) {
+    NORMAL("normal"), OLD("old"), HIDDEN("hidden");
+
+    companion object {
+        fun from(raw: String?): MessageRequestFolder = entries.firstOrNull { it.raw == raw } ?: NORMAL
+    }
+}
+
+data class MessageRequestMessage(
+    val id: String,
+    val senderId: String,
+    val content: String,
+    val timestamp: Date,
+    val type: MessageType,
+    val sequence: Int,
+    val mediaUrl: String? = null,
+    val thumbnailUrl: String? = null,
+    val mediaEncryption: EncryptedChatMediaMetadata? = null,
+    val contextKind: String = "general",
+    val storyId: String? = null,
+    val storyOwnerId: String? = null,
+    val sharedContentId: String? = null,
+    val sharedContentOwnerId: String? = null,
+    val expirationDate: Date? = null,
+    val isViewOnce: Boolean = false,
+    val allowReplay: Boolean = false,
+) {
+    val isExpired: Boolean get() = expirationDate?.before(Date()) == true
+}
+
 data class MessageRequest(
     val id: String? = null,
     val senderId: String,
@@ -921,16 +952,22 @@ data class MessageRequest(
     val messageType: MessageType = MessageType.TEXT,
     val mediaUrl: String? = null,
     val thumbnailUrl: String? = null,
+    val folder: MessageRequestFolder = MessageRequestFolder.NORMAL,
+    val messages: List<MessageRequestMessage> = emptyList(),
+    val messageCount: Int = (if (message.isBlank()) 0 else 1),
+    val schemaVersion: Int = 1,
+    val generation: Int = 1,
+    val lastActivityAt: Date = timestamp,
 ) {
     enum class RequestStatus(val raw: String) {
-        PENDING("pending"), ACCEPTED("accepted"), REJECTED("rejected"), BLOCKED("blocked");
+        PENDING("pending"), ACCEPTED("accepted"), REJECTED("rejected"), BLOCKED("blocked"), CANCELLED("cancelled");
 
         /** ≡ `RequestStatus.displayName`. */
         fun displayName(context: Context): String = context.getString(
             when (this) {
                 PENDING -> R.string.messaging_request_status_pending
                 ACCEPTED -> R.string.messaging_request_status_accepted
-                REJECTED -> R.string.messaging_request_status_rejected
+                REJECTED, CANCELLED -> R.string.messaging_request_status_rejected
                 BLOCKED -> R.string.messaging_request_status_blocked
             },
         )
@@ -940,7 +977,7 @@ data class MessageRequest(
             get() = when (this) {
                 PENDING -> "FF9500"
                 ACCEPTED -> "34C759"
-                REJECTED -> "FF3B30"
+                REJECTED, CANCELLED -> "FF3B30"
                 BLOCKED -> "8E8E93"
             }
 
@@ -959,10 +996,17 @@ data class MessageRequest(
         "messageType" to messageType.raw,
         "mediaUrl" to mediaUrl,
         "thumbnailUrl" to thumbnailUrl,
+        "folder" to folder.raw,
+        "messageCount" to messageCount.coerceIn(0, 5),
+        "schemaVersion" to schemaVersion,
+        "generation" to generation,
+        "lastActivityAt" to Timestamp(lastActivityAt),
     )
 
     val isPending: Boolean get() = status == RequestStatus.PENDING
     val canSendMoreRequests: Boolean get() = status != RequestStatus.BLOCKED
+    val remainingMessageCount: Int get() = (5 - messageCount).coerceAtLeast(0)
+    val canAppendMessage: Boolean get() = isPending && remainingMessageCount > 0
 
     /** ≡ `MessageRequest.messagePreview` (MessageModel.swift). */
     fun messagePreview(context: Context): String = when (messageType) {
@@ -990,9 +1034,9 @@ data class MessageRequest(
         fun fromFirestoreData(data: Map<String, Any?>, id: String): MessageRequest? {
             val senderId = data["senderId"] as? String ?: return null
             val receiverId = data["receiverId"] as? String ?: return null
-            val message = data["message"] as? String ?: return null
-            val statusRaw = data["status"] as? String ?: return null
-            val messageTypeRaw = data["messageType"] as? String ?: return null
+            val message = data["message"] as? String ?: ""
+            val statusRaw = data["status"] as? String ?: RequestStatus.PENDING.raw
+            val messageTypeRaw = data["messageType"] as? String ?: MessageType.TEXT.raw
             val timestamp = when (val ts = data["timestamp"]) {
                 is Timestamp -> ts.toDate()
                 is Date -> ts
@@ -1010,6 +1054,16 @@ data class MessageRequest(
                 messageType = MessageType.from(messageTypeRaw),
                 mediaUrl = data["mediaUrl"] as? String,
                 thumbnailUrl = data["thumbnailUrl"] as? String,
+                folder = MessageRequestFolder.from(data["folder"] as? String),
+                messageCount = ((data["messageCount"] as? Number)?.toInt()
+                    ?: if (message.isBlank()) 0 else 1).coerceIn(0, 5),
+                schemaVersion = (data["schemaVersion"] as? Number)?.toInt() ?: 1,
+                generation = (data["generation"] as? Number)?.toInt() ?: 1,
+                lastActivityAt = when (val value = data["lastActivityAt"]) {
+                    is Timestamp -> value.toDate()
+                    is Date -> value
+                    else -> timestamp
+                },
             )
         }
     }
@@ -1017,7 +1071,8 @@ data class MessageRequest(
 
 data class AcceptMessageRequestResult(
     val conversationId: String,
-    val messageId: String,
+    val messageId: String = "",
+    val messageIds: List<String> = emptyList(),
 )
 
 /** ≡ iOS `MessagingPresentationRoute`. */
@@ -1205,12 +1260,13 @@ object PendingChatContextFactory {
 
     suspend fun pendingOutgoingRequest(senderId: String, receiverId: String): MessageRequest? = runCatching {
         if (senderId.isBlank() || receiverId.isBlank()) return@runCatching null
-        val document = db.collection("messageRequests")
-            .whereEqualTo("senderId", senderId)
+        val document = db.collection("users").document(senderId)
+            .collection("messageRequestOutbox")
             .whereEqualTo("receiverId", receiverId)
             .whereEqualTo("status", MessageRequest.RequestStatus.PENDING.raw)
+            .limit(1)
             .get().await().documents.firstOrNull() ?: return@runCatching null
-        MessageRequest.fromFirestoreData(document.data.orEmpty(), document.id)
+        MessageRequestService().loadOutgoingRequest(document.id, receiverId)
     }.getOrNull()
 
     private suspend fun cachedOrRemoteUser(userId: String): AppUser? = UserCacheService.getCachedUser(userId) ?: fetchUser(userId)
@@ -1243,27 +1299,106 @@ object PendingChatContextFactory {
 
 data class PendingChatTimelineMessage(
     val id: String,
+    val threadId: String,
+    val sourceMessageId: String,
+    val senderId: String,
     val text: String,
     val messageType: MessageType,
     val mediaUrl: String?,
     val thumbnailUrl: String?,
     val timestamp: Date,
     val isOutgoing: Boolean,
+    val mediaEncryption: EncryptedChatMediaMetadata? = null,
+    val expirationDate: Date? = null,
+    val isViewOnce: Boolean = false,
+    val allowReplay: Boolean = false,
+    val contextKind: String = "general",
+    val storyId: String? = null,
+    val storyOwnerId: String? = null,
+    val sharedContentId: String? = null,
+    val sharedContentOwnerId: String? = null,
 ) {
+    val hasStoryReplyContext: Boolean
+        get() = !storyId.isNullOrBlank() && !storyOwnerId.isNullOrBlank() &&
+            (contextKind == "storyMessage" || contextKind == "storyEphemeral")
+
+    fun asEnhancedMessage(currentUserId: String): EnhancedMessage {
+        val encryptedMedia = mediaEncryption != null
+        return EnhancedMessage(
+            id = sourceMessageId,
+            conversationId = threadId,
+            senderId = senderId.ifBlank { if (isOutgoing) currentUserId else senderId },
+            type = messageType,
+            content = text,
+            mediaUrl = if (encryptedMedia) null else mediaUrl,
+            thumbnailUrl = if (encryptedMedia) null else thumbnailUrl,
+            mediaObjectPath = if (encryptedMedia) mediaUrl else null,
+            thumbnailObjectPath = if (encryptedMedia) thumbnailUrl else null,
+            mediaEncryption = mediaEncryption,
+            timestamp = timestamp,
+            status = MessageStatus.SENT,
+            isRead = false,
+            storyReplyData = if (hasStoryReplyContext) mapOf(
+                "storyId" to storyId.orEmpty(),
+                "storyAuthorId" to storyOwnerId.orEmpty(),
+            ) else null,
+            sharedMomentData = if (contextKind == "shareMoment") mapOf(
+                "momentId" to sharedContentId.orEmpty(),
+                "momentAuthorId" to sharedContentOwnerId.orEmpty(),
+            ) else null,
+            sharedStoryData = if (contextKind == "shareStory") mapOf(
+                "storyId" to (sharedContentId ?: storyId).orEmpty(),
+                "storyAuthorId" to (sharedContentOwnerId ?: storyOwnerId).orEmpty(),
+            ) else null,
+            expirationDate = expirationDate,
+            isViewed = false,
+            allowReplay = allowReplay,
+        )
+    }
+
     companion object {
         fun from(request: MessageRequest, currentUserId: String): PendingChatTimelineMessage = PendingChatTimelineMessage(
             id = request.id?.let { "pending-request:$it" }
                 ?: "pending-request:${request.senderId}:${request.timestamp.time}",
+            threadId = request.id ?: "pending:${request.receiverId}",
+            sourceMessageId = request.id ?: "pending-request:${request.senderId}:${request.timestamp.time}",
+            senderId = request.senderId,
             text = request.message,
             messageType = request.messageType,
             mediaUrl = request.mediaUrl,
             thumbnailUrl = request.thumbnailUrl,
             timestamp = request.timestamp,
             isOutgoing = request.senderId == currentUserId,
+            isViewOnce = request.messageType.isViewOnce,
+        )
+
+        fun from(message: MessageRequestMessage, threadId: String, currentUserId: String): PendingChatTimelineMessage = PendingChatTimelineMessage(
+            id = "pending-request-message:${message.id}",
+            threadId = threadId,
+            sourceMessageId = message.id,
+            senderId = message.senderId,
+            text = message.content,
+            messageType = message.type,
+            mediaUrl = message.mediaUrl,
+            thumbnailUrl = message.thumbnailUrl,
+            timestamp = message.timestamp,
+            isOutgoing = message.senderId == currentUserId,
+            mediaEncryption = message.mediaEncryption,
+            expirationDate = message.expirationDate,
+            isViewOnce = message.isViewOnce,
+            allowReplay = message.allowReplay,
+            contextKind = message.contextKind,
+            storyId = message.storyId,
+            storyOwnerId = message.storyOwnerId,
+            sharedContentId = message.sharedContentId,
+            sharedContentOwnerId = message.sharedContentOwnerId,
         )
 
         fun outgoingText(text: String, receiverId: String): PendingChatTimelineMessage = PendingChatTimelineMessage(
             id = "pending-outgoing:$receiverId",
+            threadId = "pending:$receiverId",
+            sourceMessageId = "pending-outgoing:$receiverId",
+            senderId = "",
             text = text,
             messageType = MessageType.TEXT,
             mediaUrl = null,
