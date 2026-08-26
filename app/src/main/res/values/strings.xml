@@ -2307,8 +2307,10 @@
     <string name="settings_privacy_control_description">When you enable these options, other users won\'t be able to see these lists on your profile. You can always change these settings.</string>
     <string name="settings_privacy_hide_following">Hide my following list</string>
     <string name="settings_privacy_hide_following_desc">Only you can see who you follow</string>
+    <string name="settings_privacy_hide_following_desc_visible">Other people can see who you follow</string>
     <string name="settings_privacy_hide_followers">Hide my followers</string>
     <string name="settings_privacy_hide_followers_desc">Only you can see who follows you</string>
+    <string name="settings_privacy_hide_followers_desc_visible">Other people can see who follows you</string>
     <string name="settings_connection_privacy_title">Profile Privacy</string>
     <string name="settings_security_password_add">Add password</string>
     <string name="settings_security_password_add_description">Create a backup password</string>

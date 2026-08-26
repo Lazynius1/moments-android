@@ -99,6 +99,8 @@ import com.moments.android.views.profile.highlights.HighlightStoryDateBadge
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.story.storyviewer.GlassmorphicEmptyState
 import com.moments.android.views.story.storyviewer.StoryViewerScreen
+import com.moments.android.views.story.storyviewer.StoryRevealThumbnailPolicy
+import com.moments.android.views.story.storyviewer.StoryStaticPreviewSurface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
@@ -373,7 +375,6 @@ fun ArchiveStoryCardVisual(
     cornerRadius: Dp = 0.dp,
     modifier: Modifier = Modifier,
 ) {
-    val preview = story.mediaItem.thumbnailUrl ?: story.mediaItem.url
     Box(
         modifier
             .fillMaxWidth()
@@ -381,21 +382,11 @@ fun ArchiveStoryCardVisual(
             .clip(RoundedCornerShape(cornerRadius))
             .background(Color.Gray.copy(0.26f)),
     ) {
-        if (preview.isNotBlank()) {
-            AsyncImage(
-                model = preview,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Icon(
-                Icons.Filled.Photo,
-                contentDescription = null,
-                tint = Color.Gray,
-                modifier = Modifier.align(Alignment.Center),
-            )
-        }
+        StoryStaticPreviewSurface(
+            story = story,
+            revealPolicy = StoryRevealThumbnailPolicy.EXPOSED,
+            modifier = Modifier.fillMaxSize(),
+        )
         HighlightStoryDateBadge(
             date = story.timestamp,
             modifier = Modifier
@@ -584,13 +575,12 @@ private fun ArchiveMapView(
 
 @Composable
 private fun ArchiveMapPinAnnotation(pin: ArchiveStoryPin) {
-    val preview = pin.stories.firstOrNull()?.let { archiveCalendarPreviewURL(it) }.orEmpty()
+    val previewStory = pin.stories.firstOrNull()
     Box {
-        if (preview.isNotBlank()) {
-            AsyncImage(
-                model = preview,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+        if (previewStory != null) {
+            StoryStaticPreviewSurface(
+                story = previewStory,
+                revealPolicy = StoryRevealThumbnailPolicy.EXPOSED,
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(10.dp))
@@ -726,16 +716,15 @@ private fun ArchiveCalendarView(
                                         ) {
                                             if (bucket != null) {
                                                 Box(contentAlignment = Alignment.Center) {
-                                                    if (bucket.thumbnailURL.isNotBlank()) {
-                                                        AsyncImage(
-                                                            model = bucket.thumbnailURL,
-                                                            contentDescription = null,
-                                                            contentScale = ContentScale.Crop,
+                                                    bucket.stories.firstOrNull()?.let { story ->
+                                                        StoryStaticPreviewSurface(
+                                                            story = story,
+                                                            revealPolicy = StoryRevealThumbnailPolicy.EXPOSED,
                                                             modifier = Modifier
                                                                 .size(40.dp)
                                                                 .clip(CircleShape),
                                                         )
-                                                    } else {
+                                                    } ?: run {
                                                         Box(
                                                             Modifier
                                                                 .size(40.dp)

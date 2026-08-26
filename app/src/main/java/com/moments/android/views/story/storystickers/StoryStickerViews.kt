@@ -72,6 +72,7 @@ import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
+import coil.decode.BitmapFactoryDecoder
 import coil.request.ImageRequest
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -97,6 +98,7 @@ import com.moments.android.views.components.stickerHostLabel
 import com.moments.android.views.explore.ExploreView
 import com.moments.android.views.feed.maps.LocationMapView
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
+import com.moments.android.views.feed.sharing.SharedMomentStoryCard
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.story.InteractiveQuizSticker
 import com.moments.android.views.story.QuestionResponseStoryStickerCardView
@@ -661,6 +663,7 @@ fun StoryStickerRendererLayer(
     stickers: List<StickerData>,
     gestureGate: StoryDeckGestureGate? = null,
     reportsDeckInteractionExclusion: Boolean = true,
+    isThumbnail: Boolean = false,
     onPauseStory: () -> Unit = {},
     onResumeStory: () -> Unit = {},
     onMentionTap: (String) -> Unit = {},
@@ -679,6 +682,7 @@ fun StoryStickerRendererLayer(
             heightPx = containerHeightPx,
             gestureGate = gestureGate,
             reportsDeckInteractionExclusion = reportsDeckInteractionExclusion,
+            isThumbnail = isThumbnail,
             onPauseStory = onPauseStory,
             onResumeStory = onResumeStory,
             onMentionTap = onMentionTap,
@@ -694,6 +698,7 @@ fun StoryStickerRendererLayer(
                 heightPx = constraints.maxHeight.toFloat(),
                 gestureGate = gestureGate,
                 reportsDeckInteractionExclusion = reportsDeckInteractionExclusion,
+                isThumbnail = isThumbnail,
                 onPauseStory = onPauseStory,
                 onResumeStory = onResumeStory,
                 onMentionTap = onMentionTap,
@@ -712,6 +717,7 @@ private fun StoryStickerRendererContent(
     heightPx: Float,
     gestureGate: StoryDeckGestureGate?,
     reportsDeckInteractionExclusion: Boolean,
+    isThumbnail: Boolean,
     onPauseStory: () -> Unit,
     onResumeStory: () -> Unit,
     onMentionTap: (String) -> Unit,
@@ -768,18 +774,69 @@ private fun StoryStickerRendererContent(
                         enabled = reportsDeckInteractionExclusion && sticker.needsInteractionRegion(),
                     ),
             ) {
-                StoryStickerView(
-                    sticker = sticker,
-                    storyId = storyId,
-                    userId = userId,
-                    gestureGate = gestureGate,
-                    onPauseStory = onPauseStory,
-                    onResumeStory = onResumeStory,
-                    onMentionTap = onMentionTap,
-                    onMomentTap = onMomentTap,
-                )
+                if (isThumbnail) {
+                    StoryStaticStickerView(
+                        sticker = sticker,
+                        storyId = storyId,
+                        userId = userId,
+                        gestureGate = gestureGate,
+                    )
+                } else {
+                    StoryStickerView(
+                        sticker = sticker,
+                        storyId = storyId,
+                        userId = userId,
+                        gestureGate = gestureGate,
+                        onPauseStory = onPauseStory,
+                        onResumeStory = onResumeStory,
+                        onMentionTap = onMentionTap,
+                        onMomentTap = onMomentTap,
+                    )
+                }
             }
         }
+}
+
+/** Visual idéntico al visor, pero sin reproducción, animación ni interacción. */
+@Composable
+private fun StoryStaticStickerView(
+    sticker: StickerData,
+    storyId: String,
+    userId: String,
+    gestureGate: StoryDeckGestureGate?,
+) {
+    when {
+        sticker.type == "shareMoment" -> StorySharedMomentSticker(
+            sticker = sticker,
+            onClick = {},
+            playsVideo = false,
+            modifier = Modifier,
+        )
+        sticker.isAnimated && !sticker.videoURL.isNullOrBlank() -> StoryAnimatedVideoSticker(
+            sticker = sticker,
+            onClick = {},
+            playsVideo = false,
+            modifier = Modifier,
+        )
+        !sticker.gifURL.isNullOrBlank() -> {
+            val decoded = remember(sticker.content, sticker.stickerId) {
+                decodeShareMomentBitmap(sticker.content)
+            }
+            StoryStaticGifSticker(
+                gifURL = sticker.gifURL,
+                modifier = Modifier.size(
+                    decoded?.width?.dp ?: 180.dp,
+                    decoded?.height?.dp ?: 180.dp,
+                ),
+            )
+        }
+        else -> StoryStickerView(
+            sticker = sticker,
+            storyId = storyId,
+            userId = userId,
+            gestureGate = gestureGate,
+        )
+    }
 }
 
 /** ≡ iOS `StoryStickerView.needsInteractionRegion`. */
@@ -976,129 +1033,39 @@ fun StoryStickerView(
 }
 
 @Composable
-private fun StorySharedMomentSticker(sticker: StickerData, onClick: () -> Unit, modifier: Modifier) {
+private fun StorySharedMomentSticker(
+    sticker: StickerData,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    playsVideo: Boolean = true,
+) {
     val density = LocalDensity.current
-    val corner = FeedMomentCardLayout.mediaCornerRadius
     val decoded = remember(sticker.content, sticker.stickerId) {
         decodeShareMomentBitmap(sticker.content)
     }
-    val widthDp = decoded?.let { with(density) { it.width.toDp() } } ?: 260.dp
-    val heightDp = decoded?.let { with(density) { it.height.toDp() } } ?: 340.dp
+    val widthDp = decoded?.let {
+        if (it.width > 480) with(density) { it.width.toDp() } else it.width.dp
+    } ?: 260.dp
+    val heightDp = decoded?.let {
+        if (it.width > 480) with(density) { it.height.toDp() } else it.height.dp
+    } ?: 340.dp
 
-    Box(
-        modifier
+    SharedMomentStoryCard(
+        bitmap = decoded,
+        videoURL = sticker.videoURL.takeIf { playsVideo },
+        username = sticker.username ?: "User",
+        userId = sticker.userId,
+        profileImagePath = sticker.profileImagePath,
+        sharedMediaPath = sticker.sharedMediaPath,
+        caption = sticker.caption,
+        mediaCount = sticker.mediaCount ?: 1,
+        styleVariant = sticker.styleVariant ?: 0,
+        cardLayoutVariant = sticker.cardLayoutVariant ?: 0,
+        modifier = modifier
             .width(widthDp)
             .height(heightDp)
-            .clip(RoundedCornerShape(corner))
             .clickable(enabled = LocalStoryStickerHitTesting.current, onClick = onClick),
-    ) {
-        when {
-            decoded != null -> Image(
-                bitmap = decoded.asImageBitmap(),
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize(),
-            )
-            else -> {
-                val baseUrl = sticker.gifURL ?: sticker.content.takeIf { it.startsWith("http") }
-                if (!baseUrl.isNullOrBlank()) {
-                    AsyncImage(baseUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                } else {
-                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
-                }
-            }
-        }
-        sticker.videoURL?.takeIf { it.isNotBlank() }?.let { url ->
-            StickerVideoPlayer(url, Modifier.fillMaxSize())
-        }
-
-        // Header ≡ ultraThinMaterial mask iOS
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(alpha = 0.22f),
-                            Color.White.copy(alpha = 0.10f),
-                            Color.Transparent,
-                        ),
-                    ),
-                )
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val profileUid = sticker.userId
-                if (!profileUid.isNullOrBlank()) {
-                    AsyncProfileImageView(
-                        userId = profileUid,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    listOf(Color.White.copy(0.5f), Color.Transparent),
-                                ),
-                                shape = CircleShape,
-                            ),
-                    )
-                } else {
-                    Icon(
-                        Icons.Filled.Person,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.5f),
-                        modifier = Modifier.size(34.dp),
-                    )
-                }
-                Text(
-                    text = sticker.username ?: "User",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-
-        if ((sticker.mediaCount ?: 0) > 1) {
-            Icon(
-                Icons.Filled.FilterNone,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 54.dp, end = 12.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White.copy(alpha = 0.18f))
-                    .padding(6.dp)
-                    .size(11.dp),
-            )
-        }
-
-        sticker.caption?.takeIf { it.isNotBlank() }?.let { caption ->
-            Text(
-                text = caption,
-                color = Color.White,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 10.dp)
-                    .clip(RoundedCornerShape(percent = 50))
-                    .background(Color.White.copy(alpha = 0.18f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            )
-        }
-    }
+    )
 }
 
 private fun decodeShareMomentBitmap(content: String): android.graphics.Bitmap? {
@@ -1115,6 +1082,7 @@ private fun StoryAnimatedVideoSticker(
     sticker: StickerData,
     onClick: () -> Unit,
     modifier: Modifier,
+    playsVideo: Boolean = true,
 ) {
     val corner = FeedMomentCardLayout.mediaCornerRadius
     Box(
@@ -1128,7 +1096,9 @@ private fun StoryAnimatedVideoSticker(
         if (!baseUrl.isNullOrBlank()) {
             AsyncImage(baseUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         }
-        sticker.videoURL?.let { StickerVideoPlayer(it, Modifier.fillMaxSize()) }
+        if (playsVideo) {
+            sticker.videoURL?.let { StickerVideoPlayer(it, Modifier.fillMaxSize()) }
+        }
         sticker.username?.let { username ->
             Text(
                 username,
@@ -1178,6 +1148,28 @@ private fun StoryGifSticker(gifURL: String, modifier: Modifier) {
         loading = { Box(Modifier.fillMaxSize()) },
         error = { Box(Modifier.fillMaxSize()) },
         success = { SubcomposeAsyncImageContent(modifier = Modifier.fillMaxSize()) },
+    )
+}
+
+/** Primer frame real del GIF, preservando alpha y sin iniciar animación. */
+@Composable
+private fun StoryStaticGifSticker(gifURL: String, modifier: Modifier) {
+    val context = LocalContext.current
+    val request = remember(gifURL) {
+        ImageRequest.Builder(context)
+            .data(gifURL)
+            .crossfade(false)
+            .decoderFactory(BitmapFactoryDecoder.Factory())
+            .build()
+    }
+    SubcomposeAsyncImage(
+        model = request,
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = modifier,
+        loading = { Box(Modifier.fillMaxSize()) },
+        error = { Box(Modifier.fillMaxSize()) },
+        success = { SubcomposeAsyncImageContent(Modifier.fillMaxSize()) },
     )
 }
 

@@ -306,7 +306,11 @@ fun TabBarScreen(
     }
 
     fun selectTab(index: Int) {
-        if (index == AppTab.toIndex(AppTab.HOME) && selectedTab == index) {
+        // Read the navigation state at click time. A remembered function reference can
+        // otherwise retain the initial selectedTab (Home) and mistake every later Home
+        // tap for a re-tap, emitting only ScrollFeedToTop instead of changing tabs.
+        val currentTab = tabNavigationState.selectedTabIndex
+        if (index == AppTab.toIndex(AppTab.HOME) && currentTab == index) {
             HapticManager.shared.lightImpact()
             NavigationEventBus.emit(CoordinatorNavigationEvent.ScrollFeedToTop)
         } else if (index == AppTab.toIndex(AppTab.CREATE)) {

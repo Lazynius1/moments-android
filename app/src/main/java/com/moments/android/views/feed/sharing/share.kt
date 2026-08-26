@@ -1322,9 +1322,13 @@ private suspend fun prepareShareMomentSticker(
     context: Context,
     moment: FeedMoment,
 ): Result<StickerData> = withContext(Dispatchers.IO) {
-    val contentUrl = moment.imagePath
-        ?: moment.thumbnailUrl
-        ?: moment.mediaItems.firstOrNull { it.url.isNotBlank() }?.url
+    val primaryMedia = moment.visibleMediaItems.firstOrNull()
+    val contentUrl = when {
+        primaryMedia?.type.equals("video", ignoreCase = true) ->
+            primaryMedia?.thumbnailUrl?.takeIf(String::isNotBlank) ?: primaryMedia?.url
+        primaryMedia != null -> primaryMedia.url
+        else -> moment.imagePath ?: moment.thumbnailUrl
+    }
     if (contentUrl.isNullOrBlank()) {
         return@withContext Result.failure(
             IllegalStateException(context.getString(R.string.errors_moment_image_unavailable)),
@@ -1354,27 +1358,29 @@ private suspend fun prepareShareMomentSticker(
         )
     // Profile se prefetchea como iOS; con renderClean no entra en el bitmap final.
     if (!profilePath.isNullOrBlank()) {
-        loadShareBitmap(context, profilePath!!)
+        loadShareBitmap(context, profilePath)
     }
 
-    val density = context.resources.displayMetrics.density
-    val videoUrl = moment.mediaItems
-        .firstOrNull { it.type.equals("video", ignoreCase = true) && it.url.isNotBlank() }
+    val videoUrl = primaryMedia
+        ?.takeIf { it.type.equals("video", ignoreCase = true) }
         ?.url
     val stickerBitmap = renderCleanShareMomentStickerBitmap(
         content = contentBitmap,
-        aspectRatio = moment.aspectRatio,
-        isVideo = videoUrl != null,
-        density = density,
+        aspectRatio = primaryMedia?.aspectRatio ?: moment.aspectRatio,
     )
 
     val interaction = StickerInteractionData(
         username = moment.username,
         userId = moment.authorId,
         caption = moment.content.takeIf { it.isNotBlank() },
-        profileImagePath = moment.profileImagePath,
+        styleVariant = 0,
+        cardLayoutVariant = 0,
+        profileImagePath = profilePath,
+        sharedMediaPath = primaryMedia
+            ?.takeIf { it.type.equals("image", ignoreCase = true) }
+            ?.url,
         momentId = moment.id,
-        mediaCount = moment.mediaItems.size.coerceAtLeast(1),
+        mediaCount = moment.visibleMediaItems.size.coerceAtLeast(1),
     )
     val stickerItem = StickerItem.create(
         image = stickerBitmap,
@@ -1400,14 +1406,12 @@ private suspend fun loadShareBitmap(context: Context, url: String): Bitmap? =
 private fun renderCleanShareMomentStickerBitmap(
     content: Bitmap,
     aspectRatio: String?,
-    isVideo: Boolean,
-    density: Float,
 ): Bitmap {
     val heightDp = shareMomentStickerHeight(aspectRatio, content)
-    val widthPx = (260f * density).toInt().coerceAtLeast(1)
-    val heightPx = (heightDp.value * density).toInt().coerceAtLeast(1)
-    val corner = FeedMomentCardLayout.mediaCornerRadius.value * density
-    val strokeW = 1.2f * density
+    val widthPx = 260
+    val heightPx = heightDp.value.toInt().coerceAtLeast(1)
+    val corner = FeedMomentCardLayout.mediaCornerRadius.value
+    val strokeW = 1.2f
 
     val out = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(out)
@@ -1434,27 +1438,6 @@ private fun renderCleanShareMomentStickerBitmap(
         android.graphics.RectF(left, top, left + drawW, top + drawH),
         Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG),
     )
-
-    if (isVideo) {
-        val cx = widthPx / 2f
-        val cy = heightPx / 2f
-        val r = 22f * density
-        val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.argb((0.35f * 255).toInt(), 0, 0, 0)
-        }
-        canvas.drawCircle(cx, cy, r, circlePaint)
-        val play = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.WHITE
-            style = Paint.Style.FILL
-        }
-        val path = android.graphics.Path().apply {
-            moveTo(cx - 6f * density, cy - 8f * density)
-            lineTo(cx - 6f * density, cy + 8f * density)
-            lineTo(cx + 10f * density, cy)
-            close()
-        }
-        canvas.drawPath(path, play)
-    }
 
     // ≡ overlay stroke LinearGradient white 0.4 → 0.05 → 0.2
     val inset = strokeW / 2f

@@ -1941,6 +1941,7 @@
     <string name="settings_privacy_connections_hidden_singular">1 lista oculta</string>
     <string name="settings_privacy_message_requests_desc">Quem pode enviar-te pedidos</string>
     <string name="settings_privacy_hide_following_desc">Só tu podes ver quem segues</string>
+    <string name="settings_privacy_hide_following_desc_visible">As outras pessoas podem ver quem segues</string>
     <string name="settings_connection_privacy_title">Privacidade do perfil</string>
     <string name="settings_security_google_unlink_confirm">Desvincular</string>
     <string name="settings_security_google_cannot_unlink_message">É o teu único método de acesso. Primeiro adiciona um email real e uma palavra-passe de backup.</string>
@@ -2076,6 +2077,7 @@
     <string name="settings_personal_info">Informação pessoal</string>
     <string name="settings_privacy_hide_followers">Ocultar os meus seguidores</string>
     <string name="settings_privacy_hide_followers_desc">Só tu podes ver quem te segue</string>
+    <string name="settings_privacy_hide_followers_desc_visible">As outras pessoas podem ver quem te segue</string>
     <string name="settings_privacy_policy">Política de privacidade e termos</string>
     <string name="settings_private_account_desc">Só os teus seguidores podem ver as tuas publicações</string>
     <string name="settings_read_receipts">Confirmações de leitura</string>

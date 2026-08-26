@@ -55,6 +55,7 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.models.Story
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.feed.sharing.SharedDMPreviewBottomGradient
@@ -280,6 +281,7 @@ fun StoryReplyGatedThumbnailView(
     var denialReason by remember { mutableStateOf(SharedStoryAccessDenialReason.Expired) }
     var isLoading by remember { mutableStateOf(true) }
     var displayData by remember(storyReplyData) { mutableStateOf(storyReplyData) }
+    var resolvedStory by remember(storyReplyData) { mutableStateOf<Story?>(null) }
 
     LaunchedEffect(storyReplyData, messageSenderId, otherParticipantId) {
         isLoading = true
@@ -320,6 +322,7 @@ fun StoryReplyGatedThumbnailView(
                     "storyExpiration" to (story.expirationDate.time / 1000.0).toString(),
                     "storyTimestamp" to (story.timestamp.time / 1000.0).toString(),
                 )
+                resolvedStory = story
                 canViewStory = true
                 denialReason = SharedStoryAccessDenialReason.Expired
             }
@@ -334,7 +337,7 @@ fun StoryReplyGatedThumbnailView(
     Box(modifier) {
         when {
             isLoading -> StoryReplyThumbnailSkeleton()
-            canViewStory -> StoryReplyThumbnailView(displayData)
+            canViewStory -> StoryReplyThumbnailView(displayData, story = resolvedStory)
             else -> StoryReplyUnavailableThumbnail(denialReason, displayData)
         }
     }
@@ -421,6 +424,7 @@ fun StoryReplyUnavailableThumbnail(
 fun StoryReplyThumbnailView(
     storyReplyData: Map<String, String>,
     modifier: Modifier = Modifier,
+    story: Story? = null,
 ) {
     val adaptive = rememberAdaptiveColors()
     val isDark = isSystemInDarkTheme()
@@ -435,7 +439,9 @@ fun StoryReplyThumbnailView(
             .clip(RoundedCornerShape(innerRadius)),
         contentAlignment = Alignment.Center,
     ) {
-        if (!mediaUrl.isNullOrBlank()) {
+        if (story != null) {
+            StoryStaticPreviewSurface(story = story, modifier = Modifier.fillMaxSize())
+        } else if (!mediaUrl.isNullOrBlank()) {
             AsyncImage(
                 model = mediaUrl,
                 contentDescription = null,

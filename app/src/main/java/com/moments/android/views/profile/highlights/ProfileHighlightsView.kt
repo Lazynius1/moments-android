@@ -62,6 +62,7 @@ import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.profile.core.ProfileColors
 import com.moments.android.views.shared.AppErrorBanner
+import com.moments.android.views.story.storyviewer.StoryStaticPreviewSurface
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -267,6 +268,17 @@ fun HighlightIconView(
     size: Dp = 64.dp,
     modifier: Modifier = Modifier,
 ) {
+    var resolvedCoverStory by remember(highlight.id, highlight.storyIds) { mutableStateOf<Story?>(null) }
+    LaunchedEffect(highlight.id, highlight.authorId, highlight.storyIds) {
+        resolvedCoverStory = if (highlight.storyIds.isEmpty()) {
+            null
+        } else {
+            runCatching {
+                val stories = FirestoreService().fetchStoriesByIds(highlight.authorId, highlight.storyIds)
+                stories.firstOrNull { it.mediaItem.url == highlight.coverImageUrl } ?: stories.firstOrNull()
+            }.getOrNull()
+        }
+    }
     Box(
         modifier
             .size(size)
@@ -275,7 +287,12 @@ fun HighlightIconView(
             .border(1.dp, ProfileColors.textSecondary().copy(alpha = 0.5f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        if (!highlight.coverImageUrl.isNullOrBlank()) {
+        if (resolvedCoverStory != null) {
+            StoryStaticPreviewSurface(
+                story = resolvedCoverStory!!,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (!highlight.coverImageUrl.isNullOrBlank()) {
             AsyncImage(
                 model = highlight.coverImageUrl,
                 contentDescription = null,

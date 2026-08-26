@@ -53,6 +53,8 @@ import com.moments.android.models.MediaItem
 import com.moments.android.models.Story
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.profile.core.ProfileColors
+import com.moments.android.views.story.storyviewer.StoryRevealThumbnailPolicy
+import com.moments.android.views.story.storyviewer.StoryStaticPreviewSurface
 import java.util.Calendar
 import java.util.Date
 
@@ -120,14 +122,11 @@ fun HighlightArchiveStoryCardVisual(story: Story, modifier: Modifier = Modifier)
             .clip(RoundedCornerShape(1.dp))
             .background(Color.Gray.copy(alpha = 0.22f)),
     ) {
-        val url = story.mediaItem.thumbnailUrl ?: story.mediaItem.url
-        if (url.isNotBlank()) {
-            AsyncImage(url, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        } else {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Photo, null, tint = Color.Gray.copy(alpha = 0.5f))
-            }
-        }
+        StoryStaticPreviewSurface(
+            story = story,
+            revealPolicy = StoryRevealThumbnailPolicy.EXPOSED,
+            modifier = Modifier.fillMaxSize(),
+        )
         HighlightStoryDateBadge(
             date = story.timestamp,
             modifier = Modifier.align(Alignment.TopStart).padding(7.dp),

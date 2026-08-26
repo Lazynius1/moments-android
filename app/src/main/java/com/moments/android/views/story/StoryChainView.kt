@@ -71,6 +71,7 @@ import com.moments.android.services.social.StoryChainLimitsService
 import com.moments.android.services.social.formattedRemainingTime
 import com.moments.android.services.social.localizedMessage
 import com.moments.android.utilities.momentsEmptyStateAppear
+import com.moments.android.views.story.storyviewer.StoryStaticPreviewSurface
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -433,11 +434,6 @@ private fun StoryChainGridItemView(
     isDark: Boolean,
     onTap: () -> Unit,
 ) {
-    val thumbnail = if (story.mediaItem.type == MediaItem.MediaType.VIDEO) {
-        story.mediaItem.thumbnailUrl ?: story.mediaItem.url
-    } else {
-        story.mediaItem.url
-    }
     val borderBrush = if (isSelected) {
         Brush.linearGradient(listOf(Color(0xFF007AFF), Color(0xFFAF52DE), Color(0xFFFF2D55)))
     } else {
@@ -457,12 +453,7 @@ private fun StoryChainGridItemView(
             .background(if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f))
             .clickable(onClick = onTap),
     ) {
-        AsyncImage(
-            model = thumbnail,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
+        StoryStaticPreviewSurface(story = story, modifier = Modifier.fillMaxSize())
 
         Box(
             Modifier

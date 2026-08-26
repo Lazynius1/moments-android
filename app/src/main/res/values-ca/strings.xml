@@ -1959,6 +1959,7 @@
     <string name="settings_privacy_connections_hidden_singular">1 llista oculta</string>
     <string name="settings_privacy_message_requests_desc">Qui pot enviar-te sol·licituds</string>
     <string name="settings_privacy_hide_following_desc">Només tu podràs veure a qui segueixes</string>
+    <string name="settings_privacy_hide_following_desc_visible">Altres persones poden veure a qui segueixes</string>
     <string name="settings_connection_privacy_title">Privadesa del perfil</string>
     <string name="settings_security_google_unlink_confirm">Desvincular</string>
     <string name="settings_security_google_cannot_unlink_message">És el teu únic mètode d\'accés. Primer afegeix un email real i una contrasenya de respatller.</string>
@@ -2090,6 +2091,7 @@
     <string name="settings_connections_pending_body">Pendent el port de ConnectionVisibilityView (SettingsSections).</string>
     <string name="settings_privacy_hide_followers">Amaga els meus seguidors</string>
     <string name="settings_privacy_hide_followers_desc">Només tu pots veure qui et segueix</string>
+    <string name="settings_privacy_hide_followers_desc_visible">Altres persones poden veure qui et segueix</string>
     <string name="settings_security_google">Google</string>
     <string name="settings_security_google_cannot_unlink_title">No pots desvincular Google</string>
     <string name="settings_security_google_description">Vincula el teu compte amb Google per iniciar sessió de manera ràpida i segura.</string>

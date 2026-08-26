@@ -91,6 +91,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
+import com.moments.android.views.feed.sharing.SharedMomentStoryCard
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.style.TextOverflow
@@ -316,6 +317,7 @@ fun StoryEditingView(
     var showingIntensitySlider by remember { mutableStateOf(false) }
     var isVideoPreviewMuted by remember { mutableStateOf(false) }
     var stickers by remember { mutableStateOf<List<StoryStickerDraft>>(emptyList()) }
+    var sharedMomentCardTransforms by remember { mutableStateOf<Map<String, StoryStickerDraft>>(emptyMap()) }
     var showingStickerPicker by remember { mutableStateOf(false) }
     var nextStickerZ by remember { mutableIntStateOf(0) }
     // ≡ iOS chain context (storyeditor.swift)
@@ -409,6 +411,7 @@ fun StoryEditingView(
         username = data.username,
         userId = data.userId,
         profileImagePath = data.profileImagePath,
+        sharedMediaPath = data.sharedMediaPath,
         questionText = data.questionText,
         caption = data.caption,
         pollOptions = data.pollOptions,
@@ -431,6 +434,7 @@ fun StoryEditingView(
         contentOffsetX = data.contentOffsetX,
         contentOffsetY = data.contentOffsetY,
         styleVariant = data.styleVariant,
+        cardLayoutVariant = data.cardLayoutVariant,
         revealType = data.revealType,
         revealPattern = data.revealPattern,
         revealPrimaryColor = data.revealPrimaryColor,
@@ -472,6 +476,46 @@ fun StoryEditingView(
     fun cycleStickerStyle(stickerId: String) {
         stickers = stickers.map { item ->
             if (item.id != stickerId) return@map item
+            if (item.type == "shareMoment") {
+                val nextLayout = ((item.cardLayoutVariant ?: 0) + 1) % 2
+                if (!item.videoURL.isNullOrBlank() && (item.mediaCount ?: 1) == 1) {
+                    if (nextLayout == 1) {
+                        sharedMomentCardTransforms = sharedMomentCardTransforms + (item.id to item)
+                        val bitmap = item.image
+                        val legacyDensityBitmap = (bitmap?.width ?: 0) > 480
+                        val naturalWidthDp = when {
+                            bitmap == null -> 260f
+                            legacyDensityBitmap -> bitmap.width / densityScale
+                            else -> bitmap.width.toFloat()
+                        }.coerceAtLeast(1f)
+                        val naturalHeightDp = when {
+                            bitmap == null -> 340f
+                            legacyDensityBitmap -> bitmap.height / densityScale
+                            else -> bitmap.height.toFloat()
+                        }.coerceAtLeast(1f)
+                        val canvasWidthDp = mediaCanvasWidthPx / densityScale
+                        val canvasHeightDp = mediaCanvasHeightPx / densityScale
+                        val fillScale = maxOf(canvasWidthDp / naturalWidthDp, canvasHeightDp / naturalHeightDp)
+                        return@map item.copy(
+                            cardLayoutVariant = nextLayout,
+                            normalizedX = 0.5,
+                            normalizedY = 0.5,
+                            scale = fillScale.toDouble(),
+                            rotationRadians = 0.0,
+                        )
+                    }
+                    val previous = sharedMomentCardTransforms[item.id]
+                    sharedMomentCardTransforms = sharedMomentCardTransforms - item.id
+                    return@map item.copy(
+                        cardLayoutVariant = nextLayout,
+                        normalizedX = previous?.normalizedX ?: 0.5,
+                        normalizedY = previous?.normalizedY ?: 0.5,
+                        scale = previous?.scale ?: 1.0,
+                        rotationRadians = previous?.rotationRadians ?: 0.0,
+                    )
+                }
+                return@map item.copy(cardLayoutVariant = nextLayout)
+            }
             val count = if (item.type == "questionResponse") 6 else 4
             val next = ((item.styleVariant ?: 0) + 1) % count
             item.copy(styleVariant = next)
@@ -506,8 +550,9 @@ fun StoryEditingView(
         resolvedStoryBackgroundPalette().take(3)
 
     fun showsStickerPaletteButton(): Boolean {
-        val active = stickers.firstOrNull { it.id == activeEditingStickerId } ?: return false
-        return active.type in setOf("poll", "question", "quiz", "countdown", "emojiSlider")
+        val targetId = activeEditingStickerId ?: selectedStickerId ?: return false
+        val active = stickers.firstOrNull { it.id == targetId } ?: return false
+        return active.type in setOf("poll", "question", "quiz", "countdown", "emojiSlider", "shareMoment")
     }
 
     /** Sin transforms aún: solo text-only (media vacío), ≡ iOS `selectedMediaItems.isEmpty`. */
@@ -595,7 +640,8 @@ fun StoryEditingView(
 
     fun tapCyclesStickerStyle(type: String): Boolean =
         type == "location" || type == "mention" || type == "link" ||
-            type == "hashtag" || type == "time" || type == "questionResponse"
+            type == "hashtag" || type == "time" || type == "questionResponse" ||
+            type == "shareMoment"
 
     fun restoreFocusedInlineSticker() {
         val original = focusedInlineStickerOriginal ?: return
@@ -1350,6 +1396,7 @@ fun StoryEditingView(
                             username = draft.username,
                             userId = draft.userId,
                             profileImagePath = draft.profileImagePath,
+                            sharedMediaPath = draft.sharedMediaPath,
                             hashtag = draft.hashtag,
                             weatherSymbol = draft.weatherSymbol,
                             questionText = draft.questionText,
@@ -1361,6 +1408,7 @@ fun StoryEditingView(
                             latitude = draft.latitude,
                             longitude = draft.longitude,
                             styleVariant = draft.styleVariant,
+                            cardLayoutVariant = draft.cardLayoutVariant,
                             countdownTitle = draft.countdownTitle,
                             countdownTargetAtMs = draft.countdownTargetAtMs,
                             quizQuestion = draft.quizQuestion,
@@ -1379,6 +1427,8 @@ fun StoryEditingView(
                             revealEffectColor = draft.revealEffectColor,
                             audioURL = draft.audioURL,
                             audioDuration = draft.audioDuration,
+                            momentId = draft.momentId,
+                            mediaCount = draft.mediaCount,
                         ),
                     )
                 }
@@ -1847,7 +1897,7 @@ fun StoryEditingView(
                                     tapCyclesStickerStyle(sticker.type) -> {
                                         val wasSelected = selectedStickerId == sticker.id
                                         selectedStickerId = sticker.id
-                                        if (wasSelected) cycleStickerStyle(sticker.id)
+                                        if (wasSelected || sticker.type == "shareMoment") cycleStickerStyle(sticker.id)
                                     }
                                     // ≡ handleStickerTap (frame / toasts / select)
                                     else -> handleStickerTap(sticker)
@@ -2817,113 +2867,22 @@ private fun ShareMomentEditorSticker(
 ) {
     val bmp = sticker.image ?: return
     val density = LocalDensity.current
-    // ≡ iOS frame(width: image.size.width/height) — tamaño natural del bitmap limpio (~260pt)
-    val widthDp = with(density) { bmp.width.toDp() }
-    val heightDp = with(density) { bmp.height.toDp() }
-    // ≡ StickerOverlayView.swift clip storyViewerCanvasCornerRadius
-    val corner = storyViewerCanvasCornerRadius
-    val cardShape = RoundedCornerShape(corner)
-
-    Box(
-        modifier
-            .width(widthDp)
-            .height(heightDp)
-            .clip(cardShape),
-    ) {
-        Image(
-            bitmap = bmp.asImageBitmap(),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize(),
-        )
-
-        // Header + caption + gallery ≡ StickerOverlayView.swift shareMoment (overlays dinámicos)
-        Column(Modifier.fillMaxSize()) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(
-                        // Aprox. ultraThinMaterial + mask gradient iOS
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.White.copy(0.22f),
-                                Color.White.copy(0.10f),
-                                Color.Transparent,
-                            ),
-                        ),
-                    )
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val uid = sticker.userId
-                if (!uid.isNullOrBlank()) {
-                    AsyncProfileImageView(
-                        userId = uid,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    listOf(Color.White.copy(0.5f), Color.Transparent),
-                                ),
-                                shape = CircleShape,
-                            ),
-                    )
-                } else {
-                    Icon(
-                        Icons.Filled.Person,
-                        contentDescription = null,
-                        tint = Color.White.copy(0.5f),
-                        modifier = Modifier.size(34.dp),
-                    )
-                }
-                Text(
-                    text = sticker.username?.takeIf { it.isNotBlank() } ?: "User",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            sticker.caption?.takeIf { it.isNotBlank() }?.let { caption ->
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = caption,
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .padding(bottom = 10.dp)
-                            .clip(RoundedCornerShape(percent = 50))
-                            .background(Color.White.copy(0.18f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
-                }
-            }
-        }
-
-        if ((sticker.mediaCount ?: 0) > 1) {
-            Icon(
-                Icons.Filled.FilterNone,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 54.dp, end = 12.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White.copy(0.18f))
-                    .padding(6.dp)
-                    .size(11.dp),
-            )
-        }
-    }
+    val legacyDensityBitmap = bmp.width > 480
+    val widthDp = if (legacyDensityBitmap) with(density) { bmp.width.toDp() } else bmp.width.dp
+    val heightDp = if (legacyDensityBitmap) with(density) { bmp.height.toDp() } else bmp.height.dp
+    SharedMomentStoryCard(
+        bitmap = bmp,
+        videoURL = sticker.videoURL,
+        username = sticker.username?.takeIf(String::isNotBlank) ?: "User",
+        userId = sticker.userId,
+        profileImagePath = sticker.profileImagePath,
+        sharedMediaPath = sticker.sharedMediaPath,
+        caption = sticker.caption,
+        mediaCount = sticker.mediaCount ?: 1,
+        styleVariant = sticker.styleVariant ?: 0,
+        cardLayoutVariant = sticker.cardLayoutVariant ?: 0,
+        modifier = modifier.width(widthDp).height(heightDp),
+    )
 }
 
 @Composable
@@ -3349,6 +3308,7 @@ private fun StoryStickerDraft.toChatStickerData(zIndex: Int): StickerData = Stic
     latitude = latitude,
     longitude = longitude,
     styleVariant = styleVariant,
+    cardLayoutVariant = cardLayoutVariant,
     questionText = questionText,
     pollOptions = pollOptions,
     weatherSymbol = weatherSymbol,
@@ -3360,6 +3320,7 @@ private fun StoryStickerDraft.toChatStickerData(zIndex: Int): StickerData = Stic
     sliderPrompt = sliderPrompt,
     caption = caption,
     profileImagePath = profileImagePath,
+    sharedMediaPath = sharedMediaPath,
     momentId = momentId,
     mediaCount = mediaCount,
     quizQuestion = quizQuestion,

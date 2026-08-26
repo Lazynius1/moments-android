@@ -255,6 +255,10 @@ private fun NovaSecureContent() {
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    // Paint the full inset-owning chrome, including the space reserved
+                    // for the navigation bar / IME, so chat content cannot show through.
+                    .background(fadeBase)
                     .then(
                         if (keyboardHeight > 0.dp) {
                             Modifier.windowInsetsPadding(WindowInsets.ime)

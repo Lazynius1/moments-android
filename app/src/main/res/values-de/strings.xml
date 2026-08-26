@@ -1960,6 +1960,7 @@
     <string name="settings_privacy_connections_hidden_singular">1 ausgeblendete Liste</string>
     <string name="settings_privacy_message_requests_desc">Wer dir Anfragen senden kann</string>
     <string name="settings_privacy_hide_following_desc">Nur du kannst sehen, wem du folgst</string>
+    <string name="settings_privacy_hide_following_desc_visible">Andere können sehen, wem du folgst</string>
     <string name="settings_connection_privacy_title">Profil-Privatsphäre</string>
     <string name="settings_security_google_unlink_confirm">Trennen</string>
     <string name="settings_security_google_cannot_unlink_message">Das ist deine einzige Anmeldemethode. Füge zuerst eine echte E-Mail und ein Backup-Passwort hinzu.</string>
@@ -2106,6 +2107,7 @@
     <string name="settings_not_configured">Nicht festgelegt</string>
     <string name="settings_privacy_hide_followers">Meine Follower ausblenden</string>
     <string name="settings_privacy_hide_followers_desc">Nur du kannst sehen, wer dir folgt</string>
+    <string name="settings_privacy_hide_followers_desc_visible">Andere können sehen, wer dir folgt</string>
     <string name="settings_sections_blocked_accounts_subtitle">%1$d Konten</string>
     <string name="settings_sections_email_notifications_subtitle">Aktivitätszusammenfassungen</string>
     <string name="settings_sections_report_problem_subtitle">Sag uns Bescheid, wenn etwas nicht funktioniert</string>

@@ -25,6 +25,7 @@ data class CachedStickerInteractionData(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val styleVariant: Int? = null,
+    val cardLayoutVariant: Int? = null,
     val pollData: List<String>? = null,
     val questionText: String? = null,
     val weatherSymbol: String? = null,
@@ -36,6 +37,7 @@ data class CachedStickerInteractionData(
     val sliderPrompt: String? = null,
     val caption: String? = null,
     val profileImagePath: String? = null,
+    val sharedMediaPath: String? = null,
     val momentId: String? = null,
     val mediaCount: Int? = null,
     val quizQuestion: String? = null,
@@ -458,6 +460,7 @@ object UploadPayloadDecoder {
                                             data.latitude?.let { put("latitude", it) }
                                             data.longitude?.let { put("longitude", it) }
                                             data.styleVariant?.let { put("styleVariant", it) }
+                                            data.cardLayoutVariant?.let { put("cardLayoutVariant", it) }
                                             data.pollData?.let { put("pollData", JSONArray(it)) }
                                             data.questionText?.let { put("questionText", it) }
                                             data.weatherSymbol?.let { put("weatherSymbol", it) }
@@ -469,6 +472,7 @@ object UploadPayloadDecoder {
                                             data.sliderPrompt?.let { put("sliderPrompt", it) }
                                             data.caption?.let { put("caption", it) }
                                             data.profileImagePath?.let { put("profileImagePath", it) }
+                                            data.sharedMediaPath?.let { put("sharedMediaPath", it) }
                                             data.momentId?.let { put("momentId", it) }
                                             data.mediaCount?.let { put("mediaCount", it) }
                                             data.quizQuestion?.let { put("quizQuestion", it) }
@@ -536,6 +540,7 @@ object UploadPayloadDecoder {
                 latitude = data.optDouble("latitude").takeIf { data.has("latitude") && !data.isNull("latitude") },
                 longitude = data.optDouble("longitude").takeIf { data.has("longitude") && !data.isNull("longitude") },
                 styleVariant = data.optInt("styleVariant").takeIf { data.has("styleVariant") },
+                cardLayoutVariant = data.optInt("cardLayoutVariant").takeIf { data.has("cardLayoutVariant") },
                 pollData = data.optStringList("pollData"),
                 questionText = data.optString("questionText").takeIf { data.has("questionText") && !data.isNull("questionText") },
                 weatherSymbol = data.optString("weatherSymbol").takeIf { data.has("weatherSymbol") && !data.isNull("weatherSymbol") },
@@ -547,6 +552,7 @@ object UploadPayloadDecoder {
                 sliderPrompt = data.optString("sliderPrompt").takeIf { data.has("sliderPrompt") && !data.isNull("sliderPrompt") },
                 caption = data.optString("caption").takeIf { data.has("caption") && !data.isNull("caption") },
                 profileImagePath = data.optString("profileImagePath").takeIf { data.has("profileImagePath") && !data.isNull("profileImagePath") },
+                sharedMediaPath = data.optString("sharedMediaPath").takeIf { data.has("sharedMediaPath") && !data.isNull("sharedMediaPath") },
                 momentId = data.optString("momentId").takeIf { data.has("momentId") && !data.isNull("momentId") },
                 mediaCount = data.optInt("mediaCount").takeIf { data.has("mediaCount") },
                 quizQuestion = data.optString("quizQuestion").takeIf { data.has("quizQuestion") && !data.isNull("quizQuestion") },

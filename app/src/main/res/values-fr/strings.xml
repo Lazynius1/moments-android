@@ -1974,6 +1974,7 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="settings_privacy_connections_hidden_singular">1 liste masquée</string>
     <string name="settings_privacy_message_requests_desc">Qui peut vous envoyer des demandes</string>
     <string name="settings_privacy_hide_following_desc">Vous seul pouvez voir qui vous suivez</string>
+    <string name="settings_privacy_hide_following_desc_visible">Les autres peuvent voir qui vous suivez</string>
     <string name="settings_connection_privacy_title">Confidentialité du profil</string>
     <string name="settings_security_google_unlink_confirm">Dissocier</string>
     <string name="settings_security_google_cannot_unlink_message">C\'est votre seule méthode de connexion. Ajoutez d\'abord un e-mail réel et un mot de passe de secours.</string>
@@ -2157,6 +2158,7 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="settings_personal_info">Informations personnelles</string>
     <string name="settings_privacy_hide_followers">Masquer mes abonnés</string>
     <string name="settings_privacy_hide_followers_desc">Seul vous pouvez voir qui vous suit</string>
+    <string name="settings_privacy_hide_followers_desc_visible">Les autres peuvent voir qui vous suit</string>
     <string name="settings_privacy_policy">Politique de confidentialité et conditions</string>
     <string name="settings_private_account_desc">Seuls vos abonnés peuvent voir vos publications</string>
     <string name="settings_read_receipts">Accusés de lecture</string>

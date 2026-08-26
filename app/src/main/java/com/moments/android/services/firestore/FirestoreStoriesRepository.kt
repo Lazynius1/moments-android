@@ -287,6 +287,7 @@ private fun serializedStorySticker(sticker: StickerData): Map<String, Any> = bui
         put("longitude", sticker.longitude)
     }
     sticker.styleVariant?.let { put("styleVariant", it) }
+    sticker.cardLayoutVariant?.let { put("cardLayoutVariant", it) }
     sticker.questionText?.let { put("questionText", it) }
     sticker.pollOptions?.let { put("pollOptions", it) }
     sticker.weatherSymbol?.let { put("weatherSymbol", it) }
@@ -298,6 +299,7 @@ private fun serializedStorySticker(sticker: StickerData): Map<String, Any> = bui
     sticker.sliderPrompt?.let { put("sliderPrompt", it) }
     sticker.caption?.let { put("caption", it) }
     sticker.profileImagePath?.let { put("profileImagePath", it) }
+    sticker.sharedMediaPath?.let { put("sharedMediaPath", it) }
     sticker.momentId?.let { put("momentId", it) }
     sticker.mediaCount?.let { put("mediaCount", it) }
     sticker.quizQuestion?.let { put("quizQuestion", it) }

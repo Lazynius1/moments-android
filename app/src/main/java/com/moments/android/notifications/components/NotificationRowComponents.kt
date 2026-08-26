@@ -30,8 +30,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.moments.android.coordinators.AsyncProfileImageView
+import com.moments.android.models.Story
 import com.moments.android.notifications.core.NotificationRowMetrics
 import com.moments.android.views.story.StoryRingAvatarView
+import com.moments.android.views.story.storyviewer.StoryStaticPreviewSurface
 
 /**
  * Port de NotificationRowComponents.swift —
@@ -128,6 +130,7 @@ fun NotificationStoryThumbnailView(
     reaction: String?,
     isDark: Boolean,
     loadFailed: Boolean,
+    story: Story? = null,
     modifier: Modifier = Modifier,
 ) {
     val corner = RoundedCornerShape(NotificationRowMetrics.STORY_THUMB_CORNER_RADIUS_DP.dp)
@@ -144,7 +147,9 @@ fun NotificationStoryThumbnailView(
             contentAlignment = Alignment.Center,
         ) {
             val showImage = !imagePath.isNullOrBlank() && !loadFailed
-            if (showImage) {
+            if (story != null) {
+                StoryStaticPreviewSurface(story = story, modifier = Modifier.matchParentSize())
+            } else if (showImage) {
                 AsyncImage(
                     model = imagePath,
                     contentDescription = null,

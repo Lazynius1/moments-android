@@ -13,11 +13,13 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
+import com.moments.android.models.Story
 import com.moments.android.notifications.components.NotificationMomentThumbnail
 import com.moments.android.notifications.components.NotificationStoryThumbnailView
 import com.moments.android.notifications.core.NotificationGroup
 import com.moments.android.notifications.core.NotificationsViewModel
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.views.story.StoryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -121,6 +123,14 @@ object EnhancedNotificationRowPreviews {
         }
     }
 
+    suspend fun fetchStoryPreviewModel(storyId: String, authorId: String): Story? {
+        val userId = authorId.trim()
+        if (userId.isEmpty() || storyId.isBlank()) return null
+        return withContext(Dispatchers.IO) {
+            runCatching { StoryRepository().fetchStory(userId, storyId) }.getOrNull()
+        }
+    }
+
     /**
      * ≡ fetchMomentPreview (en +Follow.swift iOS) — owner = momentAuthorId ?? currentUser.
      */
@@ -183,15 +193,10 @@ object EnhancedNotificationRowPreviews {
         var imagePath by remember(first.id) { mutableStateOf<String?>(null) }
         var loadFailed by remember(first.id) { mutableStateOf(false) }
         var isLoading by remember(first.id) { mutableStateOf(true) }
+        var storyModel by remember(first.id) { mutableStateOf<Story?>(null) }
 
         LaunchedEffect(first.id, first.storyId, first.storyPreviewUrl, first.storyAuthorId) {
             val attached = first.storyPreviewUrl?.trim().orEmpty()
-            if (attached.isNotEmpty()) {
-                imagePath = attached
-                loadFailed = false
-                isLoading = false
-                return@LaunchedEffect
-            }
             val storyId = first.storyId?.trim().orEmpty()
             if (storyId.isEmpty()) {
                 loadFailed = true
@@ -199,9 +204,11 @@ object EnhancedNotificationRowPreviews {
                 return@LaunchedEffect
             }
             isLoading = true
-            val path = fetchStoryPreview(storyId, resolvedStoryAuthorId(first))
+            val authorId = resolvedStoryAuthorId(first)
+            storyModel = fetchStoryPreviewModel(storyId, authorId)
+            val path = attached.takeIf { it.isNotEmpty() } ?: fetchStoryPreview(storyId, authorId)
             imagePath = path
-            loadFailed = path == null
+            loadFailed = storyModel == null && path == null
             isLoading = false
         }
 
@@ -210,6 +217,7 @@ object EnhancedNotificationRowPreviews {
             reaction = first.reaction,
             isDark = isDark,
             loadFailed = loadFailed || (!isLoading && imagePath.isNullOrBlank()),
+            story = storyModel,
         )
     }
 }

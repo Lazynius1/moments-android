@@ -1332,8 +1332,10 @@
     <string name="settings_privacy_control_description">Al activar estas opciones, otros usuarios no podrán ver estas listas en tu perfil. Puedes cambiarlas cuando quieras.</string>
     <string name="settings_privacy_hide_following">Ocultar a quién sigo</string>
     <string name="settings_privacy_hide_following_desc">Solo tú puedes ver a quién sigues</string>
+    <string name="settings_privacy_hide_following_desc_visible">Las demás personas pueden ver a quién sigues</string>
     <string name="settings_privacy_hide_followers">Ocultar mis seguidores</string>
     <string name="settings_privacy_hide_followers_desc">Solo tú puedes ver quién te sigue</string>
+    <string name="settings_privacy_hide_followers_desc_visible">Las demás personas pueden ver quién te sigue</string>
     <string name="settings_connection_privacy_title">Privacidad del perfil</string>
     <string name="settings_security_password_add">Añadir contraseña</string>
     <string name="settings_security_password_add_description">Crea una contraseña de respaldo</string>

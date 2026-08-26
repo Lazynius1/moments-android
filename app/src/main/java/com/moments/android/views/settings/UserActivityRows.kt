@@ -71,6 +71,8 @@ import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.story.StoryRingAvatarView
+import com.moments.android.views.story.storyviewer.StoryRevealThumbnailPolicy
+import com.moments.android.views.story.storyviewer.StoryStaticPreviewSurface
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -693,19 +695,15 @@ fun ActivityDeletedStoryCard(
 ) {
     val story = item.story
     val isVideo = story.mediaItem.type.raw == "video"
-    val previewUrl = (if (isVideo) story.mediaItem.thumbnailUrl else null)
-        ?.trim()?.takeIf { it.isNotEmpty() }
-        ?: story.mediaItem.url.trim().takeIf { it.isNotEmpty() }
-
     Box(
         modifier = modifier.aspectRatio(9f / 16f),
         contentAlignment = Alignment.TopEnd,
     ) {
-        if (previewUrl != null) {
-            AsyncImage(previewUrl, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        } else {
-            StoryPlaceholder(isVideo)
-        }
+        StoryStaticPreviewSurface(
+            story = story,
+            revealPolicy = StoryRevealThumbnailPolicy.EXPOSED,
+            modifier = Modifier.fillMaxSize(),
+        )
 
         Box(Modifier.fillMaxSize().padding(7.dp), contentAlignment = Alignment.TopStart) {
             StoryDateBadge(story.timestamp)

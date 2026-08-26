@@ -120,7 +120,7 @@ fun StickerOverlayView(
 
     val minScale = stickerMinimumScale(sticker.type)
     val maxScale = stickerMaximumScale(
-        type = sticker.type,
+        sticker = sticker,
         baseWidthPx = naturalWidthPx,
         baseHeightPx = naturalHeightPx,
         canvasWidthPx = canvasWidthPx,
@@ -464,13 +464,25 @@ private fun stickerMinimumScale(type: String): Float = when (type) {
 }
 
 private fun stickerMaximumScale(
-    type: String,
+    sticker: StoryStickerDraft,
     baseWidthPx: Int,
     baseHeightPx: Int,
     canvasWidthPx: Int,
     canvasHeightPx: Int,
 ): Float {
     if (baseWidthPx <= 0 || baseHeightPx <= 0 || canvasWidthPx <= 0 || canvasHeightPx <= 0) return 4f
+    if (
+        sticker.type == "shareMoment" &&
+        !sticker.videoURL.isNullOrBlank() &&
+        (sticker.mediaCount ?: 1) == 1 &&
+        (sticker.cardLayoutVariant ?: 0) % 2 == 1
+    ) {
+        return maxOf(
+            canvasWidthPx.toFloat() / baseWidthPx,
+            canvasHeightPx.toFloat() / baseHeightPx,
+        ).coerceAtLeast(stickerMinimumScale(sticker.type))
+    }
+    val type = sticker.type
     val (widthPadding, heightRatio, typeCap) = when (type) {
         "poll", "question", "quiz", "emojiSlider" -> Triple(34f, .42f, 1.45f)
         "countdown" -> Triple(40f, .34f, 1.35f)

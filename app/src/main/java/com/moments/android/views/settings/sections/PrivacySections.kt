@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -262,7 +263,13 @@ fun ConnectionVisibilityView(
                 Column {
                     connectionToggleRow(
                         title = stringResource(R.string.settings_privacy_hide_following),
-                        description = stringResource(R.string.settings_privacy_hide_following_desc),
+                        description = stringResource(
+                            if (showFollowing) {
+                                R.string.settings_privacy_hide_following_desc_visible
+                            } else {
+                                R.string.settings_privacy_hide_following_desc
+                            },
+                        ),
                         isOn = !showFollowing,
                         onChange = { hide ->
                             onShowFollowingChange(!hide)
@@ -273,7 +280,13 @@ fun ConnectionVisibilityView(
                     HorizontalDivider(Modifier.padding(start = 32.dp), color = primary.copy(0.2f), thickness = 0.5.dp)
                     connectionToggleRow(
                         title = stringResource(R.string.settings_privacy_hide_followers),
-                        description = stringResource(R.string.settings_privacy_hide_followers_desc),
+                        description = stringResource(
+                            if (showFollowers) {
+                                R.string.settings_privacy_hide_followers_desc_visible
+                            } else {
+                                R.string.settings_privacy_hide_followers_desc
+                            },
+                        ),
                         isOn = !showFollowers,
                         onChange = { hide ->
                             onShowFollowersChange(!hide)
@@ -310,7 +323,7 @@ private fun connectionToggleRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            Icons.Filled.VisibilityOff,
+            if (isOn) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
             null,
             tint = primary,
             modifier = Modifier.size(18.dp),

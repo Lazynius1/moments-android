@@ -39,6 +39,7 @@ import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
+import com.moments.android.models.Story
 import com.moments.android.notifications.components.GlassmorphicActionButton
 import com.moments.android.notifications.core.NotificationGroup
 import com.moments.android.notifications.core.NotificationsViewModel
@@ -47,6 +48,7 @@ import com.moments.android.notifications.row.EnhancedNotificationRowFollow.follo
 import com.moments.android.notifications.row.EnhancedNotificationRowPreviews.isStoryMention
 import com.moments.android.notifications.row.EnhancedNotificationRowPreviews.momentTrailing
 import com.moments.android.notifications.row.EnhancedNotificationRowPreviews.storyTrailing
+import com.moments.android.views.story.storyviewer.StoryStaticPreviewSurface
 
 /**
  * Port de EnhancedNotificationRow+Trailing.swift
@@ -140,26 +142,26 @@ object EnhancedNotificationRowTrailing {
         val first = group.notifications.first()
         var imagePath by remember(first.id) { mutableStateOf<String?>(null) }
         var loadFailed by remember(first.id) { mutableStateOf(false) }
+        var storyModel by remember(first.id) { mutableStateOf<Story?>(null) }
 
         // ≡ setupPreviews: storyPreviewUrl adjunto, si no fetchStoryPreview(resolvedStoryAuthorId)
         LaunchedEffect(first.id, first.storyId, first.storyPreviewUrl, first.storyAuthorId) {
             val attached = first.storyPreviewUrl?.trim().orEmpty()
-            if (attached.isNotEmpty()) {
-                imagePath = attached
-                loadFailed = false
-                return@LaunchedEffect
-            }
             val storyId = first.storyId?.trim().orEmpty()
             if (storyId.isEmpty()) {
-                loadFailed = true
+                imagePath = attached.takeIf { it.isNotEmpty() }
+                loadFailed = attached.isEmpty()
                 return@LaunchedEffect
             }
-            val path = EnhancedNotificationRowPreviews.fetchStoryPreview(
+            val authorId = EnhancedNotificationRowPreviews.resolvedStoryAuthorId(first)
+            storyModel = EnhancedNotificationRowPreviews.fetchStoryPreviewModel(
                 storyId,
-                EnhancedNotificationRowPreviews.resolvedStoryAuthorId(first),
+                authorId,
             )
+            val path = attached.takeIf { it.isNotEmpty() }
+                ?: EnhancedNotificationRowPreviews.fetchStoryPreview(storyId, authorId)
             imagePath = path
-            loadFailed = path == null
+            loadFailed = storyModel == null && path == null
         }
 
         val path = imagePath
@@ -169,9 +171,24 @@ object EnhancedNotificationRowTrailing {
                 contentAlignment = Alignment.BottomEnd,
             ) {
                 val corner = RoundedCornerShape(8.dp)
-                AsyncImage(
-                    model = path,
-                    contentDescription = null,
+                if (storyModel != null) {
+                    StoryStaticPreviewSurface(
+                        story = storyModel!!,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(corner),
+                    )
+                } else {
+                    AsyncImage(
+                        model = path,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(corner),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+                Box(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(corner)
@@ -185,7 +202,6 @@ object EnhancedNotificationRowTrailing {
                             ),
                             corner,
                         ),
-                    contentScale = ContentScale.Crop,
                 )
                 Icon(
                     imageVector = Icons.Filled.Link,

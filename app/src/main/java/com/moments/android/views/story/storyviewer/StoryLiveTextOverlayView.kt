@@ -34,6 +34,7 @@ fun StoryLiveTextOverlayView(
     replayToken: Int,
     modifier: Modifier = Modifier,
     containerSize: Size? = null,
+    animates: Boolean = true,
 ) {
     BoxWithConstraints(modifier.zIndex(metadata.layerOrder.toFloat())) {
         val density = LocalDensity.current
@@ -67,7 +68,7 @@ fun StoryLiveTextOverlayView(
             StoryTextOverlayLabel(
                 configuration = config,
                 maxWidth = maxWidth,
-                motionRaw = metadata.motion.raw,
+                motionRaw = if (animates) metadata.motion.raw else "none",
                 replayToken = replayToken,
                 modifier = Modifier.onSizeChanged {
                     contentWidthPx = it.width.toFloat()

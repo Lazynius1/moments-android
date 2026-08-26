@@ -1970,7 +1970,9 @@ fun StickerEmojiSliderCardView(
                     y = (thumbCenter.y - thumbSize / 2).dp,
                 )
                 .size(thumbSize.dp)
-                .wrapContentSize(unbounded = true, align = Alignment.Center)
+                // Igual que el `.frame(width:height:)` de iOS: centra el glifo
+                // sin permitir que su layout desborde la tarjeta y sea cortado.
+                .wrapContentSize(align = Alignment.Center)
                 .graphicsLayer {
                     scaleX = animatedScale
                     scaleY = animatedScale

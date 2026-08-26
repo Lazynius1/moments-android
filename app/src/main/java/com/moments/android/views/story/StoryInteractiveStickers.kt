@@ -291,6 +291,7 @@ fun StoryInteractiveStickerLayer(
     onResumeStory: () -> Unit,
     gestureGate: StoryDeckGestureGate? = null,
     reportsDeckInteractionExclusion: Boolean = true,
+    isThumbnail: Boolean = false,
     /** Si se pasa, no hay Box fillMaxSize intermedio → zIndex interleave con texto. */
     containerWidthPx: Float? = null,
     containerHeightPx: Float? = null,
@@ -306,6 +307,7 @@ fun StoryInteractiveStickerLayer(
             onResumeStory = onResumeStory,
             gestureGate = gestureGate,
             reportsDeckInteractionExclusion = reportsDeckInteractionExclusion,
+            isThumbnail = isThumbnail,
         )
     } else {
         BoxWithConstraints(modifier) {
@@ -319,6 +321,7 @@ fun StoryInteractiveStickerLayer(
                 onResumeStory = onResumeStory,
                 gestureGate = gestureGate,
                 reportsDeckInteractionExclusion = reportsDeckInteractionExclusion,
+                isThumbnail = isThumbnail,
             )
         }
     }
@@ -334,6 +337,7 @@ private fun StoryInteractiveFrameStickers(
     onResumeStory: () -> Unit,
     gestureGate: StoryDeckGestureGate?,
     reportsDeckInteractionExclusion: Boolean,
+    isThumbnail: Boolean,
 ) {
     val density = LocalDensity.current
     val canvasScaleFactor = StoryViewerLayoutHelpers.stickerDisplayScale(1.0, widthPx, density.density)
@@ -349,17 +353,7 @@ private fun StoryInteractiveFrameStickers(
             val exclusionId = "sticker.$storyId.${sticker.stickerId.orEmpty()}"
             val displayScale = sticker.scale.toFloat() * canvasScaleFactor
 
-            InteractiveFrameSticker(
-                storyId = "$storyId.${sticker.stickerId.orEmpty()}",
-                imageContent = sticker.content,
-                caption = sticker.caption,
-                frameStyle = StoryPolaroidFrameStyle.fromRawOrDefault(sticker.frameStyle),
-                contentScale = sticker.contentScale?.toFloat() ?: 1f,
-                contentOffsetX = sticker.contentOffsetX?.toFloat() ?: 0f,
-                contentOffsetY = sticker.contentOffsetY?.toFloat() ?: 0f,
-                onPauseStory = onPauseStory,
-                onResumeStory = onResumeStory,
-                modifier = Modifier
+            val frameModifier = Modifier
                     .zIndex((sticker.zIndex ?: 0).toFloat())
                     .size(width = 200.dp, height = 240.dp)
                     .offset {
@@ -376,9 +370,33 @@ private fun StoryInteractiveFrameStickers(
                     .storyDeckInteractionExclusion(
                         id = exclusionId,
                         gate = gestureGate,
-                        enabled = reportsDeckInteractionExclusion,
-                    ),
-            )
+                        enabled = reportsDeckInteractionExclusion && !isThumbnail,
+                    )
+            if (isThumbnail) {
+                StickerPolaroidFrameView(
+                    image = remember(sticker.content) { decodeStickerBitmap(sticker.content) },
+                    caption = sticker.caption,
+                    frameStyle = StoryPolaroidFrameStyle.fromRawOrDefault(sticker.frameStyle),
+                    contentScale = sticker.contentScale?.toFloat() ?: 1f,
+                    contentOffsetX = sticker.contentOffsetX?.toFloat() ?: 0f,
+                    contentOffsetY = sticker.contentOffsetY?.toFloat() ?: 0f,
+                    progress = 0f,
+                    modifier = frameModifier,
+                )
+            } else {
+                InteractiveFrameSticker(
+                    storyId = "$storyId.${sticker.stickerId.orEmpty()}",
+                    imageContent = sticker.content,
+                    caption = sticker.caption,
+                    frameStyle = StoryPolaroidFrameStyle.fromRawOrDefault(sticker.frameStyle),
+                    contentScale = sticker.contentScale?.toFloat() ?: 1f,
+                    contentOffsetX = sticker.contentOffsetX?.toFloat() ?: 0f,
+                    contentOffsetY = sticker.contentOffsetY?.toFloat() ?: 0f,
+                    onPauseStory = onPauseStory,
+                    onResumeStory = onResumeStory,
+                    modifier = frameModifier,
+                )
+            }
         }
 }
 

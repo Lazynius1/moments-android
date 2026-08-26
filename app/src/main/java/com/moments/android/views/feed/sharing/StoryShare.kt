@@ -62,6 +62,7 @@ import com.moments.android.services.messaging.MessageRequestInteractionContext
 import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.views.messaging.services.sendSharedStoryMessage
 import com.moments.android.views.story.StoryRepository
+import com.moments.android.views.story.storyviewer.StoryStaticPreviewSurface
 import kotlinx.coroutines.launch
 import java.util.Date
 
@@ -314,6 +315,7 @@ fun SharedStoryMessageBubble(
 ) {
     var canViewStory by remember(message.id) { mutableStateOf<Boolean?>(null) }
     var displayData by remember(message.id) { mutableStateOf(message.sharedStoryData) }
+    var resolvedStory by remember(message.id) { mutableStateOf<Story?>(null) }
     var denialReason by remember(message.id) {
         mutableStateOf<SharedStoryAccessDenialReason?>(null)
     }
@@ -351,6 +353,7 @@ fun SharedStoryMessageBubble(
                     "storyExpiration" to (story.expirationDate.time / 1000.0).toString(),
                     "storyTimestamp" to (story.timestamp.time / 1000.0).toString(),
                 )
+                resolvedStory = story
                 canViewStory = true
                 denialReason = null
             }
@@ -377,6 +380,7 @@ fun SharedStoryMessageBubble(
                     StoryBubbleContent(
                         sharedStoryData = displayData!!,
                         isCurrentUser = isCurrentUser,
+                        story = resolvedStory,
                     )
                 }
             }
@@ -413,13 +417,14 @@ fun BlockedStoryBubble(
 fun StoryBubbleContent(
     sharedStoryData: Map<String, String>,
     isCurrentUser: Boolean,
+    story: Story? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier.padding(vertical = 4.dp),
         horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start,
     ) {
-        StoryPreviewCard(sharedStoryData = sharedStoryData)
+        StoryPreviewCard(sharedStoryData = sharedStoryData, story = story)
     }
 }
 
@@ -433,6 +438,7 @@ object StoryShareCardMetrics {
 @Composable
 fun StoryPreviewCard(
     sharedStoryData: Map<String, String>,
+    story: Story? = null,
     modifier: Modifier = Modifier,
 ) {
     val isVideo = sharedStoryData["storyMediaType"] == "video"
@@ -444,7 +450,11 @@ fun StoryPreviewCard(
             .clip(shape)
             .border(0.5.dp, Color.White.copy(0.12f), shape),
     ) {
-        StoryVisualContent(sharedStoryData = sharedStoryData, modifier = Modifier.fillMaxSize())
+        if (story != null) {
+            StoryStaticPreviewSurface(story = story, modifier = Modifier.fillMaxSize())
+        } else {
+            StoryVisualContent(sharedStoryData = sharedStoryData, modifier = Modifier.fillMaxSize())
+        }
 
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().height(70.dp)) {
