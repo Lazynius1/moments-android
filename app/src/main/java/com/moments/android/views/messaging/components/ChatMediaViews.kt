@@ -332,7 +332,12 @@ fun ChatVideoPlayBadge(
         modifier = modifier
             .padding(padding)
             .size(size)
-            .shadow(3.dp, ambientColor = Color.Black.copy(0.5f), spotColor = Color.Black.copy(0.5f)),
+            .shadow(
+                elevation = 6.dp,
+                shape = CircleShape,
+                ambientColor = Color.Black.copy(0.75f),
+                spotColor = Color.Black.copy(0.55f),
+            ),
     )
 }
 

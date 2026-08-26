@@ -310,11 +310,7 @@ fun StoryShareRecipientsPanel(
     }
 }
 
-// Chat bubble: miniatura de historia ampliada — no tarjeta de post
-
-private val sharedStoryRingGradient = Brush.linearGradient(
-    listOf(Color(0xFF0A84FF), Color(0xFFAF52DE), Color(0xFFFF2D55)),
-)
+// Chat bubble: preview 9:16 sin anillo
 
 @Composable
 fun SharedStoryMessageBubble(
@@ -431,10 +427,9 @@ fun StoryBubbleContent(
 }
 
 object StoryShareCardMetrics {
-    val width = 140.dp
-    val height = 217.dp
-    val cornerRadius = 16.dp
-    val ringLineWidth = 2.25.dp
+    val width = 180.dp
+    val height = 320.dp
+    val cornerRadius = 18.dp
 }
 
 @Composable
@@ -444,8 +439,7 @@ private fun SharedStoryPreviewSkeleton(modifier: Modifier = Modifier) {
         modifier
             .size(StoryShareCardMetrics.width, StoryShareCardMetrics.height)
             .clip(shape)
-            .background(Color.White.copy(0.1f))
-            .border(StoryShareCardMetrics.ringLineWidth, sharedStoryRingGradient, shape),
+            .background(Color.White.copy(0.1f)),
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(
@@ -465,69 +459,60 @@ private fun SharedStoryUnavailablePreview(
     authorName: String?,
     modifier: Modifier = Modifier,
 ) {
-    val outerShape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius)
-    val inset = StoryShareCardMetrics.ringLineWidth + 1.5.dp
-    val innerShape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius - 2.5.dp)
+    val shape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius)
 
     Box(
         modifier
             .size(StoryShareCardMetrics.width, StoryShareCardMetrics.height)
-            .border(StoryShareCardMetrics.ringLineWidth, sharedStoryRingGradient, outerShape)
-            .padding(inset),
+            .clip(shape),
     ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .clip(innerShape),
-        ) {
-            if (!previewImageURL.isNullOrBlank()) {
-                AsyncImage(
-                    model = previewImageURL,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .blur(18.dp),
-                )
-            } else {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.linearGradient(
-                                listOf(Color.White.copy(0.14f), Color.White.copy(0.06f)),
-                            ),
-                        ),
-                )
-            }
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(0.48f)))
-            Column(
-                Modifier.align(Alignment.Center).padding(horizontal = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Icon(icon, contentDescription = null, tint = Color.White.copy(0.92f), modifier = Modifier.size(22.dp))
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    title,
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
-                )
-            }
-            SharedDMPreviewAuthorRow(
-                authorId = authorId,
-                authorName = authorName,
-                useStoryRing = true,
+        if (!previewImageURL.isNullOrBlank()) {
+            AsyncImage(
+                model = previewImageURL,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                    .fillMaxSize()
+                    .blur(18.dp),
+            )
+        } else {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color.White.copy(0.14f), Color.White.copy(0.06f)),
+                        ),
+                    ),
             )
         }
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(0.48f)))
+        Column(
+            Modifier.align(Alignment.Center).padding(horizontal = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(icon, contentDescription = null, tint = Color.White.copy(0.92f), modifier = Modifier.size(22.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(
+                title,
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+        }
+        SharedDMPreviewAuthorRow(
+            authorId = authorId,
+            authorName = authorName,
+            useStoryRing = true,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+        )
     }
 }
 
-/** Historia compartida en DM: reply thumb más grande + anillo; autor encima. */
+/** Historia compartida en DM: 9:16 sin anillo; autor encima. */
 @Composable
 fun StoryPreviewCard(
     sharedStoryData: Map<String, String>,
@@ -535,62 +520,57 @@ fun StoryPreviewCard(
     modifier: Modifier = Modifier,
 ) {
     val isVideo = sharedStoryData["storyMediaType"] == "video"
-    val outerShape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius)
-    val inset = StoryShareCardMetrics.ringLineWidth + 1.5.dp
-    val innerShape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius - 2.5.dp)
+    val shape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius)
 
     Box(
         modifier
             .size(StoryShareCardMetrics.width, StoryShareCardMetrics.height)
-            .border(StoryShareCardMetrics.ringLineWidth, sharedStoryRingGradient, outerShape)
-            .padding(inset),
+            .clip(shape),
     ) {
-        Box(Modifier.fillMaxSize().clip(innerShape)) {
-            if (story != null) {
-                StoryStaticPreviewSurface(story = story, modifier = Modifier.fillMaxSize())
-            } else {
-                StoryVisualContent(sharedStoryData = sharedStoryData, modifier = Modifier.fillMaxSize())
-            }
+        if (story != null) {
+            StoryStaticPreviewSurface(story = story, modifier = Modifier.fillMaxSize())
+        } else {
+            StoryVisualContent(sharedStoryData = sharedStoryData, modifier = Modifier.fillMaxSize())
+        }
 
-            Column(Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxWidth().height(64.dp)) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color.Black.copy(0.5f), Color.Transparent),
-                                ),
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxWidth().height(72.dp)) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Black.copy(0.5f), Color.Transparent),
                             ),
-                    )
-                    SharedDMPreviewAuthorRow(
-                        authorId = sharedStoryData["storyAuthorId"],
-                        authorName = sharedStoryData["storyAuthor"],
-                        useStoryRing = true,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(horizontal = 10.dp, vertical = 10.dp),
-                    )
-                }
-                Spacer(Modifier.weight(1f))
+                        ),
+                )
+                SharedDMPreviewAuthorRow(
+                    authorId = sharedStoryData["storyAuthorId"],
+                    authorName = sharedStoryData["storyAuthor"],
+                    useStoryRing = true,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                )
             }
+            Spacer(Modifier.weight(1f))
+        }
 
-            if (isVideo) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Box(
-                        Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(0.35f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Filled.PlayArrow,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
+        if (isVideo) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(0.35f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp),
+                    )
                 }
             }
         }

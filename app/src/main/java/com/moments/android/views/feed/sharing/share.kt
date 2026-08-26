@@ -147,6 +147,7 @@ import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
+import com.moments.android.views.messaging.components.ChatVideoPlayBadge
 import com.moments.android.views.messaging.components.GlassmorphicAvatar
 import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.EnhancedMessage
@@ -1561,6 +1562,13 @@ fun parseSharedAspectRatio(raw: String?): Float {
     return trimmed.toFloatOrNull()?.takeIf { it > 0f } ?: 1f
 }
 
+/** ≡ iOS `sharedMomentLooksLikeReel` — vídeo vertical ~9:16. */
+fun sharedMomentLooksLikeReel(isVideo: Boolean, aspectRatio: Float): Boolean {
+    if (!isVideo) return false
+    val target = 9f / 16f
+    return kotlin.math.abs(aspectRatio - target) <= 0.05f
+}
+
 @Composable
 fun SharedDMPostCard(
     authorId: String?,
@@ -2013,17 +2021,87 @@ fun MomentPreviewCard(
     modifier: Modifier = Modifier,
 ) {
     val isVideo = !sharedMomentData["momentVideoUrl"].isNullOrBlank()
-    SharedDMPostCard(
-        authorId = sharedMomentData["momentAuthorId"],
-        authorName = sharedMomentData["momentAuthor"],
-        useStoryRing = true,
-        isVideo = isVideo,
-        aspectRatio = parseSharedAspectRatio(sharedMomentData["momentAspectRatio"]),
-        captionAuthor = sharedMomentData["momentAuthor"],
-        caption = sharedMomentData["momentContent"],
-        modifier = modifier,
+    val aspectRatio = parseSharedAspectRatio(sharedMomentData["momentAspectRatio"])
+    if (sharedMomentLooksLikeReel(isVideo = isVideo, aspectRatio = aspectRatio)) {
+        ReelPreviewCard(sharedMomentData = sharedMomentData, modifier = modifier)
+    } else {
+        SharedDMPostCard(
+            authorId = sharedMomentData["momentAuthorId"],
+            authorName = sharedMomentData["momentAuthor"],
+            useStoryRing = true,
+            isVideo = isVideo,
+            aspectRatio = aspectRatio,
+            captionAuthor = sharedMomentData["momentAuthor"],
+            caption = sharedMomentData["momentContent"],
+            modifier = modifier,
+        ) {
+            MomentVisualContent(sharedMomentData = sharedMomentData)
+        }
+    }
+}
+
+/** Preview DM de reel: mismas métricas que historia; play + pill de caption. */
+@Composable
+fun ReelPreviewCard(
+    sharedMomentData: Map<String, String>,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius)
+    val caption = sharedMomentData["momentContent"]?.trim()?.takeIf { it.isNotEmpty() }
+    Box(
+        modifier
+            .size(StoryShareCardMetrics.width, StoryShareCardMetrics.height)
+            .clip(shape),
     ) {
-        MomentVisualContent(sharedMomentData = sharedMomentData)
+        MomentVisualContent(
+            sharedMomentData = sharedMomentData,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxWidth().height(72.dp)) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Black.copy(0.5f), Color.Transparent),
+                            ),
+                        ),
+                )
+                SharedDMPreviewAuthorRow(
+                    authorId = sharedMomentData["momentAuthorId"],
+                    authorName = sharedMomentData["momentAuthor"],
+                    useStoryRing = true,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 12.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ChatVideoPlayBadge(size = 18.dp, padding = 8.dp)
+                if (caption != null) {
+                    Text(
+                        caption,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .background(Color.Black.copy(0.45f), CircleShape)
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
+            }
+        }
     }
 }
 
