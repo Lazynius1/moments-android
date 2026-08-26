@@ -43,6 +43,7 @@ object ChatRowHeightEstimator {
     private val viewOnceRowVerticalPadding = 10.dp
     private val ephemeralHeight = 150.dp
     private val sharedPreviewHeight = 220.dp
+    private val sharedProfilePreviewHeight = 248.dp
     private val chatNoticeHeight = 36.dp
 
     private val headerHeight = 32.dp
@@ -121,6 +122,7 @@ object ChatRowHeightEstimator {
         MessageType.VIEW_ONCE_IMAGE, MessageType.VIEW_ONCE_VIDEO -> viewOnceHeight(message)
         MessageType.EPHEMERAL -> ephemeralHeight
         MessageType.SHARED_MOMENT, MessageType.SHARED_STORY -> sharedPreviewHeight
+        MessageType.SHARED_PROFILE -> sharedProfilePreviewHeight
         MessageType.CHAT_NOTICE -> chatNoticeHeight
     }
 

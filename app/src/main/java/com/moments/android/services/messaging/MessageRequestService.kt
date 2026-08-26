@@ -62,6 +62,7 @@ data class MessageRequestInteractionContext(
         STORY_EPHEMERAL("storyEphemeral"),
         SHARE_STORY("shareStory"),
         SHARE_MOMENT("shareMoment"),
+        SHARE_PROFILE("shareProfile"),
         FORWARD_TEXT("forwardText"),
     }
 
@@ -99,6 +100,7 @@ class MessageRequestService(
             MessageType.EPHEMERAL,
             MessageType.SHARED_MOMENT,
             MessageType.SHARED_STORY,
+            MessageType.SHARED_PROFILE,
             MessageType.VIEW_ONCE_IMAGE,
             MessageType.VIEW_ONCE_VIDEO,
         )

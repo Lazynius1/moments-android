@@ -13,6 +13,7 @@ import com.moments.android.models.StickerData
 import com.moments.android.models.StoryTextOverlayMetadata
 import com.moments.android.models.toMap
 import com.moments.android.services.messaging.EncryptionService
+import com.moments.android.services.messaging.MessageRequestInteractionContext
 import com.moments.android.views.messaging.models.ChatLocationPayload
 import java.util.Date
 import java.util.concurrent.locks.ReentrantLock
@@ -253,11 +254,33 @@ suspend fun ChatService.buildEnhancedMessage(
     val storyReplyData = (data["storyReplyData"] as? Map<String, Any?>)
         ?.mapValues { (_, value) -> value?.toString().orEmpty() }
     @Suppress("UNCHECKED_CAST")
-    val sharedMomentData = (data["sharedMomentData"] as? Map<String, Any?>)
+    val requestContext = data["context"] as? Map<String, Any?> ?: emptyMap()
+    val requestContextKind = data["contextKind"] as? String ?: requestContext["kind"] as? String
+    var sharedMomentData = (data["sharedMomentData"] as? Map<String, Any?>)
         ?.mapValues { (_, value) -> value?.toString().orEmpty() }
-    @Suppress("UNCHECKED_CAST")
-    val sharedStoryData = (data["sharedStoryData"] as? Map<String, Any?>)
+    var sharedStoryData = (data["sharedStoryData"] as? Map<String, Any?>)
         ?.mapValues { (_, value) -> value?.toString().orEmpty() }
+    var sharedProfileData = (data["sharedProfileData"] as? Map<String, Any?>)
+        ?.mapValues { (_, value) -> value?.toString().orEmpty() }
+    if (sharedMomentData == null && requestContextKind == MessageRequestInteractionContext.Kind.SHARE_MOMENT.raw) {
+        sharedMomentData = mapOf(
+            "momentId" to requestContext["sharedContentId"]?.toString().orEmpty(),
+            "momentAuthorId" to requestContext["sharedContentOwnerId"]?.toString().orEmpty(),
+        )
+    }
+    if (sharedStoryData == null && requestContextKind == MessageRequestInteractionContext.Kind.SHARE_STORY.raw) {
+        sharedStoryData = mapOf(
+            "storyId" to (requestContext["sharedContentId"]?.toString()
+                ?: requestContext["storyId"]?.toString()).orEmpty(),
+            "storyAuthorId" to (requestContext["sharedContentOwnerId"]?.toString()
+                ?: requestContext["storyOwnerId"]?.toString()).orEmpty(),
+        )
+    }
+    if (sharedProfileData == null && requestContextKind == MessageRequestInteractionContext.Kind.SHARE_PROFILE.raw) {
+        sharedProfileData = mapOf(
+            "profileUserId" to requestContext["sharedContentId"]?.toString().orEmpty(),
+        )
+    }
     fun stringList(key: String): List<String>? = (data[key] as? List<*>)?.filterIsInstance<String>()
     val drawingData = when (val value = data["drawingData"]) {
         is ByteArray -> value
@@ -308,6 +331,7 @@ suspend fun ChatService.buildEnhancedMessage(
         storyReplyData = storyReplyData,
         sharedMomentData = sharedMomentData,
         sharedStoryData = sharedStoryData,
+        sharedProfileData = sharedProfileData,
         expirationDate = (data["expirationDate"] as? Timestamp)?.toDate(),
         isViewed = data["isViewed"] as? Boolean ?: false,
         mediaBatchId = data["mediaBatchId"] as? String,

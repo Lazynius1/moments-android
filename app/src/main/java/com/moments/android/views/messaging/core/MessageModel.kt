@@ -33,7 +33,7 @@ import java.util.UUID
 enum class MessageType(val raw: String) {
     TEXT("text"), IMAGE("image"), VIDEO("video"), AUDIO("audio"), GIF("gif"),
     STICKER("sticker"), LOCATION("location"), FILE("file"), EPHEMERAL("ephemeral"),
-    SHARED_MOMENT("sharedMoment"), SHARED_STORY("sharedStory"),
+    SHARED_MOMENT("sharedMoment"), SHARED_STORY("sharedStory"), SHARED_PROFILE("sharedProfile"),
     VIEW_ONCE_IMAGE("viewOnceImage"), VIEW_ONCE_VIDEO("viewOnceVideo"), CHAT_NOTICE("chatNotice");
 
     val isViewOnce: Boolean get() = this == VIEW_ONCE_IMAGE || this == VIEW_ONCE_VIDEO
@@ -53,6 +53,7 @@ enum class MessageType(val raw: String) {
             EPHEMERAL -> "timer"
             SHARED_MOMENT -> "square.and.arrow.up"
             SHARED_STORY -> "paperplane.fill"
+            SHARED_PROFILE -> "person.crop.circle"
             VIEW_ONCE_IMAGE -> "camera.circle"
             VIEW_ONCE_VIDEO -> "video.circle"
             CHAT_NOTICE -> "timer"
@@ -70,6 +71,7 @@ enum class MessageType(val raw: String) {
         EPHEMERAL -> context.getString(R.string.chat_view_once_label)
         SHARED_MOMENT -> context.getString(R.string.chat_preview_shared_moment)
         SHARED_STORY -> context.getString(R.string.chat_preview_shared_story)
+        SHARED_PROFILE -> context.getString(R.string.chat_preview_shared_profile)
         VIEW_ONCE_IMAGE -> context.getString(R.string.chat_view_once_photo) +
             " (" + context.getString(R.string.chat_view_once_label) + ")"
         VIEW_ONCE_VIDEO -> context.getString(R.string.chat_view_once_video) +
@@ -95,6 +97,7 @@ fun MessageType.conversationPreview(context: android.content.Context): String = 
     MessageType.EPHEMERAL -> context.getString(com.moments.android.R.string.chat_preview_ephemeral)
     MessageType.SHARED_MOMENT -> context.getString(com.moments.android.R.string.chat_preview_shared_moment)
     MessageType.SHARED_STORY -> context.getString(com.moments.android.R.string.chat_preview_shared_story)
+    MessageType.SHARED_PROFILE -> context.getString(com.moments.android.R.string.chat_preview_shared_profile)
     MessageType.CHAT_NOTICE -> ""
 }
 
@@ -233,6 +236,7 @@ data class EnhancedMessage(
     val storyReplyData: Map<String, String>? = null,
     val sharedMomentData: Map<String, String>? = null,
     val sharedStoryData: Map<String, String>? = null,
+    val sharedProfileData: Map<String, String>? = null,
     var expirationDate: Date? = null,
     var isViewed: Boolean = false,
     val mediaBatchId: String? = null,
@@ -298,6 +302,7 @@ data class EnhancedMessage(
         storyReplyData?.let { put("storyReplyData", JSONObject(it)) }
         sharedMomentData?.let { put("sharedMomentData", JSONObject(it)) }
         sharedStoryData?.let { put("sharedStoryData", JSONObject(it)) }
+        sharedProfileData?.let { put("sharedProfileData", JSONObject(it)) }
         expirationDate?.let { put("expirationDate", it.time) }
         put("isViewed", isViewed)
         mediaBatchId?.let { put("mediaBatchId", it) }
@@ -377,6 +382,7 @@ data class EnhancedMessage(
             MessageType.EPHEMERAL -> context.getString(R.string.chat_preview_ephemeral_long)
             MessageType.SHARED_MOMENT -> context.getString(R.string.chat_preview_shared_moment)
             MessageType.SHARED_STORY -> context.getString(R.string.chat_preview_shared_story)
+            MessageType.SHARED_PROFILE -> context.getString(R.string.chat_preview_shared_profile)
             MessageType.VIEW_ONCE_IMAGE -> context.getString(R.string.chat_preview_photo)
             MessageType.VIEW_ONCE_VIDEO -> context.getString(R.string.chat_preview_video)
             MessageType.CHAT_NOTICE -> chatNoticePreviewText(context, content.orEmpty())
@@ -606,6 +612,7 @@ data class EnhancedMessage(
             },
             sharedMomentData = obj.optJSONObject("sharedMomentData")?.let { payload -> payload.keys().asSequence().associateWith { key -> payload.optString(key) } },
             sharedStoryData = obj.optJSONObject("sharedStoryData")?.let { payload -> payload.keys().asSequence().associateWith { key -> payload.optString(key) } },
+            sharedProfileData = obj.optJSONObject("sharedProfileData")?.let { payload -> payload.keys().asSequence().associateWith { key -> payload.optString(key) } },
             expirationDate = obj.optLong("expirationDate").takeIf { obj.has("expirationDate") }?.let { Date(it) },
             isViewed = obj.optBoolean("isViewed"),
             mediaBatchId = obj.optString("mediaBatchId").takeIf { obj.has("mediaBatchId") && !obj.isNull("mediaBatchId") },
@@ -1022,6 +1029,7 @@ data class MessageRequest(
         MessageType.EPHEMERAL -> context.getString(R.string.chat_preview_ephemeral)
         MessageType.SHARED_MOMENT -> context.getString(R.string.chat_preview_shared_moment)
         MessageType.SHARED_STORY -> context.getString(R.string.chat_preview_shared_story)
+        MessageType.SHARED_PROFILE -> context.getString(R.string.chat_preview_shared_profile)
         MessageType.VIEW_ONCE_IMAGE -> context.getString(R.string.chat_preview_view_once_photo)
         MessageType.VIEW_ONCE_VIDEO -> context.getString(R.string.chat_preview_view_once_video)
         MessageType.CHAT_NOTICE -> {
@@ -1349,6 +1357,9 @@ data class PendingChatTimelineMessage(
             sharedStoryData = if (contextKind == "shareStory") mapOf(
                 "storyId" to (sharedContentId ?: storyId).orEmpty(),
                 "storyAuthorId" to (sharedContentOwnerId ?: storyOwnerId).orEmpty(),
+            ) else null,
+            sharedProfileData = if (contextKind == "shareProfile") mapOf(
+                "profileUserId" to sharedContentId.orEmpty(),
             ) else null,
             expirationDate = expirationDate,
             isViewed = false,

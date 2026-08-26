@@ -67,6 +67,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.extensions.rawPadding
 import com.moments.android.views.feed.sharing.SharedMomentMessageBubble
+import com.moments.android.views.feed.sharing.SharedProfileMessageBubble
 import com.moments.android.views.feed.sharing.SharedStoryMessageBubble
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageStatus
@@ -462,6 +463,12 @@ fun GlassmorphicMessageBubble(
                     message = message,
                     isCurrentUser = isCurrentUser,
                     onTap = { callbacks.onStoryNavigation?.invoke(message) },
+                )
+            }
+            MessageType.SHARED_PROFILE -> AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {
+                SharedProfileMessageBubble(
+                    message = message,
+                    isCurrentUser = isCurrentUser,
                 )
             }
             else -> AttachBubbleBadges(isCurrentUser, reactions, starred, callbacks.onReaction) {

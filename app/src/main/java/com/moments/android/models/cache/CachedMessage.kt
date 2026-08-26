@@ -61,6 +61,7 @@ data class CachedMessage(
     val storyReplyDataEncoded: ByteArray? = null,
     val sharedMomentDataEncoded: ByteArray? = null,
     val sharedStoryDataEncoded: ByteArray? = null,
+    val sharedProfileDataEncoded: ByteArray? = null,
     val textOverlayLive: Boolean? = null,
     val textOverlaysData: ByteArray? = null,
     val stickersData: ByteArray? = null,
@@ -119,6 +120,7 @@ data class CachedMessage(
             storyReplyData = decodeStringMap(storyReplyDataEncoded),
             sharedMomentData = decodeStringMap(sharedMomentDataEncoded),
             sharedStoryData = decodeStringMap(sharedStoryDataEncoded),
+            sharedProfileData = decodeStringMap(sharedProfileDataEncoded),
             mediaBatchId = mediaBatchId,
             textOverlayLive = textOverlayLive,
             textOverlays = decodeOverlays(textOverlaysData),
@@ -177,6 +179,7 @@ data class CachedMessage(
             Arrays.equals(storyReplyDataEncoded, other.storyReplyDataEncoded) &&
             Arrays.equals(sharedMomentDataEncoded, other.sharedMomentDataEncoded) &&
             Arrays.equals(sharedStoryDataEncoded, other.sharedStoryDataEncoded) &&
+            Arrays.equals(sharedProfileDataEncoded, other.sharedProfileDataEncoded) &&
             textOverlayLive == other.textOverlayLive &&
             Arrays.equals(textOverlaysData, other.textOverlaysData) &&
             Arrays.equals(stickersData, other.stickersData) &&
@@ -232,6 +235,7 @@ data class CachedMessage(
         result = 31 * result + (storyReplyDataEncoded?.let { Arrays.hashCode(it) } ?: 0)
         result = 31 * result + (sharedMomentDataEncoded?.let { Arrays.hashCode(it) } ?: 0)
         result = 31 * result + (sharedStoryDataEncoded?.let { Arrays.hashCode(it) } ?: 0)
+        result = 31 * result + (sharedProfileDataEncoded?.let { Arrays.hashCode(it) } ?: 0)
         result = 31 * result + (textOverlayLive?.hashCode() ?: 0)
         result = 31 * result + (textOverlaysData?.let { Arrays.hashCode(it) } ?: 0)
         result = 31 * result + (stickersData?.let { Arrays.hashCode(it) } ?: 0)
@@ -306,6 +310,7 @@ data class CachedMessage(
             storyReplyDataEncoded = encodeStringMap(message.storyReplyData),
             sharedMomentDataEncoded = encodeStringMap(message.sharedMomentData),
             sharedStoryDataEncoded = encodeStringMap(message.sharedStoryData),
+            sharedProfileDataEncoded = encodeStringMap(message.sharedProfileData),
             textOverlayLive = message.textOverlayLive,
             textOverlaysData = encodeOverlays(message.textOverlays),
             stickersData = encodeStickers(message.stickers),

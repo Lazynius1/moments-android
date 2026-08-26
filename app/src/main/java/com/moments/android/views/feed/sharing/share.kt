@@ -840,6 +840,7 @@ fun ModernShareSheet(
     val scope = rememberCoroutineScope()
     val author = UserCacheService.getCachedUser(moment.authorId)?.username ?: moment.username
     var deliveryFeedback by remember { mutableStateOf<String?>(null) }
+    var showSuccessFeedback by remember { mutableStateOf(false) }
 
     ShareRecipientsPickerSheet(
         title = stringResource(R.string.share_send_to),
@@ -894,7 +895,7 @@ fun ModernShareSheet(
                 }
                 if (selectedUsers.isNotEmpty() && failures.isEmpty()) {
                     HapticManager.shared.success()
-                    onDismiss()
+                    showSuccessFeedback = true
                 } else {
                     deliveryFeedback = failures.firstOrNull() ?: context.getString(R.string.common_error)
                 }
@@ -906,6 +907,21 @@ fun ModernShareSheet(
             onDismissRequest = { deliveryFeedback = null },
             text = { Text(message) },
             confirmButton = { TextButton(onClick = { deliveryFeedback = null }) { Text(stringResource(R.string.common_ok)) } },
+        )
+    }
+    if (showSuccessFeedback) {
+        AlertDialog(
+            onDismissRequest = { showSuccessFeedback = false; onDismiss() },
+            title = { Text(stringResource(R.string.share_send_success_title)) },
+            text = { Text(stringResource(R.string.share_send_success_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSuccessFeedback = false
+                    onDismiss()
+                }) {
+                    Text(stringResource(R.string.common_ok))
+                }
+            },
         )
     }
 }

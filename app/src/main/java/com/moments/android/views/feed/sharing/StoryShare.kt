@@ -235,6 +235,7 @@ fun StoryShareRecipientsPanel(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var deliveryFeedback by remember { mutableStateOf<String?>(null) }
+    var showSuccessFeedback by remember { mutableStateOf(false) }
 
     LiveUsernameContent(userId = story.authorId, fallbackUsername = story.username) { username ->
         ShareRecipientsPickerSheet(
@@ -289,7 +290,7 @@ fun StoryShareRecipientsPanel(
                     }
                     if (selectedUsers.isNotEmpty() && failures.isEmpty()) {
                         HapticManager.shared.success()
-                        onDismiss()
+                        showSuccessFeedback = true
                     } else {
                         deliveryFeedback = failures.firstOrNull() ?: context.getString(R.string.common_error)
                     }
@@ -303,6 +304,21 @@ fun StoryShareRecipientsPanel(
             text = { Text(message) },
             confirmButton = {
                 TextButton(onClick = { deliveryFeedback = null }) {
+                    Text(stringResource(R.string.common_ok))
+                }
+            },
+        )
+    }
+    if (showSuccessFeedback) {
+        AlertDialog(
+            onDismissRequest = { showSuccessFeedback = false; onDismiss() },
+            title = { Text(stringResource(R.string.share_send_success_title)) },
+            text = { Text(stringResource(R.string.share_send_success_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSuccessFeedback = false
+                    onDismiss()
+                }) {
                     Text(stringResource(R.string.common_ok))
                 }
             },

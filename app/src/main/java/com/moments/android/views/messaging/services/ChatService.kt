@@ -637,6 +637,7 @@ object ChatService {
         message.storyReplyData?.let { data["storyReplyData"] = it }
         message.sharedMomentData?.let { data["sharedMomentData"] = it }
         message.sharedStoryData?.let { data["sharedStoryData"] = it }
+        message.sharedProfileData?.let { data["sharedProfileData"] = it }
         message.expirationDate?.let { data["expirationDate"] = Timestamp(it) }
         message.mediaBatchId?.let { data["mediaBatchId"] = it }
         message.textOverlayLive?.let { data["textOverlayLive"] = it }

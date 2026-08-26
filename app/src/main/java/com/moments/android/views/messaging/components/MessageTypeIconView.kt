@@ -1,6 +1,7 @@
 package com.moments.android.views.messaging.components
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Image
@@ -38,6 +39,7 @@ val MessageType.attachmentIcon: AttachmentIcon?
         MessageType.IMAGE -> AttachmentIcon.PHOTOS
         MessageType.EPHEMERAL, MessageType.VIEW_ONCE_IMAGE, MessageType.VIEW_ONCE_VIDEO -> AttachmentIcon.EPHEMERAL
         MessageType.SHARED_MOMENT -> AttachmentIcon.SHARE
+        MessageType.SHARED_PROFILE -> AttachmentIcon.SHARE
         else -> null
     }
 
@@ -49,6 +51,7 @@ private val MessageType.fallbackIcon: ImageVector
         MessageType.STICKER -> Icons.Default.StickyNote2
         MessageType.FILE -> Icons.Default.InsertDriveFile
         MessageType.SHARED_STORY -> Icons.Default.PlayCircle
+        MessageType.SHARED_PROFILE -> Icons.Default.AccountCircle
         MessageType.CHAT_NOTICE -> Icons.Default.Article
         else -> Icons.Default.Image
     }

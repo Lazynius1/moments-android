@@ -434,6 +434,7 @@
     <string name="chat_preview_ephemeral">Momento effimero</string>
     <string name="chat_preview_shared_moment">Momento condiviso</string>
     <string name="chat_preview_shared_story">Storia condivisa</string>
+    <string name="chat_preview_shared_profile">Profilo condiviso</string>
     <string name="banner_verb_media_moderation_partial">Parte del tuo post è stato nascosta</string>
     <string name="banner_verb_media_moderation_full">Il tuo post è ora visibile solo a te</string>
     <string name="banner_verb_media_moderation_story_partial">Parte della tua storia è stata nascosta</string>

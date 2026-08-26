@@ -159,6 +159,35 @@ suspend fun ChatService.sendSharedStoryMessage(
     sent
 }
 
+suspend fun ChatService.sendSharedProfileMessage(
+    conversationId: String,
+    senderId: String,
+    sharedProfileData: Map<String, String>,
+    shareText: String,
+): Result<EnhancedMessage> = runCatching {
+    val encryptedContent = EncryptionService.encryptChatMessage(shareText, conversationId)
+    val sent = sendMessage(
+        EnhancedMessage(
+            id = UUID.randomUUID().toString(),
+            conversationId = conversationId,
+            senderId = senderId,
+            type = MessageType.SHARED_PROFILE,
+            content = encryptedContent,
+            timestamp = Date(),
+            status = MessageStatus.SENDING,
+            sharedProfileData = sharedProfileData,
+        ),
+        useServerTimestamp = true,
+    ).getOrThrow()
+    updateConversation(
+        conversationId = conversationId,
+        lastMessage = neutralConversationPreview(MessageType.SHARED_PROFILE),
+        senderId = senderId,
+        messageType = MessageType.SHARED_PROFILE,
+    )
+    sent
+}
+
 // MARK: - View Once
 
 fun ChatService.deleteViewOnceAfterViewing(

@@ -434,6 +434,7 @@
     <string name="chat_preview_ephemeral">Ephemeral moment</string>
     <string name="chat_preview_shared_moment">Shared moment</string>
     <string name="chat_preview_shared_story">Shared story</string>
+    <string name="chat_preview_shared_profile">Shared profile</string>
     <string name="chat_preview_image">Image</string>
     <string name="chat_preview_ephemeral_long">Temporary message</string>
     <string name="chat_preview_new_conversation">New conversation</string>

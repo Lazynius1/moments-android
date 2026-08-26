@@ -141,7 +141,7 @@ object ChatBubbleAnchorMetrics {
         MessageType.IMAGE, MessageType.VIDEO,
         MessageType.VIEW_ONCE_IMAGE, MessageType.VIEW_ONCE_VIDEO,
         MessageType.LOCATION, MessageType.EPHEMERAL,
-        MessageType.SHARED_MOMENT, MessageType.SHARED_STORY,
+        MessageType.SHARED_MOMENT, MessageType.SHARED_STORY, MessageType.SHARED_PROFILE,
         -> 16f
         MessageType.GIF, MessageType.STICKER -> 12f
         MessageType.FILE -> 14f

@@ -48,7 +48,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.models.AppUser
+import com.moments.android.views.feed.sharing.ProfileShareBottomSheet
+import com.moments.android.views.feed.sharing.ProfileShareSheetItem
+import com.moments.android.views.feed.sharing.SharedProfilePayloadBuilder
 import com.moments.android.extensions.ChromeIconDescription
 import com.moments.android.extensions.MomentsGlassButtonPreset
 import com.moments.android.extensions.ProfileChromeControlsCluster
@@ -86,7 +91,15 @@ fun ProfileVisitorPinnedTopChrome(
     val colors = rememberAdaptiveColors()
     val context = LocalContext.current
     var menuExpanded by remember { mutableStateOf(false) }
+    var profileShareItem by remember { mutableStateOf<ProfileShareSheetItem?>(null) }
     val user = viewModel.userProfile
+
+    profileShareItem?.let { item ->
+        ProfileShareBottomSheet(
+            item = item,
+            onDismiss = { profileShareItem = null },
+        )
+    }
 
     StickyChromeBarLayout(
         modifier = modifier,
@@ -170,6 +183,16 @@ fun ProfileVisitorPinnedTopChrome(
                             leadingIcon = { Icon(Icons.Filled.Flag, contentDescription = null) },
                         )
                         if (user != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.share_profile_send_in_chat)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    presentProfileShare(viewModel, user)?.let { profileShareItem = it }
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.qr_code_share)) },
                                 onClick = {
@@ -352,4 +375,24 @@ private fun shareProfileUrl(context: android.content.Context, username: String) 
         putExtra(Intent.EXTRA_TEXT, url)
     }
     context.startActivity(Intent.createChooser(intent, null))
+}
+
+/** ≡ iOS `presentProfileShare(for:)` + `ProfileShareSheetItem`. */
+private fun presentProfileShare(
+    viewModel: UserProfileViewModel,
+    user: AppUser,
+): ProfileShareSheetItem? {
+    val resolvedId = user.id.trim().ifEmpty { viewModel.userId }
+    val isOwnProfile = resolvedId == FirebaseAuth.getInstance().currentUser?.uid
+    val data = SharedProfilePayloadBuilder.make(
+        user = user,
+        moments = viewModel.moments,
+        canViewContent = viewModel.canViewContent,
+        visibleConnectionTypes = viewModel.visibleConnectionTypes,
+        isOwnProfile = isOwnProfile,
+        fallbackUserId = viewModel.userId,
+    )
+    val profileUserId = data["profileUserId"]?.trim().orEmpty()
+    if (profileUserId.isEmpty()) return null
+    return ProfileShareSheetItem(profileUserId = profileUserId, sharedProfileData = data)
 }

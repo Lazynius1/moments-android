@@ -433,6 +433,7 @@
     <string name="chat_preview_ephemeral">Momento efímero</string>
     <string name="chat_preview_shared_moment">Momento compartido</string>
     <string name="chat_preview_shared_story">Historia compartida</string>
+    <string name="chat_preview_shared_profile">Perfil compartido</string>
     <string name="chat_preview_image">Imagen</string>
     <string name="chat_preview_ephemeral_long">Mensaje temporal</string>
     <string name="chat_preview_new_conversation">Nueva conversación</string>

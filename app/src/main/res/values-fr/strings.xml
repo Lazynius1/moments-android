@@ -464,6 +464,7 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="chat_preview_ephemeral">Moment éphémère</string>
     <string name="chat_preview_shared_moment">Moment partagé</string>
     <string name="chat_preview_shared_story">Story partagée</string>
+    <string name="chat_preview_shared_profile">Profil partagé</string>
     <string name="banner_verb_media_moderation_partial">Une partie du contenu de votre publication a été masquée</string>
     <string name="banner_verb_media_moderation_full">Votre publication n\'est désormais visible que par vous</string>
     <string name="banner_verb_media_moderation_story_partial">Une partie du contenu de votre story a été masquée</string>

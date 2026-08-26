@@ -39,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
@@ -88,9 +87,8 @@ object StoryReplyPreviewMetrics {
     val cornerRadius = 14.dp
 }
 
-private val storyReplyRingGradient = Brush.linearGradient(
-    listOf(Color(0xFF0A84FF), Color(0xFFAF52DE), Color(0xFFFF2D55)),
-)
+/** Borde sutil de chasis Moments (familia fichas DM; sin anillo arcoíris). */
+private val storyReplyChassisStroke = Color.White.copy(alpha = 0.2f)
 
 private fun storyReplyFormatTimeLeft(ms: Long): String {
     val totalSeconds = (ms.coerceAtLeast(0) / 1000).toInt()
@@ -381,13 +379,11 @@ fun StoryReplyUnavailableThumbnail(
 ) {
     val preview = storyReplyData["storyPreviewUrl"]?.trim()?.takeIf { it.isNotEmpty() }
         ?: storyReplyData["storyMediaUrl"]
-    val innerRadius = StoryReplyPreviewMetrics.cornerRadius - 2.dp
     Box(
         modifier
             .size(StoryReplyPreviewMetrics.width, StoryReplyPreviewMetrics.height)
-            .border(2.dp, storyReplyRingGradient, RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius))
-            .padding(2.dp)
-            .clip(RoundedCornerShape(innerRadius)),
+            .clip(RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius))
+            .border(0.5.dp, storyReplyChassisStroke, RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius)),
     ) {
         if (!preview.isNullOrBlank()) {
             AsyncImage(
@@ -430,13 +426,11 @@ fun StoryReplyThumbnailView(
     val isDark = isSystemInDarkTheme()
     val mediaUrl = storyReplyData["storyMediaUrl"]
     val isVideo = storyReplyData["storyMediaType"] == "video"
-    val innerRadius = StoryReplyPreviewMetrics.cornerRadius - 2.dp
     Box(
         modifier
             .size(StoryReplyPreviewMetrics.width, StoryReplyPreviewMetrics.height)
-            .border(2.dp, storyReplyRingGradient, RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius))
-            .padding(2.dp)
-            .clip(RoundedCornerShape(innerRadius)),
+            .clip(RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius))
+            .border(0.5.dp, storyReplyChassisStroke, RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius)),
         contentAlignment = Alignment.Center,
     ) {
         if (story != null) {
@@ -483,7 +477,7 @@ fun StoryReplyEphemeralTapCard(
         modifier
             .size(StoryReplyPreviewMetrics.width, StoryReplyPreviewMetrics.height)
             .clip(RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius))
-            .border(2.dp, storyReplyRingGradient, RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius))
+            .border(0.5.dp, storyReplyChassisStroke, RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius))
             .clickable(onClick = onTap),
     ) {
         if (!previewImageUrl.isNullOrBlank()) {
@@ -626,7 +620,7 @@ fun StoryReplyEphemeralResolvingCard(modifier: Modifier = Modifier) {
         modifier
             .size(StoryReplyPreviewMetrics.width, StoryReplyPreviewMetrics.height)
             .clip(RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius))
-            .border(2.dp, storyReplyRingGradient, RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius))
+            .border(0.5.dp, storyReplyChassisStroke, RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius))
             .background(Color.White.copy(if (isDark) 0.08f else 0.12f)),
         contentAlignment = Alignment.Center,
     ) {

@@ -37,4 +37,11 @@
     <string name="share_story_denied_private_title">Privates Konto</string>
     <string name="share_story_denied_private">Folge dieser Person, um ihre Stories zu sehen.</string>
     <string name="share_story_denied_restricted">Du hast keine Berechtigung, diese Story anzusehen.</string>
+    <string name="share_profile_send_in_chat">In Moments senden</string>
+    <string name="share_profile_by">Profil · @%1$s</string>
+    <string name="share_profile_unavailable">Dieses Profil ist nicht verfügbar</string>
+    <string name="share_send_success_title">Gesendet</string>
+    <string name="share_send_success_message">In Moments geteilt</string>
+    <string name="share_send_invalid_payload">Dieses Profil konnte nicht geteilt werden. Bitte erneut versuchen.</string>
+    <string name="messaging_forward_partial_failure">Senden an %1$d von %2$d Empfängern fehlgeschlagen.</string>
 </resources>

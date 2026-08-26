@@ -1226,6 +1226,7 @@ object LocalPersistenceService {
             MessageType.EPHEMERAL -> "Ephemeral message"
             MessageType.SHARED_MOMENT -> "Shared moment"
             MessageType.SHARED_STORY -> "Shared story"
+            MessageType.SHARED_PROFILE -> "Shared profile"
             MessageType.VIEW_ONCE_IMAGE -> "Photo"
             MessageType.VIEW_ONCE_VIDEO -> "Video"
             MessageType.CHAT_NOTICE -> chatNoticePreviewText(message.content.orEmpty())
@@ -1252,6 +1253,7 @@ object LocalPersistenceService {
         MessageType.EPHEMERAL -> "Ephemeral message"
         MessageType.SHARED_MOMENT -> "Shared moment"
         MessageType.SHARED_STORY -> "Shared story"
+        MessageType.SHARED_PROFILE -> "Shared profile"
         MessageType.CHAT_NOTICE -> "Notice"
     }
 
