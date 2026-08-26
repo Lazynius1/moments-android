@@ -14,11 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,6 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -42,7 +45,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
@@ -304,7 +310,11 @@ fun StoryShareRecipientsPanel(
     }
 }
 
-// MARK: - Chat bubble (misma huella que momentos compartidos en DM)
+// Chat bubble: miniatura de historia ampliada — no tarjeta de post
+
+private val sharedStoryRingGradient = Brush.linearGradient(
+    listOf(Color(0xFF0A84FF), Color(0xFFAF52DE), Color(0xFFFF2D55)),
+)
 
 @Composable
 fun SharedStoryMessageBubble(
@@ -368,15 +378,11 @@ fun SharedStoryMessageBubble(
     val align = if (isCurrentUser) Alignment.CenterEnd else Alignment.CenterStart
     Box(modifier.fillMaxWidth(), contentAlignment = align) {
         when {
-            isLoading -> SharedDMPreviewCardSkeleton(
-                Modifier
-                    .widthIn(max = 280.dp)
-                    .padding(vertical = 4.dp),
+            isLoading -> SharedStoryPreviewSkeleton(
+                Modifier.padding(vertical = 4.dp),
             )
             canViewStory == true && displayData != null -> {
-                Box(
-                    Modifier.padding(vertical = 4.dp),
-                ) {
+                Box(Modifier.padding(vertical = 4.dp)) {
                     StoryBubbleContent(
                         sharedStoryData = displayData!!,
                         isCurrentUser = isCurrentUser,
@@ -387,9 +393,7 @@ fun SharedStoryMessageBubble(
             else -> BlockedStoryBubble(
                 reason = denialReason ?: SharedStoryAccessDenialReason.Restricted,
                 sharedStoryData = displayData,
-                modifier = Modifier
-                    .widthIn(max = 280.dp)
-                    .padding(vertical = 4.dp),
+                modifier = Modifier.padding(vertical = 4.dp),
             )
         }
     }
@@ -401,14 +405,12 @@ fun BlockedStoryBubble(
     sharedStoryData: Map<String, String>?,
     modifier: Modifier = Modifier,
 ) {
-    SharedDMUnavailablePreviewCard(
+    SharedStoryUnavailablePreview(
         title = stringResource(reason.titleRes),
-        message = stringResource(reason.messageRes),
         icon = reason.icon,
         previewImageURL = sharedStoryData?.get("storyPreviewUrl"),
         authorId = sharedStoryData?.get("storyAuthorId"),
         authorName = sharedStoryData?.get("storyAuthor"),
-        useStoryRing = true,
         modifier = modifier,
     )
 }
@@ -429,12 +431,103 @@ fun StoryBubbleContent(
 }
 
 object StoryShareCardMetrics {
-    val width = 172.dp
-    val height = width * 16f / 9f
-    val cornerRadius = 12.dp
+    val width = 140.dp
+    val height = 217.dp
+    val cornerRadius = 16.dp
+    val ringLineWidth = 2.25.dp
 }
 
-/** Story compartida: media vertical 9:16 con autor superpuesto. */
+@Composable
+private fun SharedStoryPreviewSkeleton(modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius)
+    Box(
+        modifier
+            .size(StoryShareCardMetrics.width, StoryShareCardMetrics.height)
+            .clip(shape)
+            .background(Color.White.copy(0.1f))
+            .border(StoryShareCardMetrics.ringLineWidth, sharedStoryRingGradient, shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        CircularProgressIndicator(
+            color = Color.White.copy(0.65f),
+            strokeWidth = 2.dp,
+            modifier = Modifier.size(24.dp),
+        )
+    }
+}
+
+@Composable
+private fun SharedStoryUnavailablePreview(
+    title: String,
+    icon: ImageVector,
+    previewImageURL: String?,
+    authorId: String?,
+    authorName: String?,
+    modifier: Modifier = Modifier,
+) {
+    val outerShape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius)
+    val inset = StoryShareCardMetrics.ringLineWidth + 1.5.dp
+    val innerShape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius - 2.5.dp)
+
+    Box(
+        modifier
+            .size(StoryShareCardMetrics.width, StoryShareCardMetrics.height)
+            .border(StoryShareCardMetrics.ringLineWidth, sharedStoryRingGradient, outerShape)
+            .padding(inset),
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .clip(innerShape),
+        ) {
+            if (!previewImageURL.isNullOrBlank()) {
+                AsyncImage(
+                    model = previewImageURL,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(18.dp),
+                )
+            } else {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color.White.copy(0.14f), Color.White.copy(0.06f)),
+                            ),
+                        ),
+                )
+            }
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(0.48f)))
+            Column(
+                Modifier.align(Alignment.Center).padding(horizontal = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(icon, contentDescription = null, tint = Color.White.copy(0.92f), modifier = Modifier.size(22.dp))
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    title,
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            SharedDMPreviewAuthorRow(
+                authorId = authorId,
+                authorName = authorName,
+                useStoryRing = true,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+            )
+        }
+    }
+}
+
+/** Historia compartida en DM: reply thumb más grande + anillo; autor encima. */
 @Composable
 fun StoryPreviewCard(
     sharedStoryData: Map<String, String>,
@@ -442,46 +535,63 @@ fun StoryPreviewCard(
     modifier: Modifier = Modifier,
 ) {
     val isVideo = sharedStoryData["storyMediaType"] == "video"
-    val shape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius)
+    val outerShape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius)
+    val inset = StoryShareCardMetrics.ringLineWidth + 1.5.dp
+    val innerShape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius - 2.5.dp)
+
     Box(
         modifier
-            .width(StoryShareCardMetrics.width)
-            .height(StoryShareCardMetrics.height)
-            .clip(shape)
-            .border(0.5.dp, Color.White.copy(0.12f), shape),
+            .size(StoryShareCardMetrics.width, StoryShareCardMetrics.height)
+            .border(StoryShareCardMetrics.ringLineWidth, sharedStoryRingGradient, outerShape)
+            .padding(inset),
     ) {
-        if (story != null) {
-            StoryStaticPreviewSurface(story = story, modifier = Modifier.fillMaxSize())
-        } else {
-            StoryVisualContent(sharedStoryData = sharedStoryData, modifier = Modifier.fillMaxSize())
-        }
-
-        Column(Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxWidth().height(70.dp)) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Black.copy(0.45f), Color.Transparent),
-                            ),
-                        ),
-                )
-                SharedDMPreviewAuthorRow(
-                    authorId = sharedStoryData["storyAuthorId"],
-                    authorName = sharedStoryData["storyAuthor"],
-                    useStoryRing = true,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(horizontal = 10.dp, vertical = 10.dp),
-                )
+        Box(Modifier.fillMaxSize().clip(innerShape)) {
+            if (story != null) {
+                StoryStaticPreviewSurface(story = story, modifier = Modifier.fillMaxSize())
+            } else {
+                StoryVisualContent(sharedStoryData = sharedStoryData, modifier = Modifier.fillMaxSize())
             }
-            Spacer(Modifier.weight(1f))
-        }
 
-        if (isVideo) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                SharedDMCenteredPlayOverlay()
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxWidth().height(64.dp)) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color.Black.copy(0.5f), Color.Transparent),
+                                ),
+                            ),
+                    )
+                    SharedDMPreviewAuthorRow(
+                        authorId = sharedStoryData["storyAuthorId"],
+                        authorName = sharedStoryData["storyAuthor"],
+                        useStoryRing = true,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(horizontal = 10.dp, vertical = 10.dp),
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+            }
+
+            if (isVideo) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(0.35f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
             }
         }
     }

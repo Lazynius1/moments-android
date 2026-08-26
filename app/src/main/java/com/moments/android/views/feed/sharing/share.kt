@@ -1762,6 +1762,8 @@ fun SharedDMPreviewAuthorRow(
             }
         }
         if (!authorName.isNullOrBlank()) {
+            // Un solo weight: el Spacer extra partía el ancho a la mitad y truncaba a "l..."
+            // en tarjetas estrechas (story share ~140dp). Paridad con iOS (Spacer sin flex).
             Text(
                 authorName,
                 color = Color.White,
@@ -1775,7 +1777,6 @@ fun SharedDMPreviewAuthorRow(
         if (!authorId.isNullOrBlank()) {
             VerifiedBadgeView(userId = authorId, size = 12.dp)
         }
-        Spacer(Modifier.weight(1f))
     }
 }
 
