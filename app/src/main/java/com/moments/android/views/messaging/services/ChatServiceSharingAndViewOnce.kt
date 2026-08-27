@@ -91,9 +91,10 @@ suspend fun ChatService.sendSharedMomentMessage(
         "momentAuthor" to author,
         "momentAuthorId" to moment.authorId,
         "momentContent" to moment.content,
-        "momentImageUrl" to (moment.thumbnailUrl ?: moment.imagePath).orEmpty(),
-        "momentAspectRatio" to (moment.aspectRatio ?: "1:1"),
-        "momentVideoUrl" to moment.videoUrl.orEmpty(),
+        "momentImageUrl" to moment.previewImageURLString.orEmpty(),
+        "momentAspectRatio" to (moment.primaryVisibleMediaItem?.aspectRatio ?: moment.aspectRatio ?: "1:1"),
+        "momentMediaCount" to maxOf(moment.visibleMediaCount, 1).toString(),
+        "momentVideoUrl" to moment.previewVideoURLString.orEmpty(),
         "momentTimestamp" to epochSeconds,
         "shareUrl" to momentUrl,
     )

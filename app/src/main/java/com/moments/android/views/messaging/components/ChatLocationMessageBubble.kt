@@ -134,6 +134,7 @@ object ChatLocationLiveCountdownFormatter {
 }
 
 private val bubbleWidth = 276.dp
+private val mapContentWidth = 264.dp
 private val mapHeight = 150.dp
 private val bubbleShape = RoundedCornerShape(18.dp)
 /** ≡ iOS MKMapSnapshotter span 0.01. */
@@ -155,6 +156,7 @@ fun ChatLocationMessageBubble(
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val isDark = isSystemInDarkTheme()
     val canStopLive = isCurrentUser && isLive && isLiveActive && onStopLive != null
+    val cardBackground = if (isDark) Color(0xFF151C1D) else Color(0xFFE8EEF0)
 
     LaunchedEffect(isLiveActive) {
         if (!isLiveActive) return@LaunchedEffect
@@ -180,6 +182,7 @@ fun ChatLocationMessageBubble(
     }
     val iconTint = when {
         isLive && isLiveActive -> Color(0xFF34C759)
+        !isLive -> Color(0xFFFF3B30)
         isDark -> Color.White.copy(alpha = 0.7f)
         else -> Color.Black.copy(alpha = 0.6f)
     }
@@ -188,6 +191,7 @@ fun ChatLocationMessageBubble(
         modifier
             .width(bubbleWidth)
             .clip(bubbleShape)
+            .background(cardBackground)
             .border(
                 0.5.dp,
                 if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.08f),
@@ -195,7 +199,14 @@ fun ChatLocationMessageBubble(
             ),
     ) {
         Column(Modifier.fillMaxWidth()) {
-            Box(Modifier.fillMaxWidth().height(mapHeight)) {
+            Box(
+                Modifier
+                    .padding(horizontal = 6.dp)
+                    .padding(top = 6.dp)
+                    .fillMaxWidth()
+                    .height(mapHeight)
+                    .clip(RoundedCornerShape(14.dp)),
+            ) {
                 ChatLocationBubbleMapThumbnail(
                     latitude = payload.lat,
                     longitude = payload.lng,
@@ -219,7 +230,7 @@ fun ChatLocationMessageBubble(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .background(if (isDark) Color.White.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.6f))
+                    .background(cardBackground)
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -255,7 +266,7 @@ fun ChatLocationMessageBubble(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .background(if (isDark) Color.White.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.6f))
+                    .background(Color.Red.copy(alpha = if (isDark) 0.12f else 0.08f))
                     .clickable { onStopLive?.invoke() }
                     .padding(vertical = 10.dp),
                 horizontalArrangement = Arrangement.Center,
@@ -284,7 +295,7 @@ private fun ChatLocationBubbleMapThumbnail(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    val widthPx = with(density) { bubbleWidth.roundToPx() }
+    val widthPx = with(density) { mapContentWidth.roundToPx() }
     val heightPx = with(density) { mapHeight.roundToPx() }
     var snapshot by remember(latitude, longitude, isDark, widthPx, heightPx) {
         mutableStateOf(

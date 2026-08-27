@@ -79,6 +79,88 @@ data class ChatFailedMessageRetryAction(
 
 val LocalChatFailedMessageRetryAction = staticCompositionLocalOf<ChatFailedMessageRetryAction?> { null }
 
+/** ≡ iOS `ChatComposerReplyHeader.fieldCornerRadius` / `composerFieldShape`. */
+private val ComposerFieldCornerRadius = 20.dp
+private val ComposerReplyHeaderTopShape = RoundedCornerShape(
+    topStart = ComposerFieldCornerRadius,
+    topEnd = ComposerFieldCornerRadius,
+)
+
+@Composable
+fun ChatComposerReplyHeader(
+    message: EnhancedMessage,
+    otherParticipantName: String,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val isDark = isSystemInDarkTheme()
+    val colors = AdaptiveColors(isDark)
+    val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid.orEmpty() }
+    val fromSelf = message.senderId == currentUserId
+    val accent = if (fromSelf) colors.userAccentColor else colors.receivedAccentColor
+    val surface = if (isDark) Color(0xFF151C1D) else Color(0xFFE8EEF0)
+    val name = if (fromSelf) stringResource(R.string.chat_reply_you) else otherParticipantName
+    val preview = message.preview(context)
+    val cancelLabel = stringResource(R.string.common_cancel)
+    val content: @Composable () -> Unit = {
+        Row(
+            modifier
+                .fillMaxWidth()
+                .height(54.dp)
+                .clip(ComposerReplyHeaderTopShape)
+                .background(surface, ComposerReplyHeaderTopShape)
+                .padding(horizontal = 8.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            Box(
+                Modifier
+                    .width(3.dp)
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(accent),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(name, color = accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                Text(
+                    preview,
+                    color = if (isDark) Color.White.copy(0.72f) else Color.Black.copy(0.68f),
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            ReplyThumb(message, 34.dp, cornerRadius = 9.dp, startPadding = 0.dp)
+            Box(
+                Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(if (isDark) Color.White.copy(0.09f) else Color.Black.copy(0.08f))
+                    .clickable(onClick = onCancel)
+                    .semantics { contentDescription = cancelLabel },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = null,
+                    tint = if (isDark) Color.White.copy(0.72f) else Color.Black.copy(0.62f),
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+    }
+    if (message.isVanishModeMessage) {
+        ScreenshotProtectedView(
+            isProtected = true,
+            cornerRadius = ComposerFieldCornerRadius,
+            mode = ScreenshotProtectionMode.WindowFlag,
+        ) { content() }
+    } else {
+        content()
+    }
+}
+
 object MessageReactionMetrics {
     fun emojiSize(compact: Boolean, cluster: Boolean = false): Float =
         when {
@@ -240,11 +322,19 @@ fun StackedReplyQuote(
         stringResource(R.string.chat_reply_replied_to, otherParticipantName)
     }
     val preview = repliedMessage.preview(context)
+    // Cita tappable: hit-test propio (scroll + highlight del mensaje citado).
     val body: @Composable () -> Unit = {
         Column(
             Modifier
                 .widthIn(max = 240.dp)
-                .clickable(enabled = onTap != null) { onTap?.invoke(repliedMessage.id) }
+                .clip(RoundedCornerShape(13.dp))
+                .clickable(
+                    enabled = onTap != null,
+                    onClick = {
+                        HapticManager.shared.lightImpact()
+                        onTap?.invoke(repliedMessage.id)
+                    },
+                )
                 .semantics { contentDescription = "$caption, $preview" },
             horizontalAlignment = if (isOutgoingRow) Alignment.End else Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -384,18 +474,23 @@ private fun ReplyBarBody(
 }
 
 @Composable
-private fun ReplyThumb(message: EnhancedMessage, size: Dp) {
+private fun ReplyThumb(
+    message: EnhancedMessage,
+    size: Dp,
+    cornerRadius: Dp = if (size >= 36.dp) 6.dp else 4.dp,
+    startPadding: Dp = 4.dp,
+) {
     if (message.isViewOnce) return
-    val url = message.thumbnailUrl ?: message.mediaUrl
-    if (url.isNullOrBlank()) return
+    val url = message.replyPreviewThumbnailURL ?: return
+    if (url.isBlank()) return
     AsyncImage(
         model = url,
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = Modifier
-            .padding(start = 4.dp)
+            .padding(start = startPadding)
             .size(size)
-            .clip(RoundedCornerShape(if (size >= 36.dp) 6.dp else 4.dp)),
+            .clip(RoundedCornerShape(cornerRadius)),
     )
 }
 

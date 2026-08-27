@@ -435,6 +435,8 @@
     <string name="chat_preview_shared_moment">Moment partilhado</string>
     <string name="chat_preview_shared_story">História partilhada</string>
     <string name="chat_preview_shared_profile">Perfil partilhado</string>
+    <string name="chat_preview_story_kind">Story</string>
+    <string name="chat_preview_reel_kind">Reel</string>
     <string name="banner_verb_media_moderation_partial">Parte do conteúdo da tua publicação foi ocultada</string>
     <string name="banner_verb_media_moderation_full">A tua publicação está visível apenas para ti</string>
     <string name="banner_verb_media_moderation_story_partial">Parte do conteúdo da tua story foi ocultada</string>

@@ -1,5 +1,6 @@
 package com.moments.android.views.messaging.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -74,6 +75,7 @@ import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.messaging.core.EnhancedMessage
 import java.io.File
 import kotlin.math.max
 import kotlin.math.min
@@ -98,12 +100,15 @@ fun GlassmorphicInputBar(
     recordingInteractionId: String?,
     voiceRecordingDraft: VoiceRecordingDraft?,
     isPreparingVoiceRecordingPreview: Boolean,
+    replyingTo: EnhancedMessage? = null,
+    otherParticipantName: String = "",
     voiceGestureState: VoiceRecordingGestureState,
     isVanishModeActive: Boolean = false,
     allowsAttachments: Boolean = true,
     allowsVoiceRecording: Boolean = true,
     isAttachmentMenuOpen: Boolean = false,
     onSend: () -> Unit,
+    onCancelReply: () -> Unit = {},
     onOpenAttachments: () -> Unit,
     onAttachmentPlusAnchorBoundsChanged: (androidx.compose.ui.unit.IntRect) -> Unit = {},
     onVoiceButtonAnchorBoundsChanged: (androidx.compose.ui.unit.IntRect) -> Unit = {},
@@ -169,13 +174,14 @@ fun GlassmorphicInputBar(
                 }
             }
 
-            Box(
+            Column(
                 Modifier
                     .weight(1f)
                     .heightIn(min = ComposerControlSize)
                     .padding(horizontal = 2.dp)
                     .clip(composerFieldShape)
                     .background(fieldFill, composerFieldShape)
+                    .animateContentSize()
                     .then(
                         if (isVanishModeActive) {
                             Modifier.drawWithContent {
@@ -194,46 +200,66 @@ fun GlassmorphicInputBar(
                         } else {
                             Modifier
                         },
-                    )
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                contentAlignment = Alignment.CenterStart,
+                    ),
             ) {
-                when {
-                    isRecordingVoice -> VoiceRecordingHeldStatus(
-                        isLocked = isVoiceRecordingLocked,
-                        recordingSeconds = recordingSeconds.toLong(),
-                        cancelDragOffsetPx = voiceGestureState.cancelDragOffset,
-                        colors = colors,
-                        onCancel = ::cancelVoiceRecording,
+                replyingTo?.let { message ->
+                    ChatComposerReplyHeader(
+                        message = message,
+                        otherParticipantName = otherParticipantName,
+                        onCancel = onCancelReply,
                     )
-                    showingDraft -> VoiceRecordingDraftPreview(
-                        draft = voiceRecordingDraft,
-                        fallbackDurationSeconds = recordingSeconds,
-                        isPreparing = isPreparingVoiceRecordingPreview,
-                        colors = colors,
-                        onTrimChanged = onVoiceRecordingTrimChanged,
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(0.5.dp)
+                            .background(if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.07f)),
                     )
-                    else -> BasicTextField(
-                        value = text,
-                        onValueChange = onTextChange,
-                        textStyle = TextStyle(color = colors.primary, fontSize = 16.sp),
-                        cursorBrush = SolidColor(composerAccent),
-                        maxLines = 6,
-                        modifier = Modifier.fillMaxWidth(),
-                        decorationBox = { inner ->
-                            if (text.isEmpty()) {
-                                Text(
-                                    stringResource(
-                                        if (isVanishModeActive) R.string.chat_input_vanish_placeholder
-                                        else R.string.chat_input_placeholder,
-                                    ),
-                                    color = colors.secondary.copy(alpha = 0.65f),
-                                    fontSize = 16.sp,
-                                )
-                            }
-                            inner()
-                        },
-                    )
+                }
+
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = ComposerControlSize)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    when {
+                        isRecordingVoice -> VoiceRecordingHeldStatus(
+                            isLocked = isVoiceRecordingLocked,
+                            recordingSeconds = recordingSeconds.toLong(),
+                            cancelDragOffsetPx = voiceGestureState.cancelDragOffset,
+                            colors = colors,
+                            onCancel = ::cancelVoiceRecording,
+                        )
+                        showingDraft -> VoiceRecordingDraftPreview(
+                            draft = voiceRecordingDraft,
+                            fallbackDurationSeconds = recordingSeconds,
+                            isPreparing = isPreparingVoiceRecordingPreview,
+                            colors = colors,
+                            onTrimChanged = onVoiceRecordingTrimChanged,
+                        )
+                        else -> BasicTextField(
+                            value = text,
+                            onValueChange = onTextChange,
+                            textStyle = TextStyle(color = colors.primary, fontSize = 16.sp),
+                            cursorBrush = SolidColor(composerAccent),
+                            maxLines = 6,
+                            modifier = Modifier.fillMaxWidth(),
+                            decorationBox = { inner ->
+                                if (text.isEmpty()) {
+                                    Text(
+                                        stringResource(
+                                            if (isVanishModeActive) R.string.chat_input_vanish_placeholder
+                                            else R.string.chat_input_placeholder,
+                                        ),
+                                        color = colors.secondary.copy(alpha = 0.65f),
+                                        fontSize = 16.sp,
+                                    )
+                                }
+                                inner()
+                            },
+                        )
+                    }
                 }
             }
 

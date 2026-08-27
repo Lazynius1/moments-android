@@ -144,6 +144,8 @@ import com.moments.android.views.components.shimmer
 import com.moments.android.views.creator.CreatorView
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
+import com.moments.android.views.profile.core.sections.MomentCarouselIndicatorIcon
+import com.moments.android.views.profile.core.sections.profileMomentZoomSource
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
@@ -1558,9 +1560,15 @@ object SharedDMMediaCardMetrics {
 // MARK: - Tarjeta compartida (cabecera arriba · media limpia · caption debajo)
 
 object SharedDMPostCardMetrics {
-    val width = 248.dp
-    val defaultMediaHeight = 248.dp
-    val cornerRadius = 12.dp
+    val width = 272.dp
+    val mediaInset = 6.dp
+    val mediaVerticalInset = 4.dp
+    val mediaWidth = width - mediaInset * 2
+    val defaultMediaHeight = 240.dp
+    val minimumMediaHeight = 145.dp
+    val maximumMediaHeight = 240.dp
+    val cornerRadius = 18.dp
+    val mediaCornerRadius = 10.dp
 }
 
 /** ≡ iOS `parseSharedAspectRatio` — ("9:16", "4:5", "1.0") → width/height. */
@@ -1593,34 +1601,41 @@ fun SharedDMPostCard(
     caption: String?,
     modifier: Modifier = Modifier,
     useStoryRing: Boolean = false,
+    mediaCount: Int = 1,
     aspectRatio: Float = 1f,
     captionAuthor: String? = null,
     media: @Composable () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
     val cardBackground = if (isDark) {
-        Color.fromHex("FAF9F6").copy(0.14f)
+        Color.fromHex("151C1D")
     } else {
-        Color.fromHex("0B1215").copy(0.07f)
+        Color.fromHex("E8EEF0")
     }
     val primaryText = if (isDark) Color.fromHex("FAF9F6") else Color.fromHex("0B1215")
     val mediaHeight = remember(aspectRatio) {
         if (aspectRatio <= 0.01f) {
             SharedDMPostCardMetrics.defaultMediaHeight
         } else {
-            val raw = SharedDMPostCardMetrics.width / aspectRatio
+            val raw = SharedDMPostCardMetrics.mediaWidth / aspectRatio
             raw.coerceIn(
-                SharedDMPostCardMetrics.width * 0.6f,
-                SharedDMPostCardMetrics.width * 1.25f,
+                SharedDMPostCardMetrics.minimumMediaHeight,
+                SharedDMPostCardMetrics.maximumMediaHeight,
             )
         }
     }
+    val cardShape = RoundedCornerShape(SharedDMPostCardMetrics.cornerRadius)
 
     Column(
         modifier
             .width(SharedDMPostCardMetrics.width)
-            .clip(RoundedCornerShape(SharedDMPostCardMetrics.cornerRadius))
-            .background(cardBackground),
+            .clip(cardShape)
+            .background(cardBackground)
+            .border(
+                0.75.dp,
+                if (isDark) Color.White.copy(0.13f) else Color.Black.copy(0.09f),
+                cardShape,
+            ),
     ) {
         Row(
             Modifier
@@ -1662,15 +1677,27 @@ fun SharedDMPostCard(
 
         Box(
             Modifier
-                .width(SharedDMPostCardMetrics.width)
+                .padding(
+                    horizontal = SharedDMPostCardMetrics.mediaInset,
+                    vertical = SharedDMPostCardMetrics.mediaVerticalInset,
+                )
+                .width(SharedDMPostCardMetrics.mediaWidth)
                 .height(mediaHeight)
-                .background(Color.Black)
-                .clip(RoundedCornerShape(0.dp)),
+                .clip(RoundedCornerShape(SharedDMPostCardMetrics.mediaCornerRadius)),
             contentAlignment = Alignment.Center,
         ) {
             Box(Modifier.fillMaxSize()) { media() }
             if (isVideo) {
                 SharedDMCenteredPlayOverlay()
+            }
+            if (mediaCount > 1) {
+                MomentCarouselIndicatorIcon(
+                    size = 20.dp,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(9.dp)
+                        .shadow(3.dp, ambientColor = Color.Black.copy(0.5f), spotColor = Color.Black.copy(0.5f)),
+                )
             }
         }
 
@@ -1706,9 +1733,9 @@ fun Modifier.sharedDMPreviewCardChrome(): Modifier = this
 fun SharedDMPreviewCardSkeleton(modifier: Modifier = Modifier) {
     val isDark = isSystemInDarkTheme()
     val cardBackground = if (isDark) {
-        Color.fromHex("FAF9F6").copy(0.14f)
+        Color.fromHex("151C1D")
     } else {
-        Color.fromHex("0B1215").copy(0.07f)
+        Color.fromHex("E8EEF0")
     }
     val placeholderFill = if (isDark) Color.White.copy(0.10f) else Color.Black.copy(0.07f)
     Column(
@@ -1739,8 +1766,13 @@ fun SharedDMPreviewCardSkeleton(modifier: Modifier = Modifier) {
         }
         Box(
             Modifier
-                .width(SharedDMPostCardMetrics.width)
+                .padding(
+                    horizontal = SharedDMPostCardMetrics.mediaInset,
+                    vertical = SharedDMPostCardMetrics.mediaVerticalInset,
+                )
+                .width(SharedDMPostCardMetrics.mediaWidth)
                 .height(SharedDMPostCardMetrics.defaultMediaHeight)
+                .clip(RoundedCornerShape(SharedDMPostCardMetrics.mediaCornerRadius))
                 .background(placeholderFill),
             contentAlignment = Alignment.Center,
         ) {
@@ -1927,9 +1959,10 @@ fun SharedMomentMessageBubble(
                     "momentAuthor" to author,
                     "momentAuthorId" to ownMoment.authorId,
                     "momentContent" to ownMoment.content,
-                    "momentImageUrl" to (ownMoment.thumbnailUrl ?: ownMoment.imagePath).orEmpty(),
-                    "momentAspectRatio" to (ownMoment.aspectRatio ?: "1:1"),
-                    "momentVideoUrl" to ownMoment.videoUrl.orEmpty(),
+                    "momentImageUrl" to ownMoment.previewImageURLString.orEmpty(),
+                    "momentAspectRatio" to (ownMoment.primaryVisibleMediaItem?.aspectRatio ?: ownMoment.aspectRatio ?: "1:1"),
+                    "momentMediaCount" to maxOf(ownMoment.visibleMediaCount, 1).toString(),
+                    "momentVideoUrl" to ownMoment.previewVideoURLString.orEmpty(),
                     "momentTimestamp" to (ownMoment.timestamp.time / 1000.0).toString(),
                 )
                 canViewMoment = true
@@ -1953,9 +1986,10 @@ fun SharedMomentMessageBubble(
                 "momentAuthor" to author,
                 "momentAuthorId" to moment.authorId,
                 "momentContent" to moment.content,
-                "momentImageUrl" to (moment.thumbnailUrl ?: moment.imagePath).orEmpty(),
-                "momentAspectRatio" to (moment.aspectRatio ?: "1:1"),
-                "momentVideoUrl" to moment.videoUrl.orEmpty(),
+                "momentImageUrl" to moment.previewImageURLString.orEmpty(),
+                "momentAspectRatio" to (moment.primaryVisibleMediaItem?.aspectRatio ?: moment.aspectRatio ?: "1:1"),
+                "momentMediaCount" to maxOf(moment.visibleMediaCount, 1).toString(),
+                "momentVideoUrl" to moment.previewVideoURLString.orEmpty(),
                 "momentTimestamp" to (moment.timestamp.time / 1000.0).toString(),
             )
         }
@@ -1972,7 +2006,12 @@ fun SharedMomentMessageBubble(
             )
             canViewMoment == true && displayData != null -> {
                 Box(
-                    Modifier.padding(vertical = 4.dp),
+                    Modifier
+                        .padding(vertical = 4.dp)
+                        .profileMomentZoomSource(
+                            sourceID = "chat-moment-${message.id}",
+                            cornerRadius = SharedDMPostCardMetrics.cornerRadius,
+                        ),
                 ) {
                     MomentBubbleContent(
                         content = null,
@@ -2046,6 +2085,7 @@ fun MomentPreviewCard(
             authorName = sharedMomentData["momentAuthor"],
             useStoryRing = true,
             isVideo = isVideo,
+            mediaCount = sharedMomentData["momentMediaCount"]?.toIntOrNull() ?: 1,
             aspectRatio = aspectRatio,
             captionAuthor = sharedMomentData["momentAuthor"],
             caption = sharedMomentData["momentContent"],

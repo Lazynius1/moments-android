@@ -28,6 +28,64 @@ import java.util.Date
 import java.util.Base64
 import java.util.UUID
 
+private fun nonEmptyTrimmed(raw: String?): String? =
+    raw?.trim()?.takeIf { it.isNotEmpty() }
+
+private fun previewAspectRatio(raw: String?): Float {
+    val value = raw?.trim().orEmpty()
+    if (value.isEmpty()) return 1f
+    if (value.contains(":")) {
+        val parts = value.split(":")
+        if (parts.size == 2) {
+            val w = parts[0].toDoubleOrNull()
+            val h = parts[1].toDoubleOrNull()
+            if (w != null && h != null && h > 0) return (w / h).toFloat()
+        }
+    }
+    return value.toFloatOrNull()?.takeIf { it > 0f } ?: 1f
+}
+
+private fun sharedMomentLooksLikeReelPreview(isVideo: Boolean, aspectRatio: Float): Boolean {
+    if (!isVideo) return false
+    val target = 9f / 16f
+    return kotlin.math.abs(aspectRatio - target) <= 0.05f
+}
+
+private fun authorAtPrefix(username: String): String =
+    if (username.startsWith("@")) username else "@$username"
+
+private fun truncatedPreviewCaption(caption: String, limit: Int = 80): String =
+    if (caption.length <= limit) caption else caption.take(limit - 1) + "…"
+
+private fun sharedMomentPreviewText(context: Context, data: Map<String, String>?): String {
+    if (data == null) return context.getString(R.string.chat_preview_shared_moment)
+    val author = nonEmptyTrimmed(data["momentAuthor"])
+        ?: return context.getString(R.string.chat_preview_shared_moment)
+    val prefixed = authorAtPrefix(author)
+    val isVideo = nonEmptyTrimmed(data["momentVideoUrl"]) != null
+    val aspectRatio = previewAspectRatio(data["momentAspectRatio"])
+    if (sharedMomentLooksLikeReelPreview(isVideo, aspectRatio)) {
+        return "$prefixed · ${context.getString(R.string.chat_preview_reel_kind)}"
+    }
+    nonEmptyTrimmed(data["momentContent"])?.let { caption ->
+        return "$prefixed · ${truncatedPreviewCaption(caption)}"
+    }
+    return prefixed
+}
+
+private fun sharedStoryPreviewText(context: Context, data: Map<String, String>?): String {
+    if (data == null) return context.getString(R.string.chat_preview_shared_story)
+    val author = nonEmptyTrimmed(data["storyAuthor"])
+        ?: return context.getString(R.string.chat_preview_shared_story)
+    return "${authorAtPrefix(author)} · ${context.getString(R.string.chat_preview_story_kind)}"
+}
+
+private fun sharedProfilePreviewText(context: Context, data: Map<String, String>?): String {
+    val username = nonEmptyTrimmed(data?.get("username"))
+        ?: return context.getString(R.string.chat_preview_shared_profile)
+    return authorAtPrefix(username)
+}
+
 // MARK: - Tipos de mensaje / estado / media (MessageModel.swift)
 
 enum class MessageType(val raw: String) {
@@ -365,6 +423,20 @@ data class EnhancedMessage(
     val typeIcon: String get() = type.iconName
     val canBeAutoDeleted: Boolean get() = isViewOnce && isViewed && !isDeleted
 
+    /** Miniatura para citas / reply (payload de shares y respuestas a historias). */
+    val replyPreviewThumbnailURL: String?
+        get() {
+            if (isViewOnce) return null
+            nonEmptyTrimmed(thumbnailUrl)?.let { return it }
+            nonEmptyTrimmed(mediaUrl)?.let { return it }
+            return when (type) {
+                MessageType.SHARED_MOMENT -> nonEmptyTrimmed(sharedMomentData?.get("momentImageUrl"))
+                MessageType.SHARED_STORY -> nonEmptyTrimmed(sharedStoryData?.get("storyPreviewUrl"))
+                MessageType.SHARED_PROFILE -> nonEmptyTrimmed(sharedProfileData?.get("profileImagePath"))
+                else -> nonEmptyTrimmed(storyReplyData?.get("storyPreviewUrl"))
+            }
+        }
+
     /** ≡ `EnhancedMessage.preview`. */
     fun preview(context: Context): String {
         if (isVanishModeMessage && type != MessageType.CHAT_NOTICE) {
@@ -380,9 +452,9 @@ data class EnhancedMessage(
             MessageType.LOCATION -> context.getString(R.string.chat_preview_location)
             MessageType.FILE -> "📎 ${fileName ?: context.getString(R.string.message_type_file)}"
             MessageType.EPHEMERAL -> context.getString(R.string.chat_preview_ephemeral_long)
-            MessageType.SHARED_MOMENT -> context.getString(R.string.chat_preview_shared_moment)
-            MessageType.SHARED_STORY -> context.getString(R.string.chat_preview_shared_story)
-            MessageType.SHARED_PROFILE -> context.getString(R.string.chat_preview_shared_profile)
+            MessageType.SHARED_MOMENT -> sharedMomentPreviewText(context, sharedMomentData)
+            MessageType.SHARED_STORY -> sharedStoryPreviewText(context, sharedStoryData)
+            MessageType.SHARED_PROFILE -> sharedProfilePreviewText(context, sharedProfileData)
             MessageType.VIEW_ONCE_IMAGE -> context.getString(R.string.chat_preview_photo)
             MessageType.VIEW_ONCE_VIDEO -> context.getString(R.string.chat_preview_video)
             MessageType.CHAT_NOTICE -> chatNoticePreviewText(context, content.orEmpty())

@@ -41,11 +41,11 @@ import com.moments.android.models.Moment
 import com.moments.android.models.Story
 import com.moments.android.reportes.ReportBottomSheet
 import com.moments.android.reportes.ReportTarget
-import com.moments.android.views.explore.toExploreFeedMoment
 import com.moments.android.views.feed.sharing.SharedStoryAccessDenialReason
 import com.moments.android.views.messaging.components.chatBuzzShakeEffect
-import com.moments.android.views.shared.momentdetail.MomentDetailContainerView
-import com.moments.android.views.shared.momentdetail.MomentDetailContext
+import com.moments.android.views.profile.core.sections.MomentZoomDestination
+import com.moments.android.views.profile.core.sections.MomentZoomDetailDestination
+import com.moments.android.views.profile.core.sections.MomentZoomPresentationKind
 import com.moments.android.views.story.StoriesView
 import com.moments.android.views.messaging.screens.ConversationFullScreenMediaView
 import com.moments.android.views.messaging.screens.SharedMedia
@@ -234,9 +234,10 @@ fun GlassmorphicChatView(
     var reactionPickerMessage by remember { mutableStateOf<EnhancedMessage?>(null) }
     var forwardingMessage by remember { mutableStateOf<EnhancedMessage?>(null) }
     var starredMessageIds by remember(conversation.id) { mutableStateOf(emptySet<String>()) }
-    // ≡ iOS selectedMoment / showingMomentDetail / storyUnavailable
+    // ≡ iOS selectedMoment / momentZoomDestination / storyUnavailable
     // chatStoryRoute declarado arriba (holder para onStoriesDisabled)
     var selectedMoment by remember { mutableStateOf<Moment?>(null) }
+    var momentZoomDestination by remember { mutableStateOf<MomentZoomDestination?>(null) }
     var showingMomentError by remember { mutableStateOf(false) }
     var storyUnavailableReason by remember { mutableStateOf<SharedStoryAccessDenialReason?>(null) }
     val vanishMessageTimer by session.vanishMessageTimer.collectAsState()
@@ -489,6 +490,25 @@ fun GlassmorphicChatView(
         }
     }
 
+    /**
+     * Tap en la cita del reply: scroll al mensaje citado y lo resalta ~1s.
+     * Si el mensaje no está en el historial cargado, no-op.
+     */
+    fun jumpToRepliedMessage(messageId: String) {
+        if (messageId.isBlank()) return
+        val exists = session.messagesById.containsKey(messageId) ||
+            session.messages.value.any { it.id == messageId }
+        if (!exists) return
+        scroll.scrollToTarget(
+            ChatScrollTarget.HighlightedMessage(messageId),
+            animated = !MotionPolicy.reduceMotion,
+        )
+        scope.launch {
+            delay(80L)
+            messagePresentation.pulseBubbleHighlight(messageId, durationMs = 1_000L)
+        }
+    }
+
     fun openChatMedia(message: EnhancedMessage) {
         session.hydrateMediaIfNeeded(message)
         val selected = sharedMediaFrom(message) ?: return
@@ -683,8 +703,7 @@ fun GlassmorphicChatView(
         onClusterReply = { cluster -> clusterForReply = cluster },
         onAvatarTap = { onProfile(conversation.otherParticipantId) },
         onReplyTap = { messageId ->
-            scope.launch { messagePresentation.pulseBubbleHighlight(messageId) }
-            scroll.scrollToTarget(ChatScrollTarget.HighlightedMessage(messageId), animated = !MotionPolicy.reduceMotion)
+            jumpToRepliedMessage(messageId)
         },
         onOpenMedia = { message ->
             openChatMedia(message)
@@ -702,7 +721,16 @@ fun GlassmorphicChatView(
             onMomentNavigation(message)
             scope.launch {
                 when (val result = GlassmorphicChatSharedContentNavigation.handleMomentNavigationFromChat(message)) {
-                    is ChatMomentNavigationResult.Open -> selectedMoment = result.moment
+                    is ChatMomentNavigationResult.Open -> {
+                        selectedMoment = result.moment
+                        momentZoomDestination = MomentZoomDestination(
+                            zoomSourceID = "chat-moment-${message.id}",
+                            initialIndex = 0,
+                            initialMomentId = result.moment.id,
+                            presentation = MomentZoomPresentationKind.Single,
+                        )
+                        HapticManager.shared.lightImpact()
+                    }
                     ChatMomentNavigationResult.Failed -> showingMomentError = true
                     ChatMomentNavigationResult.Ignored -> Unit
                 }
@@ -788,7 +816,8 @@ fun GlassmorphicChatView(
     BackHandler(enabled = locationDetailMessage != null) {
         locationDetailMessage = null
     }
-    BackHandler(enabled = selectedMoment != null) {
+    BackHandler(enabled = momentZoomDestination != null) {
+        momentZoomDestination = null
         selectedMoment = null
     }
     BackHandler(enabled = clusterForReply != null) {
@@ -1625,15 +1654,27 @@ fun GlassmorphicChatView(
         }
     }
 
-    // ≡ sheet(isPresented: $showingMomentDetail)
-    selectedMoment?.let { moment ->
-        MomentsModalSheet(
-            onDismissRequest = { selectedMoment = null },
-            largeOnly = true,
+    // Destino fullscreen con el mismo zoom/container transform del resto de Moments.
+    val activeMomentDestination = momentZoomDestination
+    val activeMoment = selectedMoment
+    if (activeMomentDestination != null && activeMoment != null) {
+        Dialog(
+            onDismissRequest = {
+                momentZoomDestination = null
+                selectedMoment = null
+            },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
         ) {
-            MomentDetailContainerView(
-                context = MomentDetailContext.Single(moment.toExploreFeedMoment()),
-                onDismiss = { selectedMoment = null },
+            MomentZoomDetailDestination(
+                destination = activeMomentDestination,
+                moments = listOf(activeMoment),
+                onDismiss = {
+                    momentZoomDestination = null
+                    selectedMoment = null
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }

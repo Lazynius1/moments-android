@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material3.Icon
@@ -172,16 +173,18 @@ fun ChatBubbleReplySwipeContainer(
     isOutgoing: Boolean,
     @Suppress("UNUSED_PARAMETER") cornerRadius: Float = 18f,
     onReply: () -> Unit,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val view = LocalView.current
     val replyLabel = stringResource(R.string.chat_action_reply)
-    // ≡ iOS `.fixedSize(horizontal: false, vertical: true)` — no expandir a maxHeight del LazyColumn.
+    // Hit-test = tamaño de la burbuja (wrap), no el ancho vacío de la fila.
     // `cornerRadius` alimenta iOS `contentShape(RoundedRectangle)`; en Compose el hit
     // ya coincide con el wrap del contenido (sin clip, para no cortar el offset horizontal).
     Box(
-        Modifier
+        modifier
+            .wrapContentWidth()
             .wrapContentHeight()
             .chatReplySwipeGesture(isOutgoing, state, onReply, scope, view)
             .semantics {

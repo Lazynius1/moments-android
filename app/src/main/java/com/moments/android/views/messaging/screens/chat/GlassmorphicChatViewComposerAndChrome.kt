@@ -406,13 +406,9 @@ fun ChatComposerChrome(
             modifier = safeModifier,
         )
         else -> Column(safeModifier) {
-            // ≡ iOS `replyBarSection` encima del input
-            ChatReplyAndEditingBar(
-                replyingTo = replyingTo,
+            ChatEditingBar(
                 editingMessage = editingMessage,
-                otherParticipantName = otherParticipantDisplayName,
                 adaptiveColors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()),
-                onReplyCancelled = onReplyingFinished,
                 onEditingCancelled = {
                     onEditingFinished()
                     onMessageTextChange("")
@@ -427,11 +423,14 @@ fun ChatComposerChrome(
                 recordingInteractionId = recordingInteractionId,
                 voiceRecordingDraft = voiceRecordingDraft,
                 isPreparingVoiceRecordingPreview = isPreparingVoiceRecordingPreview,
+                replyingTo = replyingTo,
+                otherParticipantName = otherParticipantDisplayName,
                 voiceGestureState = voiceGestureState,
                 isVanishModeActive = vanishModeActive,
                 allowsAttachments = !controller.isPendingChat || controller.pendingChatCanType,
                 allowsVoiceRecording = !controller.isPendingChat,
                 isAttachmentMenuOpen = isAttachmentMenuOpen,
+                onCancelReply = onReplyingFinished,
                 onSend = {
                     val outgoing = messageText.trim()
                     if (outgoing.isEmpty()) return@GlassmorphicInputBar
@@ -731,13 +730,12 @@ fun GlassmorphicChatMessageItem(
                             if (viewModel.canRetryMessage(failed)) viewModel.retryFailedMessage(failed)
                         },
                     ),
-                    modifier = modifier.pointerInput(message.id) {
-                        detectTapGestures(onDoubleTap = {
-                            viewModel.addReaction(message, quickReactionEmoji)
-                            pulse(message.id)
-                            HapticManager.shared.lightImpact()
-                        })
+                    onDoubleTap = {
+                        viewModel.addReaction(message, quickReactionEmoji)
+                        pulse(message.id)
+                        HapticManager.shared.lightImpact()
                     },
+                    modifier = modifier,
                 )
             }
         }
@@ -778,13 +776,14 @@ fun GlassmorphicChatMessageItem(
                     )
                     callbacks.onLongPress(message, rowId, cluster.takeIf { it.size > 1 })
                 },
-                modifier = modifier.combinedClickable(
-                    onClick = {},
-                ).pointerInput(item.id) {
-                    detectTapGestures(onDoubleTap = {
-                        cluster.firstOrNull()?.let { message -> viewModel.addReaction(message, quickReactionEmoji); pulse(message.id); HapticManager.shared.lightImpact() }
-                    })
+                onDoubleTap = {
+                    cluster.firstOrNull()?.let { message ->
+                        viewModel.addReaction(message, quickReactionEmoji)
+                        pulse(message.id)
+                        HapticManager.shared.lightImpact()
+                    }
                 },
+                modifier = modifier,
             )
         }
     }

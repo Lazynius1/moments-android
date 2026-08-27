@@ -82,9 +82,9 @@ import java.util.Date
 
 /** Métricas de `StoryReplyPreviewMetrics` / `StoryReplyEphemeralMetrics`. */
 object StoryReplyPreviewMetrics {
-    val width = 76.dp
-    val height = 118.dp
-    val cornerRadius = 14.dp
+    val width = 104.dp
+    val height = 162.dp
+    val cornerRadius = 17.dp
 }
 
 /** Borde sutil de chasis Moments (familia fichas DM; sin anillo arcoíris). */

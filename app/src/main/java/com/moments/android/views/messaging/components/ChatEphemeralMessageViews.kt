@@ -8,6 +8,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +39,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.CornerRadius
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.Rect
+import androidx.compose.ui.graphics.RoundRect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -51,6 +60,8 @@ import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.messaging.core.EnhancedMessage
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import java.util.Date
 import kotlin.math.max
 
@@ -64,7 +75,7 @@ enum class ChatEphemeralLayout(
     val cornerRadius: Dp,
     val iconPreset: AttachmentIconPreset,
 ) {
-    COMPACT(76.dp, 118.dp, 14.dp, AttachmentIconPreset.STORY_EPHEMERAL),
+    COMPACT(104.dp, 162.dp, 17.dp, AttachmentIconPreset.STORY_EPHEMERAL),
     STANDARD(188.dp, 240.dp, 18.dp, AttachmentIconPreset.CHAT_EPHEMERAL_PLACEHOLDER),
 }
 
@@ -98,6 +109,55 @@ private val ephemeralAccentBorder = Brush.linearGradient(
 private val ephemeralSaturationFilter = ColorFilter.colorMatrix(
     ColorMatrix().apply { setToSaturation(0.65f) },
 )
+
+/** Perímetro de vida restante; usa timestamps reales y no se reinicia al reciclar la fila. */
+@Composable
+private fun ChatEphemeralLifetimeBorder(
+    layout: ChatEphemeralLayout,
+    sentAt: Date,
+    expirationDate: Date?,
+    lineWidth: Dp = 1.5.dp,
+    modifier: Modifier = Modifier,
+) {
+    var nowMillis by remember(expirationDate) { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(expirationDate) {
+        val expiresAt = expirationDate?.time ?: return@LaunchedEffect
+        while (isActive && nowMillis < expiresAt) {
+            delay(minOf(60_000L, (expiresAt - nowMillis).coerceAtLeast(1L)))
+            nowMillis = System.currentTimeMillis()
+        }
+    }
+
+    val progress = remember(sentAt, expirationDate, nowMillis) {
+        if (expirationDate == null) {
+            1f
+        } else {
+            val duration = (expirationDate.time - sentAt.time).coerceAtLeast(1L)
+            ((expirationDate.time - nowMillis).toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+        }
+    }
+    Canvas(modifier.fillMaxSize()) {
+        val strokePx = lineWidth.toPx()
+        val inset = strokePx / 2f
+        val radius = (layout.cornerRadius.toPx() - inset).coerceAtLeast(0f)
+        val perimeter = Path().apply {
+            addRoundRect(
+                RoundRect(
+                    rect = Rect(inset, inset, size.width - inset, size.height - inset),
+                    cornerRadius = CornerRadius(radius, radius),
+                ),
+            )
+        }
+        val measure = PathMeasure().apply { setPath(perimeter, false) }
+        val visibleSegment = Path()
+        measure.getSegment(0f, measure.length * progress, visibleSegment, true)
+        drawPath(
+            path = visibleSegment,
+            brush = ephemeralAccentBorder,
+            style = Stroke(width = strokePx, cap = StrokeCap.Round, join = StrokeJoin.Round),
+        )
+    }
+}
 
 @Composable
 fun ChatEphemeralMessageContent(
@@ -135,16 +195,23 @@ fun ChatEphemeralMessageContent(
             EphemeralBranch.TAP -> ChatEphemeralTapCard(
                 layout = layout,
                 previewImageUrl = preview,
+                sentAt = message.timestamp,
                 expirationDate = message.expirationDate,
                 modifier = modifier,
             )
             EphemeralBranch.IMAGE -> ChatEphemeralImageCard(
                 layout = layout,
                 imageUrl = checkNotNull(resolvedMediaUrl),
+                sentAt = message.timestamp,
                 expirationDate = message.expirationDate,
                 modifier = modifier,
             )
-            EphemeralBranch.RESOLVING -> ChatEphemeralResolvingCard(layout, modifier)
+            EphemeralBranch.RESOLVING -> ChatEphemeralResolvingCard(
+                layout = layout,
+                sentAt = message.timestamp,
+                expirationDate = message.expirationDate,
+                modifier = modifier,
+            )
         }
     }
 
@@ -174,6 +241,7 @@ private enum class EphemeralBranch { EXPIRED, TAP, IMAGE, RESOLVING }
 fun ChatEphemeralTapCard(
     layout: ChatEphemeralLayout,
     previewImageUrl: String?,
+    sentAt: Date,
     expirationDate: Date?,
     modifier: Modifier = Modifier,
 ) {
@@ -187,7 +255,6 @@ fun ChatEphemeralTapCard(
         modifier
             .size(layout.width, layout.height)
             .clip(shape)
-            .border(1.5.dp, ephemeralAccentBorder, shape)
             .semantics { contentDescription = "$a11yMedia. $a11yHint" },
     ) {
         if (canUsePreview) {
@@ -248,6 +315,11 @@ fun ChatEphemeralTapCard(
                 }
             }
         }
+        ChatEphemeralLifetimeBorder(
+            layout = layout,
+            sentAt = sentAt,
+            expirationDate = expirationDate,
+        )
     }
 }
 
@@ -255,6 +327,7 @@ fun ChatEphemeralTapCard(
 fun ChatEphemeralImageCard(
     layout: ChatEphemeralLayout,
     imageUrl: String,
+    sentAt: Date,
     expirationDate: Date?,
     modifier: Modifier = Modifier,
 ) {
@@ -265,7 +338,6 @@ fun ChatEphemeralImageCard(
         modifier
             .size(layout.width, layout.height)
             .clip(shape)
-            .border(1.dp, ephemeralAccent.copy(alpha = 0.45f), shape)
             .semantics { contentDescription = "$a11yPhoto. $a11yHint" },
     ) {
         AsyncImage(
@@ -289,18 +361,28 @@ fun ChatEphemeralImageCard(
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
+        ChatEphemeralLifetimeBorder(
+            layout = layout,
+            sentAt = sentAt,
+            expirationDate = expirationDate,
+            lineWidth = 1.dp,
+        )
     }
 }
 
 @Composable
-fun ChatEphemeralResolvingCard(layout: ChatEphemeralLayout, modifier: Modifier = Modifier) {
+fun ChatEphemeralResolvingCard(
+    layout: ChatEphemeralLayout,
+    sentAt: Date,
+    expirationDate: Date?,
+    modifier: Modifier = Modifier,
+) {
     val shape = RoundedCornerShape(layout.cornerRadius)
     Box(
         modifier
             .size(layout.width, layout.height)
             .clip(shape)
-            .background(ephemeralCardGradient)
-            .border(1.dp, ephemeralAccent.copy(alpha = 0.35f), shape),
+            .background(ephemeralCardGradient),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -318,6 +400,12 @@ fun ChatEphemeralResolvingCard(layout: ChatEphemeralLayout, modifier: Modifier =
                 fontSize = 11.sp,
             )
         }
+        ChatEphemeralLifetimeBorder(
+            layout = layout,
+            sentAt = sentAt,
+            expirationDate = expirationDate,
+            lineWidth = 1.dp,
+        )
     }
 }
 

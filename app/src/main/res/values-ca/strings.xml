@@ -435,6 +435,8 @@
     <string name="chat_preview_shared_moment">Moment compartit</string>
     <string name="chat_preview_shared_story">Història compartida</string>
     <string name="chat_preview_shared_profile">Perfil compartit</string>
+    <string name="chat_preview_story_kind">Història</string>
+    <string name="chat_preview_reel_kind">Reel</string>
     <string name="banner_verb_media_moderation_partial">S\'ha ocultat contingut de la teva publicació</string>
     <string name="banner_verb_media_moderation_full">La teva publicació ara és només per a tu</string>
     <string name="banner_verb_media_moderation_story_partial">S\'ha ocultat contingut de la teva història</string>

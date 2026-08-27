@@ -8,6 +8,8 @@ import java.net.URLConnection
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
@@ -15,6 +17,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -24,6 +27,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
@@ -132,6 +136,7 @@ fun GlassmorphicMessageRow(
     isStarred: Boolean = false,
     timestampRevealState: ChatTimestampRevealState = remember { ChatTimestampRevealState() },
     callbacks: ChatMessageBubbleCallbacks = ChatMessageBubbleCallbacks(),
+    onDoubleTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val swipeState = rememberChatReplySwipeState()
@@ -160,20 +165,20 @@ fun GlassmorphicMessageRow(
             .fillMaxWidth()
             .padding(start = 8.dp, top = if (head) 5.dp else 1.dp, end = 8.dp, bottom = bottomPad)
             .offset { IntOffset(revealOffset.roundToInt(), 0) }
-            .then(
-                if (!isCurrentUser) Modifier.chatTimestampRevealGesture(true, timestampRevealState)
-                else Modifier,
-            ),
+            // Superficie vacía (entrantes y propios): swipe izq. → hora a la derecha.
+            // Encima de la burbuja propia manda el reply.
+            .chatTimestampRevealGesture(true, timestampRevealState),
         verticalAlignment = Alignment.Bottom,
     ) {
         Row(
             Modifier
                 .weight(1f)
+                .height(IntrinsicSize.Max)
                 .rawPadding(end = (-67).dp),
             verticalAlignment = Alignment.Bottom,
         ) {
             if (isCurrentUser) {
-                // ≡ iOS `Color.clear.chatTimestampRevealGutter` — altura = burbuja (Row).
+                // Hueco vacío a la izquierda de la burbuja propia.
                 Box(
                     Modifier
                         .weight(1f)
@@ -200,6 +205,9 @@ fun GlassmorphicMessageRow(
                 )
             }
             Column(
+                modifier = Modifier.wrapContentWidth(
+                    if (isCurrentUser) Alignment.End else Alignment.Start,
+                ),
                 horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start,
                 verticalArrangement = Arrangement.spacedBy(reactionSpacing),
             ) {
@@ -211,6 +219,13 @@ fun GlassmorphicMessageRow(
                     isOutgoing = isCurrentUser,
                     cornerRadius = cornerRadius,
                     onReply = callbacks.onReply,
+                    modifier = if (onDoubleTap != null) {
+                        Modifier.pointerInput(message.id) {
+                            detectTapGestures(onDoubleTap = { onDoubleTap() })
+                        }
+                    } else {
+                        Modifier
+                    },
                 ) {
                     ChatMessageBubbleChrome(
                         isMenuSelected = isMenuSelected,

@@ -36,7 +36,7 @@ object ChatRowHeightEstimator {
     private const val GIF_DEFAULT_ASPECT = 200f / 150f
 
     private val voiceNoteHeight = 68.dp
-    private val locationHeight = 205.dp
+    private val locationHeight = 217.dp
     private val liveLocationExtraHeight = 40.dp
     private val fileHeight = 72.dp
     private val viewOncePillHeight = 50.dp
@@ -44,6 +44,8 @@ object ChatRowHeightEstimator {
     private val ephemeralHeight = 150.dp
     private val sharedPreviewHeight = 220.dp
     private val sharedProfilePreviewHeight = 248.dp
+    private val storyReplyTextHeight = 244.dp
+    private val storyReplyEphemeralHeight = 368.dp
     private val chatNoticeHeight = 36.dp
 
     private val headerHeight = 32.dp
@@ -61,6 +63,13 @@ object ChatRowHeightEstimator {
             is ChatRenderRow.ConversationIntro -> conversationIntroHeight
             is ChatRenderRow.RequestDisclaimer -> requestDisclaimerHeight
             is ChatRenderRow.PendingRequestMessage -> {
+                if (row.message.hasStoryReplyContext) {
+                    return if (row.message.messageType == MessageType.EPHEMERAL) {
+                        storyReplyEphemeralHeight
+                    } else {
+                        storyReplyTextHeight
+                    }
+                }
                 val text = row.message.text.trim()
                 if (text.isEmpty()) {
                     viewOncePillHeight + viewOnceRowVerticalPadding
@@ -108,7 +117,15 @@ object ChatRowHeightEstimator {
             6.dp
     }
 
-    private fun estimatedHeight(message: EnhancedMessage, bubbleWidth: Dp): Dp = when (message.type) {
+    private fun estimatedHeight(message: EnhancedMessage, bubbleWidth: Dp): Dp {
+        if (message.storyReplyData != null) {
+            return if (message.type == MessageType.EPHEMERAL) {
+                storyReplyEphemeralHeight
+            } else {
+                storyReplyTextHeight
+            }
+        }
+        return when (message.type) {
         MessageType.TEXT -> textHeight(message, bubbleWidth)
         MessageType.IMAGE, MessageType.VIDEO ->
             mediaHeight(message, bubbleWidth, MEDIA_DEFAULT_ASPECT)
@@ -124,6 +141,7 @@ object ChatRowHeightEstimator {
         MessageType.SHARED_MOMENT, MessageType.SHARED_STORY -> sharedPreviewHeight
         MessageType.SHARED_PROFILE -> sharedProfilePreviewHeight
         MessageType.CHAT_NOTICE -> chatNoticeHeight
+        }
     }
 
     private fun textHeight(message: EnhancedMessage, bubbleWidth: Dp): Dp {

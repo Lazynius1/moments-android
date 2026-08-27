@@ -2,7 +2,9 @@ package com.moments.android.views.messaging.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -100,6 +103,7 @@ fun GlassmorphicClusterRow(
     isMenuSelected: Boolean = false,
     isBubbleFlashing: Boolean = false,
     onLongPress: ((EnhancedMessage, ChatMessageLiftSnapshot) -> Unit)? = null,
+    onDoubleTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (messages.isEmpty()) return
@@ -114,7 +118,12 @@ fun GlassmorphicClusterRow(
         if (!isCurrentUser) {
             ChatIncomingAvatarGutter(showAvatar, otherUserId, isOtherParticipantUnavailable, onAvatarTap)
         }
-        Column(horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start) {
+        Column(
+            modifier = Modifier.wrapContentWidth(
+                if (isCurrentUser) Alignment.End else Alignment.Start,
+            ),
+            horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start,
+        ) {
             repliedMessage?.let {
                 StackedReplyQuote(it, isCurrentUser, otherParticipantName, onReplyTap)
             }
@@ -131,6 +140,7 @@ fun GlassmorphicClusterRow(
                     isMenuSelected = isMenuSelected,
                     isBubbleFlashing = isBubbleFlashing,
                     onReply = onReply,
+                    onDoubleTap = onDoubleTap,
                 )
                 if (isStarred) {
                     MessageStarBadge(
@@ -249,6 +259,7 @@ fun MediaGridBubble(
     isMenuSelected: Boolean = false,
     isBubbleFlashing: Boolean = false,
     onReply: () -> Unit = {},
+    onDoubleTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val front = messages.firstOrNull() ?: return
@@ -299,6 +310,13 @@ fun MediaGridBubble(
             isOutgoing = isCurrentUser,
             cornerRadius = ChatBubbleAnchorMetrics.clusterCornerRadius,
             onReply = onReply,
+            modifier = if (onDoubleTap != null) {
+                Modifier.pointerInput(active.map { it.id }) {
+                    detectTapGestures(onDoubleTap = { onDoubleTap() })
+                }
+            } else {
+                Modifier
+            },
         ) {
             ChatMessageBubbleChrome(
                 isMenuSelected = isMenuSelected,

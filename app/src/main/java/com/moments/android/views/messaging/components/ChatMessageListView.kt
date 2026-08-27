@@ -439,13 +439,14 @@ fun ChatMessageListView(
                 else controller.pendingScroll = PendingScrollRequest(command.messageId, command.animated)
             }
             is ChatListScrollCommand.Highlight -> {
-                controller.scrollNavigationTargetRowId = command.messageId
+                val rowId = controller.resolvedRowId(command.messageId)
+                controller.scrollNavigationTargetRowId = rowId
                 val index = resolveRowDisplayIndex(command.messageId)
+                    ?: resolveRowDisplayIndex(rowId)
                 if (index != null) {
                     state.goTo(index, command.animated)
-                    // Clear when settled ≈ clearNavigationTargetIfSettled
                 } else {
-                    controller.pendingScroll = PendingScrollRequest(command.messageId, command.animated)
+                    controller.pendingScroll = PendingScrollRequest(rowId, command.animated)
                 }
             }
             ChatListScrollCommand.None -> Unit

@@ -330,7 +330,7 @@ fun SharedProfilePreviewCard(
     val profileUserId = sharedProfileData["profileUserId"].orEmpty()
     val viewModel = remember(profileUserId) { UserProfileViewModel(profileUserId) }
     val isDark = isSystemInDarkTheme()
-    val cardBackground = if (isDark) Color(0xFFFAF9F6).copy(0.14f) else Color(0xFF0B1215).copy(0.07f)
+    val cardBackground = if (isDark) Color(0xFF151C1D) else Color(0xFFE8EEF0)
     val cardShape = RoundedCornerShape(sharedProfileCardCornerRadius)
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid
     val isOwnProfile = profileUserId.isNotEmpty() && profileUserId == currentUid

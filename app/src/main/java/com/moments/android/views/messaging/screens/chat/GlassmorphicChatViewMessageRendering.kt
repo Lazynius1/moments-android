@@ -45,7 +45,6 @@ import com.moments.android.views.messaging.components.ChatHistoryStartHeader
 import com.moments.android.views.messaging.components.ChatRequestDisclaimerRow
 import com.moments.android.views.messaging.components.ChatTimestampRevealState
 import com.moments.android.views.messaging.components.GlassmorphicDateHeader
-import com.moments.android.views.messaging.components.GlassmorphicReplyBar
 import com.moments.android.views.messaging.components.GlassmorphicTypingIndicator
 import com.moments.android.views.messaging.components.LocalChatFailedMessageRetryAction
 import com.moments.android.views.messaging.components.PendingRequestMessageRow
@@ -171,17 +170,13 @@ fun GlassmorphicChatRenderRow(
 }
 
 @Composable
-fun ChatReplyAndEditingBar(
-    replyingTo: EnhancedMessage?,
+fun ChatEditingBar(
     editingMessage: EnhancedMessage?,
-    otherParticipantName: String,
     adaptiveColors: AdaptiveColors,
-    onReplyCancelled: () -> Unit,
     onEditingCancelled: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
-        replyingTo?.let { GlassmorphicReplyBar(it, otherParticipantName, onReplyCancelled) }
         if (editingMessage != null) {
             // ≡ iOS ultraThinMaterial.opacity(0.5) → canvas sólido AdaptiveColors
             Row(
