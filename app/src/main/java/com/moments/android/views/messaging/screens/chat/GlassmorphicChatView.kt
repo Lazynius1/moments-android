@@ -492,13 +492,16 @@ fun GlassmorphicChatView(
 
     /**
      * Tap en la cita del reply: scroll al mensaje citado y lo resalta ~1s.
-     * Si el mensaje no está en el historial cargado, no-op.
+     * Si el mensaje no está en el historial cargado, materializa primero su ventana.
      */
     fun jumpToRepliedMessage(messageId: String) {
         if (messageId.isBlank()) return
         val exists = session.messagesById.containsKey(messageId) ||
             session.messages.value.any { it.id == messageId }
-        if (!exists) return
+        if (!exists) {
+            scroll.scheduleSearchHighlightScroll(messageId)
+            return
+        }
         scroll.scrollToTarget(
             ChatScrollTarget.HighlightedMessage(messageId),
             animated = !MotionPolicy.reduceMotion,
@@ -1118,7 +1121,7 @@ fun GlassmorphicChatView(
                     context.findActivity()?.let { voice.startVoiceRecording(it, id, locked) }
                 },
                 onFinishVoiceRecording = { id, action ->
-                    voice.finishVoiceRecording(id, action)
+                    voice.finishVoiceRecording(id, action, voiceGestureState)
                 },
                 onVoiceRecordingTrimChanged = voice::updateVoiceRecordingTrimRange,
                 onLockChanged = voice::setVoiceRecordingLocked,

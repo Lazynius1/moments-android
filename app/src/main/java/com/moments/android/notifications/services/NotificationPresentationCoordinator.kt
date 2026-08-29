@@ -145,7 +145,7 @@ object NotificationPresentationCoordinator {
     private fun mapPushPayload(userInfo: Map<String, Any?>): MomentsNotification? {
         val rawType = userInfo["type"] as? String ?: return null
         val notificationType = mapPushType(rawType) ?: return null
-        val senderId = firstString(userInfo, listOf("senderId", "userId", "followerId"))
+        val senderId = firstString(userInfo, listOf("senderId", "userId", "followerId", "continuerId", "hostId"))
             ?: if (notificationType == NotificationType.GENTLE_REMINDER) "gentle_reminder" else ""
         return MomentsNotification(
             id = firstString(userInfo, listOf("notificationId", "gcm.message_id"))
@@ -163,8 +163,11 @@ object NotificationPresentationCoordinator {
             mentionContext = firstString(userInfo, listOf("mentionContext")),
             targetAuthorId = firstString(userInfo, listOf("targetAuthorId", "momentOwnerId")),
             targetAuthorUsername = firstString(userInfo, listOf("targetAuthorUsername")),
-            reaction = firstString(userInfo, listOf("reactionEmoji", "reactionType", "reaction", "moderationType")),
-            reactionCount = intValue(userInfo, listOf("reactionCount", "moderatedMediaCount")),
+            reaction = firstString(userInfo, listOf("commentPreview", "momentTitle", "reactionEmoji", "reactionType", "reaction", "moderationType")),
+            reactionCount = intValue(
+                userInfo,
+                listOf("reactionCount", "unreadInConvo", "moderatedMediaCount", "aggregateCount"),
+            ),
             commentId = firstString(userInfo, listOf("commentId")),
             conversationId = firstString(userInfo, listOf("conversationId", "targetId")),
             echoId = firstString(userInfo, listOf("echoId")),
@@ -179,6 +182,7 @@ object NotificationPresentationCoordinator {
             buzzEventId = firstString(userInfo, listOf("buzzEventId")),
             reminderVariant = firstString(userInfo, listOf("reminderVariant")),
             isReactionPlural = parseBool(userInfo["isReactionPlural"]),
+            isHost = parseBool(userInfo["isHost"]).takeIf { userInfo["isHost"] != null },
         )
     }
 
@@ -201,8 +205,9 @@ object NotificationPresentationCoordinator {
         "media_moderation" -> NotificationType.MEDIA_MODERATION
         "echo_suggestion" -> NotificationType.ECHO_SUGGESTION
         "data_export_ready" -> NotificationType.DATA_EXPORT_READY
-        "mutual_connection" -> NotificationType.MUTUAL_CONNECTION
+        "mutual_connection", "mutualConnection" -> NotificationType.MUTUAL_CONNECTION
         "mention" -> NotificationType.MENTION
+        "requestAccepted" -> NotificationType.REQUEST_ACCEPTED
         else -> NotificationType.from(rawType)
     }
 

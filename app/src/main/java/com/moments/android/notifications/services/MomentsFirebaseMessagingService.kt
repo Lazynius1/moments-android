@@ -1,24 +1,13 @@
 package com.moments.android.notifications.services
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.os.Build
 import android.util.Log
-import androidx.core.app.NotificationCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import com.google.firebase.storage.FirebaseStorage
-import com.moments.android.MainActivity
 import com.moments.android.R
-import com.moments.android.services.messaging.ChatCommunicationIntentDonor
 import com.moments.android.services.messaging.MessageIngestService
 import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.messaging.SharedChatDecryptor
@@ -30,9 +19,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * Port de push FCM ≈ `AppDelegate` + **NSE** `MomentsNotificationService/NotificationService.swift`.
@@ -134,7 +120,7 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     private suspend fun showSystemNotificationIfNeeded(message: RemoteMessage, userInfo: Map<String, Any?>) {
-        ensureDefaultChannel()
+        NotificationShadePoster.ensureChannels(this)
         val title = message.notification?.title
             ?: userInfo["senderUsername"] as? String
             ?: getString(R.string.app_name)
@@ -143,46 +129,14 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
             ?: userInfo["reaction"] as? String
             ?: getString(R.string.notification_message_single_default)
 
-        // ≡ resolveMessagePreview (+ reaction); para tipos sociales usa CopyResolver (loc keys iOS).
         val resolved = resolveSystemNotificationContent(title, suppliedBody, userInfo)
-        val body = resolved.body
-        val resolvedTitle = resolved.title
-
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            userInfo.forEach { (k, v) -> putExtra(k, v?.toString()) }
-            putExtra(EXTRA_FROM_PUSH, true)
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            userInfo.hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-
-        val builder = ChatCommunicationIntentDonor.buildMessagePushNotification(
+        NotificationShadePoster.post(
             context = this,
+            messageId = message.messageId,
             userInfo = userInfo,
-            fallbackTitle = resolvedTitle,
-            body = body,
-            channelId = CHANNEL_ID,
-            contentIntent = pendingIntent,
+            title = resolved.title,
+            body = resolved.body,
         )
-
-        // ≡ resolveNotificationAttachment → BigPicture / largeIcon
-        resolveNotificationBitmap(userInfo)?.let { bitmap ->
-            builder.setLargeIcon(bitmap)
-                .setStyle(
-                    NotificationCompat.BigPictureStyle()
-                        .bigPicture(bitmap)
-                        .bigLargeIcon(null as Bitmap?),
-                )
-        }
-
-        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        runCatching {
-            manager.notify(message.messageId?.hashCode() ?: body.hashCode(), builder.build())
-        }.onFailure { Log.w(TAG, "Failed to post notification: $it") }
     }
 
     private data class ResolvedContent(val title: String, val body: String)
@@ -205,6 +159,7 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
 
         if (type == "message_reaction") {
             return resolveChatReactionPreview(suppliedTitle, suppliedBody, userInfo)
+                ?: copyFromResolver(userInfo, suppliedTitle, suppliedBody, genericBody)
                 ?: ResolvedContent(suppliedTitle, ChatSystemNotificationPreviewContract.safeFallback(suppliedBody, genericBody))
         }
 
@@ -217,10 +172,11 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
                     ChatPreviewPrivacy.isVanishModeMessage(userInfo),
                 )
             ) {
-                return ResolvedContent(
-                    suppliedTitle,
-                    ChatSystemNotificationPreviewContract.safeFallback(suppliedBody, genericBody),
-                )
+                return copyFromResolver(userInfo, suppliedTitle, suppliedBody, genericBody)
+                    ?: ResolvedContent(
+                        suppliedTitle,
+                        ChatSystemNotificationPreviewContract.safeFallback(suppliedBody, genericBody),
+                    )
             }
 
             val encryptedContent = userInfo["encryptedContent"] as? String
@@ -240,10 +196,11 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
                     return applyPreviewText(plain, userInfo, suppliedTitle)
                 }
             }
-            return ResolvedContent(
-                suppliedTitle,
-                ChatSystemNotificationPreviewContract.safeFallback(suppliedBody, genericBody),
-            )
+            return copyFromResolver(userInfo, suppliedTitle, suppliedBody, genericBody)
+                ?: ResolvedContent(
+                    suppliedTitle,
+                    ChatSystemNotificationPreviewContract.safeFallback(suppliedBody, genericBody),
+                )
         }
 
         // Data-only FCM (sin APNs loc-key): localizar con NotificationCopyResolver.
@@ -259,6 +216,20 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
             suppliedTitle,
             ChatSystemNotificationPreviewContract.safeFallback(suppliedBody, genericBody),
         )
+    }
+
+    private fun copyFromResolver(
+        userInfo: Map<String, Any?>,
+        suppliedTitle: String,
+        suppliedBody: String,
+        genericBody: String,
+    ): ResolvedContent? {
+        val mapped = NotificationPresentationCoordinator.notificationFromPush(userInfo) ?: return null
+        val copy = NotificationCopyResolver.resolve(mapped)
+        val resolvedTitle = copy.title.ifBlank { suppliedTitle }
+        val resolvedBody = copy.body?.takeIf { it.isNotBlank() }
+            ?: ChatSystemNotificationPreviewContract.safeFallback(suppliedBody, genericBody)
+        return ResolvedContent(resolvedTitle, resolvedBody)
     }
 
     private fun applyPreviewText(
@@ -315,127 +286,10 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         return null
     }
 
-    /**
-     * ≡ resolveNotificationAttachment — bitmap para BigPicture.
-     * View-once nunca; chat image/video cifrado; gif/sticker URL; else mediaUrl/avatar.
-     */
-    private suspend fun resolveNotificationBitmap(userInfo: Map<String, Any?>): Bitmap? {
-        val notificationType = (userInfo["type"] as? String)?.lowercase()
-        val isChatMessage = notificationType == "new_message" || notificationType == "message"
-        val messageType = userInfo["messageType"] as? String
-        val viewOnce = setOf("viewOnceImage", "viewOnceVideo", "ephemeral")
-
-        if (isChatMessage && messageType != null && messageType !in viewOnce) {
-            val conversationId = userInfo["conversationId"] as? String ?: return null
-            if (!ChatPreviewPrivacy.shouldRevealPreview(
-                    conversationId,
-                    ChatPreviewPrivacy.isVanishModeMessage(userInfo),
-                )
-            ) {
-                return null
-            }
-            if (messageType == "image" || messageType == "video") {
-                val messageId = userInfo["messageId"] as? String ?: return null
-                return resolveEncryptedMediaBitmap(
-                    conversationId = conversationId,
-                    messageId = messageId,
-                    allowFullMediaFallback = messageType == "image",
-                )
-            }
-            if (messageType == "gif" || messageType == "sticker") {
-                val url = userInfo["mediaUrl"] as? String ?: return null
-                return downloadPublicBitmap(url)
-            }
-            return null
-        }
-
-        (userInfo["mediaUrl"] as? String)?.takeIf { it.isNotBlank() }?.let { return downloadPublicBitmap(it) }
-        (userInfo["senderProfileImage"] as? String)?.takeIf { it.isNotBlank() }?.let { return downloadPublicBitmap(it) }
-        return null
-    }
-
-    /** ≡ resolveEncryptedMediaAttachment */
-    private suspend fun resolveEncryptedMediaBitmap(
-        conversationId: String,
-        messageId: String,
-        allowFullMediaFallback: Boolean,
-    ): Bitmap? {
-        val data = runCatching {
-            FirebaseFirestore.getInstance().collection("conversations").document(conversationId)
-                .collection("messages").document(messageId).get().await().data
-        }.getOrNull() ?: return null
-
-        val thumbPath = data["thumbnailObjectPath"] as? String
-        val thumbMeta = SharedChatDecryptor.MediaMetadata.fromMap(
-            data["thumbnailEncryption"] as? Map<String, Any?>,
-        )
-        if (!thumbPath.isNullOrBlank() && thumbMeta != null) {
-            downloadAndDecryptBitmap(thumbPath, thumbMeta, conversationId, messageId)?.let { return it }
-        }
-
-        if (allowFullMediaFallback) {
-            val mediaPath = data["mediaObjectPath"] as? String
-            val mediaMeta = SharedChatDecryptor.MediaMetadata.fromMap(
-                data["mediaEncryption"] as? Map<String, Any?>,
-            )
-            if (!mediaPath.isNullOrBlank() && mediaMeta != null &&
-                mediaMeta.plaintextSize <= MAX_ATTACHMENT_BYTES
-            ) {
-                return downloadAndDecryptBitmap(mediaPath, mediaMeta, conversationId, messageId)
-            }
-        }
-        return null
-    }
-
-    private suspend fun downloadAndDecryptBitmap(
-        objectPath: String,
-        metadata: SharedChatDecryptor.MediaMetadata,
-        conversationId: String,
-        messageId: String,
-    ): Bitmap? {
-        val maxSize = minOf(
-            maxOf(metadata.plaintextSize + 256 * 1024, 2L * 1024 * 1024),
-            MAX_ATTACHMENT_BYTES + 256 * 1024,
-        )
-        val encrypted = runCatching {
-            FirebaseStorage.getInstance().reference.child(objectPath).getBytes(maxSize).await()
-        }.getOrNull() ?: return null
-        val decrypted = SharedChatDecryptor.decryptMedia(encrypted, metadata, conversationId, messageId)
-            ?: return null
-        return BitmapFactory.decodeByteArray(decrypted, 0, decrypted.size)
-    }
-
-    private suspend fun downloadPublicBitmap(urlString: String): Bitmap? = withContext(Dispatchers.IO) {
-        runCatching {
-            val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 8_000
-                readTimeout = 8_000
-                instanceFollowRedirects = true
-            }
-            connection.inputStream.use { BitmapFactory.decodeStream(it) }
-        }.getOrNull()
-    }
-
-    private fun ensureDefaultChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        if (manager.getNotificationChannel(CHANNEL_ID) != null) return
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            getString(R.string.notification_channel_default_name),
-            NotificationManager.IMPORTANCE_DEFAULT,
-        ).apply {
-            description = getString(R.string.notification_channel_default_description)
-        }
-        manager.createNotificationChannel(channel)
-    }
-
     companion object {
         const val CHANNEL_ID = "moments_default"
         const val EXTRA_FROM_PUSH = "from_push"
         private const val TAG = "MomentsFCM"
-        /** ≡ maxAttachmentBytes NSE */
-        private const val MAX_ATTACHMENT_BYTES = 8L * 1024 * 1024
     }
 }
 

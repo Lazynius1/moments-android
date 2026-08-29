@@ -1,0 +1,40 @@
+<es-ES>
+• Compartir perfil en el chat — Envía un perfil desde el menú de cualquier perfil. El destinatario recibe una ficha en la conversación; tócala para abrirlo.
+
+• Confirmación al compartir — Al enviar un moment, story o perfil por chat, ves una confirmación antes de cerrar el selector.
+</es-ES>
+<ca>
+• Compartir perfil al xat — Envia un perfil des del menú de qualsevol perfil. El destinatari rep una fitxa a la conversa; toca per obrir-lo.
+
+• Confirmació en compartir — En enviar un moment, story o perfil per xat, veus una confirmació abans de tancar el selector.
+</ca>
+<de-DE>
+• Profile im Chat teilen — Sende ein Profil über das Menü auf jedem Profil. Empfänger sehen eine Vorschaukarte im Chat — tippen zum Öffnen.
+
+• Bestätigung beim Teilen — Beim Senden eines Moments, einer Story oder eines Profils im Chat siehst du eine Bestätigung, bevor sich der Auswahl-Sheet schließt.
+</de-DE>
+<en-US>
+• Share profiles in chat — Send a profile from the menu on any profile. Recipients get a preview card in the conversation — tap to open.
+
+• Share confirmation — When you send a moment, story or profile in chat, you get a confirmation before the picker closes.
+</en-US>
+<fr-FR>
+• Partager des profils dans le chat — Envoie un profil depuis le menu de n'importe quel profil. Le destinataire reçoit une carte dans la conversation — touche pour l'ouvrir.
+
+• Confirmation d'envoi — Quand tu envoies un moment, une story ou un profil dans le chat, une confirmation s'affiche avant de fermer le sélecteur.
+</fr-FR>
+<it-IT>
+• Condividi profili in chat — Invia un profilo dal menu di qualsiasi profilo. Il destinatario riceve una scheda nella conversazione — tocca per aprirla.
+
+• Conferma di invio — Quando invii un moment, una story o un profilo in chat, vedi una conferma prima che si chiuda il selettore.
+</it-IT>
+<pt-BR>
+• Compartilhar perfis no chat — Envie um perfil pelo menu de qualquer perfil. O destinatário recebe um cartão na conversa — toque para abrir.
+
+• Confirmação ao compartilhar — Ao enviar um moment, story ou perfil no chat, você vê uma confirmação antes de fechar o seletor.
+</pt-BR>
+<pt-PT>
+• Partilhar perfis no chat — Envia um perfil a partir do menu de qualquer perfil. O destinatário recebe um cartão na conversa — toca para abrir.
+
+• Confirmação ao partilhar — Ao enviar um moment, story ou perfil no chat, vês uma confirmação antes de fechar o seletor.
+</pt-PT>

@@ -80,6 +80,21 @@ private fun sharedStoryPreviewText(context: Context, data: Map<String, String>?)
     return "${authorAtPrefix(author)} · ${context.getString(R.string.chat_preview_story_kind)}"
 }
 
+/** Preview de inbox para `sharedStory`: mención vs historia compartida genérica. */
+fun sharedStoryConversationPreview(
+    context: Context,
+    data: Map<String, String>?,
+    isOutgoing: Boolean,
+): String {
+    if (data?.get("isStoryMention") == "true") {
+        return context.getString(
+            if (isOutgoing) R.string.story_mention_chat_outgoing
+            else R.string.story_mention_chat_incoming,
+        )
+    }
+    return context.getString(R.string.chat_preview_shared_story)
+}
+
 private fun sharedProfilePreviewText(context: Context, data: Map<String, String>?): String {
     val username = nonEmptyTrimmed(data?.get("username"))
         ?: return context.getString(R.string.chat_preview_shared_profile)
@@ -1012,6 +1027,7 @@ data class MessageRequestMessage(
     val storyOwnerId: String? = null,
     val sharedContentId: String? = null,
     val sharedContentOwnerId: String? = null,
+    val isStoryMention: Boolean = false,
     val expirationDate: Date? = null,
     val isViewOnce: Boolean = false,
     val allowReplay: Boolean = false,
@@ -1397,6 +1413,7 @@ data class PendingChatTimelineMessage(
     val storyOwnerId: String? = null,
     val sharedContentId: String? = null,
     val sharedContentOwnerId: String? = null,
+    val isStoryMention: Boolean = false,
 ) {
     val hasStoryReplyContext: Boolean
         get() = !storyId.isNullOrBlank() && !storyOwnerId.isNullOrBlank() &&
@@ -1429,6 +1446,7 @@ data class PendingChatTimelineMessage(
             sharedStoryData = if (contextKind == "shareStory") mapOf(
                 "storyId" to (sharedContentId ?: storyId).orEmpty(),
                 "storyAuthorId" to (sharedContentOwnerId ?: storyOwnerId).orEmpty(),
+                "isStoryMention" to isStoryMention.toString(),
             ) else null,
             sharedProfileData = if (contextKind == "shareProfile") mapOf(
                 "profileUserId" to sharedContentId.orEmpty(),
@@ -1475,6 +1493,7 @@ data class PendingChatTimelineMessage(
             storyOwnerId = message.storyOwnerId,
             sharedContentId = message.sharedContentId,
             sharedContentOwnerId = message.sharedContentOwnerId,
+            isStoryMention = message.isStoryMention,
         )
 
         fun outgoingText(text: String, receiverId: String): PendingChatTimelineMessage = PendingChatTimelineMessage(

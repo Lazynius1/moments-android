@@ -1,9 +1,11 @@
 package com.moments.android.views.messaging.services
 
 import com.google.firebase.firestore.FieldValue
+import com.moments.android.MomentsApplication
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageStatus
 import com.moments.android.views.messaging.core.MessageType
+import com.moments.android.views.messaging.core.sharedStoryConversationPreview
 import com.moments.android.models.Moment
 import com.moments.android.models.Story
 import com.moments.android.services.cache.UserCacheService
@@ -125,6 +127,8 @@ suspend fun ChatService.sendSharedStoryMessage(
     senderId: String,
     story: Story,
     shareText: String,
+    isStoryMention: Boolean = false,
+    messageId: String? = null,
 ): Result<EnhancedMessage> = runCatching {
     val storyId = requireNotNull(story.id) { "Missing story id" }
     val encryptedContent = EncryptionService.encryptChatMessage(shareText, conversationId)
@@ -137,10 +141,11 @@ suspend fun ChatService.sendSharedStoryMessage(
         "storyMediaType" to storyMediaTypeString(story),
         "storyExpiration" to (story.expirationDate.time / 1000.0).toString(),
         "storyTimestamp" to (story.timestamp.time / 1000.0).toString(),
+        "isStoryMention" to isStoryMention.toString(),
     )
     val sent = sendMessage(
         EnhancedMessage(
-            id = UUID.randomUUID().toString(),
+            id = messageId ?: UUID.randomUUID().toString(),
             conversationId = conversationId,
             senderId = senderId,
             type = MessageType.SHARED_STORY,
@@ -151,9 +156,11 @@ suspend fun ChatService.sendSharedStoryMessage(
         ),
         useServerTimestamp = true,
     ).getOrThrow()
+    val ctx = MomentsApplication.instance
+        ?: error("Application context unavailable")
     updateConversation(
         conversationId = conversationId,
-        lastMessage = neutralConversationPreview(MessageType.SHARED_STORY),
+        lastMessage = sharedStoryConversationPreview(ctx, sharedStoryData, isOutgoing = true),
         senderId = senderId,
         messageType = MessageType.SHARED_STORY,
     )

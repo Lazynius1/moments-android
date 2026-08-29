@@ -1,0 +1,120 @@
+<es-ES>
+• Notificaciones de chat — Avatar del remitente, vista de conversación y textos más claros al recibir mensajes.
+
+• Notificaciones sociales — Reacciones, comentarios y seguidores con avatares, textos más claros y mejor agrupación.
+
+• Responder en el chat — Desliza en la burbuja para responder. Toca una cita para saltar al mensaje original.
+
+• Citas en el chat — Las respuestas muestran miniatura cuando citas un moment, story o perfil.
+
+• Horas en el chat — Desliza horizontalmente en una fila para ver la hora, también en tus mensajes enviados.
+
+• Entrada de mensaje — Compositor renovado y notas de voz más fluidas, con animación más clara al cancelar.
+
+• Menciones en historias — Si te mencionan en una story, recibes un mensaje en el chat.
+</es-ES>
+<ca>
+• Notificacions de xat — Avatar del remitent, vista de conversa i textos més clars en rebre missatges.
+
+• Notificacions socials — Reaccions, comentaris i seguidors amb avatars, textos més clars i millor agrupació.
+
+• Respondre al xat — Llisca a la bombolla per respondre. Toca una cita per saltar al missatge original.
+
+• Cites al xat — Les respostes mostren miniatura quan cites un moment, story o perfil.
+
+• Hores al xat — Llisca horitzontalment en una fila per veure l'hora, també als teus missatges enviats.
+
+• Entrada de missatge — Compositor renovat i notes de veu més fluides, amb animació més clara en cancel·lar.
+
+• Mencions en històries — Si et mencionen en una story, reps un missatge al xat.
+</ca>
+<de-DE>
+• Chat-Benachrichtigungen — Absender-Avatar, Gesprächsansicht und klarere Texte bei neuen Nachrichten.
+
+• Social-Benachrichtigungen — Reaktionen, Kommentare und Follower mit Avataren, klareren Texten und besserer Gruppierung.
+
+• Im Chat antworten — Auf der Sprechblase wischen zum Antworten. Tippe auf ein Zitat, um zur Originalnachricht zu springen.
+
+• Zitate im Chat — Antworten zeigen eine Miniatur, wenn du einen Moment, eine Story oder ein Profil zitierst.
+
+• Uhrzeiten im Chat — Horizontal auf einer Zeile wischen, um die Uhrzeit zu sehen — auch bei eigenen Nachrichten.
+
+• Nachrichteneingabe — Überarbeiteter Composer und flüssigere Sprachnachrichten, mit klarerer Animation beim Abbrechen.
+
+• Erwähnungen in Stories — Wenn du in einer Story erwähnt wirst, erhältst du eine Chat-Nachricht.
+</de-DE>
+<en-US>
+• Chat notifications — Sender avatar, conversation view and clearer message previews.
+
+• Social notifications — Reactions, comments and followers with avatars, clearer text and better grouping.
+
+• Reply in chat — Swipe on the bubble to reply. Tap a quote to jump to the original message.
+
+• Quotes in chat — Replies show a thumbnail when you quote a moment, story or profile.
+
+• Timestamps in chat — Swipe horizontally on a row to reveal the time, including on your own messages.
+
+• Message input — Redesigned composer and smoother voice notes, with a clearer cancel animation.
+
+• Story mentions — If someone mentions you in a story, you get a message in chat.
+</en-US>
+<fr-FR>
+• Notifications de chat — Avatar de l'expéditeur, vue conversation et textes plus clairs pour les messages.
+
+• Notifications sociales — Réactions, commentaires et abonnés avec avatars, textes plus clairs et meilleur regroupement.
+
+• Répondre dans le chat — Glisse sur la bulle pour répondre. Touche une citation pour aller au message d'origine.
+
+• Citations dans le chat — Les réponses affichent une miniature quand tu cites un moment, une story ou un profil.
+
+• Heures dans le chat — Glisse horizontalement sur une ligne pour voir l'heure, y compris sur tes propres messages.
+
+• Saisie de message — Composeur repensé et notes vocales plus fluides, avec une animation d'annulation plus claire.
+
+• Mentions dans les stories — Si on te mentionne dans une story, tu reçois un message dans le chat.
+</fr-FR>
+<it-IT>
+• Notifiche chat — Avatar del mittente, vista conversazione e anteprime più chiare.
+
+• Notifiche social — Reazioni, commenti e follower con avatar, testi più chiari e raggruppamento migliore.
+
+• Rispondi in chat — Scorri sulla bolla per rispondere. Tocca una citazione per saltare al messaggio originale.
+
+• Citazioni in chat — Le risposte mostrano una miniatura quando citi un moment, una story o un profilo.
+
+• Orari in chat — Scorri orizzontalmente su una riga per vedere l'ora, anche sui tuoi messaggi inviati.
+
+• Input messaggio — Compositore rinnovato e note vocali più fluide, con animazione di annullamento più chiara.
+
+• Menzioni nelle story — Se ti menzionano in una story, ricevi un messaggio in chat.
+</it-IT>
+<pt-BR>
+• Notificações de chat — Avatar do remetente, vista de conversa e textos mais claros nas mensagens.
+
+• Notificações sociais — Reações, comentários e seguidores com avatares, textos mais claros e melhor agrupamento.
+
+• Responder no chat — Deslize na bolha para responder. Toque em uma citação para ir à mensagem original.
+
+• Citações no chat — As respostas mostram miniatura quando você cita um moment, story ou perfil.
+
+• Horários no chat — Deslize horizontalmente em uma linha para ver a hora, inclusive nas suas mensagens.
+
+• Entrada de mensagem — Compositor renovado e áudios mais fluidos, com animação mais clara ao cancelar.
+
+• Menções em stories — Se alguém te mencionar em uma story, você recebe uma mensagem no chat.
+</pt-BR>
+<pt-PT>
+• Notificações de chat — Avatar do remetente, vista de conversa e textos mais claros nas mensagens.
+
+• Notificações sociais — Reações, comentários e seguidores com avatares, textos mais claros e melhor agrupamento.
+
+• Responder no chat — Desliza na bolha para responder. Toca numa citação para saltar para a mensagem original.
+
+• Citações no chat — As respostas mostram miniatura quando citas um moment, story ou perfil.
+
+• Horas no chat — Desliza horizontalmente numa linha para ver a hora, também nas tuas mensagens enviadas.
+
+• Entrada de mensagem — Compositor renovado e notas de voz mais fluidas, com animação mais clara ao cancelar.
+
+• Menções em stories — Se te mencionarem numa story, recebes uma mensagem no chat.
+</pt-PT>

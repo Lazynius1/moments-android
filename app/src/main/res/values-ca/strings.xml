@@ -371,6 +371,12 @@
     <string name="notifications_message_message_multiple">%1$s i %2$d persones més t\'han enviat missatges</string>
     <string name="notification_channel_default_name">Moments</string>
     <string name="notification_channel_default_description">Notificacions de Moments</string>
+    <string name="notification_channel_messages_name">Missatges</string>
+    <string name="notification_channel_messages_description">Missatges directes i xat</string>
+    <string name="notification_channel_social_name">Activitat</string>
+    <string name="notification_channel_social_description">Seguidors, reaccions, comentaris i mencions</string>
+    <string name="notification_channel_reminders_name">Recordatoris</string>
+    <string name="notification_channel_reminders_description">Avisos suaus per compartir un moment</string>
     <string name="notification_message_single_text">T\'ha enviat un missatge</string>
     <string name="notification_message_single_photo">T\'ha enviat una foto 📷</string>
     <string name="notification_message_single_video">T\'ha enviat un vídeo 🎥</string>
@@ -378,6 +384,9 @@
     <string name="notification_message_single_view_once">T\'ha enviat un missatge que desapareix 👀</string>
     <string name="notification_message_single_moment">T\'ha enviat un moment 📸</string>
     <string name="notification_message_single_default">T\'ha enviat un missatge</string>
+    <string name="notification_message_single_story_mention">T\'ha mencionat a la seva història</string>
+    <string name="story_mention_chat_incoming">T\'ha mencionat a la seva història</string>
+    <string name="story_mention_chat_outgoing">Has mencionat aquesta persona a la teva història</string>
     <string name="notification_message_multiple">T\'ha enviat %1$s missatges</string>
     <string name="notification_chat_reaction_single">Ha reaccionat amb %1$s al teu missatge</string>
     <string name="notification_chat_reaction_single_quoted">Ha reaccionat amb %1$s al teu missatge \"%2$s\"</string>
@@ -420,8 +429,7 @@
     <string name="notification_mutual_connection_body">Tu i %1$s ara us seguiu mútuament</string>
     <string name="notification_mutual_connection_multiple_title">Noves connexions mútues! 🎉</string>
     <string name="notification_mutual_connection_multiple_body">%1$s i %2$s més ara són connexions mútues</string>
-    <string name="banner_verb_echo_suggestion">està a prop teu! Creeu un Echo</string>
-    <string name="notification_action_reply">Respon</string>
+    <string name="banner_verb_echo_suggestion">està a prop teu! Creeu un Echo</string>    <string name="notification_action_reply">Respon</string>
     <string name="notification_action_placeholder">Missatge</string>
     <string name="chat_preview_text">Missatge nou</string>
     <string name="chat_preview_photo">Foto</string>

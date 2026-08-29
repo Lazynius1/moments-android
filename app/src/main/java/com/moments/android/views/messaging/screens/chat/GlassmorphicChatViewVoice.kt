@@ -13,6 +13,7 @@ import com.moments.android.views.messaging.components.RecordedVoiceNote
 import com.moments.android.views.messaging.components.VoiceRecordingComposer
 import com.moments.android.views.messaging.components.VoiceRecordingDraft
 import com.moments.android.views.messaging.components.VoiceRecordingFinishAction
+import com.moments.android.views.messaging.components.VoiceRecordingGestureState
 import com.moments.android.views.messaging.components.VoiceRecordingSegment
 import com.moments.android.views.messaging.core.EnhancedChatViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -142,11 +143,32 @@ class GlassmorphicChatVoiceController(
         }
     }
 
-    fun finishVoiceRecording(id: String, action: VoiceRecordingFinishAction) {
+    fun finishVoiceRecording(
+        id: String,
+        action: VoiceRecordingFinishAction,
+        gestureState: VoiceRecordingGestureState? = null,
+    ) {
         if (interactionId != id) return
         if (action == VoiceRecordingFinishAction.CANCEL) {
-            clearVoiceRecordingState()
+            recordingTimer?.cancel()
+            recordingTimer = null
+            isRecording = false
+            isLocked = false
             recorder.stopRecording { }
+
+            if (gestureState?.playDeleteAnimation == true) {
+                val gestureCleanup = gestureState.trashAnimationCompletionHandler
+                gestureState.trashAnimationCompletionHandler = {
+                    gestureCleanup?.invoke()
+                    clearVoiceRecordingState()
+                }
+                interactionId = null
+                draft = null
+                isPreparingPreview = false
+                recordingTime = 0.0
+            } else {
+                clearVoiceRecordingState()
+            }
             return
         }
         if (isRecording) {

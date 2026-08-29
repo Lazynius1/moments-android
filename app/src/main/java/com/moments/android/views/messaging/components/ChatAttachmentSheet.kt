@@ -271,7 +271,7 @@ fun ChatAttachmentPlusButton(
     isMenuOpen: Boolean,
     onClick: () -> Unit,
     onAnchorBoundsChanged: (IntRect) -> Unit = {},
-    /** Android composer (Telegram-like): icono plano sin glass. */
+    /** Android composer: icono plano sin glass. */
     flat: Boolean = false,
     modifier: Modifier = Modifier,
 ) {

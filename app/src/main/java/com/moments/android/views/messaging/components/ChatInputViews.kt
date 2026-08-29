@@ -1,9 +1,20 @@
 package com.moments.android.views.messaging.components
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -45,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,20 +70,31 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
+import com.moments.android.views.messaging.screens.chat.measureRootKeyboardBottomInsetPx
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import android.media.MediaPlayer
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.extensions.MomentsChromeGlass
+import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.feed.rememberAdaptiveColors
@@ -83,12 +106,15 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
-/** Android chat composer: layout ≡ Telegram EnterView, cromática Moments. */
+/** Compositor de chat Android: layout unificado, cromática Moments. */
 enum class VoiceRecordingFloatingControlMode { LOCKING, PAUSE, PREPARING, RESUME }
 
-/** ≡ Telegram `DEFAULT_HEIGHT`. */
+private enum class ComposerTrailingMode { LOCKED_SEND, DRAFT_SEND, TEXT_SEND, VOICE, EMPTY }
+
+/** Altura estándar del control del compositor. */
 private val ComposerControlSize = 44.dp
 private val composerFieldShape = RoundedCornerShape(20.dp)
+private val unifiedComposerShape = RoundedCornerShape(24.dp)
 
 @Composable
 fun GlassmorphicInputBar(
@@ -103,6 +129,7 @@ fun GlassmorphicInputBar(
     replyingTo: EnhancedMessage? = null,
     otherParticipantName: String = "",
     voiceGestureState: VoiceRecordingGestureState,
+    isKeyboardVisible: Boolean = false,
     isVanishModeActive: Boolean = false,
     allowsAttachments: Boolean = true,
     allowsVoiceRecording: Boolean = true,
@@ -126,6 +153,39 @@ fun GlassmorphicInputBar(
     val panelBg = colors.chatInputBackground
     val fieldFill = if (isDark) Color(0xFF0B1215) else Color(0xFFF4F5F5)
     val vanishStroke = if (isDark) Color.White.copy(alpha = 0.28f) else Color.Black.copy(alpha = 0.22f)
+    val focusRequester = remember { FocusRequester() }
+    val focusInteractionSource = remember { MutableInteractionSource() }
+    var isTextFieldFocused by remember { mutableStateOf(false) }
+    var hadActiveVoiceRecording by remember { mutableStateOf(isRecordingVoice) }
+    val scope = rememberCoroutineScope()
+    val separatesCancelTrashCircle =
+        voiceGestureState.playDeleteAnimation || voiceGestureState.isTrashMorphingToPlus
+    val separatesLeadingControl = showingDraft || separatesCancelTrashCircle
+    val usesCompactKeyboardChrome = isKeyboardVisible ||
+        voiceGestureState.preserveKeyboardElevation
+    val returnsToUnifiedComposerAfterTrash =
+        isTextFieldFocused || isKeyboardVisible || text.isNotEmpty() ||
+            voiceGestureState.preserveKeyboardElevation
+    val showsLeadingPlusButton = !isRecordingVoice && allowsAttachments &&
+        !voiceGestureState.playDeleteAnimation && !voiceGestureState.isTrashMorphingToPlus
+    val showsComposerTextInput = !showingDraft
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val rootView = LocalView.current
+    fun trashToPlusMorphOffset(): Dp {
+        if (!separatesCancelTrashCircle || !returnsToUnifiedComposerAfterTrash) return 0.dp
+        // La fila fusionada recupera el hueco del control separado; el centro final
+        // del + solo conserva los 4dp de padding interior.
+        return 4.dp
+    }
+    val chromeFill = MomentsChromeGlass.canvasTint(isDark)
+    val chromeStroke = MomentsChromeGlass.strokeColor(isDark)
+    val trailingMode = when {
+        isVoiceRecordingLocked -> ComposerTrailingMode.LOCKED_SEND
+        showingDraft -> ComposerTrailingMode.DRAFT_SEND
+        text.isNotBlank() -> ComposerTrailingMode.TEXT_SEND
+        allowsAttachments && allowsVoiceRecording -> ComposerTrailingMode.VOICE
+        else -> ComposerTrailingMode.EMPTY
+    }
 
     fun sendCurrentContent() {
         if (recordingInteractionId != null && (voiceRecordingDraft != null || isRecordingVoice)) {
@@ -136,10 +196,37 @@ fun GlassmorphicInputBar(
     }
 
     fun cancelVoiceRecording() {
-        recordingInteractionId?.let { onFinishVoiceRecording(it, VoiceRecordingFinishAction.CANCEL) }
+        recordingInteractionId?.let { id ->
+            if (showingDraft) {
+                voiceGestureState.trashAnimationCompletionHandler = null
+                voiceGestureState.playDeleteAnimation = true
+            }
+            onFinishVoiceRecording(id, VoiceRecordingFinishAction.CANCEL)
+        }
     }
 
-    // ≡ Telegram textFieldContainer: una franja, controles 44dp, campo plano al centro.
+    LaunchedEffect(voiceGestureState.preserveKeyboardElevation) {
+        if (voiceGestureState.preserveKeyboardElevation) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
+    LaunchedEffect(isRecordingVoice, voiceGestureState.preserveKeyboardElevation) {
+        if (voiceGestureState.preserveKeyboardElevation) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+        // No limpiar durante los 150 ms del long-press: en ese intervalo el gesto ya
+        // ha fijado el IME pero el recorder todavia no ha publicado isRecording=true.
+        if (hadActiveVoiceRecording && !isRecordingVoice) {
+            voiceGestureState.preserveKeyboardElevation = false
+            voiceGestureState.pinnedKeyboardBottomPx = 0
+        }
+        hadActiveVoiceRecording = isRecordingVoice
+    }
+
+    // Franja unificada: controles 44dp, campo plano al centro.
     Column(
         modifier
             .fillMaxWidth()
@@ -154,144 +241,252 @@ fun GlassmorphicInputBar(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(start = 2.dp, end = 4.dp, top = 6.dp, bottom = 8.dp),
+                .padding(
+                    horizontal = 14.dp,
+                    vertical = if (usesCompactKeyboardChrome) 2.dp else 4.dp,
+                ),
             verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(if (separatesLeadingControl) 10.dp else 0.dp),
         ) {
-            Box(Modifier.size(ComposerControlSize), contentAlignment = Alignment.Center) {
-                when {
-                    showingDraft -> ComposerFlatIconButton(
-                        icon = Icons.Default.Delete,
-                        tint = Color(0xFFFF3B30),
-                        onClick = ::cancelVoiceRecording,
-                        contentDescription = stringResource(R.string.common_cancel),
-                    )
-                    !isRecordingVoice && allowsAttachments -> ChatAttachmentPlusButton(
-                        isMenuOpen = isAttachmentMenuOpen,
-                        onClick = onOpenAttachments,
-                        onAnchorBoundsChanged = onAttachmentPlusAnchorBoundsChanged,
-                        flat = true,
-                    )
-                }
-            }
-
-            Column(
-                Modifier
-                    .weight(1f)
-                    .heightIn(min = ComposerControlSize)
-                    .padding(horizontal = 2.dp)
-                    .clip(composerFieldShape)
-                    .background(fieldFill, composerFieldShape)
-                    .animateContentSize()
-                    .then(
-                        if (isVanishModeActive) {
-                            Modifier.drawWithContent {
-                                drawContent()
-                                drawRoundRect(
-                                    color = vanishStroke,
-                                    cornerRadius = CornerRadius(20.dp.toPx()),
-                                    style = Stroke(
-                                        width = 1.2.dp.toPx(),
-                                        pathEffect = PathEffect.dashPathEffect(
-                                            floatArrayOf(5.dp.toPx(), 4.dp.toPx()),
-                                        ),
-                                    ),
-                                )
-                            }
-                        } else {
-                            Modifier
-                        },
-                    ),
-            ) {
-                replyingTo?.let { message ->
-                    ChatComposerReplyHeader(
-                        message = message,
-                        otherParticipantName = otherParticipantName,
-                        onCancel = onCancelReply,
-                    )
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(0.5.dp)
-                            .background(if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.07f)),
-                    )
-                }
-
+            if (separatesLeadingControl) {
                 Box(
                     Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = ComposerControlSize)
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    contentAlignment = Alignment.CenterStart,
+                        .size(ComposerControlSize)
+                        .zIndex(2f),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    when {
-                        isRecordingVoice -> VoiceRecordingHeldStatus(
-                            isLocked = isVoiceRecordingLocked,
-                            recordingSeconds = recordingSeconds.toLong(),
-                            cancelDragOffsetPx = voiceGestureState.cancelDragOffset,
-                            colors = colors,
-                            onCancel = ::cancelVoiceRecording,
-                        )
-                        showingDraft -> VoiceRecordingDraftPreview(
-                            draft = voiceRecordingDraft,
-                            fallbackDurationSeconds = recordingSeconds,
-                            isPreparing = isPreparingVoiceRecordingPreview,
-                            colors = colors,
-                            onTrimChanged = onVoiceRecordingTrimChanged,
-                        )
-                        else -> BasicTextField(
-                            value = text,
-                            onValueChange = onTextChange,
-                            textStyle = TextStyle(color = colors.primary, fontSize = 16.sp),
-                            cursorBrush = SolidColor(composerAccent),
-                            maxLines = 6,
-                            modifier = Modifier.fillMaxWidth(),
-                            decorationBox = { inner ->
-                                if (text.isEmpty()) {
-                                    Text(
-                                        stringResource(
-                                            if (isVanishModeActive) R.string.chat_input_vanish_placeholder
-                                            else R.string.chat_input_placeholder,
-                                        ),
-                                        color = colors.secondary.copy(alpha = 0.65f),
-                                        fontSize = 16.sp,
-                                    )
+                    if (separatesCancelTrashCircle) {
+                        VoiceRecordingTrashIndicator(
+                            morphProgress = voiceGestureState.trashMorphProgress,
+                            morphOffsetX = trashToPlusMorphOffset(),
+                            onLottieFinished = {
+                                voiceGestureState.startTrashMorphToPlus(scope) {
+                                    voiceGestureState.trashAnimationCompletionHandler?.invoke()
+                                    voiceGestureState.trashAnimationCompletionHandler = null
                                 }
-                                inner()
                             },
+                        )
+                    } else {
+                        InputCircleButton(
+                            icon = Icons.Default.Delete,
+                            tint = Color(0xFFFF3B30),
+                            contentDescription = stringResource(R.string.common_cancel),
+                            onClick = ::cancelVoiceRecording,
                         )
                     }
                 }
             }
 
-            Box(Modifier.size(ComposerControlSize), contentAlignment = Alignment.Center) {
-                when {
-                    isVoiceRecordingLocked -> VoiceRecordingLockedSendButton(
-                        accent = composerAccent,
-                        onClick = ::sendCurrentContent,
+            Row(
+                Modifier
+                    .weight(1f)
+                    .clip(unifiedComposerShape)
+                    .background(chromeFill, unifiedComposerShape)
+                    .border(
+                        MomentsChromeGlass.strokeWidth,
+                        chromeStroke,
+                        unifiedComposerShape,
                     )
-                    showingDraft -> ComposerFlatSendButton(
-                        accent = composerAccent,
-                        enabled = !isPreparingVoiceRecordingPreview,
-                        dimmed = isPreparingVoiceRecordingPreview,
-                        onClick = ::sendCurrentContent,
-                    )
-                    text.isNotEmpty() -> ComposerFlatSendButton(
-                        accent = composerAccent,
-                        onClick = ::sendCurrentContent,
-                    )
-                    allowsAttachments && allowsVoiceRecording -> VoiceRecordingGestureButton(
-                        tint = colors.mediaIconColor,
-                        isRecording = isRecordingVoice,
-                        activeInteractionId = recordingInteractionId,
-                        isLocked = isVoiceRecordingLocked,
-                        gestureState = voiceGestureState,
-                        glassInteractive = false,
-                        audioPower = audioPower,
-                        onStart = onStartVoiceRecording,
-                        onFinish = onFinishVoiceRecording,
-                        onLockChanged = onLockChanged,
-                        onAnchorBoundsChanged = onVoiceButtonAnchorBoundsChanged,
-                    )
+                    .padding(if (usesCompactKeyboardChrome) 0.dp else 2.dp),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                if (!separatesLeadingControl) {
+                    Box(
+                        Modifier
+                            .size(ComposerControlSize)
+                            .zIndex(2f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        when {
+                            showsLeadingPlusButton -> ChatAttachmentPlusButton(
+                                isMenuOpen = isAttachmentMenuOpen,
+                                onClick = onOpenAttachments,
+                                onAnchorBoundsChanged = onAttachmentPlusAnchorBoundsChanged,
+                                flat = true,
+                            )
+                        }
+                    }
+                }
+
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .zIndex(1f)
+                        .heightIn(min = ComposerControlSize)
+                        .clip(composerFieldShape)
+                        .background(
+                            if (isVanishModeActive) fieldFill
+                            else Color.Transparent,
+                            composerFieldShape,
+                        )
+                        .border(
+                            MomentsChromeGlass.strokeWidth,
+                            if (isVanishModeActive) chromeStroke else Color.Transparent,
+                            composerFieldShape,
+                        )
+                        .then(
+                            if (isVanishModeActive) {
+                                Modifier.drawWithContent {
+                                    drawContent()
+                                    drawRoundRect(
+                                        color = vanishStroke,
+                                        cornerRadius = CornerRadius(20.dp.toPx()),
+                                        style = Stroke(
+                                            width = 1.2.dp.toPx(),
+                                            pathEffect = PathEffect.dashPathEffect(
+                                                floatArrayOf(5.dp.toPx(), 4.dp.toPx()),
+                                            ),
+                                        ),
+                                    )
+                                }
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .animateContentSize(),
+                    content = {
+                        replyingTo?.let { message ->
+                            ChatComposerReplyHeader(
+                                message = message,
+                                otherParticipantName = otherParticipantName,
+                                onCancel = onCancelReply,
+                            )
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(0.5.dp)
+                                    .background(if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.07f)),
+                            )
+                        }
+
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = ComposerControlSize)
+                                .clickable(
+                                    interactionSource = focusInteractionSource,
+                                    indication = null,
+                                    enabled = !isRecordingVoice && !showingDraft,
+                                ) {
+                                    focusRequester.requestFocus()
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            if (showsComposerTextInput) {
+                                BasicTextField(
+                                    value = text,
+                                    // Mantener el input connection vivo durante la grabacion.
+                                    // Telegram oculta el editor bajo su record panel, pero no lo
+                                    // vuelve read-only: hacerlo cerraba el IME y bajaba el composer.
+                                    onValueChange = { updated ->
+                                        if (!isRecordingVoice) onTextChange(updated)
+                                    },
+                                    textStyle = TextStyle(color = colors.primary, fontSize = 16.sp),
+                                    cursorBrush = SolidColor(composerAccent),
+                                    maxLines = 6,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .alpha(if (isRecordingVoice) 0f else 1f)
+                                        .focusRequester(focusRequester)
+                                        .onFocusChanged { isTextFieldFocused = it.isFocused },
+                                    decorationBox = { inner ->
+                                        if (text.isBlank() && !isRecordingVoice) {
+                                            Text(
+                                                stringResource(
+                                                    if (isVanishModeActive) R.string.chat_input_vanish_placeholder
+                                                    else R.string.chat_input_placeholder,
+                                                ),
+                                                color = colors.secondary.copy(alpha = 0.65f),
+                                                fontSize = 16.sp,
+                                            )
+                                        }
+                                        inner()
+                                    },
+                                )
+                            }
+
+                            if (isRecordingVoice) {
+                                VoiceRecordingHeldStatus(
+                                    isLocked = isVoiceRecordingLocked,
+                                    recordingSeconds = recordingSeconds.toLong(),
+                                    cancelDragOffsetPx = voiceGestureState.cancelDragOffset,
+                                    cancelProgress = voiceGestureState.cancelProgress,
+                                    colors = colors,
+                                    onCancel = ::cancelVoiceRecording,
+                                )
+                            } else if (showingDraft) {
+                                VoiceRecordingDraftPreview(
+                                    draft = voiceRecordingDraft,
+                                    fallbackDurationSeconds = recordingSeconds,
+                                    isPreparing = isPreparingVoiceRecordingPreview,
+                                    colors = colors,
+                                    onTrimChanged = onVoiceRecordingTrimChanged,
+                                )
+                            }
+                        }
+                    },
+                )
+
+                Box(
+                    Modifier
+                        .size(ComposerControlSize)
+                        .zIndex(2f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AnimatedContent(
+                        targetState = trailingMode,
+                        transitionSpec = {
+                            (fadeIn(tween(140)) + scaleIn(tween(180), initialScale = 0.78f))
+                                .togetherWith(
+                                    fadeOut(tween(110)) + scaleOut(tween(140), targetScale = 0.78f),
+                                )
+                        },
+                        label = "chatComposerTrailingControl",
+                    ) { mode ->
+                        when (mode) {
+                            ComposerTrailingMode.LOCKED_SEND -> VoiceRecordingLockedSendButton(
+                                accent = composerAccent,
+                                onClick = ::sendCurrentContent,
+                            )
+                            ComposerTrailingMode.DRAFT_SEND -> ComposerFlatSendButton(
+                                accent = composerAccent,
+                                enabled = !isPreparingVoiceRecordingPreview,
+                                dimmed = isPreparingVoiceRecordingPreview,
+                                onClick = ::sendCurrentContent,
+                            )
+                            ComposerTrailingMode.TEXT_SEND -> ComposerFlatSendButton(
+                                accent = composerAccent,
+                                onClick = ::sendCurrentContent,
+                            )
+                            ComposerTrailingMode.VOICE -> VoiceRecordingGestureButton(
+                                tint = colors.mediaIconColor,
+                                isRecording = isRecordingVoice,
+                                activeInteractionId = recordingInteractionId,
+                                isLocked = isVoiceRecordingLocked,
+                                gestureState = voiceGestureState,
+                                glassInteractive = false,
+                                standaloneChrome = false,
+                                audioPower = audioPower,
+                                onStart = onStartVoiceRecording,
+                                onFinish = onFinishVoiceRecording,
+                                onLockChanged = onLockChanged,
+                                onPressBegan = {
+                                    // Solo elevar si el teclado ya está visible; foco sin IME
+                                    // no debe abrir teclado ni subir el compositor al grabar abajo.
+                                    if (!isKeyboardVisible) return@VoiceRecordingGestureButton
+                                    val keyboardInsetPx = measureRootKeyboardBottomInsetPx(rootView)
+                                    voiceGestureState.preserveKeyboardElevation = true
+                                    voiceGestureState.pinnedKeyboardBottomPx = keyboardInsetPx
+                                    focusRequester.requestFocus()
+                                    keyboardController?.show()
+                                },
+                                onAnchorBoundsChanged = onVoiceButtonAnchorBoundsChanged,
+                            )
+                            ComposerTrailingMode.EMPTY -> Unit
+                        }
+                    }
                 }
             }
         }
@@ -414,7 +609,7 @@ fun VoiceRecordingFloatingControl(
         VoiceRecordingFloatingControlMode.PREPARING -> stringResource(R.string.common_loading)
         VoiceRecordingFloatingControlMode.RESUME -> stringResource(R.string.chat_voice_record_resume)
     }
-    // Android: fill sólido (Telegram), no glass iOS.
+    // Android: fill sólido, no glass iOS.
     val fill = when (mode) {
         VoiceRecordingFloatingControlMode.LOCKING -> tint.copy(alpha = 0.14f + progress * 0.22f)
         VoiceRecordingFloatingControlMode.PAUSE,
@@ -488,24 +683,98 @@ private fun VoiceRecordingLockedSendButton(
 }
 
 @Composable
+private fun VoiceRecordingRecordDot(modifier: Modifier = Modifier) {
+    val reduceMotion = MotionPolicy.reduceMotion
+    var pulseLow by remember { mutableStateOf(false) }
+    val dotAlpha by animateFloatAsState(
+        targetValue = if (reduceMotion || !pulseLow) 1f else 0.35f,
+        animationSpec = tween(500),
+        label = "voiceRecordDotPulse",
+    )
+    LaunchedEffect(reduceMotion) {
+        pulseLow = false
+        if (reduceMotion) return@LaunchedEffect
+        while (isActive) {
+            pulseLow = false
+            delay(500)
+            pulseLow = true
+            delay(500)
+        }
+    }
+    Box(
+        modifier
+            .size(9.dp)
+            .clip(CircleShape)
+            .background(Color.Red.copy(alpha = dotAlpha)),
+    )
+}
+
+@Composable
+private fun VoiceRecordingSlideToCancelHint(
+    cancelDragOffsetPx: Float,
+    cancelProgress: Float,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val density = LocalDensity.current
+    val reduceMotion = MotionPolicy.reduceMotion
+    var bounceOffset by remember { mutableFloatStateOf(0f) }
+    val slideOffset = with(density) { (cancelDragOffsetPx * 0.55f + bounceOffset).toDp() }
+    val slideOpacity = (1f - cancelProgress * 1.15f).coerceAtLeast(0f)
+    LaunchedEffect(cancelProgress, slideOpacity, reduceMotion) {
+        if (reduceMotion || cancelProgress > 0.2f || slideOpacity < 0.5f) {
+            bounceOffset = 0f
+            return@LaunchedEffect
+        }
+        while (isActive) {
+            bounceOffset = with(density) { 6.dp.toPx() }
+            delay(750)
+            bounceOffset = with(density) { (-6).dp.toPx() }
+            delay(750)
+        }
+    }
+    Row(
+        modifier
+            .offset(x = slideOffset)
+            .graphicsLayer { alpha = slideOpacity },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Icon(
+            Icons.Default.KeyboardArrowLeft,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(10.dp),
+        )
+        Text(
+            stringResource(R.string.chat_voice_slide_to_cancel),
+            color = color,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
 fun VoiceRecordingHeldStatus(
     isLocked: Boolean,
     recordingSeconds: Long,
     colors: AdaptiveColors,
     onCancel: () -> Unit,
     cancelDragOffsetPx: Float = 0f,
+    cancelProgress: Float = 0f,
 ) {
-    val density = LocalDensity.current
-    // ≡ iOS: offset = cancelDragOffset * 0.55; opacity = 1 + cancelDragOffset / 130
-    val cancelThresholdPx = with(density) { 130.dp.toPx() }
-    val slideOffset = with(density) { (cancelDragOffsetPx * 0.55f).toDp() }
-    val slideOpacity = max(0f, 1f + cancelDragOffsetPx / cancelThresholdPx)
     Row(
-        Modifier.fillMaxWidth(),
+        Modifier
+            .fillMaxWidth()
+            .padding(end = 46.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(Color.Red))
+        if (!isLocked) {
+            VoiceRecordingRecordDot()
+        }
         Text(
             formatVoiceTime(recordingSeconds),
             color = colors.primary,
@@ -523,27 +792,11 @@ fun VoiceRecordingHeldStatus(
                 fontWeight = FontWeight.Medium,
             )
         } else {
-            Row(
-                Modifier
-                    .offset(x = slideOffset)
-                    .graphicsLayer { alpha = slideOpacity },
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Icon(
-                    Icons.Default.KeyboardArrowLeft,
-                    contentDescription = null,
-                    tint = colors.timestampColor,
-                    modifier = Modifier.size(10.dp),
-                )
-                Text(
-                    stringResource(R.string.chat_voice_slide_to_cancel),
-                    color = colors.timestampColor,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                )
-            }
+            VoiceRecordingSlideToCancelHint(
+                cancelDragOffsetPx = cancelDragOffsetPx,
+                cancelProgress = cancelProgress,
+                color = colors.timestampColor,
+            )
         }
     }
 }
@@ -552,6 +805,7 @@ fun VoiceRecordingHeldStatus(
 private fun InputCircleButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tint: Color,
+    contentDescription: String? = null,
     filled: Boolean = false,
     enabled: Boolean = true,
     preparingDim: Boolean = false,
@@ -559,14 +813,19 @@ private fun InputCircleButton(
 ) {
     Box(
         Modifier
-            .size(44.dp)
+            .size(ComposerControlSize)
             .graphicsLayer { alpha = if (preparingDim) 0.45f else 1f }
             .clip(CircleShape)
             .then(if (filled) Modifier.background(tint) else Modifier.momentsChromeGlass(CircleShape, interactive = enabled))
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, null, tint = if (filled) Color.White else tint, modifier = Modifier.size(18.dp))
+        Icon(
+            icon,
+            contentDescription,
+            tint = if (filled) Color.White else tint,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 

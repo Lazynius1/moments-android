@@ -24,8 +24,8 @@ android {
         minSdk = 26
         targetSdk = 37
         // Subir versionCode en cada AAB que subas a Play.
-		versionCode = 10
-		versionName = "1.0.9"
+		versionCode = 11
+		versionName = "1.0.10"
         // Snap Camera Kit ≡ iOS Info.plist SCCameraKit* + SnapCameraKit.plist (vacío = no configurado).
         buildConfigField("String", "SC_CAMERA_KIT_API_TOKEN", "\"\"")
         buildConfigField("String", "SC_CAMERA_KIT_CLIENT_ID", "\"\"")
@@ -166,6 +166,7 @@ dependencies {
     implementation(libs.mapbox.maps.compose)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.zxing.core)
+    implementation(libs.lottie.compose)
     debugImplementation(libs.androidx.ui.tooling)
     testImplementation("junit:junit:4.13.2")
 }

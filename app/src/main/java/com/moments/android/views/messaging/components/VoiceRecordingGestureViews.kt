@@ -22,13 +22,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -74,12 +77,8 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 /**
- * Chrome de grabación ≡ Telegram Android (`RecordCircle` + `BlobDrawable` + gestos
- * de `ChatActivityEnterView`), con accent Moments y **sin glass**.
- *
- * Paridad de plataforma (no clonar métricas iOS):
- * - iOS Moments ↔ Telegram iOS
- * - Android Moments ↔ Telegram Android
+ * Chrome de grabación de voz (RecordCircle + BlobDrawable + gestos de arrastre),
+ * con accent Moments y **sin glass**.
  *
  * Gestos (SDK Android):
  * - Cancel: slide izquierda; distancia `min(width*0.35, 140dp)`; suelta si alpha &lt; 0.45
@@ -96,6 +95,36 @@ class VoiceRecordingGestureState {
     var lockProgress by mutableFloatStateOf(0f)
     var followX by mutableFloatStateOf(0f)
     var followY by mutableFloatStateOf(0f)
+    var playDeleteAnimation by mutableStateOf(false)
+    var isTrashMorphingToPlus by mutableStateOf(false)
+    var trashMorphProgress by mutableFloatStateOf(0f)
+    var preserveKeyboardElevation by mutableStateOf(false)
+    /** Altura IME capturada al pulsar mic (px); mantiene el composer elevado si el teclado baja. */
+    var pinnedKeyboardBottomPx by mutableIntStateOf(0)
+    var trashAnimationCompletionHandler: (() -> Unit)? = null
+
+    fun startTrashMorphToPlus(
+        scope: kotlinx.coroutines.CoroutineScope,
+        completion: () -> Unit,
+    ) {
+        if (isTrashMorphingToPlus) return
+        isTrashMorphingToPlus = true
+        trashMorphProgress = 0f
+        scope.launch {
+            androidx.compose.animation.core.animate(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 200),
+            ) { value, _ ->
+                trashMorphProgress = value
+            }
+            delay(22)
+            isTrashMorphingToPlus = false
+            trashMorphProgress = 0f
+            playDeleteAnimation = false
+            completion()
+        }
+    }
 }
 
 object VoiceRecordingBlobMetrics {
@@ -105,19 +134,19 @@ object VoiceRecordingBlobMetrics {
     val innerAura = 150.dp
     val momentsIcon = 30.dp
 
-    // Overlay de grabación (gesto Telegram-aligned en Android).
+    // Overlay de grabación (gesto de arrastre).
     val overlay = 160.dp
     val circleRadius = 41.dp
     val circleRadiusAmplitude = 30.dp
     val icon = 24.dp
     val waveMinRadius = 47.dp
     val waveMaxRadius = 55.dp
-    /** ≡ Telegram `setLockTranslation` threshold `dp(57)`. */
+    /** Umbral de bloqueo: `dp(57)`. */
     const val lockDistanceDp = 57f
-    /** ≡ Telegram `distCanMove` cap. */
+    /** Distancia máxima de cancelación por arrastre. */
     const val cancelDistanceMaxDp = 140f
     const val cancelDistanceWidthFraction = 0.35f
-    /** ≡ Telegram release cancel when `alpha < 0.45`. */
+    /** Cancelar al soltar si alpha &lt; 0.45. */
     const val cancelReleaseAlpha = 0.45f
     const val followOvershootDp = 28f
     const val directionThresholdDp = 8f
@@ -132,10 +161,11 @@ private enum class VoiceRecordingGesturePhase {
     Pressing,
     RecordingHeld,
     RecordingLocked,
+    Cancelling,
 }
 
-/** Port fiel de `org.telegram.ui.Components.BlobDrawable`. */
-private class TelegramBlobDrawable(
+/** Blob orgánico animado (N puntos, radio variable). */
+private class VoiceBlobDrawable(
     private val pointsCount: Int,
     seed: Long = System.nanoTime(),
 ) {
@@ -240,7 +270,7 @@ private class TelegramBlobDrawable(
 }
 
 /**
- * Forma ≡ Telegram `RecordCircle` (BlobDrawable N=11/12).
+ * Forma del círculo de grabación (BlobDrawable N=11/12).
  * Colores ≡ Moments blob (userAccent + aurora sin 007AFF).
  */
 object MomentsVoiceBlobColors {
@@ -251,7 +281,7 @@ object MomentsVoiceBlobColors {
 }
 
 @Composable
-fun VoiceRecordingTelegramRecordCircle(
+fun VoiceRecordingRecordCircle(
     audioPower: Float,
     @Suppress("UNUSED_PARAMETER") accent: Color = MomentsVoiceBlobColors.core,
     modifier: Modifier = Modifier,
@@ -264,14 +294,14 @@ fun VoiceRecordingTelegramRecordCircle(
     val ampCircle = with(density) { VoiceRecordingBlobMetrics.circleRadiusAmplitude.toPx() }
 
     val tinyWave = remember {
-        TelegramBlobDrawable(11, 11L).also {
+        VoiceBlobDrawable(11, 11L).also {
             it.minRadius = waveMin
             it.maxRadius = waveMax
             it.generateBlob()
         }
     }
     val bigWave = remember {
-        TelegramBlobDrawable(12, 12L).also {
+        VoiceBlobDrawable(12, 12L).also {
             it.minRadius = waveMin
             it.maxRadius = waveMax
             it.generateBlob()
@@ -361,10 +391,12 @@ fun VoiceRecordingGestureButton(
     isLocked: Boolean,
     gestureState: VoiceRecordingGestureState,
     glassInteractive: Boolean,
+    standaloneChrome: Boolean = false,
     audioPower: Float,
     onStart: (String, Boolean) -> Unit,
     onFinish: (String, VoiceRecordingFinishAction) -> Unit,
     onLockChanged: (Boolean) -> Unit,
+    onPressBegan: () -> Unit = {},
     onAnchorBoundsChanged: (IntRect) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -404,6 +436,7 @@ fun VoiceRecordingGestureButton(
     val onStartState = rememberUpdatedState(onStart)
     val onFinishState = rememberUpdatedState(onFinish)
     val onLockChangedState = rememberUpdatedState(onLockChanged)
+    val onPressBeganState = rememberUpdatedState(onPressBegan)
 
     val a11yLabel = stringResource(R.string.chat_voice_record_accessibility)
     val a11yHint = stringResource(R.string.chat_voice_record_hold_hint)
@@ -429,10 +462,28 @@ fun VoiceRecordingGestureButton(
         gestureState.lockProgress = 0f
         gestureState.followX = 0f
         gestureState.followY = 0f
+        gestureState.playDeleteAnimation = false
+        gestureState.isTrashMorphingToPlus = false
+        gestureState.trashMorphProgress = 0f
+        gestureState.preserveKeyboardElevation = false
+        gestureState.pinnedKeyboardBottomPx = 0
+        gestureState.trashAnimationCompletionHandler = null
         scope.launch {
             followXAnim.snapTo(0f)
             followYAnim.snapTo(0f)
         }
+    }
+
+    fun commitCancellation(id: String) {
+        if (phase != VoiceRecordingGesturePhase.RecordingHeld) return
+        phase = VoiceRecordingGesturePhase.Cancelling
+        HapticManager.shared.warning(view)
+        view.announceForAccessibility(cancelledAnnouncement)
+        gestureState.playDeleteAnimation = true
+        gestureState.trashAnimationCompletionHandler = { resetLocalState() }
+        holdJob?.cancel()
+        holdJob = null
+        onFinishState.value(id, VoiceRecordingFinishAction.CANCEL)
     }
 
     fun settleBlobFollow() {
@@ -471,7 +522,7 @@ fun VoiceRecordingGestureButton(
         gestureState.followX = followX
         gestureState.followY = followY
         gestureState.cancelDragOffset = min(0f, x)
-        // ≡ Telegram slideToCancelProgress: 1 = idle, 0 = fully cancelled
+        // Progreso de cancelación: 1 = idle, 0 = totalmente cancelado
         // alpha = 1 + dist/distCanMove con dist negativo al slide left
         val slideAlpha = (1f + min(0f, x) / cancelDistancePx).coerceIn(0f, 1f)
         gestureState.cancelProgress = 1f - slideAlpha
@@ -498,14 +549,6 @@ fun VoiceRecordingGestureButton(
         view.announceForAccessibility(lockedAnnouncement)
     }
 
-    fun commitCancellation(id: String) {
-        if (phase != VoiceRecordingGesturePhase.RecordingHeld) return
-        HapticManager.shared.warning(view)
-        view.announceForAccessibility(cancelledAnnouncement)
-        onFinishState.value(id, VoiceRecordingFinishAction.CANCEL)
-        resetLocalState()
-    }
-
     fun updateDrag(dx: Float, dy: Float) {
         val horizontal = abs(dx)
         val vertical = abs(dy)
@@ -514,9 +557,9 @@ fun VoiceRecordingGestureButton(
         ) {
             return
         }
-        // ≡ Telegram setLockTranslation: finger up → y decreases → progress
+        // Arrastre hacia arriba → y negativo → progreso de bloqueo
         val lockProgress = (-dy / lockDistancePx).coerceIn(0f, 1f)
-        // ≡ Telegram: lock blocked while slideToCancelProgress < 0.7 (cancelProgress > 0.3)
+        // Bloqueo bloqueado mientras slideAlpha &lt; 0.7 (cancelProgress &gt; 0.3)
         val slideAlpha = (1f + min(0f, dx) / cancelDistancePx).coerceIn(0f, 1f)
         val cancelProgress = 1f - slideAlpha
         gestureState.lockProgress = lockProgress
@@ -545,6 +588,7 @@ fun VoiceRecordingGestureButton(
         if (!isRecording && !isLocked && activeInteractionId == null &&
             phase != VoiceRecordingGesturePhase.Pressing
         ) {
+            if (gestureState.playDeleteAnimation || phase == VoiceRecordingGesturePhase.Cancelling) return@LaunchedEffect
             if (phase != VoiceRecordingGesturePhase.Idle) resetLocalState()
         }
     }
@@ -553,6 +597,14 @@ fun VoiceRecordingGestureButton(
     Box(
         modifier
             .size(44.dp)
+            .focusProperties { canFocus = false }
+            .then(
+                if (standaloneChrome) {
+                    Modifier.momentsChromeGlass(CircleShape, interactive = false)
+                } else {
+                    Modifier
+                },
+            )
             .semantics { contentDescription = "$a11yLabel. $a11yHint" }
             .onGloballyPositioned { coordinates ->
                 val bounds = coordinates.boundsInWindow()
@@ -576,6 +628,7 @@ fun VoiceRecordingGestureButton(
                             if (touchExploration) return@awaitEachGesture
                             if (isRecordingState.value || isLockedState.value) return@awaitEachGesture
 
+                            onPressBeganState.value()
                             val id = UUID.randomUUID().toString()
                             interactionId = id
                             phase = VoiceRecordingGesturePhase.Pressing
@@ -624,7 +677,6 @@ fun VoiceRecordingGestureButton(
                             when (phase) {
                                 VoiceRecordingGesturePhase.Pressing -> resetLocalState()
                                 VoiceRecordingGesturePhase.RecordingHeld -> {
-                                    // ≡ Telegram UP: cancel if slide alpha < 0.45
                                     val slideAlpha = (1f + min(0f, latestDx) / cancelDistancePx)
                                         .coerceIn(0f, 1f)
                                     if (slideAlpha < VoiceRecordingBlobMetrics.cancelReleaseAlpha) {
@@ -634,6 +686,7 @@ fun VoiceRecordingGestureButton(
                                         resetLocalState()
                                     }
                                 }
+                                VoiceRecordingGesturePhase.Cancelling -> Unit
                                 VoiceRecordingGesturePhase.RecordingLocked -> {
                                     interactionId = null
                                 }
@@ -668,6 +721,7 @@ fun VoiceRecordingBlobOverlay(
     val centerX = (anchorBounds.left + anchorBounds.right) / 2
     val centerY = (anchorBounds.top + anchorBounds.bottom) / 2
     val overlayPx = with(density) { VoiceRecordingBlobMetrics.overlay.roundToPx() }
+    val cancelDragScale = (1f - gestureState.cancelProgress).coerceAtLeast(0.4f)
     Box(
         modifier
             .offset {
@@ -676,10 +730,14 @@ fun VoiceRecordingBlobOverlay(
                     centerY - overlayPx / 2 + gestureState.followY.roundToInt(),
                 )
             }
-            .size(VoiceRecordingBlobMetrics.overlay),
+            .size(VoiceRecordingBlobMetrics.overlay)
+            .graphicsLayer {
+                scaleX = cancelDragScale
+                scaleY = cancelDragScale
+            },
         contentAlignment = Alignment.Center,
     ) {
-        VoiceRecordingTelegramRecordCircle(
+        VoiceRecordingRecordCircle(
             audioPower = audioPower,
         )
     }

@@ -31,9 +31,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -68,6 +70,7 @@ import com.moments.android.views.messaging.components.GlassmorphicInputBar
 import com.moments.android.views.messaging.components.GlassmorphicMessageRow
 import com.moments.android.views.messaging.components.ChatBubbleAnchorMetrics
 import com.moments.android.views.messaging.components.ChatTimestampRevealState
+import com.moments.android.views.messaging.components.chatInputBackground
 import com.moments.android.views.messaging.components.clusterAggregateStatus
 import com.moments.android.views.messaging.components.VoiceRecordingDraft
 import com.moments.android.views.messaging.components.VoiceRecordingFinishAction
@@ -80,30 +83,46 @@ import java.util.Date
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+private data class RootKeyboardMetrics(
+    val visible: Boolean,
+    val bottomInsetPx: Int,
+)
+
+internal fun measureRootKeyboardBottomInsetPx(view: android.view.View): Int {
+    val root = view.rootView
+    val visibleFrame = android.graphics.Rect()
+    root.getWindowVisibleDisplayFrame(visibleFrame)
+    return (root.height - visibleFrame.bottom).coerceAtLeast(0)
+}
+
 /**
- * The legacy chat host consumes Compose's IME inset before its composer reads it.
- * Observe the root window instead so visual composer spacing follows the real keyboard.
+ * El host legacy consume el inset IME de Compose antes de que llegue al compositor.
+ * Medimos la ventana raíz (como SizeNotifierFrameLayout) y fijamos altura al grabar.
  */
 @Composable
-private fun rememberRootKeyboardVisible(): Boolean {
+private fun rememberRootKeyboardMetrics(): RootKeyboardMetrics {
     val view = LocalView.current
     var keyboardVisible by remember(view) { mutableStateOf(false) }
+    var bottomInsetPx by remember(view) { mutableIntStateOf(0) }
 
     DisposableEffect(view) {
         val root = view.rootView
         val visibleFrame = android.graphics.Rect()
         val listener = android.view.ViewTreeObserver.OnGlobalLayoutListener {
             root.getWindowVisibleDisplayFrame(visibleFrame)
-            keyboardVisible = root.height - visibleFrame.bottom > root.height * 0.15f
+            val inset = (root.height - visibleFrame.bottom).coerceAtLeast(0)
+            bottomInsetPx = inset
+            keyboardVisible = inset > root.height * 0.15f
         }
         root.viewTreeObserver.addOnGlobalLayoutListener(listener)
         root.getWindowVisibleDisplayFrame(visibleFrame)
-        keyboardVisible = root.height - visibleFrame.bottom > root.height * 0.15f
+        bottomInsetPx = (root.height - visibleFrame.bottom).coerceAtLeast(0)
+        keyboardVisible = bottomInsetPx > root.height * 0.15f
 
         onDispose { root.viewTreeObserver.removeOnGlobalLayoutListener(listener) }
     }
 
-    return keyboardVisible
+    return RootKeyboardMetrics(keyboardVisible, bottomInsetPx)
 }
 
 /**
@@ -378,19 +397,39 @@ fun ChatComposerChrome(
     modifier: Modifier = Modifier,
 ) {
     val context = controller.pendingChatContext
-    val keyboardVisible = rememberRootKeyboardVisible()
-    val chatCanvas = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()).chatBackground.first()
-    // Fondo opaco bajo el chrome + zona de nav/gesture. Sin esto, `navigationBarsPadding`
-    // deja un hueco transparente y los mensajes se ven detrás de los botones Android.
-    // Teclado abierto: solo IME + 4.dp (evita corte en el borde del teclado). Cerrado: nav + 10.dp.
+    val density = LocalDensity.current
+    val keyboardMetrics = rememberRootKeyboardMetrics()
+    val keyboardVisible = keyboardMetrics.visible
+    val keepComposerElevated = keyboardVisible || voiceGestureState.preserveKeyboardElevation
+    val pinnedKeyboardBottom = with(density) {
+        voiceGestureState.pinnedKeyboardBottomPx.toDp()
+    }
+    val measuredKeyboardBottom = with(density) {
+        keyboardMetrics.bottomInsetPx.toDp()
+    }
+    val usePinnedKeyboardPadding = voiceGestureState.preserveKeyboardElevation &&
+        voiceGestureState.pinnedKeyboardBottomPx > 0
+    // Pequeño gap sobre el IME: imePadding() queda corto en el host legacy.
+    val keyboardGap = 8.dp
+    val composerPanelBackground = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()).chatInputBackground
+    // Una única superficie opaca cubre compositor + zona de nav/gesture.
+    // Como SizeNotifierFrameLayout en Telegram: durante todo el gesto de voz se usa
+    // la altura capturada al tocar el mic, incluso si el IME empieza a animarse.
     val safeModifier = modifier
         .fillMaxWidth()
-        .background(chatCanvas)
+        .background(composerPanelBackground)
         .then(
-            if (keyboardVisible) {
-                Modifier
-                    .imePadding()
-                    .padding(bottom = 4.dp)
+            if (keepComposerElevated) {
+                when {
+                    usePinnedKeyboardPadding ->
+                        Modifier.padding(bottom = pinnedKeyboardBottom + keyboardGap)
+                    keyboardVisible && measuredKeyboardBottom > 0.dp ->
+                        Modifier.padding(bottom = measuredKeyboardBottom + keyboardGap)
+                    else ->
+                        Modifier
+                            .imePadding()
+                            .padding(bottom = keyboardGap)
+                }
             } else {
                 Modifier
                     .navigationBarsPadding()
@@ -426,6 +465,7 @@ fun ChatComposerChrome(
                 replyingTo = replyingTo,
                 otherParticipantName = otherParticipantDisplayName,
                 voiceGestureState = voiceGestureState,
+                isKeyboardVisible = keyboardVisible,
                 isVanishModeActive = vanishModeActive,
                 allowsAttachments = !controller.isPendingChat || controller.pendingChatCanType,
                 allowsVoiceRecording = !controller.isPendingChat,

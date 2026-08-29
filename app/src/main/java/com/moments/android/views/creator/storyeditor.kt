@@ -402,7 +402,8 @@ fun StoryEditingView(
         normalizedY = data.position.y,
         scale = data.scale,
         rotationRadians = data.rotation,
-        zIndex = data.zIndex ?: nextStickerZ++,
+        // zIndex se normaliza en LaunchedEffect (≡ prepareNewStickersForCanvas iOS).
+        zIndex = nextStickerZ++,
         gifURL = data.gifURL,
         videoURL = data.videoURL,
         isAnimated = data.isAnimated,
@@ -472,6 +473,19 @@ fun StoryEditingView(
     var storyOverlayToast by remember { mutableStateOf<StoryOverlayToast?>(null) }
     var draggingStickerId by remember { mutableStateOf<String?>(null) }
     var selectedStickerId by remember { mutableStateOf<String?>(null) }
+
+    // ≡ iOS StoryOverlaysView.onChange(of: stickers.map(\.id)) → zIndex = index
+    LaunchedEffect(stickers.map { it.id }) {
+        if (stickers.isEmpty()) {
+            nextStickerZ = 0
+            return@LaunchedEffect
+        }
+        val needsNormalize = stickers.withIndex().any { (index, sticker) -> sticker.zIndex != index }
+        if (needsNormalize) {
+            stickers = stickers.mapIndexed { index, sticker -> sticker.copy(zIndex = index) }
+        }
+        nextStickerZ = stickers.size
+    }
 
     fun cycleStickerStyle(stickerId: String) {
         stickers = stickers.map { item ->
@@ -813,7 +827,6 @@ fun StoryEditingView(
             type = "selfie",
             caption = "selfie_live",
             image = makeLiveSelfiePlaceholderImage(),
-            zIndex = nextStickerZ++,
         )
         stickers = stickers + placed
         activeEditingStickerId = null
@@ -2699,11 +2712,10 @@ fun StoryEditingView(
         if (showingStickerPicker) {
             StickerPickerView(
                 onStickerCreated = { draft ->
-                    val placed = draft.copy(zIndex = nextStickerZ++)
-                    stickers = stickers + placed
+                    stickers = stickers + draft
                     showingStickerPicker = false
                     activeEditingStickerId =
-                        if (stickerSupportsInlineEdit(placed)) placed.id else null
+                        if (stickerSupportsInlineEdit(draft)) draft.id else null
                     deleteArmedStickerId = null
                 },
                 onSelfieRequested = ::requestSelfieSticker,

@@ -1275,6 +1275,7 @@ data class MomentsNotification(
     val buzzEventId: String? = null,
     val reminderVariant: String? = null,
     val isReactionPlural: Boolean? = null,
+    val isHost: Boolean? = null,
 ) {
     companion object {
         /**
@@ -1291,6 +1292,8 @@ data class MomentsNotification(
             val reaction = data["reaction"] as? String
                 ?: data["reactionType"] as? String
                 ?: data["commentText"] as? String
+                ?: data["commentPreview"] as? String
+                ?: data["momentTitle"] as? String
                 ?: data["moderationType"] as? String
             val isReactionPlural = data["isReactionPlural"] as? Boolean
                 ?: (data["isReactionPlural"] as? String)?.let { it == "1" || it.lowercase() == "true" }
@@ -1324,14 +1327,18 @@ data class MomentsNotification(
                 moderationScope = data["moderationScope"] as? String,
                 chainId = data["chainId"] as? String,
                 chainTitle = data["chainTitle"] as? String,
-                chainPosition = (data["chainPosition"] as? Number)?.toInt(),
-                totalParts = (data["totalParts"] as? Number)?.toInt(),
+                chainPosition = (data["chainPosition"] as? Number)?.toInt()
+                    ?: (data["chainPosition"] as? String)?.toIntOrNull(),
+                totalParts = (data["totalParts"] as? Number)?.toInt()
+                    ?: (data["totalParts"] as? String)?.toIntOrNull(),
                 chainRole = data["chainRole"] as? String,
                 messageId = data["messageId"] as? String,
                 messageType = data["messageType"] as? String,
                 buzzEventId = data["buzzEventId"] as? String,
                 reminderVariant = data["reminderVariant"] as? String,
                 isReactionPlural = isReactionPlural,
+                isHost = (data["isHost"] as? Boolean)
+                    ?: (data["isHost"] as? String)?.let { it == "1" || it.equals("true", true) },
             )
         }
     }

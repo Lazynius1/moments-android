@@ -45,10 +45,7 @@ object NotificationCopyResolver {
                 ctx.getString(R.string.notification_gentle_reminder_title),
                 ctx.getString(R.string.notifications_message_data_export_ready),
             )
-            NotificationType.ECHO_SUGGESTION -> NotificationBannerCopy(
-                notification.senderUsername,
-                ctx.getString(R.string.banner_verb_echo_suggestion),
-            )
+            NotificationType.ECHO_SUGGESTION -> echoCopy(ctx, notification)
             else -> NotificationBannerCopy(
                 notification.senderUsername,
                 notification.message ?: notification.reaction,
@@ -80,6 +77,7 @@ object NotificationCopyResolver {
         "audio" -> R.string.notification_message_single_audio
         "viewOnceImage", "viewOnceVideo", "ephemeral" -> R.string.notification_message_single_view_once
         "moment", "sharedMoment" -> R.string.notification_message_single_moment
+        "storyMention" -> R.string.notification_message_single_story_mention
         else -> R.string.notification_message_single_default
     }
 
@@ -216,6 +214,12 @@ object NotificationCopyResolver {
     }
 
     private fun commentCopy(ctx: Context, notification: MomentsNotification): NotificationBannerCopy {
+        if (notification.mentionContext == "reply") {
+            val quoted = notification.reaction?.trim()?.takeIf { it.isNotEmpty() }
+            val title = ctx.getString(R.string.notification_reply_title, notification.senderUsername)
+            val body = quoted?.let { "\"$it\"" } ?: ctx.getString(R.string.notification_comment_single_title, notification.senderUsername)
+            return NotificationBannerCopy(title, body)
+        }
         val count = notification.reactionCount ?: 1
         if (count > 1) {
             return NotificationBannerCopy(
@@ -224,7 +228,11 @@ object NotificationCopyResolver {
             )
         }
         notification.reaction?.trim()?.takeIf { it.isNotEmpty() }?.let {
-            return NotificationBannerCopy(notification.senderUsername, it)
+            val quoted = if (it.startsWith("\"")) it else "\"$it\""
+            return NotificationBannerCopy(
+                ctx.getString(R.string.notification_comment_single_title, notification.senderUsername),
+                quoted,
+            )
         }
         return NotificationBannerCopy(
             notification.senderUsername,
@@ -321,6 +329,20 @@ object NotificationCopyResolver {
             NotificationBannerCopy(
                 ctx.getString(R.string.notification_mutual_connection_title),
                 ctx.getString(R.string.notification_mutual_connection_body, notification.senderUsername),
+            )
+        }
+    }
+
+    private fun echoCopy(ctx: Context, notification: MomentsNotification): NotificationBannerCopy {
+        return if (notification.isHost == true) {
+            NotificationBannerCopy(
+                ctx.getString(R.string.notification_echo_host_title),
+                ctx.getString(R.string.notification_echo_host_body),
+            )
+        } else {
+            NotificationBannerCopy(
+                ctx.getString(R.string.notification_echo_title),
+                ctx.getString(R.string.notification_echo_body, notification.senderUsername),
             )
         }
     }

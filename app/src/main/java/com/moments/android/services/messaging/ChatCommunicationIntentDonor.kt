@@ -3,9 +3,11 @@ package com.moments.android.services.messaging
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
 import androidx.core.content.LocusIdCompat
@@ -33,6 +35,8 @@ object ChatNotificationReply {
 object ChatCommunicationIntentDonor {
     private const val SHORTCUT_PREFIX = "moments_chat_"
     private const val SELF_NAME = "You"
+    private const val MAX_SHADE_MESSAGES = 7
+    private const val EXTRA_SHADE_MESSAGE_IDS = "moments.shade.message_ids"
 
     data class DonatedConversation(
         val conversationId: String,
@@ -45,6 +49,7 @@ object ChatCommunicationIntentDonor {
 
     private var appContext: Context? = null
     private val lastDonationByConversation = ConcurrentHashMap<String, DonatedConversation>()
+    private val shadeHistory = ConcurrentHashMap<String, MutableList<NotificationCompat.MessagingStyle.Message>>()
 
     fun initialize(context: Context) {
         if (appContext != null) return
@@ -54,29 +59,19 @@ object ChatCommunicationIntentDonor {
     fun lastDonation(conversationId: String): DonatedConversation? =
         lastDonationByConversation[conversationId]
 
-    fun personFor(conversationId: String): Person? {
+    fun personFor(conversationId: String, avatarBitmap: Bitmap? = null): Person? {
         val d = lastDonationByConversation[conversationId] ?: return null
-        return Person.Builder()
+        val builder = Person.Builder()
             .setKey(d.senderId)
             .setName(d.senderUsername)
             .setImportant(true)
-            .build()
-    }
-
-    /** Helper MessagingStyle (paridad communication notifications). */
-    fun messagingStyleFor(conversationId: String, selfName: String = SELF_NAME): NotificationCompat.MessagingStyle? {
-        val donation = lastDonationByConversation[conversationId] ?: return null
-        val sender = personFor(conversationId) ?: return null
-        val style = NotificationCompat.MessagingStyle(
-            Person.Builder().setName(selfName).build(),
-        ).setConversationTitle(donation.senderUsername)
-        donation.messagePreview?.let { style.addMessage(it, System.currentTimeMillis(), sender) }
-        return style
+        avatarBitmap?.let { builder.setIcon(IconCompat.createWithBitmap(it)) }
+        return builder.build()
     }
 
     /**
      * Equivalente Android de `applyCommunicationIntent` + tray FCM:
-     * MessagingStyle + shortcut + RemoteInput reply.
+     * MessagingStyle + shortcut + RemoteInput reply. 1:1 sin conversationTitle.
      */
     fun buildMessagePushNotification(
         context: Context,
@@ -85,40 +80,71 @@ object ChatCommunicationIntentDonor {
         body: String,
         channelId: String,
         contentIntent: PendingIntent,
+        avatarBitmap: Bitmap? = null,
+        mediaUri: Uri? = null,
+        includeReply: Boolean = true,
+        notificationId: Int,
     ): NotificationCompat.Builder {
+        initialize(context)
         val conversationId = userInfo["conversationId"] as? String
         val type = (userInfo["type"] as? String)?.lowercase()
-        val isChatMessage = (type == "message" || type == "new_message") && !conversationId.isNullOrBlank()
-
-        if (isChatMessage) {
-            ChatCommunicationNotificationService.donateFromPush(userInfo, body)
-        }
+        val isConversation = !conversationId.isNullOrBlank() && type in setOf(
+            "message",
+            "new_message",
+            "message_reaction",
+            "chat_buzz",
+        )
+        val isChatMessage = type == "message" || type == "new_message"
 
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_moments)
             .setAutoCancel(true)
             .setContentIntent(contentIntent)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
 
-        if (isChatMessage) {
+        if (isConversation) {
             val convId = conversationId!!
-            val person = personFor(convId)
-            val style = messagingStyleFor(convId) ?: run {
-                val sender = person ?: Person.Builder().setName(fallbackTitle).build()
-                NotificationCompat.MessagingStyle(Person.Builder().setName(SELF_NAME).build())
-                    .setConversationTitle(fallbackTitle)
-                    .addMessage(body, System.currentTimeMillis(), sender)
+            val senderName = (userInfo["senderUsername"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+                ?: fallbackTitle
+            val person = Person.Builder()
+                .setKey((userInfo["senderId"] as? String) ?: convId)
+                .setName(senderName)
+                .setImportant(true)
+                .apply { avatarBitmap?.let { setIcon(IconCompat.createWithBitmap(it)) } }
+                .build()
+            val self = Person.Builder().setName(SELF_NAME).build()
+            val incoming = NotificationCompat.MessagingStyle.Message(body, System.currentTimeMillis(), person)
+            if (mediaUri != null) {
+                incoming.setData("image/jpeg", mediaUri)
             }
+            val (style, shadeIds) = conversationStyle(
+                context = context,
+                notificationId = notificationId,
+                conversationId = convId,
+                self = self,
+                incoming = incoming,
+                incomingMessageId = userInfo["messageId"] as? String,
+            )
+            donateIncomingMessage(
+                conversationId = convId,
+                messageId = userInfo["messageId"] as? String ?: convId,
+                senderId = userInfo["senderId"] as? String ?: "",
+                senderUsername = senderName,
+                senderProfileImageUrl = userInfo["senderProfileImage"] as? String,
+                messagePreview = body,
+                avatarBitmap = avatarBitmap,
+            )
             builder.setStyle(style)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setShortcutId(SHORTCUT_PREFIX + convId)
-            person?.let { builder.addPerson(it) }
+                .addPerson(person)
+            builder.extras.putStringArrayList(EXTRA_SHADE_MESSAGE_IDS, ArrayList(shadeIds))
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 builder.setLocusId(LocusIdCompat(convId))
             }
-            builder.setContentTitle(fallbackTitle)
-                .setContentText(body)
-                .addAction(createReplyAction(context, convId))
+            if (includeReply && isChatMessage) {
+                builder.addAction(createReplyAction(context, convId))
+            }
         } else {
             builder.setContentTitle(fallbackTitle)
                 .setContentText(body)
@@ -128,7 +154,7 @@ object ChatCommunicationIntentDonor {
 
     private fun createReplyAction(context: Context, conversationId: String): NotificationCompat.Action {
         val remoteInput = RemoteInput.Builder(ChatNotificationReply.KEY_TEXT_REPLY)
-            .setLabel("Reply")
+            .setLabel(context.getString(R.string.notification_action_placeholder))
             .build()
         val replyIntent = Intent(context, ChatNotificationReplyReceiver::class.java).apply {
             action = ChatNotificationReply.ACTION_IDENTIFIER
@@ -142,12 +168,59 @@ object ChatCommunicationIntentDonor {
         )
         return NotificationCompat.Action.Builder(
             android.R.drawable.sym_action_chat,
-            "Reply",
+            context.getString(R.string.notification_action_reply),
             pendingIntent,
         )
             .addRemoteInput(remoteInput)
             .setAllowGeneratedReplies(true)
             .build()
+    }
+
+    /**
+     * Android shade: al expandir se ven los mensajes del hilo (MessagingStyle),
+     * no solo el último. iOS no acumula; aquí sí. Fuente: notificación activa.
+     */
+    private fun conversationStyle(
+        context: Context,
+        notificationId: Int,
+        conversationId: String,
+        self: Person,
+        incoming: NotificationCompat.MessagingStyle.Message,
+        incomingMessageId: String?,
+    ): Pair<NotificationCompat.MessagingStyle, List<String>> {
+        val existing = NotificationManagerCompat.from(context).activeNotifications
+            .firstOrNull { it.id == notificationId }
+        if (existing == null) shadeHistory.remove(conversationId)
+        val previousIds = existing?.notification?.extras
+            ?.getStringArrayList(EXTRA_SHADE_MESSAGE_IDS)
+            .orEmpty()
+        val recovered = existing?.notification?.let {
+            NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(it)
+        }?.messages.orEmpty()
+        val fromMemory = shadeHistory[conversationId].orEmpty()
+        val priorMessages = when {
+            recovered.isNotEmpty() -> recovered
+            existing != null && fromMemory.isNotEmpty() -> fromMemory
+            else -> emptyList()
+        }
+        val alreadyPosted = !incomingMessageId.isNullOrBlank() && incomingMessageId in previousIds
+        val mergedMessages = if (alreadyPosted) {
+            priorMessages.ifEmpty { listOf(incoming) }
+        } else {
+            priorMessages + incoming
+        }.takeLast(MAX_SHADE_MESSAGES)
+        shadeHistory[conversationId] = mergedMessages.toMutableList()
+        val mergedIds = buildList {
+            if (alreadyPosted) addAll(previousIds.takeLast(MAX_SHADE_MESSAGES))
+            else {
+                addAll(previousIds)
+                incomingMessageId?.takeIf { it.isNotBlank() }?.let { add(it) }
+                while (size > MAX_SHADE_MESSAGES) removeAt(0)
+            }
+        }
+        val style = NotificationCompat.MessagingStyle(self).setGroupConversation(false)
+        mergedMessages.forEach { style.addMessage(it) }
+        return style to mergedIds
     }
 
     fun donateIncomingMessage(
@@ -157,6 +230,7 @@ object ChatCommunicationIntentDonor {
         senderUsername: String,
         senderProfileImageUrl: String?,
         messagePreview: String?,
+        avatarBitmap: Bitmap? = null,
     ) {
         val ctx = appContext ?: return
         val donation = DonatedConversation(
@@ -173,6 +247,7 @@ object ChatCommunicationIntentDonor {
             .setKey(senderId)
             .setName(senderUsername)
             .setImportant(true)
+            .apply { avatarBitmap?.let { setIcon(IconCompat.createWithBitmap(it)) } }
             .build()
 
         val intent = Intent(ctx, MainActivity::class.java).apply {
@@ -185,7 +260,7 @@ object ChatCommunicationIntentDonor {
         }
 
         val shortcutId = SHORTCUT_PREFIX + conversationId
-        val shortcut = ShortcutInfoCompat.Builder(ctx, shortcutId)
+        val shortcutBuilder = ShortcutInfoCompat.Builder(ctx, shortcutId)
             .setShortLabel(senderUsername.take(24))
             .setLongLabel(senderUsername)
             .setLocusId(LocusIdCompat(conversationId))
@@ -193,8 +268,8 @@ object ChatCommunicationIntentDonor {
             .setLongLived(true)
             .setCategories(setOf("android.shortcut.conversation"))
             .setIntent(intent)
-            .setIcon(IconCompat.createWithResource(ctx, android.R.drawable.sym_action_chat))
-            .build()
+        avatarBitmap?.let { shortcutBuilder.setIcon(IconCompat.createWithBitmap(it)) }
+        val shortcut = shortcutBuilder.build()
 
         runCatching {
             ShortcutManagerCompat.pushDynamicShortcut(ctx, shortcut)
@@ -204,6 +279,7 @@ object ChatCommunicationIntentDonor {
     fun removeConversationShortcut(conversationId: String) {
         val ctx = appContext ?: return
         lastDonationByConversation.remove(conversationId)
+        shadeHistory.remove(conversationId)
         runCatching {
             ShortcutManagerCompat.removeDynamicShortcuts(ctx, listOf(SHORTCUT_PREFIX + conversationId))
         }

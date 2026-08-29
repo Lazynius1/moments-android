@@ -22,6 +22,7 @@ import com.moments.android.models.WrappedConversationKey
 import com.moments.android.models.cache.CachedAction
 import com.moments.android.models.encode
 import com.moments.android.views.messaging.core.sanitizedConversationPreview
+import com.moments.android.views.messaging.core.sharedStoryConversationPreview
 import com.moments.android.models.toMap
 import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.firestore.FirestoreService
@@ -1893,6 +1894,22 @@ object ChatService {
                         if (noticeText.isEmpty()) continue
                         return makeConversationSnapshot(
                             preview = noticeText,
+                            timestamp = messageTimestamp,
+                            senderId = messageSenderId,
+                            messageType = messageType,
+                            messageData = data,
+                        )
+                    }
+                    MessageType.SHARED_STORY -> {
+                        @Suppress("UNCHECKED_CAST")
+                        val sharedData = data["sharedStoryData"] as? Map<String, String>
+                        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+                        val isOutgoing = messageSenderId == currentUserId
+                        val preview = ctx?.let {
+                            sharedStoryConversationPreview(it, sharedData, isOutgoing)
+                        } ?: neutralConversationPreview(messageType)
+                        return makeConversationSnapshot(
+                            preview = preview,
                             timestamp = messageTimestamp,
                             senderId = messageSenderId,
                             messageType = messageType,

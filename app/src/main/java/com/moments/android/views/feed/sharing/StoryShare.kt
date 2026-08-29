@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -438,6 +439,18 @@ fun StoryBubbleContent(
         modifier.padding(vertical = 4.dp),
         horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start,
     ) {
+        if (sharedStoryData["isStoryMention"] == "true") {
+            Text(
+                text = stringResource(
+                    if (isCurrentUser) R.string.story_mention_chat_outgoing
+                    else R.string.story_mention_chat_incoming,
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
         StoryPreviewCard(sharedStoryData = sharedStoryData, story = story)
     }
 }

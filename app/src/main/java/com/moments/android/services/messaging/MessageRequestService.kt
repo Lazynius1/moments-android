@@ -55,6 +55,7 @@ data class MessageRequestInteractionContext(
     val storyOwnerId: String? = null,
     val sharedContentId: String? = null,
     val sharedContentOwnerId: String? = null,
+    val isStoryMention: Boolean = false,
 ) {
     enum class Kind(val raw: String) {
         GENERAL("general"),
@@ -72,6 +73,7 @@ data class MessageRequestInteractionContext(
         storyOwnerId?.let { put("storyOwnerId", it) }
         sharedContentId?.let { put("sharedContentId", it) }
         sharedContentOwnerId?.let { put("sharedContentOwnerId", it) }
+        if (isStoryMention) put("isStoryMention", true)
     }
 
     companion object { val General = MessageRequestInteractionContext() }
@@ -318,12 +320,13 @@ class MessageRequestService(
         encryptedMedia: Map<String, Any>? = null,
         expirationDate: Date? = null,
         allowReplay: Boolean = false,
+        requestedMessageId: String? = null,
     ): MessageRequestSendResult {
         val senderId = requireUser().uid
         require(text.isNotBlank() || encryptedMedia != null) { localized(R.string.messaging_error_empty_message) }
         require(messageType in ALLOWED_PENDING_TYPES) { localized(R.string.messaging_error_unsupported_file) }
         val prepared = prepareOutgoingThread(senderId, receiverId, interaction)
-        val messageId = UUID.randomUUID().toString()
+        val messageId = requestedMessageId?.trim()?.takeIf(String::isNotEmpty) ?: UUID.randomUUID().toString()
         val message = mutableMapOf<String, Any>(
             "id" to messageId,
             "clientNonce" to messageId,
@@ -610,6 +613,7 @@ class MessageRequestService(
                 storyOwnerId = context["storyOwnerId"] as? String,
                 sharedContentId = context["sharedContentId"] as? String,
                 sharedContentOwnerId = context["sharedContentOwnerId"] as? String,
+                isStoryMention = context["isStoryMention"] as? Boolean ?: false,
                 expirationDate = (value["expirationDate"] as? Timestamp)?.toDate(),
                 isViewOnce = value["isViewOnce"] as? Boolean ?: false,
                 allowReplay = value["allowReplay"] as? Boolean ?: false,

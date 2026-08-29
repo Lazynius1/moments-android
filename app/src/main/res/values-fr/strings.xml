@@ -401,6 +401,12 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="notifications_message_message_multiple">%1$s et %2$d autres vous ont envoyé des messages</string>
     <string name="notification_channel_default_name">Moments</string>
     <string name="notification_channel_default_description">Notifications de Moments</string>
+    <string name="notification_channel_messages_name">Messages</string>
+    <string name="notification_channel_messages_description">Messages directs et chat</string>
+    <string name="notification_channel_social_name">Activité</string>
+    <string name="notification_channel_social_description">Abonnements, réactions, commentaires et mentions</string>
+    <string name="notification_channel_reminders_name">Rappels</string>
+    <string name="notification_channel_reminders_description">Rappels discrets pour partager un moment</string>
     <string name="notification_message_single_text">Vous a envoyé un message</string>
     <string name="notification_message_single_photo">Sent you a photo 📷</string>
     <string name="notification_message_single_video">Sent you a video 🎥</string>
@@ -408,6 +414,9 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="notification_message_single_view_once">Sent you a disappearing message 👀</string>
     <string name="notification_message_single_moment">Sent you a moment 📸</string>
     <string name="notification_message_single_default">Vous a envoyé un message</string>
+    <string name="notification_message_single_story_mention">Vous a mentionné(e) dans sa story</string>
+    <string name="story_mention_chat_incoming">Vous a mentionné(e) dans sa story</string>
+    <string name="story_mention_chat_outgoing">Vous avez mentionné cette personne dans votre story</string>
     <string name="notification_message_multiple">Vous a envoyé %1$s messages</string>
     <string name="notification_chat_reaction_single">A réagi avec %1$s à ton message</string>
     <string name="notification_chat_reaction_single_quoted">A réagi avec %1$s à ton message \"%2$s\"</string>
@@ -450,8 +459,7 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="notification_mutual_connection_body">Toi et %1$s vous suivez désormais mutuellement</string>
     <string name="notification_mutual_connection_multiple_title">Nouvelles connexions mutuelles ! 🎉</string>
     <string name="notification_mutual_connection_multiple_body">%1$s et %2$s autres sont maintenant des connexions mutuelles</string>
-    <string name="banner_verb_echo_suggestion">est près de vous! Créez un Echo</string>
-    <string name="notification_action_reply">Répondre</string>
+    <string name="banner_verb_echo_suggestion">est près de vous! Créez un Echo</string>    <string name="notification_action_reply">Répondre</string>
     <string name="notification_action_placeholder">Message</string>
     <string name="chat_preview_text">Nouveau message</string>
     <string name="chat_preview_photo">Photo</string>

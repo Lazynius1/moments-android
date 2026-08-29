@@ -12,16 +12,23 @@ import androidx.compose.ui.unit.Dp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.models.StickerData
-import com.moments.android.notifications.services.NotificationService
+import com.moments.android.R
+import com.moments.android.MomentsApplication
+import com.moments.android.services.messaging.DirectMessageRoute
+import com.moments.android.services.messaging.MessageRequestInteractionContext
+import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.services.privacy.ContentVisibilityService
 import com.moments.android.services.privacy.ContentVisibilityType
 import com.moments.android.utilities.momentsPress
+import com.moments.android.views.messaging.core.MessageType
+import com.moments.android.views.messaging.services.ChatService
+import com.moments.android.views.messaging.services.sendSharedStoryMessage
+import com.moments.android.views.story.StoryRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
 
 /** Port de `glow(color:radius:)` de SwiftUI (triple shadow). */
 fun Modifier.glow(color: Color, radius: Dp): Modifier =
@@ -66,6 +73,7 @@ fun MeshGradient(
 data class StoryMentionNotificationResult(
     val sentUserIds: List<String>,
     val skippedOutsideAudienceUserIds: List<String>,
+    val failedDeliveryUserIds: List<String>,
 )
 
 /**
@@ -110,6 +118,10 @@ suspend fun sendMentionNotificationsForStory(
 
     val sent = mutableListOf<String>()
     val skipped = mutableListOf<String>()
+    val failed = mutableListOf<String>()
+    val story = runCatching { StoryRepository().fetchStory(storyAuthorId, storyId) }.getOrElse {
+        return StoryMentionNotificationResult(emptyList(), emptyList(), mentionedUserIds)
+    }
 
     for (userId in mentionedUserIds) {
         val canNotify = canNotifyStoryMention(
@@ -123,16 +135,68 @@ suspend fun sendMentionNotificationsForStory(
             skipped += userId
             continue
         }
-        withContext(Dispatchers.Main) {
-            NotificationService.sendStoryMentionNotification(userId, storyId, storyAuthorId)
+        runCatching {
+            sendStoryMentionMessage(storyAuthorId, userId, story)
+        }.onSuccess {
+            sent += userId
+        }.onFailure {
+            failed += userId
         }
-        sent += userId
     }
 
     return StoryMentionNotificationResult(
         sentUserIds = sent,
         skippedOutsideAudienceUserIds = skipped,
+        failedDeliveryUserIds = failed,
     )
+}
+
+private suspend fun sendStoryMentionMessage(
+    authorId: String,
+    recipientId: String,
+    story: com.moments.android.models.Story,
+) {
+    val storyId = requireNotNull(story.id).takeIf(String::isNotBlank) ?: error("Missing story id")
+    val coordinator = MessageRequestService()
+    val deliveryMessageId = "storyMention_${storyId}_$recipientId"
+    val interaction = MessageRequestInteractionContext(
+        kind = MessageRequestInteractionContext.Kind.SHARE_STORY,
+        storyId = storyId,
+        storyOwnerId = authorId,
+        sharedContentId = storyId,
+        sharedContentOwnerId = authorId,
+        isStoryMention = true,
+    )
+    val conversationId = when (val route = coordinator.resolveRoute(recipientId, interaction)) {
+        is DirectMessageRoute.Conversation -> route.id
+        is DirectMessageRoute.ConversationDraft -> coordinator.activateConversationDraft(recipientId, route.threadId)
+        is DirectMessageRoute.IncomingRequest -> coordinator.acceptIncomingThread(route.threadId).conversationId
+        is DirectMessageRoute.OutgoingRequest -> {
+            coordinator.appendRequestMessage(
+                receiverId = recipientId,
+                text = MomentsApplication.instance?.getString(R.string.chat_preview_shared_story).orEmpty(),
+                messageType = MessageType.SHARED_STORY,
+                interaction = interaction,
+                requestedMessageId = deliveryMessageId,
+            )
+            null
+        }
+    }
+    conversationId?.let {
+        val exists = FirebaseFirestore.getInstance()
+            .collection("conversations").document(it)
+            .collection("messages").document(deliveryMessageId)
+            .get().await().exists()
+        if (exists) return
+        ChatService.sendSharedStoryMessage(
+            conversationId = it,
+            senderId = authorId,
+            story = story,
+            shareText = MomentsApplication.instance?.getString(R.string.chat_preview_shared_story).orEmpty(),
+            isStoryMention = true,
+            messageId = deliveryMessageId,
+        ).getOrThrow()
+    }
 }
 
 /** ≡ `canNotifyStoryMention` — switch audiencia 1:1 con Swift. */

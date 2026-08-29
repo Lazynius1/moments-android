@@ -138,7 +138,9 @@ object ChatRowHeightEstimator {
         MessageType.FILE -> fileHeight
         MessageType.VIEW_ONCE_IMAGE, MessageType.VIEW_ONCE_VIDEO -> viewOnceHeight(message)
         MessageType.EPHEMERAL -> ephemeralHeight
-        MessageType.SHARED_MOMENT, MessageType.SHARED_STORY -> sharedPreviewHeight
+        MessageType.SHARED_MOMENT -> sharedPreviewHeight
+        MessageType.SHARED_STORY -> sharedPreviewHeight +
+            if (message.sharedStoryData?.get("isStoryMention") == "true") 28.dp else 0.dp
         MessageType.SHARED_PROFILE -> sharedProfilePreviewHeight
         MessageType.CHAT_NOTICE -> chatNoticeHeight
         }

@@ -371,6 +371,12 @@
     <string name="notifications_message_message_multiple">%1$s and %2$d others sent you messages</string>
     <string name="notification_channel_default_name">Moments</string>
     <string name="notification_channel_default_description">Notifications from Moments</string>
+    <string name="notification_channel_messages_name">Messages</string>
+    <string name="notification_channel_messages_description">Direct messages and chat</string>
+    <string name="notification_channel_social_name">Activity</string>
+    <string name="notification_channel_social_description">Follows, reactions, comments and mentions</string>
+    <string name="notification_channel_reminders_name">Reminders</string>
+    <string name="notification_channel_reminders_description">Gentle reminders to share a moment</string>
     <string name="notification_message_single_text">Sent you a message</string>
     <string name="notification_message_single_photo">Sent you a photo 📷</string>
     <string name="notification_message_single_video">Sent you a video 🎥</string>
@@ -378,6 +384,9 @@
     <string name="notification_message_single_view_once">Sent you a disappearing message 👀</string>
     <string name="notification_message_single_moment">Sent you a moment 📸</string>
     <string name="notification_message_single_default">Sent you a message</string>
+    <string name="notification_message_single_story_mention">Mentioned you in their story</string>
+    <string name="story_mention_chat_incoming">Mentioned you in their story</string>
+    <string name="story_mention_chat_outgoing">You mentioned them in your story</string>
     <string name="notification_message_multiple">Sent you %1$s messages</string>
     <string name="notification_chat_reaction_single">Reacted with %1$s to your message</string>
     <string name="notification_chat_reaction_single_quoted">Reacted with %1$s to your message \"%2$s\"</string>
@@ -420,8 +429,7 @@
     <string name="notification_mutual_connection_body">You and %1$s are now following each other</string>
     <string name="notification_mutual_connection_multiple_title">New mutual connections! 🎉</string>
     <string name="notification_mutual_connection_multiple_body">%1$s and %2$s others are now mutual connections</string>
-    <string name="banner_verb_echo_suggestion">is near you! Create an Echo</string>
-    <string name="notification_action_reply">Reply</string>
+    <string name="banner_verb_echo_suggestion">is near you! Create an Echo</string>    <string name="notification_action_reply">Reply</string>
     <string name="notification_action_placeholder">Message</string>
     <string name="chat_preview_text">New message</string>
     <string name="chat_preview_photo">Photo</string>
