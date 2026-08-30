@@ -95,6 +95,7 @@ data class ChatMessageBubbleCallbacks(
     val onViewOnceOpen: ((EnhancedMessage, Boolean) -> Unit)? = null,
     val onOpenLocation: ((EnhancedMessage) -> Unit)? = null,
     val onRetryFailed: ((EnhancedMessage) -> Unit)? = null,
+    val onMentionTap: (String) -> Unit = {},
 )
 
 private fun openMessageBody(
@@ -158,6 +159,9 @@ fun GlassmorphicMessageRow(
     val canRetry = isCurrentUser &&
         message.status == MessageStatus.FAILED &&
         callbacks.onRetryFailed != null
+    val childHandlesTap = message.type == MessageType.TEXT &&
+        chatTextSegments(message.content.orEmpty()).any { it.isSpoiler }
+    var revealSpoilers by remember(message.id) { mutableStateOf(false) }
     val timestampAlpha = ((-revealOffset) / 40f).coerceIn(0f, 1f)
 
     Row(
@@ -230,16 +234,18 @@ fun GlassmorphicMessageRow(
                         isOutgoing = isCurrentUser,
                         cornerRadius = cornerRadius,
                         isFlashing = isBubbleFlashing,
-                        onTap = if (
+                        onTap = when {
+                            childHandlesTap -> {
+                                { revealSpoilers = !revealSpoilers }
+                            }
                             ChatMessageBodyOpen.isOpenable(
                                 message,
                                 isCurrentUser,
                                 FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
-                            )
-                        ) {
-                            { openMessageBody(message, isCurrentUser, callbacks) }
-                        } else {
-                            null
+                            ) -> {
+                                { openMessageBody(message, isCurrentUser, callbacks) }
+                            }
+                            else -> null
                         },
                         onLongPress = callbacks.onLongPress,
                     ) {
@@ -256,6 +262,8 @@ fun GlassmorphicMessageRow(
                                 isDownloadingMedia = isDownloadingMedia,
                                 isStarred = isStarred,
                                 callbacks = callbacks,
+                                revealSpoilers = revealSpoilers,
+                                spoilerTapOnChrome = childHandlesTap,
                             )
                         }
                         if (message.isVanishModeMessage) {
@@ -335,6 +343,8 @@ fun GlassmorphicMessageBubble(
     isDownloadingMedia: Boolean,
     isStarred: Boolean = false,
     callbacks: ChatMessageBubbleCallbacks,
+    revealSpoilers: Boolean = false,
+    spoilerTapOnChrome: Boolean = false,
     @Suppress("UNUSED_PARAMETER") isFlashing: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -391,6 +401,9 @@ fun GlassmorphicMessageBubble(
                             repliedMessage = null,
                             otherParticipantName = otherParticipantName,
                             onReaction = callbacks.onReaction,
+                            onMentionTap = callbacks.onMentionTap,
+                            revealSpoilers = revealSpoilers,
+                            spoilerTapOnChrome = spoilerTapOnChrome,
                         )
                     }
                 }

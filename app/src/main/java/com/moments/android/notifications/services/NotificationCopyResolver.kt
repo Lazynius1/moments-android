@@ -4,6 +4,7 @@ import android.content.Context
 import com.moments.android.MomentsApplication
 import com.moments.android.R
 import com.moments.android.views.messaging.core.MessageType
+import com.moments.android.views.messaging.core.ChatTextMarkup
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
 
@@ -93,14 +94,17 @@ object NotificationCopyResolver {
         val textPreview = MomentsApplication.instance?.getString(R.string.chat_preview_text) ?: "New message"
         if (preview == textPreview) return null
         if (looksLikeEncryptedPayload(preview)) return null
-        return preview
+        return ChatTextMarkup.plainText(preview, hidesSpoilers = true)
     }
 
     private fun messageReactionCopy(ctx: Context, notification: MomentsNotification): NotificationBannerCopy {
         val emoji = notification.reaction ?: "❤️"
         val emojiList = notification.message ?: emoji
         val isPlural = notification.isReactionPlural == true || (notification.reactionCount ?: 0) > 1
-        val quotedPreview = notification.title?.trim().orEmpty()
+        val quotedPreview = notification.title
+            ?.let { ChatTextMarkup.plainText(it, hidesSpoilers = true) }
+            ?.trim()
+            .orEmpty()
         val body = when {
             isPlural -> ctx.getString(R.string.notification_chat_reaction_multiple, emojiList)
             quotedPreview.isNotEmpty() -> ctx.getString(R.string.notification_chat_reaction_single_quoted, emoji, quotedPreview)

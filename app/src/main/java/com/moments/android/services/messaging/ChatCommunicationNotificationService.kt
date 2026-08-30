@@ -1,5 +1,7 @@
 package com.moments.android.services.messaging
 
+import com.moments.android.views.messaging.core.ChatTextMarkup
+
 /**
  * Port de ChatCommunicationNotificationService.swift — solo `donateFromPush`.
  * La donación real / shortcuts viven en [ChatCommunicationIntentDonor].
@@ -14,7 +16,10 @@ object ChatCommunicationNotificationService {
         val senderId = userInfo["senderId"] as? String ?: return
         val senderUsername = (userInfo["senderUsername"] as? String)?.takeIf { it.isNotBlank() } ?: "Moments"
         val avatarUrl = userInfo["senderProfileImage"] as? String
-        val preview = previewBody?.trim()?.takeIf { it.isNotEmpty() }
+        val preview = previewBody
+            ?.let { ChatTextMarkup.plainText(it, hidesSpoilers = true) }
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
 
         ChatCommunicationIntentDonor.donateIncomingMessage(
             conversationId = conversationId,

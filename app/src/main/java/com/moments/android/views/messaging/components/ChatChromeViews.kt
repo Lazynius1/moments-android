@@ -305,15 +305,23 @@ fun PendingRequestMessageRow(
     Row(modifier.fillMaxWidth(), horizontalArrangement = if (message.isOutgoing) Arrangement.End else Arrangement.Start) {
         val background = if (message.isOutgoing) Color.Blue.copy(alpha = .92f) else adaptiveColors.messageBubbleBackground
         val contentColor = if (message.isOutgoing) Color.White else adaptiveColors.primary
-        Row(
-            modifier = Modifier.widthIn(max = LocalConfiguration.current.screenWidthDp.dp - 96.dp).clip(RoundedCornerShape(18.dp)).background(background).padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            when (message.messageType) {
-                MessageType.IMAGE -> { Icon(Icons.Default.Photo, null, tint = contentColor); Text(stringResource(R.string.message_requests_image), color = contentColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
-                MessageType.VIDEO -> { Icon(Icons.Default.PlayCircle, null, tint = contentColor); Text(stringResource(R.string.message_requests_video), color = contentColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
-                else -> Text(message.text, color = contentColor, fontSize = 15.sp)
+        when (message.messageType) {
+            MessageType.TEXT -> ChatTextBubbleView(
+                text = message.text,
+                isOutgoing = message.isOutgoing,
+                messageId = message.id,
+                onReaction = {},
+            )
+            else -> Row(
+                modifier = Modifier.widthIn(max = LocalConfiguration.current.screenWidthDp.dp - 96.dp).clip(RoundedCornerShape(18.dp)).background(background).padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                when (message.messageType) {
+                    MessageType.IMAGE -> { Icon(Icons.Default.Photo, null, tint = contentColor); Text(stringResource(R.string.message_requests_image), color = contentColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                    MessageType.VIDEO -> { Icon(Icons.Default.PlayCircle, null, tint = contentColor); Text(stringResource(R.string.message_requests_video), color = contentColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
+                    else -> Text(message.text, color = contentColor, fontSize = 15.sp)
+                }
             }
         }
     }
@@ -466,6 +474,21 @@ fun GlassmorphicTypingIndicator(
                     .background(colors.typingIndicatorColor),
             )
         }
+    }
+}
+
+/** Actividad remota: misma columna incoming y mismo gutter que sus mensajes. */
+@Composable
+fun ChatIncomingTypingIndicatorRow(modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Spacer(Modifier.width(ChatIncomingMessageLayout.gutterInset))
+        GlassmorphicTypingIndicator()
+        Spacer(Modifier.weight(1f))
     }
 }
 

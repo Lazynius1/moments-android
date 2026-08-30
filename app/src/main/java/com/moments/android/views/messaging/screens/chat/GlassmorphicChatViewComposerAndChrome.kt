@@ -445,14 +445,6 @@ fun ChatComposerChrome(
             modifier = safeModifier,
         )
         else -> Column(safeModifier) {
-            ChatEditingBar(
-                editingMessage = editingMessage,
-                adaptiveColors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()),
-                onEditingCancelled = {
-                    onEditingFinished()
-                    onMessageTextChange("")
-                },
-            )
             GlassmorphicInputBar(
                 text = messageText,
                 onTextChange = onMessageTextChange,
@@ -463,6 +455,7 @@ fun ChatComposerChrome(
                 voiceRecordingDraft = voiceRecordingDraft,
                 isPreparingVoiceRecordingPreview = isPreparingVoiceRecordingPreview,
                 replyingTo = replyingTo,
+                editingMessage = editingMessage,
                 otherParticipantName = otherParticipantDisplayName,
                 voiceGestureState = voiceGestureState,
                 isKeyboardVisible = keyboardVisible,
@@ -471,6 +464,10 @@ fun ChatComposerChrome(
                 allowsVoiceRecording = !controller.isPendingChat,
                 isAttachmentMenuOpen = isAttachmentMenuOpen,
                 onCancelReply = onReplyingFinished,
+                onCancelEdit = {
+                    onEditingFinished()
+                    onMessageTextChange("")
+                },
                 onSend = {
                     val outgoing = messageText.trim()
                     if (outgoing.isEmpty()) return@GlassmorphicInputBar
@@ -628,6 +625,7 @@ data class ChatMessageRendererCallbacks(
     val onHydrateMedia: (EnhancedMessage) -> Unit = {},
     val onStopLiveLocation: (String) -> Unit = {},
     val onLongPress: (EnhancedMessage, String, List<EnhancedMessage>?) -> Unit = { _, _, _ -> },
+    val onMentionTap: (String) -> Unit = {},
     val onChangeVanishTimer: () -> Unit = {},
     val onTurnOnVanish: () -> Unit = {},
 )
@@ -769,6 +767,7 @@ fun GlassmorphicChatMessageItem(
                         onRetryFailed = { failed ->
                             if (viewModel.canRetryMessage(failed)) viewModel.retryFailedMessage(failed)
                         },
+                        onMentionTap = callbacks.onMentionTap,
                     ),
                     onDoubleTap = {
                         viewModel.addReaction(message, quickReactionEmoji)

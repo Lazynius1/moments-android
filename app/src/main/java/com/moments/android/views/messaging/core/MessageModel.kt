@@ -31,6 +31,53 @@ import java.util.UUID
 private fun nonEmptyTrimmed(raw: String?): String? =
     raw?.trim()?.takeIf { it.isNotEmpty() }
 
+data class ChatTextMarkupBlock(
+    val id: Int,
+    val text: String,
+    val isQuote: Boolean,
+)
+
+/** Contrato raw E2E común con iOS; solo se interpreta localmente al pintar. */
+object ChatTextMarkup {
+    fun blocks(input: String): List<ChatTextMarkupBlock> {
+        val grouped = mutableListOf<Pair<String, Boolean>>()
+        input.split('\n').forEach { rawLine ->
+            val isQuote = rawLine == ">" || rawLine.startsWith("> ")
+            val content = when {
+                rawLine.startsWith("> ") -> rawLine.drop(2)
+                rawLine == ">" -> ""
+                else -> rawLine
+            }
+            val last = grouped.lastOrNull()
+            if (last != null && last.second == isQuote) {
+                grouped[grouped.lastIndex] = "${last.first}\n$content" to isQuote
+            } else {
+                grouped += content to isQuote
+            }
+        }
+        return grouped.mapIndexed { index, (text, isQuote) ->
+            ChatTextMarkupBlock(index, text, isQuote)
+        }
+    }
+
+    fun plainText(input: String, hidesSpoilers: Boolean): String {
+        var result = Regex("""\|\|([^|]+)\|\|""").replace(input) { match ->
+            if (hidesSpoilers) "••••" else match.groupValues[1]
+        }
+        val replacements = listOf(
+            Regex("""\*\*([^*]+)\*\*""") to "$1",
+            Regex("""(?<!\*)\*([^*]+)\*(?!\*)""") to "$1",
+            Regex("""~~([^~]+)~~""") to "$1",
+            Regex("""`([^`]+)`""") to "$1",
+            Regex("""(?m)^> ?""") to "",
+        )
+        replacements.forEach { (regex, replacement) ->
+            result = regex.replace(result, replacement)
+        }
+        return result
+    }
+}
+
 private fun previewAspectRatio(raw: String?): Float {
     val value = raw?.trim().orEmpty()
     if (value.isEmpty()) return 1f
@@ -458,7 +505,7 @@ data class EnhancedMessage(
             return type.conversationPreview(context)
         }
         return when (type) {
-            MessageType.TEXT -> content.orEmpty()
+            MessageType.TEXT -> ChatTextMarkup.plainText(content.orEmpty(), hidesSpoilers = true)
             MessageType.IMAGE -> context.getString(R.string.chat_preview_image)
             MessageType.VIDEO -> context.getString(R.string.chat_preview_video)
             MessageType.AUDIO -> context.getString(R.string.chat_preview_audio)
@@ -479,7 +526,10 @@ data class EnhancedMessage(
     /** Preview truncado para lista de conversaciones. */
     fun conversationPreview(context: Context): String {
         if (type == MessageType.TEXT) {
-            val text = content ?: return type.conversationPreview(context)
+            val text = ChatTextMarkup.plainText(
+                content ?: return type.conversationPreview(context),
+                hidesSpoilers = true,
+            )
             return if (text.length > 50) text.take(47) + "..." else text
         }
         return type.conversationPreview(context)
@@ -815,8 +865,13 @@ data class Conversation(
         val last = lastMessage
         if (last != null) {
             if (last.startsWith("📎")) return last
-            if (last.length > 50) return last.take(47) + "..."
-            return last
+            val display = if (lastMessageType == MessageType.TEXT) {
+                ChatTextMarkup.plainText(last, hidesSpoilers = true)
+            } else {
+                last
+            }
+            if (display.length > 50) return display.take(47) + "..."
+            return display
         }
         return context.getString(R.string.chat_preview_new_conversation)
     }
@@ -1105,8 +1160,10 @@ data class MessageRequest(
 
     /** ≡ `MessageRequest.messagePreview` (MessageModel.swift). */
     fun messagePreview(context: Context): String = when (messageType) {
-        MessageType.TEXT ->
-            if (message.length > 50) message.take(47) + "..." else message
+        MessageType.TEXT -> {
+            val display = ChatTextMarkup.plainText(message, hidesSpoilers = true)
+            if (display.length > 50) display.take(47) + "..." else display
+        }
         MessageType.IMAGE -> context.getString(R.string.chat_preview_photo)
         MessageType.VIDEO -> context.getString(R.string.chat_preview_video)
         MessageType.AUDIO -> context.getString(R.string.chat_preview_audio)

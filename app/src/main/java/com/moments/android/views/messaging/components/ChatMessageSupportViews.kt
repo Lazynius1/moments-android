@@ -86,10 +86,13 @@ private val ComposerReplyHeaderTopShape = RoundedCornerShape(
     topEnd = ComposerFieldCornerRadius,
 )
 
+enum class ChatComposerContextMode { Reply, Edit }
+
 @Composable
 fun ChatComposerReplyHeader(
     message: EnhancedMessage,
     otherParticipantName: String,
+    mode: ChatComposerContextMode,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -98,9 +101,17 @@ fun ChatComposerReplyHeader(
     val colors = AdaptiveColors(isDark)
     val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid.orEmpty() }
     val fromSelf = message.senderId == currentUserId
-    val accent = if (fromSelf) colors.userAccentColor else colors.receivedAccentColor
+    val accent = when {
+        mode == ChatComposerContextMode.Edit -> colors.userAccentColor
+        fromSelf -> colors.userAccentColor
+        else -> colors.receivedAccentColor
+    }
     val surface = if (isDark) Color(0xFF151C1D) else Color(0xFFE8EEF0)
-    val name = if (fromSelf) stringResource(R.string.chat_reply_you) else otherParticipantName
+    val name = when {
+        mode == ChatComposerContextMode.Edit -> stringResource(R.string.chat_editing_title)
+        fromSelf -> stringResource(R.string.chat_reply_you)
+        else -> otherParticipantName
+    }
     val preview = message.preview(context)
     val cancelLabel = stringResource(R.string.common_cancel)
     val content: @Composable () -> Unit = {

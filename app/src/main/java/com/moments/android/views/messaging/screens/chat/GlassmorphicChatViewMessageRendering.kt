@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,7 +43,7 @@ import com.moments.android.views.messaging.components.ChatHistoryStartHeader
 import com.moments.android.views.messaging.components.ChatRequestDisclaimerRow
 import com.moments.android.views.messaging.components.ChatTimestampRevealState
 import com.moments.android.views.messaging.components.GlassmorphicDateHeader
-import com.moments.android.views.messaging.components.GlassmorphicTypingIndicator
+import com.moments.android.views.messaging.components.ChatIncomingTypingIndicatorRow
 import com.moments.android.views.messaging.components.LocalChatFailedMessageRetryAction
 import com.moments.android.views.messaging.components.PendingRequestMessageRow
 import com.moments.android.views.messaging.components.chatMenuDimmedUnlessSelected
@@ -155,54 +153,13 @@ fun GlassmorphicChatRenderRow(
             row.event.senderId == viewModel.currentUserId,
             modifier.chatMenuDimmedWhenOpen(menuOpen),
         )
-        ChatRenderRow.Typing -> GlassmorphicTypingIndicator(
-            reduceMotion = MotionPolicy.reduceMotion,
-            modifier = modifier
-                .chatMenuDimmedWhenOpen(menuOpen)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 2.dp),
+        ChatRenderRow.Typing -> ChatIncomingTypingIndicatorRow(
+            modifier = modifier.chatMenuDimmedWhenOpen(menuOpen),
         )
         ChatRenderRow.HistoryStart -> ChatHistoryStartHeader(
             adaptiveColors,
             modifier.chatMenuDimmedWhenOpen(menuOpen),
         )
-    }
-}
-
-@Composable
-fun ChatEditingBar(
-    editingMessage: EnhancedMessage?,
-    adaptiveColors: AdaptiveColors,
-    onEditingCancelled: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier) {
-        if (editingMessage != null) {
-            // ≡ iOS ultraThinMaterial.opacity(0.5) → canvas sólido AdaptiveColors
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(adaptiveColors.primary.copy(.06f))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(Icons.Default.Edit, null, tint = adaptiveColors.primary, modifier = Modifier.padding(end = 2.dp))
-                Text(
-                    stringResource(R.string.chat_editing_title),
-                    color = adaptiveColors.primary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    Icons.Default.Close,
-                    stringResource(R.string.chat_editing_cancel),
-                    tint = adaptiveColors.primary.copy(.6f),
-                    modifier = Modifier.clickable(onClick = onEditingCancelled),
-                )
-            }
-        }
     }
 }
 

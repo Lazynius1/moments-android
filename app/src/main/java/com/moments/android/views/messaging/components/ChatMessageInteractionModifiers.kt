@@ -29,6 +29,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
@@ -58,7 +59,6 @@ import com.moments.android.views.messaging.core.MessageType
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -386,33 +386,39 @@ fun ChatTimestampRevealGutter(
  * Port de `chatMessagePressClassifier`: 0.32s, max drift 18pt.
  * Soltar antes = tap; al cumplir el umbral se consume el pulso para que no abra el cuerpo.
  */
-@Composable
 fun Modifier.chatMessagePressClassifier(
     onPressingChanged: ((Boolean) -> Unit)? = null,
     onTap: (() -> Unit)? = null,
     onLongPress: () -> Unit,
-): Modifier {
+    childHandlesTap: Boolean = false,
+): Modifier = composed {
     val onTapUpdated = rememberUpdatedState(onTap)
     val onLongPressUpdated = rememberUpdatedState(onLongPress)
     val onPressingUpdated = rememberUpdatedState(onPressingChanged)
-    return pointerInput(Unit) {
-        var suppressNextTap = false
+    Modifier.pointerInput(onTap, childHandlesTap) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             onPressingUpdated.value?.invoke(true)
             val origin = down.position
             var cancelled = false
             var liftedEarly = false
+            // Media (onTap): Initial evita falso long-press si un hijo consume el up.
+            // Spoilers (childHandlesTap): Main para no robar el tap del hijo clickable.
+            // Texto plano / mentions: Initial para detectar el up antes de ClickableText.
+            val observePass = when {
+                onTapUpdated.value != null -> PointerEventPass.Initial
+                childHandlesTap -> PointerEventPass.Main
+                else -> PointerEventPass.Initial
+            }
             val timedOut = withTimeoutOrNull(320L) {
                 while (true) {
-                    val event = awaitPointerEvent(PointerEventPass.Main)
+                    val event = awaitPointerEvent(observePass)
                     val change = event.changes.firstOrNull { it.id == down.id } ?: run {
                         cancelled = true
                         return@withTimeoutOrNull Unit
                     }
                     if (change.changedToUp()) {
                         liftedEarly = true
-                        change.consume()
                         return@withTimeoutOrNull Unit
                     }
                     val dx = change.position.x - origin.x
@@ -423,8 +429,7 @@ fun Modifier.chatMessagePressClassifier(
                     }
                 }
             } == null
-            if (timedOut && !cancelled) {
-                suppressNextTap = true
+            if (timedOut && !cancelled && !liftedEarly) {
                 HapticManager.shared.heavyImpact()
                 onLongPressUpdated.value()
                 while (true) {
@@ -433,14 +438,8 @@ fun Modifier.chatMessagePressClassifier(
                     change.consume()
                     if (change.changedToUp()) break
                 }
-                delay(400)
-                suppressNextTap = false
             } else if (liftedEarly && !cancelled) {
-                if (suppressNextTap) {
-                    suppressNextTap = false
-                } else {
-                    onTapUpdated.value?.invoke()
-                }
+                onTapUpdated.value?.invoke()
             }
             onPressingUpdated.value?.invoke(false)
         }
@@ -450,14 +449,15 @@ fun Modifier.chatMessagePressClassifier(
 /**
  * Port de `chatMessageLongPress`: 0.32s, max drift 18pt, heavy haptic.
  */
-@Composable
 fun Modifier.chatMessageLongPress(
     onPressingChanged: ((Boolean) -> Unit)? = null,
     onLongPress: () -> Unit,
+    childHandlesTap: Boolean = false,
 ): Modifier = chatMessagePressClassifier(
     onPressingChanged = onPressingChanged,
     onTap = null,
     onLongPress = onLongPress,
+    childHandlesTap = childHandlesTap,
 )
 
 /** Port de `ChatMessageBodyOpen`. */

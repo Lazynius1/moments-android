@@ -6,6 +6,7 @@ import com.moments.android.R
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.feed.sharing.ShareRecipientsPickerSheet
 import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.ChatTextMarkup
 
 /** Port de `ForwardMessageWrapper`. */
 data class ForwardMessageWrapper(val message: EnhancedMessage) {
@@ -24,7 +25,9 @@ fun ChatMessageForwardSheet(
 ) {
     ShareRecipientsPickerSheet(
         title = stringResource(R.string.chat_forward_title),
-        subtitle = message.content,
+        subtitle = message.content?.let {
+            ChatTextMarkup.plainText(it, hidesSpoilers = true)
+        },
         showsBackButton = false,
         flexibleListHeight = true,
         onDismiss = onDismiss,

@@ -12,6 +12,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -50,8 +53,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.services.performance.MotionPolicy
+import com.moments.android.utilities.MomentMentionNavigation
 import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.core.ChatTextMarkup
 import com.moments.android.views.profile.userprofile.sections.ProfileUnavailableAvatar
 
 /**
@@ -141,13 +146,17 @@ fun ChatTextBubbleView(
     otherParticipantName: String = "",
     onReplyTap: (() -> Unit)? = null,
     onReaction: (String) -> Unit,
+    onMentionTap: (String) -> Unit = { username -> MomentMentionNavigation.openProfile(username) },
+    revealSpoilers: Boolean = false,
+    spoilerTapOnChrome: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val colors = AdaptiveColors(isSystemInDarkTheme())
     val outgoingFill = LocalChatOutgoingBubbleColor.current
     val searchTerm = LocalChatSearchHighlightTerm.current
     val activeSearchId = LocalChatSearchActiveMessageId.current
-    var revealSpoilers by remember(messageId) { mutableStateOf(false) }
+    var internalRevealSpoilers by remember(messageId) { mutableStateOf(false) }
+    val resolvedRevealSpoilers = if (spoilerTapOnChrome) revealSpoilers else internalRevealSpoilers
 
     val segments = remember(text) { chatTextSegments(text) }
     val hasSpoilers = segments.any { it.isSpoiler }
@@ -169,17 +178,20 @@ fun ChatTextBubbleView(
     val fontSizeSp = ChatMessageFont.bubbleSizeSp()
     val lineHeightSp = ChatMessageFont.bubbleLineHeightSp()
 
-    val annotated = remember(text, revealSpoilers, textColor, linkColor, searchTerm, isActiveSearchMatch) {
-        buildBubbleAnnotatedString(
-            segments = segments,
-            revealSpoilers = revealSpoilers,
-            textColor = textColor,
-            linkColor = linkColor,
-            searchTerm = searchTerm,
-            highlightBackground = highlightBg,
-            activeSearchMatch = isActiveSearchMatch,
-            suppressSearch = hasSpoilers && !revealSpoilers,
-        )
+    val markupBlocks = remember(text) { ChatTextMarkup.blocks(text) }
+    val annotatedBlocks = remember(text, resolvedRevealSpoilers, textColor, linkColor, searchTerm, isActiveSearchMatch) {
+        markupBlocks.map { block ->
+            block to buildBubbleAnnotatedString(
+                segments = chatTextSegments(block.text),
+                revealSpoilers = resolvedRevealSpoilers,
+                textColor = textColor,
+                linkColor = linkColor,
+                searchTerm = searchTerm,
+                highlightBackground = highlightBg,
+                activeSearchMatch = isActiveSearchMatch,
+                suppressSearch = hasSpoilers && !resolvedRevealSpoilers,
+            )
+        }
     }
 
     val spoilerHint = stringResource(R.string.chat_a11y_spoiler_hint)
@@ -204,13 +216,15 @@ fun ChatTextBubbleView(
                     shape = shape,
                 )
                 .then(
-                    if (hasSpoilers) {
+                    if (hasSpoilers && !spoilerTapOnChrome) {
                         Modifier
                             .clickable {
                                 // ≡ iOS reduceMotion vs easeInOut 0.22
-                                revealSpoilers = !revealSpoilers
+                                internalRevealSpoilers = !internalRevealSpoilers
                             }
                             .semantics { contentDescription = spoilerHint }
+                    } else if (hasSpoilers && spoilerTapOnChrome) {
+                        Modifier.semantics { contentDescription = spoilerHint }
                     } else {
                         Modifier
                     },
@@ -239,28 +253,62 @@ fun ChatTextBubbleView(
                 LinkPreviewCard(url = url, outgoing = isOutgoing, embedded = true)
             }
             val messageText: @Composable () -> Unit = {
-                ClickableText(
-                    text = annotated,
-                    style = TextStyle(
-                        color = textColor,
-                        fontSize = fontSizeSp.sp,
-                        fontWeight = FontWeight.Normal,
-                        textAlign = TextAlign.Start,
-                        lineHeight = lineHeightSp.sp,
-                    ),
-                    modifier = Modifier
+                Column(
+                    Modifier
                         .then(if (hasReply || hasLink) Modifier.fillMaxWidth() else Modifier)
                         .padding(horizontal = if (hasReply) 4.dp else 0.dp),
-                    onClick = { offset ->
-                        annotated.getStringAnnotations("url", offset, offset).firstOrNull()?.let {
-                            uriHandler.openUri(it.item)
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    annotatedBlocks.forEach { (block, annotated) ->
+                        val formattedBlock: @Composable () -> Unit = {
+                            ClickableText(
+                                text = annotated,
+                                style = TextStyle(
+                                    color = textColor,
+                                    fontSize = fontSizeSp.sp,
+                                    fontWeight = FontWeight.Normal,
+                                    textAlign = TextAlign.Start,
+                                    lineHeight = lineHeightSp.sp,
+                                ),
+                                onClick = { offset ->
+                                    val url = annotated.getStringAnnotations("url", offset, offset).firstOrNull()
+                                    if (url != null) {
+                                        uriHandler.openUri(url.item)
+                                    } else {
+                                        annotated.getStringAnnotations("mention", offset, offset).firstOrNull()?.let {
+                                            onMentionTap(it.item)
+                                        }
+                                    }
+                                },
+                            )
                         }
-                    },
-                )
+                        if (block.isQuote) {
+                            Row(
+                                Modifier.height(IntrinsicSize.Min),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                Box(
+                                    Modifier
+                                        .width(3.dp)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(50))
+                                        .background(
+                                            if (isOutgoing) Color.White.copy(alpha = 0.78f)
+                                            else colors.receivedAccentColor,
+                                        ),
+                                )
+                                formattedBlock()
+                            }
+                        } else {
+                            formattedBlock()
+                        }
+                    }
+                }
             }
             if (hasSpoilers && !reduceMotion) {
                 AnimatedContent(
-                    targetState = revealSpoilers,
+                    targetState = resolvedRevealSpoilers,
                     transitionSpec = {
                         fadeIn(tween(220)) togetherWith fadeOut(tween(220))
                     },
@@ -389,6 +437,18 @@ private fun AnnotatedString.Builder.appendInlineMarkdownAndLinks(
             end,
         )
         addStringAnnotation("url", url, start, end)
+    }
+    val mentionRegex = Regex("""(?<![\p{L}\p{N}_])@([\p{L}\p{N}_]{1,30})""")
+    mentionRegex.findAll(plain).forEach { match ->
+        val username = match.groupValues[1]
+        val start = rangeStart + match.range.first
+        val end = rangeStart + match.range.last + 1
+        addStyle(
+            SpanStyle(color = linkColor, fontWeight = FontWeight.SemiBold),
+            start,
+            end,
+        )
+        addStringAnnotation("mention", username, start, end)
     }
 }
 

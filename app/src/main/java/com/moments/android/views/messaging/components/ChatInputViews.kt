@@ -2,6 +2,7 @@ package com.moments.android.views.messaging.components
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateFloatAsState
@@ -38,6 +39,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
@@ -62,10 +64,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -83,8 +87,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -109,12 +120,109 @@ import kotlinx.coroutines.isActive
 /** Compositor de chat Android: layout unificado, cromática Moments. */
 enum class VoiceRecordingFloatingControlMode { LOCKING, PAUSE, PREPARING, RESUME }
 
-private enum class ComposerTrailingMode { LOCKED_SEND, DRAFT_SEND, TEXT_SEND, VOICE, EMPTY }
+private enum class ComposerTrailingMode { LOCKED_SEND, DRAFT_SEND, EDIT_APPLY, TEXT_SEND, VOICE, EMPTY }
 
 /** Altura estándar del control del compositor. */
 private val ComposerControlSize = 44.dp
 private val composerFieldShape = RoundedCornerShape(20.dp)
 private val unifiedComposerShape = RoundedCornerShape(24.dp)
+
+/**
+ * Resalta el contrato raw E2E sin alterar ni ocultar caracteres. Al conservar la
+ * longitud exacta, selección, IME, undo y posición del cursor usan OffsetMapping.Identity.
+ */
+private class ChatComposerMarkupTransformation(
+    private val primary: Color,
+    private val secondary: Color,
+    private val accent: Color,
+) : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val raw = text.text
+        val styled = AnnotatedString.Builder(text)
+        val delimiter = SpanStyle(color = secondary.copy(alpha = 0.48f))
+
+        fun applyDelimited(
+            regex: Regex,
+            contentStyle: SpanStyle,
+            prefixLength: Int,
+            suffixLength: Int = prefixLength,
+        ) {
+            regex.findAll(raw).forEach { match ->
+                val start = match.range.first
+                val endExclusive = match.range.last + 1
+                val contentStart = start + prefixLength
+                val contentEnd = endExclusive - suffixLength
+                if (contentStart < contentEnd) {
+                    styled.addStyle(contentStyle, contentStart, contentEnd)
+                    styled.addStyle(delimiter, start, contentStart)
+                    styled.addStyle(delimiter, contentEnd, endExclusive)
+                }
+            }
+        }
+
+        applyDelimited(
+            Regex("""\*\*([^*]+)\*\*"""),
+            SpanStyle(fontWeight = FontWeight.Bold, color = primary),
+            prefixLength = 2,
+        )
+        applyDelimited(
+            Regex("""(?<!\*)\*([^*]+)\*(?!\*)"""),
+            SpanStyle(fontStyle = FontStyle.Italic, color = primary),
+            prefixLength = 1,
+        )
+        applyDelimited(
+            Regex("""~~([^~]+)~~"""),
+            SpanStyle(textDecoration = TextDecoration.LineThrough, color = primary),
+            prefixLength = 2,
+        )
+        applyDelimited(
+            Regex("""`([^`]+)`"""),
+            SpanStyle(fontFamily = FontFamily.Monospace, color = primary),
+            prefixLength = 1,
+        )
+        applyDelimited(
+            Regex("""\|\|([^|]+)\|\|"""),
+            SpanStyle(
+                color = primary,
+                background = accent.copy(alpha = 0.16f),
+                fontWeight = FontWeight.Medium,
+            ),
+            prefixLength = 2,
+        )
+
+        Regex("""https?://[^\s]+""", RegexOption.IGNORE_CASE).findAll(raw).forEach { match ->
+            styled.addStyle(
+                SpanStyle(color = accent, textDecoration = TextDecoration.Underline),
+                match.range.first,
+                match.range.last + 1,
+            )
+        }
+        Regex("""(?<![\p{L}\p{N}_])@[\p{L}\p{N}._]+""").findAll(raw).forEach { match ->
+            styled.addStyle(
+                SpanStyle(color = accent, fontWeight = FontWeight.SemiBold),
+                match.range.first,
+                match.range.last + 1,
+            )
+        }
+        Regex("""(?m)^> ?.*$""").findAll(raw).forEach { match ->
+            val start = match.range.first
+            val endExclusive = match.range.last + 1
+            styled.addStyle(
+                SpanStyle(color = secondary, fontStyle = FontStyle.Italic),
+                start,
+                endExclusive,
+            )
+            val markerEnd = min(endExclusive, start + if (raw.startsWith("> ", start)) 2 else 1)
+            styled.addStyle(
+                SpanStyle(color = accent, fontWeight = FontWeight.Bold),
+                start,
+                markerEnd,
+            )
+        }
+
+        return TransformedText(styled.toAnnotatedString(), OffsetMapping.Identity)
+    }
+}
 
 @Composable
 fun GlassmorphicInputBar(
@@ -127,6 +235,7 @@ fun GlassmorphicInputBar(
     voiceRecordingDraft: VoiceRecordingDraft?,
     isPreparingVoiceRecordingPreview: Boolean,
     replyingTo: EnhancedMessage? = null,
+    editingMessage: EnhancedMessage? = null,
     otherParticipantName: String = "",
     voiceGestureState: VoiceRecordingGestureState,
     isKeyboardVisible: Boolean = false,
@@ -136,6 +245,7 @@ fun GlassmorphicInputBar(
     isAttachmentMenuOpen: Boolean = false,
     onSend: () -> Unit,
     onCancelReply: () -> Unit = {},
+    onCancelEdit: () -> Unit = {},
     onOpenAttachments: () -> Unit,
     onAttachmentPlusAnchorBoundsChanged: (androidx.compose.ui.unit.IntRect) -> Unit = {},
     onVoiceButtonAnchorBoundsChanged: (androidx.compose.ui.unit.IntRect) -> Unit = {},
@@ -150,6 +260,9 @@ fun GlassmorphicInputBar(
     val audioPower by AudioRecordingManager.shared.audioPower.collectAsState()
     val showingDraft = voiceRecordingDraft != null || isPreparingVoiceRecordingPreview
     val composerAccent = colors.userAccentColor
+    val composerMarkupTransformation = remember(colors.primary, colors.secondary, composerAccent) {
+        ChatComposerMarkupTransformation(colors.primary, colors.secondary, composerAccent)
+    }
     val panelBg = colors.chatInputBackground
     val fieldFill = if (isDark) Color(0xFF0B1215) else Color(0xFFF4F5F5)
     val vanishStroke = if (isDark) Color.White.copy(alpha = 0.28f) else Color.Black.copy(alpha = 0.22f)
@@ -166,7 +279,7 @@ fun GlassmorphicInputBar(
     val returnsToUnifiedComposerAfterTrash =
         isTextFieldFocused || isKeyboardVisible || text.isNotEmpty() ||
             voiceGestureState.preserveKeyboardElevation
-    val showsLeadingPlusButton = !isRecordingVoice && allowsAttachments &&
+    val showsLeadingPlusButton = !isRecordingVoice && editingMessage == null && allowsAttachments &&
         !voiceGestureState.playDeleteAnimation && !voiceGestureState.isTrashMorphingToPlus
     val showsComposerTextInput = !showingDraft
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -182,6 +295,7 @@ fun GlassmorphicInputBar(
     val trailingMode = when {
         isVoiceRecordingLocked -> ComposerTrailingMode.LOCKED_SEND
         showingDraft -> ComposerTrailingMode.DRAFT_SEND
+        editingMessage != null -> ComposerTrailingMode.EDIT_APPLY
         text.isNotBlank() -> ComposerTrailingMode.TEXT_SEND
         allowsAttachments && allowsVoiceRecording -> ComposerTrailingMode.VOICE
         else -> ComposerTrailingMode.EMPTY
@@ -224,6 +338,13 @@ fun GlassmorphicInputBar(
             voiceGestureState.pinnedKeyboardBottomPx = 0
         }
         hadActiveVoiceRecording = isRecordingVoice
+    }
+
+    LaunchedEffect(editingMessage?.id) {
+        if (editingMessage != null) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
     }
 
     // Franja unificada: controles 44dp, campo plano al centro.
@@ -291,21 +412,19 @@ fun GlassmorphicInputBar(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(0.dp),
             ) {
-                if (!separatesLeadingControl) {
+                if (!separatesLeadingControl && showsLeadingPlusButton) {
                     Box(
                         Modifier
                             .size(ComposerControlSize)
                             .zIndex(2f),
                         contentAlignment = Alignment.Center,
                     ) {
-                        when {
-                            showsLeadingPlusButton -> ChatAttachmentPlusButton(
-                                isMenuOpen = isAttachmentMenuOpen,
-                                onClick = onOpenAttachments,
-                                onAnchorBoundsChanged = onAttachmentPlusAnchorBoundsChanged,
-                                flat = true,
-                            )
-                        }
+                        ChatAttachmentPlusButton(
+                            isMenuOpen = isAttachmentMenuOpen,
+                            onClick = onOpenAttachments,
+                            onAnchorBoundsChanged = onAttachmentPlusAnchorBoundsChanged,
+                            flat = true,
+                        )
                     }
                 }
 
@@ -346,11 +465,17 @@ fun GlassmorphicInputBar(
                         )
                         .animateContentSize(),
                     content = {
-                        replyingTo?.let { message ->
+                        val contextMessage = editingMessage ?: replyingTo
+                        contextMessage?.let { message ->
                             ChatComposerReplyHeader(
                                 message = message,
                                 otherParticipantName = otherParticipantName,
-                                onCancel = onCancelReply,
+                                mode = if (editingMessage != null) {
+                                    ChatComposerContextMode.Edit
+                                } else {
+                                    ChatComposerContextMode.Reply
+                                },
+                                onCancel = if (editingMessage != null) onCancelEdit else onCancelReply,
                             )
                             Box(
                                 Modifier
@@ -384,6 +509,7 @@ fun GlassmorphicInputBar(
                                         if (!isRecordingVoice) onTextChange(updated)
                                     },
                                     textStyle = TextStyle(color = colors.primary, fontSize = 16.sp),
+                                    visualTransformation = composerMarkupTransformation,
                                     cursorBrush = SolidColor(composerAccent),
                                     maxLines = 6,
                                     modifier = Modifier
@@ -454,6 +580,11 @@ fun GlassmorphicInputBar(
                                 accent = composerAccent,
                                 enabled = !isPreparingVoiceRecordingPreview,
                                 dimmed = isPreparingVoiceRecordingPreview,
+                                onClick = ::sendCurrentContent,
+                            )
+                            ComposerTrailingMode.EDIT_APPLY -> ComposerFlatApplyButton(
+                                accent = composerAccent,
+                                enabled = text.isNotBlank(),
                                 onClick = ::sendCurrentContent,
                             )
                             ComposerTrailingMode.TEXT_SEND -> ComposerFlatSendButton(
@@ -539,6 +670,32 @@ private fun ComposerFlatSendButton(
 }
 
 @Composable
+private fun ComposerFlatApplyButton(
+    accent: Color,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val applyLabel = stringResource(R.string.chat_editing_title)
+    Box(
+        Modifier
+            .size(ComposerControlSize)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
+            .clip(CircleShape)
+            .background(accent)
+            .semantics { contentDescription = applyLabel }
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Default.Check,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(19.dp),
+        )
+    }
+}
+
+@Composable
 fun VoiceRecordingFloatingControlHost(
     isRecording: Boolean,
     isLocked: Boolean,
@@ -595,6 +752,7 @@ fun VoiceRecordingFloatingControl(
     lockProgress: Float = 1f,
     modifier: Modifier = Modifier,
 ) {
+    val isDark = isSystemInDarkTheme()
     val interactive = mode == VoiceRecordingFloatingControlMode.PAUSE || mode == VoiceRecordingFloatingControlMode.RESUME
     val progress = lockProgress.coerceIn(0f, 1f)
     val height = if (mode == VoiceRecordingFloatingControlMode.LOCKING) {
@@ -609,19 +767,39 @@ fun VoiceRecordingFloatingControl(
         VoiceRecordingFloatingControlMode.PREPARING -> stringResource(R.string.common_loading)
         VoiceRecordingFloatingControlMode.RESUME -> stringResource(R.string.chat_voice_record_resume)
     }
-    // Android: fill sólido, no glass iOS.
-    val fill = when (mode) {
-        VoiceRecordingFloatingControlMode.LOCKING -> tint.copy(alpha = 0.14f + progress * 0.22f)
+    // Lenguaje Android propio: surface tonal opaca y elevada. La geometría sigue
+    // el control dibujado de Telegram, pero sin copiar el glass/aurora de iOS.
+    val baseSurface = MomentsChromeGlass.canvasTint(isDark)
+    val targetFill = when (mode) {
+        VoiceRecordingFloatingControlMode.LOCKING ->
+            tint.copy(alpha = 0.10f + progress * 0.08f).compositeOver(baseSurface)
         VoiceRecordingFloatingControlMode.PAUSE,
-        VoiceRecordingFloatingControlMode.RESUME -> tint.copy(alpha = 0.16f)
-        VoiceRecordingFloatingControlMode.PREPARING -> tint.copy(alpha = 0.12f)
+        VoiceRecordingFloatingControlMode.RESUME -> tint.copy(alpha = 0.14f).compositeOver(baseSurface)
+        VoiceRecordingFloatingControlMode.PREPARING ->
+            primaryTint.copy(alpha = 0.08f).compositeOver(baseSurface)
     }
+    val fill by animateColorAsState(
+        targetValue = targetFill,
+        animationSpec = tween(180),
+        label = "voiceFloatingControlFill",
+    )
+    val controlShape = RoundedCornerShape(50)
     Box(
         modifier
             .width(44.dp)
             .height(height)
-            .clip(RoundedCornerShape(50))
-            .background(fill)
+            .shadow(
+                elevation = if (interactive) 4.dp else 2.dp,
+                shape = controlShape,
+                clip = false,
+            )
+            .clip(controlShape)
+            .background(fill, controlShape)
+            .border(
+                MomentsChromeGlass.strokeWidth,
+                MomentsChromeGlass.strokeColor(isDark),
+                controlShape,
+            )
             .semantics { contentDescription = a11y }
             .clickable(enabled = interactive) {
                 when (mode) {
@@ -632,26 +810,47 @@ fun VoiceRecordingFloatingControl(
             },
         contentAlignment = Alignment.Center,
     ) {
-        when (mode) {
-            VoiceRecordingFloatingControlMode.LOCKING -> Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Icon(Icons.Default.Lock, null, tint = tint, modifier = Modifier.size(17.dp))
-                Icon(
-                    Icons.Default.KeyboardArrowUp,
+        AnimatedContent(
+            targetState = mode,
+            transitionSpec = {
+                (fadeIn(tween(150)) + scaleIn(tween(190), initialScale = 0.72f))
+                    .togetherWith(
+                        fadeOut(tween(110)) + scaleOut(tween(150), targetScale = 0.72f),
+                    )
+            },
+            label = "voiceFloatingControlMode",
+        ) { displayedMode ->
+            when (displayedMode) {
+                VoiceRecordingFloatingControlMode.LOCKING -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(Icons.Default.Lock, null, tint = tint, modifier = Modifier.size(17.dp))
+                    Icon(
+                        Icons.Default.KeyboardArrowUp,
+                        null,
+                        tint = tint.copy(alpha = max(0f, 0.9f - progress)),
+                        modifier = Modifier.size(12.dp),
+                    )
+                }
+                VoiceRecordingFloatingControlMode.PAUSE -> Icon(
+                    Icons.Default.Pause,
                     null,
-                    tint = tint.copy(alpha = max(0f, 0.9f - progress)),
-                    modifier = Modifier.size(12.dp),
+                    tint = tint,
+                    modifier = Modifier.size(17.dp),
+                )
+                VoiceRecordingFloatingControlMode.RESUME -> Icon(
+                    Icons.Default.Mic,
+                    null,
+                    tint = tint,
+                    modifier = Modifier.size(17.dp),
+                )
+                VoiceRecordingFloatingControlMode.PREPARING -> CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = tint,
+                    strokeWidth = 2.dp,
                 )
             }
-            VoiceRecordingFloatingControlMode.PAUSE -> Icon(Icons.Default.Pause, null, tint = tint, modifier = Modifier.size(16.dp))
-            VoiceRecordingFloatingControlMode.RESUME -> Icon(Icons.Default.Mic, null, tint = tint, modifier = Modifier.size(16.dp))
-            VoiceRecordingFloatingControlMode.PREPARING -> CircularProgressIndicator(
-                modifier = Modifier.size(18.dp),
-                color = tint,
-                strokeWidth = 2.dp,
-            )
         }
     }
 }

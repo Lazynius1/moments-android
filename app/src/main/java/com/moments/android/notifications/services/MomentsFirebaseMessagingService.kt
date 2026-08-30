@@ -12,6 +12,7 @@ import com.moments.android.services.messaging.MessageIngestService
 import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.messaging.SharedChatDecryptor
 import com.moments.android.views.messaging.core.MessageRequestFolder
+import com.moments.android.views.messaging.core.ChatTextMarkup
 import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.shared.ChatPreviewPrivacy
 import kotlinx.coroutines.CoroutineScope
@@ -237,7 +238,7 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         userInfo: Map<String, Any?>,
         fallbackTitle: String,
     ): ResolvedContent {
-        val trimmed = text.trim()
+        val trimmed = ChatTextMarkup.plainText(text, hidesSpoilers = true).trim()
         if (trimmed.isEmpty()) return ResolvedContent(fallbackTitle, trimmed)
         val title = (userInfo["senderUsername"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: fallbackTitle
         val body = if (trimmed.length > 200) trimmed.take(199) + "…" else trimmed
@@ -265,7 +266,7 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         val title = (userInfo["senderUsername"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: suppliedTitle
 
         suspend fun quoted(plain: String): ResolvedContent {
-            val trimmed = plain.trim()
+            val trimmed = ChatTextMarkup.plainText(plain, hidesSpoilers = true).trim()
             if (trimmed.isEmpty()) return ResolvedContent(title, suppliedBody)
             val quoted = if (trimmed.length > 120) trimmed.take(119) + "…" else trimmed
             val body = getString(R.string.notification_chat_reaction_single_quoted, emoji, quoted)

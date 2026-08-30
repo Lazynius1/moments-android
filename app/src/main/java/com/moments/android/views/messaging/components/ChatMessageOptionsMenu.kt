@@ -229,6 +229,7 @@ fun ChatMessageBubbleChrome(
     isFlashing: Boolean = false,
     onTap: (() -> Unit)? = null,
     onLongPress: ((ChatMessageLiftSnapshot) -> Unit)? = null,
+    childHandlesTap: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val dark = isSystemInDarkTheme()
@@ -265,6 +266,7 @@ fun ChatMessageBubbleChrome(
                     Modifier.chatMessagePressClassifier(
                         onPressingChanged = { isPressing = it },
                         onTap = onTap,
+                        childHandlesTap = childHandlesTap,
                         onLongPress = {
                             if (longPressHandler == null) return@chatMessagePressClassifier
                             isPressing = false

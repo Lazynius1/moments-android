@@ -100,6 +100,7 @@ import com.moments.android.views.messaging.components.ConversationMenuSelection
 import com.moments.android.views.messaging.components.MessagingActionToast
 import com.moments.android.views.messaging.components.OnlineStatusSelectorView
 import com.moments.android.views.messaging.core.Conversation
+import com.moments.android.views.messaging.core.ChatTextMarkup
 import com.moments.android.views.messaging.core.GlobalMessageSearchResult
 import com.moments.android.views.messaging.core.MessageRequest
 import com.moments.android.views.messaging.core.MessagingPresentationRoute
@@ -1168,7 +1169,7 @@ private fun SearchMessageResultRow(result: GlobalMessageSearchResult, onTap: () 
             fontSize = 14.sp,
         )
         Text(
-            result.message.content.orEmpty(),
+            ChatTextMarkup.plainText(result.message.content.orEmpty(), hidesSpoilers = true),
             color = colors.secondary,
             fontSize = 13.sp,
             maxLines = 2,

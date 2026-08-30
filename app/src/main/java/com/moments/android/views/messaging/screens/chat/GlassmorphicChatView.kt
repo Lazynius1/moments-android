@@ -65,6 +65,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.firestore.fetchUserByUsername
 import com.moments.android.views.messaging.components.GlassmorphicDateHeader
 import com.moments.android.views.messaging.components.GlassmorphicMessageRow
 import com.moments.android.views.messaging.components.ChatMessageBubbleCallbacks
@@ -105,7 +107,7 @@ import com.moments.android.views.messaging.components.ChatMessageMenuCallbacks
 import com.moments.android.views.messaging.components.ChatMessageBodyOpen
 import com.moments.android.views.messaging.components.ChatLocationDetailView
 import com.moments.android.views.messaging.components.ChatVanishTimerSheet
-import com.moments.android.views.messaging.components.GlassmorphicTypingIndicator
+import com.moments.android.views.messaging.components.ChatIncomingTypingIndicatorRow
 import com.moments.android.views.messaging.components.GlassmorphicUnreadDivider
 import com.moments.android.views.messaging.components.VoiceRecordingBlobOverlay
 import com.moments.android.views.messaging.components.VoiceRecordingFloatingControlHost
@@ -759,6 +761,17 @@ fun GlassmorphicChatView(
         onStopLiveLocation = session::stopLiveLocation,
         onChangeVanishTimer = { showVanishTimerSheet = true },
         onTurnOnVanish = { session.toggleVanishMode() },
+        onMentionTap = { username ->
+            scope.launch {
+                val user = runCatching {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        FirestoreService().fetchUserByUsername(username.trim())
+                    }
+                }.getOrNull() ?: return@launch
+                onProfile(user.id)
+                HapticManager.shared.lightImpact()
+            }
+        },
     )
 
     // Port de `handleIncomingBuzzToastIfNeeded()`: al llegar un zumbido ajeno se muestra el aviso
@@ -927,11 +940,9 @@ fun GlassmorphicChatView(
                             )
                         },
                         renderTyping = {
-                            GlassmorphicTypingIndicator(
-                                reduceMotion = MotionPolicy.reduceMotion,
+                            ChatIncomingTypingIndicatorRow(
                                 modifier = Modifier
-                                    .chatMenuDimmedWhenOpen(messagePresentation.menuSelection != null)
-                                    .padding(horizontal = 16.dp),
+                                    .chatMenuDimmedWhenOpen(messagePresentation.menuSelection != null),
                             )
                         },
                         renderPendingRequest = { pending ->
@@ -968,6 +979,7 @@ fun GlassmorphicChatView(
                                     onLongPress = null,
                                     onMessageViewed = null,
                                     onHydrateMedia = null,
+                                    onMentionTap = renderer.onMentionTap,
                                 ),
                             )
                         },

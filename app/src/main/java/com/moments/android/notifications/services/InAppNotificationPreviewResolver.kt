@@ -6,6 +6,7 @@ import com.moments.android.R
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
 import com.moments.android.services.messaging.EncryptionService
+import com.moments.android.views.messaging.core.ChatTextMarkup
 import com.moments.android.views.shared.ChatPreviewPrivacy
 import kotlinx.coroutines.tasks.await
 
@@ -44,17 +45,17 @@ object InAppNotificationPreviewResolver {
         }
         (userInfo?.get("encryptedContent") as? String)?.let { embedded ->
             decryptPreview(embedded, conversationId)?.let {
-                return notification.withBannerPreview(reaction = truncated(it, 200), title = notification.title)
+                return notification.withBannerPreview(reaction = previewText(it, 200), title = notification.title)
             }
         }
         notification.messageId?.let { messageId ->
             fetchAndDecryptMessage(messageId, conversationId)?.let {
-                return notification.withBannerPreview(reaction = truncated(it, 200), title = notification.title)
+                return notification.withBannerPreview(reaction = previewText(it, 200), title = notification.title)
             }
         }
         notification.reaction?.takeIf { it.isNotBlank() && !isNeutralPlaceholder(it) }?.let { reaction ->
             decryptPreview(reaction, conversationId)?.let {
-                return notification.withBannerPreview(reaction = truncated(it, 200), title = notification.title)
+                return notification.withBannerPreview(reaction = previewText(it, 200), title = notification.title)
             }
         }
         return notification.withBannerPreview(reaction = null, title = notification.title)
@@ -73,17 +74,17 @@ object InAppNotificationPreviewResolver {
         }
         (userInfo?.get("encryptedContent") as? String)?.let { embedded ->
             decryptPreview(embedded, conversationId)?.let {
-                return notification.withBannerPreview(reaction = notification.reaction, title = truncated(it, 120))
+                return notification.withBannerPreview(reaction = notification.reaction, title = previewText(it, 120))
             }
         }
         notification.messageId?.let { messageId ->
             fetchAndDecryptMessage(messageId, conversationId)?.let {
-                return notification.withBannerPreview(reaction = notification.reaction, title = truncated(it, 120))
+                return notification.withBannerPreview(reaction = notification.reaction, title = previewText(it, 120))
             }
         }
         notification.title?.takeIf { it.isNotBlank() }?.let { title ->
             decryptPreview(title, conversationId)?.let {
-                return notification.withBannerPreview(reaction = notification.reaction, title = truncated(it, 120))
+                return notification.withBannerPreview(reaction = notification.reaction, title = previewText(it, 120))
             }
         }
         return notification.withBannerPreview(reaction = notification.reaction, title = null)
@@ -137,6 +138,9 @@ object InAppNotificationPreviewResolver {
         if (trimmed.length < 24) return false
         return trimmed.all { it.isLetterOrDigit() || it in "+/=_-" }
     }
+
+    private fun previewText(text: String, maxLength: Int): String =
+        truncated(ChatTextMarkup.plainText(text, hidesSpoilers = true), maxLength)
 
     private fun truncated(text: String, maxLength: Int): String =
         if (text.length <= maxLength) text else text.take(maxLength - 1) + "…"
