@@ -164,10 +164,7 @@ fun GlassmorphicMessageRow(
         modifier
             .fillMaxWidth()
             .padding(start = 8.dp, top = if (head) 5.dp else 1.dp, end = 8.dp, bottom = bottomPad)
-            .offset { IntOffset(revealOffset.roundToInt(), 0) }
-            // Superficie vacía (entrantes y propios): swipe izq. → hora a la derecha.
-            // Encima de la burbuja propia manda el reply.
-            .chatTimestampRevealGesture(true, timestampRevealState),
+            .offset { IntOffset(revealOffset.roundToInt(), 0) },
         verticalAlignment = Alignment.Bottom,
     ) {
         Row(
@@ -178,12 +175,13 @@ fun GlassmorphicMessageRow(
             verticalAlignment = Alignment.Bottom,
         ) {
             if (isCurrentUser) {
-                // Hueco vacío a la izquierda de la burbuja propia.
-                Box(
-                    Modifier
+                // Hueco vacío a la izquierda de la burbuja propia — solo ahí el swipe de hora.
+                ChatTimestampRevealGutter(
+                    state = timestampRevealState,
+                    isEnabled = true,
+                    modifier = Modifier
                         .weight(1f)
-                        .fillMaxHeight()
-                        .chatTimestampRevealGesture(true, timestampRevealState),
+                        .fillMaxHeight(),
                 )
             }
             if (!isCurrentUser) {
@@ -275,7 +273,13 @@ fun GlassmorphicMessageRow(
                 }
             }
             if (!isCurrentUser) {
-                Spacer(Modifier.weight(1f))
+                ChatTimestampRevealGutter(
+                    state = timestampRevealState,
+                    isEnabled = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                )
             }
         }
         MessageTimestamp(

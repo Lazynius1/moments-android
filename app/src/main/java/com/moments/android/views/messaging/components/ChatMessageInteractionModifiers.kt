@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +58,7 @@ import com.moments.android.views.messaging.core.MessageType
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -234,34 +236,39 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectCh
         var completed = false
 
         while (!failed) {
-            val event = awaitPointerEvent(PointerEventPass.Main)
+            // Hasta validar horizontal, observar en Initial para no robar el tap/long-press
+            // de la burbuja (Main). Tras validar, consumir en Main como iOS reply/timestamp.
+            val pass = if (validated) PointerEventPass.Main else PointerEventPass.Initial
+            val event = awaitPointerEvent(pass)
             val change = event.changes.firstOrNull { it.id == down.id } ?: break
             if (change.changedToUp()) {
                 completed = validated
                 break
             }
             val delta = change.positionChange()
-            totalX += delta.x
-            totalY += delta.y
+            if (!validated) {
+                totalX += delta.x
+                totalY += delta.y
+            } else {
+                totalX += delta.x
+                totalY += delta.y
+                change.consume()
+                onChanged(totalX)
+                continue
+            }
             val horizontal = abs(totalX)
             val vertical = abs(totalY)
 
-            if (!validated) {
-                if (vertical > 2f && vertical > horizontal) {
-                    failed = true
-                    break
-                }
-                if (horizontal > 2f && !direction.accepts(totalX)) {
-                    failed = true
-                    break
-                }
-                if (horizontal > 2f && horizontal > vertical * 1.2f) {
-                    validated = true
-                }
+            if (vertical > 2f && vertical > horizontal) {
+                failed = true
+                break
             }
-
-            if (validated) {
-                change.consume()
+            if (horizontal > 2f && !direction.accepts(totalX)) {
+                failed = true
+                break
+            }
+            if (horizontal > 2f && horizontal > vertical * 1.2f) {
+                validated = true
                 onChanged(totalX)
             }
         }
@@ -379,56 +386,71 @@ fun ChatTimestampRevealGutter(
  * Port de `chatMessagePressClassifier`: 0.32s, max drift 18pt.
  * Soltar antes = tap; al cumplir el umbral se consume el pulso para que no abra el cuerpo.
  */
+@Composable
 fun Modifier.chatMessagePressClassifier(
     onPressingChanged: ((Boolean) -> Unit)? = null,
     onTap: (() -> Unit)? = null,
     onLongPress: () -> Unit,
-): Modifier = pointerInput(onPressingChanged, onTap, onLongPress) {
-    awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false)
-        onPressingChanged?.invoke(true)
-        val origin = down.position
-        var cancelled = false
-        var liftedEarly = false
-        val timedOut = withTimeoutOrNull(320L) {
-            while (true) {
-                val event = awaitPointerEvent(PointerEventPass.Main)
-                val change = event.changes.firstOrNull { it.id == down.id } ?: run {
-                    cancelled = true
-                    return@withTimeoutOrNull Unit
+): Modifier {
+    val onTapUpdated = rememberUpdatedState(onTap)
+    val onLongPressUpdated = rememberUpdatedState(onLongPress)
+    val onPressingUpdated = rememberUpdatedState(onPressingChanged)
+    return pointerInput(Unit) {
+        var suppressNextTap = false
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            onPressingUpdated.value?.invoke(true)
+            val origin = down.position
+            var cancelled = false
+            var liftedEarly = false
+            val timedOut = withTimeoutOrNull(320L) {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Main)
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: run {
+                        cancelled = true
+                        return@withTimeoutOrNull Unit
+                    }
+                    if (change.changedToUp()) {
+                        liftedEarly = true
+                        change.consume()
+                        return@withTimeoutOrNull Unit
+                    }
+                    val dx = change.position.x - origin.x
+                    val dy = change.position.y - origin.y
+                    if (hypot(dx.toDouble(), dy.toDouble()) > 18.0) {
+                        cancelled = true
+                        return@withTimeoutOrNull Unit
+                    }
                 }
-                if (change.changedToUp()) {
-                    liftedEarly = true
+            } == null
+            if (timedOut && !cancelled) {
+                suppressNextTap = true
+                HapticManager.shared.heavyImpact()
+                onLongPressUpdated.value()
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Main)
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
                     change.consume()
-                    return@withTimeoutOrNull Unit
+                    if (change.changedToUp()) break
                 }
-                val dx = change.position.x - origin.x
-                val dy = change.position.y - origin.y
-                if (hypot(dx.toDouble(), dy.toDouble()) > 18.0) {
-                    cancelled = true
-                    return@withTimeoutOrNull Unit
+                delay(400)
+                suppressNextTap = false
+            } else if (liftedEarly && !cancelled) {
+                if (suppressNextTap) {
+                    suppressNextTap = false
+                } else {
+                    onTapUpdated.value?.invoke()
                 }
             }
-        } == null
-        if (timedOut && !cancelled) {
-            HapticManager.shared.heavyImpact()
-            onLongPress()
-            while (true) {
-                val event = awaitPointerEvent(PointerEventPass.Main)
-                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                change.consume()
-                if (change.changedToUp()) break
-            }
-        } else if (liftedEarly) {
-            onTap?.invoke()
+            onPressingUpdated.value?.invoke(false)
         }
-        onPressingChanged?.invoke(false)
     }
 }
 
 /**
  * Port de `chatMessageLongPress`: 0.32s, max drift 18pt, heavy haptic.
  */
+@Composable
 fun Modifier.chatMessageLongPress(
     onPressingChanged: ((Boolean) -> Unit)? = null,
     onLongPress: () -> Unit,
