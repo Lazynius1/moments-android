@@ -86,6 +86,7 @@ import com.moments.android.views.messaging.screens.chat.measureRootKeyboardBotto
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -95,6 +96,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -124,8 +126,36 @@ private enum class ComposerTrailingMode { LOCKED_SEND, DRAFT_SEND, EDIT_APPLY, T
 
 /** Altura estándar del control del compositor. */
 private val ComposerControlSize = 44.dp
-private val composerFieldShape = RoundedCornerShape(20.dp)
-private val unifiedComposerShape = RoundedCornerShape(24.dp)
+/** Send/check dentro de la cápsula — más compactos que el + o el mic. */
+private val ComposerInlineActionSize = 34.dp
+private val ComposerInlineSendIconSize = 15.dp
+private val ComposerInlineApplyIconSize = 16.dp
+// ≡ iOS `inputFieldShape` (22) y `unifiedComposerShape` (26).
+private val composerFieldShape = RoundedCornerShape(22.dp)
+private val unifiedComposerShape = RoundedCornerShape(26.dp)
+
+/** ≡ iOS composer body — sin includeFontPadding para evitar recorte vertical en el input. */
+private fun composerInputTextStyle(primary: Color): TextStyle = TextStyle(
+    color = primary,
+    fontSize = 16.sp,
+    lineHeight = 20.sp,
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Center,
+        trim = LineHeightStyle.Trim.None,
+    ),
+)
+
+private fun composerPlaceholderTextStyle(secondary: Color): TextStyle = TextStyle(
+    color = secondary.copy(alpha = 0.65f),
+    fontSize = 16.sp,
+    lineHeight = 20.sp,
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Center,
+        trim = LineHeightStyle.Trim.None,
+    ),
+)
 
 /**
  * Resalta el contrato raw E2E sin alterar ni ocultar caracteres. Al conservar la
@@ -260,6 +290,8 @@ fun GlassmorphicInputBar(
     val audioPower by AudioRecordingManager.shared.audioPower.collectAsState()
     val showingDraft = voiceRecordingDraft != null || isPreparingVoiceRecordingPreview
     val composerAccent = colors.userAccentColor
+    val composerInputStyle = remember(colors.primary) { composerInputTextStyle(colors.primary) }
+    val composerPlaceholderStyle = remember(colors.secondary) { composerPlaceholderTextStyle(colors.secondary) }
     val composerMarkupTransformation = remember(colors.primary, colors.secondary, composerAccent) {
         ChatComposerMarkupTransformation(colors.primary, colors.secondary, composerAccent)
     }
@@ -398,7 +430,9 @@ fun GlassmorphicInputBar(
                 }
             }
 
-            Row(
+            val contextMessage = editingMessage ?: replyingTo
+
+            Column(
                 Modifier
                     .weight(1f)
                     .clip(unifiedComposerShape)
@@ -408,83 +442,84 @@ fun GlassmorphicInputBar(
                         chromeStroke,
                         unifiedComposerShape,
                     )
-                    .padding(if (usesCompactKeyboardChrome) 0.dp else 2.dp),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(0.dp),
+                    .padding(if (usesCompactKeyboardChrome) 0.dp else 2.dp)
+                    .animateContentSize(),
             ) {
-                if (!separatesLeadingControl && showsLeadingPlusButton) {
+                // ≡ iOS `usesUnifiedComposerSurface && hasComposerContext`: panel encima del HStack del input.
+                if (contextMessage != null) {
+                    ChatComposerReplyHeader(
+                        message = contextMessage,
+                        otherParticipantName = otherParticipantName,
+                        mode = if (editingMessage != null) {
+                            ChatComposerContextMode.Edit
+                        } else {
+                            ChatComposerContextMode.Reply
+                        },
+                        onCancel = if (editingMessage != null) onCancelEdit else onCancelReply,
+                        topCornerRadius = if (usesCompactKeyboardChrome) 26.dp else 22.dp,
+                    )
                     Box(
                         Modifier
-                            .size(ComposerControlSize)
-                            .zIndex(2f),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        ChatAttachmentPlusButton(
-                            isMenuOpen = isAttachmentMenuOpen,
-                            onClick = onOpenAttachments,
-                            onAnchorBoundsChanged = onAttachmentPlusAnchorBoundsChanged,
-                            flat = true,
-                        )
-                    }
+                            .fillMaxWidth()
+                            .height(0.5.dp)
+                            .background(if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.07f)),
+                    )
                 }
 
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .zIndex(1f)
-                        .heightIn(min = ComposerControlSize)
-                        .clip(composerFieldShape)
-                        .background(
-                            if (isVanishModeActive) fieldFill
-                            else Color.Transparent,
-                            composerFieldShape,
-                        )
-                        .border(
-                            MomentsChromeGlass.strokeWidth,
-                            if (isVanishModeActive) chromeStroke else Color.Transparent,
-                            composerFieldShape,
-                        )
-                        .then(
-                            if (isVanishModeActive) {
-                                Modifier.drawWithContent {
-                                    drawContent()
-                                    drawRoundRect(
-                                        color = vanishStroke,
-                                        cornerRadius = CornerRadius(20.dp.toPx()),
-                                        style = Stroke(
-                                            width = 1.2.dp.toPx(),
-                                            pathEffect = PathEffect.dashPathEffect(
-                                                floatArrayOf(5.dp.toPx(), 4.dp.toPx()),
-                                            ),
-                                        ),
-                                    )
-                                }
-                            } else {
-                                Modifier
-                            },
-                        )
-                        .animateContentSize(),
-                    content = {
-                        val contextMessage = editingMessage ?: replyingTo
-                        contextMessage?.let { message ->
-                            ChatComposerReplyHeader(
-                                message = message,
-                                otherParticipantName = otherParticipantName,
-                                mode = if (editingMessage != null) {
-                                    ChatComposerContextMode.Edit
-                                } else {
-                                    ChatComposerContextMode.Reply
-                                },
-                                onCancel = if (editingMessage != null) onCancelEdit else onCancelReply,
-                            )
-                            Box(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(0.5.dp)
-                                    .background(if (isDark) Color.White.copy(0.08f) else Color.Black.copy(0.07f)),
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(0.dp),
+                ) {
+                    if (!separatesLeadingControl && showsLeadingPlusButton) {
+                        Box(
+                            Modifier
+                                .size(ComposerControlSize)
+                                .zIndex(2f),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            ChatAttachmentPlusButton(
+                                isMenuOpen = isAttachmentMenuOpen,
+                                onClick = onOpenAttachments,
+                                onAnchorBoundsChanged = onAttachmentPlusAnchorBoundsChanged,
+                                flat = true,
                             )
                         }
+                    }
 
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .zIndex(1f)
+                            .heightIn(min = ComposerControlSize)
+                            .then(
+                                if (isVanishModeActive) {
+                                    Modifier
+                                        .clip(composerFieldShape)
+                                        .background(fieldFill, composerFieldShape)
+                                        .border(
+                                            MomentsChromeGlass.strokeWidth,
+                                            chromeStroke,
+                                            composerFieldShape,
+                                        )
+                                        .drawWithContent {
+                                            drawContent()
+                                            drawRoundRect(
+                                                color = vanishStroke,
+                                                cornerRadius = CornerRadius(22.dp.toPx()),
+                                                style = Stroke(
+                                                    width = 1.2.dp.toPx(),
+                                                    pathEffect = PathEffect.dashPathEffect(
+                                                        floatArrayOf(5.dp.toPx(), 4.dp.toPx()),
+                                                    ),
+                                                ),
+                                            )
+                                        }
+                                } else {
+                                    Modifier
+                                },
+                            ),
+                    ) {
                         Box(
                             Modifier
                                 .fillMaxWidth()
@@ -496,7 +531,7 @@ fun GlassmorphicInputBar(
                                 ) {
                                     focusRequester.requestFocus()
                                 }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                .padding(start = 14.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
                             contentAlignment = Alignment.CenterStart,
                         ) {
                             if (showsComposerTextInput) {
@@ -508,7 +543,7 @@ fun GlassmorphicInputBar(
                                     onValueChange = { updated ->
                                         if (!isRecordingVoice) onTextChange(updated)
                                     },
-                                    textStyle = TextStyle(color = colors.primary, fontSize = 16.sp),
+                                    textStyle = composerInputStyle,
                                     visualTransformation = composerMarkupTransformation,
                                     cursorBrush = SolidColor(composerAccent),
                                     maxLines = 6,
@@ -524,8 +559,7 @@ fun GlassmorphicInputBar(
                                                     if (isVanishModeActive) R.string.chat_input_vanish_placeholder
                                                     else R.string.chat_input_placeholder,
                                                 ),
-                                                color = colors.secondary.copy(alpha = 0.65f),
-                                                fontSize = 16.sp,
+                                                style = composerPlaceholderStyle,
                                             )
                                         }
                                         inner()
@@ -552,70 +586,70 @@ fun GlassmorphicInputBar(
                                 )
                             }
                         }
-                    },
-                )
+                    }
 
-                Box(
-                    Modifier
-                        .size(ComposerControlSize)
-                        .zIndex(2f),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AnimatedContent(
-                        targetState = trailingMode,
-                        transitionSpec = {
-                            (fadeIn(tween(140)) + scaleIn(tween(180), initialScale = 0.78f))
-                                .togetherWith(
-                                    fadeOut(tween(110)) + scaleOut(tween(140), targetScale = 0.78f),
+                    Box(
+                        Modifier
+                            .size(ComposerControlSize)
+                            .zIndex(2f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AnimatedContent(
+                            targetState = trailingMode,
+                            transitionSpec = {
+                                (fadeIn(tween(140)) + scaleIn(tween(180), initialScale = 0.78f))
+                                    .togetherWith(
+                                        fadeOut(tween(110)) + scaleOut(tween(140), targetScale = 0.78f),
+                                    )
+                            },
+                            label = "chatComposerTrailingControl",
+                        ) { mode ->
+                            when (mode) {
+                                ComposerTrailingMode.LOCKED_SEND -> VoiceRecordingLockedSendButton(
+                                    accent = composerAccent,
+                                    onClick = ::sendCurrentContent,
                                 )
-                        },
-                        label = "chatComposerTrailingControl",
-                    ) { mode ->
-                        when (mode) {
-                            ComposerTrailingMode.LOCKED_SEND -> VoiceRecordingLockedSendButton(
-                                accent = composerAccent,
-                                onClick = ::sendCurrentContent,
-                            )
-                            ComposerTrailingMode.DRAFT_SEND -> ComposerFlatSendButton(
-                                accent = composerAccent,
-                                enabled = !isPreparingVoiceRecordingPreview,
-                                dimmed = isPreparingVoiceRecordingPreview,
-                                onClick = ::sendCurrentContent,
-                            )
-                            ComposerTrailingMode.EDIT_APPLY -> ComposerFlatApplyButton(
-                                accent = composerAccent,
-                                enabled = text.isNotBlank(),
-                                onClick = ::sendCurrentContent,
-                            )
-                            ComposerTrailingMode.TEXT_SEND -> ComposerFlatSendButton(
-                                accent = composerAccent,
-                                onClick = ::sendCurrentContent,
-                            )
-                            ComposerTrailingMode.VOICE -> VoiceRecordingGestureButton(
-                                tint = colors.mediaIconColor,
-                                isRecording = isRecordingVoice,
-                                activeInteractionId = recordingInteractionId,
-                                isLocked = isVoiceRecordingLocked,
-                                gestureState = voiceGestureState,
-                                glassInteractive = false,
-                                standaloneChrome = false,
-                                audioPower = audioPower,
-                                onStart = onStartVoiceRecording,
-                                onFinish = onFinishVoiceRecording,
-                                onLockChanged = onLockChanged,
-                                onPressBegan = {
-                                    // Solo elevar si el teclado ya está visible; foco sin IME
-                                    // no debe abrir teclado ni subir el compositor al grabar abajo.
-                                    if (!isKeyboardVisible) return@VoiceRecordingGestureButton
-                                    val keyboardInsetPx = measureRootKeyboardBottomInsetPx(rootView)
-                                    voiceGestureState.preserveKeyboardElevation = true
-                                    voiceGestureState.pinnedKeyboardBottomPx = keyboardInsetPx
-                                    focusRequester.requestFocus()
-                                    keyboardController?.show()
-                                },
-                                onAnchorBoundsChanged = onVoiceButtonAnchorBoundsChanged,
-                            )
-                            ComposerTrailingMode.EMPTY -> Unit
+                                ComposerTrailingMode.DRAFT_SEND -> ComposerFlatSendButton(
+                                    accent = composerAccent,
+                                    enabled = !isPreparingVoiceRecordingPreview,
+                                    dimmed = isPreparingVoiceRecordingPreview,
+                                    onClick = ::sendCurrentContent,
+                                )
+                                ComposerTrailingMode.EDIT_APPLY -> ComposerFlatApplyButton(
+                                    accent = composerAccent,
+                                    enabled = text.isNotBlank(),
+                                    onClick = ::sendCurrentContent,
+                                )
+                                ComposerTrailingMode.TEXT_SEND -> ComposerFlatSendButton(
+                                    accent = composerAccent,
+                                    onClick = ::sendCurrentContent,
+                                )
+                                ComposerTrailingMode.VOICE -> VoiceRecordingGestureButton(
+                                    tint = colors.mediaIconColor,
+                                    isRecording = isRecordingVoice,
+                                    activeInteractionId = recordingInteractionId,
+                                    isLocked = isVoiceRecordingLocked,
+                                    gestureState = voiceGestureState,
+                                    glassInteractive = false,
+                                    standaloneChrome = false,
+                                    audioPower = audioPower,
+                                    onStart = onStartVoiceRecording,
+                                    onFinish = onFinishVoiceRecording,
+                                    onLockChanged = onLockChanged,
+                                    onPressBegan = {
+                                        // Solo elevar si el teclado ya está visible; foco sin IME
+                                        // no debe abrir teclado ni subir el compositor al grabar abajo.
+                                        if (!isKeyboardVisible) return@VoiceRecordingGestureButton
+                                        val keyboardInsetPx = measureRootKeyboardBottomInsetPx(rootView)
+                                        voiceGestureState.preserveKeyboardElevation = true
+                                        voiceGestureState.pinnedKeyboardBottomPx = keyboardInsetPx
+                                        focusRequester.requestFocus()
+                                        keyboardController?.show()
+                                    },
+                                    onAnchorBoundsChanged = onVoiceButtonAnchorBoundsChanged,
+                                )
+                                ComposerTrailingMode.EMPTY -> Unit
+                            }
                         }
                     }
                 }
@@ -653,19 +687,25 @@ private fun ComposerFlatSendButton(
     Box(
         Modifier
             .size(ComposerControlSize)
-            .graphicsLayer { alpha = if (dimmed) 0.45f else 1f }
-            .clip(CircleShape)
-            .background(accent)
-            .semantics { contentDescription = sendLabel }
-            .clickable(enabled = enabled, onClick = onClick),
+            .semantics { contentDescription = sendLabel },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            Icons.AutoMirrored.Filled.Send,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(18.dp),
-        )
+        Box(
+            Modifier
+                .size(ComposerInlineActionSize)
+                .graphicsLayer { alpha = if (dimmed) 0.45f else 1f }
+                .clip(CircleShape)
+                .background(accent)
+                .clickable(enabled = enabled, onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.Send,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(ComposerInlineSendIconSize),
+            )
+        }
     }
 }
 
@@ -679,19 +719,25 @@ private fun ComposerFlatApplyButton(
     Box(
         Modifier
             .size(ComposerControlSize)
-            .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
-            .clip(CircleShape)
-            .background(accent)
-            .semantics { contentDescription = applyLabel }
-            .clickable(enabled = enabled, onClick = onClick),
+            .semantics { contentDescription = applyLabel },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            Icons.Default.Check,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(19.dp),
-        )
+        Box(
+            Modifier
+                .size(ComposerInlineActionSize)
+                .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
+                .clip(CircleShape)
+                .background(accent)
+                .clickable(enabled = enabled, onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(ComposerInlineApplyIconSize),
+            )
+        }
     }
 }
 

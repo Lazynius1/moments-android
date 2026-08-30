@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -51,7 +52,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -79,14 +83,37 @@ data class ChatFailedMessageRetryAction(
 
 val LocalChatFailedMessageRetryAction = staticCompositionLocalOf<ChatFailedMessageRetryAction?> { null }
 
-/** ≡ iOS `ChatComposerReplyHeader.fieldCornerRadius` / `composerFieldShape`. */
-private val ComposerFieldCornerRadius = 20.dp
+/** ≡ iOS `ChatComposerReplyHeader.fieldCornerRadius` / cápsula unificada del compositor. */
+private val ComposerFieldCornerRadius = 22.dp
+private val ComposerUnifiedCornerRadius = 26.dp
 private val ComposerReplyHeaderTopShape = RoundedCornerShape(
-    topStart = ComposerFieldCornerRadius,
-    topEnd = ComposerFieldCornerRadius,
+    topStart = ComposerUnifiedCornerRadius,
+    topEnd = ComposerUnifiedCornerRadius,
 )
 
 enum class ChatComposerContextMode { Reply, Edit }
+
+/** ≡ iOS reply/edit header typography — sin includeFontPadding para evitar recorte vertical. */
+private val ComposerContextTitleStyle = TextStyle(
+    fontSize = 12.sp,
+    lineHeight = 14.sp,
+    fontWeight = FontWeight.SemiBold,
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Center,
+        trim = LineHeightStyle.Trim.None,
+    ),
+)
+
+private val ComposerContextPreviewStyle = TextStyle(
+    fontSize = 13.sp,
+    lineHeight = 16.sp,
+    platformStyle = PlatformTextStyle(includeFontPadding = false),
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Center,
+        trim = LineHeightStyle.Trim.None,
+    ),
+)
 
 @Composable
 fun ChatComposerReplyHeader(
@@ -95,6 +122,7 @@ fun ChatComposerReplyHeader(
     mode: ChatComposerContextMode,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    topCornerRadius: Dp = ComposerUnifiedCornerRadius,
 ) {
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
@@ -114,13 +142,15 @@ fun ChatComposerReplyHeader(
     }
     val preview = message.preview(context)
     val cancelLabel = stringResource(R.string.common_cancel)
+    val headerTopShape = RoundedCornerShape(topStart = topCornerRadius, topEnd = topCornerRadius)
     val content: @Composable () -> Unit = {
         Row(
             modifier
                 .fillMaxWidth()
-                .height(54.dp)
-                .clip(ComposerReplyHeaderTopShape)
-                .background(surface, ComposerReplyHeaderTopShape)
+                // ≡ iOS `.frame(minHeight: 54)` — altura mínima, no fija (evita recortar preview).
+                .defaultMinSize(minHeight = 54.dp)
+                .clip(headerTopShape)
+                .background(surface, headerTopShape)
                 .padding(horizontal = 8.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(9.dp),
@@ -132,12 +162,21 @@ fun ChatComposerReplyHeader(
                     .clip(RoundedCornerShape(50))
                     .background(accent),
             )
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(name, color = accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Column(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    name,
+                    color = accent,
+                    style = ComposerContextTitleStyle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Text(
                     preview,
                     color = if (isDark) Color.White.copy(0.72f) else Color.Black.copy(0.68f),
-                    fontSize = 13.sp,
+                    style = ComposerContextPreviewStyle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -164,7 +203,7 @@ fun ChatComposerReplyHeader(
     if (message.isVanishModeMessage) {
         ScreenshotProtectedView(
             isProtected = true,
-            cornerRadius = ComposerFieldCornerRadius,
+            cornerRadius = topCornerRadius,
             mode = ScreenshotProtectionMode.WindowFlag,
         ) { content() }
     } else {
