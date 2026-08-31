@@ -15,12 +15,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -39,9 +42,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -54,11 +59,14 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
+import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.coordinators.CoordinatorNavigationEvent
 import com.moments.android.coordinators.NavigationEventBus
+import com.moments.android.models.AppUser
 import com.moments.android.models.Moment
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.incognito.IncognitoModeService
@@ -94,6 +102,7 @@ import com.moments.android.views.settings.SettingsView
 import com.moments.android.views.story.StoriesView
 import com.moments.android.views.story.StoryViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /** Paleta que declara `ProfileView.swift`, con equivalente adaptativo Compose. */
@@ -309,6 +318,8 @@ fun ProfileView(
     var showEditProfile by remember { mutableStateOf(false) }
     var showQr by remember { mutableStateOf(false) }
     var showIncognito by remember { mutableStateOf(false) }
+    var avatarFlipBounds by remember { mutableStateOf(Rect.Zero) }
+    var menuFlipBounds by remember { mutableStateOf(Rect.Zero) }
     var showProfileImage by remember { mutableStateOf(false) }
     var showStories by remember { mutableStateOf(false) }
     var showSavedManager by remember { mutableStateOf(false) }
@@ -327,7 +338,7 @@ fun ProfileView(
     )
 
     val suppressTabBar =
-        showSettings || showEditProfile || showSavedManager ||
+        showSettings || showEditProfile || showSavedManager || showQr || showIncognito ||
             momentDestination != null || heroCoordinator.isInteractive
     LaunchedEffect(suppressTabBar) {
         onSuppressTabBarChange(suppressTabBar)
@@ -441,10 +452,26 @@ fun ProfileView(
                     onShowStory = { actions.onShowStory(); showStories = true },
                     onShowProfileImage = { actions.onShowProfileImage(); showProfileImage = true },
                     onShowNotifications = actions.onShowNotifications,
-                    onShowQr = { actions.onShowQr(); showQr = true },
-                    onShowIncognito = { actions.onShowIncognito(); showIncognito = true },
+                    onShowQr = {
+                        actions.onShowQr()
+                        scope.launch {
+                            delay(120)
+                            showQr = true
+                        }
+                    },
+                    onShowIncognito = {
+                        actions.onShowIncognito()
+                        scope.launch {
+                            delay(120)
+                            showIncognito = true
+                        }
+                    },
                     onShowSettings = { actions.onOpenSettings(); showSettings = true },
                     isIncognitoActive = isIncognitoActive,
+                    onAvatarBoundsChange = { avatarFlipBounds = it },
+                    onMenuBoundsChange = { menuFlipBounds = it },
+                    hideAvatarForFlip = showQr,
+                    hideMenuForFlip = showIncognito,
                     onMomentLongPress = { moment, index, _ ->
                         heroCoordinator.openMenu(moment, index)
                     },
@@ -519,20 +546,35 @@ fun ProfileView(
                         onDismiss = { momentDestination = null },
                     )
                 }
+
+                if (showQr) {
+                    ProfileContextFlipTransition(
+                        sourceBounds = avatarFlipBounds,
+                        configuration = ProfileContextFlipConfiguration.Qr,
+                        onDismiss = { showQr = false },
+                        modifier = Modifier.zIndex(40f),
+                        source = { ProfileQrAvatarFace(viewModel.userProfile) },
+                        destination = { close ->
+                            QRCodeView(onNavigateBack = close)
+                        },
+                    )
+                }
+
+                if (showIncognito) {
+                    ProfileContextFlipTransition(
+                        sourceBounds = menuFlipBounds,
+                        configuration = ProfileContextFlipConfiguration.Incognito,
+                        onDismiss = { showIncognito = false },
+                        modifier = Modifier.zIndex(40f),
+                        source = { ProfileIncognitoMenuFace() },
+                        destination = {
+                            IncognitoModeSheet(
+                                Modifier.fillMaxSize().padding(top = 18.dp),
+                            )
+                        },
+                    )
+                }
             }
-        }
-    }
-
-    if (showQr) {
-        MomentsModalSheet(onDismissRequest = { showQr = false }, largeOnly = true) {
-            QRCodeView(user = viewModel.userProfile, onNavigateBack = { showQr = false })
-        }
-    }
-
-    if (showIncognito) {
-        // ≡ iOS `.presentationDetents([.fraction(0.64), .large])` → medium+large
-        MomentsModalSheet(onDismissRequest = { showIncognito = false }, largeOnly = false) {
-            IncognitoModeSheet()
         }
     }
 
@@ -611,6 +653,51 @@ fun ProfileView(
                     Text(stringResource(R.string.common_cancel))
                 }
             },
+        )
+    }
+}
+
+@Composable
+internal fun ProfileQrAvatarFace(user: AppUser?) {
+    val dark = isSystemInDarkTheme()
+    val fallback = if (dark) Color(0xFF182429) else Color(0xFFEAF0F2)
+    Box(
+        Modifier.fillMaxSize().background(fallback),
+        contentAlignment = Alignment.Center,
+    ) {
+        val imagePath = user?.profileImagePath
+        if (!imagePath.isNullOrBlank()) {
+            AsyncImage(
+                model = imagePath,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Icon(
+                Icons.Filled.Person,
+                contentDescription = null,
+                tint = Color(0xFF84939A),
+                modifier = Modifier.size(54.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileIncognitoMenuFace() {
+    val dark = isSystemInDarkTheme()
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(if (dark) Color(0xFF151D21) else Color.White),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Filled.MoreHoriz,
+            contentDescription = null,
+            tint = if (dark) Color.White else Color(0xFF0B1215),
+            modifier = Modifier.size(22.dp),
         )
     }
 }

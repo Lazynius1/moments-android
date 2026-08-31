@@ -42,10 +42,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -90,6 +93,8 @@ fun ProfileOwnPinnedTopChrome(
     onShowQrCode: () -> Unit,
     onShowIncognito: () -> Unit,
     onShowSettings: () -> Unit,
+    onMenuBoundsChange: (Rect) -> Unit = {},
+    hideMenuForFlip: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val dark = isSystemInDarkTheme()
@@ -139,10 +144,13 @@ fun ProfileOwnPinnedTopChrome(
                         onClick = { menuExpanded = true },
                         standaloneGlass = false,
                         accessibilityLabel = stringResource(R.string.profile_header_more),
-                        modifier = Modifier.profileMomentZoomSource(
-                            sourceID = ProfileOwnZoomSource.SETTINGS,
-                            cornerRadius = ProfileChromeGlassMetrics.controlSize / 2,
-                        ),
+                        modifier = Modifier
+                            .alpha(if (hideMenuForFlip) 0f else 1f)
+                            .onGloballyPositioned { onMenuBoundsChange(it.boundsInRoot()) }
+                            .profileMomentZoomSource(
+                                sourceID = ProfileOwnZoomSource.SETTINGS,
+                                cornerRadius = ProfileChromeGlassMetrics.controlSize / 2,
+                            ),
                     )
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                         DropdownMenuItem(
@@ -180,6 +188,8 @@ fun ModernProfileHeader(
     onEditProfile: () -> Unit,
     onShowStoryViewer: () -> Unit,
     onShowProfileImage: () -> Unit,
+    onAvatarBoundsChange: (Rect) -> Unit = {},
+    hideAvatarForFlip: Boolean = false,
     onIdentityMinY: (Float) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -209,6 +219,9 @@ fun ModernProfileHeader(
                         if (storyViewModel.hasActiveStory && uid != null) onShowStoryViewer()
                         else onShowProfileImage()
                     },
+                    modifier = Modifier
+                        .alpha(if (hideAvatarForFlip) 0f else 1f)
+                        .onGloballyPositioned { onAvatarBoundsChange(it.boundsInRoot()) },
                 )
                 ProfileAvatarNoteView(
                     note = user?.profileNote,
@@ -304,6 +317,7 @@ private fun ProfileHeaderAvatar(
     storyCount: Int,
     storyAudiences: List<String?>,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val dark = isSystemInDarkTheme()
     val material = if (dark) Color(0xFF182429) else Color(0xFFEAF0F2)
@@ -314,7 +328,7 @@ private fun ProfileHeaderAvatar(
     val outerSize = avatarSize + ringLineWidth + 2.dp
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(outerSize)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,

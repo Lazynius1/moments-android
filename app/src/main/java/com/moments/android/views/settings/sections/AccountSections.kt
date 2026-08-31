@@ -24,8 +24,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -159,8 +166,10 @@ fun ProfileSection(username: String) {
 @Composable
 fun AccountSection(
     onShowPersonalInfo: () -> Unit,
-    onShowQRCode: () -> Unit,
+    onShowQRCode: (Rect) -> Unit,
+    hideQRCodeRow: Boolean = false,
 ) {
+    var qrBounds by remember { mutableStateOf(Rect.Zero) }
     Column {
         SettingsRow(
             icon = Icons.Filled.Person,
@@ -172,7 +181,12 @@ fun AccountSection(
             icon = Icons.Filled.QrCode,
             title = stringResource(R.string.settings_sections_qr_code),
             subtitle = stringResource(R.string.settings_sections_qr_code_subtitle),
-            onClick = onShowQRCode,
+            modifier = Modifier
+                .alpha(if (hideQRCodeRow) 0f else 1f)
+                .onGloballyPositioned { coordinates ->
+                    if (!hideQRCodeRow) qrBounds = coordinates.boundsInRoot()
+                },
+            onClick = { onShowQRCode(qrBounds) },
         )
     }
 }

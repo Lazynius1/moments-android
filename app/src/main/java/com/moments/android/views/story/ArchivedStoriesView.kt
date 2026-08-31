@@ -35,13 +35,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,7 +49,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -58,14 +57,19 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -76,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -96,12 +101,13 @@ import com.moments.android.views.components.MomentRefreshOverlayHost
 import com.moments.android.views.components.momentRefresh
 import com.moments.android.views.feed.maps.FeedMaps
 import com.moments.android.views.profile.highlights.HighlightStoryDateBadge
-import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.story.storyviewer.GlassmorphicEmptyState
 import com.moments.android.views.story.storyviewer.StoryViewerScreen
 import com.moments.android.views.story.storyviewer.StoryRevealThumbnailPolicy
 import com.moments.android.views.story.storyviewer.StoryStaticPreviewSurface
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Date
@@ -113,7 +119,7 @@ enum class ArchiveDisplayMode { STORIES, CALENDAR, MAP }
 
 /**
  * Port de `ArchiveView` (`archived stories.swift`).
- * Grid + square card + day viewer + activity sheet + calendar + map.
+ * Grid + square card + day viewer + activity flip + calendar + map.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,6 +127,8 @@ fun ArchivedStoriesView(
     onNavigateBack: () -> Unit = {},
     /** ≡ iOS `ArchiveView(embedInNavigation:false, showsCustomDismiss:false)` — chrome lo aporta el host. */
     showTopBar: Boolean = true,
+    controlledDisplayMode: ArchiveDisplayMode? = null,
+    onDisplayModeChange: ((ArchiveDisplayMode) -> Unit)? = null,
     viewModel: ArchiveViewModel = viewModel(),
 ) {
     val isDark = isSystemInDarkTheme()
@@ -128,12 +136,21 @@ fun ArchivedStoriesView(
     val textColor = if (isDark) Color.White else Color.Black
     val secondaryColor = if (isDark) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.5f)
 
-    var displayMode by remember { mutableStateOf(ArchiveDisplayMode.STORIES) }
+    var internalDisplayMode by remember { mutableStateOf(ArchiveDisplayMode.STORIES) }
+    val displayMode = controlledDisplayMode ?: internalDisplayMode
+    val updateDisplayMode: (ArchiveDisplayMode) -> Unit = { mode ->
+        if (onDisplayModeChange != null) {
+            onDisplayModeChange(mode)
+        } else {
+            internalDisplayMode = mode
+        }
+    }
     val storiesForGrid = viewModel.storiesForGrid
     // ≡ StoryViewerPresentation / StoryStatsPresentation
     var viewerStories by remember { mutableStateOf<List<Story>?>(null) }
     var viewerInitialIndex by remember { mutableIntStateOf(0) }
-    var statsStory by remember { mutableStateOf<Story?>(null) }
+    var statsPresentation by remember { mutableStateOf<StoryStatsFlipPresentation?>(null) }
+    var archiveRootBounds by remember { mutableStateOf(Rect.Zero) }
     val storyViewModel: StoryViewModel = viewModel()
 
     LaunchedEffect(Unit) {
@@ -144,44 +161,59 @@ fun ArchivedStoriesView(
         BackHandler(onBack = onNavigateBack)
     }
 
-    Scaffold(
-        containerColor = backgroundColor,
-        topBar = {
-            if (showTopBar) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = stringResource(R.string.archived_stories_header_title),
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = textColor,
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.common_back),
-                                tint = textColor,
+    Box(
+        Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { coordinates ->
+                archiveRootBounds = coordinates.boundsInRoot()
+            },
+    ) {
+        Scaffold(
+            containerColor = backgroundColor,
+            topBar = {
+                if (showTopBar) {
+                    CenterAlignedTopAppBar(
+                        title = {
+                            Text(
+                                text = stringResource(R.string.archived_stories_header_title),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = textColor,
+                                maxLines = 1,
                             )
-                        }
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onNavigateBack) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.common_back),
+                                    tint = textColor,
+                                )
+                            }
+                        },
+                        actions = {
+                            ArchiveDisplayModeActions(
+                                displayMode = displayMode,
+                                onDisplayModeChange = updateDisplayMode,
+                                contentColor = textColor,
+                            )
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = backgroundColor),
+                    )
+                }
+            },
+        ) { innerPadding ->
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .consumeWindowInsets(innerPadding)
+                    // ≡ iOS `.momentRefresh { await reloadArchivedStories() }`
+                    .momentRefresh {
+                        viewModel.loadArchivedStories()
+                        kotlinx.coroutines.delay(700)
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = backgroundColor),
-                )
-            }
-        },
-    ) { innerPadding ->
-        Box(
-            Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .consumeWindowInsets(innerPadding)
-                // ≡ iOS `.momentRefresh { await reloadArchivedStories() }`
-                .momentRefresh {
-                    viewModel.loadArchivedStories()
-                    kotlinx.coroutines.delay(700)
-                },
-        ) {
+            ) {
             when {
                 viewModel.isLoading -> {
                     Column(
@@ -235,43 +267,6 @@ fun ArchivedStoriesView(
 
                 else -> {
                     Column(Modifier.fillMaxSize()) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.Center,
-                        ) {
-                            Row(
-                                Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(textColor.copy(alpha = 0.08f))
-                                    .padding(3.dp),
-                            ) {
-                                val modes = listOf(
-                                    ArchiveDisplayMode.STORIES to Icons.Filled.GridView,
-                                    ArchiveDisplayMode.CALENDAR to Icons.Filled.CalendarMonth,
-                                    ArchiveDisplayMode.MAP to Icons.Filled.Map,
-                                )
-                                modes.forEach { (mode, icon) ->
-                                    val selected = displayMode == mode
-                                    Box(
-                                        Modifier
-                                            .clip(RoundedCornerShape(18.dp))
-                                            .background(if (selected) Color(0xFF007AFF) else Color.Transparent)
-                                            .clickable { displayMode = mode }
-                                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                                    ) {
-                                        Icon(
-                                            icon,
-                                            contentDescription = null,
-                                            tint = if (selected) Color.White else secondaryColor,
-                                            modifier = Modifier.size(18.dp),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
                         when (displayMode) {
                             ArchiveDisplayMode.STORIES -> {
                                 if (storiesForGrid.isEmpty()) {
@@ -294,11 +289,17 @@ fun ArchivedStoriesView(
                                         items(storiesForGrid, key = { it.id ?: it.hashCode().toString() }) { story ->
                                             ArchiveStorySquareCard(
                                                 story = story,
+                                                isHidden = statsPresentation?.story === story,
                                                 onTap = {
                                                     viewerInitialIndex = 0
                                                     viewerStories = listOf(story)
                                                 },
-                                                onStatsTap = { statsStory = story },
+                                                onStatsTap = { bounds ->
+                                                    statsPresentation = StoryStatsFlipPresentation(
+                                                        story = story,
+                                                        sourceBounds = bounds.relativeTo(archiveRootBounds),
+                                                    )
+                                                },
                                             )
                                         }
                                     }
@@ -331,7 +332,17 @@ fun ArchivedStoriesView(
                     }
                 }
             }
-            MomentRefreshOverlayHost(Modifier.align(Alignment.TopCenter))
+                MomentRefreshOverlayHost(Modifier.align(Alignment.TopCenter))
+            }
+        }
+
+        statsPresentation?.let { presentation ->
+            StoryActivityFlipTransition(
+                story = presentation.story,
+                sourceBounds = presentation.sourceBounds,
+                onDismiss = { statsPresentation = null },
+                modifier = Modifier.zIndex(20f),
+            )
         }
     }
 
@@ -353,32 +364,106 @@ fun ArchivedStoriesView(
         }
     }
 
-    // ≡ .sheet StoryStatsView (medium+large)
-    statsStory?.let { story ->
-        MomentsModalSheet(
-            onDismissRequest = { statsStory = null },
-            largeOnly = false,
-        ) {
-            StoryStatsView(
-                story = story,
-                onDismiss = { statsStory = null },
-                modifier = Modifier.fillMaxSize(),
+}
+
+private data class StoryStatsFlipPresentation(
+    val story: Story,
+    val sourceBounds: Rect,
+)
+
+@Composable
+fun ArchiveDisplayModeActions(
+    displayMode: ArchiveDisplayMode,
+    onDisplayModeChange: (ArchiveDisplayMode) -> Unit,
+    contentColor: Color,
+) {
+    val selectedColor = Color(0xFF0A84FF)
+
+    IconButton(
+        onClick = {
+            onDisplayModeChange(
+                if (displayMode == ArchiveDisplayMode.CALENDAR) {
+                    ArchiveDisplayMode.STORIES
+                } else {
+                    ArchiveDisplayMode.CALENDAR
+                },
             )
-        }
+        },
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(
+                if (displayMode == ArchiveDisplayMode.CALENDAR) {
+                    selectedColor.copy(alpha = 0.14f)
+                } else {
+                    Color.Transparent
+                },
+            ),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.CalendarMonth,
+            contentDescription = stringResource(R.string.archived_stories_mode_calendar),
+            tint = if (displayMode == ArchiveDisplayMode.CALENDAR) selectedColor else contentColor,
+            modifier = Modifier.size(19.dp),
+        )
+    }
+
+    IconButton(
+        onClick = {
+            onDisplayModeChange(
+                if (displayMode == ArchiveDisplayMode.MAP) {
+                    ArchiveDisplayMode.STORIES
+                } else {
+                    ArchiveDisplayMode.MAP
+                },
+            )
+        },
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(
+                if (displayMode == ArchiveDisplayMode.MAP) {
+                    selectedColor.copy(alpha = 0.14f)
+                } else {
+                    Color.Transparent
+                },
+            ),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Map,
+            contentDescription = stringResource(R.string.archived_stories_mode_map),
+            tint = if (displayMode == ArchiveDisplayMode.MAP) selectedColor else contentColor,
+            modifier = Modifier.size(19.dp),
+        )
     }
 }
+
+private fun Rect.relativeTo(container: Rect): Rect = Rect(
+    left = left - container.left,
+    top = top - container.top,
+    right = right - container.left,
+    bottom = bottom - container.top,
+)
 
 /** Port de `ArchiveStoryCardVisual`. */
 @Composable
 fun ArchiveStoryCardVisual(
     story: Story,
     cornerRadius: Dp = 0.dp,
+    keepsArchiveAspectRatio: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier
-            .fillMaxWidth()
-            .aspectRatio(9f / 16f)
+            .then(
+                if (keepsArchiveAspectRatio) {
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(9f / 16f)
+                } else {
+                    Modifier.fillMaxSize()
+                },
+            )
             .clip(RoundedCornerShape(cornerRadius))
             .background(Color.Gray.copy(0.26f)),
     ) {
@@ -418,14 +503,21 @@ fun ArchiveStoryCardVisual(
 @Composable
 private fun ArchiveStorySquareCard(
     story: Story,
+    isHidden: Boolean,
     onTap: () -> Unit,
-    onStatsTap: () -> Unit,
+    onStatsTap: (Rect) -> Unit,
 ) {
     // ≡ contextMenu "Ver actividad"
     var menuExpanded by remember { mutableStateOf(false) }
+    var cardBounds by remember { mutableStateOf(Rect.Zero) }
+    val scope = rememberCoroutineScope()
     Box(
         Modifier
             .fillMaxWidth()
+            .alpha(if (isHidden) 0f else 1f)
+            .onGloballyPositioned { coordinates ->
+                cardBounds = coordinates.boundsInRoot()
+            }
             .combinedClickable(
                 onClick = onTap,
                 onLongClick = { menuExpanded = true },
@@ -440,7 +532,11 @@ private fun ArchiveStorySquareCard(
                 text = { Text(stringResource(R.string.archived_stories_view_activity)) },
                 onClick = {
                     menuExpanded = false
-                    onStatsTap()
+                    scope.launch {
+                        // Igual que iOS: el popup desaparece antes de montar el host del flip.
+                        delay(90)
+                        onStatsTap(cardBounds)
+                    }
                 },
             )
         }

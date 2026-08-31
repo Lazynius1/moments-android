@@ -43,6 +43,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -144,6 +146,10 @@ fun ModernProfileContentView(
     onShowIncognito: () -> Unit,
     onShowSettings: () -> Unit,
     isIncognitoActive: Boolean,
+    onAvatarBoundsChange: (Rect) -> Unit = {},
+    onMenuBoundsChange: (Rect) -> Unit = {},
+    hideAvatarForFlip: Boolean = false,
+    hideMenuForFlip: Boolean = false,
     onMomentLongPress: (Moment, Int, ProfileMomentZoomFeedKind) -> Unit = { _, _, _ -> },
     onRefreshSaved: () -> Unit = {},
     openConnectionsRoute: ProfileConnectionsRoute? = null,
@@ -226,6 +232,8 @@ fun ModernProfileContentView(
                         onEditProfile = onEditProfile,
                         onShowStoryViewer = onShowStory,
                         onShowProfileImage = onShowProfileImage,
+                        onAvatarBoundsChange = onAvatarBoundsChange,
+                        hideAvatarForFlip = hideAvatarForFlip,
                         modifier = Modifier.padding(
                             top = ProfileHeaderCollapseMetrics.headerTopPadding,
                             bottom = 4.dp,
@@ -325,6 +333,8 @@ fun ModernProfileContentView(
                             onShowQrCode = onShowQr,
                             onShowIncognito = onShowIncognito,
                             onShowSettings = onShowSettings,
+                            onMenuBoundsChange = onMenuBoundsChange,
+                            hideMenuForFlip = hideMenuForFlip,
                         )
                     },
                     pinnedTabs = {

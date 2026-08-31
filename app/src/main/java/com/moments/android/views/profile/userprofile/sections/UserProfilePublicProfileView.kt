@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -70,6 +71,8 @@ fun UserModernPublicProfileView(
     onOpenMessage: () -> Unit,
     onShowProfileImageFullscreen: () -> Unit,
     onShowQrCode: () -> Unit,
+    onAvatarBoundsChange: (Rect) -> Unit = {},
+    hideAvatarForFlip: Boolean = false,
     onShowReport: () -> Unit,
     onOpenSocial: (SocialConnectionTab) -> Unit,
     onOpenMoment: (moments: List<com.moments.android.models.Moment>, index: Int) -> Unit,
@@ -129,6 +132,8 @@ fun UserModernPublicProfileView(
                 onOpenStories = onOpenStories,
                 onShowProfileImageFullscreen = onShowProfileImageFullscreen,
                 onOpenMessage = onOpenMessage,
+                onAvatarBoundsChange = onAvatarBoundsChange,
+                hideAvatarForFlip = hideAvatarForFlip,
                 modifier = Modifier
                     .padding(top = ProfileHeaderCollapseMetrics.headerTopPadding)
                     .padding(bottom = 4.dp),

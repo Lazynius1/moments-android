@@ -10,12 +10,16 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.NotificationManagerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.core.content.ContextCompat
 import com.moments.android.views.permission.microphone.MicrophonePermissionView
 import com.moments.android.views.permission.notifications.NotificationsPermissionView
@@ -105,7 +109,7 @@ class PermissionPrimerGate(val kind: Kind) {
             emptyArray()
         }
         // ≡ PHPhotoLibrary .readWrite
-        Kind.PHOTOS -> photoLibraryPermissions()
+        Kind.PHOTOS -> photoLibraryPermissionsToRequest()
         // ≡ PHPhotoLibrary .addOnly — API 29+ MediaStore insert sin runtime perm.
         Kind.PHOTOS_SAVE -> if (Build.VERSION.SDK_INT >= 29) {
             emptyArray()
@@ -116,6 +120,10 @@ class PermissionPrimerGate(val kind: Kind) {
 
     private fun isAuthorized(context: Context): Boolean {
         val perms = permissions()
+        if (kind == Kind.PHOTOS_SAVE && Build.VERSION.SDK_INT >= 29) {
+            // MediaStore insert on Q+ — no runtime permission; do not tie to SharedPreferences.
+            return true
+        }
         if (kind == Kind.PHOTOS) {
             return photoLibraryAccess(context) != PhotoLibraryAccess.DENIED
         }
@@ -180,11 +188,25 @@ fun PermissionPrimerGateHost(
     gate: PermissionPrimerGate = remember { PermissionPrimerGate(PermissionPrimerGate.Kind.PHOTOS) },
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
         gate.onNativeResult(context)
     }
+
+    DisposableEffect(lifecycleOwner, gate.isPresenting) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && gate.isPresenting) {
+                if (gate.currentState(context) == PermissionPrimerGate.State.AUTHORIZED) {
+                    gate.finish(granted = true)
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     if (!gate.isPresenting) return
 
     val primary = {

@@ -161,9 +161,9 @@ fun StoryStatsView(
                 // ≡ statsHeader
                 Box(
                     Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 22.dp)
-                        .padding(top = 0.dp, bottom = 8.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 22.dp)
+            .padding(top = 12.dp, bottom = 8.dp),
                 ) {
                     Text(
                         stringResource(R.string.archived_stories_stats_title),

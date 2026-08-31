@@ -1,4 +1,76 @@
 <resources>
+    <!-- Interest catalog v2 -->
+    <string name="interest_photography">Fotografia</string>
+    <string name="interest_travel">Viatges</string>
+    <string name="interest_music">Música</string>
+    <string name="interest_movies">Cinema i televisió</string>
+    <string name="interest_art">Art</string>
+    <string name="interest_sports">Esports</string>
+    <string name="interest_books">Lectura</string>
+    <string name="interest_cooking">Cuina</string>
+    <string name="interest_technology">Tecnologia</string>
+    <string name="interest_fashion">Moda</string>
+    <string name="interest_gaming">Videojocs</string>
+    <string name="interest_fitness">Fitness</string>
+    <string name="interest_nature">Natura</string>
+    <string name="interest_animals">Animals</string>
+    <string name="interest_food">Gastronomia</string>
+    <string name="interest_science">Ciència</string>
+    <string name="interest_history">Història</string>
+    <string name="interest_politics">Política</string>
+    <string name="interest_business">Negocis</string>
+    <string name="interest_health">Salut</string>
+    <string name="interest_style">Estil personal</string>
+    <string name="interest_dance">Dansa</string>
+    <string name="interest_writing">Escriptura</string>
+    <string name="interest_diy">DIY</string>
+    <string name="interest_cars">Cotxes</string>
+    <string name="interest_theater">Teatre</string>
+    <string name="interest_meditation">Meditació</string>
+    <string name="interest_entrepreneurship">Startups</string>
+    <string name="interest_yoga">Ioga</string>
+    <string name="interest_coffee">Cafè</string>
+    <string name="interest_astronomy">Astronomia</string>
+    <string name="interest_podcasts">Pòdcasts</string>
+    <string name="interest_pets">Animals de companyia</string>
+    <string name="interest_design">Disseny</string>
+    <string name="interest_programming">Programació</string>
+    <string name="interest_kpop">K-pop</string>
+    <string name="interest_anime">Anime</string>
+    <string name="interest_hiking">Senderisme</string>
+    <string name="interest_cycling">Ciclisme</string>
+    <string name="interest_running">Running</string>
+    <string name="interest_climbing">Escalada</string>
+    <string name="interest_surfing">Surf</string>
+    <string name="interest_football">Futbol</string>
+    <string name="interest_basketball">Bàsquet</string>
+    <string name="interest_swimming">Natació</string>
+    <string name="interest_skateboarding">Skateboarding</string>
+    <string name="interest_vinyl">Discos de vinil</string>
+    <string name="interest_concerts">Música en directe</string>
+    <string name="interest_hiphop">Hip-hop</string>
+    <string name="interest_electronic_music">Música electrònica</string>
+    <string name="interest_baking">Rebosteria</string>
+    <string name="interest_wine">Vi</string>
+    <string name="interest_craft_beer">Cervesa artesana</string>
+    <string name="interest_beauty">Bellesa</string>
+    <string name="interest_sneakers">Sneakers</string>
+    <string name="interest_tattoos">Tatuatges</string>
+    <string name="interest_plants">Plantes d\'interior</string>
+    <string name="interest_gardening">Jardineria</string>
+    <string name="interest_languages">Llengües</string>
+    <string name="interest_volunteering">Voluntariat</string>
+    <string name="interest_sustainability">Sostenibilitat</string>
+    <string name="interest_cosplay">Cosplay</string>
+    <string name="interest_true_crime">Crim real</string>
+    <string name="interest_collecting">Col·leccionisme</string>
+    <string name="interest_crafts">Manualitats</string>
+    <string name="interest_streaming">Streaming</string>
+    <string name="interest_ai">AI</string>
+    <string name="interest_personal_finance">Finances personals</string>
+    <string name="interest_philosophy">Filosofia</string>
+    <string name="interest_chess">Escacs</string>
+    <string name="interest_board_games">Jocs de taula</string>
     <string name="brand_wordmark">moments</string>
     <string name="welcome_create_account">Crea un compte</string>
     <string name="welcome_have_account">Ja tens un compte?</string>
@@ -57,43 +129,7 @@
     <string name="register_username_taken">Aquest nom d’usuari ja existeix.</string>
     <string name="register_profile_error">No s’ha pogut crear el perfil.</string>
     <string name="register_account_error">No s’ha pogut crear el compte.</string>
-    <string name="interest_photography">Fotografia</string>
-    <string name="interest_travel">Viatges</string>
-    <string name="interest_music">Música</string>
-    <string name="interest_movies">Cinema</string>
-    <string name="interest_art">Art</string>
-    <string name="interest_sports">Esports</string>
-    <string name="interest_books">Llibres</string>
-    <string name="interest_cooking">Cuina</string>
-    <string name="interest_technology">Tecnologia</string>
-    <string name="interest_fashion">Moda</string>
-    <string name="interest_gaming">Videojocs</string>
-    <string name="interest_fitness">Fitness</string>
-    <string name="interest_nature">Natura</string>
-    <string name="interest_animals">Animals</string>
-    <string name="interest_food">Menjar</string>
-    <string name="interest_science">Ciència</string>
-    <string name="interest_history">Història</string>
-    <string name="interest_politics">Política</string>
-    <string name="interest_business">Negocis</string>
-    <string name="interest_health">Salut</string>
-    <string name="interest_style">Estil</string>
-    <string name="interest_dance">Ball</string>
-    <string name="interest_writing">Escriptura</string>
-    <string name="interest_diy">Bricolatge</string>
-    <string name="interest_cars">Cotxes</string>
-    <string name="interest_theater">Teatre</string>
-    <string name="interest_meditation">Meditació</string>
-    <string name="interest_entrepreneurship">Emprenedoria</string>
-    <string name="interest_yoga">Ioga</string>
-    <string name="interest_coffee">Cafè</string>
     <string name="interest_viajar">Viatjar</string>
-    <string name="interest_astronomy">Astronomia</string>
-    <string name="interest_podcasts">Podcasts</string>
-    <string name="interest_pets">Mascotes</string>
-    <string name="interest_design">Disseny</string>
-    <string name="interest_programming">Programació</string>
-    <string name="interest_kpop">Kpop</string>
     <string name="common_back">Enrere</string>
     <string name="common_close">Tancar</string>
     <string name="common_cancel">Cancel·lar</string>
@@ -145,19 +181,39 @@
     <string name="privacy_summary_title">1. Resum</string>
     <string name="privacy_summary_body">Moments és una app social per compartir moments, històries, cadenes, missatges i converses amb Nova. No recopilem dades innecessàries ni construïm perfils comercials sobre tu.\n\nGuardem o processem la informació mínima que introdueixes, crees o actives mentre fas servir l\'app, juntament amb dades tècniques necessàries perquè Moments funcioni, sigui segura, sincronitzi contingut, mostri anuncis quan correspongui i permeti usar Nova.</string>
     <string name="privacy_data_title">2. Informació que fas servir o generes a Moments</string>
-    <string name="privacy_data_body">Quan crees un compte o configures el perfil, guardem dades com correu electrònic, nom d\'usuari, foto de perfil, biografia, web, interessos, insígnies, estat en línia i preferències.\n\nQuan fas servir l\'app, guardem el contingut i les accions que decideixes crear: moments, històries, cadenes, ecos, comentaris, reaccions, elements desats, visites, etiquetes, llistes personalitzades, millors amics i ajustos d\'audiència.\n\nTambé tractem dades tècniques mínimes necessàries per a seguretat, sessió, sincronització, notificacions, anuncis i resolució d\'errors.</string>
+    <string name="privacy_data_body">Quan crees un compte o configures el perfil, guardem dades com correu electrònic, nom d\'usuari, foto de perfil, biografia, web, interessos, insígnies, estat en línia i preferències.
+
+Quan fas servir l\'app, guardem el contingut i les accions que decideixes crear: moments, històries, cadenes, ecos, comentaris, reaccions, elements desats, visites, etiquetes, llistes personalitzades, millors amics i ajustos d\'audiència.
+
+També tractem dades tècniques mínimes necessàries per a seguretat, sessió, sincronització, notificacions, anuncis i resolució d\'errors.
+
+Per a la seguretat del compte, també podem guardar la teva adreça IP, informació del dispositiu, token de notificacions push, sessions actives i ubicació aproximada quan inicies sessió o actives funcions de seguretat.</string>
     <string name="privacy_use_title">3. Com fem servir les dades</string>
     <string name="privacy_use_body">Fem servir la informació per prestar el servei, autenticar-te, sincronitzar contingut, entregar missatges, aplicar els teus ajustos de privacitat, personalitzar l\'experiència, millorar Moments, prevenir abusos, gestionar denúncies i complir obligacions legals.\n\nLes bases legals poden incloure la prestació del servei que demanes, el teu consentiment, el nostre interès legítim en seguretat i millora del producte, i el compliment d\'obligacions legals.</string>
     <string name="privacy_nova_title">4. Nova i intel·ligència artificial</string>
-    <string name="privacy_nova_body">Nova pot processar els teus missatges, imatges que li enviïs, context del teu compte, preferències, activitat recent i memòria personal per respondre\'t de manera més útil.\n\nLa memòria de Nova pot guardar detalls com ara com prefereixes que et diguin, interessos, estil de conversa o informació que comparteixes voluntàriament. Pots editar o esborrar aquesta memòria des de l\'app.\n\nNova funciona mitjançant proveïdors tècnics d\'IA, com Firebase Vertex AI/Gemini, i algunes tasques de moderació poden utilitzar serveis externs. No fem servir les teves converses amb Nova per vendre dades ni per a publicitat personalitzada de tercers.</string>
+    <string name="privacy_nova_body">Nova pot processar els teus missatges, imatges que li enviïs, context del teu compte, preferències, activitat recent i memòria personal per respondre\'t de manera més útil.
+
+La memòria de Nova pot guardar detalls com ara com prefereixes que et diguin, interessos, estil de conversa o informació que comparteixes voluntàriament. Pots editar o esborrar aquesta memòria des de l\'app.
+
+Nova també pot fer servir la cerca web per respondre a certes preguntes quan això ajuda a donar-te una resposta útil.
+
+Nova funciona mitjançant proveïdors tècnics d\'IA, com Firebase Vertex AI/Gemini, i algunes tasques de moderació poden utilitzar serveis externs. No fem servir les teves converses amb Nova per vendre dades ni per a publicitat personalitzada de tercers.</string>
     <string name="privacy_visibility_title">5. Contingut, audiències i visibilitat</string>
     <string name="privacy_visibility_body">Tu controles qui pot veure part del teu contingut mitjançant compte privat, audiències, millors amics, llistes personalitzades, només jo, bloquejos, silencis i ajustos de visibilitat de seguidors, seguits i admiradors.\n\nEl contingut privat o restringit usa Blackout: Moments intenta ocultar-lo en captures i gravacions de pantalla mitjançant protecció segura del sistema. Les publicacions fetes per a everyone no fan servir aquesta protecció. Tot i això, cap mesura pot impedir del tot que algú copiï o comparteixi fora de l\'app contingut al qual hagi tingut accés.</string>
     <string name="privacy_messages_title">6. Missatges i comunicacions</string>
-    <string name="privacy_messages_body">Processem converses, sol·licituds de missatges, participants, marques de temps, confirmacions de lectura, fitxers multimèdia, missatges efímers i contingut compartit per entregar la missatgeria.\n\nApliquem xifratge i mesures de seguretat per protegir missatges i dades sensibles. Tot i això, algunes metadades, URLs de fitxers multimèdia o informació necessària per entregar el servei poden emmagatzemar-se i processar-se per separat.</string>
+    <string name="privacy_messages_body">Processem converses, sol·licituds de missatges, participants, marques de temps, confirmacions de lectura, fitxers multimèdia, missatges efímers i contingut compartit per entregar la missatgeria.
+
+Apliquem xifratge i mesures de seguretat per protegir missatges i dades sensibles. Tot i això, algunes metadades, URLs de fitxers multimèdia o informació necessària per entregar el servei poden emmagatzemar-se i processar-se per separat.
+
+Si decideixes compartir ubicació en viu en una conversa, tractem aquesta ubicació fins que la sessió de compartició acabi o expiri.</string>
     <string name="privacy_permissions_title">7. Permisos del dispositiu</string>
-    <string name="privacy_permissions_body">Demanem permisos només quan són necessaris per a una funció concreta: càmera per crear fotos o vídeos, galeria per pujar o desar contingut, micròfon per a àudio, i ubicació per etiquetar publicacions, mapes, contingut proper i context opcional de Nova.\n\nPots canviar aquests permisos des dels ajustos d\'iOS. Si els desactives, algunes funcions poden deixar d\'estar disponibles.</string>
+    <string name="privacy_permissions_body">Demanem permisos només quan són necessaris per a una funció concreta: càmera per crear fotos o vídeos, galeria per pujar o desar contingut, micròfon per a àudio, i ubicació per etiquetar publicacions, mapes, contingut proper i context opcional de Nova.
+
+Pots canviar aquests permisos des dels ajustos del teu dispositiu. Si els desactives, algunes funcions poden deixar d\'estar disponibles.</string>
     <string name="privacy_ads_title">8. Publicitat i consentiment</string>
-    <string name="privacy_ads_body">Moments pot mostrar anuncis mitjançant Google AdMob. Segons la teva regió i ajustos, podem demanar consentiment mitjançant el formulari de privacitat de Google i el permís de rastreig d\'Apple.\n\nSi acceptes, els anuncis poden ser personalitzats utilitzant identificadors publicitaris i senyals permesos. Si no acceptes, podem mostrar anuncis no personalitzats o limitats. També fem servir SKAdNetwork i tecnologies similars per a mesurament agregat.</string>
+    <string name="privacy_ads_body">Moments pot mostrar anuncis mitjançant Google AdMob. Segons la teva regió i ajustos, podem demanar consentiment mitjançant la plataforma de missatges per a l\'usuari de Google (UMP).
+
+Si acceptes, els anuncis poden ser personalitzats utilitzant el teu identificador publicitari i senyals permesos. Si no acceptes, podem mostrar anuncis no personalitzats o limitats.</string>
     <string name="privacy_moderation_title">9. Seguretat, denúncies i moderació</string>
     <string name="privacy_moderation_body">Fem servir denúncies d\'usuaris, revisió automàtica i registres de seguretat per detectar spam, abusos, contingut il·legal, nuesa no permesa, violència, assetjament, suplantació, frau i altres usos que incompleixin les nostres normes.\n\nEls comentaris, imatges, vídeos o àudio poden ser analitzats per sistemes automàtics i proveïdors especialitzats. Podem ocultar contingut, limitar comptes, suspendre\'ls o conservar registres necessaris per revisar apel·lacions i protegir la comunitat.</string>
     <string name="privacy_providers_title">10. Proveïdors i transferències</string>
@@ -167,9 +223,11 @@
     <string name="privacy_rights_title">12. Els teus drets</string>
     <string name="privacy_rights_body">Pots sol·licitar accés, rectificació, eliminació, oposició, limitació, portabilitat de les teves dades i retirada del consentiment quan correspongui. També pots exportar dades, esborrar records de Nova, canviar la privacitat, bloquejar usuaris, silenciar comptes o paraules, desactivar el compte o sol·licitar-ne l\'eliminació.\n\nSi ets a la Unió Europea o en una altra regió amb drets equivalents, també pots reclamar davant la teva autoritat de protecció de dades.</string>
     <string name="privacy_minors_title">13. Menors</string>
-    <string name="privacy_minors_body">Moments no està dirigida a menors de 13 anys. Si detectem que un compte pertany a una persona per sota de l\'edat mínima aplicable, podem limitar-lo o eliminar-lo. Si ets menor d\'edat, fes servir Moments amb supervisió dels pares o tutors quan correspongui.</string>
+    <string name="privacy_minors_body">Moments no està dirigida a menors. L\'edat mínima per crear un compte i utilitzar el servei depèn del teu país o regió; en molts llocs és de 13 anys o més. Quan ho exigeixi la llei local, pot ser necessari el consentiment d\'un pare, mare o tutor. Si detectem que un compte no compleix l\'edat mínima aplicable o els requisits de consentiment, el podem restringir o eliminar.</string>
     <string name="privacy_contact_title">14. Contacte i canvis</string>
-    <string name="privacy_contact_body">Podem actualitzar aquesta política quan canviïn les nostres funcions, proveïdors o requisits legals. Si el canvi és important, ho comunicarem a l\'app o per altres mitjans raonables.\n\nPer a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@moments.app o visita moments.app/privacy.</string>
+    <string name="privacy_contact_body">Podem actualitzar aquesta política quan canviïn les nostres funcions, proveïdors o requisits legals. Si el canvi és important, ho comunicarem a l\'app o per altres mitjans raonables.
+
+Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@momentsapp.app o visita momentsapp.app/privacy.</string>
     <string name="deactivated_title">Compte en Repòs</string>
     <string name="deactivated_subtitle">El teu compte està desactivat temporalment però totes les teves dades són segures.</string>
     <string name="deactivated_reactivate">Reactivar Compte</string>

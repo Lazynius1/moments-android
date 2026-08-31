@@ -38,9 +38,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -223,6 +226,8 @@ fun UserModernProfileHeader(
     onOpenStories: () -> Unit,
     onShowProfileImageFullscreen: () -> Unit,
     onOpenMessage: () -> Unit,
+    onAvatarBoundsChange: (Rect) -> Unit = {},
+    hideAvatarForFlip: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
@@ -244,6 +249,9 @@ fun UserModernProfileHeader(
                     storyRingRefreshTrigger = storyRingRefreshTrigger,
                     onOpenStories = onOpenStories,
                     onShowProfileImageFullscreen = onShowProfileImageFullscreen,
+                    modifier = Modifier
+                        .alpha(if (hideAvatarForFlip) 0f else 1f)
+                        .onGloballyPositioned { onAvatarBoundsChange(it.boundsInRoot()) },
                 )
                 ProfileAvatarNoteView(
                     note = user?.profileNote,

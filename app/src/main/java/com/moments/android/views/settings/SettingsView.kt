@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.AlertDialog
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Text
@@ -23,11 +25,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.models.BestFriendsView
@@ -35,6 +39,7 @@ import com.moments.android.reportes.ModerationReviewStatusView
 import com.moments.android.services.auth.AuthService
 import com.moments.android.views.nova.NovaMemoryManagementView
 import com.moments.android.views.settings.sections.ConnectionVisibilityView
+import com.moments.android.views.settings.sections.SettingsRow
 import com.moments.android.views.settings.sections.SettingsFormView
 import com.moments.android.views.settings.settingssections.NotificationSettingsView
 import com.moments.android.views.settings.settingssections.PersonalInfoView
@@ -43,6 +48,8 @@ import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.LocalMomentsSharedAnimatedVisibilityScope
 import com.moments.android.views.shared.LocalMomentsSharedTransitionScope
 import com.moments.android.views.story.ArchivedStoriesView
+import com.moments.android.views.profile.core.ProfileContextFlipConfiguration
+import com.moments.android.views.profile.core.ProfileContextFlipTransition
 import java.util.Date
 
 /**
@@ -133,6 +140,7 @@ fun SettingsView(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var isShowingQRCode by remember { mutableStateOf(false) }
+    var qrFlipBounds by remember { mutableStateOf(Rect.Zero) }
     var route by remember { mutableStateOf<SettingsRoute?>(null) }
     var isShowingAdvancedAccountManagement by remember { mutableStateOf(false) }
     var isShowingNovaMemory by remember { mutableStateOf(false) }
@@ -246,7 +254,11 @@ fun SettingsView(
                 phoneNumber = phoneNumber,
                 onPhoneNumberChange = { phoneNumber = it },
                 onShowPersonalInfo = { isShowingPersonalInfo = true },
-                onShowQRCode = { isShowingQRCode = true },
+                onShowQRCode = { bounds ->
+                    qrFlipBounds = bounds
+                    isShowingQRCode = true
+                },
+                hideQRCodeRow = isShowingQRCode,
                 onRoute = { route = it },
                 onShowAdvancedAccountManagement = { isShowingAdvancedAccountManagement = true },
                 onShowNovaMemory = { isShowingNovaMemory = true },
@@ -281,15 +293,23 @@ fun SettingsView(
                 )
             }
         }
-    }
 
-    // ≡ iOS `.sheet` QR
-    if (isShowingQRCode) {
-        MomentsModalSheet(
-            onDismissRequest = { isShowingQRCode = false },
-            largeOnly = false,
-        ) { dismiss ->
-            QRCodeView(onNavigateBack = dismiss)
+        if (isShowingQRCode) {
+            ProfileContextFlipTransition(
+                sourceBounds = qrFlipBounds,
+                configuration = ProfileContextFlipConfiguration.SettingsQr,
+                onDismiss = { isShowingQRCode = false },
+                modifier = Modifier.zIndex(40f),
+                source = {
+                    SettingsRow(
+                        icon = Icons.Filled.QrCode,
+                        title = stringResource(R.string.settings_sections_qr_code),
+                        subtitle = stringResource(R.string.settings_sections_qr_code_subtitle),
+                        onClick = {},
+                    )
+                },
+                destination = { close -> QRCodeView(onNavigateBack = close) },
+            )
         }
     }
 

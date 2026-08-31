@@ -1,4 +1,76 @@
 <resources>
+    <!-- Interest catalog v2 -->
+    <string name="interest_photography">Photographie</string>
+    <string name="interest_travel">Voyage</string>
+    <string name="interest_music">Musique</string>
+    <string name="interest_movies">Films et séries</string>
+    <string name="interest_art">Art</string>
+    <string name="interest_sports">Sports</string>
+    <string name="interest_books">Lecture</string>
+    <string name="interest_cooking">Cuisine</string>
+    <string name="interest_technology">Tech</string>
+    <string name="interest_fashion">Mode</string>
+    <string name="interest_gaming">Jeux vidéo</string>
+    <string name="interest_fitness">Fitness</string>
+    <string name="interest_nature">Nature</string>
+    <string name="interest_animals">Animaux</string>
+    <string name="interest_food">Gastronomie</string>
+    <string name="interest_science">Sciences</string>
+    <string name="interest_history">Histoire</string>
+    <string name="interest_politics">Politique</string>
+    <string name="interest_business">Business</string>
+    <string name="interest_health">Santé</string>
+    <string name="interest_style">Style personnel</string>
+    <string name="interest_dance">Danse</string>
+    <string name="interest_writing">Écriture</string>
+    <string name="interest_diy">DIY</string>
+    <string name="interest_cars">Automobile</string>
+    <string name="interest_theater">Théâtre</string>
+    <string name="interest_meditation">Méditation</string>
+    <string name="interest_entrepreneurship">Startups</string>
+    <string name="interest_yoga">Yoga</string>
+    <string name="interest_coffee">Café</string>
+    <string name="interest_astronomy">Astronomie</string>
+    <string name="interest_podcasts">Podcasts</string>
+    <string name="interest_pets">Animaux de compagnie</string>
+    <string name="interest_design">Design</string>
+    <string name="interest_programming">Programmation</string>
+    <string name="interest_kpop">K-pop</string>
+    <string name="interest_anime">Anime</string>
+    <string name="interest_hiking">Randonnée</string>
+    <string name="interest_cycling">Cyclisme</string>
+    <string name="interest_running">Course à pied</string>
+    <string name="interest_climbing">Escalade</string>
+    <string name="interest_surfing">Surf</string>
+    <string name="interest_football">Football</string>
+    <string name="interest_basketball">Basket-ball</string>
+    <string name="interest_swimming">Natation</string>
+    <string name="interest_skateboarding">Skateboard</string>
+    <string name="interest_vinyl">Disques vinyles</string>
+    <string name="interest_concerts">Musique live</string>
+    <string name="interest_hiphop">Hip-hop</string>
+    <string name="interest_electronic_music">Musique électronique</string>
+    <string name="interest_baking">Pâtisserie</string>
+    <string name="interest_wine">Vin</string>
+    <string name="interest_craft_beer">Bière artisanale</string>
+    <string name="interest_beauty">Beauté</string>
+    <string name="interest_sneakers">Sneakers</string>
+    <string name="interest_tattoos">Tatouages</string>
+    <string name="interest_plants">Plantes d’intérieur</string>
+    <string name="interest_gardening">Jardinage</string>
+    <string name="interest_languages">Langues</string>
+    <string name="interest_volunteering">Bénévolat</string>
+    <string name="interest_sustainability">Développement durable</string>
+    <string name="interest_cosplay">Cosplay</string>
+    <string name="interest_true_crime">True crime</string>
+    <string name="interest_collecting">Collection</string>
+    <string name="interest_crafts">Loisirs créatifs</string>
+    <string name="interest_streaming">Streaming</string>
+    <string name="interest_ai">AI</string>
+    <string name="interest_personal_finance">Finances personnelles</string>
+    <string name="interest_philosophy">Philosophie</string>
+    <string name="interest_chess">Échecs</string>
+    <string name="interest_board_games">Jeux de société</string>
     <string name="brand_wordmark">moments</string>
     <string name="welcome_create_account">Créer un compte</string>
     <string name="welcome_have_account">Vous avez déjà un compte?</string>
@@ -57,43 +129,7 @@
     <string name="register_username_taken">Ce nom d’utilisateur est déjà pris.</string>
     <string name="register_profile_error">Impossible de créer le profil.</string>
     <string name="register_account_error">Impossible de créer le compte.</string>
-    <string name="interest_photography">Photographie</string>
-    <string name="interest_travel">Voyage</string>
-    <string name="interest_music">Musique</string>
-    <string name="interest_movies">Cinéma</string>
-    <string name="interest_art">Art</string>
-    <string name="interest_sports">Sport</string>
-    <string name="interest_books">Livres</string>
-    <string name="interest_cooking">Cuisine</string>
-    <string name="interest_technology">Technologie</string>
-    <string name="interest_fashion">Mode</string>
-    <string name="interest_gaming">Jeux vidéo</string>
-    <string name="interest_fitness">Fitness</string>
-    <string name="interest_nature">Nature</string>
-    <string name="interest_animals">Animaux</string>
-    <string name="interest_food">Nourriture</string>
-    <string name="interest_science">Science</string>
-    <string name="interest_history">Histoire</string>
-    <string name="interest_politics">Politique</string>
-    <string name="interest_business">Affaires</string>
-    <string name="interest_health">Santé</string>
-    <string name="interest_style">Style</string>
-    <string name="interest_dance">Danse</string>
-    <string name="interest_writing">Écriture</string>
-    <string name="interest_diy">Bricolage</string>
-    <string name="interest_cars">Voitures</string>
-    <string name="interest_theater">Théâtre</string>
-    <string name="interest_meditation">Méditation</string>
-    <string name="interest_entrepreneurship">Entrepreneuriat</string>
-    <string name="interest_yoga">Yoga</string>
-    <string name="interest_coffee">Café</string>
     <string name="interest_viajar">Voyage</string>
-    <string name="interest_astronomy">Astronomie</string>
-    <string name="interest_podcasts">Podcasts</string>
-    <string name="interest_pets">Animaux de compagnie</string>
-    <string name="interest_design">Design</string>
-    <string name="interest_programming">Programmation</string>
-    <string name="interest_kpop">Kpop</string>
     <string name="common_back">Retour</string>
     <string name="common_close">Fermer</string>
     <string name="common_cancel">Annuler</string>
@@ -141,7 +177,7 @@
     <string name="creating_step_configuring">Configuration des préférences...</string>
     <string name="creating_step_completed">Terminé</string>
     <string name="privacy_title">Politique de confidentialité</string>
-    <string name="privacy_last_updated">Dernière mise à jour : 29 avril 2026</string>
+    <string name="privacy_last_updated">Dernière mise à jour : 30 août 2026</string>
     <string name="privacy_summary_title">1. Résumé</string>
     <string name="privacy_summary_body">Moments est une application sociale permettant de partager des moments, des stories, des chaînes, des messages et des conversations avec Nova. Nous ne collectons pas de données inutiles et ne créons pas de profils commerciaux à votre sujet.
 
@@ -151,7 +187,9 @@ Nous stockons ou traitons le minimum d\'informations que vous saisissez, créez 
 
 Lorsque vous utilisez l\'application, nous stockons le contenu et les actions que vous choisissez de créer : moments, stories, chaînes, echoes, commentaires, réactions, éléments enregistrés, visites, tags, listes personnalisées, meilleurs amis et paramètres d\'audience.
 
-Nous traitons également un minimum de données techniques nécessaires à la sécurité, aux sessions, à la synchronisation, aux notifications, aux publicités et à la résolution des erreurs.</string>
+Nous traitons également un minimum de données techniques nécessaires à la sécurité, aux sessions, à la synchronisation, aux notifications, aux publicités et à la résolution des erreurs.
+
+Pour la sécurité du compte, nous pouvons aussi enregistrer votre adresse IP, les informations de l\'appareil, le jeton de notifications push, les sessions actives et la localisation approximative lorsque vous vous connectez ou activez des fonctions de sécurité.</string>
     <string name="privacy_use_title">3. Comment nous utilisons les données</string>
     <string name="privacy_use_body">Nous utilisons les informations pour fournir le service, vous authentifier, synchroniser le contenu, délivrer les messages, appliquer vos paramètres de confidentialité, personnaliser l\'expérience, améliorer Moments, prévenir les abus, traiter les signalements et respecter les obligations légales.
 
@@ -161,6 +199,8 @@ Les bases légales peuvent inclure la fourniture du service que vous demandez, v
 
 La mémoire de Nova peut conserver des détails tels que le nom que vous préférez qu\'on vous donne, vos centres d\'intérêt, votre style de conversation ou des informations que vous partagez volontairement. Vous pouvez modifier ou supprimer cette mémoire depuis l\'application.
 
+Nova peut aussi utiliser la recherche web pour répondre à certaines questions lorsque cela aide à fournir une réponse utile.
+
 Nova fonctionne grâce à des prestataires techniques d\'IA, comme Firebase Vertex AI/Gemini, et certaines tâches de modération peuvent faire appel à des services externes. Nous n\'utilisons pas vos conversations avec Nova pour vendre des données ni pour de la publicité personnalisée de tiers.</string>
     <string name="privacy_visibility_title">5. Contenu, audiences et visibilité</string>
     <string name="privacy_visibility_body">Vous contrôlez qui peut voir certaines parties de votre contenu grâce aux paramètres de compte privé, aux audiences, aux meilleurs amis, aux listes personnalisées, à l\'option moi uniquement, aux blocages, aux mises en sourdine et aux paramètres de visibilité pour les abonnés, les abonnements et les admirateurs.
@@ -169,15 +209,17 @@ Le contenu privé ou restreint utilise Blackout : Moments essaie de le masquer d
     <string name="privacy_messages_title">6. Messages et communications</string>
     <string name="privacy_messages_body">Nous traitons les conversations, les demandes de message, les participants, les horodatages, les accusés de lecture, les fichiers multimédias, les messages éphémères et le contenu partagé afin de fournir la messagerie.
 
-Nous appliquons des mesures de chiffrement et de sécurité pour protéger les messages et les données sensibles. Cependant, certaines métadonnées, URL de fichiers multimédias ou informations nécessaires à la fourniture du service peuvent être stockées et traitées séparément.</string>
+Nous appliquons des mesures de chiffrement et de sécurité pour protéger les messages et les données sensibles. Cependant, certaines métadonnées, URL de fichiers multimédias ou informations nécessaires à la fourniture du service peuvent être stockées et traitées séparément.
+
+Si vous choisissez de partager votre localisation en direct dans une conversation, nous traitons cette localisation jusqu\'à la fin ou l\'expiration de la session de partage.</string>
     <string name="privacy_permissions_title">7. Autorisations de l\'appareil</string>
     <string name="privacy_permissions_body">Nous demandons des autorisations uniquement lorsqu\'elles sont nécessaires à une fonctionnalité précise : l\'appareil photo pour créer des photos ou des vidéos, la photothèque pour importer ou enregistrer du contenu, le microphone pour l\'audio, et la localisation pour identifier des publications, afficher des cartes, du contenu à proximité et un contexte optionnel pour Nova.
 
-Vous pouvez modifier ces autorisations dans les réglages iOS. Si vous les désactivez, certaines fonctionnalités peuvent ne plus être disponibles.</string>
+Vous pouvez modifier ces autorisations dans les réglages de votre appareil. Si vous les désactivez, certaines fonctionnalités peuvent ne plus être disponibles.</string>
     <string name="privacy_ads_title">8. Publicité et consentement</string>
-    <string name="privacy_ads_body">Moments peut afficher des publicités via Google AdMob. Selon votre région et vos paramètres, nous pouvons demander votre consentement via le formulaire de confidentialité de Google et l\'autorisation de suivi d\'Apple.
+    <string name="privacy_ads_body">Moments peut afficher des publicités via Google AdMob. Selon votre région et vos paramètres, nous pouvons demander votre consentement via la User Messaging Platform (UMP) de Google.
 
-Si vous acceptez, les publicités peuvent être personnalisées à l\'aide d\'identifiants publicitaires et de signaux autorisés. Si vous n\'acceptez pas, nous pouvons afficher des publicités non personnalisées ou limitées. Nous utilisons également SKAdNetwork et des technologies similaires pour la mesure agrégée.</string>
+Si vous acceptez, les publicités peuvent être personnalisées à l\'aide de votre identifiant publicitaire et de signaux autorisés. Si vous refusez, nous pouvons afficher des publicités non personnalisées ou limitées.</string>
     <string name="privacy_moderation_title">9. Sécurité, signalements et modération</string>
     <string name="privacy_moderation_body">Nous utilisons les signalements des utilisateurs, l\'analyse automatisée et les journaux de sécurité pour détecter le spam, les abus, le contenu illégal, la nudité interdite, la violence, le harcèlement, l\'usurpation d\'identité, la fraude et d\'autres usages contraires à nos règles.
 
@@ -195,11 +237,11 @@ Les stories, les messages éphémères et le contenu temporaire suivent leurs r�
 
 Si vous résidez dans l\'Union européenne ou dans une autre région disposant de droits équivalents, vous pouvez également déposer une réclamation auprès de votre autorité de protection des données.</string>
     <string name="privacy_minors_title">13. Mineurs</string>
-    <string name="privacy_minors_body">Moments ne s\'adresse pas aux enfants de moins de 13 ans. Si nous détectons qu\'un compte appartient à une personne n\'ayant pas atteint l\'âge minimum applicable, nous pouvons le limiter ou le supprimer. Si vous êtes mineur, utilisez Moments sous la supervision d\'un parent ou d\'un tuteur lorsque cela est approprié.</string>
+    <string name="privacy_minors_body">Moments ne s\'adresse pas aux enfants. L\'âge minimum pour créer un compte et utiliser le service dépend de votre pays ou région ; dans de nombreux endroits, il est de 13 ans ou plus. Lorsque la loi locale l\'exige, le consentement d\'un parent ou d\'un tuteur peut également s\'appliquer. Si nous détectons qu\'un compte ne respecte pas l\'âge minimum applicable ou les exigences de consentement, nous pouvons le limiter ou le supprimer.</string>
     <string name="privacy_contact_title">14. Contact et modifications</string>
     <string name="privacy_contact_body">Nous pouvons mettre à jour cette politique lorsque nos fonctionnalités, nos prestataires ou les exigences légales évoluent. Si un changement est important, nous vous en informerons dans l\'application ou par tout autre moyen raisonnable.
 
-Pour toute question ou demande relative à la confidentialité, contactez-nous à soporte@moments.app ou visitez moments.app/privacy.</string>
+Pour toute question ou demande relative à la confidentialité, contactez-nous à soporte@momentsapp.app ou visitez momentsapp.app/privacy.</string>
     <string name="deactivated_title">Compte en veille</string>
     <string name="deactivated_subtitle">Votre compte est temporairement désactivé, mais toutes vos données sont en sécurité.</string>
     <string name="deactivated_reactivate">Réactiver le compte</string>

@@ -51,6 +51,9 @@ object AdMobConfiguration {
 
     private const val PREFS_NAME = "admob_config"
     private const val KEY_HAS_SEEN_PRIVACY_CONSENT = "hasSeenPrivacyConsent"
+    private const val KEY_CONSENT_MIGRATION_VERSION = "consentMigrationVersion"
+    /** Bump when consent storage logic changes — one-time repair for stale installs. */
+    private const val CONSENT_MIGRATION_VERSION = 2
     private const val KEY_ATT_STATUS = "attAuthorizationStatus"
     private const val KEY_ATT_TIMESTAMP = "attDecisionTimestamp"
     private const val KEY_HAS_SEEN_ATT_PRE_ALERT = "hasSeenATTPreAlert"
@@ -75,6 +78,7 @@ object AdMobConfiguration {
         if (appContext != null) return
         appContext = context.applicationContext
         prefs = appContext!!.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        migrateConsentPrefsIfNeeded()
 
         if (!canSafelyInitializeAds()) {
             AppLog.debug { "AdMob: APP_ID placeholder — skipping SDK init (ads disabled until Android key is set)" }
@@ -83,7 +87,7 @@ object AdMobConfiguration {
 
         MobileAds.initialize(appContext!!) {
             _isInitialized.value = true
-            AppLog.debug { "AdMob: SDK initialized" }
+            AppLog.debug { "AdMob: SDK initialized (unit=${getNativeAdUnitId()})" }
         }
     }
 
@@ -108,6 +112,8 @@ object AdMobConfiguration {
     val shouldShowConsentFlow: Boolean
         get() {
             if (hasPresentedConsentFlow) return false
+            // ≡ iOS: si ya pasó el primer en una sesión anterior, no repetir en cada cold start.
+            // (UMP puede quedar UNKNOWN hasta requestConsentInfoUpdate — no usar eso para re-mostrar.)
             if (prefs?.getBoolean(KEY_HAS_SEEN_PRIVACY_CONSENT, false) == true) return false
 
             val ctx = appContext ?: return false
@@ -120,12 +126,37 @@ object AdMobConfiguration {
 
     fun startConsentFlow(activity: Activity, completion: () -> Unit) {
         hasPresentedConsentFlow = true
+        // ≡ iOS startConsentFlow — persistir al iniciar el flujo (usuario pulsó Permitir).
         prefs?.edit()?.putBoolean(KEY_HAS_SEEN_PRIVACY_CONSENT, true)?.apply()
 
         requestGdprConsent(activity) {
             requestATTAuthorization()
             completion()
         }
+    }
+
+    /**
+     * Repara installs antiguos que guardaron `hasSeenPrivacyConsent` antes de completar UMP.
+     * Usuarios que ya consintieron bien (UMP OBTAINED + canRequestAds) no se tocan.
+     */
+    private fun migrateConsentPrefsIfNeeded() {
+        val p = prefs ?: return
+        if (p.getInt(KEY_CONSENT_MIGRATION_VERSION, 0) >= CONSENT_MIGRATION_VERSION) return
+
+        val ctx = appContext ?: return
+        val consentInfo = UserMessagingPlatform.getConsentInformation(ctx)
+        val sawPrimer = p.getBoolean(KEY_HAS_SEEN_PRIVACY_CONSENT, false)
+
+        // Solo resetear si UMP exige consentimiento de verdad — no en UNKNOWN de cold start.
+        if (sawPrimer &&
+            consentInfo.consentStatus == ConsentInformation.ConsentStatus.REQUIRED &&
+            !consentInfo.canRequestAds()
+        ) {
+            p.edit().putBoolean(KEY_HAS_SEEN_PRIVACY_CONSENT, false).apply()
+            AppLog.debug { "AdMob: reset stale hasSeenPrivacyConsent for UMP recovery" }
+        }
+
+        p.edit().putInt(KEY_CONSENT_MIGRATION_VERSION, CONSENT_MIGRATION_VERSION).apply()
     }
 
     fun showPrivacyOptionsForm(activity: Activity) {
@@ -326,7 +357,9 @@ class NativeAdManager {
             }
             .withAdListener(object : AdListener() {
                 override fun onAdFailedToLoad(error: LoadAdError) {
-                    AppLog.debug { "AdMob native load failed: ${error.message}" }
+                    AppLog.debug {
+                        "AdMob native load failed: code=${error.code} domain=${error.domain} msg=${error.message}"
+                    }
                     _isLoading.value = false
                     _hasError.value = true
                 }

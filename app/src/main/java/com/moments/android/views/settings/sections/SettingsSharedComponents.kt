@@ -142,6 +142,7 @@ fun SettingsRow(
     isExternal: Boolean = false,
     /** ≡ iOS `icon == "star.fill"` → verde. */
     starFillTint: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
@@ -156,7 +157,7 @@ fun SettingsRow(
     }
 
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .clickable(role = Role.Button, onClick = onClick),
     ) {

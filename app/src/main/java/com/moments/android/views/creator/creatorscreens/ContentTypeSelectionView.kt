@@ -75,6 +75,7 @@ import com.moments.android.views.creator.creatoruikit.BackgroundCameraView
 import com.moments.android.views.creator.creatoruikit.StopBackgroundCameraSession
 import com.moments.android.views.permission.shared.PermissionPrimerGate
 import com.moments.android.views.permission.shared.PermissionPrimerGateHost
+import com.moments.android.views.permission.shared.rememberRuntimePermissionGranted
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -102,8 +103,7 @@ fun ContentTypeSelectionView(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val photosGate = remember { PermissionPrimerGate(PermissionPrimerGate.Kind.PHOTOS) }
-    val hasCameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-        PackageManager.PERMISSION_GRANTED
+    val hasCameraPermission = rememberRuntimePermissionGranted(Manifest.permission.CAMERA)
     val density = LocalDensity.current
 
     val dialControlWidth = 170.dp

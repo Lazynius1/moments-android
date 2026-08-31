@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.extensions.MomentsGlassButtonPreset
 import com.moments.android.views.settings.sections.SettingsSubsectionGroup
+import com.moments.android.views.story.ArchiveDisplayMode
+import com.moments.android.views.story.ArchiveDisplayModeActions
 import com.moments.android.views.story.ArchivedStoriesView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -276,6 +278,7 @@ fun ArchivedActivityView(
     val background = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     var selectedKind by remember { mutableStateOf(initialKind) }
     var menuOpen by remember { mutableStateOf(false) }
+    var storyDisplayMode by remember { mutableStateOf(ArchiveDisplayMode.STORIES) }
 
     val momentsTitle = stringResource(R.string.user_activity_archived_header_title)
     val storiesTitle = stringResource(R.string.archived_stories_header_title)
@@ -299,6 +302,17 @@ fun ArchivedActivityView(
             momentsSelected = selectedKind == ArchivedContentKind.MOMENTS,
             onSelectMoments = { selectedKind = ArchivedContentKind.MOMENTS },
             onSelectStories = { selectedKind = ArchivedContentKind.STORIES },
+            trailing = if (selectedKind == ArchivedContentKind.STORIES) {
+                {
+                    ArchiveDisplayModeActions(
+                        displayMode = storyDisplayMode,
+                        onDisplayModeChange = { storyDisplayMode = it },
+                        contentColor = primary,
+                    )
+                }
+            } else {
+                null
+            },
         )
         Box(Modifier.fillMaxSize()) {
             key(selectedKind) {
@@ -311,6 +325,8 @@ fun ArchivedActivityView(
                     ArchivedContentKind.STORIES -> ArchivedStoriesView(
                         onNavigateBack = onNavigateBack,
                         showTopBar = false,
+                        controlledDisplayMode = storyDisplayMode,
+                        onDisplayModeChange = { storyDisplayMode = it },
                     )
                 }
             }
@@ -331,9 +347,10 @@ private fun ActivityKindMenuBar(
     onSelectMoments: () -> Unit,
     onSelectStories: () -> Unit,
     selectionController: ActivitySelectionController? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val controlSize = MomentsGlassButtonPreset.NAVIGATION_BACK.controlSize
-    val edgeSlotWidth = if (selectionController != null) 112.dp else controlSize
+    val edgeSlotWidth = if (selectionController != null || trailing != null) 112.dp else controlSize
     Row(
         Modifier
             .fillMaxWidth()
@@ -352,7 +369,13 @@ private fun ActivityKindMenuBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                Text(currentTitle, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = primary)
+                Text(
+                    text = currentTitle,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = primary,
+                    maxLines = 1,
+                )
                 Icon(
                     Icons.Filled.KeyboardArrowDown,
                     contentDescription = null,
@@ -419,6 +442,14 @@ private fun ActivityKindMenuBar(
                         maxLines = 1,
                     )
                 }
+            }
+        } else if (trailing != null) {
+            Row(
+                modifier = Modifier.width(edgeSlotWidth),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                trailing()
             }
         } else {
             Spacer(Modifier.size(edgeSlotWidth))

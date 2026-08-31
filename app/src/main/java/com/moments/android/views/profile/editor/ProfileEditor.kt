@@ -106,12 +106,7 @@ private enum class EditSection {
     INTERESTS,
 }
 
-private val DefaultInterestsFallback = listOf(
-    "Música", "Cine", "Deportes", "Viajes", "Fotografía", "Arte", "Tecnología",
-    "Lectura", "Cocina", "Moda", "Gaming", "Fitness", "Naturaleza", "Animales",
-    "Baile", "Teatro", "Escritura", "Ciencia", "Historia", "Idiomas", "Anime",
-    "K-pop", "Streaming", "Yoga", "Meditación", "Senderismo", "Ciclismo",
-)
+private val DefaultInterestsFallback: List<String> = InterestOption.firestoreKeys
 
 /**
  * Port simplificado de `GridPhotoPickerView` — entrada a crop vía

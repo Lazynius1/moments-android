@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
@@ -71,6 +73,9 @@ import com.moments.android.views.messaging.screens.chat.GlassmorphicChatView
 import com.moments.android.views.profile.core.SocialConnectionTab
 import com.moments.android.views.profile.core.SocialConnectionsRoute
 import com.moments.android.views.profile.core.SocialConnectionsScreen
+import com.moments.android.views.profile.core.ProfileContextFlipConfiguration
+import com.moments.android.views.profile.core.ProfileContextFlipTransition
+import com.moments.android.views.profile.core.ProfileQrAvatarFace
 import com.moments.android.views.profile.core.sections.LocalProfileGridHeroCoordinator
 import com.moments.android.views.profile.core.sections.ProfileGridHeroDetailLayer
 import com.moments.android.views.profile.core.sections.ProfileGridHeroMenuKind
@@ -325,6 +330,7 @@ fun UserProfileView(
     var showingStories by remember { mutableStateOf(false) }
     var showProfileImageFullscreen by remember { mutableStateOf(false) }
     var showingQrCode by remember { mutableStateOf(false) }
+    var qrAvatarBounds by remember { mutableStateOf(Rect.Zero) }
     var showingReport by remember { mutableStateOf(false) }
     var momentZoomDestination by remember { mutableStateOf<ProfileMomentZoomDestination?>(null) }
     var socialConnectionsRoute by remember { mutableStateOf<SocialConnectionsRoute?>(null) }
@@ -477,7 +483,14 @@ fun UserProfileView(
                             onOpenStories = { showingStories = true },
                             onOpenMessage = openMessageFlow,
                             onShowProfileImageFullscreen = { showProfileImageFullscreen = true },
-                            onShowQrCode = { showingQrCode = true },
+                            onShowQrCode = {
+                                scope.launch {
+                                    delay(120)
+                                    showingQrCode = true
+                                }
+                            },
+                            onAvatarBoundsChange = { qrAvatarBounds = it },
+                            hideAvatarForFlip = showingQrCode,
                             onShowReport = { showingReport = true },
                             onOpenSocial = { tab -> socialConnectionsRoute = SocialConnectionsRoute(initialTab = tab) },
                             onOpenMoment = { moments, index ->
@@ -506,6 +519,22 @@ fun UserProfileView(
                         onDismiss = {
                             momentZoomDestination = null
                             heroCoordinator.dismissDetail()
+                        },
+                    )
+                }
+
+                if (showingQrCode) {
+                    ProfileContextFlipTransition(
+                        sourceBounds = qrAvatarBounds,
+                        configuration = ProfileContextFlipConfiguration.Qr,
+                        onDismiss = { showingQrCode = false },
+                        modifier = Modifier.zIndex(40f),
+                        source = { ProfileQrAvatarFace(viewModel.userProfile) },
+                        destination = { close ->
+                            QRCodeView(
+                                user = viewModel.userProfile,
+                                onNavigateBack = close,
+                            )
                         },
                     )
                 }
@@ -639,15 +668,6 @@ fun UserProfileView(
                 startWithUserId = userId,
                 onDismiss = { showingStories = false },
             )
-        }
-    }
-
-    if (showingQrCode) {
-        Dialog(
-            onDismissRequest = { showingQrCode = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            QRCodeView(user = viewModel.userProfile, onNavigateBack = { showingQrCode = false })
         }
     }
 

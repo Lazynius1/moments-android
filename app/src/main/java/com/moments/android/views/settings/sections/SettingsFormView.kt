@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -71,7 +72,8 @@ fun SettingsFormView(
     phoneNumber: String,
     onPhoneNumberChange: (String) -> Unit,
     onShowPersonalInfo: () -> Unit,
-    onShowQRCode: () -> Unit,
+    onShowQRCode: (Rect) -> Unit,
+    hideQRCodeRow: Boolean = false,
     onRoute: (SettingsRoute) -> Unit,
     onShowAdvancedAccountManagement: () -> Unit,
     onShowNovaMemory: () -> Unit,
@@ -128,6 +130,7 @@ fun SettingsFormView(
                     AccountSection(
                         onShowPersonalInfo = onShowPersonalInfo,
                         onShowQRCode = onShowQRCode,
+                        hideQRCodeRow = hideQRCodeRow,
                     )
                 }
             }
