@@ -1,19 +1,27 @@
 package com.moments.android.views.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -30,15 +39,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -46,10 +60,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.moments.android.R
-import com.moments.android.views.shared.MomentsModalSheet
-import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Moment
@@ -58,6 +74,8 @@ import com.moments.android.utilities.MomentMentionNavigation
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.shared.ScreenshotProtectedView
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /** Port de `MomentCaptionPresentationStyle` (MomentCaptionView.swift). */
 enum class MomentCaptionPresentationStyle {
@@ -182,7 +200,7 @@ private fun truncatedCollapsedText(content: String, needsMore: Boolean): String 
 }
 
 /**
- * Port de `MomentCaptionView.swift` — feed, detail y reels con sheet lector completo.
+ * Port de `MomentCaptionView.swift` — feed/detail con morph contextual y reels inline.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -220,17 +238,8 @@ fun MomentCaptionView(
         MomentCaptionPresentationStyle.Detail -> trimmed
     }
 
-    val maxCharacters = when (style) {
-        MomentCaptionPresentationStyle.Feed -> 120
-        MomentCaptionPresentationStyle.Reels -> 90
-        MomentCaptionPresentationStyle.Detail -> 180
-    }
-    val needsExpansion = cardContent.length > maxCharacters || trimmed.count { it == '\n' } > 1
-    val previewContent = if (needsExpansion && cardContent.length > maxCharacters) {
-        cardContent.take(maxCharacters).trim() + "..."
-    } else {
-        cardContent
-    }
+    var needsExpansion by remember(cardContent, style) { mutableStateOf(false) }
+    val previewContent = cardContent
 
     val mediaPreviewContext = remember(moment, authorId, username, previewImageUrl, thumbnailUrl, previewVideoUrl, audience, isVideo) {
         resolveCaptionMediaPreviewContext(
@@ -246,6 +255,7 @@ fun MomentCaptionView(
     }
 
     var showFullCaption by remember { mutableStateOf(false) }
+    var captionBounds by remember { mutableStateOf(Rect.Zero) }
 
     if (style == MomentCaptionPresentationStyle.Reels) {
         ReelsCaptionBody(
@@ -269,6 +279,7 @@ fun MomentCaptionView(
     Column(
         modifier
             .fillMaxWidth()
+            .onGloballyPositioned { captionBounds = it.boundsInWindow() }
             .padding(horizontal = FeedMomentCardLayout.captionHorizontalPadding)
             .padding(top = if (style == MomentCaptionPresentationStyle.Detail) 0.dp else 2.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -283,6 +294,10 @@ fun MomentCaptionView(
             fontSize = bodyFontSize,
             lineLimit = lineLimit,
             modifier = Modifier.fillMaxWidth(),
+            onTextLayout = { result ->
+                val overflows = result.hasVisualOverflow
+                if (needsExpansion != overflows) needsExpansion = overflows
+            },
         )
 
         if (needsExpansion) {
@@ -290,6 +305,7 @@ fun MomentCaptionView(
             val density = LocalDensity.current
             Row(
                 Modifier
+                    .heightIn(min = 44.dp)
                     .momentsChromeGlass(CircleShape, interactive = true)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -319,19 +335,224 @@ fun MomentCaptionView(
     }
 
     if (showFullCaption) {
-        MomentsModalSheet(
-            onDismissRequest = { showFullCaption = false },
-            largeOnly = false,
-        ) { _ ->
-            MomentCaptionReaderSheet(
-                content = trimmed,
-                mediaPreviewContext = mediaPreviewContext,
-                onHashtagTap = onHashtagTap,
-                onMentionTap = onMentionTap,
+        Dialog(
+            onDismissRequest = { /* El cierre inverso lo controla el morph. */ },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+            ),
+        ) {
+            MomentCaptionContextDestination(
+                sourceBounds = captionBounds,
+                onDismiss = { showFullCaption = false },
+                source = {
+                    CaptionMorphSource(
+                        content = previewContent,
+                        needsExpansion = needsExpansion,
+                        baseColor = baseColor,
+                        secondaryColor = secondaryColor,
+                        hashtagColor = hashtagColor,
+                        mentionColor = mentionColor,
+                        bodyFontSize = bodyFontSize,
+                        lineLimit = lineLimit,
+                    )
+                },
+                destination = { close, reportContentHeight ->
+                    MomentCaptionReaderCard(
+                        content = trimmed,
+                        mediaPreviewContext = mediaPreviewContext,
+                        onHashtagTap = onHashtagTap,
+                        onMentionTap = onMentionTap,
+                        onClose = close,
+                        onContentHeightChange = reportContentHeight,
+                    )
+                },
             )
         }
     }
 }
+
+@Composable
+private fun CaptionMorphSource(
+    content: String,
+    needsExpansion: Boolean,
+    baseColor: Color,
+    secondaryColor: Color,
+    hashtagColor: Color,
+    mentionColor: Color,
+    bodyFontSize: androidx.compose.ui.unit.TextUnit,
+    lineLimit: Int,
+) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(horizontal = FeedMomentCardLayout.captionHorizontalPadding)
+            .padding(top = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        MomentHashtagText(
+            content = content,
+            onHashtagTap = {},
+            onMentionTap = {},
+            baseColor = baseColor,
+            hashtagColor = hashtagColor,
+            mentionColor = mentionColor,
+            fontSize = bodyFontSize,
+            lineLimit = lineLimit,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        if (needsExpansion) {
+            Row(
+                Modifier
+                    .heightIn(min = 44.dp)
+                    .momentsChromeGlass(CircleShape, interactive = false)
+                    .padding(horizontal = 11.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.feed_see_more),
+                    color = secondaryColor,
+                    fontSize = with(density) { legacyPoppinsSize(context, 12).toSp() },
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.FormatAlignLeft,
+                    contentDescription = null,
+                    tint = secondaryColor,
+                    modifier = Modifier.size(10.dp),
+                )
+            }
+        }
+    }
+}
+
+/** M3 container morph equivalente al lector contextual de iOS, sin giro 3D. */
+@Composable
+private fun MomentCaptionContextDestination(
+    sourceBounds: Rect,
+    onDismiss: () -> Unit,
+    source: @Composable () -> Unit,
+    destination: @Composable (close: () -> Unit, onContentHeightChange: (Int) -> Unit) -> Unit,
+) {
+    val progress = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    var isClosing by remember { mutableStateOf(false) }
+    var destinationContentHeightPx by remember { mutableIntStateOf(0) }
+    val isDark = isSystemInDarkTheme()
+    val surface = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+
+    fun close() {
+        if (isClosing) return
+        isClosing = true
+        scope.launch {
+            progress.animateTo(0f, tween(380, easing = FastOutSlowInEasing))
+            onDismiss()
+        }
+    }
+
+    BackHandler(onBack = ::close)
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val density = LocalDensity.current
+        val widthPx = with(density) { maxWidth.toPx() }
+        val heightPx = with(density) { maxHeight.toPx() }
+        val horizontalInsetPx = with(density) { 12.dp.toPx() }
+        val verticalInsetPx = with(density) { 16.dp.toPx() }
+        val maxCardHeightPx = minOf(with(density) { 560.dp.toPx() }, heightPx * 0.50f)
+        val minCardHeightPx = with(density) { 220.dp.toPx() }
+        val fallbackCardHeightPx = with(density) { 260.dp.toPx() }
+        val measuredCardHeightPx = destinationContentHeightPx
+            .takeIf { it > 0 }
+            ?.toFloat()
+            ?: fallbackCardHeightPx
+        val effectiveMinHeightPx = minOf(minCardHeightPx, maxCardHeightPx)
+        val cardHeightPx = measuredCardHeightPx.coerceIn(effectiveMinHeightPx, maxCardHeightPx)
+        val destinationBounds = Rect(
+            left = horizontalInsetPx,
+            top = (heightPx - cardHeightPx) / 2f,
+            right = widthPx - horizontalInsetPx,
+            bottom = (heightPx + cardHeightPx) / 2f,
+        )
+        val safeSource = sourceBounds.takeIf { it.width > 0f && it.height > 0f }
+            ?: Rect(
+                left = horizontalInsetPx,
+                top = heightPx / 2f - verticalInsetPx,
+                right = widthPx - horizontalInsetPx,
+                bottom = heightPx / 2f + verticalInsetPx,
+            )
+        val frame = captionLerpRect(safeSource, destinationBounds, progress.value)
+        val corner = with(density) { captionLerp(16.dp.toPx(), 28.dp.toPx(), progress.value).toDp() }
+        val sourceAlpha = (1f - progress.value / 0.44f).coerceIn(0f, 1f)
+        val destinationAlpha = ((progress.value - 0.16f) / 0.42f).coerceIn(0f, 1f)
+
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.34f * progress.value))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = ::close,
+                ),
+        )
+
+        Box(
+            Modifier
+                .offset { IntOffset(frame.left.roundToInt(), frame.top.roundToInt()) }
+                .size(
+                    width = with(density) { frame.width.toDp() },
+                    height = with(density) { frame.height.toDp() },
+                )
+                .graphicsLayer {
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(corner)
+                    clip = true
+                    shadowElevation = 24f * density.density * progress.value
+                }
+                .background(surface)
+                .zIndex(1f),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = sourceAlpha },
+            ) {
+                source()
+            }
+
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = destinationAlpha },
+            ) {
+                destination(::close) { measuredHeight ->
+                    if (measuredHeight > 0 && measuredHeight != destinationContentHeightPx) {
+                        destinationContentHeightPx = measuredHeight
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun captionLerpRect(start: Rect, end: Rect, progress: Float): Rect = Rect(
+    left = captionLerp(start.left, end.left, progress),
+    top = captionLerp(start.top, end.top, progress),
+    right = captionLerp(start.right, end.right, progress),
+    bottom = captionLerp(start.bottom, end.bottom, progress),
+)
+
+private fun captionLerp(start: Float, end: Float, progress: Float): Float =
+    start + (end - start) * progress
 
 @Composable
 private fun ReelsCaptionBody(
@@ -446,99 +667,118 @@ private fun ReelsCaptionBody(
     }
 }
 
-/** Port de `MomentCaptionReaderSheet` (MomentCaptionView.swift). */
+/** Port de `MomentCaptionReaderCard` (MomentCaptionView.swift). */
 @Composable
-private fun MomentCaptionReaderSheet(
+private fun MomentCaptionReaderCard(
     content: String,
     mediaPreviewContext: CaptionMediaPreviewContext?,
     onHashtagTap: (String) -> Unit,
     onMentionTap: (String) -> Unit,
+    onClose: () -> Unit,
+    onContentHeightChange: (Int) -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
     val baseColor = sheetBaseTextColor(isDark)
     val hashtagColor = captionHashtagTextColor(isDark)
     val context = LocalContext.current
     val density = LocalDensity.current
-    val dragCapsuleColor = if (isDark) Color.White else Color.Black
 
-    Column(
+    Box(
         Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 18.dp)
-            .padding(bottom = 34.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
     ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            Box(
-                Modifier
-                    .size(width = 42.dp, height = 5.dp)
-                    .clip(CircleShape)
-                    .background(dragCapsuleColor.copy(alpha = 0.22f)),
-            )
-        }
-
-        mediaPreviewContext?.let { preview ->
-            MomentCaptionMediaPreview(
-                context = preview,
-                isDark = isDark,
-            )
-        }
-
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(20.dp)
+                .padding(bottom = 14.dp)
+                .onSizeChanged { onContentHeightChange(it.height) },
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Text(
-                text = stringResource(R.string.edit_moment_description),
-                color = baseColor,
-                fontSize = with(density) { legacyPoppinsSize(context, 17).toSp() },
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                mediaPreviewContext?.let { preview ->
+                    MomentCaptionReaderThumbnail(
+                        context = preview,
+                        isDark = isDark,
+                    )
+                }
 
-            MomentHashtagText(
-                content = content,
-                onHashtagTap = onHashtagTap,
-                onMentionTap = onMentionTap,
-                baseColor = baseColor,
-                hashtagColor = hashtagColor,
-                mentionColor = captionMentionTextColor,
-                fontSize = 16.sp,
-                modifier = Modifier.fillMaxWidth(),
-            )
+                mediaPreviewContext?.let { preview ->
+                    LiveUsernameText(
+                        userId = preview.authorId,
+                        fallbackUsername = preview.username,
+                        color = baseColor,
+                        style = androidx.compose.ui.text.TextStyle(
+                            fontSize = with(density) { legacyPoppinsSize(context, 14).toSp() },
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        maxLines = 1,
+                    )
+                }
+
+                Spacer(Modifier.weight(1f))
+
+                Box(
+                    Modifier
+                        .size(38.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clickable(onClick = onClose),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.common_close),
+                        tint = baseColor,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+
+            Column(
+                Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.edit_moment_description),
+                    color = baseColor,
+                    fontSize = with(density) { legacyPoppinsSize(context, 17).toSp() },
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                MomentHashtagText(
+                    content = content,
+                    onHashtagTap = onHashtagTap,
+                    onMentionTap = onMentionTap,
+                    baseColor = baseColor,
+                    hashtagColor = hashtagColor,
+                    mentionColor = captionMentionTextColor,
+                    fontSize = 16.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }
 
-/** Port de `MomentCaptionMediaPreview` (MomentCaptionView.swift). */
 @Composable
-private fun MomentCaptionMediaPreview(
+private fun MomentCaptionReaderThumbnail(
     context: CaptionMediaPreviewContext,
     isDark: Boolean,
 ) {
     val isProtected = (context.audience?.lowercase() ?: "") != "everyone"
-    val composeContext = LocalContext.current
-    val density = LocalDensity.current
-    val usernameStyle = androidx.compose.ui.text.TextStyle(
-        fontSize = with(density) { legacyPoppinsSize(composeContext, 13).toSp() },
-        fontWeight = FontWeight.SemiBold,
-    )
 
     ScreenshotProtectedView(isProtected = isProtected) {
         Box(
             Modifier
-                .fillMaxWidth()
-                .height(230.dp)
-                .shadow(18.dp, FeedMomentCardLayout.continuousRoundedRectShape, clip = false)
-                .clip(FeedMomentCardLayout.continuousRoundedRectShape),
+                .size(58.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(15.dp)),
+            contentAlignment = Alignment.Center,
         ) {
             if (!context.mediaUrl.isNullOrBlank()) {
                 AsyncImage(
@@ -569,46 +809,14 @@ private fun MomentCaptionMediaPreview(
                 )
             }
 
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0f to Color.Transparent,
-                                0.5f to Color.Transparent,
-                                1f to Color.Black.copy(alpha = 0.45f),
-                            ),
-                        ),
-                    ),
-            )
-
-            val chromeContent = MomentsChromeGlass.contentColor(isDark)
-            Row(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(12.dp)
-                    .momentsChromeGlass(CircleShape, interactive = false)
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                if (context.isVideo) {
-                    Icon(
-                        imageVector = Icons.Filled.PlayArrow,
-                        contentDescription = null,
-                        tint = chromeContent,
-                        modifier = Modifier.size(10.dp),
-                    )
-                }
-
-                LiveUsernameText(
-                    userId = context.authorId,
-                    fallbackUsername = context.username,
-                    // iOS fuerza white sobre media; en Android chrome light es opaco claro.
-                    color = chromeContent,
-                    style = usernameStyle,
-                    maxLines = 1,
+            if (context.isVideo) {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(14.dp)
+                        .shadow(3.dp, CircleShape),
                 )
             }
         }

@@ -59,6 +59,7 @@ import com.moments.android.services.firestore.loadSavedMoments
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.network.OfflineSyncService
 import com.moments.android.services.social.EchoService
+import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.BackgroundMomentUploadService
 import com.moments.android.views.feed.FeedInk
@@ -220,6 +221,7 @@ fun FeedView(
 
     fun openStoryViewer(userId: String, startStoryId: String? = null, startElapsed: Double = 0.0) {
         if (userId.isEmpty()) return
+        GlobalVideoManager.beginPlaybackHold("feed-comments-or-stories")
         syncStoryRingNavigationOrder()
         selectedStoryRoute = StoryUserPresentationRoute(
             userId = userId,
@@ -445,8 +447,18 @@ fun FeedView(
         onSuppressTabBarChange(isPresentingStoryViewer)
     }
 
+    val isPresentingCommentsOrStories = selectedMoment != null || isPresentingStoryViewer
+    LaunchedEffect(isPresentingCommentsOrStories) {
+        if (isPresentingCommentsOrStories) {
+            GlobalVideoManager.beginPlaybackHold("feed-comments-or-stories")
+        } else {
+            GlobalVideoManager.endPlaybackHold("feed-comments-or-stories")
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
+            GlobalVideoManager.endPlaybackHold("feed-comments-or-stories")
             onSuppressTabBarChange(false)
             pendingEchoesListener?.remove()
             pendingEchoesListener = null
@@ -615,7 +627,10 @@ fun FeedView(
                         selectedLocationLongitude = coordinate?.longitude
                         showingLocationMap = true
                     },
-                    onOpenComments = { moment -> selectedMoment = moment },
+                    onOpenComments = { moment ->
+                        GlobalVideoManager.beginPlaybackHold("feed-comments-or-stories")
+                        selectedMoment = moment
+                    },
                     onShare = { moment ->
                         shareMoment = moment
                         selectedMomentForMenu = moment

@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -61,6 +62,7 @@ fun MomentHashtagText(
     actionColor: Color = hashtagColor,
     onMentionTap: ((String) -> Unit)? = null,
     onActionTap: (() -> Unit)? = null,
+    onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     data class Token(val range: IntRange, val tag: String, val value: String)
     val tokens = (MomentHashtagParser.matchesIn(content).map { Token(it.range, "hashtag", it.term) } +
@@ -88,6 +90,7 @@ fun MomentHashtagText(
         modifier = modifier,
         style = TextStyle(color = baseColor, fontSize = fontSize, textAlign = textAlignment, shadow = shadow),
         maxLines = lineLimit ?: Int.MAX_VALUE,
+        onTextLayout = { onTextLayout?.invoke(it) },
         onClick = { offset ->
             annotated.getStringAnnotations("action", offset, offset).firstOrNull()?.let { onActionTap?.invoke(); return@ClickableText }
             annotated.getStringAnnotations("hashtag", offset, offset).firstOrNull()?.let { onHashtagTap(it.item); return@ClickableText }

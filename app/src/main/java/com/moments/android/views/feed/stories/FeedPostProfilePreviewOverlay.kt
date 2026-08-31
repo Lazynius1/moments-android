@@ -221,14 +221,14 @@ fun FeedPostProfilePreviewOverlay(
     LaunchedEffect(selection?.userId) {
         val userId = selection?.userId
         if (userId == null) {
-            GlobalVideoManager.endPlaybackHold()
+            GlobalVideoManager.endPlaybackHold("feed-profile-preview")
             onPresentedChange(false)
             isPresented = false
             showUnfollowConfirmation = false
             unfollowViewModel = null
             return@LaunchedEffect
         }
-        GlobalVideoManager.beginPlaybackHold()
+        GlobalVideoManager.beginPlaybackHold("feed-profile-preview")
         dismissGeneration += 1
         cardSurfaceAlpha = 1f
         isPresented = false

@@ -46,6 +46,7 @@ object GlobalVideoManager {
     private val playbackPositionsByMomentId = ConcurrentHashMap<String, Double>()
     private val preservedPlayerConsumerIds = mutableSetOf<String>()
     private val pendingDetailHandoffMomentIds = mutableSetOf<String>()
+    private val playbackHoldOwners = ConcurrentHashMap.newKeySet<String>()
 
     private val _activeVideoId = MutableStateFlow<String?>(null)
     val activeVideoId: StateFlow<String?> = _activeVideoId.asStateFlow()
@@ -131,15 +132,20 @@ object GlobalVideoManager {
         runCatching { SharedVideoPlayerPool.pauseAll() }
     }
 
-    /** Overlay u otra UI encima del feed: pausa el post activo y evita que la visibilidad lo reanude. */
-    fun beginPlaybackHold() {
+    /**
+     * Overlay u otra UI encima del feed: pausa el post activo y evita que la
+     * visibilidad lo reanude. El owner evita que cerrar un overlay libere el
+     * hold de otro que siga presentado.
+     */
+    fun beginPlaybackHold(owner: String = "legacy") {
+        playbackHoldOwners += owner
         _isPlaybackHeld.value = true
         pauseAllVideos()
     }
 
-    fun endPlaybackHold() {
-        if (!_isPlaybackHeld.value) return
-        _isPlaybackHeld.value = false
+    fun endPlaybackHold(owner: String = "legacy") {
+        playbackHoldOwners -= owner
+        _isPlaybackHeld.value = playbackHoldOwners.isNotEmpty()
     }
 
     // MARK: - Mute de sesión

@@ -279,14 +279,14 @@ fun FeedStoryRingPreviewOverlay(
     LaunchedEffect(selection?.userId) {
         val userId = selection?.userId
         if (userId == null) {
-            GlobalVideoManager.endPlaybackHold()
+            GlobalVideoManager.endPlaybackHold("feed-story-preview")
             isPresented = false
             resetPreviewPlayback()
             showMuteConfirmation = false
             successMessage = null
             return@LaunchedEffect
         }
-        GlobalVideoManager.beginPlaybackHold()
+        GlobalVideoManager.beginPlaybackHold("feed-story-preview")
         dismissGeneration += 1
         isPresented = false
         showMuteConfirmation = false
