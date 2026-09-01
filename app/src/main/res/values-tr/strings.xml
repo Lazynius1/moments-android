@@ -794,6 +794,8 @@
     <string name="modern_comments_replying_to">%1$s adlı kişiye yanıt veriliyor</string>
     <string name="modern_comments_editing">Yorum düzenleniyor</string>
     <string name="modern_comments_view_more_replies">%1$d yanıt daha göster</string>
+    <string name="modern_comments_view_one_more_reply">1 yanıt daha göster</string>
+    <string name="modern_comments_hide_replies">Yanıtları gizle</string>
     <string name="modern_comments_edited">(düzenlendi)</string>
     <string name="modern_comments_empty_title">Henüz yorum yok</string>
     <string name="modern_comments_empty_description">Bu ana ilk yorumu sen yap</string>

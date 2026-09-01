@@ -794,6 +794,8 @@
     <string name="modern_comments_replying_to">Antwoord aan %1$s</string>
     <string name="modern_comments_editing">Reactie bewerken</string>
     <string name="modern_comments_view_more_replies">Nog %1$d reacties bekijken</string>
+    <string name="modern_comments_view_one_more_reply">Nog 1 reactie bekijken</string>
+    <string name="modern_comments_hide_replies">Reacties verbergen</string>
     <string name="modern_comments_edited">(bewerkt)</string>
     <string name="modern_comments_empty_title">Nog geen reacties</string>
     <string name="modern_comments_empty_description">Plaats als eerste een reactie op dit moment</string>

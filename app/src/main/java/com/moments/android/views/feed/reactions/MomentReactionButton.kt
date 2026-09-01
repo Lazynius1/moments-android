@@ -150,6 +150,7 @@ fun EpicReactionButton(
     sizeDp: Float = 44f,
     emojiSizeSp: Float = 24f,
     pickerXOffset: Float = 0f,
+    chromeOnMedia: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
@@ -316,7 +317,11 @@ fun EpicReactionButton(
                             Color.Black.copy(0.1f)
                         },
                     )
-                    .momentsChromeGlass(CircleShape, interactive = true)
+                    .momentsChromeGlass(
+                        CircleShape,
+                        interactive = true,
+                        tint = if (chromeOnMedia) Color.fromHex("151D21") else null,
+                    )
                     .combinedClickable(
                         onClick = {
                             if (hasReacted) removeReactionWithAnimation()
@@ -350,7 +355,7 @@ fun EpicReactionButton(
                     Icon(
                         imageVector = Icons.Outlined.FavoriteBorder,
                         contentDescription = null,
-                        tint = if (isDark) Color.White else ink,
+                        tint = if (chromeOnMedia || isDark) Color.White else ink,
                         modifier = Modifier.size(emojiSizeSp.dp),
                     )
                 }

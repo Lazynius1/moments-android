@@ -623,7 +623,9 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="modern_comments_loading">Carregant comentaris...</string>
     <string name="modern_comments_replying_to">Responent a %1$s</string>
     <string name="modern_comments_editing">Editant comentari</string>
-    <string name="modern_comments_view_more_replies">Veure %1$d resposta(s) més</string>
+    <string name="modern_comments_view_one_more_reply">Veure 1 resposta més</string>
+    <string name="modern_comments_view_more_replies">Veure %1$d respostes més</string>
+    <string name="modern_comments_hide_replies">Amagar respostes</string>
     <string name="modern_comments_edited">(editat)</string>
     <string name="modern_comments_empty_title">No hi ha comentaris encara</string>
     <string name="modern_comments_empty_description">Sigues el primer a comentar aquest moment</string>

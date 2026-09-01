@@ -10,6 +10,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
@@ -61,9 +63,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -72,6 +76,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -106,6 +111,7 @@ import com.moments.android.views.comments.ModernCommentsSheet
 import com.moments.android.views.components.CurrentUserVerifiedBadge
 import com.moments.android.views.components.MomentCaptionPresentationStyle
 import com.moments.android.views.components.MomentCaptionView
+import com.moments.android.views.components.RailCountBadge
 import com.moments.android.views.components.VerifiedBadgeView
 import com.moments.android.views.feed.reactions.EpicReactionButton
 import com.moments.android.views.feed.reactions.ReactionType
@@ -162,19 +168,24 @@ fun ReelVideoView(
     var isSaveLoading by remember { mutableStateOf(false) }
     var scrubProgress by remember { mutableDoubleStateOf(0.0) }
     var progressBarWidthPx by remember { mutableFloatStateOf(0f) }
+    var commentsSheetTopFraction by remember { mutableFloatStateOf(0.5f) }
     val savedMomentIds by firestore.savedMomentIds.collectAsState()
 
-    val chromePrimary = if (isDark) Color.White else Color(0xFF0B1215)
-    val chromeSecondary = if (isDark) Color.White.copy(0.78f) else Color(0xFF0B1215).copy(0.72f)
-    val chromeTertiary = if (isDark) Color.White.copy(0.72f) else Color(0xFF0B1215).copy(0.58f)
+    val mediaChromePrimary = Color.White
+    val mediaChromeSecondary = Color.White.copy(alpha = 0.82f)
+    val mediaChromeTertiary = Color.White.copy(alpha = 0.72f)
+    val mediaControlBackground = Color(0xFF151D21)
+    val bottomBarTertiary = if (isDark) Color.White.copy(0.72f) else Color(0xFF0B1215).copy(0.58f)
     val bottomBarBg = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
-    // ≡ iOS bottomBarHeight 68 + nav inset − overlap (-6) → caption/acciones encima del progress.
-    val bottomBarHeight = 68.dp
+    val bottomBarHeight = 46.dp
     val progressCommentOverlap = 6.dp
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val bottomChromeClearance = bottomBarHeight + navBottom - progressCommentOverlap + 8.dp
+    val chromeBottomPadding = navBottom
+    val bottomChromeClearance = 2.5.dp + bottomBarHeight + chromeBottomPadding
 
     val displayAuthorUsername = liveAuthorUsername.trim().ifEmpty { video.moment.username }
+    val windowHeightPx = LocalWindowInfo.current.containerSize.height.coerceAtLeast(1)
+    val videoScale = if (showComments) commentsSheetTopFraction.coerceIn(0f, 1f) else 1f
 
     val resizeMode = remember(video.moment.aspectRatio) {
         when (video.moment.aspectRatio) {
@@ -341,42 +352,52 @@ fun ReelVideoView(
         val posterContentScale =
             if (resizeMode == AspectRatioFrameLayout.RESIZE_MODE_FIT) ContentScale.Fit else ContentScale.Crop
 
-        if (exo != null) {
-            VideoPlayerRepresentable(
-                player = exo,
-                resizeMode = resizeMode,
-                onProgress = { /* manager.observePlayback owns progress */ },
-                onBuffering = { playerManager.isBuffering = it },
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Box(Modifier.fillMaxSize().background(Color.Black))
-        }
-
-        // ≡ iOS VideoPosterOverlay hasta readyToPlay (también en el reel adyacente al swipe).
-        VideoPosterOverlay(
-            posterUrl = video.posterUrlString,
-            isReadyToPlay = playerManager.isLoaded && exo != null,
-            contentScale = posterContentScale,
-        )
-
-        // Capa de gestos (tap play/pause, double-tap feel)
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = {
-                            HapticManager.shared.lightImpact()
-                            playerManager.togglePlayback()
-                        },
-                        onDoubleTap = { handleDoubleTap() },
-                    )
+                .graphicsLayer {
+                    scaleX = videoScale
+                    scaleY = videoScale
+                    transformOrigin = TransformOrigin(0.5f, 0f)
                 },
-        )
+        ) {
+            if (exo != null) {
+                VideoPlayerRepresentable(
+                    player = exo,
+                    resizeMode = resizeMode,
+                    onProgress = { /* manager.observePlayback owns progress */ },
+                    onBuffering = { playerManager.isBuffering = it },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Box(Modifier.fillMaxSize().background(Color.Black))
+            }
+
+            // ≡ iOS VideoPosterOverlay hasta readyToPlay (también en el reel adyacente al swipe).
+            VideoPosterOverlay(
+                posterUrl = video.posterUrlString,
+                isReadyToPlay = playerManager.isLoaded && exo != null,
+                contentScale = posterContentScale,
+            )
+
+            // Capa de gestos (tap play/pause, double-tap feel)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                HapticManager.shared.lightImpact()
+                                playerManager.togglePlayback()
+                            },
+                            onDoubleTap = { handleDoubleTap() },
+                        )
+                    },
+            )
+        }
 
         AnimatedVisibility(
-            visible = isDoubleTapAnimating,
+            visible = isDoubleTapAnimating && !showComments,
             enter = scaleIn(initialScale = 0.1f) + fadeIn(),
             exit = scaleOut(targetScale = 1.5f) + fadeOut(),
             modifier = Modifier.align(Alignment.Center),
@@ -393,7 +414,8 @@ fun ReelVideoView(
         AnimatedVisibility(
             visible = playerManager.player != null &&
                 !playerManager.isPlaying &&
-                !isDraggingProgress,
+                !isDraggingProgress &&
+                !showComments,
             enter = fadeIn() + scaleIn(initialScale = 0.92f),
             exit = fadeOut() + scaleOut(targetScale = 0.92f),
             modifier = Modifier.align(Alignment.Center),
@@ -405,7 +427,7 @@ fun ReelVideoView(
                 Box(
                     Modifier
                         .size(28.dp)
-                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .momentsChromeGlass(CircleShape, interactive = true, tint = mediaControlBackground)
                         .clickable {
                             HapticManager.shared.lightImpact()
                             playerManager.toggleMute()
@@ -418,14 +440,14 @@ fun ReelVideoView(
                             if (playerManager.isMuted) R.string.feed_video_unmute
                             else R.string.feed_video_mute,
                         ),
-                        tint = chromePrimary,
+                        tint = mediaChromePrimary,
                         modifier = Modifier.size(12.dp),
                     )
                 }
                 Box(
                     Modifier
                         .size(64.dp)
-                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .momentsChromeGlass(CircleShape, interactive = true, tint = mediaControlBackground)
                         .clickable {
                             HapticManager.shared.lightImpact()
                             playerManager.play()
@@ -435,7 +457,7 @@ fun ReelVideoView(
                     Icon(
                         Icons.Filled.PlayArrow,
                         contentDescription = stringResource(R.string.feed_video_play),
-                        tint = chromePrimary,
+                        tint = mediaChromePrimary,
                         modifier = Modifier
                             .size(28.dp)
                             .offset(x = 1.dp),
@@ -445,7 +467,7 @@ fun ReelVideoView(
         }
 
         // Chrome overlay
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().alpha(if (showComments) 0f else 1f)) {
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -456,22 +478,21 @@ fun ReelVideoView(
             ) {
                 Box(
                     Modifier
-                        .size(38.dp)
-                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .size(34.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true, tint = mediaControlBackground)
                         .clickable {
                             HapticManager.shared.mediumImpact()
                             onClose()
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.Close, null, tint = chromePrimary, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Filled.Close, null, tint = mediaChromePrimary, modifier = Modifier.size(15.dp))
                 }
             }
 
             Spacer(Modifier.weight(1f))
 
-            // Gradiente: misma área útil que iOS (300−22) + clearance del comment/progress.
-            val gradientHeight = 300.dp - 22.dp + bottomChromeClearance
+            val gradientHeight = maxOf(300.dp, 293.dp + navBottom)
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -486,16 +507,14 @@ fun ReelVideoView(
                     Modifier
                         .align(Alignment.BottomStart)
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                        // ≡ iOS overlay comment bar: subir chrome por encima del progress + surface.
-                        .padding(bottom = bottomChromeClearance),
+                        .padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     Column(
                         Modifier
                             .weight(1f)
-                            .padding(bottom = 6.dp),
+                            .padding(bottom = bottomChromeClearance + 6.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Row(
@@ -545,7 +564,7 @@ fun ReelVideoView(
                                 ) {
                                     Text(
                                         displayAuthorUsername,
-                                        color = chromePrimary,
+                                        color = mediaChromePrimary,
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
@@ -563,7 +582,7 @@ fun ReelVideoView(
                                 ) {
                                     Text(
                                         MomentsFormat.relativeTime(from = video.moment.timestamp),
-                                        color = chromeSecondary,
+                                        color = mediaChromeSecondary,
                                         fontSize = 12.sp,
                                     )
                                     val loc = video.moment.location
@@ -575,12 +594,12 @@ fun ReelVideoView(
                                             Icon(
                                                 Icons.Filled.LocationOn,
                                                 null,
-                                                tint = chromeTertiary,
+                                                tint = mediaChromeTertiary,
                                                 modifier = Modifier.size(9.dp),
                                             )
                                             Text(
                                                 loc,
-                                                color = chromeTertiary,
+                                                color = mediaChromeTertiary,
                                                 fontSize = 12.sp,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
@@ -605,15 +624,15 @@ fun ReelVideoView(
                     Column(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        // ≡ iOS: actions `.padding(.bottom, bottomChromeClearance + 18)`
-                        modifier = Modifier.padding(bottom = 18.dp),
+                        modifier = Modifier.padding(bottom = bottomChromeClearance + 26.dp),
                     ) {
                         EpicReactionButton(
                             moment = feedMoment,
                             showCount = video.moment.authorId == uid || !video.moment.hideLikeCounts,
-                            sizeDp = 56f,
-                            emojiSizeSp = 28f,
+                            sizeDp = 44f,
+                            emojiSizeSp = 22f,
                             pickerXOffset = -110f,
+                            chromeOnMedia = true,
                         )
 
                         if (!video.moment.disableComments) {
@@ -641,7 +660,7 @@ fun ReelVideoView(
                             vectorIcon = Icons.Filled.MoreHoriz,
                             count = null,
                             isActive = false,
-                            activeColor = chromePrimary,
+                            activeColor = mediaChromePrimary,
                             onClick = { showContextMenu = !showContextMenu },
                         )
                     }
@@ -654,7 +673,8 @@ fun ReelVideoView(
         Column(
             Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .alpha(if (showComments) 0f else 1f),
             verticalArrangement = Arrangement.spacedBy((-progressCommentOverlap)),
         ) {
             if (playerManager.duration > 0) {
@@ -747,16 +767,21 @@ fun ReelVideoView(
                     .navigationBarsPadding()
                     .height(bottomBarHeight)
                     .padding(horizontal = 16.dp)
-                    .padding(top = 14.dp, bottom = 2.dp),
+                    .padding(top = 6.dp),
             ) {
                 if (!video.moment.disableComments) {
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .height(46.dp)
+                            .height(40.dp)
                             .clip(RoundedCornerShape(percent = 50))
                             .background(
                                 if (isDark) Color.White.copy(0.06f) else Color.Black.copy(0.06f),
+                            )
+                            .border(
+                                1.dp,
+                                if (isDark) Color.White.copy(0.10f) else Color.Black.copy(0.10f),
+                                RoundedCornerShape(percent = 50),
                             )
                             .clickable { showComments = true }
                             .padding(horizontal = 18.dp),
@@ -766,12 +791,12 @@ fun ReelVideoView(
                         Icon(
                             Icons.Filled.ChatBubble,
                             null,
-                            tint = chromeTertiary,
+                            tint = bottomBarTertiary,
                             modifier = Modifier.size(14.dp),
                         )
                         Text(
                             stringResource(R.string.comments_add_placeholder),
-                            color = chromeTertiary,
+                            color = bottomBarTertiary,
                             fontSize = 15.sp,
                         )
                     }
@@ -814,6 +839,10 @@ fun ReelVideoView(
     if (showComments) {
         ModernCommentsSheet(
             moment = feedMoment,
+            keepBackgroundVisible = true,
+            onSheetOffsetChanged = { offsetPx ->
+                commentsSheetTopFraction = (offsetPx / windowHeightPx).coerceIn(0f, 1f)
+            },
             onDismiss = {
                 showComments = false
                 loadCommentCount()
@@ -862,22 +891,15 @@ fun EnhancedReelActionButton(
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val isDark = isSystemInDarkTheme()
-    // Chrome glass Android es opaco (canvas); blanco fijo desaparece en light.
-    val chromeInk = if (isDark) Color.White else Color(0xFF0B1215)
+    val chromeInk = Color.White
+    val controlBackground = Color(0xFF151D21)
     val inactiveTint = chromeInk
-    val countBg = chromeInk.copy(alpha = 0.15f)
-
-    Column(
-        modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    Box(modifier.requiredSize(44.dp)) {
         Box(
             Modifier
-                .size(56.dp)
+                .fillMaxSize()
                 .scale(if (isPressed) 0.95f else 1f)
-                .momentsChromeGlass(CircleShape, interactive = true)
+                .momentsChromeGlass(CircleShape, interactive = true, tint = controlBackground)
                 .drawBehind {
                     if (isActive) {
                         drawCircle(
@@ -909,21 +931,19 @@ fun EnhancedReelActionButton(
                     contentDescription = null,
                     tint = if (isActive) activeColor else inactiveTint,
                     modifier = Modifier
-                        .size(24.dp)
+                        .size(20.dp)
                         .scale(if (isActive) 1.1f else 1f),
                 )
             }
         }
 
         if (count != null && count > 0) {
-            Text(
-                MomentsFormat.count(count, MomentsFormat.CountStyle.SOCIAL_METRIC),
-                color = chromeInk,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
+            RailCountBadge(
+                text = MomentsFormat.count(count, MomentsFormat.CountStyle.SOCIAL_METRIC),
+                background = if (isActive) activeColor.copy(alpha = 0.82f) else Color.Gray.copy(alpha = 0.68f),
                 modifier = Modifier
-                    .background(countBg, RoundedCornerShape(percent = 50))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .align(Alignment.TopEnd)
+                    .offset(x = 4.dp, y = (-4).dp),
             )
         }
     }

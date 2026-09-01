@@ -794,6 +794,8 @@
     <string name="modern_comments_replying_to">%1$s님에게 답글 남기는 중</string>
     <string name="modern_comments_editing">댓글 수정 중</string>
     <string name="modern_comments_view_more_replies">답글 %1$d개 더 보기</string>
+    <string name="modern_comments_view_one_more_reply">답글 1개 더 보기</string>
+    <string name="modern_comments_hide_replies">답글 숨기기</string>
     <string name="modern_comments_edited">(수정됨)</string>
     <string name="modern_comments_empty_title">아직 댓글이 없어요</string>
     <string name="modern_comments_empty_description">이 모먼트에 첫 댓글을 남겨 보세요</string>

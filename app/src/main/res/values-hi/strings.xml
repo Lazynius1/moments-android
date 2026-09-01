@@ -794,6 +794,8 @@
     <string name="modern_comments_replying_to">%1$s को जवाब दे रहे हैं</string>
     <string name="modern_comments_editing">कमेंट एडिट कर रहे हैं</string>
     <string name="modern_comments_view_more_replies">%1$d और जवाब देखें</string>
+    <string name="modern_comments_view_one_more_reply">1 और जवाब देखें</string>
+    <string name="modern_comments_hide_replies">जवाब छिपाएँ</string>
     <string name="modern_comments_edited">(एडिट किया गया)</string>
     <string name="modern_comments_empty_title">अभी कोई कमेंट नहीं</string>
     <string name="modern_comments_empty_description">इस मोमेंट पर कमेंट करने वाले पहले व्यक्ति बनें</string>

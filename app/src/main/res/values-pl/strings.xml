@@ -794,6 +794,8 @@
     <string name="modern_comments_replying_to">Odpowiadasz użytkownikowi %1$s</string>
     <string name="modern_comments_editing">Edytujesz komentarz</string>
     <string name="modern_comments_view_more_replies">Wyświetl jeszcze %1$d odpowiedzi</string>
+    <string name="modern_comments_view_one_more_reply">Wyświetl jeszcze 1 odpowiedź</string>
+    <string name="modern_comments_hide_replies">Ukryj odpowiedzi</string>
     <string name="modern_comments_edited">(edytowano)</string>
     <string name="modern_comments_empty_title">Nie ma jeszcze komentarzy</string>
     <string name="modern_comments_empty_description">Skomentuj ten moment jako pierwsza osoba</string>

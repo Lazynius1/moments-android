@@ -794,6 +794,8 @@
     <string name="modern_comments_replying_to">Membalas %1$s</string>
     <string name="modern_comments_editing">Mengedit komentar</string>
     <string name="modern_comments_view_more_replies">Lihat %1$d balasan lainnya</string>
+    <string name="modern_comments_view_one_more_reply">Lihat 1 balasan lainnya</string>
+    <string name="modern_comments_hide_replies">Sembunyikan balasan</string>
     <string name="modern_comments_edited">(diedit)</string>
     <string name="modern_comments_empty_title">Belum ada komentar</string>
     <string name="modern_comments_empty_description">Jadilah yang pertama mengomentari momen ini</string>

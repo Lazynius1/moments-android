@@ -5,9 +5,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,15 +25,19 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
@@ -74,8 +82,11 @@ fun MomentsModalSheet(
     containerColor: Color = Color.Unspecified,
     shape: Shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     showDragHandle: Boolean = true,
+    scrimColor: Color? = null,
     /** false ≡ bloquear swipe-to-dismiss y tap en scrim (M3 confirmValueChange). */
     dismissEnabled: Boolean = true,
+    /** Posición Y real del borde superior; permite coordinar el contenido de fondo. */
+    onSheetOffsetChanged: ((Float) -> Unit)? = null,
     content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit,
 ) {
     val canvas = if (containerColor == Color.Unspecified) {
@@ -96,6 +107,11 @@ fun MomentsModalSheet(
             sheetState.expand()
         }
     }
+    LaunchedEffect(sheetState, onSheetOffsetChanged) {
+        val observer = onSheetOffsetChanged ?: return@LaunchedEffect
+        snapshotFlow { runCatching { sheetState.requireOffset() }.getOrNull() }
+            .collect { offset -> offset?.let(observer) }
+    }
     val scope = rememberCoroutineScope()
     val dismissSheet: () -> Unit = {
         scope.launch {
@@ -112,7 +128,7 @@ fun MomentsModalSheet(
         shape = shape,
         containerColor = canvas,
         tonalElevation = 0.dp,
-        scrimColor = BottomSheetDefaults.ScrimColor,
+        scrimColor = scrimColor ?: BottomSheetDefaults.ScrimColor,
         dragHandle = if (showDragHandle) {
             { BottomSheetDefaults.DragHandle() }
         } else {
@@ -185,15 +201,17 @@ fun MomentsSheetHeader(
 @Composable
 fun BoxScope.MomentsSheetPinnedFooter(
     modifier: Modifier = Modifier,
-    /** Espacio bajo el drag handle M3 ≈ 48.dp. */
-    handleAllowance: Dp = 48.dp,
     content: @Composable ColumnScope.() -> Unit,
 ): Dp {
     val sheetState = LocalMomentsSheetState.current
     val density = LocalDensity.current
     val windowHeightPx = LocalWindowInfo.current.containerSize.height
-    val handleAllowancePx = with(density) { handleAllowance.roundToPx() }
+    // IME + nav: recomponer al abrir/cerrar teclado (composer de comentarios, etc.).
+    val bottomInsetPx = WindowInsets.ime
+        .union(WindowInsets.navigationBars)
+        .getBottom(density)
     var footerHeightPx by remember { mutableIntStateOf(0) }
+    var parentOffsetWithinSheetPx by remember { mutableFloatStateOf(Float.NaN) }
 
     // Lectura aislada: solo este footer se recompone mientras arrastras el sheet.
     val sheetOffsetPx = if (sheetState != null) {
@@ -201,12 +219,18 @@ fun BoxScope.MomentsSheetPinnedFooter(
     } else {
         Float.NaN
     }
-    val yPx = if (sheetOffsetPx.isNaN() || footerHeightPx <= 0) {
+    val parentTopPx = if (sheetOffsetPx.isNaN() || parentOffsetWithinSheetPx.isNaN()) {
+        Float.NaN
+    } else {
+        sheetOffsetPx + parentOffsetWithinSheetPx
+    }
+    val yPx = if (parentTopPx.isNaN() || footerHeightPx <= 0) {
         0
     } else {
-        val visibleContentPx =
-            (windowHeightPx - sheetOffsetPx - handleAllowancePx).coerceAtLeast(0f)
-        (visibleContentPx - footerHeightPx).roundToInt().coerceAtLeast(0)
+        val systemContentBottomPx = windowHeightPx - bottomInsetPx
+        (systemContentBottomPx - parentTopPx - footerHeightPx)
+            .roundToInt()
+            .coerceAtLeast(0)
     }
 
     Column(
@@ -214,6 +238,17 @@ fun BoxScope.MomentsSheetPinnedFooter(
             .fillMaxWidth()
             .align(Alignment.TopStart)
             .onSizeChanged { footerHeightPx = it.height }
+            .onGloballyPositioned { coordinates ->
+                val currentSheetOffset = runCatching { sheetState?.requireOffset() }
+                    .getOrNull()
+                    ?.takeUnless { it.isNaN() }
+                    ?: return@onGloballyPositioned
+                val parentTopInWindow = coordinates.parentLayoutCoordinates
+                    ?.localToWindow(Offset.Zero)
+                    ?.y
+                    ?: return@onGloballyPositioned
+                parentOffsetWithinSheetPx = parentTopInWindow - currentSheetOffset
+            }
             .offset { IntOffset(0, yPx) },
         content = content,
     )

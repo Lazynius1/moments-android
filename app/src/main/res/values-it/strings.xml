@@ -623,7 +623,9 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="modern_comments_loading">Caricamento commenti...</string>
     <string name="modern_comments_replying_to">Risposta a %1$s</string>
     <string name="modern_comments_editing">Modifica commento</string>
+    <string name="modern_comments_view_one_more_reply">Vedi 1 altra risposta</string>
     <string name="modern_comments_view_more_replies">Vedi altre %1$d risposte</string>
+    <string name="modern_comments_hide_replies">Nascondi risposte</string>
     <string name="modern_comments_edited">(modificato)</string>
     <string name="modern_comments_empty_title">Ancora nessun commento</string>
     <string name="modern_comments_empty_description">Sii il primo a commentare questo momento</string>

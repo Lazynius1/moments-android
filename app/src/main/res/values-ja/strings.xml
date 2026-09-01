@@ -794,6 +794,8 @@
     <string name="modern_comments_replying_to">%1$sに返信中</string>
     <string name="modern_comments_editing">コメントを編集中</string>
     <string name="modern_comments_view_more_replies">さらに%1$d件の返信を見る</string>
+    <string name="modern_comments_view_one_more_reply">さらに1件の返信を見る</string>
+    <string name="modern_comments_hide_replies">返信を非表示</string>
     <string name="modern_comments_edited">（編集済み）</string>
     <string name="modern_comments_empty_title">まだコメントはありません</string>
     <string name="modern_comments_empty_description">このモーメントに最初のコメントを投稿しましょう</string>

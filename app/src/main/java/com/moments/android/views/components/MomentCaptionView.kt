@@ -225,9 +225,10 @@ fun MomentCaptionView(
     if (trimmed.isEmpty()) return
 
     val isDark = isSystemInDarkTheme()
-    val baseColor = captionBaseTextColor(isDark)
-    val secondaryColor = captionSecondaryTextColor(isDark)
-    val hashtagColor = captionHashtagTextColor(isDark)
+    val isMediaOverlay = style == MomentCaptionPresentationStyle.Reels
+    val baseColor = if (isMediaOverlay) Color.White.copy(alpha = 0.92f) else captionBaseTextColor(isDark)
+    val secondaryColor = if (isMediaOverlay) Color.White.copy(alpha = 0.72f) else captionSecondaryTextColor(isDark)
+    val hashtagColor = if (isMediaOverlay) Color.White else captionHashtagTextColor(isDark)
     val mentionColor = captionMentionTextColor
 
     // Feed/Reels: flujo continuo (IG). Detail: respeta saltos del autor.

@@ -664,7 +664,9 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="modern_comments_loading">Cargando comentarios...</string>
     <string name="modern_comments_replying_to">Respondiendo a %1$s</string>
     <string name="modern_comments_editing">Editando comentario</string>
-    <string name="modern_comments_view_more_replies">Ver %1$d respuesta(s) más</string>
+    <string name="modern_comments_view_one_more_reply">Ver 1 respuesta más</string>
+    <string name="modern_comments_view_more_replies">Ver %1$d respuestas más</string>
+    <string name="modern_comments_hide_replies">Ocultar respuestas</string>
     <string name="modern_comments_edited">(editado)</string>
     <string name="modern_comments_empty_title">No hay comentarios aún</string>
     <string name="modern_comments_empty_description">Sé el primero en comentar este momento</string>

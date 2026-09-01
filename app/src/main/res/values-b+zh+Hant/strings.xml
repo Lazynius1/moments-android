@@ -794,6 +794,8 @@
     <string name="modern_comments_replying_to">正在回覆 %1$s</string>
     <string name="modern_comments_editing">正在編輯留言</string>
     <string name="modern_comments_view_more_replies">查看另外 %1$d 則回覆</string>
+    <string name="modern_comments_view_one_more_reply">查看另外 1 則回覆</string>
+    <string name="modern_comments_hide_replies">隱藏回覆</string>
     <string name="modern_comments_edited">（已編輯）</string>
     <string name="modern_comments_empty_title">目前還沒有留言</string>
     <string name="modern_comments_empty_description">成為第一個留言的人吧</string>

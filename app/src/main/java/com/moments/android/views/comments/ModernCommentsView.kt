@@ -101,6 +101,7 @@ import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
+import com.moments.android.views.shared.MomentsSheetPinnedFooter
 import com.moments.android.views.story.StoryRingAvatarView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -159,7 +160,7 @@ fun ModernCommentsView(
 
     var showDeleteAlert by remember { mutableStateOf(false) }
     var commentToDelete by remember { mutableStateOf<Comment?>(null) }
-    val maxCommentNestingLevel = 4
+    val maxCommentNestingLevel = 2
     var expandedComments by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     var commentsListener by remember { mutableStateOf<ListenerRegistration?>(null) }
@@ -453,7 +454,7 @@ fun ModernCommentsView(
         }
     }
 
-    // Sheet large: header + lista (weight) + composer al fondo.
+    // Header + lista expandida; el composer se ancla al borde visible medium/large.
     Column(modifier.fillMaxWidth().fillMaxSize().background(colors.surfaceBackground)) {
         if (moment.disableComments) {
             CommentsHeader(
@@ -519,7 +520,7 @@ fun ModernCommentsView(
                     else -> {
                         LazyColumn(
                             Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 12.dp, top = 8.dp, start = 16.dp, end = 16.dp),
+                            contentPadding = PaddingValues(bottom = 104.dp, top = 8.dp, start = 8.dp, end = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             items(rootComments, key = { it.id ?: it.hashCode().toString() }) { comment ->
@@ -566,9 +567,9 @@ fun ModernCommentsView(
                         }
                     }
                 }
-            }
-
-            Column(Modifier.fillMaxWidth()) {
+                MomentsSheetPinnedFooter(
+                    modifier = Modifier,
+                ) {
                 replyToComment?.let { reply ->
                     val preview = reply.content.take(50) + if (reply.content.length > 50) "..." else ""
                     Row(
@@ -681,6 +682,7 @@ fun ModernCommentsView(
                         activeEditingCommentMention = null
                     },
                 )
+                }
             }
         }
 
