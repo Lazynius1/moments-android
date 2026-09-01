@@ -116,6 +116,9 @@
     <string name="auth_error_emptyFields">Identifiant et mot de passe requis.</string>
     <string name="auth_error_usernameNotFound">Utilisateur introuvable. Vérifiez votre nom d’utilisateur.</string>
     <string name="auth_error_privacyPolicyRequired">Vous devez accepter la politique de confidentialité.</string>
+    <string name="auth_error_minimumAgeRequired">Vous n’atteignez pas l’âge minimum applicable dans votre région.</string>
+    <string name="onboarding_birth_date_label">Date de naissance</string>
+    <string name="onboarding_birth_date_helper">Vous devez avoir au moins 16 ans pour créer un compte.</string>
     <string name="auth_error_usernameUnavailable">Nom d’utilisateur indisponible.</string>
     <string name="auth_error_userIdNotFound">Impossible de récupérer l’identifiant utilisateur.</string>
     <string name="auth_error_incompleteRegistrationWrongPassword">Cet e-mail a une inscription inachevée. Utilisez le mot de passe choisi lors de l\'inscription.</string>
@@ -237,7 +240,7 @@ Les stories, les messages éphémères et le contenu temporaire suivent leurs r�
 
 Si vous résidez dans l\'Union européenne ou dans une autre région disposant de droits équivalents, vous pouvez également déposer une réclamation auprès de votre autorité de protection des données.</string>
     <string name="privacy_minors_title">13. Mineurs</string>
-    <string name="privacy_minors_body">Moments ne s\'adresse pas aux enfants. L\'âge minimum pour créer un compte et utiliser le service dépend de votre pays ou région ; dans de nombreux endroits, il est de 13 ans ou plus. Lorsque la loi locale l\'exige, le consentement d\'un parent ou d\'un tuteur peut également s\'appliquer. Si nous détectons qu\'un compte ne respecte pas l\'âge minimum applicable ou les exigences de consentement, nous pouvons le limiter ou le supprimer.</string>
+    <string name="privacy_minors_body">Moments ne s\'adresse pas aux enfants. Vous devez respecter l’âge minimum indiqué lors de l’inscription pour votre région pour créer un compte et utiliser le service. Lorsque la loi locale l\'exige, une vérification d\'âge supplémentaire ou le consentement parental peut s\'appliquer. Si nous détectons qu\'un compte ne respecte pas l\'âge minimum applicable ou les exigences de consentement, nous pouvons le limiter ou le supprimer.</string>
     <string name="privacy_contact_title">14. Contact et modifications</string>
     <string name="privacy_contact_body">Nous pouvons mettre à jour cette politique lorsque nos fonctionnalités, nos prestataires ou les exigences légales évoluent. Si un changement est important, nous vous en informerons dans l\'application ou par tout autre moyen raisonnable.
 

@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Source
 import com.moments.android.models.AppUser
+import com.moments.android.services.compliance.AgePolicy
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.persistence.LocalPersistenceService
 import kotlinx.coroutines.delay
@@ -69,7 +70,16 @@ suspend fun FirestoreService.createUser(
     email: String,
     interests: List<String>,
     profileImagePath: String?,
+    birthDate: Date,
+    privacyPolicyAccepted: Boolean,
+    countryCode: String = AgePolicy.currentCountryCode,
+    privacyPolicyVersion: String = AgePolicy.PRIVACY_POLICY_VERSION,
 ) {
+    require(privacyPolicyAccepted) { "privacyPolicyAccepted required" }
+    val normalizedCountryCode = countryCode.trim().uppercase().takeIf { it.length == 2 && it.all(Char::isLetter) }
+        ?: error("invalid country code")
+    require(AgePolicy.isEligibleForAccount(birthDate, normalizedCountryCode)) { "minimum age not met" }
+    val normalizedBirthDate = AgePolicy.normalizedBirthDate(birthDate)
     val usernameLower = username.lowercase()
     val now = FieldValue.serverTimestamp()
     val notificationPreferences = hashMapOf(
@@ -106,6 +116,11 @@ suspend fun FirestoreService.createUser(
         "isOnline" to false,
         "createdAt" to now,
         "updatedAt" to now,
+        "birthDate" to Timestamp(normalizedBirthDate),
+        "countryCode" to normalizedCountryCode,
+        "privacyPolicyAccepted" to true,
+        "privacyPolicyAcceptedAt" to now,
+        "privacyPolicyVersion" to privacyPolicyVersion,
     )
     if (profileImagePath != null) profile["profileImagePath"] = profileImagePath
 

@@ -117,6 +117,9 @@
     <string name="auth_error_emptyFields">ユーザー名またはメールアドレスとパスワードを入力してください。</string>
     <string name="auth_error_usernameNotFound">ユーザーが見つかりません。ユーザー名を確認してください。</string>
     <string name="auth_error_privacyPolicyRequired">プライバシーポリシーへの同意が必要です。</string>
+    <string name="auth_error_minimumAgeRequired">お住まいの地域で適用される最低年齢要件を満たしていません。</string>
+    <string name="onboarding_birth_date_label">生年月日</string>
+    <string name="onboarding_birth_date_helper">アカウントを作成するには16歳以上である必要があります。</string>
     <string name="auth_error_usernameUnavailable">そのユーザー名は使用できません。</string>
     <string name="auth_error_userIdNotFound">ユーザーIDを取得できませんでした。</string>
     <string name="auth_error_incompleteRegistrationWrongPassword">このメールアドレスでは登録が完了していません。登録時に設定したパスワードを使用してください。</string>
@@ -203,7 +206,7 @@
     <string name="privacy_rights_title">12. お客様の権利</string>
     <string name="privacy_rights_body">適用される場合、データへのアクセス、訂正、削除、異議申し立て、処理の制限、データポータビリティ、同意の撤回を請求できます。また、データのエクスポート、Novaのメモリーの削除、プライバシー設定の変更、ユーザーのブロック、アカウントや言葉のミュート、アカウントの停止、削除の請求も行えます。\n\n欧州連合または同等の権利が認められている地域にお住まいの場合、データ保護当局に申し立てることもできます。</string>
     <string name="privacy_minors_title">13. 未成年者</string>
-    <string name="privacy_minors_body">Momentsは子どもを対象としたサービスではありません。アカウントを作成してサービスを利用できる最低年齢は、国や地域によって異なり、多くの地域では13歳以上です。現地法で必要とされる場合は、保護者の同意が必要になることもあります。アカウントが適用される最低年齢や同意の要件を満たしていないことが判明した場合、アカウントを制限または削除することがあります。</string>
+    <string name="privacy_minors_body">Momentsは子どもを対象としたサービスではありません。アカウントを作成してサービスを利用するには、登録時にお住まいの地域に表示される最低年齢を満たす必要があります。現地法で定められている場合は、追加の年齢確認や保護者の同意が必要になることがあります。アカウントが適用される最低年齢や同意の要件を満たしていないことが判明した場合、利用を制限またはアカウントを削除することがあります。</string>
     <string name="privacy_contact_title">14. お問い合わせと変更</string>
     <string name="privacy_contact_body">機能、プロバイダー、法的要件の変更に伴い、このポリシーを更新する場合があります。重要な変更がある場合は、アプリ内またはその他の合理的な方法でお知らせします。\n\nプライバシーに関するご質問やご請求は、soporte@momentsapp.appまでご連絡いただくか、momentsapp.app/privacyをご覧ください。</string>
     <string name="deactivated_title">休止中のアカウント</string>

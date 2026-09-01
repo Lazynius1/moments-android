@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@file:OptIn(
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+    ExperimentalMaterial3Api::class,
+)
 
 package com.moments.android.views.login
 
@@ -79,6 +82,13 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
 import com.moments.android.extensions.InterestEmojiHelper
 import com.moments.android.services.auth.AuthService
+import com.moments.android.services.compliance.AgePolicy
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberDatePickerState
+import java.util.Calendar
+import java.util.Date
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -134,6 +144,8 @@ fun OnboardingScreen(
     var selectedInterests by remember { mutableStateOf<List<String>>(emptyList()) }
     var photoUri by remember { mutableStateOf<Uri?>(null) }
     var privacyAccepted by remember { mutableStateOf(false) }
+    var birthDate by remember { mutableStateOf(AgePolicy.defaultPickerBirthDate()) }
+    var showBirthDatePicker by remember { mutableStateOf(false) }
     var isCreating by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showPrivacy by remember { mutableStateOf(false) }
@@ -192,7 +204,7 @@ fun OnboardingScreen(
         OnboardingStepKind.EMAIL -> isValidEmail(email.trim()) && emailError == null && !emailChecking
         OnboardingStepKind.PASSWORD -> password.length >= 8
         OnboardingStepKind.INTERESTS -> selectedInterests.size >= INTERESTS_MIN
-        OnboardingStepKind.PREVIEW -> privacyAccepted
+        OnboardingStepKind.PREVIEW -> privacyAccepted && AgePolicy.isEligibleForAccount(birthDate)
     }
 
     fun goNext() {
@@ -216,12 +228,20 @@ fun OnboardingScreen(
                             password = password,
                             interests = selectedInterests,
                             privacyPolicyAccepted = privacyAccepted,
+                            birthDate = birthDate,
                             profileImage = bitmapFrom(context, photoUri),
                         )
                         // El usuario de Firebase Auth ya existe (Google); aquí solo falta
                         // crear el perfil en Firestore. ≡ iOS completeSocialRegistration.
                         OnboardingUiContext.SOCIAL ->
-                            completeSocialRegistrationFromUi(context, username, selectedInterests, photoUri)
+                            completeSocialRegistrationFromUi(
+                                context,
+                                username,
+                                selectedInterests,
+                                photoUri,
+                                birthDate,
+                                privacyAccepted,
+                            )
                     }
                     // Duración mínima para que se vea la animación de "creando perfil" (como iOS).
                     val elapsed = System.currentTimeMillis() - start
@@ -298,6 +318,8 @@ fun OnboardingScreen(
                             username = username,
                             email = email.ifBlank { socialAccountEmail() },
                             interests = selectedInterests,
+                            birthDate = birthDate,
+                            onBirthDateClick = { showBirthDatePicker = true },
                             privacyAccepted = privacyAccepted,
                             onPrivacyChange = { privacyAccepted = it },
                             onOpenPrivacy = { showPrivacy = true },
@@ -333,6 +355,37 @@ fun OnboardingScreen(
         PrivacyPolicySheet(onDismiss = { showPrivacy = false })
     }
 
+    if (showBirthDatePicker) {
+        val maxSelectable = AgePolicy.maximumSelectableBirthDate()
+        val minSelectable = AgePolicy.minimumSelectableBirthDate()
+        val maxCalendar = Calendar.getInstance().apply { time = maxSelectable }
+        val minCalendar = Calendar.getInstance().apply { time = minSelectable }
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = birthDate.time,
+            yearRange = minCalendar.get(Calendar.YEAR)..maxCalendar.get(Calendar.YEAR),
+        )
+        DatePickerDialog(
+            onDismissRequest = { showBirthDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        birthDate = Date(millis)
+                    }
+                    showBirthDatePicker = false
+                }) {
+                    Text(stringResource(R.string.login_ok))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBirthDatePicker = false }) {
+                    Text(stringResource(R.string.register_close))
+                }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
     if (isCreating) {
         CreatingProfileOverlay()
     }
@@ -354,6 +407,8 @@ private suspend fun completeSocialRegistrationFromUi(
     username: String,
     interests: List<String>,
     photoUri: Uri?,
+    birthDate: Date,
+    privacyPolicyAccepted: Boolean,
 ) {
     val usernameLower = username.lowercase()
     val taken = FirebaseFirestore.getInstance()
@@ -364,6 +419,8 @@ private suspend fun completeSocialRegistrationFromUi(
         username = usernameLower,
         interests = interests,
         profileImage = bitmapFrom(context, photoUri),
+        birthDate = birthDate,
+        privacyPolicyAccepted = privacyPolicyAccepted,
     )
 }
 
@@ -746,16 +803,23 @@ private fun InterestsSelector(selected: List<String>, onToggle: (String) -> Unit
 }
 
 // MARK: - Step 5: preview + privacy
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PreviewStep(
     photoUri: Uri?,
     username: String,
     email: String,
     interests: List<String>,
+    birthDate: Date,
+    onBirthDateClick: () -> Unit,
     privacyAccepted: Boolean,
     onPrivacyChange: (Boolean) -> Unit,
     onOpenPrivacy: () -> Unit,
 ) {
+    val birthDateEligible = AgePolicy.isEligibleForAccount(birthDate)
+    val birthDateLabel = remember(birthDate) {
+        java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(birthDate)
+    }
     Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(AuthColors.subtle(0.05f)).padding(20.dp),
@@ -794,6 +858,35 @@ private fun PreviewStep(
                     }
                 }
             }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(R.string.onboarding_birth_date_label),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = AuthColors.secondary(0.68f),
+            )
+            Text(
+                birthDateLabel,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = AuthColors.primary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AuthColors.subtle(0.06f))
+                    .clickable(onClick = onBirthDateClick)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+            )
+            Text(
+                stringResource(R.string.onboarding_birth_date_helper),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (birthDateEligible) AuthColors.secondary(0.7f) else Color(0xFFE5484D),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {

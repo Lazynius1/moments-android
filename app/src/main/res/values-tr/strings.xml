@@ -117,6 +117,9 @@
     <string name="auth_error_emptyFields">Kullanıcı adı ve şifre gerekli.</string>
     <string name="auth_error_usernameNotFound">Kullanıcı bulunamadı. Kullanıcı adını kontrol et.</string>
     <string name="auth_error_privacyPolicyRequired">Gizlilik politikasını kabul etmelisin.</string>
+    <string name="auth_error_minimumAgeRequired">Bölgenizde geçerli olan minimum yaş şartını karşılamıyorsunuz.</string>
+    <string name="onboarding_birth_date_label">Doğum tarihi</string>
+    <string name="onboarding_birth_date_helper">Hesap oluşturmak için en az 16 yaşında olmalısın.</string>
     <string name="auth_error_usernameUnavailable">Bu kullanıcı adı kullanılamıyor.</string>
     <string name="auth_error_userIdNotFound">Kullanıcı kimliği alınamadı.</string>
     <string name="auth_error_incompleteRegistrationWrongPassword">Bu e-postayla başlatılmış bir kayıt tamamlanmamış. Kayıt olurken belirlediğin şifreyi kullan.</string>
@@ -203,7 +206,7 @@
     <string name="privacy_rights_title">12. Hakların</string>
     <string name="privacy_rights_body">Verilerine erişme, düzeltme, silme, itiraz etme, işlemeyi kısıtlama ve verilerini taşınabilir biçimde alma talebinde bulunabilir; geçerli olduğu durumlarda onayını geri çekebilirsin. Ayrıca verilerini dışa aktarabilir, Nova hafızalarını silebilir, gizlilik ayarlarını değiştirebilir, kullanıcıları engelleyebilir, hesapları veya kelimeleri sessize alabilir, hesabını devre dışı bırakabilir ya da silinmesini isteyebilirsin.\n\nAvrupa Birliği\'nde veya eşdeğer hakların geçerli olduğu başka bir bölgede yaşıyorsan veri koruma kurumuna da şikâyette bulunabilirsin.</string>
     <string name="privacy_minors_title">13. Çocuklar</string>
-    <string name="privacy_minors_body">Moments çocuklara yönelik değildir. Hesap oluşturmak ve hizmeti kullanmak için gereken asgari yaş, ülkene veya bölgene bağlıdır; birçok yerde bu yaş 13 veya daha yüksektir. Yerel yasaların gerektirdiği durumlarda ebeveyn veya vasi onayı da gerekebilir. Bir hesabın geçerli asgari yaş veya onay şartlarını karşılamadığını tespit edersek hesabı kısıtlayabilir veya silebiliriz.</string>
+    <string name="privacy_minors_body">Moments çocuklara yönelik değildir. Hesap oluşturmak ve hizmeti kullanmak için bölgeniz için kayıt sırasında gösterilen minimum yaşı karşılamalısınız. Yerel yasa gerektirdiğinde ek yaş doğrulaması veya ebeveyn/vasi onayı gerekebilir. Bir hesabın geçerli minimum yaş veya onay koşullarını karşılamadığını tespit edersek hesabı kısıtlayabilir veya silebiliriz.</string>
     <string name="privacy_contact_title">14. İletişim ve değişiklikler</string>
     <string name="privacy_contact_body">Özelliklerimiz, sağlayıcılarımız veya yasal gereklilikler değiştiğinde bu politikayı güncelleyebiliriz. Önemli bir değişiklik olursa bunu uygulama içinde veya başka makul yollarla bildiririz.\n\nGizlilikle ilgili soruların veya taleplerin için soporte@momentsapp.app adresinden bize ulaşabilir ya da momentsapp.app/privacy adresini ziyaret edebilirsin.</string>
     <string name="deactivated_title">Uyuyan Hesap</string>

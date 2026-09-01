@@ -16,6 +16,7 @@ import com.google.firebase.firestore.Source
 import com.moments.android.extensions.optStringOrNull
 import com.moments.android.R
 import com.moments.android.models.AppUser
+import com.moments.android.services.compliance.AgePolicy
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.messaging.MessageCatchUpService
 import com.moments.android.views.messaging.services.ChatAccessCoordinator
@@ -591,15 +592,27 @@ object AuthService {
         username: String,
         interests: List<String>,
         profileImage: Bitmap?,
-    ) = completeSocialRegistration(username, interests, profileImage)
+        birthDate: Date,
+        privacyPolicyAccepted: Boolean,
+    ) = completeSocialRegistration(
+        username = username,
+        interests = interests,
+        profileImage = profileImage,
+        birthDate = birthDate,
+        privacyPolicyAccepted = privacyPolicyAccepted,
+    )
 
     /** Completa perfil tras Google (≡ completeSocialRegistration iOS). */
     suspend fun completeSocialRegistration(
         username: String,
         interests: List<String>,
         profileImage: Bitmap?,
+        birthDate: Date,
+        privacyPolicyAccepted: Boolean,
         fallbackEmail: String? = null,
     ) {
+        if (!privacyPolicyAccepted) throw authError(R.string.auth_error_privacyPolicyRequired)
+        if (!AgePolicy.isEligibleForAccount(birthDate)) throw authError(R.string.auth_error_minimumAgeRequired)
         val firebaseUser = auth.currentUser ?: throw authError(R.string.auth_error_userIdNotFound)
         val email = firebaseUser.email?.takeIf { it.isNotEmpty() }
             ?: fallbackEmail?.takeIf { it.isNotEmpty() }
@@ -607,7 +620,15 @@ object AuthService {
         val profilePath = profileImage?.let {
             runCatching { StorageService.uploadProfileImage(firebaseUser.uid, it) }.getOrNull()
         }
-        firestoreService.createUser(firebaseUser.uid, username, email, interests, profilePath)
+        firestoreService.createUser(
+            userId = firebaseUser.uid,
+            username = username,
+            email = email,
+            interests = interests,
+            profileImagePath = profilePath,
+            birthDate = birthDate,
+            privacyPolicyAccepted = privacyPolicyAccepted,
+        )
     }
 
     // MARK: - Register
@@ -618,9 +639,11 @@ object AuthService {
         password: String,
         interests: List<String>,
         privacyPolicyAccepted: Boolean,
+        birthDate: Date,
         profileImage: Bitmap?,
     ) {
         if (!privacyPolicyAccepted) throw authError(R.string.auth_error_privacyPolicyRequired)
+        if (!AgePolicy.isEligibleForAccount(birthDate)) throw authError(R.string.auth_error_minimumAgeRequired)
         authMutex.withLock {
             registrationState = RegistrationState.REGISTERING
             authProcessingEnabled = false
@@ -651,7 +674,15 @@ object AuthService {
                 runCatching { StorageService.uploadProfileImage(userId, it) }.getOrNull()
             }
             try {
-                firestoreService.createUser(userId, username, email.trim(), interests, profilePath)
+                firestoreService.createUser(
+                    userId = userId,
+                    username = username,
+                    email = email.trim(),
+                    interests = interests,
+                    profileImagePath = profilePath,
+                    birthDate = birthDate,
+                    privacyPolicyAccepted = privacyPolicyAccepted,
+                )
             } catch (e: Exception) {
                 if (!isResumingExistingAuth) {
                     runCatching { user.delete().await() }
@@ -1601,6 +1632,7 @@ object AuthService {
         email: String,
         selectedInterests: List<String>,
         privacyPolicyAccepted: Boolean,
+        birthDate: Date? = null,
         profileImage: Bitmap? = null,
         firebaseUID: String? = null,
     ) {
@@ -1613,6 +1645,7 @@ object AuthService {
             email = email,
             selectedInterests = selectedInterests,
             privacyPolicyAccepted = privacyPolicyAccepted,
+            birthDate = birthDate,
             profileImage = profileImage,
             firebaseUID = firebaseUID ?: auth.currentUser?.uid,
         )

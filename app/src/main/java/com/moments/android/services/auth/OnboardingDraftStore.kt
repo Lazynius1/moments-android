@@ -32,6 +32,7 @@ data class OnboardingDraft(
     var email: String = "",
     var selectedInterests: List<String> = emptyList(),
     var privacyPolicyAccepted: Boolean = false,
+    var birthDateMillis: Long? = null,
     var profileImageFilename: String? = null,
     var startedAt: Date = Date(),
     var updatedAt: Date = Date(),
@@ -99,6 +100,7 @@ object OnboardingDraftStore {
         email: String? = null,
         selectedInterests: List<String>? = null,
         privacyPolicyAccepted: Boolean? = null,
+        birthDate: Date? = null,
         profileImage: Bitmap? = null,
         firebaseUID: String? = null,
     ) {
@@ -108,6 +110,7 @@ object OnboardingDraftStore {
         if (email != null) draft.email = email
         if (selectedInterests != null) draft.selectedInterests = selectedInterests
         if (privacyPolicyAccepted != null) draft.privacyPolicyAccepted = privacyPolicyAccepted
+        if (birthDate != null) draft.birthDateMillis = birthDate.time
         if (firebaseUID != null) draft.firebaseUID = firebaseUID
         if (profileImage != null) {
             draft.profileImageFilename?.let { removeProfileImage(it) }
@@ -154,6 +157,7 @@ object OnboardingDraftStore {
         put("email", d.email)
         put("selectedInterests", JSONArray(d.selectedInterests))
         put("privacyPolicyAccepted", d.privacyPolicyAccepted)
+        d.birthDateMillis?.let { put("birthDateMillis", it) }
         put("profileImageFilename", d.profileImageFilename)
         put("startedAt", d.startedAt.time)
         put("updatedAt", d.updatedAt.time)
@@ -172,6 +176,7 @@ object OnboardingDraftStore {
             email = json.optString("email"),
             selectedInterests = interests,
             privacyPolicyAccepted = json.optBoolean("privacyPolicyAccepted"),
+            birthDateMillis = json.optLong("birthDateMillis").takeIf { json.has("birthDateMillis") && !json.isNull("birthDateMillis") },
             profileImageFilename = json.optString("profileImageFilename").takeIf { it.isNotEmpty() && !json.isNull("profileImageFilename") },
             startedAt = Date(json.optLong("startedAt", System.currentTimeMillis())),
             updatedAt = Date(json.optLong("updatedAt", System.currentTimeMillis())),

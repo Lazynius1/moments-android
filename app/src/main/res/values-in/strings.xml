@@ -117,6 +117,9 @@
     <string name="auth_error_emptyFields">Nama pengguna atau email dan kata sandi wajib diisi.</string>
     <string name="auth_error_usernameNotFound">Pengguna tidak ditemukan. Periksa nama pengguna Anda.</string>
     <string name="auth_error_privacyPolicyRequired">Anda harus menyetujui kebijakan privasi.</string>
+    <string name="auth_error_minimumAgeRequired">Kamu belum memenuhi batas usia minimum yang berlaku di wilayahmu.</string>
+    <string name="onboarding_birth_date_label">Tanggal lahir</string>
+    <string name="onboarding_birth_date_helper">Kamu harus berusia minimal 16 tahun untuk membuat akun.</string>
     <string name="auth_error_usernameUnavailable">Nama pengguna tidak tersedia.</string>
     <string name="auth_error_userIdNotFound">Tidak dapat mendapatkan ID pengguna.</string>
     <string name="auth_error_incompleteRegistrationWrongPassword">Pendaftaran dengan email ini belum selesai. Gunakan kata sandi yang Anda pilih saat mendaftar.</string>
@@ -203,7 +206,7 @@
     <string name="privacy_rights_title">12. Hak Anda</string>
     <string name="privacy_rights_body">Anda dapat meminta akses, perbaikan, penghapusan, keberatan, pembatasan, portabilitas data, dan pencabutan persetujuan jika berlaku. Anda juga dapat mengekspor data, menghapus memori Nova, mengubah pengaturan privasi, memblokir pengguna, membisukan akun atau kata, menonaktifkan akun, atau meminta penghapusan akun.\n\nJika Anda berada di Uni Eropa atau wilayah lain dengan hak yang setara, Anda juga dapat mengajukan keluhan kepada otoritas perlindungan data setempat.</string>
     <string name="privacy_minors_title">13. Anak di bawah umur</string>
-    <string name="privacy_minors_body">Moments tidak ditujukan untuk anak-anak. Usia minimum untuk membuat akun dan menggunakan layanan bergantung pada negara atau wilayah Anda; di banyak tempat usia tersebut adalah 13 tahun atau lebih. Jika diwajibkan oleh hukum setempat, persetujuan orang tua atau wali juga dapat diperlukan. Jika kami mendeteksi bahwa sebuah akun tidak memenuhi usia minimum yang berlaku atau persyaratan persetujuan, kami dapat membatasi atau menghapus akun tersebut.</string>
+    <string name="privacy_minors_body">Moments tidak ditujukan untuk anak-anak. Kamu harus memenuhi usia minimum yang ditampilkan saat pendaftaran untuk wilayahmu untuk membuat akun dan menggunakan layanan. Jika diwajibkan oleh hukum setempat, verifikasi usia tambahan atau persetujuan orang tua/wali mungkin diperlukan. Jika kami mendeteksi bahwa sebuah akun tidak memenuhi usia minimum yang berlaku atau persyaratan persetujuan, kami dapat membatasi atau menghapus akun tersebut.</string>
     <string name="privacy_contact_title">14. Kontak dan perubahan</string>
     <string name="privacy_contact_body">Kami dapat memperbarui kebijakan ini ketika fitur, penyedia, atau persyaratan hukum kami berubah. Jika perubahannya penting, kami akan menyampaikannya melalui aplikasi atau cara wajar lainnya.\n\nUntuk pertanyaan atau permintaan terkait privasi, hubungi kami di soporte@momentsapp.app atau kunjungi momentsapp.app/privacy.</string>
     <string name="deactivated_title">Akun Tidur</string>

@@ -44,6 +44,9 @@
     <string name="auth_error_emptyFields">El identificador y la contraseña son obligatorios.</string>
     <string name="auth_error_usernameNotFound">Usuario no encontrado. Por favor, verifica tu nombre de usuario.</string>
     <string name="auth_error_privacyPolicyRequired">Debes aceptar las políticas de privacidad.</string>
+    <string name="auth_error_minimumAgeRequired">No cumples la edad mínima aplicable en tu región.</string>
+    <string name="onboarding_birth_date_label">Fecha de nacimiento</string>
+    <string name="onboarding_birth_date_helper">Debes tener al menos 16 años para crear una cuenta.</string>
     <string name="auth_error_usernameUnavailable">Nombre de usuario no disponible.</string>
     <string name="auth_error_userIdNotFound">No se pudo obtener el ID del usuario.</string>
     <string name="auth_error_incompleteRegistrationWrongPassword">Este correo tiene un registro sin terminar. Usa la contraseña que elegiste al registrarte.</string>
@@ -222,7 +225,7 @@ Si aceptas, los anuncios pueden ser personalizados usando tu identificador publi
     <string name="privacy_rights_title">12. Tus derechos</string>
     <string name="privacy_rights_body">Puedes solicitar acceso, rectificación, eliminación, oposición, limitación, portabilidad de tus datos y retirada del consentimiento cuando aplique. También puedes exportar datos, borrar recuerdos de Nova, cambiar privacidad, bloquear usuarios, silenciar cuentas o palabras, desactivar tu cuenta o solicitar su eliminación.\n\nSi estás en la Unión Europea u otra región con derechos equivalentes, también puedes reclamar ante tu autoridad de protección de datos.</string>
     <string name="privacy_minors_title">13. Menores</string>
-    <string name="privacy_minors_body">Moments no está dirigida a menores. La edad mínima para crear una cuenta y usar el servicio depende de tu país o región; en muchos lugares es de 13 años o más. Cuando la ley local lo exija, puede ser necesario el consentimiento de un padre, madre o tutor. Si detectamos que una cuenta no cumple la edad mínima aplicable o los requisitos de consentimiento, podemos restringirla o eliminarla.</string>
+    <string name="privacy_minors_body">Moments no está dirigida a menores. Debes cumplir la edad mínima que se muestra durante el registro para tu región para crear una cuenta y usar el servicio. Cuando la ley local lo exija, puede aplicarse verificación de edad adicional o consentimiento parental. Si detectamos que una cuenta no cumple la edad mínima aplicable o los requisitos de consentimiento, podemos restringirla o eliminarla.</string>
     <string name="privacy_contact_title">14. Contacto y cambios</string>
     <string name="privacy_contact_body">Podemos actualizar esta política cuando cambien nuestras funciones, proveedores o requisitos legales. Si el cambio es importante, lo comunicaremos en la app o por otros medios razonables.
 

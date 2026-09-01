@@ -117,6 +117,9 @@
     <string name="auth_error_emptyFields">Gebruikersnaam en wachtwoord zijn verplicht.</string>
     <string name="auth_error_usernameNotFound">Gebruiker niet gevonden. Controleer je gebruikersnaam.</string>
     <string name="auth_error_privacyPolicyRequired">Je moet het privacybeleid accepteren.</string>
+    <string name="auth_error_minimumAgeRequired">Je voldoet niet aan de minimumleeftijd die in jouw regio geldt.</string>
+    <string name="onboarding_birth_date_label">Geboortedatum</string>
+    <string name="onboarding_birth_date_helper">Je moet minstens 16 jaar zijn om een account aan te maken.</string>
     <string name="auth_error_usernameUnavailable">Deze gebruikersnaam is niet beschikbaar.</string>
     <string name="auth_error_userIdNotFound">Gebruikers-ID kan niet worden opgehaald.</string>
     <string name="auth_error_incompleteRegistrationWrongPassword">Voor dit e-mailadres is de registratie nog niet afgerond. Gebruik het wachtwoord dat je bij het aanmelden hebt gekozen.</string>
@@ -203,7 +206,7 @@
     <string name="privacy_rights_title">12. Jouw rechten</string>
     <string name="privacy_rights_body">Je kunt verzoeken om inzage, correctie, verwijdering, bezwaar, beperking en overdraagbaarheid van je gegevens en, waar van toepassing, je toestemming intrekken. Je kunt ook gegevens exporteren, herinneringen van Nova verwijderen, je privacyinstellingen wijzigen, gebruikers blokkeren, accounts of woorden dempen, je account deactiveren of verwijdering aanvragen.\n\nAls je in de Europese Unie of een andere regio met vergelijkbare rechten woont, kun je ook een klacht indienen bij je privacytoezichthouder.</string>
     <string name="privacy_minors_title">13. Minderjarigen</string>
-    <string name="privacy_minors_body">Moments is niet bedoeld voor kinderen. De minimumleeftijd om een account aan te maken en de dienst te gebruiken hangt af van je land of regio; op veel plaatsen is dat 13 jaar of ouder. Waar de lokale wet dat vereist, kan ook toestemming van een ouder of voogd nodig zijn. Als we vaststellen dat een account niet voldoet aan de geldende minimumleeftijd of toestemmingsvereisten, kunnen we het beperken of verwijderen.</string>
+    <string name="privacy_minors_body">Moments is niet bedoeld voor kinderen. Je moet voldoen aan de minimumleeftijd die tijdens de registratie voor jouw regio wordt vermeld om een account aan te maken en de dienst te gebruiken. Waar de lokale wet dat vereist, kunnen extra leeftijdscontroles of toestemming van een ouder of voogd gelden. Als we vaststellen dat een account niet voldoet aan de geldende minimumleeftijd of toestemmingsvereisten, kunnen we het beperken of verwijderen.</string>
     <string name="privacy_contact_title">14. Contact en wijzigingen</string>
     <string name="privacy_contact_body">We kunnen dit beleid bijwerken wanneer onze functies, providers of wettelijke vereisten veranderen. Als een wijziging belangrijk is, brengen we je daarvan op de hoogte in de app of via andere redelijke middelen.\n\nHeb je vragen of verzoeken over privacy? Neem dan contact met ons op via soporte@momentsapp.app of ga naar momentsapp.app/privacy.</string>
     <string name="deactivated_title">Slapend account</string>
