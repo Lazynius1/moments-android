@@ -132,7 +132,6 @@
     <string name="register_username_taken">Ce nom d’utilisateur est déjà pris.</string>
     <string name="register_profile_error">Impossible de créer le profil.</string>
     <string name="register_account_error">Impossible de créer le compte.</string>
-    <string name="interest_viajar">Voyage</string>
     <string name="common_back">Retour</string>
     <string name="common_close">Fermer</string>
     <string name="common_cancel">Annuler</string>
@@ -2354,4 +2353,5 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="chat_request_disclaimer_sent">Cette demande de message attend une réponse.</string>
     <string name="chat_request_disclaimer_outgoing">Vous pouvez envoyer jusqu’à 5 messages tant que la demande est en attente.</string>
     <string name="notification_message_request_generic">Vous avez une nouvelle demande de message.</string>
+    <string name="profile_editor_profile_image_rejected">Cette photo ne peut pas être utilisée comme photo de profil.</string>
 </resources>

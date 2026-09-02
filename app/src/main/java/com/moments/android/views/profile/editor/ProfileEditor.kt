@@ -82,6 +82,7 @@ import com.moments.android.services.firestore.fetchUserProfile
 import com.moments.android.services.firestore.removeProfilePicture
 import com.moments.android.services.firestore.updateProfilePicture
 import com.moments.android.services.storage.StorageService
+import com.moments.android.services.storage.ModerationError
 import com.moments.android.views.creator.creatoruikit.CameraCapture
 import com.moments.android.views.creator.creatoruikit.CameraCaptureMediaType
 import com.moments.android.views.permissions.CameraAccessBoundary
@@ -162,6 +163,9 @@ fun ModernEditProfileView(
     var selectedInterests by remember { mutableStateOf(user?.interests?.toSet().orEmpty()) }
     var availableInterests by remember { mutableStateOf<List<String>>(emptyList()) }
     var currentProfileImage by remember { mutableStateOf<Bitmap?>(null) }
+    var pendingProfileImage by remember { mutableStateOf<Bitmap?>(null) }
+    var isProfileImageUploading by remember { mutableStateOf(false) }
+    var profileImageUploadError by remember { mutableStateOf<String?>(null) }
 
     var activeSection by remember { mutableStateOf(EditSection.BASIC) }
     var isLoading by remember { mutableStateOf(true) }
@@ -213,8 +217,9 @@ fun ModernEditProfileView(
 
     fun uploadCaptured(bitmap: Bitmap) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        isLoading = true
-        errorMessage = null
+        pendingProfileImage = bitmap
+        isProfileImageUploading = true
+        profileImageUploadError = null
         scope.launch {
             runCatching {
                 val old = runCatching { FirestoreService().fetchUserProfile(userId).profileImagePath }
@@ -226,13 +231,19 @@ fun ModernEditProfileView(
             }.onSuccess { path ->
                 profileImagePath = path
                 currentProfileImage = bitmap
-                isLoading = false
-            }.onFailure {
-                isLoading = false
-                errorMessage = context.getString(
-                    R.string.profile_editor_error_upload_image,
-                    it.message.orEmpty(),
-                )
+                pendingProfileImage = null
+                isProfileImageUploading = false
+            }.onFailure { error ->
+                pendingProfileImage = null
+                isProfileImageUploading = false
+                profileImageUploadError = if (error is ModerationError.ContentRejected) {
+                    context.getString(R.string.profile_editor_profile_image_rejected)
+                } else {
+                    context.getString(
+                        R.string.profile_editor_error_upload_image,
+                        error.message.orEmpty(),
+                    )
+                }
             }
         }
     }
@@ -374,6 +385,8 @@ fun ModernEditProfileView(
                         primary = primary,
                         characterCount = characterCount,
                         currentProfileImage = currentProfileImage,
+                        pendingProfileImage = pendingProfileImage,
+                        isProfileImageUploading = isProfileImageUploading,
                         profileImagePath = profileImagePath,
                         onDismiss = onDismiss,
                         onSave = { if (characterCount <= 150) saveProfile() },
@@ -496,6 +509,19 @@ fun ModernEditProfileView(
             },
         )
     }
+
+    profileImageUploadError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { profileImageUploadError = null },
+            title = { Text(stringResource(R.string.profile_editor_error)) },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton({ profileImageUploadError = null }) {
+                    Text(stringResource(R.string.common_ok))
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -503,6 +529,8 @@ private fun EditProfileHeader(
     primary: Color,
     characterCount: Int,
     currentProfileImage: Bitmap?,
+    pendingProfileImage: Bitmap?,
+    isProfileImageUploading: Boolean,
     profileImagePath: String?,
     onDismiss: () -> Unit,
     onSave: () -> Unit,
@@ -547,6 +575,17 @@ private fun EditProfileHeader(
                     contentAlignment = Alignment.Center,
                 ) {
                     when {
+                        pendingProfileImage != null -> {
+                            androidx.compose.foundation.Image(
+                                pendingProfileImage.asImageBitmap(),
+                                null,
+                                Modifier
+                                    .size(110.dp)
+                                    .clip(CircleShape)
+                                    .alpha(0.42f),
+                                contentScale = ContentScale.Crop,
+                            )
+                        }
                         currentProfileImage != null -> {
                             androidx.compose.foundation.Image(
                                 currentProfileImage.asImageBitmap(),
@@ -587,6 +626,12 @@ private fun EditProfileHeader(
                             }
                         }
                     }
+
+                    if (isProfileImageUploading) {
+                        MomentsCircularProgressIndicator(
+                            modifier = Modifier.size(30.dp),
+                        )
+                    }
                 }
                 Icon(
                     Icons.Filled.CameraAlt,
@@ -598,7 +643,7 @@ private fun EditProfileHeader(
                         .size(32.dp)
                         .clip(CircleShape)
                         .momentsChromeGlass(CircleShape, interactive = true)
-                        .clickable(onClick = onPhotoTap)
+                        .clickable(enabled = !isProfileImageUploading, onClick = onPhotoTap)
                         .padding(8.dp),
                 )
             }
@@ -607,7 +652,7 @@ private fun EditProfileHeader(
                 Modifier
                     .clip(RoundedCornerShape(50))
                     .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
-                    .clickable(onClick = onPhotoTap)
+                    .clickable(enabled = !isProfileImageUploading, onClick = onPhotoTap)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,

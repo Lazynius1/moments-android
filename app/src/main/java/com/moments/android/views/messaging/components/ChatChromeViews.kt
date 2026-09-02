@@ -578,15 +578,15 @@ fun ChatScrollDownButton(
             Text(
                 if (pendingCount > 99) stringResource(R.string.chat_scroll_badge_max) else pendingCount.toString(),
                 color = badgeTextColor,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 6.dp, y = (-4).dp)
+                    .align(Alignment.TopCenter)
+                    .offset(y = (-10).dp)
                     .clip(RoundedCornerShape(50))
-                    .background(accentColor)
-                    .padding(horizontal = 5.dp)
-                    .height(18.dp),
+                    .momentsChromeGlass(RoundedCornerShape(50), interactive = false, tint = accentColor)
+                    .padding(horizontal = 6.dp)
+                    .height(20.dp),
             )
         }
     }

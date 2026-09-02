@@ -60,7 +60,7 @@ Descárgala en Google Play y comparte solo con quienes realmente importan.
 ################################################################################
 
 NOMBRE
-Moments: Meet Real Friends
+Moments: Friends & Stories
 
 DESCRIPCIÓN CORTA
 Private social app: photos, stories, Hidden Layers, chat & Nova.
@@ -114,7 +114,7 @@ Get it on Google Play and share only with the people who truly matter.
 ################################################################################
 
 NOMBRE
-Moments: Fes Amics i Connecta
+Moments: Amics i Històries
 
 DESCRIPCIÓN CORTA
 Xarxa social privada: fotos, històries, capes ocultes, xat i Nova.
@@ -168,7 +168,7 @@ Descarrega-la a Google Play i comparteix només amb qui realment importa.
 ################################################################################
 
 NOMBRE
-Moments: Amis et Connexions
+Moments : Amis et Stories
 
 DESCRIPCIÓN CORTA
 Réseau social privé : photos, stories, calques cachés, chat et Nova.
@@ -222,7 +222,7 @@ Télécharge-la sur Google Play et partage seulement avec ceux qui comptent vrai
 ################################################################################
 
 NOMBRE
-Moments: Freunde treffen
+Moments: Freunde & Stories
 
 DESCRIPCIÓN CORTA
 Privates soziales Netz: Fotos, Stories, Hidden Layers, Chat & Nova.
@@ -276,7 +276,7 @@ Hol sie dir bei Google Play und teile nur mit denen, die wirklich zählen.
 ################################################################################
 
 NOMBRE
-Moments: Amici e Connessioni
+Moments: Amici e Storie
 
 DESCRIPCIÓN CORTA
 Social privato: foto, storie, Hidden Layers, chat e Nova.
@@ -330,7 +330,7 @@ Scaricala su Google Play e condividi solo con chi conta davvero.
 ################################################################################
 
 NOMBRE
-Moments: Amigos e Conexões
+Moments: Amigos e Stories
 
 DESCRIPCIÓN CORTA
 Rede social privada: fotos, stories, camadas ocultas, chat e Nova.
@@ -384,7 +384,7 @@ Baixe no Google Play e compartilhe só com quem realmente importa.
 ################################################################################
 
 NOMBRE
-Moments: Amigos e Ligações
+Moments: Amigos e Stories
 
 DESCRIPCIÓN CORTA
 Rede social privada: fotos, histórias, camadas ocultas, chat e Nova.
@@ -432,4 +432,3 @@ Moments não é publicar mais.
 É partilhar melhor.
 
 Descarrega-a na Google Play e partilha só com quem realmente importa.
-

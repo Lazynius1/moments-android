@@ -133,7 +133,6 @@
     <string name="register_username_taken">這個使用者名稱已有人使用。</string>
     <string name="register_profile_error">無法建立個人檔案。</string>
     <string name="register_account_error">無法建立帳戶。</string>
-    <string name="interest_viajar">旅遊</string>
     <string name="common_back">返回</string>
     <string name="common_close">關閉</string>
     <string name="messaging_new_conversation">新對話</string>
@@ -2889,4 +2888,5 @@
     <string name="message_requests_hidden_words_custom">字詞與片語</string>
     <string name="message_requests_hidden_words_custom_description">每行輸入一個，或以逗號分隔。比對會在本機進行。</string>
     <string name="notification_message_request_generic">你有一則新的訊息邀請。</string>
+    <string name="profile_editor_profile_image_rejected">這張照片無法用作個人檔案相片。</string>
 </resources>

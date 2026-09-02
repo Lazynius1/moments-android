@@ -133,7 +133,6 @@
     <string name="register_username_taken">이미 사용 중인 사용자 이름이에요.</string>
     <string name="register_profile_error">프로필을 만들 수 없어요.</string>
     <string name="register_account_error">계정을 만들 수 없어요.</string>
-    <string name="interest_viajar">여행</string>
     <string name="common_back">뒤로</string>
     <string name="common_close">닫기</string>
     <string name="messaging_new_conversation">새 대화</string>
@@ -2889,4 +2888,5 @@
     <string name="message_requests_hidden_words_custom">단어 및 문구</string>
     <string name="message_requests_hidden_words_custom_description">한 줄에 하나씩 입력하거나 쉼표로 구분해 주세요. 일치 여부는 기기에서 확인해요.</string>
     <string name="notification_message_request_generic">새 메시지 요청이 있어요.</string>
+    <string name="profile_editor_profile_image_rejected">이 사진은 프로필 사진으로 사용할 수 없어요.</string>
 </resources>

@@ -132,7 +132,6 @@
     <string name="register_username_taken">Aquest nom d’usuari ja existeix.</string>
     <string name="register_profile_error">No s’ha pogut crear el perfil.</string>
     <string name="register_account_error">No s’ha pogut crear el compte.</string>
-    <string name="interest_viajar">Viatjar</string>
     <string name="common_back">Enrere</string>
     <string name="common_close">Tancar</string>
     <string name="common_cancel">Cancel·lar</string>
@@ -2295,4 +2294,5 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="chat_request_disclaimer_sent">Aquesta sol·licitud de missatge està esperant una resposta.</string>
     <string name="chat_request_disclaimer_outgoing">Pots enviar fins a 5 missatges mentre la sol·licitud estigui pendent.</string>
     <string name="notification_message_request_generic">Tens una nova sol·licitud de missatge.</string>
+    <string name="profile_editor_profile_image_rejected">Aquesta foto no es pot utilitzar com a foto de perfil.</string>
 </resources>

@@ -1,7 +1,7 @@
 ===== ca =====
 
 --- NOMBRE (máx 30) ---
-Moments: Fes Amics i Connecta
+Moments: Amics i Històries
 
 --- DESCRIPCIÓN CORTA (máx 80) ---
 Xarxa social privada: fotos, històries, capes ocultes, xat i Nova.
@@ -49,4 +49,3 @@ Moments no va de publicar més.
 Va de compartir millor.
 
 Descarrega-la a Google Play i comparteix només amb qui realment importa.
-

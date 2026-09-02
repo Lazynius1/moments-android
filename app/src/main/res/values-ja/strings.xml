@@ -133,7 +133,6 @@
     <string name="register_username_taken">そのユーザー名はすでに使用されています。</string>
     <string name="register_profile_error">プロフィールを作成できませんでした。</string>
     <string name="register_account_error">アカウントを作成できませんでした。</string>
-    <string name="interest_viajar">旅行</string>
     <string name="common_back">戻る</string>
     <string name="common_close">閉じる</string>
     <string name="messaging_new_conversation">新しい会話</string>
@@ -2889,4 +2888,5 @@
     <string name="message_requests_hidden_words_custom">単語とフレーズ</string>
     <string name="message_requests_hidden_words_custom_description">1行に1つずつ入力するか、カンマで区切って入力してください。一致するかどうかはデバイス上で確認されます。</string>
     <string name="notification_message_request_generic">新しいメッセージリクエストがあります。</string>
+    <string name="profile_editor_profile_image_rejected">この写真はプロフィール写真として使用できません。</string>
 </resources>

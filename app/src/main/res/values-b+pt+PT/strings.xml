@@ -132,7 +132,6 @@
     <string name="register_username_taken">Esse nome de utilizador já existe.</string>
     <string name="register_profile_error">Não foi possível criar o perfil.</string>
     <string name="register_account_error">Não foi possível criar a conta.</string>
-    <string name="interest_viajar">Viagens</string>
     <string name="common_back">Voltar</string>
     <string name="common_close">Fechar</string>
     <string name="common_cancel">Cancelar</string>
@@ -2288,4 +2287,5 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="chat_request_disclaimer_sent">Este pedido de mensagem está à espera de uma resposta.</string>
     <string name="chat_request_disclaimer_outgoing">Podes enviar até 5 mensagens enquanto o pedido estiver pendente.</string>
     <string name="notification_message_request_generic">Tens um novo pedido de mensagem.</string>
+    <string name="profile_editor_profile_image_rejected">Esta fotografia não pode ser usada como foto de perfil.</string>
 </resources>

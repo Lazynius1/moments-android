@@ -133,7 +133,6 @@
     <string name="register_username_taken">यह यूज़रनेम पहले से लिया जा चुका है।</string>
     <string name="register_profile_error">प्रोफ़ाइल नहीं बनाई जा सकी।</string>
     <string name="register_account_error">अकाउंट नहीं बनाया जा सका।</string>
-    <string name="interest_viajar">यात्रा</string>
     <string name="common_back">वापस</string>
     <string name="common_close">बंद करें</string>
     <string name="messaging_new_conversation">नई बातचीत</string>
@@ -2889,4 +2888,5 @@
     <string name="message_requests_hidden_words_custom">शब्द और वाक्यांश</string>
     <string name="message_requests_hidden_words_custom_description">हर लाइन में एक शब्द या वाक्यांश डालें, या उन्हें कॉमा से अलग करें। मिलान इसी डिवाइस पर होता है।</string>
     <string name="notification_message_request_generic">आपके पास मैसेज का नया अनुरोध है।</string>
+    <string name="profile_editor_profile_image_rejected">इस फ़ोटो को प्रोफ़ाइल फ़ोटो के रूप में इस्तेमाल नहीं किया जा सकता।</string>
 </resources>

@@ -7,13 +7,10 @@ import android.net.Uri
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.storageMetadata
+import com.moments.android.services.storage.StorageService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
-import java.util.UUID
 
 /**
  * Registro por email: crea la cuenta en Auth, sube la foto a Storage (misma ruta/campo que iOS)
@@ -107,30 +104,8 @@ private fun buildProfileMap(
 }
 
 private suspend fun uploadProfileImage(context: Context, uid: String, uri: Uri): String = withContext(Dispatchers.IO) {
-    val jpeg = jpegBytes(context, uri) ?: throw ProfileCreationException()
-    val path = "users/$uid/profile/avatar/${UUID.randomUUID()}.jpg"
-    val ref = FirebaseStorage.getInstance().reference.child(path)
-    val metadata = storageMetadata {
-        contentType = "image/jpeg"
-        setCustomMetadata("ownerId", uid)
-        setCustomMetadata("type", "profile_picture")
-    }
-    ref.putBytes(jpeg, metadata).await()
-    ref.downloadUrl.await().toString()
-}
-
-/** Decodifica, reescala a máx. 1080px y comprime a JPEG 0.75 — igual que iOS. */
-private fun jpegBytes(context: Context, uri: Uri): ByteArray? {
-    val original = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } ?: return null
-    val maxDim = 1080
-    val scale = maxOf(original.width, original.height).let { if (it > maxDim) maxDim.toFloat() / it else 1f }
-    val bitmap = if (scale < 1f) {
-        Bitmap.createScaledBitmap(original, (original.width * scale).toInt(), (original.height * scale).toInt(), true)
-    } else {
-        original
-    }
-    return ByteArrayOutputStream().use { out ->
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 75, out)
-        out.toByteArray()
-    }
+    val bitmap = context.contentResolver.openInputStream(uri)
+        ?.use { BitmapFactory.decodeStream(it) }
+        ?: throw ProfileCreationException()
+    StorageService.uploadProfileImage(uid, bitmap)
 }

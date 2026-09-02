@@ -1,7 +1,7 @@
 ===== en-US =====
 
 --- NOMBRE (máx 30) ---
-Moments: Meet Real Friends
+Moments: Friends & Stories
 
 --- DESCRIPCIÓN CORTA (máx 80) ---
 Private social app: photos, stories, Hidden Layers, chat & Nova.
@@ -49,4 +49,3 @@ Moments isn’t about posting more.
 It’s about sharing better.
 
 Get it on Google Play and share only with the people who truly matter.
-

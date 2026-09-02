@@ -133,7 +133,6 @@
     <string name="register_username_taken">Nama pengguna tersebut sudah digunakan.</string>
     <string name="register_profile_error">Profil tidak dapat dibuat.</string>
     <string name="register_account_error">Akun tidak dapat dibuat.</string>
-    <string name="interest_viajar">Perjalanan</string>
     <string name="common_back">Kembali</string>
     <string name="common_close">Tutup</string>
     <string name="messaging_new_conversation">Percakapan baru</string>
@@ -2889,4 +2888,5 @@
     <string name="message_requests_hidden_words_custom">Kata dan frasa</string>
     <string name="message_requests_hidden_words_custom_description">Masukkan satu per baris atau pisahkan dengan koma. Pencocokan dilakukan secara lokal.</string>
     <string name="notification_message_request_generic">Anda punya permintaan pesan baru.</string>
+    <string name="profile_editor_profile_image_rejected">Foto ini tidak dapat digunakan sebagai foto profil.</string>
 </resources>

@@ -1,0 +1,144 @@
+<es-ES>
+• Chat — Formato de texto, spoilers, menciones interactivas y respuestas/edición más claras.
+
+• Captions — «Ver más» aparece solo cuando hace falta y abre el texto sin perder tu sitio.
+
+• Reels — Comentarios junto al vídeo, compositor siempre visible y respuestas más limpias.
+
+• Más tuyo — Más intereses, 8 idiomas nuevos y transiciones más fluidas en perfiles, QR y archivo.
+</es-ES>
+<ca>
+• Xat — Format de text, spoilers, mencions interactives i respostes/edició més clares.
+
+• Textos — «Veure'n més» només apareix quan cal i obre el text sense perdre el lloc.
+
+• Reels — Comentaris al costat del vídeo, compositor sempre visible i respostes més netes.
+
+• Més teu — Més interessos, 8 idiomes nous i transicions més fluides en perfils, QR i arxiu.
+</ca>
+<de-DE>
+• Chat — Textformatierung, Spoiler, interaktive Erwähnungen und klareres Antworten/Bearbeiten.
+
+• Captions — „Mehr anzeigen“ erscheint nur bei Bedarf und öffnet den Text ohne Positionsverlust.
+
+• Reels — Kommentare neben dem Video, Eingabe immer sichtbar und übersichtlichere Antworten.
+
+• Persönlicher — Mehr Interessen, 8 neue Sprachen und flüssigere Übergänge bei Profil, QR und Archiv.
+</de-DE>
+<en-US>
+• Chat — Text formatting, spoilers, interactive mentions, and clearer replies/editing.
+
+• Captions — “See more” appears only when needed and expands without losing your place.
+
+• Reels — Comments stay with the video, the composer stays visible, and replies are cleaner.
+
+• More yours — More interests, 8 new languages, and smoother profile, QR, and archive transitions.
+</en-US>
+<fr-FR>
+• Chat — Mise en forme, spoilers, mentions interactives et réponses/modification plus claires.
+
+• Légendes — « Voir plus » s'affiche seulement si nécessaire, sans perdre ta position.
+
+• Reels — Commentaires avec la vidéo, saisie toujours visible et réponses plus lisibles.
+
+• Plus personnel — Plus d'intérêts, 8 nouvelles langues et transitions plus fluides pour profils, QR et archives.
+</fr-FR>
+<hi-IN>
+• चैट — टेक्स्ट फ़ॉर्मैटिंग, स्पॉइलर, इंटरैक्टिव मेंशन और बेहतर जवाब/एडिटिंग।
+
+• कैप्शन — “और देखें” केवल ज़रूरत पर दिखता है और आपकी जगह बनाए रखता है।
+
+• Reels — वीडियो के साथ टिप्पणियाँ, हमेशा दिखता कंपोज़र और साफ़ जवाब।
+
+• और आपका — अधिक रुचियाँ, 8 नई भाषाएँ और प्रोफ़ाइल, QR व आर्काइव में सहज ट्रांज़िशन।
+</hi-IN>
+<id>
+• Chat — Format teks, spoiler, mention interaktif, serta balasan/edit yang lebih jelas.
+
+• Caption — “Lihat selengkapnya” hanya muncul saat perlu tanpa kehilangan posisi.
+
+• Reels — Komentar tetap bersama video, kolom input selalu terlihat, dan balasan lebih rapi.
+
+• Makin personal — Minat lebih banyak, 8 bahasa baru, serta transisi profil, QR, dan arsip yang lebih mulus.
+</id>
+<it-IT>
+• Chat — Formattazione, spoiler, menzioni interattive e risposte/modifica più chiare.
+
+• Didascalie — “Altro” appare solo quando serve e apre il testo senza perdere il punto.
+
+• Reels — Commenti accanto al video, compositore sempre visibile e risposte più pulite.
+
+• Più tuo — Più interessi, 8 nuove lingue e transizioni più fluide per profili, QR e archivio.
+</it-IT>
+<ja-JP>
+• チャット — 文字装飾、スポイラー、操作できるメンション、返信・編集を改善しました。
+
+• キャプション — 必要なときだけ「もっと見る」を表示し、位置を保ったまま全文を開けます。
+
+• Reels — 動画と一緒にコメントを表示し、入力欄を常時表示。返信も見やすくなりました。
+
+• もっと自分らしく — 興味を追加し、8言語に新対応。プロフィール、QR、アーカイブの遷移も滑らかに。
+</ja-JP>
+<ko-KR>
+• 채팅 — 텍스트 서식, 스포일러, 대화형 멘션과 더 명확한 답장·편집 기능.
+
+• 캡션 — 필요할 때만 ‘더 보기’가 나타나며 위치를 유지한 채 전문을 엽니다.
+
+• Reels — 영상과 함께 댓글을 보고 입력창은 항상 표시되며 답글도 더 깔끔해졌습니다.
+
+• 더 나답게 — 더 많은 관심사, 8개 새 언어, 프로필·QR·보관함의 부드러운 전환.
+</ko-KR>
+<nl-NL>
+• Chat — Tekstopmaak, spoilers, interactieve vermeldingen en duidelijker antwoorden/bewerken.
+
+• Bijschriften — ‘Meer weergeven’ verschijnt alleen als het nodig is, zonder je plek te verliezen.
+
+• Reels — Reacties blijven bij de video, invoer blijft zichtbaar en antwoorden zijn overzichtelijker.
+
+• Meer van jou — Meer interesses, 8 nieuwe talen en vloeiendere profiel-, QR- en archiefovergangen.
+</nl-NL>
+<pl-PL>
+• Czat — Formatowanie tekstu, spoilery, aktywne wzmianki oraz czytelniejsze odpowiedzi i edycja.
+
+• Podpisy — „Więcej” pojawia się tylko w razie potrzeby i rozwija tekst bez utraty miejsca.
+
+• Reels — Komentarze obok filmu, zawsze widoczne pole wpisywania i czytelniejsze odpowiedzi.
+
+• Bardziej Twoje — Więcej zainteresowań, 8 nowych języków i płynniejsze przejścia profilu, QR i archiwum.
+</pl-PL>
+<pt-BR>
+• Chat — Formatação, spoilers, menções interativas e respostas/edição mais claras.
+
+• Legendas — “Ver mais” aparece só quando necessário e abre o texto sem perder sua posição.
+
+• Reels — Comentários junto ao vídeo, compositor sempre visível e respostas mais limpas.
+
+• Mais seu — Mais interesses, 8 novos idiomas e transições mais fluidas em perfis, QR e arquivo.
+</pt-BR>
+<pt-PT>
+• Chat — Formatação, spoilers, menções interativas e respostas/edição mais claras.
+
+• Legendas — «Ver mais» aparece só quando necessário e abre o texto sem perderes o lugar.
+
+• Reels — Comentários junto ao vídeo, compositor sempre visível e respostas mais limpas.
+
+• Mais teu — Mais interesses, 8 novos idiomas e transições mais fluidas em perfis, QR e arquivo.
+</pt-PT>
+<tr-TR>
+• Sohbet — Metin biçimleri, spoiler, etkileşimli bahsetmeler ve daha anlaşılır yanıt/düzenleme.
+
+• Açıklamalar — “Devamını gör” yalnızca gerektiğinde çıkar ve yerini kaybetmeden metni açar.
+
+• Reels — Yorumlar videoyla kalır, yazma alanı hep görünür ve yanıtlar daha sadedir.
+
+• Daha çok sen — Daha fazla ilgi alanı, 8 yeni dil ve profil, QR, arşivde akıcı geçişler.
+</tr-TR>
+<zh-TW>
+• 聊天 — 新增文字格式、劇透遮罩、互動式提及，回覆與編輯也更清楚。
+
+• 說明文字 — 只有需要時才顯示「查看更多」，展開後也不會失去閱讀位置。
+
+• Reels — 留言與影片同時呈現，輸入框保持可見，回覆更整潔。
+
+• 更符合你 — 更多興趣、8 種新語言，以及更流暢的個人檔案、QR 與封存轉場。
+</zh-TW>

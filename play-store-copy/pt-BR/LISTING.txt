@@ -1,7 +1,7 @@
 ===== pt-BR =====
 
 --- NOMBRE (máx 30) ---
-Moments: Amigos e Conexões
+Moments: Amigos e Stories
 
 --- DESCRIPCIÓN CORTA (máx 80) ---
 Rede social privada: fotos, stories, camadas ocultas, chat e Nova.
@@ -49,4 +49,3 @@ Moments não é sobre postar mais.
 É sobre compartilhar melhor.
 
 Baixe no Google Play e compartilhe só com quem realmente importa.
-

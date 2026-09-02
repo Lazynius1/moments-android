@@ -5,11 +5,14 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import com.google.firebase.storage.FirebaseStorage
 import com.moments.android.services.messaging.EncryptionService
+import com.moments.android.services.network.CloudFunctionsClient
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import android.util.Base64
 
 // MARK: - Types (StorageService.swift)
 
@@ -68,10 +71,24 @@ object StorageService {
             maxPixelDimension = 1080,
         ) ?: throw StorageError.InvalidData
 
-        val target = StoragePathBuilder.build(userId, StorageUploadDomain.ProfileAvatar())
-        return completeWithPublicDownloadURL(
-            uploader.upload(target, MediaUploadPayload.Data(imageData)),
+        val payload = JSONObject().put(
+            "imageBase64",
+            Base64.encodeToString(imageData, Base64.NO_WRAP),
         )
+        return try {
+            val response = CloudFunctionsClient.postJson(
+                function = "uploadModeratedProfileImage",
+                payload = payload,
+                timeoutMs = 120_000,
+            )
+            response.optString("mediaURL").takeIf { it.isNotBlank() }
+                ?: throw StorageError.UrlRetrievalFailed
+        } catch (error: CloudFunctionsClient.BackendException) {
+            if (error.statusCode == 422) {
+                throw ModerationError.ContentRejected(error.message ?: "profile_image_rejected")
+            }
+            throw StorageError.UploadFailed
+        }
     }
 
     // MARK: - Nova

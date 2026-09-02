@@ -133,7 +133,6 @@
     <string name="register_username_taken">Bu kullanıcı adı zaten alınmış.</string>
     <string name="register_profile_error">Profil oluşturulamadı.</string>
     <string name="register_account_error">Hesap oluşturulamadı.</string>
-    <string name="interest_viajar">Seyahat</string>
     <string name="common_back">Geri</string>
     <string name="common_close">Kapat</string>
     <string name="messaging_new_conversation">Yeni konuşma</string>
@@ -2889,4 +2888,5 @@
     <string name="message_requests_hidden_words_custom">Kelimeler ve ifadeler</string>
     <string name="message_requests_hidden_words_custom_description">Her satıra bir tane yaz veya virgülle ayır. Eşleşmeler cihazında gerçekleşir.</string>
     <string name="notification_message_request_generic">Yeni bir mesaj isteğin var.</string>
+    <string name="profile_editor_profile_image_rejected">Bu fotoğraf profil fotoğrafı olarak kullanılamaz.</string>
 </resources>

@@ -132,7 +132,6 @@
     <string name="register_username_taken">Dieser Benutzername ist bereits vergeben.</string>
     <string name="register_profile_error">Das Profil konnte nicht erstellt werden.</string>
     <string name="register_account_error">Das Konto konnte nicht erstellt werden.</string>
-    <string name="interest_viajar">Reisen</string>
     <string name="common_back">Zurück</string>
     <string name="common_close">Schließen</string>
     <string name="common_cancel">Abbrechen</string>
@@ -2313,4 +2312,5 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="chat_request_disclaimer_sent">Diese Nachrichtenanfrage wartet auf eine Antwort.</string>
     <string name="chat_request_disclaimer_outgoing">Du kannst bis zu 5 Nachrichten senden, solange die Anfrage aussteht.</string>
     <string name="notification_message_request_generic">Du hast eine neue Nachrichtenanfrage.</string>
+    <string name="profile_editor_profile_image_rejected">Dieses Foto kann nicht als Profilbild verwendet werden.</string>
 </resources>

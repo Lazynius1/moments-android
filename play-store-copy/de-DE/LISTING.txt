@@ -1,7 +1,7 @@
 ===== de-DE =====
 
 --- NOMBRE (máx 30) ---
-Moments: Freunde treffen
+Moments: Freunde & Stories
 
 --- DESCRIPCIÓN CORTA (máx 80) ---
 Privates soziales Netz: Fotos, Stories, Hidden Layers, Chat & Nova.

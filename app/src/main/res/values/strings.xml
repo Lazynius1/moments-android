@@ -2911,4 +2911,5 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="message_requests_hidden_words_custom">Words and phrases</string>
     <string name="message_requests_hidden_words_custom_description">Enter one per line or separate them with commas. Matching happens locally.</string>
     <string name="notification_message_request_generic">You have a new message request.</string>
+    <string name="profile_editor_profile_image_rejected">This photo can\'t be used as your profile picture.</string>
 </resources>
