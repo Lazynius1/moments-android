@@ -666,11 +666,13 @@ class UserProfileViewModel(
     }
 
     override fun relationshipState(targetId: String): FollowButtonState {
-        FollowStateStore.state(targetId)?.let { return it }
-
         val current = currentUserId
         if (current == targetId) return FollowButtonState.OWN_PROFILE
-        if (following.any { it.id == targetId } || mutuals.any { it.id == targetId }) return FollowButtonState.FOLLOWING
+        if (targetId == userId) return followButtonState
+        FollowStateStore.state(targetId)?.let { return it }
+
+        // Estas listas pertenecen al perfil visitado; no implican que el usuario
+        // autenticado siga a las personas que aparecen en ellas.
         val known = followers.firstOrNull { it.id == targetId }
             ?: following.firstOrNull { it.id == targetId }
             ?: mutuals.firstOrNull { it.id == targetId }
@@ -681,7 +683,6 @@ class UserProfileViewModel(
         val current = currentUserId ?: return
         if (current == targetId) return
         viewModelScope.launch {
-            if (FollowStateStore.state(targetId) != null) return@launch
             val state = PrivacyService.getFollowButtonState(current, targetId)
             FollowStateStore.setState(FollowStateStore.reconciledState(state, targetId), targetId)
         }

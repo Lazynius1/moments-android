@@ -7,7 +7,7 @@ data class ProfileMessagePresentation(
     val destination: Destination,
 ) {
     sealed class Destination {
-        data class Conversation(val conversation: Conversation) : Destination()
+        data class OpenConversation(val conversation: Conversation) : Destination()
         data class PendingChat(val context: PendingChatContext) : Destination()
     }
 }
@@ -28,7 +28,7 @@ suspend fun MessagingViewModel.consumeProfileMessagePresentation(
     if (conversation != null) {
         presentationRoute = null
         return ProfileMessagePresentation(
-            ProfileMessagePresentation.Destination.Conversation(conversation),
+            ProfileMessagePresentation.Destination.OpenConversation(conversation),
         )
     }
 
@@ -36,7 +36,7 @@ suspend fun MessagingViewModel.consumeProfileMessagePresentation(
         is MessagingPresentationRoute.Conversation -> {
             presentationRoute = null
             return ProfileMessagePresentation(
-                ProfileMessagePresentation.Destination.Conversation(route.conversation),
+                ProfileMessagePresentation.Destination.OpenConversation(route.conversation),
             )
         }
         is MessagingPresentationRoute.PendingChat -> {

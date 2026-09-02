@@ -397,7 +397,7 @@ fun UserProfileView(
                 )
                 if (presentation != null) {
                     when (val destination = presentation.destination) {
-                        is ProfileMessagePresentation.Destination.Conversation -> {
+                        is ProfileMessagePresentation.Destination.OpenConversation -> {
                             targetConversation = destination.conversation
                         }
                         is ProfileMessagePresentation.Destination.PendingChat -> {

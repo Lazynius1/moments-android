@@ -198,7 +198,7 @@ fun FeedPostProfilePreviewOverlay(
                     ) ?: return@launch
 
                     when (val destination = presentation.destination) {
-                        is ProfileMessagePresentation.Destination.Conversation -> {
+                        is ProfileMessagePresentation.Destination.OpenConversation -> {
                             val resolvedConversation = destination.conversation
                             val conversationId = resolvedConversation.id
                             if (!conversationId.isNullOrEmpty()) {

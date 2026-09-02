@@ -472,7 +472,7 @@ fun MessagingView(
                                     currentUserId = current,
                                 ) ?: return@launch
                                 when (val destination = presentation.destination) {
-                                    is ProfileMessagePresentation.Destination.Conversation ->
+                                    is ProfileMessagePresentation.Destination.OpenConversation ->
                                         viewModel.openConversation(destination.conversation)
                                     is ProfileMessagePresentation.Destination.PendingChat ->
                                         pendingChatContext = destination.context
@@ -1270,7 +1270,7 @@ private fun GlassmorphicNewConversationView(
                                             currentUserId = currentUserId,
                                         ) ?: return@launch
                                         when (val destination = presentation.destination) {
-                                            is ProfileMessagePresentation.Destination.Conversation ->
+                                            is ProfileMessagePresentation.Destination.OpenConversation ->
                                                 onConversationReady(destination.conversation)
                                             is ProfileMessagePresentation.Destination.PendingChat ->
                                                 onNeedsRequest(destination.context)
