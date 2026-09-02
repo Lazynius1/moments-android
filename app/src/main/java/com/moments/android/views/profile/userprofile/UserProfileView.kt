@@ -65,10 +65,10 @@ import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.messaging.components.ChatRecoveryGateView
 import com.moments.android.views.messaging.core.Conversation
-import com.moments.android.views.messaging.core.MessagingPresentationRoute
 import com.moments.android.views.messaging.core.MessagingViewModel
 import com.moments.android.views.messaging.core.PendingChatContext
-import com.moments.android.views.messaging.core.PendingChatContextFactory
+import com.moments.android.views.messaging.core.ProfileMessagePresentation
+import com.moments.android.views.messaging.core.consumeProfileMessagePresentation
 import com.moments.android.views.messaging.screens.chat.GlassmorphicChatView
 import com.moments.android.views.profile.core.SocialConnectionTab
 import com.moments.android.views.profile.core.SocialConnectionsRoute
@@ -337,6 +337,7 @@ fun UserProfileView(
     var openedProfileId by remember { mutableStateOf<String?>(null) }
     var targetConversation by remember { mutableStateOf<Conversation?>(null) }
     var pendingChatContext by remember { mutableStateOf<PendingChatContext?>(null) }
+    var messageFlowError by remember { mutableStateOf<String?>(null) }
 
     val zoomFeedKind = if (selectedTab == UserProfileTabType.TAGGED) {
         ProfileMomentZoomFeedKind.USER_PROFILE_TAGGED
@@ -381,31 +382,30 @@ fun UserProfileView(
     }
 
     // Port de `openMessageFlow()` (HeaderSection / StateViews): conversación existente → chat;
-    // si `requiresMessageRequest` → `PendingChatContextFactory.outgoing` → chat en modo solicitud.
+    // solicitud saliente vía `presentationRoute` o fallback `PendingChatContextFactory.outgoing`.
     val openMessageFlow: () -> Unit = openMessage@{
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return@openMessage
         val targetUser = viewModel.userProfile ?: return@openMessage
         messagingViewModel.startConversation(targetUser, currentUserId) { conversation ->
-            when (val route = messagingViewModel.presentationRoute) {
-                is MessagingPresentationRoute.Conversation -> {
-                    messagingViewModel.presentationRoute = null
-                    targetConversation = route.conversation
-                }
-                is MessagingPresentationRoute.PendingChat -> {
-                    messagingViewModel.presentationRoute = null
-                    pendingChatContext = route.context
-                }
-                null -> if (conversation != null) {
-                    targetConversation = conversation
-                } else if (messagingViewModel.requiresMessageRequest) {
-                    scope.launch {
-                        pendingChatContext = PendingChatContextFactory.outgoing(
-                            user = targetUser,
-                            currentUserId = currentUserId,
-                            followersCountOverride = viewModel.followers.size,
-                            momentsCountOverride = viewModel.moments.size,
-                        )
+            scope.launch {
+                val presentation = messagingViewModel.consumeProfileMessagePresentation(
+                    conversation = conversation,
+                    user = targetUser,
+                    currentUserId = currentUserId,
+                    followersCountOverride = viewModel.followers.size,
+                    momentsCountOverride = viewModel.moments.size,
+                )
+                if (presentation != null) {
+                    when (val destination = presentation.destination) {
+                        is ProfileMessagePresentation.Destination.Conversation -> {
+                            targetConversation = destination.conversation
+                        }
+                        is ProfileMessagePresentation.Destination.PendingChat -> {
+                            pendingChatContext = destination.context
+                        }
                     }
+                } else {
+                    messagingViewModel.errorMessage?.takeIf { it.isNotEmpty() }?.let { messageFlowError = it }
                 }
             }
         }
@@ -641,6 +641,19 @@ fun UserProfileView(
             dismissButton = {
                 TextButton(onClick = { showingUnfollowConfirmation = false }) {
                     Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
+    messageFlowError?.let { error ->
+        AlertDialog(
+            onDismissRequest = { messageFlowError = null },
+            title = { Text(stringResource(R.string.user_profile_send_message)) },
+            text = { Text(error) },
+            confirmButton = {
+                TextButton(onClick = { messageFlowError = null }) {
+                    Text(stringResource(R.string.common_ok))
                 }
             },
         )

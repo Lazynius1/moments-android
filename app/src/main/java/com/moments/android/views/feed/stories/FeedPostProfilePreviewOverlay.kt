@@ -77,7 +77,8 @@ import com.moments.android.views.components.VerifiedBadge
 import com.moments.android.views.messaging.components.ChatVideoPlayBadge
 import com.moments.android.views.messaging.core.MessagingPresentationRoute
 import com.moments.android.views.messaging.core.MessagingViewModel
-import com.moments.android.views.messaging.core.PendingChatContextFactory
+import com.moments.android.views.messaging.core.ProfileMessagePresentation
+import com.moments.android.views.messaging.core.consumeProfileMessagePresentation
 import com.moments.android.views.profile.core.GridPreviewThumbnailFrame
 import com.moments.android.views.profile.core.gridPreviewSettings
 import com.moments.android.views.profile.core.sections.ProfileAvatarNoteMetrics
@@ -188,31 +189,32 @@ fun FeedPostProfilePreviewOverlay(
         dismissOverlay {
             messagingViewModel.startConversation(user, currentUserId) { conversation ->
                 scope.launch {
-                    val conversationId = conversation?.id
-                    if (conversation != null && !conversationId.isNullOrEmpty()) {
-                        LegacyNavigationBridge.conversation(conversationId)
-                        return@launch
-                    }
-                    if (conversation != null) {
-                        messagingViewModel.presentationRoute =
-                            MessagingPresentationRoute.Conversation(conversation)
-                        onPresentMessages()
-                        return@launch
-                    }
-                    if (messagingViewModel.presentationRoute != null) {
-                        onPresentMessages()
-                        return@launch
-                    }
-                    if (!messagingViewModel.requiresMessageRequest) return@launch
-                    val context = PendingChatContextFactory.outgoing(
+                    val presentation = messagingViewModel.consumeProfileMessagePresentation(
+                        conversation = conversation,
                         user = user,
                         currentUserId = currentUserId,
                         followersCountOverride = profileViewModel.followers.size,
                         momentsCountOverride = profileViewModel.moments.size,
-                    )
-                    messagingViewModel.presentationRoute =
-                        MessagingPresentationRoute.PendingChat(context)
-                    onPresentMessages()
+                    ) ?: return@launch
+
+                    when (val destination = presentation.destination) {
+                        is ProfileMessagePresentation.Destination.Conversation -> {
+                            val resolvedConversation = destination.conversation
+                            val conversationId = resolvedConversation.id
+                            if (!conversationId.isNullOrEmpty()) {
+                                LegacyNavigationBridge.conversation(conversationId)
+                            } else {
+                                messagingViewModel.presentationRoute =
+                                    MessagingPresentationRoute.Conversation(resolvedConversation)
+                                onPresentMessages()
+                            }
+                        }
+                        is ProfileMessagePresentation.Destination.PendingChat -> {
+                            messagingViewModel.presentationRoute =
+                                MessagingPresentationRoute.PendingChat(destination.context)
+                            onPresentMessages()
+                        }
+                    }
                 }
             }
         }

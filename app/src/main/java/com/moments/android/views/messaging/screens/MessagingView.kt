@@ -107,6 +107,8 @@ import com.moments.android.views.messaging.core.MessagingPresentationRoute
 import com.moments.android.views.messaging.core.MessagingViewModel
 import com.moments.android.views.messaging.core.PendingChatContext
 import com.moments.android.views.messaging.core.PendingChatContextFactory
+import com.moments.android.views.messaging.core.ProfileMessagePresentation
+import com.moments.android.views.messaging.core.consumeProfileMessagePresentation
 import com.moments.android.views.messaging.screens.chat.ChatStoryRoute
 import com.moments.android.views.messaging.screens.chat.GlassmorphicChatView
 import com.moments.android.views.messaging.services.ChatDraftEvent
@@ -293,12 +295,9 @@ fun MessagingView(
                     showingNewConversation = false
                     viewModel.openConversation(conversation)
                 },
-                onNeedsRequest = { user ->
-                    scope.launch {
-                        val current = uid ?: return@launch
-                        pendingChatContext = PendingChatContextFactory.outgoing(user, current)
-                        showingNewConversation = false
-                    }
+                onNeedsRequest = { context ->
+                    pendingChatContext = context
+                    showingNewConversation = false
                 },
             )
             return
@@ -466,10 +465,17 @@ fun MessagingView(
                         viewModel.clearSearch()
                         val current = uid ?: return@MessagingConversationList
                         viewModel.startConversation(user = user, fromUserId = current) { conversation ->
-                            if (conversation != null) viewModel.openConversation(conversation)
-                            else if (viewModel.requiresMessageRequest) {
-                                scope.launch {
-                                    pendingChatContext = PendingChatContextFactory.outgoing(user, current)
+                            scope.launch {
+                                val presentation = viewModel.consumeProfileMessagePresentation(
+                                    conversation = conversation,
+                                    user = user,
+                                    currentUserId = current,
+                                ) ?: return@launch
+                                when (val destination = presentation.destination) {
+                                    is ProfileMessagePresentation.Destination.Conversation ->
+                                        viewModel.openConversation(destination.conversation)
+                                    is ProfileMessagePresentation.Destination.PendingChat ->
+                                        pendingChatContext = destination.context
                                 }
                             }
                         }
@@ -1183,12 +1189,13 @@ private fun GlassmorphicNewConversationView(
     viewModel: MessagingViewModel,
     onDismiss: () -> Unit,
     onConversationReady: (Conversation) -> Unit,
-    onNeedsRequest: (AppUser) -> Unit,
+    onNeedsRequest: (PendingChatContext) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
     var searchText by remember { mutableStateOf("") }
     val uid = FirebaseAuth.getInstance().currentUser?.uid
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { viewModel.searchUsers("") }
     LaunchedEffect(searchText) { viewModel.searchUsers(searchText) }
@@ -1256,8 +1263,19 @@ private fun GlassmorphicNewConversationView(
                             .clickable {
                                 val currentUserId = uid ?: return@clickable
                                 viewModel.startConversation(user = user, fromUserId = currentUserId) { conversation ->
-                                    if (conversation != null) onConversationReady(conversation)
-                                    else if (viewModel.requiresMessageRequest) onNeedsRequest(user)
+                                    scope.launch {
+                                        val presentation = viewModel.consumeProfileMessagePresentation(
+                                            conversation = conversation,
+                                            user = user,
+                                            currentUserId = currentUserId,
+                                        ) ?: return@launch
+                                        when (val destination = presentation.destination) {
+                                            is ProfileMessagePresentation.Destination.Conversation ->
+                                                onConversationReady(destination.conversation)
+                                            is ProfileMessagePresentation.Destination.PendingChat ->
+                                                onNeedsRequest(destination.context)
+                                        }
+                                    }
                                 }
                             }
                             .padding(horizontal = 12.dp, vertical = 6.dp),
