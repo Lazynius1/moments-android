@@ -31,9 +31,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import com.moments.android.R
 import com.moments.android.services.cache.VideoPreloader
 import com.moments.android.services.performance.VideoMoment
@@ -54,6 +51,7 @@ fun ReelsViewer(
     modifier: Modifier = Modifier,
     startIndex: Int = 0,
     initialStartSeconds: Double = 0.0,
+    handoffConsumerId: String? = null,
 ) {
     val safeStart = startIndex.coerceIn(0, (videos.size - 1).coerceAtLeast(0))
     val pagerState = rememberPagerState(
@@ -65,17 +63,15 @@ fun ReelsViewer(
 
     BackHandler(onBack = onClose)
 
-    // ≡ iOS .statusBarHidden() + preferredColorScheme(.dark) + vídeo en safe area
+    // Barra de estado visible (como IG / iOS Reels). No esconderla.
     DisposableEffect(Unit) {
         val window = (view.context as? android.app.Activity)?.window
-        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
-        controller?.hide(WindowInsetsCompat.Type.statusBars())
-        // Nav bar transparente: el vídeo pinta debajo; el comment bar aporta el fondo AdaptiveColors.
+        val wasContrastEnforced = window?.isNavigationBarContrastEnforced
         window?.isNavigationBarContrastEnforced = false
-        controller?.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         onDispose {
-            controller?.show(WindowInsetsCompat.Type.statusBars())
+            if (wasContrastEnforced != null) {
+                window?.isNavigationBarContrastEnforced = wasContrastEnforced
+            }
             ReelPrebufferService.discard()
         }
     }
@@ -129,6 +125,7 @@ fun ReelsViewer(
                     video = video,
                     isCurrentVideo = isCurrent,
                     startAtSeconds = if (index == safeStart) initialStartSeconds else 0.0,
+                    handoffConsumerId = if (index == safeStart) handoffConsumerId else null,
                     onClose = onClose,
                     modifier = Modifier.fillMaxSize(),
                 )

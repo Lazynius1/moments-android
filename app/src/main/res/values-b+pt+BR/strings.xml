@@ -543,6 +543,7 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="feed_video_pause">Pausar vídeo</string>
     <string name="feed_video_mute">Silenciar vídeo</string>
     <string name="feed_video_unmute">Ativar som do vídeo</string>
+    <string name="feed_video_watch_again">Assistir novamente</string>
     <string name="att_pre_alert_title">Informações sobre anúncios</string>
     <string name="att_pre_alert_description">Este aplicativo exibe anúncios para continuar gratuito. A seguir, você poderá escolher se quer anúncios personalizados para você.</string>
     <string name="att_pre_alert_continue">Continuar</string>

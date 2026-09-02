@@ -543,6 +543,7 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="feed_video_pause">Pausar vídeo</string>
     <string name="feed_video_mute">Silenciar vídeo</string>
     <string name="feed_video_unmute">Activar so del vídeo</string>
+    <string name="feed_video_watch_again">Torna a veure</string>
     <string name="att_pre_alert_title">Informació sobre anuncis</string>
     <string name="att_pre_alert_description">Aquesta aplicació mostra anuncis per mantenir-se gratuïta. A continuació podràs triar si vols que els anuncis siguin personalitzats per a tu.</string>
     <string name="att_pre_alert_continue">Continuar</string>

@@ -577,6 +577,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="feed_video_pause">Pausar vídeo</string>
     <string name="feed_video_mute">Silenciar vídeo</string>
     <string name="feed_video_unmute">Activar sonido del vídeo</string>
+    <string name="feed_video_watch_again">Ver otra vez</string>
     <string name="att_pre_alert_title">Información sobre anuncios</string>
     <string name="att_pre_alert_description">Esta aplicación muestra anuncios para mantenerse gratuita. A continuación podrás elegir si quieres que los anuncios sean personalizados para ti.</string>
     <string name="att_pre_alert_continue">Continuar</string>

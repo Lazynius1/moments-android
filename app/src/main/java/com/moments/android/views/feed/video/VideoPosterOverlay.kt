@@ -34,7 +34,7 @@ fun VideoPosterOverlay(
 ) {
     val alpha by animateFloatAsState(
         targetValue = if (isReadyToPlay) 0f else 1f,
-        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 80, easing = FastOutSlowInEasing),
         label = "posterFade",
     )
 

@@ -543,6 +543,7 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="feed_video_pause">Pausar vídeo</string>
     <string name="feed_video_mute">Silenciar vídeo</string>
     <string name="feed_video_unmute">Ativar som do vídeo</string>
+    <string name="feed_video_watch_again">Ver outra vez</string>
     <string name="att_pre_alert_title">Informação sobre anúncios</string>
     <string name="att_pre_alert_description">Esta aplicação mostra anúncios para continuar gratuita. De seguida, podes escolher se queres anúncios personalizados para ti.</string>
     <string name="att_pre_alert_continue">Continuar</string>

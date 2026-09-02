@@ -556,6 +556,7 @@
     <string name="feed_video_pause">Wstrzymaj film</string>
     <string name="feed_video_mute">Wycisz film</string>
     <string name="feed_video_unmute">Włącz dźwięk</string>
+    <string name="feed_video_watch_again">Obejrzyj ponownie</string>
     <string name="att_pre_alert_title">Informacje o reklamach</string>
     <string name="att_pre_alert_description">Ta aplikacja wyświetla reklamy, aby pozostać bezpłatna. Następnie możesz zdecydować, czy chcesz, aby reklamy były dopasowane do Ciebie.</string>
     <string name="att_pre_alert_continue">Dalej</string>

@@ -72,6 +72,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.graphics.drawable.toBitmap
 import coil.ImageLoader
+import coil.imageLoader
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -113,7 +114,7 @@ private fun rememberEchoOverlayTone(assetUrl: String?): EchoOverlayTone {
         } else {
             withContext(Dispatchers.IO) {
                 val request = ImageRequest.Builder(context).data(assetUrl).allowHardware(false).build()
-                val drawable = (ImageLoader(context).execute(request) as? SuccessResult)?.drawable
+                val drawable = (context.imageLoader.execute(request) as? SuccessResult)?.drawable
                 drawable?.toBitmap()?.let(::computeEchoOverlayTone) ?: EchoOverlayTone()
             }
         }

@@ -31,6 +31,8 @@ interface RegisteredVideoPlayer {
     fun resumeVideo()
     fun setMuted(muted: Boolean, respectSilentMode: Boolean = true)
     fun toggleMute(respectSilentMode: Boolean = true)
+    fun setFinishedPlayback(finished: Boolean) {}
+    fun replayFromBeginning() {}
 }
 
 /**
@@ -47,6 +49,7 @@ object GlobalVideoManager {
     private val preservedPlayerConsumerIds = mutableSetOf<String>()
     private val pendingDetailHandoffMomentIds = mutableSetOf<String>()
     private val playbackHoldOwners = ConcurrentHashMap.newKeySet<String>()
+    private val finishedPlaybackIds = mutableSetOf<String>()
 
     private val _activeVideoId = MutableStateFlow<String?>(null)
     val activeVideoId: StateFlow<String?> = _activeVideoId.asStateFlow()
@@ -60,6 +63,10 @@ object GlobalVideoManager {
     /** Overlay encima del feed: los posts no deben seguir sonando ni reanudarse por visibilidad. */
     private val _isPlaybackHeld = MutableStateFlow(false)
     val isPlaybackHeld: StateFlow<Boolean> = _isPlaybackHeld.asStateFlow()
+
+    /** Posts cuyo vídeo ha llegado al final (overlay “Ver otra vez”). */
+    private val _finishedPlaybackIds = MutableStateFlow<Set<String>>(emptySet())
+    val finishedPlaybackIdsFlow: StateFlow<Set<String>> = _finishedPlaybackIds.asStateFlow()
 
     @Volatile private var initialized = false
     private var appContext: Context? = null
@@ -110,6 +117,7 @@ object GlobalVideoManager {
 
     fun playVideo(playerId: String) {
         if (_isPlaybackHeld.value) return
+        if (hasFinishedPlayback(playerId)) return
         val currentActive = _activeVideoId.value
         if (currentActive != null && currentActive != playerId) {
             pausePlayer(currentActive)
@@ -128,8 +136,49 @@ object GlobalVideoManager {
     fun pauseAllVideos() {
         _activeVideoId.value = null
         allPlayers.values.forEach { it.pauseVideo() }
-        // Fallback pool (players aún no registrados vía VideoPlayerManager)
         runCatching { SharedVideoPlayerPool.pauseAll() }
+    }
+
+    fun pauseAllVideos(except: String) {
+        allPlayers.forEach { (id, manager) ->
+            if (id != except) manager.pauseVideo()
+        }
+        _activeVideoId.value = except
+    }
+
+    fun markPlaybackFinished(playerId: String) {
+        synchronized(lock) { finishedPlaybackIds.add(playerId) }
+        _finishedPlaybackIds.value = synchronized(lock) { finishedPlaybackIds.toSet() }
+        allPlayers[playerId]?.setFinishedPlayback(true)
+    }
+
+    fun clearPlaybackFinished(playerId: String) {
+        synchronized(lock) { finishedPlaybackIds.remove(playerId) }
+        _finishedPlaybackIds.value = synchronized(lock) { finishedPlaybackIds.toSet() }
+        allPlayers[playerId]?.setFinishedPlayback(false)
+    }
+
+    fun hasFinishedPlayback(playerId: String): Boolean =
+        synchronized(lock) { finishedPlaybackIds.contains(playerId) }
+
+    fun replayFromStart(playerId: String) {
+        clearPlaybackFinished(playerId)
+        setPlaybackPosition(0.0, playerId)
+        val currentActive = _activeVideoId.value
+        if (currentActive != null && currentActive != playerId) {
+            pausePlayer(currentActive)
+        }
+        _activeVideoId.value = playerId
+        val manager = allPlayers[playerId]
+        if (manager != null) {
+            manager.replayFromBeginning()
+        } else {
+            runCatching {
+                val exo = SharedVideoPlayerPool.player(playerId)
+                exo.seekTo(0)
+                exo.play()
+            }
+        }
     }
 
     /**
@@ -212,8 +261,9 @@ object GlobalVideoManager {
         _livePlaybackSeconds.value = _livePlaybackSeconds.value + (forMomentId to 0.0)
     }
 
-    /** Captura posición actual del ExoPlayer del pool (ms → s). Bridge hasta ticks de VideoPlayerManager. */
+    /** Captura posición actual del ExoPlayer del pool (ms → s). No crea slots nuevos. */
     fun capturePlaybackPosition(consumerId: String) {
+        if (!SharedVideoPlayerPool.hasPlayer(consumerId)) return
         runCatching {
             val player = SharedVideoPlayerPool.player(consumerId)
             setPlaybackPosition(player.currentPosition / 1000.0, consumerId)
@@ -311,6 +361,7 @@ object GlobalVideoManager {
             profileVideoConsumerId(moment)
         }
         synchronized(lock) { preservedPlayerConsumerIds.add(id) }
+        clearPlaybackFinished(id)
     }
 
     fun completeReelsFeedHandoff(moment: FeedMoment, mediaItem: FeedMediaItem? = null) {

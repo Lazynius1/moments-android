@@ -8,6 +8,9 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Port de SharedVideoPlayerPool.swift.
  * Pool compartido de ExoPlayer para feed y reels (máx. 3 instancias activas).
+ *
+ * Lazy: no crea los 3 ExoPlayers en Application.onCreate — el primer `player()`
+ * materializa slots bajo demanda (cold start más ligero).
  */
 object SharedVideoPlayerPool {
 
@@ -21,21 +24,11 @@ object SharedVideoPlayerPool {
     private val slots = mutableListOf<Slot>()
     private val lock = Any()
     private val evictionHandlers = ConcurrentHashMap<String, () -> Unit>()
-    private var appContext: Context? = null
+    @Volatile private var appContext: Context? = null
 
     fun initialize(context: Context) {
-        if (slots.isNotEmpty()) return
         appContext = context.applicationContext
-        synchronized(lock) {
-            if (slots.isNotEmpty()) return
-            repeat(POOL_SIZE) {
-                // iOS: AVPlayer() sin mute forzado — el caller (VideoPlayer) fija volume.
-                // Android: LoadControl + TrackSelector adaptativos (≡ MomentsVideoPlayer).
-                slots += Slot(
-                    player = buildAdaptiveExoPlayer(context.applicationContext),
-                )
-            }
-        }
+        // No crear players aquí: se materializan en ensureSlotCapacity / player().
     }
 
     fun setEvictionHandler(consumerId: String, handler: () -> Unit) {
@@ -43,10 +36,11 @@ object SharedVideoPlayerPool {
     }
 
     fun player(consumerId: String): ExoPlayer {
-        ensureInitialized()
+        ensureContext()
         var handler: (() -> Unit)? = null
         val player: ExoPlayer
         synchronized(lock) {
+            ensureSlotCapacityLocked()
             val existing = slots.indexOfFirst { it.consumerId == consumerId }
             if (existing >= 0) {
                 slots[existing].lastUsed = Date()
@@ -58,6 +52,13 @@ object SharedVideoPlayerPool {
                 slots[free].lastUsed = Date()
                 return slots[free].player
             }
+            // Ampliar hasta POOL_SIZE si aún no está lleno.
+            if (slots.size < POOL_SIZE) {
+                val ctx = appContext!!
+                val slot = Slot(player = buildAdaptiveExoPlayer(ctx), consumerId = consumerId, lastUsed = Date())
+                slots += slot
+                return slot.player
+            }
             val lruIndex = slots.withIndex().minByOrNull { it.value.lastUsed.time }?.index ?: 0
             val evictedConsumer = slots[lruIndex].consumerId
             evictSlot(lruIndex)
@@ -66,7 +67,6 @@ object SharedVideoPlayerPool {
             player = slots[lruIndex].player
             handler = evictedConsumer?.let { evictionHandlers[it] }
         }
-        // Notificar fuera del lock (paridad iOS — evita reentradas).
         handler?.invoke()
         return player
     }
@@ -83,6 +83,12 @@ object SharedVideoPlayerPool {
         }
     }
 
+    fun hasPlayer(consumerId: String): Boolean {
+        synchronized(lock) {
+            return slots.any { it.consumerId == consumerId }
+        }
+    }
+
     fun hasActiveItem(consumerId: String): Boolean {
         synchronized(lock) {
             val index = slots.indexOfFirst { it.consumerId == consumerId }
@@ -93,14 +99,12 @@ object SharedVideoPlayerPool {
 
     /** Port de pausar todos los AVPlayer del pool (GlobalVideoManager.pauseAllVideos). */
     fun pauseAll() {
-        ensureInitialized()
         synchronized(lock) {
             slots.forEach { it.player.pause() }
         }
     }
 
     fun setAllVolumes(volume: Float) {
-        ensureInitialized()
         synchronized(lock) {
             slots.forEach { it.player.volume = volume }
         }
@@ -114,9 +118,16 @@ object SharedVideoPlayerPool {
         slots[index].lastUsed = Date(0)
     }
 
-    private fun ensureInitialized() {
-        check(slots.isNotEmpty()) {
+    private fun ensureContext() {
+        check(appContext != null) {
             "SharedVideoPlayerPool.initialize(context) debe llamarse antes de usar el pool"
         }
+    }
+
+    /** Crea el primer slot si el pool aún está vacío (primer vídeo del feed). */
+    private fun ensureSlotCapacityLocked() {
+        if (slots.isNotEmpty()) return
+        val ctx = appContext ?: return
+        slots += Slot(player = buildAdaptiveExoPlayer(ctx))
     }
 }

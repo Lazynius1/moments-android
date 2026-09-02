@@ -556,6 +556,7 @@
     <string name="feed_video_pause">동영상 일시정지</string>
     <string name="feed_video_mute">동영상 음소거</string>
     <string name="feed_video_unmute">동영상 음소거 해제</string>
+    <string name="feed_video_watch_again">다시 보기</string>
     <string name="att_pre_alert_title">광고 관련 정보</string>
     <string name="att_pre_alert_description">무료로 이용할 수 있도록 광고를 표시합니다. 다음 단계에서 맞춤형 광고를 받을지 선택할 수 있어요.</string>
     <string name="att_pre_alert_continue">계속</string>

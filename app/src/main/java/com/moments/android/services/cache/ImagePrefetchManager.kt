@@ -71,6 +71,8 @@ object ImagePrefetchManager {
         val key = url.toString()
         val request = ImageRequest.Builder(context)
             .data(url)
+            // Prefetch al ancho típico de card (~pantalla), no full-res.
+            .size(1080, 1920)
             .listener(
                 object : ImageRequest.Listener {
                     override fun onSuccess(request: ImageRequest, result: SuccessResult) {

@@ -556,6 +556,7 @@
     <string name="feed_video_pause">Videoyu duraklat</string>
     <string name="feed_video_mute">Videonun sesini kapat</string>
     <string name="feed_video_unmute">Videonun sesini aç</string>
+    <string name="feed_video_watch_again">Tekrar izle</string>
     <string name="att_pre_alert_title">Reklamlar hakkında bilgi</string>
     <string name="att_pre_alert_description">Bu uygulama ücretsiz kalabilmek için reklam gösterir. Sonraki adımda reklamların sana göre kişiselleştirilip kişiselleştirilmeyeceğini seçebilirsin.</string>
     <string name="att_pre_alert_continue">Devam et</string>

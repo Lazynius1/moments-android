@@ -556,6 +556,7 @@
     <string name="feed_video_pause">動画を一時停止</string>
     <string name="feed_video_mute">動画をミュート</string>
     <string name="feed_video_unmute">動画のミュートを解除</string>
+    <string name="feed_video_watch_again">もう一度見る</string>
     <string name="att_pre_alert_title">広告についてのお知らせ</string>
     <string name="att_pre_alert_description">無料でご利用いただけるよう広告を表示しています。次に、広告をあなた向けにパーソナライズするかどうかを選択できます。</string>
     <string name="att_pre_alert_continue">続ける</string>

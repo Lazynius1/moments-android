@@ -8,24 +8,21 @@ import com.moments.android.services.cache.VideoPreloader
 /**
  * Port de ReelPrebufferService.swift.
  * Mantiene el siguiente reel bufferizado en un player mudo y pausado.
+ * Lazy: el warm player se crea en el primer `prebuffer`, no en Application.onCreate.
  */
 object ReelPrebufferService {
 
     private var warmPlayer: ExoPlayer? = null
     private var preparedUrlString: String? = null
-    private var appContext: Context? = null
+    @Volatile private var appContext: Context? = null
 
     fun initialize(context: Context) {
-        if (warmPlayer != null) return
         appContext = context.applicationContext
-        warmPlayer = buildAdaptiveExoPlayer(context.applicationContext).apply {
-            volume = 0f
-            playWhenReady = false
-        }
+        // No crear ExoPlayer aquí — cold start.
     }
 
     fun prebuffer(urlString: String) {
-        ensureInitialized()
+        ensureWarmPlayer()
         if (preparedUrlString == urlString) return
         val item = VideoPreloader.getPlayerItem(urlString)
         val player = warmPlayer ?: return
@@ -41,7 +38,7 @@ object ReelPrebufferService {
     }
 
     fun takePreparedItem(forUrlString: String): MediaItem? {
-        ensureInitialized()
+        ensureWarmPlayer()
         val player = warmPlayer ?: return null
         if (preparedUrlString != forUrlString) return null
         if (player.playerError != null) return null
@@ -56,9 +53,15 @@ object ReelPrebufferService {
         preparedUrlString = null
     }
 
-    private fun ensureInitialized() {
-        check(warmPlayer != null) {
+    private fun ensureWarmPlayer() {
+        val ctx = appContext
+        check(ctx != null) {
             "ReelPrebufferService.initialize(context) debe llamarse antes de usarlo"
+        }
+        if (warmPlayer != null) return
+        warmPlayer = buildAdaptiveExoPlayer(ctx).apply {
+            volume = 0f
+            playWhenReady = false
         }
     }
 }

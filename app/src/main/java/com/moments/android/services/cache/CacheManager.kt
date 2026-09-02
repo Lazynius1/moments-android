@@ -1,13 +1,17 @@
 package com.moments.android.services.cache
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import coil.imageLoader
 import com.moments.android.services.messaging.ChatCacheStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Calendar
 import java.util.Date
@@ -22,13 +26,7 @@ object CacheManager : DefaultLifecycleObserver {
     private const val WARNING_THRESHOLD = 1500L * 1024 * 1024
 
     @Volatile private var appContext: Context? = null
-    private val handler = Handler(Looper.getMainLooper())
-    private val cleanupRunnable = object : Runnable {
-        override fun run() {
-            performIntelligentCleanup()
-            handler.postDelayed(this, TimeUnit.HOURS.toMillis(12))
-        }
-    }
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun initialize(context: Context) {
         if (appContext != null) return
@@ -41,19 +39,30 @@ object CacheManager : DefaultLifecycleObserver {
     private fun requireContext() = appContext ?: error("CacheManager.initialize required")
 
     override fun onStart(owner: LifecycleOwner) {
-        val currentSize = getCurrentCacheSize()
-        if (currentSize > WARNING_THRESHOLD && currentSize > MAX_CACHE_SIZE) {
-            performIntelligentCleanup()
+        ioScope.launch {
+            val currentSize = getCurrentCacheSize()
+            if (currentSize > WARNING_THRESHOLD && currentSize > MAX_CACHE_SIZE) {
+                performIntelligentCleanup()
+            }
         }
     }
 
     override fun onStop(owner: LifecycleOwner) {
-        cleanupTemporaryFiles()
+        ioScope.launch {
+            cleanupTemporaryFiles()
+        }
     }
 
     private fun startIntelligentCleanup() {
-        if (shouldPerformCleanup()) performIntelligentCleanup()
-        handler.postDelayed(cleanupRunnable, TimeUnit.HOURS.toMillis(12))
+        ioScope.launch {
+            // Diferir 15 segundos para no competir con el arranque en frío ni el primer frame
+            delay(15_000)
+            if (shouldPerformCleanup()) performIntelligentCleanup()
+            while (isActive) {
+                delay(TimeUnit.HOURS.toMillis(12))
+                performIntelligentCleanup()
+            }
+        }
     }
 
     private fun shouldPerformCleanup(): Boolean {

@@ -16,6 +16,7 @@ import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.services.video.ReelPrebufferService
 import com.moments.android.services.video.SharedVideoPlayerPool
 import com.moments.android.services.video.VideoAdaptiveTierController
+import com.moments.android.services.video.VideoLayerLease
 import com.moments.android.services.video.VideoPlaybackRecovery
 import com.moments.android.services.video.VideoPlaybackSelector
 import com.moments.android.services.video.configure
@@ -49,7 +50,9 @@ class ReelVideoPlayerManager {
     private var isSeeking = false
     private var pendingStartAtSeconds: Double? = null
     private var adaptiveController: VideoAdaptiveTierController? = null
-    private var consumerId: String? = null
+    var consumerId: String? = null
+        private set
+    private var leaseGeneration: Long = 0
     private var appContext: Context? = null
 
     private var playerListener: Player.Listener? = null
@@ -60,19 +63,25 @@ class ReelVideoPlayerManager {
         video: VideoMoment,
         startAtSeconds: Double = 0.0,
         appContext: Context? = null,
+        handoffConsumerId: String? = null,
     ) {
         this.appContext = appContext?.applicationContext ?: this.appContext
         val moment = video.moment
-        val newConsumerId = GlobalVideoManager.profileVideoConsumerId(moment)
+        val newConsumerId = if (!handoffConsumerId.isNullOrBlank()) {
+            handoffConsumerId
+        } else {
+            GlobalVideoManager.profileVideoConsumerId(moment)
+        }
 
         if (consumerId != null && consumerId != newConsumerId) {
             val preserve = GlobalVideoManager.shouldPreserveSharedPlayer(consumerId!!)
             cleanup(releaseFromPool = !preserve)
         } else if (consumerId != null) {
-            teardownObserversOnly()
+            teardownObserversOnly(pausePlayback = false)
         }
 
         consumerId = newConsumerId
+        leaseGeneration = VideoLayerLease.generation
         pendingStartAtSeconds = if (startAtSeconds > 0) startAtSeconds else null
 
         val mediaItem = moment.primaryVisibleMediaItem
@@ -151,9 +160,15 @@ class ReelVideoPlayerManager {
         duration = 0.0
     }
 
-    private fun teardownObserversOnly() {
-        player?.pause()
-        isPlaying = false
+    private fun teardownObserversOnly(pausePlayback: Boolean = true) {
+        if (pausePlayback) {
+            val id = consumerId
+            val preserve = id?.let { GlobalVideoManager.shouldPreserveSharedPlayer(it) } ?: false
+            if (!preserve) {
+                player?.pause()
+                isPlaying = false
+            }
+        }
         stopTimeObserver()
         teardownPlayerListener()
         adaptiveController = null
@@ -267,6 +282,7 @@ class ReelVideoPlayerManager {
     }
 
     private fun applyPendingStartAndPlayIfNeeded() {
+        if (!isCurrentLeaseGeneration()) return
         val exo = player
         if (exo == null) {
             play()
@@ -279,9 +295,20 @@ class ReelVideoPlayerManager {
         }
         val bounded = startAt.coerceAtLeast(0.0)
         pendingStartAtSeconds = null
+        val current = exo.currentPosition / 1000.0
+        if (current.isFinite() && kotlin.math.abs(current - bounded) < 0.35) {
+            play()
+            return
+        }
+        val generation = leaseGeneration
         exo.seekTo((bounded * 1000).toLong())
-        play()
+        if (generation == leaseGeneration && isCurrentLeaseGeneration()) {
+            play()
+        }
     }
+
+    private fun isCurrentLeaseGeneration(): Boolean =
+        leaseGeneration == VideoLayerLease.generation
 
     fun togglePlayback() {
         val exo = player ?: return
@@ -296,6 +323,7 @@ class ReelVideoPlayerManager {
     }
 
     fun play() {
+        if (!isCurrentLeaseGeneration()) return
         val exo = player ?: return
         if (!isLoaded) return
         exo.play()
@@ -363,10 +391,10 @@ class ReelVideoPlayerManager {
     }
 
     fun cleanup(releaseFromPool: Boolean = true) {
-        teardownObserversOnly()
-
         val id = consumerId
         val shouldPreserve = id?.let { GlobalVideoManager.shouldPreserveSharedPlayer(it) } ?: false
+        teardownObserversOnly(pausePlayback = !shouldPreserve)
+
         val actuallyRelease = releaseFromPool && !shouldPreserve
 
         if (id != null && actuallyRelease) {

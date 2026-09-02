@@ -557,6 +557,7 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="feed_video_pause">Mettre la vidéo en pause</string>
     <string name="feed_video_mute">Couper le son de la vidéo</string>
     <string name="feed_video_unmute">Activer le son de la vidéo</string>
+    <string name="feed_video_watch_again">Revoir</string>
     <string name="att_pre_alert_title">Informations sur les publicités</string>
     <string name="att_pre_alert_description">Cette application affiche des publicités pour rester gratuite. Ensuite, vous pourrez choisir si vous souhaitez des publicités personnalisées.</string>
     <string name="att_pre_alert_continue">Continuer</string>

@@ -105,6 +105,7 @@ import com.moments.android.services.performance.VideoMoment
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.services.social.StoryRingResolverService
+import com.moments.android.services.video.VideoLayerRole
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.comments.ModernCommentsSheet
@@ -139,6 +140,7 @@ fun ReelVideoView(
     startAtSeconds: Double,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    handoffConsumerId: String? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -169,6 +171,7 @@ fun ReelVideoView(
     var scrubProgress by remember { mutableDoubleStateOf(0.0) }
     var progressBarWidthPx by remember { mutableFloatStateOf(0f) }
     var commentsSheetTopFraction by remember { mutableFloatStateOf(0.5f) }
+    var hasRenderedFirstFrame by remember(video.id) { mutableStateOf(false) }
     val savedMomentIds by firestore.savedMomentIds.collectAsState()
 
     val mediaChromePrimary = Color.White
@@ -195,7 +198,7 @@ fun ReelVideoView(
     }
 
     fun setupVideo() {
-        playerManager.setupPlayer(video, startAtSeconds, context)
+        playerManager.setupPlayer(video, startAtSeconds, context, handoffConsumerId)
     }
 
     fun loadCommentCount() {
@@ -365,20 +368,28 @@ fun ReelVideoView(
                 VideoPlayerRepresentable(
                     player = exo,
                     resizeMode = resizeMode,
+                    consumerId = playerManager.consumerId.orEmpty().ifEmpty { handoffConsumerId.orEmpty() },
+                    layerRole = VideoLayerRole.Reels,
                     onProgress = { /* manager.observePlayback owns progress */ },
                     onBuffering = { playerManager.isBuffering = it },
+                    onFirstFrameRendered = { hasRenderedFirstFrame = true },
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
                 Box(Modifier.fillMaxSize().background(Color.Black))
             }
 
-            // ≡ iOS VideoPosterOverlay hasta readyToPlay (también en el reel adyacente al swipe).
-            VideoPosterOverlay(
-                posterUrl = video.posterUrlString,
-                isReadyToPlay = playerManager.isLoaded && exo != null,
-                contentScale = posterContentScale,
-            )
+            // El handoff desde feed conserva el mismo ExoPlayer: no interponer
+            // un thumbnail congelado sobre el vídeo durante la expansión.
+            if (handoffConsumerId == null) {
+                VideoPosterOverlay(
+                    posterUrl = video.posterUrlString,
+                    isReadyToPlay = playerManager.isLoaded &&
+                        exo != null &&
+                        hasRenderedFirstFrame,
+                    contentScale = posterContentScale,
+                )
+            }
 
             // Capa de gestos (tap play/pause, double-tap feel)
             Box(

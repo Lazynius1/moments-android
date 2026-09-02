@@ -556,6 +556,7 @@
     <string name="feed_video_pause">Video pauzeren</string>
     <string name="feed_video_mute">Geluid uit</string>
     <string name="feed_video_unmute">Geluid aan</string>
+    <string name="feed_video_watch_again">Opnieuw bekijken</string>
     <string name="att_pre_alert_title">Informatie over advertenties</string>
     <string name="att_pre_alert_description">Deze app toont advertenties om gratis te blijven. Hierna kun je kiezen of je gepersonaliseerde advertenties wilt zien.</string>
     <string name="att_pre_alert_continue">Doorgaan</string>

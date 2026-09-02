@@ -556,6 +556,7 @@
     <string name="feed_video_pause">वीडियो रोकें</string>
     <string name="feed_video_mute">वीडियो की आवाज़ बंद करें</string>
     <string name="feed_video_unmute">वीडियो की आवाज़ चालू करें</string>
+    <string name="feed_video_watch_again">फिर से देखें</string>
     <string name="att_pre_alert_title">विज्ञापनों के बारे में जानकारी</string>
     <string name="att_pre_alert_description">ऐप को मुफ़्त रखने के लिए इसमें विज्ञापन दिखाए जाते हैं। आगे, आप चुन सकते हैं कि विज्ञापन आपकी रुचियों के अनुसार दिखाए जाएँ या नहीं।</string>
     <string name="att_pre_alert_continue">जारी रखें</string>

@@ -75,6 +75,8 @@ import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.services.video.RegisteredVideoPlayer
 import com.moments.android.services.video.SharedVideoPlayerPool
 import com.moments.android.services.video.VideoAdaptiveTierController
+import com.moments.android.services.video.VideoLayerLease
+import com.moments.android.services.video.VideoLayerRole
 import com.moments.android.services.video.VideoPlaybackRecovery
 import com.moments.android.services.video.VideoPlaybackSelector
 import com.moments.android.services.video.VideoPlaybackSource
@@ -87,6 +89,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.lang.ref.WeakReference
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Port de `ModernVideoPlayer` (VideoPlayer.swift ~L249–674).
@@ -125,8 +129,10 @@ fun ModernVideoPlayer(
     var setupGeneration by remember(videoId) { mutableIntStateOf(0) }
     var hasLoadError by remember(videoId) { mutableStateOf(false) }
     var preferMp4Fallback by remember(videoId) { mutableStateOf(false) }
+    var hasRenderedFirstFrame by remember(videoId) { mutableStateOf(false) }
 
     val activeMomentId by FeedVisibilityCoordinator.activeVideoMomentIdFlow.collectAsState()
+    val warmingMomentId by FeedVisibilityCoordinator.warmingVideoMomentIdFlow.collectAsState()
     val soundEnabled by GlobalVideoManager.userHasEnabledSoundInSession.collectAsState()
     val isPlaybackHeld by GlobalVideoManager.isPlaybackHeld.collectAsState()
 
@@ -137,6 +143,10 @@ fun ModernVideoPlayer(
     }
 
     fun togglePlayback() {
+        if (playerManager.hasFinishedPlayback) {
+            GlobalVideoManager.replayFromStart(videoId)
+            return
+        }
         if (playerManager.isPlaying) {
             GlobalVideoManager.pauseVideo(videoId)
         } else {
@@ -196,6 +206,7 @@ fun ModernVideoPlayer(
             source.playbackUrl
         }
         hasLoadError = false
+        hasRenderedFirstFrame = false
         setupGeneration += 1
 
         // ≡ iOS consumeProfileDetailHandoff(forMomentId: profileVideoConsumerId(for: moment))
@@ -244,6 +255,10 @@ fun ModernVideoPlayer(
             return
         }
         if (usesSocialChrome) {
+            if (!hasSetupPlayer) {
+                setupPlayer()
+                GlobalVideoManager.registerPlayer(videoId, playerManager)
+            }
             togglePlayback()
             return
         }
@@ -251,20 +266,27 @@ fun ModernVideoPlayer(
         showMuteButton = true
     }
 
-    // Appear / disappear
+    // Appear / disappear — paridad iOS: no montar ExoPlayer en el mismo gesto del scroll.
+    // FeedVisibility: solo prepare cuando somos el activo (debounce 90ms).
     DisposableEffect(videoId, url) {
-        setupPlayer()
-        GlobalVideoManager.registerPlayer(videoId, playerManager)
         isVisible = true
-        applyActivationMode(FeedVisibilityCoordinator.activeVideoMomentId)
+        if (activationMode == VideoPlaybackActivationMode.AlwaysWhenVisible) {
+            setupPlayer()
+            GlobalVideoManager.registerPlayer(videoId, playerManager)
+            applyActivationMode(FeedVisibilityCoordinator.activeVideoMomentId)
+        } else {
+            applyActivationMode(FeedVisibilityCoordinator.activeVideoMomentId)
+        }
         onDispose {
+            if (GlobalVideoManager.shouldPreserveSharedPlayer(videoId)) {
+                return@onDispose
+            }
             isVisible = false
             if (GlobalVideoManager.isRegisteredPlayer(videoId, playerManager)) {
                 GlobalVideoManager.pauseVideo(videoId)
                 GlobalVideoManager.unregisterPlayer(videoId, playerManager)
             }
-            val preserve = GlobalVideoManager.shouldPreserveSharedPlayer(videoId)
-            playerManager.cleanup(releaseFromPool = !preserve)
+            playerManager.cleanup(releaseFromPool = true)
             hasSetupPlayer = false
             hasLoadError = false
             setupRetries = 0
@@ -273,7 +295,15 @@ fun ModernVideoPlayer(
         }
     }
 
-    LaunchedEffect(activeMomentId, isVisible, activationMode, isPlaybackHeld) {
+    LaunchedEffect(activeMomentId, warmingMomentId, isVisible, activationMode, isPlaybackHeld) {
+        if (activationMode == VideoPlaybackActivationMode.FeedVisibility && isVisible && !isPlaybackHeld) {
+            val shouldWarm = GlobalVideoManager.visibilityMatches(warmingMomentId, videoId)
+            val shouldPlay = GlobalVideoManager.visibilityMatches(activeMomentId, videoId)
+            if ((shouldWarm || shouldPlay) && !hasSetupPlayer) {
+                setupPlayer()
+                GlobalVideoManager.registerPlayer(videoId, playerManager)
+            }
+        }
         applyActivationMode(activeMomentId)
     }
 
@@ -303,9 +333,16 @@ fun ModernVideoPlayer(
         }
     }
 
-    // Progress + livePlaybackSeconds (social + moment)
-    LaunchedEffect(videoId, usesSocialChrome) {
+    // Progress solo mientras este player está montado y activo (evita 200ms × N cards).
+    LaunchedEffect(videoId, hasSetupPlayer, activeMomentId) {
+        if (!hasSetupPlayer) return@LaunchedEffect
         while (isActive) {
+            val isActiveVideo = activationMode == VideoPlaybackActivationMode.AlwaysWhenVisible ||
+                GlobalVideoManager.visibilityMatches(activeMomentId, videoId)
+            if (!isActiveVideo) {
+                delay(400)
+                continue
+            }
             val p = playerManager.player
             if (p != null && p.duration > 0) {
                 val cur = p.currentPosition / 1000.0
@@ -318,7 +355,7 @@ fun ModernVideoPlayer(
                 }
                 isBuffering = p.playbackState == Player.STATE_BUFFERING
             }
-            delay(200)
+            delay(250)
         }
     }
 
@@ -356,15 +393,19 @@ fun ModernVideoPlayer(
             VideoPlayerRepresentable(
                 player = playerManager.player!!,
                 resizeMode = resizeMode,
+                consumerId = videoId,
+                layerRole = VideoLayerRole.Feed,
                 onProgress = { progress = it },
                 onBuffering = { isBuffering = it },
+                onFirstFrameRendered = { hasRenderedFirstFrame = true },
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(0.dp)),
             )
             VideoPosterOverlay(
                 posterUrl = posterUrl,
-                isReadyToPlay = playerManager.isReadyToPlay,
+                isReadyToPlay = GlobalVideoManager.shouldPreserveSharedPlayer(videoId) ||
+                    (playerManager.isReadyToPlay && hasRenderedFirstFrame),
                 contentScale = contentScale,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -384,7 +425,10 @@ fun ModernVideoPlayer(
         }
 
         if (usesSocialChrome) {
-            if (!playerManager.isPlaying && allowsPauseInteraction) {
+            if (!playerManager.hasFinishedPlayback &&
+                !playerManager.isPlaying &&
+                allowsPauseInteraction
+            ) {
                 SocialVideoPausedControls(
                     isMuted = playerManager.isMuted,
                     onToggleMute = { GlobalVideoManager.toggleMute(videoId) },
@@ -392,7 +436,7 @@ fun ModernVideoPlayer(
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
-            if (showCroppedMuteButton) {
+            if (showCroppedMuteButton && !playerManager.hasFinishedPlayback) {
                 CroppedMuteButton(
                     isMuted = playerManager.isMuted,
                     onToggle = { GlobalVideoManager.toggleMute(videoId) },
@@ -668,8 +712,12 @@ fun VideoPlayerRepresentable(
     resizeMode: Int,
     onProgress: (Double) -> Unit,
     onBuffering: (Boolean) -> Unit,
+    onFirstFrameRendered: () -> Unit = {},
     modifier: Modifier = Modifier,
+    consumerId: String = "",
+    layerRole: VideoLayerRole = VideoLayerRole.Feed,
 ) {
+    val leaseRev by VideoLayerLease.revision.collectAsState()
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -678,6 +726,9 @@ fun VideoPlayerRepresentable(
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying) onBuffering(false)
+            }
+            override fun onRenderedFirstFrame() {
+                onFirstFrameRendered()
             }
         }
         player.addListener(listener)
@@ -708,15 +759,106 @@ fun VideoPlayerRepresentable(
                 )
                 useController = false
                 this.resizeMode = resizeMode
-                this.player = player
+                if (layerRole == VideoLayerRole.Reels) {
+                    VideoLayerLease.claimReels(consumerId)
+                }
+                applyLayerLease(this, player, layerRole, consumerId)
             }
         },
         update = { view ->
-            view.player = player
             view.resizeMode = resizeMode
+            if (layerRole == VideoLayerRole.Reels) {
+                VideoLayerLease.claimReels(consumerId)
+            }
+            applyLayerLease(view, player, layerRole, consumerId)
+            @Suppress("UNUSED_EXPRESSION")
+            leaseRev
         },
         modifier = modifier,
     )
+}
+
+private fun applyLayerLease(
+    view: PlayerView,
+    player: ExoPlayer,
+    role: VideoLayerRole,
+    consumerId: String,
+) {
+    if (VideoLayerLease.mayAttach(role, consumerId)) {
+        VideoPlayerViewHandoff.attach(view, player, role, consumerId)
+    } else if (view.player != null) {
+        view.player = null
+    }
+}
+
+/**
+ * Media3 conecta primero el nuevo PlayerView y después libera el anterior.
+ * Evita el frame negro que produce `old.player = null; new.player = player`.
+ */
+private object VideoPlayerViewHandoff {
+    private data class Targets(
+        var feed: WeakReference<PlayerView>? = null,
+        var reels: WeakReference<PlayerView>? = null,
+    )
+
+    private val targets = ConcurrentHashMap<String, Targets>()
+
+    fun attach(
+        target: PlayerView,
+        player: ExoPlayer,
+        role: VideoLayerRole,
+        consumerId: String,
+    ) {
+        if (consumerId.isBlank()) {
+            if (target.player !== player) target.player = player
+            return
+        }
+
+        val previous = synchronized(targets) {
+            targets.values.forEach { entry ->
+                if (entry.feed?.get() === target) entry.feed = null
+                if (entry.reels?.get() === target) entry.reels = null
+            }
+            val entry = targets.getOrPut(consumerId) { Targets() }
+            val previousTarget = when (role) {
+                VideoLayerRole.Feed -> entry.reels?.get()
+                VideoLayerRole.Reels -> entry.feed?.get()
+            }
+            when (role) {
+                VideoLayerRole.Feed -> entry.feed = WeakReference(target)
+                VideoLayerRole.Reels -> entry.reels = WeakReference(target)
+            }
+            previousTarget
+        }
+
+        when {
+            target.player === player -> Unit
+            previous != null && previous !== target && previous.player === player ->
+                PlayerView.switchTargetView(player, previous, target)
+            else -> target.player = player
+        }
+    }
+
+    fun switchToFeed(consumerId: String) {
+        if (consumerId.isBlank() || !SharedVideoPlayerPool.hasPlayer(consumerId)) return
+        val player = SharedVideoPlayerPool.player(consumerId)
+        val pair = synchronized(targets) {
+            val entry = targets[consumerId] ?: return
+            entry.reels?.get() to entry.feed?.get()
+        }
+        val reels = pair.first
+        val feed = pair.second ?: return
+        when {
+            feed.player === player -> Unit
+            reels != null && reels.player === player ->
+                PlayerView.switchTargetView(player, reels, feed)
+            else -> feed.player = player
+        }
+    }
+}
+
+fun switchVideoSurfaceToFeed(consumerId: String) {
+    VideoPlayerViewHandoff.switchToFeed(consumerId)
 }
 
 /**
@@ -734,6 +876,7 @@ class VideoPlayerManager : RegisteredVideoPlayer {
         private set
     var duration by mutableDoubleStateOf(0.0)
     var currentTime by mutableDoubleStateOf(0.0)
+    var hasFinishedPlayback by mutableStateOf(false)
 
     private var consumerId: String? = null
     /** ≡ iOS `activeItem` — MediaItem cargado en el ExoPlayer. */
@@ -760,6 +903,7 @@ class VideoPlayerManager : RegisteredVideoPlayer {
         this.consumerId = consumerId
         this.appContext = appContext
         pendingSeekSeconds = startAtSeconds
+        hasFinishedPlayback = GlobalVideoManager.hasFinishedPlayback(consumerId)
 
         // ≡ iOS adaptiveController init
         adaptiveController = if (mediaItem != null && mediaItem.type == MomentsMediaItem.MediaType.VIDEO) {
@@ -834,9 +978,10 @@ class VideoPlayerManager : RegisteredVideoPlayer {
     private fun applyPendingSeekIfPossible(on: ExoPlayer) {
         val seconds = pendingSeekSeconds ?: return
         if (seconds <= 0.05) return
-        // ≡ iOS: guard item.status == .readyToPlay
         if (on.playbackState != Player.STATE_READY) return
         pendingSeekSeconds = null
+        val current = on.currentPosition / 1000.0
+        if (current.isFinite() && kotlin.math.abs(current - seconds) < 0.35) return
         on.seekTo((seconds * 1000).toLong())
     }
 
@@ -905,10 +1050,14 @@ class VideoPlayerManager : RegisteredVideoPlayer {
                         }
                     }
                     Player.STATE_ENDED -> {
-                        // ≡ setupLooping AVPlayerItemDidPlayToEndTime
-                        if (isPlaying) {
-                            exo.seekTo(0)
-                            exo.play()
+                        val id = consumerId
+                        if (id != null && GlobalVideoManager.shouldPreserveSharedPlayer(id)) {
+                            return
+                        }
+                        isPlaying = false
+                        hasFinishedPlayback = true
+                        if (id != null) {
+                            GlobalVideoManager.markPlaybackFinished(id)
                         }
                     }
                 }
@@ -957,10 +1106,20 @@ class VideoPlayerManager : RegisteredVideoPlayer {
         }
     }
 
-    // ≡ iOS resumeVideo
-    override fun resumeVideo() {
+    override fun setFinishedPlayback(finished: Boolean) {
+        hasFinishedPlayback = finished
+    }
+
+    override fun replayFromBeginning() {
+        hasFinishedPlayback = false
         val exo = player ?: return
-        // iOS: canUseNetworkResourcesForLiveStreamingWhilePaused = true (activo)
+        exo.seekTo(0)
+        resumeVideo()
+    }
+
+    override fun resumeVideo() {
+        if (hasFinishedPlayback) return
+        val exo = player ?: return
         exo.play()
         isPlaying = true
     }
@@ -1040,18 +1199,23 @@ class VideoPlayerManager : RegisteredVideoPlayer {
 
         val id = consumerId
         val isCurrent = id?.let { GlobalVideoManager.isRegisteredPlayer(it, this) } ?: true
+        val preserve = id?.let { GlobalVideoManager.shouldPreserveSharedPlayer(it) } ?: false
 
-        if (isCurrent) {
+        if (isCurrent && !preserve) {
             player?.pause()
         }
-        if (id != null && releaseFromPool && isCurrent) {
+        if (id != null && releaseFromPool && isCurrent && !preserve) {
             SharedVideoPlayerPool.release(id)
+        }
+        if (id != null && !preserve) {
+            GlobalVideoManager.clearPlaybackFinished(id)
         }
         player = null
         activeItem = null
         consumerId = null
         isPlaying = false
         isReadyToPlay = false
+        hasFinishedPlayback = false
         lastPublishedTime = -1.0
         pendingSeekSeconds = null
     }

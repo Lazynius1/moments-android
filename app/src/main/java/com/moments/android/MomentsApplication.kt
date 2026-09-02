@@ -48,18 +48,28 @@ import com.moments.android.services.security.MomentsAppCheckProviderFactory
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.mapbox.common.MapboxOptions
 import com.moments.android.views.feed.maps.FeedMaps
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.imageLoader
+import com.moments.android.services.cache.MomentsImageLoader
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Application process entry — pares con [MomentsApp] Compose.
  * Cubre `MomentsApp.init` (AppCheck) + bootstrap de servicios que iOS hace
  * en onAppear diferido / AppDelegate.
  */
-class MomentsApplication : Application() {
+class MomentsApplication : Application(), ImageLoaderFactory {
     companion object {
         @Volatile
         var instance: MomentsApplication? = null
             private set
     }
+
+    override fun newImageLoader(): ImageLoader = MomentsImageLoader.create(this)
 
     override fun onCreate() {
         super.onCreate()
@@ -104,11 +114,18 @@ class MomentsApplication : Application() {
         EmojiUsageStore.initialize(this)
         OrientationManager.initialize(this)
         AffinityTracker.initialize(this)
-        AffinityTracker.applyTimeDecayIfNeeded()
-        AffinityTracker.cleanupVeryLowAffinities()
+        // Mantenimiento de afinidades diferido en background para no congelar arranque en frío
+        CoroutineScope(Dispatchers.IO).launch {
+            delay(12_000)
+            runCatching {
+                AffinityTracker.applyTimeDecayIfNeeded()
+                AffinityTracker.cleanupVeryLowAffinities()
+            }
+        }
         BackgroundMomentUploadService.initialize(this)
         BackgroundStoryUploadService.initialize(this)
         LiveLocationSharingService.initialize(this)
+        // Solo registrar contexto; los ExoPlayers se crean al primer vídeo / reel.
         SharedVideoPlayerPool.initialize(this)
         GlobalVideoManager.initialize(this)
         ReelPrebufferService.initialize(this)
@@ -121,9 +138,26 @@ class MomentsApplication : Application() {
         // LocalFirstMessaging / ChatCache ya inicializados arriba (antes de CacheManager)
         OfflineSyncService.enableAutomaticSync()
         OfflineSyncWorker.schedule(this)
-        NotificationService.initialize(this)
-        NotificationBadgeService.initialize(this)
-        InAppNotificationService.startListening()
-        AdMobConfiguration.initialize(this)
+
+        // Fase 2: notificaciones + ads tras primer frame (no bloquear cold start).
+        CoroutineScope(Dispatchers.Main).launch {
+            delay(1_500)
+            NotificationService.initialize(this@MomentsApplication)
+            NotificationBadgeService.initialize(this@MomentsApplication)
+            InAppNotificationService.startListening()
+            AdMobConfiguration.initialize(this@MomentsApplication)
+        }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_COMPLETE || level >= TRIM_MEMORY_BACKGROUND) {
+            imageLoader.memoryCache?.clear()
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        imageLoader.memoryCache?.clear()
     }
 }

@@ -556,6 +556,7 @@
     <string name="feed_video_pause">Jeda video</string>
     <string name="feed_video_mute">Nonaktifkan suara</string>
     <string name="feed_video_unmute">Aktifkan suara</string>
+    <string name="feed_video_watch_again">Tonton lagi</string>
     <string name="att_pre_alert_title">Informasi tentang iklan</string>
     <string name="att_pre_alert_description">Aplikasi ini menampilkan iklan agar tetap gratis. Selanjutnya, kamu bisa memilih apakah iklan yang ditampilkan akan dipersonalisasi untukmu.</string>
     <string name="att_pre_alert_continue">Lanjutkan</string>

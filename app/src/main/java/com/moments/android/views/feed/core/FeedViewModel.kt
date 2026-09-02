@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
@@ -75,10 +76,12 @@ class FeedViewModel {
     private var commentListeners = mutableMapOf<String, ListenerRegistration>()
     private var latestVisibilitySnapshot: Map<String, Float> = emptyMap()
     private val listenerVisibilityThreshold = 0.08f
-    private val listenerIndexBuffer = 5
+    /** Vecinos alrededor del post visible (±2). Antes ±5 abría ~11 listeners por scroll. */
+    private val listenerIndexBuffer = 2
     private val updateDebounceMs = 300L
     private var listenerSyncJob: Job? = null
     private val listenerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val pendingUpdateJobs = mutableMapOf<String, Job>()
     private val lastUpdateHashes = mutableMapOf<String, Int>()
     private val privacyDecisionCache = ConcurrentHashMap<String, Boolean>()
@@ -190,29 +193,30 @@ class FeedViewModel {
     /** Port 1:1 de `fetchMoments(userId:feedType:)`. */
     fun fetchMoments(scope: CoroutineScope, userId: String, feedType: FeedType? = null) {
         val targetFeedType = feedType ?: currentFeedType
-        val cached = loadFeedFromCache(targetFeedType)
 
         currentFeedType = targetFeedType
         isLoading = true
         errorMessage = null
 
-        if (cached.isNotEmpty() && moments.isEmpty()) {
-            applyCached(targetFeedType, cached)
-            preloadFeedVideos(cached)
-            isLoading = false
-        }
-
-        if (!NetworkMonitor.isConnected) {
-            if (cached.isNotEmpty()) {
-                applyCached(targetFeedType, cached)
-                preloadFeedVideos(cached)
-            }
-            isLoading = false
-            return
-        }
-
         activeJob?.cancel()
         activeJob = scope.launch {
+            val cached = withContext(Dispatchers.IO) { loadFeedFromCache(targetFeedType) }
+
+            if (cached.isNotEmpty() && moments.isEmpty()) {
+                applyCached(targetFeedType, cached)
+                preloadFeedVideos(cached)
+                isLoading = false
+            }
+
+            if (!NetworkMonitor.isConnected) {
+                if (cached.isNotEmpty()) {
+                    applyCached(targetFeedType, cached)
+                    preloadFeedVideos(cached)
+                }
+                isLoading = false
+                return@launch
+            }
+
             val mutedUserIds = resolveMutedUserIds(userId)
             val visibleCached = cached.filter { it.authorId !in mutedUserIds }
             if (visibleCached.isNotEmpty()) {
@@ -1190,74 +1194,77 @@ class FeedViewModel {
 
     private fun saveFeedToCache(type: FeedType, list: List<FeedMoment>) {
         val ctx = appContext ?: return
-        val arr = JSONArray()
-        list.take(40).forEach { m ->
-            arr.put(
-                JSONObject()
-                    .put("id", m.id)
-                    .put("authorId", m.authorId)
-                    .put("username", m.username)
-                    .put("content", m.content)
-                    .put("timestamp", m.timestamp)
-                    .put("profileImagePath", m.profileImagePath)
-                    .put("location", m.location)
-                    .put("aspectRatio", m.aspectRatio)
-                    .put("commentCount", m.commentCount)
-                    .put("reactionCount", m.reactionCount)
-                    .put("hideLikeCounts", m.hideLikeCounts)
-                    .put("disableComments", m.disableComments)
-                    .put("hasHiddenLayers", m.hasHiddenLayers)
-                    .put("hiddenLayerCount", m.hiddenLayerCount)
-                    .put("audience", m.audience)
-                    .put("customListId", m.customListId)
-                    .also { obj ->
-                        m.isArchived?.let { obj.put("isArchived", it) }
-                        m.locationCoordinate?.let { coord ->
-                            obj.put(
-                                "locationCoordinate",
-                                JSONObject()
-                                    .put("latitude", coord.latitude)
-                                    .put("longitude", coord.longitude),
-                            )
-                        }
-                    }
-                    .put(
-                        "mediaItems",
-                        JSONArray().also { mediaArr ->
-                            m.mediaItems.forEach { item ->
-                                mediaArr.put(
+        val snapshot = list.take(40)
+        ioScope.launch {
+            val arr = JSONArray()
+            snapshot.forEach { m ->
+                arr.put(
+                    JSONObject()
+                        .put("id", m.id)
+                        .put("authorId", m.authorId)
+                        .put("username", m.username)
+                        .put("content", m.content)
+                        .put("timestamp", m.timestamp)
+                        .put("profileImagePath", m.profileImagePath)
+                        .put("location", m.location)
+                        .put("aspectRatio", m.aspectRatio)
+                        .put("commentCount", m.commentCount)
+                        .put("reactionCount", m.reactionCount)
+                        .put("hideLikeCounts", m.hideLikeCounts)
+                        .put("disableComments", m.disableComments)
+                        .put("hasHiddenLayers", m.hasHiddenLayers)
+                        .put("hiddenLayerCount", m.hiddenLayerCount)
+                        .put("audience", m.audience)
+                        .put("customListId", m.customListId)
+                        .also { obj ->
+                            m.isArchived?.let { obj.put("isArchived", it) }
+                            m.locationCoordinate?.let { coord ->
+                                obj.put(
+                                    "locationCoordinate",
                                     JSONObject()
-                                        .put("id", item.id)
-                                        .put("type", item.type)
-                                        .put("url", item.url)
-                                        .put("thumbnailUrl", item.thumbnailUrl)
-                                        .put("aspectRatio", item.aspectRatio)
-                                        .put("hlsMasterUrl", item.hlsMasterUrl)
-                                        .also { obj ->
-                                            item.videoVariants?.let { v ->
-                                                obj.put(
-                                                    "videoVariants",
-                                                    JSONObject().also { vo ->
-                                                        v.low?.let { vo.put("low", it) }
-                                                        v.medium?.let { vo.put("medium", it) }
-                                                        v.high?.let { vo.put("high", it) }
-                                                    },
-                                                )
-                                            }
-                                        },
+                                        .put("latitude", coord.latitude)
+                                        .put("longitude", coord.longitude),
                                 )
                             }
-                        },
-                    ),
-            )
-        }
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(cacheKey(type), arr.toString())
-            .apply()
-        // Paridad iOS: también persiste en LocalPersistenceService (offline dual).
-        runCatching {
-            LocalPersistenceService.saveFeedMoments(list.map { it.toIndexMoment() })
+                        }
+                        .put(
+                            "mediaItems",
+                            JSONArray().also { mediaArr ->
+                                m.mediaItems.forEach { item ->
+                                    mediaArr.put(
+                                        JSONObject()
+                                            .put("id", item.id)
+                                            .put("type", item.type)
+                                            .put("url", item.url)
+                                            .put("thumbnailUrl", item.thumbnailUrl)
+                                            .put("aspectRatio", item.aspectRatio)
+                                            .put("hlsMasterUrl", item.hlsMasterUrl)
+                                            .also { obj ->
+                                                item.videoVariants?.let { v ->
+                                                    obj.put(
+                                                        "videoVariants",
+                                                        JSONObject().also { vo ->
+                                                            v.low?.let { vo.put("low", it) }
+                                                            v.medium?.let { vo.put("medium", it) }
+                                                            v.high?.let { vo.put("high", it) }
+                                                        },
+                                                    )
+                                                }
+                                            },
+                                    )
+                                }
+                            },
+                        ),
+                )
+            }
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(cacheKey(type), arr.toString())
+                .apply()
+            // Paridad iOS: también persiste en LocalPersistenceService (offline dual).
+            runCatching {
+                LocalPersistenceService.saveFeedMoments(snapshot.map { it.toIndexMoment() })
+            }
         }
     }
 

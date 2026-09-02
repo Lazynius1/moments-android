@@ -543,6 +543,7 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="feed_video_pause">Metti in pausa il video</string>
     <string name="feed_video_mute">Disattiva audio del video</string>
     <string name="feed_video_unmute">Attiva audio del video</string>
+    <string name="feed_video_watch_again">Guarda di nuovo</string>
     <string name="att_pre_alert_title">Informazioni sugli annunci</string>
     <string name="att_pre_alert_description">Questa applicazione mostra annunci per restare gratuita. Tra poco potrai scegliere se vuoi annunci personalizzati per te.</string>
     <string name="att_pre_alert_continue">Continua</string>

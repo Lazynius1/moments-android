@@ -55,21 +55,36 @@ import java.util.concurrent.ConcurrentHashMap
 class FirestoreService(
     internal val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
 ) {
-    internal val firestoreScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    companion object {
+        val shared by lazy { FirestoreService() }
 
-    internal val _savedMomentIds = MutableStateFlow<List<String>>(emptyList())
+        // Scope compartido en IO para no crear un CoroutineScope huérfano por cada instancia
+        internal val globalFirestoreScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        // Estados y cachés compartidos entre todas las pantallas y tarjetas
+        internal val sharedSavedMomentIds = MutableStateFlow<List<String>>(emptyList())
+        internal val sharedSavedMomentsLoadedForUserId = MutableStateFlow<String?>(null)
+        private val sharedFollowingCache = ConcurrentHashMap<String, Boolean>()
+        internal val sharedStorySummaryRebuildInFlight: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
+        internal val sharedStorySummaryLastRebuildAttempt = ConcurrentHashMap<String, Date>()
+        private val sharedStorySummaryRebuildMutex = Mutex()
+    }
+
+    internal val firestoreScope: CoroutineScope get() = globalFirestoreScope
+
+    internal val _savedMomentIds: MutableStateFlow<List<String>> get() = sharedSavedMomentIds
     val savedMomentIds: StateFlow<List<String>> = _savedMomentIds.asStateFlow()
 
-    internal val _savedMomentsLoadedForUserId = MutableStateFlow<String?>(null)
+    internal val _savedMomentsLoadedForUserId: MutableStateFlow<String?> get() = sharedSavedMomentsLoadedForUserId
     val savedMomentsLoadedForUserId: StateFlow<String?> = _savedMomentsLoadedForUserId.asStateFlow()
 
-    private val followingCache = ConcurrentHashMap<String, Boolean>()
+    private val followingCache: ConcurrentHashMap<String, Boolean> get() = sharedFollowingCache
     private var lastCacheUpdate = Date()
 
-    internal val storySummaryRebuildInFlight = ConcurrentHashMap.newKeySet<String>()
-    internal val storySummaryLastRebuildAttempt = ConcurrentHashMap<String, Date>()
+    internal val storySummaryRebuildInFlight: MutableSet<String> get() = sharedStorySummaryRebuildInFlight
+    internal val storySummaryLastRebuildAttempt: ConcurrentHashMap<String, Date> get() = sharedStorySummaryLastRebuildAttempt
     internal val storySummaryRebuildCooldownMs = 60_000L
-    private val storySummaryRebuildMutex = Mutex()
+    private val storySummaryRebuildMutex: Mutex get() = sharedStorySummaryRebuildMutex
 
     // --- Perfil / usuario → FirestoreProfilesRepository.kt ---
 

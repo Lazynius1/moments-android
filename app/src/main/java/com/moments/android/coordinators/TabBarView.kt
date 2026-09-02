@@ -56,6 +56,7 @@ import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSui
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -91,6 +92,9 @@ import com.moments.android.views.shared.OfflineBannerOverlay
 import com.moments.android.views.components.InAppBannerView
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.story.StoryRingAvatarView
+import com.moments.android.views.feed.video.FeedReelsHostOverlay
+import com.moments.android.views.feed.video.FeedReelsHostState
+import com.moments.android.views.feed.video.LocalFeedReelsHost
 import com.moments.android.adaptive.LocalAdaptiveWindowState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -148,6 +152,7 @@ fun TabBarScreen(
     var echoInvitationRoute by remember { mutableStateOf<String?>(null) }
     // ≡ iOS `.toolbar(.hidden, for: .tabBar)` desde Settings / edit / moment zoom
     var suppressTabBar by remember { mutableStateOf(false) }
+    val reelsHost = remember { FeedReelsHostState() }
     val adaptiveWindow = LocalAdaptiveWindowState.current
 
     val scope = rememberCoroutineScope()
@@ -343,6 +348,7 @@ fun TabBarScreen(
         )
     }
 
+    CompositionLocalProvider(LocalFeedReelsHost provides reelsHost) {
     Box(Modifier.fillMaxSize()) {
         // Skill edge-to-edge: bottom insets los consume el tab bar (navigationBarsPadding).
         // Top/horizontal → contentPadding del Scaffold; no doble-padear el dock.
@@ -489,6 +495,9 @@ fun TabBarScreen(
                 },
             )
         }
+
+        FeedReelsHostOverlay()
+    }
     }
 }
 

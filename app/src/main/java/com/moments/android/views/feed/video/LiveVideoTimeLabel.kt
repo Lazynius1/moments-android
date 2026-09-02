@@ -42,14 +42,15 @@ fun LiveVideoTimeLabel(
     val liveMap by GlobalVideoManager.livePlaybackSeconds.collectAsState()
     val currentSeconds = liveMap[consumerId] ?: 0.0
 
-    // Bridge: iOS `VideoPlayerManager` publica vía `setPlaybackPosition` → livePlaybackSeconds.
-    // Hasta portar ese tick, capturamos del pool y escribimos en el manager (misma API).
+    // Bridge: solo poll si el pool ya tiene este consumer (no crear ExoPlayer solo para el label).
     DisposableEffect(consumerId) {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         val runnable = object : Runnable {
             override fun run() {
-                GlobalVideoManager.capturePlaybackPosition(consumerId)
-                handler.postDelayed(this, 200L)
+                if (com.moments.android.services.video.SharedVideoPlayerPool.hasPlayer(consumerId)) {
+                    GlobalVideoManager.capturePlaybackPosition(consumerId)
+                }
+                handler.postDelayed(this, 250L)
             }
         }
         handler.post(runnable)

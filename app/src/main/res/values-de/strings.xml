@@ -543,6 +543,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="feed_video_pause">Video pausieren</string>
     <string name="feed_video_mute">Video stummschalten</string>
     <string name="feed_video_unmute">Ton aktivieren</string>
+    <string name="feed_video_watch_again">Nochmal ansehen</string>
     <string name="att_pre_alert_title">Informationen zu Werbung</string>
     <string name="att_pre_alert_description">Diese App zeigt Werbung, damit sie kostenlos bleibt. Als Nächstes kannst du wählen, ob die Werbung für dich personalisiert werden soll.</string>
     <string name="att_pre_alert_continue">Weiter</string>
