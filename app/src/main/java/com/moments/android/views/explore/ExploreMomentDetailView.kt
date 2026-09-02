@@ -67,10 +67,12 @@ import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.video.VideoPlaybackSelector
 import com.moments.android.views.comments.ModernCommentsSheet
+import com.moments.android.views.feed.core.FeedProfileSheetRoute
 import com.moments.android.views.feed.core.sections.ModernPostCardView
 import com.moments.android.views.feed.maps.LocationMapView
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.profile.core.sections.UserProfileZoomNavigationHost
 import com.moments.android.views.profile.momentsview.EditMomentSheet
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
 import com.moments.android.views.settings.hasVideoMedia
@@ -134,6 +136,7 @@ fun ExploreMomentDetailView(
     var selectedLocationName by remember { mutableStateOf("") }
     var selectedLocationLat by remember { mutableStateOf<Double?>(null) }
     var selectedLocationLng by remember { mutableStateOf<Double?>(null) }
+    var profileRoute by remember { mutableStateOf<FeedProfileSheetRoute?>(null) }
 
     var peekImageUrl by remember { mutableStateOf<String?>(null) }
     var peekAspectRatio by remember { mutableFloatStateOf(1f) }
@@ -163,14 +166,14 @@ fun ExploreMomentDetailView(
     fun openUserProfile(userId: String) {
         val normalized = userId.trim()
         if (normalized.isEmpty()) return
-        NavigationEventBus.emit(CoordinatorNavigationEvent.NavigateToUserProfileInFeed(normalized))
+        profileRoute = FeedProfileSheetRoute(normalized)
     }
 
     fun handleAuthorAvatarTap(userId: String, hasStory: Boolean) {
         val normalized = userId.trim()
         if (normalized.isEmpty()) return
         if (hasStory) {
-            NavigationEventBus.emit(CoordinatorNavigationEvent.ShowStories)
+            NavigationEventBus.emit(CoordinatorNavigationEvent.ShowStoriesStartingAt(normalized))
         } else {
             openUserProfile(normalized)
         }
@@ -271,8 +274,13 @@ fun ExploreMomentDetailView(
         }
     }
 
+    UserProfileZoomNavigationHost(
+        profileRoute = profileRoute,
+        onProfileRouteChange = { profileRoute = it },
+        modifier = modifier.fillMaxSize(),
+    ) { _ ->
     Box(
-        modifier
+        Modifier
             .fillMaxSize()
             .background(colors.surfaceBackground.copy(alpha = backgroundOpacity)),
     ) {
@@ -501,6 +509,10 @@ fun ExploreMomentDetailView(
             ModernCommentsSheet(
                 moment = moment,
                 onDismiss = { commentsMoment = null },
+                onOpenProfile = { userId ->
+                    commentsMoment = null
+                    openUserProfile(userId)
+                },
                 onOpenStory = { userId ->
                     commentsMoment = null
                     val normalized = userId.trim()
@@ -526,4 +538,5 @@ fun ExploreMomentDetailView(
             }
         }
     }
+    } // UserProfileZoomNavigationHost
 }
