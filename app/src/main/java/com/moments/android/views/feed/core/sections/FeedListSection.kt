@@ -46,12 +46,12 @@ import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.performance.FeedVisibilityCoordinator
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.feed.controls.FeedType
+import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.core.FeedViewModel
 import com.moments.android.views.feed.core.ModernEmptyFeedView
 import com.moments.android.views.messaging.components.momentsScrollEdgeChrome
 import com.moments.android.views.shared.ScreenshotProtectedView
 import kotlinx.coroutines.flow.collectLatest
-import kotlin.math.max
 
 /** Port 1:1 de `FeedListSection.swift`. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,7 +82,7 @@ fun FeedListSection(
     val listState = rememberLazyListState()
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    val rowSpacing = max(15f, configuration.screenHeightDp * 0.02f).dp
+    val rowSpacing = FeedMomentCardLayout.rowSpacing
     // iOS: availableHeight = screen - headerHeight - selectorHeight - tabbar - 60
     val availableHeightPx = remember(
         configuration.screenHeightDp,

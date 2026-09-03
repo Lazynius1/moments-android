@@ -605,6 +605,7 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="media_moderation_hidden_title">Conteúdo oculto</string>
     <string name="media_moderation_hidden_subtitle">Oculto pela moderação</string>
     <string name="feed_see_more">ver mais</string>
+    <string name="feed_see_more_inline">mais</string>
     <string name="feed_see_less">ver menos</string>
     <string name="feed_follow_request">Solicitar</string>
     <string name="feed_follow_requested">Solicitado</string>

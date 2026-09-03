@@ -98,6 +98,8 @@ object MomentCarouselIndicatorStyle {
 /** Port de `FeedMomentCardLayout` (MomentCarouselLayoutRules.swift). */
 object FeedMomentCardLayout {
     val listHorizontalPadding = 4.dp
+    /** Hueco entre cards en Android (iOS sigue con max(15, 2% altura)). */
+    val rowSpacing = 8.dp
     val headerHorizontalPadding = 8.dp
     val actionRowHorizontalPadding = 4.dp
     /** Alineado con el borde del media (`actionRowHorizontalPadding`). */

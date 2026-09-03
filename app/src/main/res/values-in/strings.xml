@@ -718,6 +718,7 @@
     <string name="media_moderation_hidden_title">Konten tersembunyi</string>
     <string name="media_moderation_hidden_subtitle">Disembunyikan oleh moderasi</string>
     <string name="feed_see_more">selengkapnya</string>
+    <string name="feed_see_more_inline">selengkapnya</string>
     <string name="feed_see_less">lebih sedikit</string>
     <string name="feed_follow_request">Minta</string>
     <string name="feed_follow_requested">Diminta</string>

@@ -69,7 +69,6 @@ import com.moments.android.services.firestore.deleteMoment
 import com.moments.android.services.firestore.loadSavedMoments
 import com.moments.android.services.performance.FeedVisibilityCoordinator
 import com.moments.android.services.performance.VideoMomentsIndex
-import com.moments.android.services.performance.toFeedVideoMoments
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.video.GlobalVideoManager
@@ -204,7 +203,7 @@ fun LocationMomentDetailView(
         val next = fromIndex + 1
         if (next >= moments.size) return
         val upcoming = moments.subList(next, minOf(next + 8, moments.size))
-        val imageUrls = upcoming.mapNotNull { it.previewImageURLString?.takeIf(String::isNotBlank) }
+        val imageUrls = VideoPlaybackSelector.imagePrefetchUrlStrings(upcoming, maxMoments = 8)
         if (imageUrls.isNotEmpty()) ImagePrefetchManager.prefetch(imageUrls)
         // iOS: VideoPlaybackSelector.shared.preloadURLStrings(from:maxMoments: 4)
         val videoUrls = VideoPlaybackSelector.preloadUrlStrings(upcoming, maxMoments = 4)
@@ -316,9 +315,6 @@ fun LocationMomentDetailView(
         VideoMomentsIndex.rebuild(moments)
     }
 
-    // iOS reelsVideos: moments.videoMoments (lista visible de la superficie)
-    val reelsVideos = remember(feedMoments) { feedMoments.toFeedVideoMoments() }
-
     DisposableEffect(Unit) {
         onDispose {
             GlobalVideoManager.pauseAllVideos()
@@ -390,9 +386,7 @@ fun LocationMomentDetailView(
                     start = FeedMomentCardLayout.listHorizontalPadding,
                     end = FeedMomentCardLayout.listHorizontalPadding,
                 ),
-                verticalArrangement = Arrangement.spacedBy(
-                    maxOf(15.dp, (configuration.screenHeightDp * 0.02f).dp),
-                ),
+                verticalArrangement = Arrangement.spacedBy(FeedMomentCardLayout.rowSpacing),
             ) {
                 itemsIndexed(feedMoments, key = { _, m -> "${m.authorId}_${m.id}" }) { index, moment ->
                     val source = moments.getOrNull(index)
@@ -460,7 +454,7 @@ fun LocationMomentDetailView(
                                     },
                                     onTagTap = { userId -> openUserProfile(userId) },
                                     onNearEnd = { prefetchUpcoming(index) },
-                                    reelsVideos = reelsVideos,
+                                    reelsVideos = emptyList(),
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }

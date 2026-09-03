@@ -60,8 +60,10 @@ fun MomentHashtagText(
     shadow: Shadow? = null,
     actionText: String? = null,
     actionColor: Color = hashtagColor,
+    actionWeight: FontWeight = FontWeight.Bold,
     onMentionTap: ((String) -> Unit)? = null,
     onActionTap: (() -> Unit)? = null,
+    onEmptyTap: (() -> Unit)? = null,
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
 ) {
     data class Token(val range: IntRange, val tag: String, val value: String)
@@ -81,7 +83,7 @@ fun MomentHashtagText(
         if (cursor < content.length) append(content.substring(cursor))
         if (!actionText.isNullOrEmpty()) {
             pushStringAnnotation("action", "inline")
-            withStyle(SpanStyle(color = actionColor, fontWeight = FontWeight.Bold)) { append(actionText) }
+            withStyle(SpanStyle(color = actionColor, fontWeight = actionWeight)) { append(actionText) }
             pop()
         }
     }
@@ -94,7 +96,8 @@ fun MomentHashtagText(
         onClick = { offset ->
             annotated.getStringAnnotations("action", offset, offset).firstOrNull()?.let { onActionTap?.invoke(); return@ClickableText }
             annotated.getStringAnnotations("hashtag", offset, offset).firstOrNull()?.let { onHashtagTap(it.item); return@ClickableText }
-            annotated.getStringAnnotations("mention", offset, offset).firstOrNull()?.let { onMentionTap?.invoke(it.item) }
+            annotated.getStringAnnotations("mention", offset, offset).firstOrNull()?.let { onMentionTap?.invoke(it.item); return@ClickableText }
+            onEmptyTap?.invoke()
         },
     )
 }

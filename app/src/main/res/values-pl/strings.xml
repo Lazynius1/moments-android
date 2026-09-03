@@ -718,6 +718,7 @@
     <string name="media_moderation_hidden_title">Ukryta treść</string>
     <string name="media_moderation_hidden_subtitle">Ukryte przez moderację</string>
     <string name="feed_see_more">więcej</string>
+    <string name="feed_see_more_inline">więcej</string>
     <string name="feed_see_less">mniej</string>
     <string name="feed_follow_request">Poproś o dostęp</string>
     <string name="feed_follow_requested">Wysłano prośbę</string>

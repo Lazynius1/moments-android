@@ -647,6 +647,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="media_moderation_hidden_title">Contenido oculto</string>
     <string name="media_moderation_hidden_subtitle">Oculto por moderación</string>
     <string name="feed_see_more">ver más</string>
+    <string name="feed_see_more_inline">más</string>
     <string name="feed_see_less">ver menos</string>
     <string name="feed_follow_request">Solicitar</string>
     <string name="feed_follow_requested">Solicitado</string>

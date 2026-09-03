@@ -718,6 +718,7 @@
     <string name="media_moderation_hidden_title">隱藏的內容</string>
     <string name="media_moderation_hidden_subtitle">已由審核系統隱藏</string>
     <string name="feed_see_more">查看更多</string>
+    <string name="feed_see_more_inline">更多</string>
     <string name="feed_see_less">收起</string>
     <string name="feed_follow_request">申請追蹤</string>
     <string name="feed_follow_requested">已申請</string>

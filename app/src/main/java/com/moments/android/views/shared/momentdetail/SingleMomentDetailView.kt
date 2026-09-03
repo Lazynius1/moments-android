@@ -56,7 +56,6 @@ import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.deleteMoment
 import com.moments.android.services.firestore.loadSavedMoments
 import com.moments.android.services.performance.FeedVisibilityCoordinator
-import com.moments.android.services.performance.toFeedVideoMoments
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.video.GlobalVideoManager
@@ -101,8 +100,6 @@ fun SingleMomentDetailView(
 
     var currentMoment by remember(moment.id) { mutableStateOf(moment) }
     var trackedMomentView by remember { mutableStateOf(false) }
-    // iOS reelsVideos: [moment].videoMoments
-    val reelsVideos = remember(currentMoment) { listOf(currentMoment).toFeedVideoMoments() }
 
     var dragOffsetPx by remember { mutableFloatStateOf(0f) }
     var isDragging by remember { mutableStateOf(false) }
@@ -301,7 +298,7 @@ fun SingleMomentDetailView(
                         onPeek = { url, ratio, pressing -> handlePeek(url, ratio, pressing) },
                         onTagTap = { userId -> openUserProfile(userId) },
                         availableHeight = feedCardHeightPx,
-                        reelsVideos = reelsVideos,
+                        reelsVideos = emptyList(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

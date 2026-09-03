@@ -718,6 +718,7 @@
     <string name="media_moderation_hidden_title">Verborgen content</string>
     <string name="media_moderation_hidden_subtitle">Verborgen door moderatie</string>
     <string name="feed_see_more">meer weergeven</string>
+    <string name="feed_see_more_inline">meer</string>
     <string name="feed_see_less">minder weergeven</string>
     <string name="feed_follow_request">Verzoek</string>
     <string name="feed_follow_requested">Aangevraagd</string>

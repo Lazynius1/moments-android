@@ -65,7 +65,6 @@ import com.moments.android.services.firestore.deleteMoment
 import com.moments.android.services.firestore.loadSavedMoments
 import com.moments.android.services.performance.FeedVisibilityCoordinator
 import com.moments.android.services.performance.VideoMomentsIndex
-import com.moments.android.services.performance.toVideoMoments
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.video.VideoPlaybackSelector
@@ -109,7 +108,7 @@ fun ExploreMomentDetailView(
     val screenHeightDp = configuration.screenHeightDp
     val feedCardHeight = (screenHeightDp * 0.58f).dp
     val feedCardHeightPx = with(density) { feedCardHeight.toPx() }
-    val rowSpacing = maxOf(15.dp, (screenHeightDp * 0.02f).dp)
+    val rowSpacing = FeedMomentCardLayout.rowSpacing
 
     var feedMoments by remember(moments) {
         mutableStateOf(moments.map { it.toExploreFeedMoment() })
@@ -199,7 +198,7 @@ fun ExploreMomentDetailView(
         if (next >= domainMoments.size) return
         val end = minOf(next + 8, domainMoments.size)
         val upcoming = domainMoments.subList(next, end)
-        val imageUrls = upcoming.mapNotNull { it.previewImageURLString?.takeIf(String::isNotBlank) }
+        val imageUrls = VideoPlaybackSelector.imagePrefetchUrlStrings(upcoming, maxMoments = 8)
         if (imageUrls.isNotEmpty()) ImagePrefetchManager.prefetch(imageUrls)
         val videoUrls = VideoPlaybackSelector.preloadUrlStrings(upcoming, maxMoments = 4)
         if (videoUrls.isNotEmpty()) VideoPreloader.preloadAssets(videoUrls)
@@ -251,8 +250,6 @@ fun ExploreMomentDetailView(
         VideoMomentsIndex.rebuild(domainMoments)
     }
 
-    // iOS reelsVideos: moments.videoMoments
-    val reelsVideos = remember(domainMoments) { domainMoments.toVideoMoments() }
     val adAfterIndices = remember(feedMoments) {
         FeedAdPlacement.indicesAfterWhichToShowAd(
             momentIds = feedMoments.map { it.id },
@@ -379,7 +376,7 @@ fun ExploreMomentDetailView(
                                     contextMenuMoment = tapped
                                     showContextMenu = true
                                 },
-                                reelsVideos = reelsVideos,
+                                reelsVideos = emptyList(),
                                 onAuthorAvatarTap = { authorId, hasStory ->
                                     handleAuthorAvatarTap(authorId, hasStory)
                                 },

@@ -80,7 +80,6 @@ import com.moments.android.services.firestore.fetchUser
 import com.moments.android.services.firestore.loadSavedMoments
 import com.moments.android.services.performance.FeedVisibilityCoordinator
 import com.moments.android.services.performance.VideoMomentsIndex
-import com.moments.android.services.performance.toVideoMoments
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.video.GlobalVideoManager
@@ -135,7 +134,7 @@ fun ModernSavedMomentsDetailView(
     val screenHeightDp = configuration.screenHeightDp
     val feedCardHeight = (screenHeightDp * 0.58f).dp
     val feedCardHeightPx = with(density) { feedCardHeight.toPx() }
-    val rowSpacing = maxOf(15.dp, (screenHeightDp * 0.02f).dp)
+    val rowSpacing = FeedMomentCardLayout.rowSpacing
 
     var domainMoments by remember(moments) { mutableStateOf(moments) }
     var feedMoments by remember(moments) {
@@ -228,7 +227,7 @@ fun ModernSavedMomentsDetailView(
         if (next >= domainMoments.size) return
         val end = minOf(next + 8, domainMoments.size)
         val upcoming = domainMoments.subList(next, end)
-        val imageUrls = upcoming.mapNotNull { it.previewImageURLString?.takeIf(String::isNotBlank) }
+        val imageUrls = VideoPlaybackSelector.imagePrefetchUrlStrings(upcoming, maxMoments = 8)
         if (imageUrls.isNotEmpty()) ImagePrefetchManager.prefetch(imageUrls)
         val videoUrls = VideoPlaybackSelector.preloadUrlStrings(upcoming, maxMoments = 4)
         if (videoUrls.isNotEmpty()) VideoPreloader.preloadAssets(videoUrls)
@@ -301,9 +300,6 @@ fun ModernSavedMomentsDetailView(
     LaunchedEffect(domainMoments.size) {
         VideoMomentsIndex.rebuild(domainMoments)
     }
-
-    // iOS reelsVideos: moments.videoMoments
-    val reelsVideos = remember(domainMoments) { domainMoments.toVideoMoments() }
 
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -389,7 +385,7 @@ fun ModernSavedMomentsDetailView(
                     start = FeedMomentCardLayout.listHorizontalPadding,
                     end = FeedMomentCardLayout.listHorizontalPadding,
                 ),
-                verticalArrangement = Arrangement.spacedBy(40.dp),
+                verticalArrangement = Arrangement.spacedBy(rowSpacing),
             ) {
                 itemsIndexed(
                     feedMoments,
@@ -428,7 +424,7 @@ fun ModernSavedMomentsDetailView(
                                 contextMenuMoment = tapped
                                 showContextMenu = true
                             },
-                            reelsVideos = reelsVideos,
+                            reelsVideos = emptyList(),
                             onAuthorAvatarTap = { authorId, hasStory ->
                                 handleAuthorAvatarTap(authorId, hasStory)
                             },

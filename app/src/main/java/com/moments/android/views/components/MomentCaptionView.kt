@@ -28,7 +28,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.FormatAlignLeft
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -199,6 +198,25 @@ private fun truncatedCollapsedText(content: String, needsMore: Boolean): String 
     return truncateString(content, 75)
 }
 
+/** Corta en límite de palabra para dejar sitio a `... más` en la última línea visible. */
+private fun captionCutToLastVisibleWord(
+    full: String,
+    visibleEndExclusive: Int,
+    suffixCharCount: Int,
+): String {
+    val limit = (visibleEndExclusive - suffixCharCount).coerceIn(0, full.length)
+    if (limit <= 0) return ""
+    val prefix = full.take(limit).trimEnd()
+    val breakAt = prefix.lastIndexOfAny(charArrayOf(' ', '\n', '\t'))
+    return if (breakAt > 0) prefix.take(breakAt).trimEnd() else prefix
+}
+
+private fun dropLastCaptionWord(text: String): String {
+    val trimmed = text.trimEnd()
+    val breakAt = trimmed.lastIndexOfAny(charArrayOf(' ', '\n', '\t'))
+    return if (breakAt > 0) trimmed.take(breakAt).trimEnd() else trimmed.dropLast(1)
+}
+
 /**
  * Port de `MomentCaptionView.swift` — feed/detail con morph contextual y reels inline.
  */
@@ -239,8 +257,10 @@ fun MomentCaptionView(
         MomentCaptionPresentationStyle.Detail -> trimmed
     }
 
-    var needsExpansion by remember(cardContent, style) { mutableStateOf(false) }
-    val previewContent = cardContent
+    val seeMoreInline = stringResource(R.string.feed_see_more_inline)
+    val seeMoreSuffix = "... $seeMoreInline"
+    var displayText by remember(cardContent, style) { mutableStateOf(cardContent) }
+    var showSeeMore by remember(cardContent, style) { mutableStateOf(false) }
 
     val mediaPreviewContext = remember(moment, authorId, username, previewImageUrl, thumbnailUrl, previewVideoUrl, audience, isVideo) {
         resolveCaptionMediaPreviewContext(
@@ -276,6 +296,10 @@ fun MomentCaptionView(
 
     val bodyFontSize = if (style == MomentCaptionPresentationStyle.Detail) 15.sp else 14.sp
     val lineLimit = if (style == MomentCaptionPresentationStyle.Detail) 4 else 3
+    val openFullCaption = {
+        HapticManager.shared.lightImpact()
+        showFullCaption = true
+    }
 
     Column(
         modifier
@@ -283,10 +307,9 @@ fun MomentCaptionView(
             .onGloballyPositioned { captionBounds = it.boundsInWindow() }
             .padding(horizontal = FeedMomentCardLayout.captionHorizontalPadding)
             .padding(top = if (style == MomentCaptionPresentationStyle.Detail) 0.dp else 2.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         MomentHashtagText(
-            content = previewContent,
+            content = displayText,
             onHashtagTap = onHashtagTap,
             onMentionTap = onMentionTap,
             baseColor = baseColor,
@@ -294,45 +317,30 @@ fun MomentCaptionView(
             mentionColor = mentionColor,
             fontSize = bodyFontSize,
             lineLimit = lineLimit,
+            actionText = if (showSeeMore) seeMoreSuffix else null,
+            actionColor = secondaryColor,
+            actionWeight = FontWeight.Normal,
+            onActionTap = if (showSeeMore) openFullCaption else null,
+            onEmptyTap = if (showSeeMore) openFullCaption else null,
             modifier = Modifier.fillMaxWidth(),
             onTextLayout = { result ->
-                val overflows = result.hasVisualOverflow
-                if (needsExpansion != overflows) needsExpansion = overflows
+                if (!showSeeMore && result.hasVisualOverflow) {
+                    val lastLine = (lineLimit - 1).coerceAtMost(result.lineCount - 1)
+                    val visibleEnd = result.getLineEnd(lastLine, visibleEnd = true)
+                    displayText = captionCutToLastVisibleWord(
+                        full = cardContent,
+                        visibleEndExclusive = visibleEnd,
+                        suffixCharCount = seeMoreSuffix.length,
+                    )
+                    showSeeMore = true
+                } else if (showSeeMore && result.hasVisualOverflow) {
+                    val next = dropLastCaptionWord(displayText)
+                    if (next.isNotEmpty() && next != displayText) {
+                        displayText = next
+                    }
+                }
             },
         )
-
-        if (needsExpansion) {
-            val context = LocalContext.current
-            val density = LocalDensity.current
-            Row(
-                Modifier
-                    .heightIn(min = 44.dp)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) {
-                        HapticManager.shared.lightImpact()
-                        showFullCaption = true
-                    }
-                    .padding(horizontal = 11.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.feed_see_more),
-                    color = secondaryColor,
-                    fontSize = with(density) { legacyPoppinsSize(context, 12).toSp() },
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.FormatAlignLeft,
-                    contentDescription = null,
-                    tint = secondaryColor,
-                    modifier = Modifier.size(10.dp),
-                )
-            }
-        }
     }
 
     if (showFullCaption) {
@@ -350,8 +358,8 @@ fun MomentCaptionView(
                 onDismiss = { showFullCaption = false },
                 source = {
                     CaptionMorphSource(
-                        content = previewContent,
-                        needsExpansion = needsExpansion,
+                        content = displayText,
+                        seeMoreSuffix = if (showSeeMore) seeMoreSuffix else null,
                         baseColor = baseColor,
                         secondaryColor = secondaryColor,
                         hashtagColor = hashtagColor,
@@ -378,7 +386,7 @@ fun MomentCaptionView(
 @Composable
 private fun CaptionMorphSource(
     content: String,
-    needsExpansion: Boolean,
+    seeMoreSuffix: String?,
     baseColor: Color,
     secondaryColor: Color,
     hashtagColor: Color,
@@ -386,15 +394,11 @@ private fun CaptionMorphSource(
     bodyFontSize: androidx.compose.ui.unit.TextUnit,
     lineLimit: Int,
 ) {
-    val context = LocalContext.current
-    val density = LocalDensity.current
-
     Column(
         Modifier
             .fillMaxSize()
             .padding(horizontal = FeedMomentCardLayout.captionHorizontalPadding)
             .padding(top = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         MomentHashtagText(
             content = content,
@@ -405,32 +409,11 @@ private fun CaptionMorphSource(
             mentionColor = mentionColor,
             fontSize = bodyFontSize,
             lineLimit = lineLimit,
+            actionText = seeMoreSuffix,
+            actionColor = secondaryColor,
+            actionWeight = FontWeight.Normal,
             modifier = Modifier.fillMaxWidth(),
         )
-
-        if (needsExpansion) {
-            Row(
-                Modifier
-                    .heightIn(min = 44.dp)
-                    .momentsChromeGlass(CircleShape, interactive = false)
-                    .padding(horizontal = 11.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.feed_see_more),
-                    color = secondaryColor,
-                    fontSize = with(density) { legacyPoppinsSize(context, 12).toSp() },
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.FormatAlignLeft,
-                    contentDescription = null,
-                    tint = secondaryColor,
-                    modifier = Modifier.size(10.dp),
-                )
-            }
-        }
     }
 }
 

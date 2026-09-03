@@ -605,6 +605,7 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="media_moderation_hidden_title">Contingut ocult</string>
     <string name="media_moderation_hidden_subtitle">Ocultat per moderació</string>
     <string name="feed_see_more">veure més</string>
+    <string name="feed_see_more_inline">més</string>
     <string name="feed_see_less">veure menys</string>
     <string name="feed_follow_request">Sol·licitar</string>
     <string name="feed_follow_requested">Sol·licitat</string>

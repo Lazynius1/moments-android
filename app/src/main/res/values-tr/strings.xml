@@ -718,6 +718,7 @@
     <string name="media_moderation_hidden_title">Gizli içerik</string>
     <string name="media_moderation_hidden_subtitle">İçerik denetimi nedeniyle gizlendi</string>
     <string name="feed_see_more">daha fazla gör</string>
+    <string name="feed_see_more_inline">daha fazla</string>
     <string name="feed_see_less">daha az göster</string>
     <string name="feed_follow_request">İstek gönder</string>
     <string name="feed_follow_requested">İstek gönderildi</string>

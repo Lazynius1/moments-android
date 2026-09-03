@@ -64,6 +64,7 @@ import com.moments.android.services.content.FeedMediaItem
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.performance.FeedVisibilityCoordinator
 import com.moments.android.services.performance.VideoMoment
+import com.moments.android.services.performance.VideoMomentsIndex
 import com.moments.android.services.performance.isReelsAspectFormat
 import com.moments.android.services.performance.toIndexMoment
 import com.moments.android.services.video.GlobalVideoManager
@@ -111,8 +112,8 @@ fun MomentMediaCarousel(
      */
     mediaItemsOverride: List<FeedMediaItem>? = null,
     /**
-     * Sesión Reels de esta superficie (feed / perfil / explore…).
-     * iOS `MediaItemView.reelsVideos` — nunca VideoMomentsIndex.shared.
+     * Sesión Reels de esta superficie.
+     * Vacío (detalle) → `VideoMomentsIndex`, como iOS `reelsVideos == nil`.
      */
     reelsVideos: List<VideoMoment> = emptyList(),
 ) {
@@ -136,9 +137,14 @@ fun MomentMediaCarousel(
         val videos = if (reelsVideos.isNotEmpty()) {
             reelsVideos
         } else {
-            val alone = moment.toIndexMoment()
-            val url = alone.previewVideoURLString ?: alone.videoUrl
-            if (!url.isNullOrBlank()) listOf(VideoMoment(alone)) else emptyList()
+            val indexed = VideoMomentsIndex.videoMoments.value
+            if (indexed.isNotEmpty()) {
+                indexed
+            } else {
+                val alone = moment.toIndexMoment()
+                val url = alone.previewVideoURLString ?: alone.videoUrl
+                if (!url.isNullOrBlank()) listOf(VideoMoment(alone)) else emptyList()
+            }
         }
         if (videos.isEmpty()) return null
         val idx = videos.indexOfFirst { it.moment.id == moment.id }
