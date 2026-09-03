@@ -392,7 +392,7 @@ class NativeAdManager {
 }
 
 /**
- * Pool del feed: máx. 2 cargas a la vez, caché por slot, primer request tras 400 ms.
+ * Pool del feed: máx. 2 cargas a la vez, caché por slot (tope 8, LRU; destroy al expulsar), primer request tras 400 ms.
  * No relanza loadAd si el slot ya tiene anuncio, está cargando o falló.
  */
 object FeedNativeAdPool {
@@ -409,10 +409,13 @@ object FeedNativeAdPool {
     val slots: StateFlow<Map<String, Slot>> = _slots.asStateFlow()
 
     private const val MAX_IN_FLIGHT = 2
+    private const val MAX_SLOTS = 8
     private var inFlight = 0
     private val pending = ArrayDeque<String>()
+    private val lru = ArrayDeque<String>()
     private var firstLoadScheduled = false
     private var firstLoadReady = false
+    private var initRetryScheduled = false
     private val loaders = mutableMapOf<String, AdLoader>()
     private var hostActivity: java.lang.ref.WeakReference<Activity>? = null
 
@@ -420,11 +423,13 @@ object FeedNativeAdPool {
 
     fun request(key: String, activity: Activity?) {
         if (activity != null) hostActivity = java.lang.ref.WeakReference(activity)
+        touch(key)
         val existing = _slots.value[key]
         if (existing != null && (existing.nativeAd != null || existing.isLoading || existing.hasError)) {
             return
         }
         if (!pending.contains(key)) pending.addLast(key)
+        trimPending()
         if (!firstLoadScheduled) {
             firstLoadScheduled = true
             scope.launch {
@@ -439,6 +444,10 @@ object FeedNativeAdPool {
     }
 
     fun pump() {
+        if (!AdMobConfiguration.isInitialized.value) {
+            scheduleRetryUntilInitialized()
+            return
+        }
         while (inFlight < MAX_IN_FLIGHT && pending.isNotEmpty()) {
             val key = pending.removeFirst()
             val existing = _slots.value[key]
@@ -448,17 +457,9 @@ object FeedNativeAdPool {
     }
 
     private fun startLoad(key: String) {
-        if (!AdMobConfiguration.isInitialized.value) {
-            pending.addFirst(key)
-            scope.launch {
-                kotlinx.coroutines.delay(1_000)
-                pump()
-            }
-            return
-        }
-
         inFlight += 1
         updateSlot(key, Slot(isLoading = true))
+        evictIfNeeded()
 
         AdMobConfiguration.takePreloadedNativeAd()?.let { preloaded ->
             finish(key, preloaded, error = false)
@@ -495,7 +496,44 @@ object FeedNativeAdPool {
         loaders.remove(key)
         inFlight = (inFlight - 1).coerceAtLeast(0)
         updateSlot(key, Slot(nativeAd = ad, isLoading = false, hasError = error && ad == null))
+        evictIfNeeded()
         pump()
+    }
+
+    private fun scheduleRetryUntilInitialized() {
+        if (initRetryScheduled) return
+        initRetryScheduled = true
+        scope.launch {
+            kotlinx.coroutines.delay(1_000)
+            initRetryScheduled = false
+            pump()
+        }
+    }
+
+    private fun touch(key: String) {
+        lru.remove(key)
+        lru.addLast(key)
+    }
+
+    private fun trimPending() {
+        while (pending.size > MAX_SLOTS) pending.removeFirst()
+    }
+
+    private fun evictIfNeeded() {
+        val map = _slots.value.toMutableMap()
+        while (map.size > MAX_SLOTS) {
+            val victim = lru.firstOrNull { map[it]?.isLoading != true }
+                ?: map.entries.firstOrNull { !it.value.isLoading }?.key
+                ?: break
+            lru.remove(victim)
+            pending.remove(victim)
+            loaders.remove(victim)
+            finishedKeys.remove(victim)
+            map.remove(victim)?.nativeAd?.destroy()
+        }
+        if (map.size != _slots.value.size) {
+            _slots.value = map
+        }
     }
 
     private fun updateSlot(key: String, slot: Slot) {

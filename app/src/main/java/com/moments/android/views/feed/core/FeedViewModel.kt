@@ -257,7 +257,7 @@ class FeedViewModel {
                 val result = BackendFeedService.fetchFeedPage(
                     feedType = feed.rawValue,
                     cursor = cursor,
-                    limit = 20,
+                    limit = FEED_PAGE_SIZE,
                 )
                 if (result != null) {
                     var newMoments = result.moments
@@ -387,7 +387,7 @@ class FeedViewModel {
     private suspend fun fetchFollowingMoments(userId: String) {
         val mutedUserIds = resolveMutedUserIds(userId)
         cachedFollowingIds = resolveFollowingIds(userId)
-        val result = BackendFeedService.fetchFeedPage(feedType = "following", limit = 20)
+        val result = BackendFeedService.fetchFeedPage(feedType = "following", limit = FEED_PAGE_SIZE)
         if (result != null) {
             val finalMoments = sortMomentsChronologically(
                 result.moments
@@ -438,7 +438,7 @@ class FeedViewModel {
     private suspend fun fetchForYouMoments(userId: String) {
         val mutedUserIds = resolveMutedUserIds(userId)
         cachedFollowingIds = resolveFollowingIds(userId)
-        val result = BackendFeedService.fetchFeedPage(feedType = "forYou", limit = 20)
+        val result = BackendFeedService.fetchFeedPage(feedType = "forYou", limit = FEED_PAGE_SIZE)
         if (result != null) {
             val finalMoments = applyForYouClientTuning(
                 moments = result.moments
@@ -551,7 +551,7 @@ class FeedViewModel {
             viewerId = userId,
             preserveOrder = false,
         )
-        return if (isInitialLoad) tuned.take(20) else tuned
+        return if (isInitialLoad) tuned.take(FEED_PAGE_SIZE) else tuned
     }
 
     private suspend fun fetchMoreForYouMoments(userId: String) {
@@ -1045,13 +1045,13 @@ class FeedViewModel {
 
         val mapped = fetched.map { it.toFeedMoment() }.filter { it.isArchived != true }
         val tuned: List<FeedMoment> = when (feedType) {
-            FeedType.Following -> sortMomentsChronologically(mapped, limit = 20)
+            FeedType.Following -> sortMomentsChronologically(mapped, limit = FEED_PAGE_SIZE)
             FeedType.ForYou -> applyForYouClientTuning(
                 moments = mapped,
                 followingIds = cachedFollowingIds,
                 viewerId = userId,
                 preserveOrder = false,
-            ).take(20)
+            ).take(FEED_PAGE_SIZE)
         }
 
         val filtered = filterMomentsForPrivacy(userId, tuned)
@@ -1361,6 +1361,8 @@ class FeedViewModel {
 
     companion object {
         private const val PREFS = "moments_feed_cache"
+        /** iOS pide 20; Android pagina a la mitad. */
+        private const val FEED_PAGE_SIZE = 10
     }
 }
 
