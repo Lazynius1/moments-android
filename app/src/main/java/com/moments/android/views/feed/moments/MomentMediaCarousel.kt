@@ -30,9 +30,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,7 +83,6 @@ import com.moments.android.views.feed.video.VideoPosterOverlay
 import com.moments.android.views.feed.video.switchVideoSurfaceToFeed
 import com.moments.android.views.shared.PhotoTagOverlayView
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.yield
 
 private val MediaCorner = RoundedCornerShape(MomentCarouselLayoutRules.mediaCornerRadius)
 
@@ -129,21 +128,27 @@ fun MomentMediaCarousel(
     var reelsHandoffItem by remember { mutableStateOf<FeedMediaItem?>(null) }
     var reelsResumeId by remember { mutableStateOf("") }
     var reelsSourceRect by remember { mutableStateOf(Rect.Zero) }
-    // iOS MediaItemView.resolvedReelsVideos / resolvedReelsStartIndex — todos los vídeos
-    val resolvedReelsVideos = remember(reelsVideos, moment.id, moment.mediaItems) {
-        if (reelsVideos.isNotEmpty()) {
+    var isPreparingReelsDismiss by remember { mutableStateOf(false) }
+    var localReelsVideos by remember { mutableStateOf<List<VideoMoment>>(emptyList()) }
+    var localReelsStartIndex by remember { mutableIntStateOf(0) }
+    // iOS MediaItemView.freezeReelsSession — cola de la superficie; si falta el moment, no caer a 0.
+    fun resolveReelsSession(): Pair<List<VideoMoment>, Int>? {
+        val videos = if (reelsVideos.isNotEmpty()) {
             reelsVideos
         } else {
             val alone = moment.toIndexMoment()
             val url = alone.previewVideoURLString ?: alone.videoUrl
             if (!url.isNullOrBlank()) listOf(VideoMoment(alone)) else emptyList()
         }
-    }
-    val resolvedReelsStartIndex = remember(resolvedReelsVideos, moment.id) {
-        resolvedReelsVideos.indexOfFirst { it.moment.id == moment.id }.takeIf { it >= 0 } ?: 0
+        if (videos.isEmpty()) return null
+        val idx = videos.indexOfFirst { it.moment.id == moment.id }
+        if (idx >= 0) return videos to idx
+        val alone = moment.toIndexMoment()
+        val url = alone.previewVideoURLString ?: alone.videoUrl
+        if (url.isNullOrBlank()) return null
+        return listOf(VideoMoment(alone)) to 0
     }
     val reelsHost = LocalFeedReelsHost.current
-    val reelsScope = rememberCoroutineScope()
 
     LaunchedEffect(pagerState.currentPage) {
         onPageChange(pagerState.currentPage)
@@ -164,6 +169,21 @@ fun MomentMediaCarousel(
         Modifier.fillMaxWidth().aspectRatio(canvasAspectRatio)
     }
 
+    fun prepareReelsDismiss() {
+        if (isPreparingReelsDismiss) return
+        isPreparingReelsDismiss = true
+        val handoff = reelsHandoffItem
+        val resumeId = reelsResumeId.ifBlank {
+            if (handoff != null) {
+                GlobalVideoManager.profileVideoConsumerId(moment, handoff)
+            } else {
+                GlobalVideoManager.profileVideoConsumerId(moment)
+            }
+        }
+        GlobalVideoManager.capturePlaybackPosition(resumeId)
+        moment.id.takeIf { it.isNotBlank() }?.let { FeedVisibilityCoordinator.pinActiveVideo(it) }
+    }
+
     fun finishReelsHandoff() {
         val handoff = reelsHandoffItem
         val resumeId = reelsResumeId.ifBlank {
@@ -173,43 +193,48 @@ fun MomentMediaCarousel(
                 GlobalVideoManager.profileVideoConsumerId(moment)
             }
         }
-        // El overlay termina exactamente sobre la card. Conectar primero el
-        // TextureView del feed evita dejar un frame sin superficie al retirarlo.
         switchVideoSurfaceToFeed(resumeId)
         VideoLayerLease.returnToFeed()
-        showReelsViewer = false
+        GlobalVideoManager.clearPlaybackFinished(resumeId)
         moment.id.takeIf { it.isNotBlank() }?.let { FeedVisibilityCoordinator.pinActiveVideo(it) }
-        GlobalVideoManager.capturePlaybackPosition(resumeId)
-        reelsScope.launch {
-            yield()
-            GlobalVideoManager.completeReelsFeedHandoff(moment, handoff)
-            GlobalVideoManager.playVideo(resumeId)
-            reelsHandoffItem = null
-            reelsResumeId = ""
+        GlobalVideoManager.playVideo(resumeId)
+        GlobalVideoManager.completeReelsFeedHandoff(moment, handoff)
+        if (reelsHost == null) {
+            showReelsViewer = false
         }
+        reelsHandoffItem = null
+        reelsResumeId = ""
+        isPreparingReelsDismiss = false
     }
 
     fun openReelsViewer(item: FeedMediaItem, pageConsumerId: String) {
-        if (resolvedReelsVideos.isEmpty()) return
-        if (!VideoLayerLease.beginReels(pageConsumerId)) return
+        val session = resolveReelsSession() ?: return
+        val (sessionVideos, startIndex) = session
         val handoffMedia = if (isCarousel) item else null
-        GlobalVideoManager.capturePlaybackPosition(pageConsumerId)
         GlobalVideoManager.markReelsFeedHandoff(moment, handoffMedia)
+        if (!VideoLayerLease.beginReels(pageConsumerId)) {
+            GlobalVideoManager.completeReelsFeedHandoff(moment, handoffMedia)
+            return
+        }
+        GlobalVideoManager.capturePlaybackPosition(pageConsumerId)
         GlobalVideoManager.pauseAllVideos(except = pageConsumerId)
         reelsHandoffItem = handoffMedia
         reelsResumeId = pageConsumerId
         reelsStartSeconds = GlobalVideoManager.playbackPosition(pageConsumerId).toFloat()
-        val session = FeedReelsPresentation(
-            videos = resolvedReelsVideos,
-            startIndex = resolvedReelsStartIndex,
+        val presentation = FeedReelsPresentation(
+            videos = sessionVideos,
+            startIndex = startIndex,
             startSeconds = reelsStartSeconds.toDouble(),
             sourceRectInWindow = reelsSourceRect,
             handoffConsumerId = pageConsumerId,
+            onWillDismiss = { prepareReelsDismiss() },
             onClosed = { finishReelsHandoff() },
         )
         if (reelsHost != null) {
-            reelsHost.present(session)
+            reelsHost.present(presentation)
         } else {
+            localReelsVideos = sessionVideos
+            localReelsStartIndex = startIndex
             showReelsViewer = true
         }
     }
@@ -217,11 +242,12 @@ fun MomentMediaCarousel(
     FeedReelsExpandOverlay(
         visible = showReelsViewer,
         sourceRectInWindow = reelsSourceRect,
+        onWillDismiss = { prepareReelsDismiss() },
         onDismissed = { finishReelsHandoff() },
     ) { collapse ->
         ReelsViewer(
-            videos = resolvedReelsVideos,
-            startIndex = resolvedReelsStartIndex,
+            videos = localReelsVideos,
+            startIndex = localReelsStartIndex,
             initialStartSeconds = reelsStartSeconds.toDouble(),
             handoffConsumerId = reelsResumeId,
             onClose = collapse,
@@ -236,26 +262,46 @@ fun MomentMediaCarousel(
     ) {
         if (mediaItems.isEmpty()) {
             Box(Modifier.fillMaxSize().background(FeedInk.copy(alpha = 0.08f)))
+        } else if (!isCarousel) {
+            // iOS EnhancedCarouselView: una sola media → MediaItemView, sin pager.
+            val item = mediaItems.first()
+            val pageConsumerId = GlobalVideoManager.feedVideoConsumerId(
+                moment = moment,
+                item = item,
+                prefersUnifiedCarouselFrame = false,
+            )
+            MediaItemView(
+                item = item,
+                moment = moment,
+                consumerId = pageConsumerId,
+                canvasAspectRatio = canvasAspectRatio,
+                prefersUnifiedCarouselFrame = false,
+                showTags = showTags,
+                onToggleTags = onToggleTags,
+                isImmersive = isImmersive,
+                allowsVideoPlayback = true,
+                onTagTap = onTagTap,
+                onOpenReels = { openReelsViewer(item, pageConsumerId) },
+            )
         } else {
             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                 // iOS: allowsVideoPlayback && index == currentIndex
                 val item = mediaItems[page]
-                val allowsVideoPlayback = !isCarousel || page == pagerState.currentPage
                 val pageConsumerId = GlobalVideoManager.feedVideoConsumerId(
                     moment = moment,
                     item = item,
-                    prefersUnifiedCarouselFrame = isCarousel,
+                    prefersUnifiedCarouselFrame = true,
                 )
                 MediaItemView(
                     item = item,
                     moment = moment,
                     consumerId = pageConsumerId,
                     canvasAspectRatio = canvasAspectRatio,
-                    prefersUnifiedCarouselFrame = isCarousel,
+                    prefersUnifiedCarouselFrame = true,
                     showTags = showTags,
                     onToggleTags = onToggleTags,
                     isImmersive = isImmersive,
-                    allowsVideoPlayback = allowsVideoPlayback,
+                    allowsVideoPlayback = page == pagerState.currentPage,
                     onTagTap = onTagTap,
                     onOpenReels = {
                         openReelsViewer(item, pageConsumerId)
@@ -263,7 +309,7 @@ fun MomentMediaCarousel(
                 )
             }
             AnimatedVisibility(
-                visible = mediaItems.size > 1 && !isImmersive,
+                visible = !isImmersive,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.TopCenter),
@@ -392,6 +438,39 @@ private fun MediaItemView(
 }
 
 /**
+ * Port de `CroppedVideoPlayer.videoPosterFallback`.
+ */
+@Composable
+private fun CroppedVideoPoster(
+    posterUrl: String?,
+    onTap: (() -> Unit)? = null,
+) {
+    val modifier = if (onTap != null) {
+        Modifier
+            .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onTap,
+            )
+    } else {
+        Modifier.fillMaxSize()
+    }
+    Box(modifier) {
+        if (!posterUrl.isNullOrBlank()) {
+            VideoPosterOverlay(
+                posterUrl = posterUrl,
+                isReadyToPlay = false,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.12f)))
+        }
+    }
+}
+
+/**
  * Port de `CroppedVideoPlayer` (FeedMomentComponents.swift).
  */
 @Composable
@@ -417,6 +496,12 @@ private fun CroppedVideoPlayer(
     val totalDuration = item.videoDuration ?: moment.videoDuration
     val finishedIds by GlobalVideoManager.finishedPlaybackIdsFlow.collectAsState()
     val hasFinishedPlayback = finishedIds.contains(consumerId)
+    val activeMomentId by FeedVisibilityCoordinator.activeVideoMomentIdFlow.collectAsState()
+    val warmingMomentId by FeedVisibilityCoordinator.warmingVideoMomentIdFlow.collectAsState()
+    val shouldMountPlayer = allowsVideoPlayback && (
+        GlobalVideoManager.visibilityMatches(activeMomentId, consumerId) ||
+            GlobalVideoManager.visibilityMatches(warmingMomentId, consumerId)
+        )
     // iOS mute overlay siempre si allowsVideoPlayback (código); comment dice hide immersive —
     // seguimos el código: visible cuando allowsVideoPlayback. FeedVideoPage hideMute en immersive
     // para no tapear mute encima de Reels. Oculto si el clip ya terminó (overlay “Ver otra vez”).
@@ -425,32 +510,27 @@ private fun CroppedVideoPlayer(
     Box(Modifier.fillMaxSize()) {
         when {
             !allowsVideoPlayback -> {
-                if (!posterUrl.isNullOrBlank()) {
-                    VideoPosterOverlay(
-                        posterUrl = posterUrl,
-                        isReadyToPlay = false,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.12f)))
-                }
+                CroppedVideoPoster(posterUrl = posterUrl)
             }
             usesBlurredFitLayout -> {
                 CarouselMediaBackdropView(item = item)
-                FeedVideoPage(
-                    url = playbackUrl,
-                    thumbnailUrl = posterUrl,
-                    consumerId = consumerId,
-                    mediaItem = domainMediaItem,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(vertical = 10.dp, horizontal = 6.dp),
-                    allowsPlayback = true,
-                    allowsPauseInteraction = true,
-                    showMute = showMute,
-                    onTap = null,
-                )
+                if (shouldMountPlayer) {
+                    FeedVideoPage(
+                        url = playbackUrl,
+                        thumbnailUrl = posterUrl,
+                        consumerId = consumerId,
+                        mediaItem = domainMediaItem,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(vertical = 10.dp, horizontal = 6.dp),
+                        allowsPlayback = true,
+                        allowsPauseInteraction = true,
+                        showMute = showMute,
+                        onTap = null,
+                    )
+                } else {
+                    CroppedVideoPoster(posterUrl = posterUrl, onTap = onTap)
+                }
                 AnimatedVisibility(
                     visible = !isImmersive,
                     enter = fadeIn(),
@@ -466,17 +546,21 @@ private fun CroppedVideoPlayer(
             }
             isReelsFormat -> {
                 // iOS: ModernVideoPlayer(allowsPauseInteraction: false) + clear Button(onTap)
-                FeedVideoPage(
-                    url = playbackUrl,
-                    thumbnailUrl = posterUrl,
-                    consumerId = consumerId,
-                    mediaItem = domainMediaItem,
-                    modifier = Modifier.fillMaxSize(),
-                    allowsPlayback = true,
-                    allowsPauseInteraction = false,
-                    showMute = showMute,
-                    onTap = onTap,
-                )
+                if (shouldMountPlayer) {
+                    FeedVideoPage(
+                        url = playbackUrl,
+                        thumbnailUrl = posterUrl,
+                        consumerId = consumerId,
+                        mediaItem = domainMediaItem,
+                        modifier = Modifier.fillMaxSize(),
+                        allowsPlayback = true,
+                        allowsPauseInteraction = false,
+                        showMute = showMute,
+                        onTap = onTap,
+                    )
+                } else {
+                    CroppedVideoPoster(posterUrl = posterUrl, onTap = onTap)
+                }
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -531,17 +615,21 @@ private fun CroppedVideoPlayer(
             }
             else -> {
                 // iOS horizontal videos branch
-                FeedVideoPage(
-                    url = playbackUrl,
-                    thumbnailUrl = posterUrl,
-                    consumerId = consumerId,
-                    mediaItem = domainMediaItem,
-                    modifier = Modifier.fillMaxSize(),
-                    allowsPlayback = true,
-                    allowsPauseInteraction = true,
-                    showMute = showMute,
-                    onTap = null,
-                )
+                if (shouldMountPlayer) {
+                    FeedVideoPage(
+                        url = playbackUrl,
+                        thumbnailUrl = posterUrl,
+                        consumerId = consumerId,
+                        mediaItem = domainMediaItem,
+                        modifier = Modifier.fillMaxSize(),
+                        allowsPlayback = true,
+                        allowsPauseInteraction = true,
+                        showMute = showMute,
+                        onTap = null,
+                    )
+                } else {
+                    CroppedVideoPoster(posterUrl = posterUrl, onTap = onTap)
+                }
                 AnimatedVisibility(
                     visible = !isImmersive,
                     enter = fadeIn(),
@@ -555,7 +643,6 @@ private fun CroppedVideoPlayer(
                                 .align(Alignment.TopEnd)
                                 .padding(top = 8.dp, end = 8.dp),
                         )
-                        // iOS: arrow.up.right.square bottom trailing
                         Icon(
                             Icons.Filled.OpenInFull,
                             contentDescription = null,

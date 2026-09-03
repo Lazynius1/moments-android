@@ -39,12 +39,32 @@ object VideoLayerLease {
         return owner == role
     }
 
+    /** Feed en póster mientras Reels tiene el layer (ida y vuelta). */
+    fun isFeedAsleep(consumerId: String): Boolean {
+        return exclusiveConsumerId == consumerId && owner == VideoLayerRole.Reels
+    }
+
+    /**
+     * El feed no debe marcar “Ver otra vez” mientras el mismo consumer está en handoff feed↔Reels.
+     * Cubre la ventana entre `beginReels` y `markReelsFeedHandoff`, y el encoger al cerrar.
+     */
+    fun suppressesFeedPlaybackFinished(consumerId: String): Boolean {
+        if (consumerId.isEmpty()) return false
+        val exclusive = exclusiveConsumerId ?: return false
+        if (exclusive != consumerId) return false
+        return isTransitioning || owner == VideoLayerRole.Reels
+    }
+
+    fun isHandoffConsumer(consumerId: String): Boolean =
+        !consumerId.isEmpty() && exclusiveConsumerId == consumerId
+
     fun beginReels(consumerId: String): Boolean {
         if (isTransitioning) return false
         isTransitioning = true
         canClaimReels = true
         cancelIdle()
         exclusiveConsumerId = consumerId
+        owner = VideoLayerRole.Reels
         generation += 1
         bump()
         return true

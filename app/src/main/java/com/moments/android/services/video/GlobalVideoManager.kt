@@ -370,6 +370,7 @@ object GlobalVideoManager {
         } else {
             profileVideoConsumerId(moment)
         }
+        clearPlaybackFinished(id)
         synchronized(lock) { preservedPlayerConsumerIds.remove(id) }
     }
 
@@ -393,11 +394,16 @@ object GlobalVideoManager {
 
     private fun resumePlayer(playerId: String) {
         allPlayers[playerId]?.resumeVideo()
-            ?: runCatching { SharedVideoPlayerPool.player(playerId).play() }
+        runCatching {
+            val exo = SharedVideoPlayerPool.player(playerId)
+            if (!exo.isPlaying) {
+                exo.play()
+            }
+        }
     }
 
     /**
-     * Patrón IG: subir volumen físico con vídeo activo → unmute de sesión.
+     * Subir volumen físico con vídeo activo → unmute de sesión.
      * ≡ iOS `startVolumeObservation` (AVAudioSession.outputVolume).
      */
     private fun startVolumeObservation(context: Context) {

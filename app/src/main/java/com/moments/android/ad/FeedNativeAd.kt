@@ -76,6 +76,39 @@ fun Context.findActivity(): Activity? {
     return null
 }
 
+/** Huecos variables y estables (hash del moment id). Port de `FeedAdPlacement`. */
+object FeedAdPlacement {
+    fun indicesAfterWhichToShowAd(
+        momentIds: List<String>,
+        minGap: Int,
+        maxGap: Int,
+    ): Set<Int> {
+        val minG = minGap.coerceAtLeast(1)
+        val maxG = maxGap.coerceAtLeast(minG)
+        val lastEligible = momentIds.size - 2
+        if (lastEligible < 0) return emptySet()
+
+        val result = mutableSetOf<Int>()
+        var cursor = 0
+        while (cursor <= lastEligible) {
+            val span = minG + (stableHash(momentIds[cursor]) % (maxG - minG + 1))
+            val adAfter = cursor + span - 1
+            if (adAfter > lastEligible) break
+            result.add(adAfter)
+            cursor = adAfter + 1
+        }
+        return result
+    }
+
+    private fun stableHash(string: String): Int {
+        var hash = 5381
+            for (byte in string.toByteArray(Charsets.UTF_8)) {
+                hash = ((hash shl 5) + hash) + (byte.toInt() and 0xFF)
+            }
+        return kotlin.math.abs(hash)
+    }
+}
+
 @Composable
 fun SwiftUiNativeAdView(modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -104,21 +137,15 @@ fun SwiftUiNativeAdView(modifier: Modifier = Modifier) {
 
 @Composable
 fun SmartNativeAdView(
+    slotId: String = "feed",
     authService: AuthService = AuthService,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val currentUser by authService.currentUser.collectAsState()
-    val adManager = remember { NativeAdManager() }
+    val slots by FeedNativeAdPool.slots.collectAsState()
+    val slot = slots[slotId] ?: FeedNativeAdPool.Slot()
     var showingPrivacyConsent by remember { mutableStateOf(false) }
-
-    DisposableEffect(Unit) {
-        onDispose { adManager.destroy() }
-    }
-
-    val isLoading by adManager.isLoading.collectAsState()
-    val nativeAd by adManager.nativeAd.collectAsState()
-    val hasError by adManager.hasError.collectAsState()
 
     val shouldShowAds = PlusStatusHelper.shouldShowAds(currentUser)
 
@@ -126,22 +153,24 @@ fun SmartNativeAdView(
 
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        adManager.loadAd(context.findActivity())
-        if (AdMobConfiguration.shouldShowConsentFlow) {
+    LaunchedEffect(slotId) {
+        FeedNativeAdPool.request(slotId, context.findActivity())
+        if (AdMobConfiguration.shouldShowConsentFlow &&
+            !FeedNativeAdPool.didOfferConsentThisSession
+        ) {
+            FeedNativeAdPool.didOfferConsentThisSession = true
             showingPrivacyConsent = true
         }
     }
 
     Column(modifier = modifier) {
         when {
-            isLoading -> IntegratedAdLoadingView()
-            nativeAd != null -> IntegratedNativeAdView(nativeAd = nativeAd!!)
-            hasError -> Unit
+            slot.isLoading -> IntegratedAdLoadingView()
+            slot.nativeAd != null -> IntegratedNativeAdView(nativeAd = slot.nativeAd!!)
+            slot.hasError -> Unit
         }
     }
 
-    // ≡ iOS fullScreenCover TrackingPermissionView(stage: .primer)
     if (showingPrivacyConsent) {
         PermissionPrimerFullScreenDialog(
             onDismissRequest = { showingPrivacyConsent = false },
@@ -150,13 +179,12 @@ fun SmartNativeAdView(
                 stage = PermissionPrimerStage.PRIMER,
                 primaryAction = {
                     showingPrivacyConsent = false
-                    // ≡ iOS delay 0.3s antes de UMP
                     scope.launch {
                         delay(300)
                         val activity = context.findActivity()
                         if (activity != null) {
                             AdMobConfiguration.startConsentFlow(activity) {
-                                adManager.loadAd(activity)
+                                FeedNativeAdPool.pump()
                             }
                         }
                     }

@@ -60,7 +60,7 @@ data class AdaptiveWindowState(
 }
 
 object AdaptiveContentWidths {
-    /** Instagram tablet ronda 594 dp; 600 dp conserva la escala móvil sin estirar el post. */
+    /** Tablet ~594 dp; 600 dp conserva la escala móvil sin estirar el post. */
     val FeedMax = 600.dp
     /** Visor tablet: algo mayor que Creator para aprovechar el escenario inmersivo. */
     val StoryViewerMax = 560.dp

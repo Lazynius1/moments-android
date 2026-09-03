@@ -34,7 +34,6 @@ import kotlin.math.max
 
 /**
  * Sesión Reels abierta desde un post del feed.
- * iOS: `fullScreenCover` + `matchedTransitionSource` / `.navigationTransition(.zoom)`.
  */
 data class FeedReelsPresentation(
     val videos: List<VideoMoment>,
@@ -42,6 +41,7 @@ data class FeedReelsPresentation(
     val startSeconds: Double,
     val sourceRectInWindow: Rect,
     val handoffConsumerId: String? = null,
+    val onWillDismiss: (() -> Unit)? = null,
     val onClosed: () -> Unit,
 )
 
@@ -67,10 +67,11 @@ fun FeedReelsHostOverlay() {
     FeedReelsExpandOverlay(
         visible = presentation != null,
         sourceRectInWindow = presentation?.sourceRectInWindow ?: Rect.Zero,
+        onWillDismiss = presentation?.onWillDismiss,
         onDismissed = {
             val closed = host.presentation?.onClosed
-            host.clear()
             closed?.invoke()
+            host.clear()
         },
     ) { collapse ->
         val session = presentation ?: return@FeedReelsExpandOverlay
@@ -84,22 +85,27 @@ fun FeedReelsHostOverlay() {
     }
 }
 
+private val expandSpring = spring<Float>(
+    dampingRatio = Spring.DampingRatioNoBouncy,
+    stiffness = Spring.StiffnessMediumLow,
+)
+
 /**
- * Feed → Reels en la misma ventana: Reels se escala desde el post (sin relayout).
- * No cubre la barra de estado (como IG). No usa `isImmersive` (eso es el peek).
+ * Feed → Reels: escala desde el post (graphicsLayer). No usa `isImmersive` (eso es el peek).
  */
 @Composable
 fun FeedReelsExpandOverlay(
     visible: Boolean,
     sourceRectInWindow: Rect,
     onDismissed: () -> Unit,
+    onWillDismiss: (() -> Unit)? = null,
     content: @Composable (collapse: () -> Unit) -> Unit,
 ) {
     if (!visible) return
 
     var overlayOrigin by remember { mutableStateOf<Offset?>(null) }
     val capturedSource = remember(visible) { sourceRectInWindow }
-    val from = remember(overlayOrigin) {
+    val from = remember(overlayOrigin, capturedSource) {
         val origin = overlayOrigin ?: return@remember null
         val local = Rect(
             capturedSource.left - origin.x,
@@ -112,26 +118,24 @@ fun FeedReelsExpandOverlay(
 
     val progress = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    var isDismissing by remember { mutableStateOf(false) }
+    LaunchedEffect(visible) {
+        if (visible) isDismissing = false
+    }
     LaunchedEffect(from) {
         if (from == null) return@LaunchedEffect
-        progress.animateTo(
-            1f,
-            spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessMediumLow,
-            ),
-        )
+        progress.snapTo(0f)
+        progress.animateTo(1f, expandSpring)
     }
 
-    val collapse: () -> Unit = {
+    val collapse: () -> Unit = collapse@{
+        if (isDismissing) return@collapse
+        isDismissing = true
+        onWillDismiss?.invoke()
         scope.launch {
-            progress.animateTo(
-                0f,
-                spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            )
+            if (from != null && progress.value > 0.01f) {
+                progress.animateTo(0f, expandSpring)
+            }
             onDismissed()
         }
     }
@@ -164,7 +168,6 @@ fun FeedReelsExpandOverlay(
                 .graphicsLayer {
                     if (originRect != null && size.width > 0f && size.height > 0f) {
                         transformOrigin = TransformOrigin(0f, 0f)
-                        // Ventana: de la card al fullscreen (puede ser no uniforme).
                         scaleX = lerp(originRect.width / size.width, 1f, t)
                         scaleY = lerp(originRect.height / size.height, 1f, t)
                         translationX = lerp(originRect.left, 0f, t)
@@ -177,7 +180,6 @@ fun FeedReelsExpandOverlay(
                 }
                 .background(Color.Black),
         ) {
-            // Contenido a escala uniforme (cover): el vídeo no se aplasta.
             Box(
                 Modifier
                     .fillMaxSize()

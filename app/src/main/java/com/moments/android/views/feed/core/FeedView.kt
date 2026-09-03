@@ -267,13 +267,9 @@ fun FeedView(
     }
 
     fun prefetchImages() {
-        // ≡ iOS prefetchImages: ImagePrefetch + VideoPreloader + VideoMomentsIndex (vía VM)
         val slice = viewModel.moments.take(12)
         viewModel.rebuildVideoMomentsIndex()
-        val imageUrls = slice
-            .flatMap { m -> m.visibleMediaItems.map { it.url } + listOfNotNull(m.profileImagePath) }
-            .filter { it.isNotBlank() }
-            .distinct()
+        val imageUrls = viewModel.imagePrefetchUrls(slice, maxMoments = 12)
         if (imageUrls.isNotEmpty()) ImagePrefetchManager.prefetch(imageUrls)
         val videoUrls = viewModel.videoPreloadUrls(slice, maxMoments = 6)
         if (videoUrls.isNotEmpty()) VideoPreloader.preloadAssets(videoUrls)
@@ -292,10 +288,11 @@ fun FeedView(
             firestoreService.loadSavedMoments(userId)
             viewModel.fetchMoments(scope, userId, preferred)
             viewModel.fetchUserData(scope, userId)
-            messagingViewModel.fetchConversations(userId)
             storyRingCoordinator.loadStoryUsers(scope, userId)
             prefetchImages()
             hasLoadedInitialData = true
+            delay(400)
+            messagingViewModel.fetchConversations(userId)
         }
     }
 
@@ -307,10 +304,11 @@ fun FeedView(
 
     suspend fun refreshFeed(userId: String) {
         viewModel.refreshMoments(userId)
-        notificationsViewModel.refreshNotifications()
-        messagingViewModel.fetchConversations(userId)
         storyRingCoordinator.loadStoryUsers(scope, userId, allowInstantCache = false)
         prefetchImages()
+        delay(400)
+        notificationsViewModel.refreshNotifications()
+        messagingViewModel.fetchConversations(userId)
     }
 
     suspend fun performManualRefresh(userId: String) {

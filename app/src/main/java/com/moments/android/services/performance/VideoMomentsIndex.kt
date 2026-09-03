@@ -69,10 +69,10 @@ object VideoMomentsIndex {
         _videoMoments.value = from.toVideoMoments()
     }
 
-    fun reelsStartIndex(momentId: String?): Int {
-        if (momentId == null) return 0
+    fun reelsStartIndex(momentId: String?): Int? {
+        if (momentId.isNullOrBlank()) return null
         val idx = _videoMoments.value.indexOfFirst { it.moment.id == momentId }
-        return if (idx >= 0) idx else 0
+        return idx.takeIf { it >= 0 }
     }
 }
 

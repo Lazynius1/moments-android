@@ -393,9 +393,11 @@ class ReelVideoPlayerManager {
     fun cleanup(releaseFromPool: Boolean = true) {
         val id = consumerId
         val shouldPreserve = id?.let { GlobalVideoManager.shouldPreserveSharedPlayer(it) } ?: false
-        teardownObserversOnly(pausePlayback = !shouldPreserve)
+        val handoffConsumer = id != null && VideoLayerLease.isHandoffConsumer(id)
+        val keepPlayback = shouldPreserve || handoffConsumer
+        teardownObserversOnly(pausePlayback = !keepPlayback)
 
-        val actuallyRelease = releaseFromPool && !shouldPreserve
+        val actuallyRelease = releaseFromPool && !keepPlayback
 
         if (id != null && actuallyRelease) {
             SharedVideoPlayerPool.release(id)

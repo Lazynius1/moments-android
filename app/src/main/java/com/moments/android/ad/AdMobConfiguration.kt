@@ -279,6 +279,13 @@ object AdMobConfiguration {
 
     fun getPreloadedNativeAd(): NativeAd? = preloadedNativeAd
 
+    /** Quita el preload sin destroy: el caller toma ownership. */
+    fun takePreloadedNativeAd(): NativeAd? {
+        val ad = preloadedNativeAd
+        preloadedNativeAd = null
+        return ad
+    }
+
     /** ≡ iOS `setPreloadedNativeAd(_:)`. */
     fun setPreloadedNativeAd(ad: NativeAd?) {
         if (ad === preloadedNativeAd) return
@@ -329,9 +336,8 @@ class NativeAdManager {
             return
         }
 
-        AdMobConfiguration.getPreloadedNativeAd()?.let { preloaded ->
+        AdMobConfiguration.takePreloadedNativeAd()?.let { preloaded ->
             swapAd(preloaded)
-            AdMobConfiguration.clearPreloadedNativeAd()
             _isLoading.value = false
             _hasError.value = false
             return
@@ -382,6 +388,118 @@ class NativeAdManager {
         loadedAd?.destroy()
         loadedAd = ad
         _nativeAd.value = ad
+    }
+}
+
+/**
+ * Pool del feed: máx. 2 cargas a la vez, caché por slot, primer request tras 400 ms.
+ * No relanza loadAd si el slot ya tiene anuncio, está cargando o falló.
+ */
+object FeedNativeAdPool {
+    data class Slot(
+        val nativeAd: NativeAd? = null,
+        val isLoading: Boolean = false,
+        val hasError: Boolean = false,
+    )
+
+    var didOfferConsentThisSession: Boolean = false
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val _slots = MutableStateFlow<Map<String, Slot>>(emptyMap())
+    val slots: StateFlow<Map<String, Slot>> = _slots.asStateFlow()
+
+    private const val MAX_IN_FLIGHT = 2
+    private var inFlight = 0
+    private val pending = ArrayDeque<String>()
+    private var firstLoadScheduled = false
+    private var firstLoadReady = false
+    private val loaders = mutableMapOf<String, AdLoader>()
+    private var hostActivity: java.lang.ref.WeakReference<Activity>? = null
+
+    fun slot(key: String): Slot = _slots.value[key] ?: Slot()
+
+    fun request(key: String, activity: Activity?) {
+        if (activity != null) hostActivity = java.lang.ref.WeakReference(activity)
+        val existing = _slots.value[key]
+        if (existing != null && (existing.nativeAd != null || existing.isLoading || existing.hasError)) {
+            return
+        }
+        if (!pending.contains(key)) pending.addLast(key)
+        if (!firstLoadScheduled) {
+            firstLoadScheduled = true
+            scope.launch {
+                kotlinx.coroutines.delay(400)
+                firstLoadReady = true
+                pump()
+            }
+            return
+        }
+        if (!firstLoadReady) return
+        pump()
+    }
+
+    fun pump() {
+        while (inFlight < MAX_IN_FLIGHT && pending.isNotEmpty()) {
+            val key = pending.removeFirst()
+            val existing = _slots.value[key]
+            if (existing?.nativeAd != null || existing?.isLoading == true) continue
+            startLoad(key)
+        }
+    }
+
+    private fun startLoad(key: String) {
+        if (!AdMobConfiguration.isInitialized.value) {
+            pending.addFirst(key)
+            scope.launch {
+                kotlinx.coroutines.delay(1_000)
+                pump()
+            }
+            return
+        }
+
+        inFlight += 1
+        updateSlot(key, Slot(isLoading = true))
+
+        AdMobConfiguration.takePreloadedNativeAd()?.let { preloaded ->
+            finish(key, preloaded, error = false)
+            return
+        }
+
+        val act = hostActivity?.get()
+        if (act == null) {
+            finish(key, null, error = true)
+            return
+        }
+
+        val adUnitId = AdMobConfiguration.getNativeAdUnitId()
+        val loader = AdLoader.Builder(act, adUnitId)
+            .forNativeAd { ad ->
+                finish(key, ad, error = false)
+            }
+            .withAdListener(object : AdListener() {
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    AppLog.debug { "AdMob pool failed: ${error.message}" }
+                    finish(key, null, error = true)
+                }
+            })
+            .withNativeAdOptions(AdMobConfiguration.createNativeAdOptions())
+            .build()
+        loaders[key] = loader
+        loader.loadAd(AdMobConfiguration.createAdRequest())
+    }
+
+    private val finishedKeys = mutableSetOf<String>()
+
+    private fun finish(key: String, ad: NativeAd?, error: Boolean) {
+        if (!finishedKeys.add(key)) return
+        loaders.remove(key)
+        inFlight = (inFlight - 1).coerceAtLeast(0)
+        updateSlot(key, Slot(nativeAd = ad, isLoading = false, hasError = error && ad == null))
+        pump()
+    }
+
+    private fun updateSlot(key: String, slot: Slot) {
+        _slots.value = _slots.value.toMutableMap().apply { put(key, slot) }
     }
 }
 

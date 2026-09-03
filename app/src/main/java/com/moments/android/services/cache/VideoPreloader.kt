@@ -3,9 +3,9 @@ package com.moments.android.services.cache
 import androidx.media3.common.MediaItem as ExoMediaItem
 import com.moments.android.models.Moment
 import com.moments.android.services.performance.PerformanceSignposts
+import com.moments.android.services.video.ReelPrebufferService
 import com.moments.android.services.video.VideoPlaybackSelector
 import com.moments.android.services.video.VideoPlaybackSource
-import java.net.URL
 import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -60,16 +60,24 @@ object VideoPreloader {
     fun preloadAssets(urls: List<String>) {
         PerformanceSignposts.event("VideoPreloadBatch")
         queue.execute {
+            var firstHls: String? = null
             for (urlString in urls.take(MAX_CACHE_SIZE)) {
                 if (cachedAsset(urlString) != null) continue
-                val local = PersistentVideoCache.cachedURL(urlString)
-                if (local != null) {
-                    setCachedAsset(ExoMediaItem.fromUri(local.absolutePath), urlString)
-                } else {
-                    val remote = runCatching { URL(urlString) }.getOrNull() ?: continue
-                    setCachedAsset(ExoMediaItem.fromUri(urlString), urlString)
-                    // Descargar para futuras sesiones
-                    PersistentVideoCache.downloadAndCache(remote)
+                val isHls = VideoPlaybackSelector.isHlsUrl(urlString)
+                if (!isHls) {
+                    val local = PersistentVideoCache.cachedURL(urlString)
+                    if (local != null) {
+                        setCachedAsset(ExoMediaItem.fromUri(local.absolutePath), urlString)
+                        continue
+                    }
+                }
+                setCachedAsset(ExoMediaItem.fromUri(urlString), urlString)
+                if (isHls && firstHls == null) firstHls = urlString
+            }
+            val warmUrl = firstHls
+            if (warmUrl != null) {
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    runCatching { ReelPrebufferService.prebuffer(warmUrl) }
                 }
             }
         }
@@ -77,15 +85,15 @@ object VideoPreloader {
 
     fun getPlayerItem(urlString: String): ExoMediaItem {
         cachedAsset(urlString)?.let { return it }
-        PersistentVideoCache.cachedURL(urlString)?.let {
-            return ExoMediaItem.fromUri(it.absolutePath)
+        if (!VideoPlaybackSelector.isHlsUrl(urlString)) {
+            PersistentVideoCache.cachedURL(urlString)?.let {
+                return ExoMediaItem.fromUri(it.absolutePath)
+            }
         }
         return createNewItem(urlString)
     }
 
     private fun createNewItem(urlString: String): ExoMediaItem {
-        val item = ExoMediaItem.fromUri(urlString)
-        runCatching { URL(urlString) }.getOrNull()?.let { PersistentVideoCache.downloadAndCache(it) }
-        return item
+        return ExoMediaItem.fromUri(urlString)
     }
 }

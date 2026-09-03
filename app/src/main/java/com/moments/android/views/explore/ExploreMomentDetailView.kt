@@ -8,6 +8,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,6 +52,8 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.ad.FeedAdPlacement
+import com.moments.android.ad.SmartNativeAdView
 import com.moments.android.coordinators.CoordinatorNavigationEvent
 import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.models.Moment
@@ -250,6 +253,13 @@ fun ExploreMomentDetailView(
 
     // iOS reelsVideos: moments.videoMoments
     val reelsVideos = remember(domainMoments) { domainMoments.toVideoMoments() }
+    val adAfterIndices = remember(feedMoments) {
+        FeedAdPlacement.indicesAfterWhichToShowAd(
+            momentIds = feedMoments.map { it.id },
+            minGap = 3,
+            maxGap = 5,
+        )
+    }
 
     LaunchedEffect(listState) {
         snapshotFlow {
@@ -340,46 +350,55 @@ fun ExploreMomentDetailView(
                 itemsIndexed(
                     feedMoments,
                     key = { _, m -> "${m.authorId}_${m.id}" },
-                ) { _, moment ->
-                    ScreenshotProtectedView(
-                        isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
-                        containsHardwareVideo = moment.hasHardwareVideo,
-                    ) {
-                        ModernPostCardView(
-                            moment = moment,
-                            availableHeight = feedCardHeightPx,
-                            onOpenProfile = { openUserProfile(moment.authorId) },
-                            onOpenHashtag = { tag ->
-                                selectedHashtag = if (tag.startsWith("#")) tag else "#$tag"
-                                showExploreWithHashtag = true
-                            },
-                            onOpenLocation = { name, coordinate ->
-                                selectedLocationName = name
-                                selectedLocationLat = coordinate?.latitude
-                                selectedLocationLng = coordinate?.longitude
-                                showingLocationMap = true
-                            },
-                            onOpenComments = { commentsMoment = moment },
-                            onShare = {
-                                contextMenuMoment = moment
-                                showContextMenu = true
-                            },
-                            onContextMenu = { tapped ->
-                                contextMenuMoment = tapped
-                                showContextMenu = true
-                            },
-                            reelsVideos = reelsVideos,
-                            onAuthorAvatarTap = { authorId, hasStory ->
-                                handleAuthorAvatarTap(authorId, hasStory)
-                            },
-                            onPeek = { url, ratio, pressing ->
-                                handlePeek(url, ratio, pressing, moment)
-                            },
-                            onTagTap = { userId -> openUserProfile(userId) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(feedCardHeight),
-                        )
+                ) { index, moment ->
+                    Column(Modifier.fillMaxWidth()) {
+                        ScreenshotProtectedView(
+                            isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
+                            containsHardwareVideo = moment.hasHardwareVideo,
+                        ) {
+                            ModernPostCardView(
+                                moment = moment,
+                                availableHeight = feedCardHeightPx,
+                                onOpenProfile = { openUserProfile(moment.authorId) },
+                                onOpenHashtag = { tag ->
+                                    selectedHashtag = if (tag.startsWith("#")) tag else "#$tag"
+                                    showExploreWithHashtag = true
+                                },
+                                onOpenLocation = { name, coordinate ->
+                                    selectedLocationName = name
+                                    selectedLocationLat = coordinate?.latitude
+                                    selectedLocationLng = coordinate?.longitude
+                                    showingLocationMap = true
+                                },
+                                onOpenComments = { commentsMoment = moment },
+                                onShare = {
+                                    contextMenuMoment = moment
+                                    showContextMenu = true
+                                },
+                                onContextMenu = { tapped ->
+                                    contextMenuMoment = tapped
+                                    showContextMenu = true
+                                },
+                                reelsVideos = reelsVideos,
+                                onAuthorAvatarTap = { authorId, hasStory ->
+                                    handleAuthorAvatarTap(authorId, hasStory)
+                                },
+                                onPeek = { url, ratio, pressing ->
+                                    handlePeek(url, ratio, pressing, moment)
+                                },
+                                onTagTap = { userId -> openUserProfile(userId) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(feedCardHeight),
+                            )
+                        }
+                        // iOS For You cadence. Not in Reels (aspect not always vertical).
+                        if (index in adAfterIndices) {
+                            SmartNativeAdView(
+                                slotId = "explore-${moment.id.ifBlank { "$index" }}",
+                                modifier = Modifier.padding(vertical = 4.dp),
+                            )
+                        }
                     }
                 }
             }

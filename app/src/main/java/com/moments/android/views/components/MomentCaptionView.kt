@@ -86,7 +86,7 @@ enum class MomentCaptionPresentationStyle {
 
 /** Port de `MomentCaptionText` — normalización para cards feed/reels. */
 object MomentCaptionText {
-    /** Estilo IG: colapsa saltos a espacios para que hashtags fluyan. */
+    /** Colapsa saltos a espacios para que hashtags fluyan. */
     fun flowing(content: String): String =
         content
             .replace(Regex("""\s*\n+\s*"""), " ")
@@ -231,7 +231,7 @@ fun MomentCaptionView(
     val hashtagColor = if (isMediaOverlay) Color.White else captionHashtagTextColor(isDark)
     val mentionColor = captionMentionTextColor
 
-    // Feed/Reels: flujo continuo (IG). Detail: respeta saltos del autor.
+    // Feed/Reels: flujo continuo. Detail: respeta saltos del autor.
     val cardContent = when (style) {
         MomentCaptionPresentationStyle.Feed,
         MomentCaptionPresentationStyle.Reels,

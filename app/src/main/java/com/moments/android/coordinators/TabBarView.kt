@@ -542,7 +542,7 @@ private fun RedNavigationBadge(modifier: Modifier = Modifier) {
 }
 
 /**
- * Tab bar docked estilo IG (full-width, sin labels).
+ * Tab bar docked (full-width, sin labels).
  * Edge-to-edge: [Surface] pinta bajo la gesture/nav bar; iconos en [navigationBarsPadding].
  * TODO(adaptive): NavigationSuiteScaffold / rail en tablet — skill `adaptive` + Nav3.
  */
@@ -601,7 +601,7 @@ private fun MomentsCustomTabBar(
                     inactiveColor = inactiveColor,
                     isMessages = true,
                     showBadge = showMessagesBadge,
-                    // Fill + puntito IG cuando hay no leídos (outline si no).
+                    // Fill + puntito cuando hay no leídos (outline si no).
                     messagesFilled = showMessagesBadge,
                     onClick = { onSelectTab(1) },
                 )

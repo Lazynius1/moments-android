@@ -95,7 +95,7 @@ import org.json.JSONArray
  *
  * Cableado iOS (`stickerview.handleCatalogSelection`):
  * - **Detail (sí se muestran):** Mention, Link (+ Location aparte).
- * - **Catálogo = `insertInstantCategory` (placeholders inline IG):**
+ * - **Catálogo = `insertInstantCategory` (placeholders inline):**
  *   Hashtag, Poll, Question, Quiz, Countdown, EmojiSlider.
  *   Los `Modern*InputView` de esos tipos viven en el switch `.detail` pero el
  *   catálogo no abre ese modo — se portan aquí por paridad de archivo / uso futuro.

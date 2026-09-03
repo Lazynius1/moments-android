@@ -7,7 +7,7 @@ import coil.memory.MemoryCache
 import coil.request.CachePolicy
 
 /**
- * ImageLoader de app: límites de RAM/disco para feed tipo IG.
+ * ImageLoader de app: límites de RAM/disco para el feed.
  * MomentsApplication implementa ImageLoaderFactory y delega aquí.
  */
 object MomentsImageLoader {

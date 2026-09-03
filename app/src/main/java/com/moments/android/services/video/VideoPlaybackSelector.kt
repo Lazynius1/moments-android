@@ -69,6 +69,44 @@ object VideoPlaybackSelector {
         return null
     }
 
+    fun isHlsUrl(raw: String): Boolean = raw.lowercase().contains(".m3u8")
+
+    /** MP4 / HLS / contenedores de vídeo: no van a Coil. */
+    fun isLikelyVideoUrl(raw: String): Boolean {
+        val s = raw.lowercase()
+        return isHlsUrl(s) ||
+            s.contains(".mp4") ||
+            s.contains(".mov") ||
+            s.contains(".webm") ||
+            s.contains(".m4v")
+    }
+
+    /** Prefetch de feed: foto = URL de imagen; vídeo = póster. Nunca `.mp4` / `.m3u8`. */
+    fun imagePrefetchUrlStrings(from: List<Moment>, maxMoments: Int = 8): List<String> {
+        val collected = mutableListOf<String>()
+        val seen = mutableSetOf<String>()
+        for (moment in from.take(maxMoments)) {
+            val item = moment.primaryVisibleMediaItem
+            val candidates: List<String?> = when {
+                item == null -> listOf(moment.imagePath, moment.thumbnailUrl)
+                item.type == MediaItem.MediaType.IMAGE -> listOf(item.url, moment.imagePath, moment.thumbnailUrl)
+                else -> listOf(
+                    posterUrlString(forItem = item, moment = moment),
+                    moment.imagePath,
+                    moment.thumbnailUrl,
+                )
+            }
+            for (raw in candidates) {
+                val normalized = normalizedUrlString(raw) ?: continue
+                if (isLikelyVideoUrl(normalized)) continue
+                if (!seen.add(normalized)) continue
+                collected.add(normalized)
+                break
+            }
+        }
+        return collected
+    }
+
     fun preloadUrlStrings(from: List<Moment>, maxMoments: Int = 6): List<String> {
         val collected = mutableListOf<String>()
         val seen = mutableSetOf<String>()

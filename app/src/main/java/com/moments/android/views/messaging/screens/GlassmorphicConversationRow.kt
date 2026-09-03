@@ -204,7 +204,7 @@ fun GlassmorphicConversationRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (showsUnavailablePreview) {
-            // ≡ IG / iOS: sin historia → abrir conversación
+            // Sin historia → abrir conversación
             Box(Modifier.clickable(onClick = onTap)) {
                 ProfileUnavailableAvatar(size = 56.dp)
             }
@@ -219,7 +219,7 @@ fun GlassmorphicConversationRow(
                     if (hasStory && !isBlockedByCurrentUser) {
                         onOpenStory(conversation.otherParticipantId)
                     } else {
-                        // ≡ IG / iOS: sin historia → abrir el chat
+                        // Sin historia → abrir el chat
                         onTap()
                     }
                 },

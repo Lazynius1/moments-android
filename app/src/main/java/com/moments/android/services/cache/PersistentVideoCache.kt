@@ -2,6 +2,7 @@ package com.moments.android.services.cache
 
 import android.content.Context
 import com.moments.android.services.network.NetworkMonitor
+import com.moments.android.services.video.VideoPlaybackSelector
 import java.io.File
 import java.net.URL
 import java.security.MessageDigest
@@ -48,6 +49,8 @@ object PersistentVideoCache {
     }
 
     fun downloadAndCache(url: URL) {
+        // HLS se streamea. Nunca persistir el master como `.mp4`.
+        if (VideoPlaybackSelector.isHlsUrl(url.toString())) return
         val key = url.toString()
         if (cachedURL(key) != null) return
         // iOS URLSession falla soft; aquí uncaught UnknownHostException mataba el proceso offline.

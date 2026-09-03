@@ -6,6 +6,7 @@ import coil.request.Disposable
 import coil.request.ErrorResult
 import coil.request.ImageRequest
 import coil.request.SuccessResult
+import com.moments.android.services.video.VideoPlaybackSelector
 import java.net.URL
 import java.util.Collections
 
@@ -32,12 +33,14 @@ object ImagePrefetchManager {
         if (urls.isEmpty()) return
 
         val urlsToProcess: List<URL>
+        val imageUrls = urls.filter { !VideoPlaybackSelector.isLikelyVideoUrl(it.toString()) }
+        if (imageUrls.isEmpty()) return
         synchronized(currentlyPrefetchingUrls) {
             val availableSlots = (MAX_IN_FLIGHT_URLS - currentlyPrefetchingUrls.size).coerceAtLeast(0)
             if (availableSlots == 0) {
                 urlsToProcess = emptyList()
             } else {
-                val newUrls = urls.filter { !currentlyPrefetchingUrls.contains(it.toString()) }
+                val newUrls = imageUrls.filter { !currentlyPrefetchingUrls.contains(it.toString()) }
                 urlsToProcess = newUrls.take(availableSlots)
                 urlsToProcess.forEach { currentlyPrefetchingUrls.add(it.toString()) }
             }

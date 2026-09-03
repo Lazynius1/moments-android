@@ -165,16 +165,8 @@ class FeedViewModel {
     }
 
     private fun preloadFeedVideos(list: List<FeedMoment>) {
-        val urls = list.asSequence()
-            .flatMap { it.visibleMediaItems.asSequence() }
-            .filter { it.type.equals("video", ignoreCase = true) }
-            .map { it.url }
-            .filter { it.isNotBlank() }
-            .distinct()
-            .take(12)
-            .toList()
+        val urls = videoPreloadUrls(list, maxMoments = 6)
         if (urls.isNotEmpty()) VideoPreloader.preloadAssets(urls)
-        // VideoMomentsIndex espera Moment; reconstrucción vía conversión ligera
         VideoMomentsIndex.rebuild(list.map { it.toIndexMoment() })
     }
 
@@ -189,6 +181,9 @@ class FeedViewModel {
     /** iOS VideoPlaybackSelector.shared.preloadURLStrings(from:maxMoments:) */
     fun videoPreloadUrls(from: List<FeedMoment>, maxMoments: Int = 4): List<String> =
         VideoPlaybackSelector.preloadUrlStrings(from.map { it.toIndexMoment() }, maxMoments)
+
+    fun imagePrefetchUrls(from: List<FeedMoment>, maxMoments: Int = 8): List<String> =
+        VideoPlaybackSelector.imagePrefetchUrlStrings(from.map { it.toIndexMoment() }, maxMoments)
 
     /** Port 1:1 de `fetchMoments(userId:feedType:)`. */
     fun fetchMoments(scope: CoroutineScope, userId: String, feedType: FeedType? = null) {
@@ -392,7 +387,7 @@ class FeedViewModel {
     private suspend fun fetchFollowingMoments(userId: String) {
         val mutedUserIds = resolveMutedUserIds(userId)
         cachedFollowingIds = resolveFollowingIds(userId)
-        val result = BackendFeedService.fetchFeedPage(feedType = "following", limit = 40)
+        val result = BackendFeedService.fetchFeedPage(feedType = "following", limit = 20)
         if (result != null) {
             val finalMoments = sortMomentsChronologically(
                 result.moments
@@ -443,7 +438,7 @@ class FeedViewModel {
     private suspend fun fetchForYouMoments(userId: String) {
         val mutedUserIds = resolveMutedUserIds(userId)
         cachedFollowingIds = resolveFollowingIds(userId)
-        val result = BackendFeedService.fetchFeedPage(feedType = "forYou", limit = 60)
+        val result = BackendFeedService.fetchFeedPage(feedType = "forYou", limit = 20)
         if (result != null) {
             val finalMoments = applyForYouClientTuning(
                 moments = result.moments
@@ -556,7 +551,7 @@ class FeedViewModel {
             viewerId = userId,
             preserveOrder = false,
         )
-        return if (isInitialLoad) tuned.take(60) else tuned
+        return if (isInitialLoad) tuned.take(20) else tuned
     }
 
     private suspend fun fetchMoreForYouMoments(userId: String) {
@@ -1050,13 +1045,13 @@ class FeedViewModel {
 
         val mapped = fetched.map { it.toFeedMoment() }.filter { it.isArchived != true }
         val tuned: List<FeedMoment> = when (feedType) {
-            FeedType.Following -> sortMomentsChronologically(mapped, limit = 40)
+            FeedType.Following -> sortMomentsChronologically(mapped, limit = 20)
             FeedType.ForYou -> applyForYouClientTuning(
                 moments = mapped,
                 followingIds = cachedFollowingIds,
                 viewerId = userId,
                 preserveOrder = false,
-            ).take(60)
+            ).take(20)
         }
 
         val filtered = filterMomentsForPrivacy(userId, tuned)

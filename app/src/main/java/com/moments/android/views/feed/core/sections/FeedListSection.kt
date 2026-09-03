@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import com.moments.android.ad.FeedAdPlacement
 import com.moments.android.ad.SmartNativeAdView
 import com.moments.android.coordinators.CoordinatorNavigationEvent
 import com.moments.android.coordinators.NavigationEventBus
@@ -191,6 +192,14 @@ fun FeedListSection(
     val feedReelsVideos = remember(viewModel.moments) {
         viewModel.reelsVideosForFeed()
     }
+    val adAfterIndices = remember(viewModel.moments, selectedFeedType) {
+        val (minGap, maxGap) = if (selectedFeedType == FeedType.ForYou) 3 to 5 else 5 to 7
+        FeedAdPlacement.indicesAfterWhichToShowAd(
+            momentIds = viewModel.moments.map { it.id },
+            minGap = minGap,
+            maxGap = maxGap,
+        )
+    }
 
     LaunchedEffect(Unit) {
         NavigationEventBus.events.collectLatest { event ->
@@ -215,10 +224,7 @@ fun FeedListSection(
         if (next >= viewModel.moments.size) return
         val end = minOf(next + 8, viewModel.moments.size)
         val upcoming = viewModel.moments.subList(next, end)
-        val imageUrls = upcoming.mapNotNull { m ->
-            // iOS: moment.mediaItems?.first?.url
-            m.mediaItems.firstOrNull()?.url?.takeIf { it.isNotBlank() }
-        }
+        val imageUrls = viewModel.imagePrefetchUrls(upcoming, maxMoments = 8)
         if (imageUrls.isNotEmpty()) ImagePrefetchManager.prefetch(imageUrls)
         val videoUrls = viewModel.videoPreloadUrls(upcoming, maxMoments = 4)
         if (videoUrls.isNotEmpty()) VideoPreloader.preloadAssets(videoUrls)
@@ -255,7 +261,6 @@ fun FeedListSection(
                         },
                     ) { index, moment ->
                         val isProtected = (moment.audience?.lowercase() ?: "") != "everyone"
-                        val adInterval = if (selectedFeedType == FeedType.ForYou) 3 else 5
                         val isHiddenForPreview =
                             !hiddenMomentId.isNullOrEmpty() && moment.id == hiddenMomentId
                         val hideAlpha by animateFloatAsState(
@@ -305,8 +310,11 @@ fun FeedListSection(
                                     )
                                 }
                             }
-                            if ((index + 1) % adInterval == 0 && index < viewModel.moments.lastIndex) {
-                                SmartNativeAdView(modifier = Modifier.padding(vertical = 4.dp))
+                            if (index in adAfterIndices) {
+                                SmartNativeAdView(
+                                    slotId = "feed-${moment.id.ifBlank { "$index" }}",
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                )
                             }
                         }
                     }

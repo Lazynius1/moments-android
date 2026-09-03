@@ -47,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -135,6 +136,8 @@ fun ModernVideoPlayer(
     val warmingMomentId by FeedVisibilityCoordinator.warmingVideoMomentIdFlow.collectAsState()
     val soundEnabled by GlobalVideoManager.userHasEnabledSoundInSession.collectAsState()
     val isPlaybackHeld by GlobalVideoManager.isPlaybackHeld.collectAsState()
+    val leaseRev by VideoLayerLease.revision.collectAsState()
+    val isFeedAsleep = remember(videoId, leaseRev) { VideoLayerLease.isFeedAsleep(videoId) }
 
     // Sync mute UI con sesión si el manager aún no está registrado
     LaunchedEffect(soundEnabled) {
@@ -400,12 +403,15 @@ fun ModernVideoPlayer(
                 onFirstFrameRendered = { hasRenderedFirstFrame = true },
                 modifier = Modifier
                     .fillMaxSize()
+                    .alpha(if (isFeedAsleep) 0f else 1f)
                     .clip(RoundedCornerShape(0.dp)),
             )
             VideoPosterOverlay(
                 posterUrl = posterUrl,
-                isReadyToPlay = GlobalVideoManager.shouldPreserveSharedPlayer(videoId) ||
-                    (playerManager.isReadyToPlay && hasRenderedFirstFrame),
+                isReadyToPlay = !isFeedAsleep && (
+                    GlobalVideoManager.shouldPreserveSharedPlayer(videoId) ||
+                        (playerManager.isReadyToPlay && hasRenderedFirstFrame)
+                ),
                 contentScale = contentScale,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -787,7 +793,8 @@ private fun applyLayerLease(
     if (VideoLayerLease.mayAttach(role, consumerId)) {
         VideoPlayerViewHandoff.attach(view, player, role, consumerId)
     } else if (view.player != null) {
-        view.player = null
+        val asleep = role == VideoLayerRole.Feed && VideoLayerLease.isFeedAsleep(consumerId)
+        if (!asleep) view.player = null
     }
 }
 
@@ -1051,7 +1058,12 @@ class VideoPlayerManager : RegisteredVideoPlayer {
                     }
                     Player.STATE_ENDED -> {
                         val id = consumerId
-                        if (id != null && GlobalVideoManager.shouldPreserveSharedPlayer(id)) {
+                        if (id != null && (
+                                GlobalVideoManager.shouldPreserveSharedPlayer(id) ||
+                                    VideoLayerLease.isFeedAsleep(id) ||
+                                    VideoLayerLease.suppressesFeedPlaybackFinished(id)
+                            )
+                        ) {
                             return
                         }
                         isPlaying = false
@@ -1119,8 +1131,16 @@ class VideoPlayerManager : RegisteredVideoPlayer {
 
     override fun resumeVideo() {
         if (hasFinishedPlayback) return
-        val exo = player ?: return
-        exo.play()
+        var exo = player
+        val id = consumerId
+        if (exo == null && !id.isNullOrBlank()) {
+            exo = runCatching { SharedVideoPlayerPool.player(id) }.getOrNull()
+            if (exo != null) {
+                player = exo
+            }
+        }
+        val active = exo ?: return
+        active.play()
         isPlaying = true
     }
 

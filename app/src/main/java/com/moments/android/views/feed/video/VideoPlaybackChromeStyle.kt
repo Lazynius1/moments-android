@@ -121,7 +121,7 @@ fun SocialVideoPausedControls(
     }
 }
 
-/** Oscurece solo el vídeo del post al terminar, como Instagram. */
+/** Oscurece solo el vídeo del post al terminar. */
 @Composable
 fun FeedVideoEndedOverlay(
     onWatchAgain: () -> Unit,

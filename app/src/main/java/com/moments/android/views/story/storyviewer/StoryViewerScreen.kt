@@ -938,7 +938,7 @@ fun StoryViewerScreen(
             val bottomChromeHeight = with(density) {
                 (screenH - bottomInset - captureRect.bottom).coerceAtLeast(0f).toDp()
             }
-            // IG-like: encima de nav + buffer (~25dp). Antes 8dp quedaba demasiado pegado.
+            // Encima de nav + buffer (~25dp). Antes 8dp quedaba demasiado pegado.
             val replyBottomPadding = when {
                 isKeyboardVisible -> 6.dp
                 adaptiveWindow.usesLargeStoryLayout -> 8.dp
@@ -1353,7 +1353,7 @@ fun StoryViewerScreen(
                         )
                     }
                 } else {
-                    // IG-like height: encima de nav bars + gap corto (no +25 / mid-gap)
+                    // Encima de nav bars + gap corto (no +25 / mid-gap)
                     Column(
                         Modifier
                             .align(Alignment.BottomCenter)

@@ -164,7 +164,7 @@ object ProfileGridHeroLayout {
     const val retractFadeStart = 0.74f
     /** Margen vertical del stack card+menú (pts iOS → dp). */
     const val peekStackVerticalMarginDp = 20f
-    /** Media mínima al encoger el hero para que quepa el menú (estilo IG). */
+    /** Media mínima al encoger el hero para que quepa el menú. */
     const val peekMinMediaHeightDp = 120f
 
     /** ≡ Animation.smooth — aproximación Compose. */
@@ -251,7 +251,7 @@ object ProfileGridHeroLayout {
         var height = peekCardHeight(width, moment.aspectRatio, density)
         var stackHeight = height + spacing + menuHeight
 
-        // Si card+menú no caben, encoger ancho/altura: el menú gana (como IG).
+        // Si card+menú no caben, encoger ancho/altura: el menú gana.
         if (stackHeight > availableHeight) {
             val maxCardHeight = max(
                 availableHeight - spacing - menuHeight,
@@ -337,7 +337,7 @@ class ProfileGridHeroTransitionCoordinator {
     var menuKind by mutableStateOf(ProfileGridHeroMenuKind.OWNER); private set
     /** true = lift 460ms, false = dismiss 310ms. */
     var peekAnimatingOpen by mutableStateOf(true); private set
-    /** Snapshot pixelado del perfil (estilo IG) mientras el menú está abierto. */
+    /** Snapshot pixelado del perfil mientras el menú está abierto. */
     var peekBackdrop by mutableStateOf<ImageBitmap?>(null); private set
     /** Captura sincrónica del root antes de pintar el overlay. */
     var capturePeekBackdrop: (() -> ImageBitmap?)? = null
@@ -1216,11 +1216,11 @@ fun Modifier.profileGridLiftedSource(
 }
 
 /**
- * Fondo pixelado estilo IG para el peek del grid:
+ * Fondo pixelado para el peek del grid:
  * downscale sin filtro + upscale → bloques, luego tinte oscuro en la UI.
  */
 internal object ProfileGridHeroPixelate {
-    /** Tamaño de bloque en px de pantalla (~IG). */
+    /** Tamaño de bloque en px de pantalla. */
     private const val BLOCK_PX = 22
 
     fun captureFrom(view: View): ImageBitmap? {
