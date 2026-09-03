@@ -627,6 +627,9 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="user_profile_unfollow_confirm_title">Ne plus suivre?</string>
     <string name="user_profile_unfollow_confirm_message">Vous pourrez suivre ce profil à nouveau quand vous le voudrez.</string>
     <string name="user_profile_unfollow_confirm_action">Ne plus suivre</string>
+    <string name="user_profile_cancel_request_confirm_title">Annuler la demande ?</string>
+    <string name="user_profile_cancel_request_confirm_message">Votre demande de suivi sera retirée.</string>
+    <string name="user_profile_cancel_request_confirm_action">Annuler la demande</string>
     <string name="user_profile_blocked">Bloqué</string>
 
     <!-- modernComments (iOS ModernCommentsView) -->

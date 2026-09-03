@@ -550,7 +550,6 @@ fun ModernPostCardView(
     val firestore = remember { FirestoreService() }
     var followState by remember(moment.authorId) { mutableStateOf(FollowButtonState.CAN_FOLLOW) }
     var followLoading by remember { mutableStateOf(false) }
-    var showUnfollowConfirm by remember { mutableStateOf(false) }
     var isImmersive by remember { mutableStateOf(false) }
     var showTags by remember { mutableStateOf(false) }
     var currentImageIndex by remember { mutableStateOf(0) }
@@ -687,7 +686,7 @@ fun ModernPostCardView(
         if (!followState.isActionable) return
         val previous = followState
         val optimistic = when (previous) {
-            FollowButtonState.FOLLOWING -> FollowButtonState.CAN_FOLLOW
+            FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> FollowButtonState.CAN_FOLLOW
             FollowButtonState.CAN_REQUEST_FOLLOW -> FollowButtonState.REQUEST_PENDING_CANCELLABLE
             FollowButtonState.REQUEST_PENDING_CANCELLABLE -> FollowButtonState.CAN_REQUEST_FOLLOW
             FollowButtonState.CAN_FOLLOW -> FollowButtonState.FOLLOWING
@@ -699,7 +698,7 @@ fun ModernPostCardView(
             FollowStateStore.setState(optimistic, moment.authorId)
             val error = runCatching {
                 when (previous) {
-                    FollowButtonState.FOLLOWING -> firestore.unfollowUser(uid, moment.authorId)
+                    FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> firestore.unfollowUser(uid, moment.authorId)
                     FollowButtonState.REQUEST_PENDING_CANCELLABLE ->
                         firestore.cancelFollowRequest(uid, moment.authorId)
                     else -> firestore.followUser(uid, moment.authorId)
@@ -711,29 +710,6 @@ fun ModernPostCardView(
                 FollowStateStore.setState(previous, moment.authorId)
             }
         }
-    }
-
-    if (showUnfollowConfirm) {
-        AlertDialog(
-            onDismissRequest = { showUnfollowConfirm = false },
-            title = { Text(stringResource(R.string.user_profile_unfollow_confirm_title)) },
-            text = { Text(stringResource(R.string.user_profile_unfollow_confirm_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showUnfollowConfirm = false
-                        performFollowToggle()
-                    },
-                ) {
-                    Text(stringResource(R.string.user_profile_unfollow_confirm_action), color = Color.Red)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showUnfollowConfirm = false }) {
-                    Text(stringResource(R.string.feed_actions_cancel))
-                }
-            },
-        )
     }
 
     Column(
@@ -751,13 +727,7 @@ fun ModernPostCardView(
                 showFollow = showFollow,
                 followState = followState,
                 followLoading = followLoading,
-                onFollowClick = {
-                    if (followState == FollowButtonState.FOLLOWING) {
-                        showUnfollowConfirm = true
-                    } else {
-                        performFollowToggle()
-                    }
-                },
+                onFollowClick = { performFollowToggle() },
                 onOpenProfile = onOpenProfile,
                 onOpenLocation = onOpenLocation,
                 onAuthorAvatarTap = { hasStory ->

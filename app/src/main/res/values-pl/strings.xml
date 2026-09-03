@@ -726,6 +726,9 @@
     <string name="user_profile_unfollow_confirm_title">Przestać obserwować?</string>
     <string name="user_profile_unfollow_confirm_message">Możesz ponownie obserwować ten profil, kiedy tylko zechcesz.</string>
     <string name="user_profile_unfollow_confirm_action">Przestań obserwować</string>
+    <string name="user_profile_cancel_request_confirm_title">Anulować prośbę?</string>
+    <string name="user_profile_cancel_request_confirm_message">Twoja prośba o obserwowanie zostanie wycofana.</string>
+    <string name="user_profile_cancel_request_confirm_action">Anuluj prośbę</string>
     <string name="user_profile_blocked">Zablokowano</string>
     <!-- Paridad iOS contextMenu.* / hiddenLayers.metrics.* -->
     <string name="context_menu_edit_moment">Edytuj moment</string>

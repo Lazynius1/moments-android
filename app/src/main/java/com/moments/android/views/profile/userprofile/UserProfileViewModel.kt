@@ -114,7 +114,7 @@ class UserProfileViewModel(
         if (changedUserId == userId) {
             viewModelScope.launch {
                 followButtonState = state
-                isFollowing = state == FollowButtonState.FOLLOWING
+                isFollowing = state.isFollowingOrMutual
             }
         }
     }
@@ -437,12 +437,12 @@ class UserProfileViewModel(
         viewModelScope.launch {
             FollowStateStore.state(userId)?.let { cached ->
                 followButtonState = cached
-                isFollowing = cached == FollowButtonState.FOLLOWING
+                isFollowing = cached.isFollowingOrMutual
             }
             val state = PrivacyService.getFollowButtonState(current, userId)
             val reconciled = FollowStateStore.reconciledState(state, userId)
             followButtonState = reconciled
-            isFollowing = reconciled == FollowButtonState.FOLLOWING
+            isFollowing = reconciled.isFollowingOrMutual
             FollowStateStore.setState(reconciled, userId)
         }
     }
@@ -619,7 +619,7 @@ class UserProfileViewModel(
     /** Conveniencia para el botón principal: despacha follow/unfollow/cancel según el estado actual. */
     fun toggleFollow() {
         when (followButtonState) {
-            FollowButtonState.FOLLOWING -> unfollowUser(userId)
+            FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> unfollowUser(userId)
             FollowButtonState.REQUEST_PENDING_CANCELLABLE, FollowButtonState.REQUEST_PENDING -> cancelFollowRequest(userId)
             FollowButtonState.CAN_FOLLOW, FollowButtonState.CAN_REQUEST_FOLLOW -> followUser(userId)
             else -> Unit

@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import com.moments.android.views.components.ModernFollowButton
+import com.moments.android.views.components.ModernFollowButtonStyle
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -221,12 +223,10 @@ fun FollowButtonForLocation(
     targetUserId: String,
     modifier: Modifier = Modifier,
 ) {
-    val colors = rememberAdaptiveColors()
     val scope = rememberCoroutineScope()
     val firestore = remember { FirestoreService() }
     var followButtonState by remember { mutableStateOf(FollowButtonState.CAN_FOLLOW) }
     var isLoading by remember { mutableStateOf(false) }
-    var showingUnfollowConfirmation by remember { mutableStateOf(false) }
 
     fun checkFollowStatus() {
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
@@ -245,7 +245,7 @@ fun FollowButtonForLocation(
         scope.launch {
             runCatching {
                 when (followButtonState) {
-                    FollowButtonState.FOLLOWING -> {
+                    FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> {
                         firestore.unfollowUser(currentUserId, targetUserId)
                         FollowButtonState.CAN_FOLLOW
                     }
@@ -280,92 +280,13 @@ fun FollowButtonForLocation(
         onDispose { FollowStateStore.removeListener(listener) }
     }
 
-    val isPassive = followButtonState == FollowButtonState.REQUEST_PENDING
-    Row(
-        modifier
-            .graphicsLayer {
-                alpha = if (isPassive) 0.78f else 1f
-                scaleX = if (isLoading) 0.95f else 1f
-                scaleY = scaleX
-            }
-            .momentsChromeGlass(RoundedCornerShape(14.dp), interactive = followButtonState.isActionable)
-            .clickable(
-                enabled = !isLoading && followButtonState.isActionable,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) {
-                if (followButtonState == FollowButtonState.FOLLOWING) {
-                    showingUnfollowConfirmation = true
-                } else {
-                    performFollowToggle()
-                }
-            }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (isLoading) {
-            MomentsCircularProgressIndicator(
-                modifier = Modifier.size(12.dp),
-                strokeWidth = 1.5.dp,
-            )
-        } else {
-            Icon(
-                followIcon(followButtonState),
-                contentDescription = null,
-                tint = colors.primary,
-                modifier = Modifier.size(10.dp),
-            )
-        }
-        Text(
-            followTitle(followButtonState),
-            color = colors.primary,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 11.sp,
-        )
-    }
-
-    if (showingUnfollowConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showingUnfollowConfirmation = false },
-            title = { Text(stringResource(R.string.user_profile_unfollow_confirm_title)) },
-            text = { Text(stringResource(R.string.user_profile_unfollow_confirm_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showingUnfollowConfirmation = false
-                        performFollowToggle()
-                    },
-                ) {
-                    Text(stringResource(R.string.user_profile_unfollow_confirm_action), color = Color.Red)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showingUnfollowConfirmation = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
-    }
-}
-
-@Composable
-private fun followTitle(state: FollowButtonState): String = when (state) {
-    FollowButtonState.FOLLOWING -> stringResource(R.string.user_profile_following)
-    FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
-    FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
-    FollowButtonState.REQUEST_PENDING_CANCELLABLE -> stringResource(R.string.feed_follow_cancel_request)
-    FollowButtonState.BLOCKED -> stringResource(R.string.explore_button_blocked)
-    else -> stringResource(R.string.user_profile_follow)
-}
-
-private fun followIcon(state: FollowButtonState): ImageVector = when (state) {
-    FollowButtonState.FOLLOWING -> Icons.Filled.Person
-    FollowButtonState.CAN_REQUEST_FOLLOW -> Icons.Filled.PersonAdd
-    FollowButtonState.REQUEST_PENDING -> Icons.Filled.AccessTime
-    FollowButtonState.REQUEST_PENDING_CANCELLABLE -> Icons.Filled.Close
-    FollowButtonState.BLOCKED -> Icons.Filled.Close
-    else -> Icons.Filled.PersonAdd
+    ModernFollowButton(
+        state = followButtonState,
+        isLoading = isLoading,
+        onClick = { performFollowToggle() },
+        style = ModernFollowButtonStyle.COMPACT,
+        modifier = modifier,
+    )
 }
 
 /** ≡ iOS `LocationCommentRow`. */

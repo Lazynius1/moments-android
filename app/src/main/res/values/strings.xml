@@ -749,6 +749,9 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="user_profile_unfollow_confirm_title">Unfollow?</string>
     <string name="user_profile_unfollow_confirm_message">You can follow this profile again whenever you want.</string>
     <string name="user_profile_unfollow_confirm_action">Unfollow</string>
+    <string name="user_profile_cancel_request_confirm_title">Cancel Request?</string>
+    <string name="user_profile_cancel_request_confirm_message">Your follow request will be withdrawn.</string>
+    <string name="user_profile_cancel_request_confirm_action">Cancel Request</string>
     <string name="user_profile_blocked">Blocked</string>
     <!-- Paridad iOS contextMenu.* / hiddenLayers.metrics.* -->
     <string name="context_menu_edit_moment">Edit moment</string>

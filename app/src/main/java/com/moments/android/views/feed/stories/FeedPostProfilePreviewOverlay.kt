@@ -517,7 +517,6 @@ private fun FeedPostProfilePreviewCard(
                     isLoading = false,
                     onClick = { onFollow(viewModel) },
                     style = ModernFollowButtonStyle.COMPACT,
-                    isMutual = viewModel.isMutualRelationship,
                 )
             }
         }

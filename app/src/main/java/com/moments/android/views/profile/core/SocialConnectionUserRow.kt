@@ -155,7 +155,6 @@ fun SocialConnectionUserRow(
     val scope = rememberCoroutineScope()
     var followState by remember(user.id) { mutableStateOf(viewModel.relationshipState(user.id)) }
     var isFollowLoading by remember { mutableStateOf(false) }
-    var showUnfollowConfirmation by remember { mutableStateOf(false) }
     var showRemoveConfirmation by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
     var isPressed by remember { mutableStateOf(false) }
@@ -219,7 +218,10 @@ fun SocialConnectionUserRow(
     fun performRelationshipAction() {
         if (isFollowLoading) return
         when (followState) {
-            FollowButtonState.FOLLOWING -> showUnfollowConfirmation = true
+            FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> {
+                viewModel.unfollowUser(user.id)
+                viewModel.prefetchRelationshipState(user.id)
+            }
             FollowButtonState.CAN_FOLLOW, FollowButtonState.CAN_REQUEST_FOLLOW -> performFollow()
             FollowButtonState.REQUEST_PENDING_CANCELLABLE -> {
                 viewModel.cancelFollowRequest(user.id)
@@ -242,7 +244,7 @@ fun SocialConnectionUserRow(
     ) {
         MutualAwareAvatar(
             userId = user.id,
-            isMutual = isMutual,
+            isMutual = isMutual && !supportsRelationship,
             primary = primary,
             dark = dark,
             onTap = ::handleAvatarTap,
@@ -380,27 +382,6 @@ fun SocialConnectionUserRow(
         }
     }
 
-    if (showUnfollowConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showUnfollowConfirmation = false },
-            title = { Text(stringResource(R.string.social_connection_unfollow_title)) },
-            text = { Text(stringResource(R.string.social_connection_unfollow_message)) },
-            dismissButton = {
-                TextButton({ showUnfollowConfirmation = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-            confirmButton = {
-                TextButton({
-                    showUnfollowConfirmation = false
-                    viewModel.unfollowUser(user.id)
-                    viewModel.prefetchRelationshipState(user.id)
-                }) {
-                    Text(stringResource(R.string.social_connection_unfollow_action), color = Color.Red)
-                }
-            },
-        )
-    }
     if (showRemoveConfirmation) {
         AlertDialog(
             onDismissRequest = { showRemoveConfirmation = false },

@@ -726,6 +726,9 @@
     <string name="user_profile_unfollow_confirm_title">Berhenti mengikuti?</string>
     <string name="user_profile_unfollow_confirm_message">Kamu bisa mengikuti profil ini lagi kapan saja.</string>
     <string name="user_profile_unfollow_confirm_action">Berhenti mengikuti</string>
+    <string name="user_profile_cancel_request_confirm_title">Batalkan permintaan?</string>
+    <string name="user_profile_cancel_request_confirm_message">Permintaan mengikuti kamu akan ditarik.</string>
+    <string name="user_profile_cancel_request_confirm_action">Batalkan permintaan</string>
     <string name="user_profile_blocked">Diblokir</string>
     <!-- Paridad iOS contextMenu.* / hiddenLayers.metrics.* -->
     <string name="context_menu_edit_moment">Edit momen</string>

@@ -6,16 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.PersonOff
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -28,15 +18,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
-import com.moments.android.R
-import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.views.components.ModernFollowButton
+import com.moments.android.views.components.ModernFollowButtonStyle
 import com.moments.android.models.MomentsNotification
 import com.moments.android.notifications.core.NotificationGroup
 import com.moments.android.notifications.core.NotificationsViewModel
@@ -97,12 +85,7 @@ object EnhancedNotificationRowFollow {
         if (targetUserId.isEmpty()) return
 
         var followState by remember(targetUserId) { mutableStateOf(FollowButtonState.CAN_FOLLOW) }
-        var showingUnfollowConfirmation by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
-        val primaryText = if (isDark) Color.White else Color.Black
-        val context = LocalContext.current
-        val density = LocalDensity.current
-        val fontSp = with(density) { legacyPoppinsSize(context, 12).toSp() }
 
         // ≡ checkFollowingStatus
         LaunchedEffect(targetUserId) {
@@ -123,101 +106,15 @@ object EnhancedNotificationRowFollow {
             onDispose { FollowStateStore.removeListener(listener) }
         }
 
-        val title = notificationFollowTitle(followState)
-        val icon = notificationFollowIcon(followState)
-        val passive = notificationFollowIsPassive(followState)
-        val enabled = followState.isActionable
-
-        Row(
-            modifier = Modifier
-                .alpha(if (passive) 0.78f else 1f)
-                .then(
-                    if (enabled) {
-                        Modifier.clickable {
-                            // ≡ toggleFollow
-                            if (followState == FollowButtonState.FOLLOWING) {
-                                showingUnfollowConfirmation = true
-                            } else {
-                                scope.launch { performFollowToggle(targetUserId, followState, viewModel) { followState = it } }
-                            }
-                        }
-                    } else {
-                        Modifier
-                    },
-                )
-                .momentsChromeGlass(CircleShape, interactive = followState.isActionable)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = primaryText,
-                modifier = Modifier.size(12.dp),
-            )
-            Text(
-                text = title,
-                fontSize = fontSp,
-                fontWeight = FontWeight.SemiBold,
-                color = primaryText,
-                maxLines = 1,
-            )
-        }
-
-        if (showingUnfollowConfirmation) {
-            AlertDialog(
-                onDismissRequest = { showingUnfollowConfirmation = false },
-                title = { Text(stringResource(R.string.user_profile_unfollow_confirm_title)) },
-                text = { Text(stringResource(R.string.user_profile_unfollow_confirm_message)) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showingUnfollowConfirmation = false
-                            scope.launch {
-                                performFollowToggle(targetUserId, followState, viewModel) { followState = it }
-                            }
-                        },
-                    ) {
-                        Text(
-                            stringResource(R.string.user_profile_unfollow_confirm_action),
-                            color = Color.Red,
-                        )
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showingUnfollowConfirmation = false }) {
-                        Text(stringResource(R.string.common_cancel))
-                    }
-                },
-            )
-        }
+        ModernFollowButton(
+            state = followState,
+            isLoading = false,
+            onClick = {
+                scope.launch { performFollowToggle(targetUserId, followState, viewModel) { followState = it } }
+            },
+            style = ModernFollowButtonStyle.COMPACT,
+        )
     }
-
-    /** ≡ notificationFollowTitle */
-    @Composable
-    fun notificationFollowTitle(state: FollowButtonState): String = when (state) {
-        FollowButtonState.FOLLOWING -> stringResource(R.string.user_profile_following)
-        FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
-        FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
-        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> stringResource(R.string.feed_follow_cancel_request)
-        FollowButtonState.BLOCKED -> stringResource(R.string.user_profile_blocked)
-        else -> stringResource(R.string.user_profile_follow)
-    }
-
-    /** ≡ notificationFollowIcon (SF Symbol → Material; misma mapa que UserProfileStateViews) */
-    fun notificationFollowIcon(state: FollowButtonState): ImageVector = when (state) {
-        FollowButtonState.FOLLOWING -> Icons.Filled.CheckCircle
-        FollowButtonState.CAN_REQUEST_FOLLOW -> Icons.Filled.PersonAdd
-        FollowButtonState.REQUEST_PENDING -> Icons.Filled.Schedule
-        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> Icons.Filled.Cancel
-        FollowButtonState.BLOCKED -> Icons.Filled.PersonOff
-        else -> Icons.Filled.PersonAdd
-    }
-
-    /** ≡ notificationFollowIsPassive */
-    fun notificationFollowIsPassive(state: FollowButtonState): Boolean =
-        state == FollowButtonState.REQUEST_PENDING
 
     /** ≡ performFollowToggle */
     private suspend fun performFollowToggle(
@@ -228,7 +125,7 @@ object EnhancedNotificationRowFollow {
     ) {
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         when (currentState) {
-            FollowButtonState.FOLLOWING -> {
+            FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> {
                 val err = awaitCallback { viewModel.unfollowUser(currentUserId, targetUserId, it) }
                 if (err == null) {
                     onState(FollowButtonState.CAN_FOLLOW)

@@ -62,7 +62,9 @@ import com.moments.android.extensions.MomentsGlassButtonPreset
 import com.moments.android.extensions.ProfileChromeControlsCluster
 import com.moments.android.extensions.ProfileChromeIconButton
 import com.moments.android.extensions.momentsChromeGlass
-import com.moments.android.services.privacy.FollowButtonState
+import com.moments.android.views.components.DestructiveConfirmationMode
+import com.moments.android.views.components.ModernFollowButton
+import com.moments.android.views.components.ModernFollowButtonStyle
 import com.moments.android.views.components.VerifiedBadge
 import com.moments.android.views.components.VerifiedUsernameGradientView
 import com.moments.android.views.feed.rememberAdaptiveColors
@@ -310,30 +312,14 @@ fun UserModernProfileHeader(
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             val actionable = viewModel.followButtonState.isActionable
             val scale by animateFloatAsState(if (actionable) 1f else 0.95f, label = "followScale")
-            Row(
-                modifier = Modifier
-                    .graphicsLayer { scaleX = scale; scaleY = scale }
-                    .momentsChromeGlass(RoundedCornerShape(50), interactive = actionable)
-                    .clickable(enabled = actionable, onClick = onFollowAction)
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    followButtonText(viewModel.followButtonState),
-                    color = colors.primary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
+            Box(modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale }) {
+                ModernFollowButton(
+                    state = viewModel.followButtonState,
+                    isLoading = false,
+                    onClick = onFollowAction,
+                    style = ModernFollowButtonStyle.PROFILE_HEADER,
+                    destructiveConfirmation = DestructiveConfirmationMode.NONE,
                 )
-                if (viewModel.followButtonState == FollowButtonState.FOLLOWING) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = null,
-                        modifier = Modifier.size(10.dp),
-                        tint = colors.primary,
-                    )
-                }
             }
 
             Row(
@@ -362,17 +348,6 @@ fun UserModernProfileHeader(
             }
         }
     }
-}
-
-@Composable
-internal fun followButtonText(state: FollowButtonState): String = when (state) {
-    FollowButtonState.OWN_PROFILE -> stringResource(R.string.user_profile_follow_button_own_profile)
-    FollowButtonState.BLOCKED -> stringResource(R.string.user_profile_blocked)
-    FollowButtonState.FOLLOWING -> stringResource(R.string.feed_following_action)
-    FollowButtonState.CAN_FOLLOW -> stringResource(R.string.feed_follow)
-    FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
-    FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
-    FollowButtonState.REQUEST_PENDING_CANCELLABLE -> stringResource(R.string.feed_follow_cancel_request)
 }
 
 /** ≡ ShareLink de iOS: `https://glowsy.app/{username}`. */

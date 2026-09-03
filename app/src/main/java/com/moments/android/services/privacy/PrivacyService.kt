@@ -40,16 +40,28 @@ enum class FollowButtonState {
     OWN_PROFILE,
     BLOCKED,
     FOLLOWING,
+    MUTUALS,
     CAN_FOLLOW,
     CAN_REQUEST_FOLLOW,
     REQUEST_PENDING,
     REQUEST_PENDING_CANCELLABLE;
+
+    /** True si el estado representa una relación de seguimiento activa (FOLLOWING o MUTUALS). */
+    val isFollowingOrMutual: Boolean
+        get() = this == FOLLOWING || this == MUTUALS
+
+    /** Follow / Request (o cancelar solicitud). En Reels el chip solo se muestra en estos casos. */
+    val showsProspectFollow: Boolean
+        get() = this == CAN_FOLLOW ||
+            this == CAN_REQUEST_FOLLOW ||
+            this == REQUEST_PENDING_CANCELLABLE
 
     val buttonText: String
         get() = when (this) {
             OWN_PROFILE -> "Own profile"
             BLOCKED -> "Blocked"
             FOLLOWING -> "Following"
+            MUTUALS -> "Mutuals"
             CAN_FOLLOW -> "Follow"
             CAN_REQUEST_FOLLOW -> "Request follow"
             REQUEST_PENDING -> "Request sent"
@@ -59,14 +71,14 @@ enum class FollowButtonState {
     val isActionable: Boolean
         get() = when (this) {
             OWN_PROFILE, BLOCKED, REQUEST_PENDING -> false
-            FOLLOWING, CAN_FOLLOW, CAN_REQUEST_FOLLOW, REQUEST_PENDING_CANCELLABLE -> true
+            FOLLOWING, MUTUALS, CAN_FOLLOW, CAN_REQUEST_FOLLOW, REQUEST_PENDING_CANCELLABLE -> true
         }
 
     val buttonColor: String
         get() = when (this) {
             OWN_PROFILE -> "gray"
             BLOCKED -> "red"
-            FOLLOWING -> "green"
+            FOLLOWING, MUTUALS -> "green"
             CAN_FOLLOW, CAN_REQUEST_FOLLOW -> "blue"
             REQUEST_PENDING, REQUEST_PENDING_CANCELLABLE -> "orange"
         }
@@ -324,7 +336,10 @@ object PrivacyService {
         if (viewerId == targetUserId) return FollowButtonState.OWN_PROFILE
         if (checkMutualBlocks(viewerId, targetUserId)) return FollowButtonState.BLOCKED
         // iOS: isFollowing / pending request fallan soft (false) → canFollow por defecto.
-        if (firestoreService.isFollowing(viewerId, targetUserId)) return FollowButtonState.FOLLOWING
+        if (firestoreService.isFollowing(viewerId, targetUserId)) {
+            return if (firestoreService.isMutualConnection(viewerId, targetUserId))
+                FollowButtonState.MUTUALS else FollowButtonState.FOLLOWING
+        }
         if (checkPendingFollowRequest(viewerId, targetUserId)) {
             return FollowButtonState.REQUEST_PENDING_CANCELLABLE
         }

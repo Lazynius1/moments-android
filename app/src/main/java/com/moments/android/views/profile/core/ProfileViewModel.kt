@@ -506,9 +506,8 @@ class ProfileViewModel(
 
     override fun relationshipState(userId: String): FollowButtonState {
         if (FirebaseAuth.getInstance().currentUser?.uid == userId) return FollowButtonState.OWN_PROFILE
-        if (following.any { it.id == userId } || mutuals.any { it.id == userId }) {
-            return FollowButtonState.FOLLOWING
-        }
+        if (mutuals.any { it.id == userId }) return FollowButtonState.MUTUALS
+        if (following.any { it.id == userId }) return FollowButtonState.FOLLOWING
         FollowStateStore.state(userId)?.let { return it }
         val known = followers.firstOrNull { it.id == userId }
             ?: following.firstOrNull { it.id == userId }
@@ -523,8 +522,8 @@ class ProfileViewModel(
     override fun prefetchRelationshipState(userId: String) {
         val current = FirebaseAuth.getInstance().currentUser?.uid ?: return
         if (current == userId) return
-        if (following.any { it.id == userId } || mutuals.any { it.id == userId }) {
-            FollowStateStore.setState(FollowButtonState.FOLLOWING, userId)
+        if (mutuals.any { it.id == userId }) {
+            FollowStateStore.setState(FollowButtonState.MUTUALS, userId)
             return
         }
         viewModelScope.launch {

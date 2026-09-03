@@ -183,7 +183,7 @@ class SuggestedUsersViewModel(
             val reconciled = FollowStateStore.reconciledState(authoritative, userId)
             userButtonStates = userButtonStates + (userId to reconciled)
             FollowStateStore.setState(reconciled, userId)
-            if (reconciled == FollowButtonState.FOLLOWING) {
+            if (reconciled.isFollowingOrMutual) {
                 followedUserIds = followedUserIds + userId
                 users = users.filter { it.id != userId }
             }

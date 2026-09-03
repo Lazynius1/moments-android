@@ -51,6 +51,8 @@ import com.moments.android.notifications.core.NotificationsViewModel
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.services.privacy.PrivacyService
+import com.moments.android.views.components.ModernFollowButton
+import com.moments.android.views.components.ModernFollowButtonStyle
 import com.moments.android.views.components.MomentRowButton
 import com.moments.android.views.components.VerifiedBadgeView
 import com.moments.android.views.story.StoryRingAvatarView
@@ -110,7 +112,6 @@ fun NotificationGroupedFollowersOverlay(
     val scope = rememberCoroutineScope()
     val followStates = remember { mutableStateMapOf<String, FollowButtonState>() }
     val loadingStates = remember { mutableStateMapOf<String, Boolean>() }
-    var unfollowTargetId by remember { mutableStateOf<String?>(null) }
 
     val visibleRows = minOf(items.size, GroupedFollowersLayout.maxVisibleRows)
     val listAreaHeight = if (visibleRows <= 0) {
@@ -210,17 +211,13 @@ fun NotificationGroupedFollowersOverlay(
                             },
                             onFollowClick = {
                                 val state = followStates[item.id] ?: FollowButtonState.CAN_FOLLOW
-                                if (state == FollowButtonState.FOLLOWING) {
-                                    unfollowTargetId = item.id
-                                } else {
-                                    scope.launch {
-                                        performFollowToggle(
-                                            userId = item.id,
-                                            viewModel = viewModel,
-                                            followStates = followStates,
-                                            loadingStates = loadingStates,
-                                        )
-                                    }
+                                scope.launch {
+                                    performFollowToggle(
+                                        userId = item.id,
+                                        viewModel = viewModel,
+                                        followStates = followStates,
+                                        loadingStates = loadingStates,
+                                    )
                                 }
                             },
                         )
@@ -242,39 +239,6 @@ fun NotificationGroupedFollowersOverlay(
                 }
             }
         }
-    }
-
-    unfollowTargetId?.let { targetId ->
-        AlertDialog(
-            onDismissRequest = { unfollowTargetId = null },
-            title = { Text(stringResource(R.string.user_profile_unfollow_confirm_title)) },
-            text = { Text(stringResource(R.string.user_profile_unfollow_confirm_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        unfollowTargetId = null
-                        scope.launch {
-                            performFollowToggle(
-                                userId = targetId,
-                                viewModel = viewModel,
-                                followStates = followStates,
-                                loadingStates = loadingStates,
-                            )
-                        }
-                    },
-                ) {
-                    Text(
-                        stringResource(R.string.user_profile_unfollow_confirm_action),
-                        color = Color.Red,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { unfollowTargetId = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
     }
 }
 
@@ -329,8 +293,6 @@ private fun FollowerRow(
         CompactFollowButton(
             state = state,
             isLoading = isLoading,
-            isDark = isDark,
-            primaryText = primaryText,
             onClick = onFollowClick,
         )
     }
@@ -340,44 +302,14 @@ private fun FollowerRow(
 private fun CompactFollowButton(
     state: FollowButtonState,
     isLoading: Boolean,
-    isDark: Boolean,
-    primaryText: Color,
     onClick: () -> Unit,
 ) {
-    val title = when (state) {
-        FollowButtonState.FOLLOWING -> stringResource(R.string.user_profile_following)
-        FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
-        FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
-        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> stringResource(R.string.feed_follow_cancel_request)
-        FollowButtonState.BLOCKED -> stringResource(R.string.user_profile_blocked)
-        else -> stringResource(R.string.user_profile_follow)
-    }
-    val enabled = !isLoading && state.isActionable
-    val passive = state == FollowButtonState.REQUEST_PENDING
-
-    Box(
-        modifier = Modifier
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
-            .momentsChromeGlass(CircleShape, interactive = state.isActionable)
-            .padding(horizontal = 10.dp, vertical = 7.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier.height(14.dp).padding(horizontal = 8.dp),
-                strokeWidth = 2.dp,
-                color = primaryText,
-            )
-        } else {
-            Text(
-                text = title,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = primaryText.copy(alpha = if (passive) 0.78f else 1f),
-                maxLines = 1,
-            )
-        }
-    }
+    ModernFollowButton(
+        state = state,
+        isLoading = isLoading,
+        onClick = onClick,
+        style = ModernFollowButtonStyle.COMPACT,
+    )
 }
 
 private suspend fun performFollowToggle(
@@ -391,7 +323,7 @@ private suspend fun performFollowToggle(
     loadingStates[userId] = true
 
     when (currentState) {
-        FollowButtonState.FOLLOWING -> {
+        FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> {
             val err = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
                 viewModel.unfollowUser(currentUserId, userId) { e ->
                     cont.resume(e) {}

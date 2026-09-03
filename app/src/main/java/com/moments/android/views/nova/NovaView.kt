@@ -198,7 +198,7 @@ private fun NovaSecureContent() {
                 ) {
                     items(
                         items = agent.conversationHistory,
-                        key = { "${it.id}_${if (it.isHistorical) "historical" else "new"}" },
+                        key = { it.id },
                     ) { message ->
                         EnhancedChatBubble(
                             message = message,

@@ -613,6 +613,9 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="user_profile_unfollow_confirm_title">Deixar de seguir?</string>
     <string name="user_profile_unfollow_confirm_message">Podes voltar a seguir este perfil quando quiseres.</string>
     <string name="user_profile_unfollow_confirm_action">Deixar de seguir</string>
+    <string name="user_profile_cancel_request_confirm_title">Cancelar pedido?</string>
+    <string name="user_profile_cancel_request_confirm_message">O seu pedido de seguir será retirado.</string>
+    <string name="user_profile_cancel_request_confirm_action">Cancelar pedido</string>
     <string name="user_profile_blocked">Bloqueado</string>
 
     <!-- modernComments (iOS ModernCommentsView) -->

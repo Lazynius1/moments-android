@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
+import com.moments.android.views.components.ModernFollowButton
+import com.moments.android.views.components.ModernFollowButtonStyle
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -331,58 +333,16 @@ internal fun SuggestedUserRow(
     }
 }
 
-/** Port de `SuggestedUserFollowButton`. */
+/** Port de `SuggestedUserFollowButton` — usa el botón canónico. */
 @Composable
 internal fun SuggestedUserFollowButton(
     state: FollowButtonState,
     onFollow: () -> Unit,
 ) {
-    val isDark = isSystemInDarkTheme()
-    val isPassive = state == FollowButtonState.REQUEST_PENDING
-    val (icon, text) = suggestedFollowChrome(state)
-
-    Row(
-        Modifier
-            .graphicsLayer { alpha = if (isPassive) 0.78f else 1f }
-            .momentsChromeGlass(RoundedCornerShape(12.dp), interactive = state.isActionable)
-            .clickable(enabled = state.isActionable, onClick = onFollow)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = if (isDark) Color.White else Color.Black,
-            modifier = Modifier.size(12.dp),
-        )
-        Text(
-            text,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 12.sp,
-            color = if (isDark) Color.White else Color.Black,
-        )
-    }
-}
-
-@Composable
-private fun suggestedFollowChrome(state: FollowButtonState): Pair<ImageVector, String> {
-    val text = when (state) {
-        FollowButtonState.CAN_FOLLOW -> stringResource(R.string.feed_follow)
-        FollowButtonState.FOLLOWING -> stringResource(R.string.user_profile_following)
-        FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
-        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> stringResource(R.string.feed_follow_cancel_request)
-        FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
-        FollowButtonState.OWN_PROFILE -> stringResource(R.string.explore_button_own_profile)
-        FollowButtonState.BLOCKED -> stringResource(R.string.explore_button_blocked)
-    }
-    val icon = when (state) {
-        FollowButtonState.CAN_FOLLOW, FollowButtonState.CAN_REQUEST_FOLLOW -> Icons.Filled.PersonAdd
-        FollowButtonState.FOLLOWING -> Icons.Filled.Person
-        FollowButtonState.REQUEST_PENDING -> Icons.Filled.AccessTime
-        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> Icons.Filled.Close
-        FollowButtonState.OWN_PROFILE -> Icons.Filled.Person
-        FollowButtonState.BLOCKED -> Icons.Filled.Close
-    }
-    return icon to text
+    ModernFollowButton(
+        state = state,
+        isLoading = false,
+        onClick = onFollow,
+        style = ModernFollowButtonStyle.COMPACT,
+    )
 }

@@ -103,6 +103,8 @@ import com.moments.android.services.firestore.deleteMoment
 import com.moments.android.services.firestore.toggleSaveMoment
 import com.moments.android.services.performance.VideoMoment
 import com.moments.android.services.persistence.LocalPersistenceService
+import com.moments.android.services.privacy.FollowButtonState
+import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.services.social.StoryRingResolverService
 import com.moments.android.services.video.VideoLayerRole
@@ -110,6 +112,8 @@ import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.comments.ModernCommentsSheet
 import com.moments.android.views.components.CurrentUserVerifiedBadge
+import com.moments.android.views.components.ModernFollowButton
+import com.moments.android.views.components.ModernFollowButtonStyle
 import com.moments.android.views.components.MomentCaptionPresentationStyle
 import com.moments.android.views.components.MomentCaptionView
 import com.moments.android.views.components.RailCountBadge
@@ -163,6 +167,8 @@ fun ReelVideoView(
     var storyViewedStatus by remember { mutableStateOf<List<Boolean>>(emptyList()) }
     var storyAudiences by remember { mutableStateOf<List<String?>>(emptyList()) }
     var liveAuthorUsername by remember { mutableStateOf("") }
+    var followState by remember(video.moment.authorId) { mutableStateOf<FollowButtonState?>(null) }
+    var followLoading by remember { mutableStateOf(false) }
     var isDraggingProgress by remember { mutableStateOf(false) }
     var wasPlayingBeforeDrag by remember { mutableStateOf(false) }
     var isReelCaptionExpanded by remember { mutableStateOf(false) }
@@ -187,6 +193,10 @@ fun ReelVideoView(
     val bottomChromeClearance = 2.5.dp + bottomBarHeight + chromeBottomPadding
 
     val displayAuthorUsername = liveAuthorUsername.trim().ifEmpty { video.moment.username }
+    val shouldShowReelsFollowButton =
+        uid != null &&
+            video.moment.authorId != uid &&
+            followState?.showsProspectFollow == true
     val windowHeightPx = LocalWindowInfo.current.containerSize.height.coerceAtLeast(1)
     val videoScale = if (showComments) commentsSheetTopFraction.coerceIn(0f, 1f) else 1f
 
@@ -244,6 +254,56 @@ fun ReelVideoView(
             val fetched = user?.username?.trim().orEmpty()
             if (video.moment.authorId.trim() == authorId) {
                 liveAuthorUsername = fetched
+            }
+        }
+    }
+
+    fun loadFollowStatus() {
+        val viewerId = uid ?: return
+        val authorId = video.moment.authorId.trim()
+        if (authorId.isEmpty() || authorId == viewerId) {
+            followState = FollowButtonState.OWN_PROFILE
+            return
+        }
+        FollowStateStore.state(authorId)?.let { followState = it }
+        scope.launch {
+            val authoritative = PrivacyService.getFollowButtonState(viewerId, authorId)
+            val reconciled = FollowStateStore.reconciledState(authoritative, authorId)
+            followState = reconciled
+            FollowStateStore.setState(reconciled, authorId)
+        }
+    }
+
+    fun performFollowToggle() {
+        val viewerId = uid ?: return
+        val authorId = video.moment.authorId.trim()
+        if (authorId.isEmpty()) return
+        val previous = followState ?: return
+        if (!previous.isActionable) return
+        val optimistic = when (previous) {
+            FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> FollowButtonState.CAN_FOLLOW
+            FollowButtonState.CAN_REQUEST_FOLLOW -> FollowButtonState.REQUEST_PENDING_CANCELLABLE
+            FollowButtonState.REQUEST_PENDING_CANCELLABLE -> FollowButtonState.CAN_REQUEST_FOLLOW
+            FollowButtonState.CAN_FOLLOW -> FollowButtonState.FOLLOWING
+            else -> previous
+        }
+        followState = optimistic
+        followLoading = true
+        scope.launch {
+            FollowStateStore.setState(optimistic, authorId)
+            val error = runCatching {
+                when (previous) {
+                    FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS ->
+                        firestore.unfollowUser(viewerId, authorId)
+                    FollowButtonState.REQUEST_PENDING_CANCELLABLE ->
+                        firestore.cancelFollowRequest(viewerId, authorId)
+                    else -> firestore.followUser(viewerId, authorId)
+                }
+            }.exceptionOrNull()
+            followLoading = false
+            if (error != null) {
+                followState = previous
+                FollowStateStore.setState(previous, authorId)
             }
         }
     }
@@ -321,6 +381,18 @@ fun ReelVideoView(
         } else {
             NavigationEventBus.emit(CoordinatorNavigationEvent.NavigateToUserProfileInFeed(authorId))
         }
+    }
+
+    LaunchedEffect(video.moment.authorId, uid) {
+        loadFollowStatus()
+    }
+
+    DisposableEffect(video.moment.authorId) {
+        val listener: (String, FollowButtonState) -> Unit = { userId, state ->
+            if (userId == video.moment.authorId) followState = state
+        }
+        FollowStateStore.addListener(listener)
+        onDispose { FollowStateStore.removeListener(listener) }
     }
 
     LaunchedEffect(isCurrentVideo, video.id) {
@@ -569,22 +641,38 @@ fun ReelVideoView(
 
                             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Row(
-                                    Modifier.clickable(onClick = ::openProfile),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(
-                                        displayAuthorUsername,
-                                        color = mediaChromePrimary,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    if (video.moment.authorId == uid) {
-                                        CurrentUserVerifiedBadge(size = 14.dp)
-                                    } else {
-                                        VerifiedBadgeView(userId = video.moment.authorId, size = 14.dp)
+                                    Row(
+                                        Modifier
+                                            .weight(1f, fill = false)
+                                            .clickable(onClick = ::openProfile),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            displayAuthorUsername,
+                                            color = mediaChromePrimary,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        if (video.moment.authorId == uid) {
+                                            CurrentUserVerifiedBadge(size = 14.dp)
+                                        } else {
+                                            VerifiedBadgeView(userId = video.moment.authorId, size = 14.dp)
+                                        }
+                                    }
+                                    if (shouldShowReelsFollowButton) {
+                                        ModernFollowButton(
+                                            state = followState ?: FollowButtonState.CAN_FOLLOW,
+                                            isLoading = followLoading,
+                                            onClick = ::performFollowToggle,
+                                            style = ModernFollowButtonStyle.COMPACT,
+                                        )
                                     }
                                 }
                                 Row(

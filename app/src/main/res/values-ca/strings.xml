@@ -613,6 +613,9 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="user_profile_unfollow_confirm_title">Deixar de seguir?</string>
     <string name="user_profile_unfollow_confirm_message">Pots tornar a seguir aquest perfil quan vulguis.</string>
     <string name="user_profile_unfollow_confirm_action">Deixar de seguir</string>
+    <string name="user_profile_cancel_request_confirm_title">Cancel·lar sol·licitud?</string>
+    <string name="user_profile_cancel_request_confirm_message">La teva sol·licitud de seguiment serà retirada.</string>
+    <string name="user_profile_cancel_request_confirm_action">Cancel·lar sol·licitud</string>
     <string name="user_profile_blocked">Bloquejat</string>
 
     <!-- modernComments (iOS ModernCommentsView) -->

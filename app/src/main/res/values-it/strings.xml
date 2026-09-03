@@ -613,6 +613,9 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="user_profile_unfollow_confirm_title">Smettere di seguire?</string>
     <string name="user_profile_unfollow_confirm_message">Potrai seguire di nuovo questo profilo quando vuoi.</string>
     <string name="user_profile_unfollow_confirm_action">Smetti di seguire</string>
+    <string name="user_profile_cancel_request_confirm_title">Annullare richiesta?</string>
+    <string name="user_profile_cancel_request_confirm_message">La tua richiesta di follow verrà ritirata.</string>
+    <string name="user_profile_cancel_request_confirm_action">Annulla richiesta</string>
     <string name="user_profile_blocked">Bloccato</string>
 
     <!-- modernComments (iOS ModernCommentsView) -->

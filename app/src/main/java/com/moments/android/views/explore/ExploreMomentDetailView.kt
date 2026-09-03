@@ -275,6 +275,25 @@ fun ExploreMomentDetailView(
             }
     }
 
+    LaunchedEffect(listState, feedMoments) {
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val visible = info.visibleItemsInfo
+            if (visible.isEmpty()) return@snapshotFlow emptyMap<String, Float>()
+            val viewport = (info.viewportEndOffset - info.viewportStartOffset).toFloat().coerceAtLeast(1f)
+            buildMap {
+                for (item in visible) {
+                    val moment = feedMoments.getOrNull(item.index) ?: continue
+                    val visiblePx = minOf(item.offset + item.size, info.viewportEndOffset) -
+                        maxOf(item.offset, info.viewportStartOffset)
+                    put(moment.id, (visiblePx.toFloat() / viewport).coerceIn(0f, 1f))
+                }
+            }
+        }.collect { visibility ->
+            FeedVisibilityCoordinator.update(visibility)
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             FeedVisibilityCoordinator.update(emptyMap())

@@ -22,13 +22,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MailOutline
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WifiOff
@@ -40,7 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -58,6 +53,9 @@ import com.moments.android.extensions.ProfileChromeIconButton
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
 import com.moments.android.services.privacy.FollowButtonState
+import com.moments.android.views.components.DestructiveConfirmationMode
+import com.moments.android.views.components.ModernFollowButton
+import com.moments.android.views.components.ModernFollowButtonStyle
 import com.moments.android.views.components.VerifiedBadgeView
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.profile.core.sections.ProfileSectionEmptyIcon
@@ -247,21 +245,13 @@ fun UserModernPrivateProfileView(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val actionable = followButtonState.isActionable
-            Row(
-                Modifier
-                    .momentsChromeGlass(RoundedCornerShape(50), interactive = actionable)
-                    .clickable(enabled = actionable, onClick = onFollowAction)
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(followButtonIcon(followButtonState), null, tint = content, modifier = Modifier.size(13.dp))
-                Text(followButtonText(followButtonState), color = content, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                if (followButtonState == FollowButtonState.FOLLOWING) {
-                    Icon(Icons.Filled.KeyboardArrowDown, null, tint = content, modifier = Modifier.size(10.dp))
-                }
-            }
+            ModernFollowButton(
+                state = followButtonState,
+                isLoading = false,
+                onClick = onFollowAction,
+                style = ModernFollowButtonStyle.PROFILE_HEADER,
+                destructiveConfirmation = DestructiveConfirmationMode.NONE,
+            )
 
             Row(
                 Modifier
@@ -602,15 +592,4 @@ private fun UserProfilePlaceholderStats(modifier: Modifier = Modifier) {
             }
         }
     }
-}
-
-/** Iconos del botón de seguir en el estado privado (iOS los define distintos al header). */
-private fun followButtonIcon(state: FollowButtonState): ImageVector = when (state) {
-    FollowButtonState.OWN_PROFILE -> Icons.Filled.CheckCircle
-    FollowButtonState.BLOCKED -> Icons.Filled.PersonOff
-    FollowButtonState.FOLLOWING -> Icons.Filled.CheckCircle
-    FollowButtonState.CAN_FOLLOW -> Icons.Filled.PersonAdd
-    FollowButtonState.CAN_REQUEST_FOLLOW -> Icons.Filled.MailOutline
-    FollowButtonState.REQUEST_PENDING -> Icons.Filled.AccessTime
-    FollowButtonState.REQUEST_PENDING_CANCELLABLE -> Icons.Filled.Close
 }

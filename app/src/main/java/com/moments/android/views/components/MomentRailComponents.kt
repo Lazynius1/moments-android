@@ -20,16 +20,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonAddAlt1
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -278,6 +285,14 @@ private fun RailIconButton(
 enum class ModernFollowButtonStyle {
     STANDARD,
     COMPACT,
+    PROFILE_HEADER,
+}
+
+/** Controla cuándo ModernFollowButton muestra diálogos de confirmación. */
+enum class DestructiveConfirmationMode {
+    ALL,
+    CANCEL_REQUEST_ONLY,
+    NONE,
 }
 
 /** Port de `ModernFollowButton`. */
@@ -287,34 +302,74 @@ fun ModernFollowButton(
     isLoading: Boolean,
     onClick: () -> Unit,
     style: ModernFollowButtonStyle = ModernFollowButtonStyle.STANDARD,
-    isMutual: Boolean = false,
+    destructiveConfirmation: DestructiveConfirmationMode = DestructiveConfirmationMode.ALL,
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
     val context = LocalContext.current
     val density = LocalDensity.current
     val isCompact = style == ModernFollowButtonStyle.COMPACT
-    val showsMutuals = isMutual && state == FollowButtonState.FOLLOWING
-    val fontSize = if (isCompact) 11 else 14
-    val title = if (showsMutuals) {
-        stringResource(R.string.audience_type_mutuals)
-    } else when (state) {
+    val isProfileHeader = style == ModernFollowButtonStyle.PROFILE_HEADER
+    val showsLeadIcon = !isProfileHeader
+
+    var showUnfollowConfirm by remember { mutableStateOf(false) }
+    var showCancelRequestConfirm by remember { mutableStateOf(false) }
+
+    val showsMutuals = state == FollowButtonState.MUTUALS
+    val fontSize = when (style) {
+        ModernFollowButtonStyle.STANDARD -> 14
+        ModernFollowButtonStyle.COMPACT -> 11
+        ModernFollowButtonStyle.PROFILE_HEADER -> 13
+    }
+    val hPadding = when (style) {
+        ModernFollowButtonStyle.STANDARD -> 16.dp
+        ModernFollowButtonStyle.COMPACT -> 10.dp
+        ModernFollowButtonStyle.PROFILE_HEADER -> 18.dp
+    }
+    val vPadding = when (style) {
+        ModernFollowButtonStyle.STANDARD -> 8.dp
+        ModernFollowButtonStyle.COMPACT -> 6.dp
+        ModernFollowButtonStyle.PROFILE_HEADER -> 10.dp
+    }
+    val spacing = when (style) {
+        ModernFollowButtonStyle.STANDARD -> 6.dp
+        ModernFollowButtonStyle.COMPACT -> 4.dp
+        ModernFollowButtonStyle.PROFILE_HEADER -> 7.dp
+    }
+
+    val title = when (state) {
+        FollowButtonState.MUTUALS -> stringResource(R.string.audience_type_mutuals)
         FollowButtonState.FOLLOWING -> stringResource(R.string.user_profile_following)
         FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
         FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
         FollowButtonState.REQUEST_PENDING_CANCELLABLE -> stringResource(R.string.feed_follow_cancel_request)
         FollowButtonState.BLOCKED -> stringResource(R.string.user_profile_blocked)
+        FollowButtonState.OWN_PROFILE -> stringResource(R.string.user_profile_follow_button_own_profile)
         else -> stringResource(R.string.feed_follow)
     }
     val icon = when (state) {
+        FollowButtonState.MUTUALS -> Icons.Filled.People
         FollowButtonState.FOLLOWING -> Icons.Filled.PersonAddAlt1
         FollowButtonState.CAN_REQUEST_FOLLOW -> Icons.Filled.PersonAdd
         FollowButtonState.REQUEST_PENDING -> Icons.Filled.AccessTime
         FollowButtonState.REQUEST_PENDING_CANCELLABLE -> Icons.Filled.Close
         FollowButtonState.BLOCKED -> Icons.Filled.Block
+        FollowButtonState.OWN_PROFILE -> Icons.Filled.Person
         else -> Icons.Filled.PersonAdd
     }
     val isPassive = state == FollowButtonState.REQUEST_PENDING
+
+    val handleTap: () -> Unit = {
+        HapticManager.shared.mediumImpact()
+        when {
+            state.isFollowingOrMutual && destructiveConfirmation == DestructiveConfirmationMode.ALL ->
+                showUnfollowConfirm = true
+            state == FollowButtonState.REQUEST_PENDING_CANCELLABLE && destructiveConfirmation != DestructiveConfirmationMode.NONE ->
+                showCancelRequestConfirm = true
+            else -> onClick()
+        }
+    }
+
     Row(
         modifier
             .graphicsLayer { alpha = if (isPassive) 0.78f else 1f }
@@ -322,16 +377,10 @@ fun ModernFollowButton(
                 shape = RoundedCornerShape(percent = 50),
                 interactive = state.isActionable,
             )
-            .clickable(enabled = !isLoading && state.isActionable) {
-                HapticManager.shared.mediumImpact()
-                onClick()
-            }
-            .padding(
-                horizontal = if (isCompact) 10.dp else 16.dp,
-                vertical = if (isCompact) 6.dp else 8.dp,
-            ),
+            .clickable(enabled = !isLoading && state.isActionable, onClick = handleTap)
+            .padding(horizontal = hPadding, vertical = vPadding),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
     ) {
         if (isLoading) {
             MomentsCircularProgressIndicator(
@@ -345,7 +394,7 @@ fun ModernFollowButton(
                     size = if (isCompact) 11.dp else 13.dp,
                     tintColor = colors.primary,
                 )
-            } else {
+            } else if (showsLeadIcon) {
                 Icon(
                     icon,
                     contentDescription = null,
@@ -360,6 +409,56 @@ fun ModernFollowButton(
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
             )
+            if (isProfileHeader && state.isFollowingOrMutual) {
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.size(10.dp),
+                )
+            }
         }
+    }
+
+    if (showUnfollowConfirm) {
+        AlertDialog(
+            onDismissRequest = { showUnfollowConfirm = false },
+            title = { Text(stringResource(R.string.user_profile_unfollow_confirm_title)) },
+            text = { Text(stringResource(R.string.user_profile_unfollow_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showUnfollowConfirm = false
+                    onClick()
+                }) {
+                    Text(stringResource(R.string.user_profile_unfollow_confirm_action), color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnfollowConfirm = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+
+    if (showCancelRequestConfirm) {
+        AlertDialog(
+            onDismissRequest = { showCancelRequestConfirm = false },
+            title = { Text(stringResource(R.string.user_profile_cancel_request_confirm_title)) },
+            text = { Text(stringResource(R.string.user_profile_cancel_request_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showCancelRequestConfirm = false
+                    onClick()
+                }) {
+                    Text(stringResource(R.string.user_profile_cancel_request_confirm_action), color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelRequestConfirm = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
     }
 }

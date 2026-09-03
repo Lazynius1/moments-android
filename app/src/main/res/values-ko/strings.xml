@@ -726,6 +726,9 @@
     <string name="user_profile_unfollow_confirm_title">팔로우를 취소할까요?</string>
     <string name="user_profile_unfollow_confirm_message">언제든 다시 팔로우할 수 있어요.</string>
     <string name="user_profile_unfollow_confirm_action">팔로우 취소</string>
+    <string name="user_profile_cancel_request_confirm_title">요청을 취소할까요?</string>
+    <string name="user_profile_cancel_request_confirm_message">팔로우 요청이 철회됩니다.</string>
+    <string name="user_profile_cancel_request_confirm_action">요청 취소</string>
     <string name="user_profile_blocked">차단됨</string>
     <!-- Paridad iOS contextMenu.* / hiddenLayers.metrics.* -->
     <string name="context_menu_edit_moment">모먼트 수정</string>

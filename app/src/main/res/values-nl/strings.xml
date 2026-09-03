@@ -726,6 +726,9 @@
     <string name="user_profile_unfollow_confirm_title">Niet meer volgen?</string>
     <string name="user_profile_unfollow_confirm_message">Je kunt dit profiel altijd weer volgen.</string>
     <string name="user_profile_unfollow_confirm_action">Niet meer volgen</string>
+    <string name="user_profile_cancel_request_confirm_title">Verzoek intrekken?</string>
+    <string name="user_profile_cancel_request_confirm_message">Je volgverzoek wordt ingetrokken.</string>
+    <string name="user_profile_cancel_request_confirm_action">Verzoek intrekken</string>
     <string name="user_profile_blocked">Geblokkeerd</string>
     <!-- Paridad iOS contextMenu.* / hiddenLayers.metrics.* -->
     <string name="context_menu_edit_moment">Moment bewerken</string>

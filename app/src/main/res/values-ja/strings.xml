@@ -726,6 +726,9 @@
     <string name="user_profile_unfollow_confirm_title">フォローをやめますか？</string>
     <string name="user_profile_unfollow_confirm_message">いつでもこのプロフィールを再度フォローできます。</string>
     <string name="user_profile_unfollow_confirm_action">フォローをやめる</string>
+    <string name="user_profile_cancel_request_confirm_title">リクエストを取り消しますか？</string>
+    <string name="user_profile_cancel_request_confirm_message">フォローリクエストが取り下げられます。</string>
+    <string name="user_profile_cancel_request_confirm_action">リクエストを取り消す</string>
     <string name="user_profile_blocked">ブロック済み</string>
     <!-- Paridad iOS contextMenu.* / hiddenLayers.metrics.* -->
     <string name="context_menu_edit_moment">モーメントを編集</string>

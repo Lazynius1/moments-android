@@ -726,6 +726,9 @@
     <string name="user_profile_unfollow_confirm_title">要取消追蹤嗎？</string>
     <string name="user_profile_unfollow_confirm_message">你隨時都可以再次追蹤此個人檔案。</string>
     <string name="user_profile_unfollow_confirm_action">取消追蹤</string>
+    <string name="user_profile_cancel_request_confirm_title">取消申請？</string>
+    <string name="user_profile_cancel_request_confirm_message">你的追蹤申請將會被撤回。</string>
+    <string name="user_profile_cancel_request_confirm_action">取消申請</string>
     <string name="user_profile_blocked">已封鎖</string>
     <!-- Paridad iOS contextMenu.* / hiddenLayers.metrics.* -->
     <string name="context_menu_edit_moment">編輯動態</string>

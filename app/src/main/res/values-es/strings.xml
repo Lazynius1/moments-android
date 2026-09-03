@@ -655,6 +655,9 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="user_profile_unfollow_confirm_title">¿Dejar de seguir?</string>
     <string name="user_profile_unfollow_confirm_message">Puedes volver a seguir este perfil cuando quieras.</string>
     <string name="user_profile_unfollow_confirm_action">Dejar de seguir</string>
+    <string name="user_profile_cancel_request_confirm_title">¿Cancelar solicitud?</string>
+    <string name="user_profile_cancel_request_confirm_message">Tu solicitud de seguimiento será retirada.</string>
+    <string name="user_profile_cancel_request_confirm_action">Cancelar solicitud</string>
     <string name="user_profile_blocked">Bloqueado</string>
 
     <!-- modernComments (iOS ModernCommentsView) -->

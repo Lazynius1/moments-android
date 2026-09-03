@@ -613,6 +613,9 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="user_profile_unfollow_confirm_title">Nicht mehr folgen?</string>
     <string name="user_profile_unfollow_confirm_message">Du kannst diesem Profil jederzeit wieder folgen.</string>
     <string name="user_profile_unfollow_confirm_action">Entfolgen</string>
+    <string name="user_profile_cancel_request_confirm_title">Anfrage abbrechen?</string>
+    <string name="user_profile_cancel_request_confirm_message">Deine Follow-Anfrage wird zurückgezogen.</string>
+    <string name="user_profile_cancel_request_confirm_action">Anfrage abbrechen</string>
     <string name="user_profile_blocked">Blockiert</string>
 
     <!-- modernComments (iOS ModernCommentsView) -->

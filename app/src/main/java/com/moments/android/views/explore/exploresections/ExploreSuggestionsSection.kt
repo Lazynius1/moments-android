@@ -81,6 +81,7 @@ import com.moments.android.models.AppUser
 import com.moments.android.models.Moment
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.components.ModernFollowButton
 import com.moments.android.views.components.VerifiedBadgeView
 import com.moments.android.views.feed.rememberAdaptiveColors
 
@@ -523,7 +524,6 @@ fun ExploreErrorStateView(
 
 /**
  * Port de `FollowButton` (ExploreSuggestionsSection.swift).
- * Distinto de ModernFollowButton del feed.
  */
 @Composable
 fun ExploreSuggestionsFollowButton(
@@ -531,53 +531,12 @@ fun ExploreSuggestionsFollowButton(
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = rememberAdaptiveColors()
-    val view = LocalView.current
-    val isPassive = buttonState == FollowButtonState.REQUEST_PENDING
-    val (icon, text) = exploreFollowChrome(buttonState)
-
-    Row(
-        modifier
-            .graphicsLayer { alpha = if (isPassive) 0.78f else 1f }
-            .momentsChromeGlass(RoundedCornerShape(50), interactive = buttonState.isActionable)
-            .clickable(enabled = buttonState.isActionable) {
-                HapticManager.shared.lightImpact(view)
-                onTap()
-            }
-            .padding(horizontal = 20.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Icon(icon, contentDescription = null, tint = colors.primary, modifier = Modifier.size(14.dp))
-        Text(
-            text,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 14.sp,
-            color = colors.primary,
-        )
-    }
-}
-
-@Composable
-private fun exploreFollowChrome(state: FollowButtonState): Pair<ImageVector, String> {
-    val text = when (state) {
-        FollowButtonState.OWN_PROFILE -> stringResource(R.string.explore_button_own_profile)
-        FollowButtonState.BLOCKED -> stringResource(R.string.explore_button_blocked)
-        FollowButtonState.FOLLOWING -> stringResource(R.string.user_profile_following)
-        FollowButtonState.CAN_FOLLOW -> stringResource(R.string.explore_button_follow)
-        FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
-        FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
-        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> stringResource(R.string.feed_follow_cancel_request)
-    }
-    val icon = when (state) {
-        FollowButtonState.FOLLOWING -> Icons.Filled.Check
-        FollowButtonState.CAN_FOLLOW, FollowButtonState.CAN_REQUEST_FOLLOW -> Icons.Filled.Add
-        FollowButtonState.REQUEST_PENDING -> Icons.Filled.AccessTime
-        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> Icons.Filled.Close
-        FollowButtonState.BLOCKED -> Icons.Filled.Close
-        FollowButtonState.OWN_PROFILE -> Icons.Filled.Person
-    }
-    return icon to text
+    ModernFollowButton(
+        state = buttonState,
+        isLoading = false,
+        onClick = onTap,
+        modifier = modifier,
+    )
 }
 
 /** Port de `ProfileImageeView`. */

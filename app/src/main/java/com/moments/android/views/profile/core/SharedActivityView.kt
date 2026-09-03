@@ -167,7 +167,7 @@ fun SharedActivityView(
 
     fun handleRelationshipAction() {
         when (relationshipState) {
-            FollowButtonState.FOLLOWING -> showUnfollowConfirmation = true
+            FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> showUnfollowConfirmation = true
             FollowButtonState.CAN_FOLLOW, FollowButtonState.CAN_REQUEST_FOLLOW -> {
                 val next = if (relationshipState == FollowButtonState.CAN_REQUEST_FOLLOW) {
                     FollowButtonState.REQUEST_PENDING_CANCELLABLE
@@ -568,6 +568,7 @@ private data class SharedActivityTimelineItem(
 private fun sharedRelationshipLabel(state: FollowButtonState): Int = when (state) {
     FollowButtonState.OWN_PROFILE -> R.string.shared_activity_relationship_own
     FollowButtonState.BLOCKED -> R.string.shared_activity_relationship_blocked
+    FollowButtonState.MUTUALS -> R.string.audience_type_mutuals
     FollowButtonState.FOLLOWING -> R.string.shared_activity_relationship_following
     FollowButtonState.CAN_FOLLOW -> R.string.shared_activity_relationship_follow
     FollowButtonState.CAN_REQUEST_FOLLOW -> R.string.shared_activity_relationship_request_follow

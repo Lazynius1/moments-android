@@ -74,7 +74,6 @@ fun ModernExploreDetailHeader(
     var liveUsername by remember(moment?.authorId) { mutableStateOf("") }
     var followButtonState by remember(moment?.authorId) { mutableStateOf(FollowButtonState.CAN_FOLLOW) }
     var isFollowLoading by remember { mutableStateOf(false) }
-    var showingUnfollowConfirmation by remember { mutableStateOf(false) }
 
     LaunchedEffect(moment?.authorId) {
         liveUsername = ""
@@ -190,19 +189,15 @@ fun ModernExploreDetailHeader(
                             state = followButtonState,
                             isLoading = isFollowLoading,
                             onClick = {
-                                if (followButtonState == FollowButtonState.FOLLOWING) {
-                                    showingUnfollowConfirmation = true
-                                } else {
-                                    scope.launch {
-                                        performFollowToggle(
-                                            firestore = firestore,
-                                            moment = m,
-                                            currentUserId = currentUserId,
-                                            previousState = followButtonState,
-                                            onState = { followButtonState = it },
-                                            onLoading = { isFollowLoading = it },
-                                        )
-                                    }
+                                scope.launch {
+                                    performFollowToggle(
+                                        firestore = firestore,
+                                        moment = m,
+                                        currentUserId = currentUserId,
+                                        previousState = followButtonState,
+                                        onState = { followButtonState = it },
+                                        onLoading = { isFollowLoading = it },
+                                    )
                                 }
                             },
                         )
@@ -212,39 +207,6 @@ fun ModernExploreDetailHeader(
                 }
             }
         }
-    }
-
-    if (showingUnfollowConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showingUnfollowConfirmation = false },
-            title = { Text(stringResource(R.string.user_profile_unfollow_confirm_title)) },
-            text = { Text(stringResource(R.string.user_profile_unfollow_confirm_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showingUnfollowConfirmation = false
-                        val m = moment ?: return@TextButton
-                        scope.launch {
-                            performFollowToggle(
-                                firestore = firestore,
-                                moment = m,
-                                currentUserId = currentUserId,
-                                previousState = followButtonState,
-                                onState = { followButtonState = it },
-                                onLoading = { isFollowLoading = it },
-                            )
-                        }
-                    },
-                ) {
-                    Text(stringResource(R.string.user_profile_unfollow_confirm_action))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showingUnfollowConfirmation = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
     }
 }
 
@@ -286,7 +248,7 @@ private suspend fun performFollowToggle(
     if (!previousState.isActionable) return
 
     val optimistic = when (previousState) {
-        FollowButtonState.FOLLOWING -> FollowButtonState.CAN_FOLLOW
+        FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> FollowButtonState.CAN_FOLLOW
         FollowButtonState.CAN_REQUEST_FOLLOW -> FollowButtonState.REQUEST_PENDING_CANCELLABLE
         FollowButtonState.REQUEST_PENDING_CANCELLABLE -> FollowButtonState.CAN_REQUEST_FOLLOW
         FollowButtonState.CAN_FOLLOW -> FollowButtonState.FOLLOWING
@@ -297,7 +259,7 @@ private suspend fun performFollowToggle(
     onLoading(true)
     try {
         when (previousState) {
-            FollowButtonState.FOLLOWING ->
+            FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS ->
                 firestore.unfollowUser(currentUserId, moment.authorId)
             FollowButtonState.REQUEST_PENDING_CANCELLABLE ->
                 firestore.cancelFollowRequest(currentUserId, moment.authorId)

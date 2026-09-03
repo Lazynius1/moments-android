@@ -65,6 +65,8 @@ import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.utilities.momentsEmptyStateAppear
 import com.moments.android.utilities.momentsPressSubtle
+import com.moments.android.views.components.ModernFollowButton
+import com.moments.android.views.components.ModernFollowButtonStyle
 import com.moments.android.views.components.VerifiedBadge
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.shared.MomentsModalSheet
@@ -98,7 +100,6 @@ fun ReactionsListSheet(
     var isLoading by remember { mutableStateOf(true) }
     var followStates by remember { mutableStateOf<Map<String, FollowButtonState>>(emptyMap()) }
     var followLoadingStates by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
-    var pendingUnfollowUserId by remember { mutableStateOf<String?>(null) }
     var searchText by remember { mutableStateOf("") }
 
     val reactionGroups = remember(reactions) {
@@ -166,7 +167,7 @@ fun ReactionsListSheet(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
+                    .padding(horizontal = 12.dp)
                     .padding(top = 0.dp, bottom = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -190,8 +191,8 @@ fun ReactionsListSheet(
 
             Row(
                 Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 16.dp)
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 8.dp)
                     .fillMaxWidth()
                     .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = false)
                     .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -321,8 +322,8 @@ fun ReactionsListSheet(
                 else -> {
                     LazyColumn(
                         Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     ) {
                         items(filteredReactionGroups, key = { it.type.rawValue }) { group ->
                             ReactionGroupBlock(
@@ -333,23 +334,19 @@ fun ReactionsListSheet(
                                 currentUserId = uid,
                                 onFollowClick = { userId ->
                                     val state = followStates[userId] ?: FollowButtonState.CAN_FOLLOW
-                                    if (state == FollowButtonState.FOLLOWING) {
-                                        pendingUnfollowUserId = userId
-                                    } else {
-                                        scope.launch {
-                                            performFollowAction(
-                                                firestore = firestore,
-                                                userId = userId,
-                                                currentUserId = uid,
-                                                currentState = state,
-                                                onLoading = { loading ->
-                                                    followLoadingStates = followLoadingStates + (userId to loading)
-                                                },
-                                                onState = { next ->
-                                                    followStates = followStates + (userId to next)
-                                                },
-                                            )
-                                        }
+                                    scope.launch {
+                                        performFollowAction(
+                                            firestore = firestore,
+                                            userId = userId,
+                                            currentUserId = uid,
+                                            currentState = state,
+                                            onLoading = { loading ->
+                                                followLoadingStates = followLoadingStates + (userId to loading)
+                                            },
+                                            onState = { next ->
+                                                followStates = followStates + (userId to next)
+                                            },
+                                        )
                                     }
                                 },
                             )
@@ -358,41 +355,6 @@ fun ReactionsListSheet(
                 }
             }
         }
-    }
-
-    pendingUnfollowUserId?.let { unfollowId ->
-        AlertDialog(
-            onDismissRequest = { pendingUnfollowUserId = null },
-            title = { Text(stringResource(R.string.user_profile_unfollow_confirm_title)) },
-            text = { Text(stringResource(R.string.user_profile_unfollow_confirm_message)) },
-            confirmButton = {
-                TextButton({
-                    pendingUnfollowUserId = null
-                    scope.launch {
-                        val state = followStates[unfollowId] ?: FollowButtonState.FOLLOWING
-                        performFollowAction(
-                            firestore = firestore,
-                            userId = unfollowId,
-                            currentUserId = uid,
-                            currentState = state,
-                            onLoading = { loading ->
-                                followLoadingStates = followLoadingStates + (unfollowId to loading)
-                            },
-                            onState = { next ->
-                                followStates = followStates + (unfollowId to next)
-                            },
-                        )
-                    }
-                }) {
-                    Text(stringResource(R.string.user_profile_unfollow_confirm_action))
-                }
-            },
-            dismissButton = {
-                TextButton({ pendingUnfollowUserId = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
     }
 }
 
@@ -413,44 +375,31 @@ private fun ReactionGroupBlock(
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Box(
-                Modifier
-                    .size(32.dp)
-                    .background(group.type.color.copy(0.2f), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(group.type.filledIcon, color = group.type.color, fontSize = with(density) { legacyPoppinsSize(context, 18).toSp() }, fontWeight = FontWeight.Bold)
-            }
-            Column {
-                Text(
-                    group.type.displayName,
-                    color = if (isDark) Color.White else Color.Black,
-                    fontSize = with(density) { legacyPoppinsSize(context, 14).toSp() },
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    stringResource(
-                        if (group.count == 1) R.string.reactions_people_count_single else R.string.reactions_people_count,
-                        group.count,
-                    ),
-                    color = if (isDark) Color.White.copy(0.7f) else Color.Black.copy(0.7f),
-                    fontSize = with(density) { legacyPoppinsSize(context, 11).toSp() },
-                )
-            }
+            Text(
+                group.type.filledIcon,
+                color = group.type.color,
+                fontSize = with(density) { legacyPoppinsSize(context, 18).toSp() },
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                "${group.count}",
+                color = if (isDark) Color.White.copy(0.7f) else Color.Black.copy(0.7f),
+                fontSize = with(density) { legacyPoppinsSize(context, 13).toSp() },
+                fontWeight = FontWeight.SemiBold,
+            )
         }
 
         Column {
             visibleUsers.forEachIndexed { index, userId ->
                 ReactionUserRow(
                     userId = userId,
-                    reactionType = group.type,
                     profile = userProfiles[userId],
                     followState = followStates[userId] ?: FollowButtonState.CAN_FOLLOW,
                     followLoading = followLoadingStates[userId] == true,
@@ -482,7 +431,6 @@ private fun ReactionGroupBlock(
 @Composable
 private fun ReactionUserRow(
     userId: String,
-    reactionType: ReactionType,
     profile: AppUser?,
     followState: FollowButtonState,
     followLoading: Boolean,
@@ -496,7 +444,7 @@ private fun ReactionUserRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -525,23 +473,20 @@ private fun ReactionUserRow(
             }
         }
 
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = profile?.username ?: stringResource(R.string.messaging_user_default),
-                    color = if (isDark) Color.White else Color.Black,
-                    fontSize = with(density) { legacyPoppinsSize(context, 14).toSp() },
-                    fontWeight = FontWeight.SemiBold,
-                )
-                if (profile?.isVerified == true) {
-                    VerifiedBadge(size = 12.dp)
-                }
-            }
+        Row(
+            Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             Text(
-                stringResource(R.string.reactions_user_reacted, reactionType.displayName),
-                color = if (isDark) Color.White.copy(0.7f) else Color.Black.copy(0.7f),
-                fontSize = with(density) { legacyPoppinsSize(context, 11).toSp() },
+                text = profile?.username ?: stringResource(R.string.messaging_user_default),
+                color = if (isDark) Color.White else Color.Black,
+                fontSize = with(density) { legacyPoppinsSize(context, 14).toSp() },
+                fontWeight = FontWeight.SemiBold,
             )
+            if (profile?.isVerified == true) {
+                VerifiedBadge(size = 12.dp)
+            }
         }
 
         if (userId != currentUserId) {
@@ -551,8 +496,6 @@ private fun ReactionUserRow(
                 onClick = onFollowClick,
             )
         }
-
-        Text(reactionType.filledIcon, color = reactionType.color, fontSize = with(density) { legacyPoppinsSize(context, 16).toSp() })
     }
 }
 
@@ -562,64 +505,12 @@ private fun ReactionFollowChip(
     loading: Boolean,
     onClick: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val density = LocalDensity.current
-    val isDark = isSystemInDarkTheme()
-    val (icon, title) = followChrome(state)
-    val passive = state == FollowButtonState.REQUEST_PENDING
-
-    Box(
-        Modifier
-            .graphicsLayer { alpha = if (passive) 0.78f else 1f }
-            .momentsPressSubtle()
-            .clip(RoundedCornerShape(12.dp))
-            .momentsChromeGlass(RoundedCornerShape(12.dp), interactive = state.isActionable)
-            .clickable(enabled = !loading && state.isActionable, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (loading) {
-            CircularProgressIndicator(
-                Modifier.size(14.dp),
-                color = if (isDark) Color.White else Color.Black,
-                strokeWidth = 1.5.dp,
-            )
-        } else {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(icon, null, tint = if (isDark) Color.White else Color.Black, modifier = Modifier.size(12.dp))
-                Text(
-                    title,
-                    color = if (isDark) Color.White else Color.Black,
-                    fontSize = with(density) { legacyPoppinsSize(context, 12).toSp() },
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun followChrome(state: FollowButtonState): Pair<ImageVector, String> {
-    val title = when (state) {
-        FollowButtonState.FOLLOWING -> stringResource(R.string.user_profile_following)
-        FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
-        FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
-        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> stringResource(R.string.feed_follow_cancel_request)
-        FollowButtonState.BLOCKED -> stringResource(R.string.explore_button_blocked)
-        else -> stringResource(R.string.user_profile_follow)
-    }
-    val icon = when (state) {
-        FollowButtonState.FOLLOWING -> Icons.Filled.Person
-        FollowButtonState.CAN_REQUEST_FOLLOW -> Icons.Filled.PersonAdd
-        FollowButtonState.REQUEST_PENDING -> Icons.Filled.AccessTime
-        FollowButtonState.REQUEST_PENDING_CANCELLABLE -> Icons.Filled.Close
-        FollowButtonState.BLOCKED -> Icons.Filled.Close
-        else -> Icons.Filled.PersonAdd
-    }
-    return icon to title
+    ModernFollowButton(
+        state = state,
+        isLoading = loading,
+        onClick = onClick,
+        style = ModernFollowButtonStyle.COMPACT,
+    )
 }
 
 private suspend fun performFollowAction(
@@ -635,7 +526,7 @@ private suspend fun performFollowAction(
     onLoading(true)
     val result = runCatching {
         when (currentState) {
-            FollowButtonState.FOLLOWING -> {
+            FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> {
                 firestore.unfollowUser(uid, userId)
                 FollowButtonState.CAN_FOLLOW
             }
@@ -655,7 +546,7 @@ private suspend fun performFollowAction(
     }
     onLoading(false)
     result.onSuccess { next ->
-        if (currentState == FollowButtonState.FOLLOWING) HapticManager.shared.lightImpact()
+        if (currentState.isFollowingOrMutual) HapticManager.shared.lightImpact()
         else if (currentState == FollowButtonState.CAN_FOLLOW || currentState == FollowButtonState.CAN_REQUEST_FOLLOW) {
             HapticManager.shared.mediumImpact()
         }

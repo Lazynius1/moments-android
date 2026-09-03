@@ -371,7 +371,7 @@ fun UserProfileView(
     // Port de `handleFollowAction()`.
     val handleFollowAction: () -> Unit = {
         when (viewModel.followButtonState) {
-            FollowButtonState.FOLLOWING -> {
+            FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> {
                 viewModel.loadRelationshipManagementState()
                 showingRelationshipSheet = true
             }

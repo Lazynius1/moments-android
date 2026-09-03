@@ -726,6 +726,9 @@
     <string name="user_profile_unfollow_confirm_title">Takibi bırak?</string>
     <string name="user_profile_unfollow_confirm_message">İstediğin zaman bu profili tekrar takip edebilirsin.</string>
     <string name="user_profile_unfollow_confirm_action">Takibi bırak</string>
+    <string name="user_profile_cancel_request_confirm_title">İstek iptal edilsin mi?</string>
+    <string name="user_profile_cancel_request_confirm_message">Takip isteğiniz geri çekilecek.</string>
+    <string name="user_profile_cancel_request_confirm_action">İsteği iptal et</string>
     <string name="user_profile_blocked">Engellendi</string>
     <!-- Paridad iOS contextMenu.* / hiddenLayers.metrics.* -->
     <string name="context_menu_edit_moment">Moment\'i düzenle</string>
