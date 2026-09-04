@@ -2359,4 +2359,22 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="chat_request_disclaimer_outgoing">Vous pouvez envoyer jusqu’à 5 messages tant que la demande est en attente.</string>
     <string name="notification_message_request_generic">Vous avez une nouvelle demande de message.</string>
     <string name="profile_editor_profile_image_rejected">Cette photo ne peut pas être utilisée comme photo de profil.</string>
+    <string name="nova_welcome_editorial_greeting">Bonjour, %1$s.</string>
+    <string name="nova_welcome_editorial_question">À quoi pensez-vous ?</string>
+    <string name="nova_welcome_editorial_question_create">Qu’aimeriez-vous créer ?</string>
+    <string name="nova_welcome_editorial_question_solve">Quel problème aimeriez-vous résoudre ?</string>
+    <string name="nova_welcome_editorial_question_begin">Par où commençons-nous ?</string>
+    <string name="nova_welcome_editorial_support">Je peux vous aider à écrire, décider, apprendre ou créer dans Moments.</string>
+    <string name="nova_welcome_editorial_privacy">Je me souviens de vos préférences · Privé</string>
+    <string name="nova_ai_disclaimer">Nova peut faire des erreurs. Vérifiez les informations importantes.</string>
+    <string name="nova_welcome_today_title">Aujourd’hui avec Nova</string>
+    <string name="nova_welcome_memory_title">Un souvenir de Nova</string>
+    <string name="nova_welcome_continue_title">Continuer</string>
+    <string name="nova_welcome_spark_title">Étincelle du jour</string>
+    <string name="nova_welcome_editorial_organize_title">Aidez-moi à structurer une idée</string>
+    <string name="nova_welcome_editorial_organize_prompt">Aidez-moi à structurer une idée que j’ai</string>
+    <string name="nova_welcome_editorial_write_title">Écrivez quelque chose avec moi</string>
+    <string name="nova_welcome_editorial_write_prompt">Aidez-moi à écrire quelque chose</string>
+    <string name="nova_welcome_editorial_moments_title">Que puis-je faire dans Moments ?</string>
+    <string name="nova_welcome_editorial_moments_prompt">Que pouvez-vous m’aider à faire dans Moments ?</string>
 </resources>

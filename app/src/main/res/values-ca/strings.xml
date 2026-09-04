@@ -2300,4 +2300,22 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="chat_request_disclaimer_outgoing">Pots enviar fins a 5 missatges mentre la sol·licitud estigui pendent.</string>
     <string name="notification_message_request_generic">Tens una nova sol·licitud de missatge.</string>
     <string name="profile_editor_profile_image_rejected">Aquesta foto no es pot utilitzar com a foto de perfil.</string>
+    <string name="nova_welcome_editorial_greeting">Hola, %1$s.</string>
+    <string name="nova_welcome_editorial_question">En què estàs pensant?</string>
+    <string name="nova_welcome_editorial_question_create">Què t’agradaria crear?</string>
+    <string name="nova_welcome_editorial_question_solve">Què t’agradaria resoldre?</string>
+    <string name="nova_welcome_editorial_question_begin">Per on comencem?</string>
+    <string name="nova_welcome_editorial_support">Puc ajudar-te a escriure, decidir, aprendre o fer coses a Moments.</string>
+    <string name="nova_welcome_editorial_privacy">Recordo les teves preferències · Privat</string>
+    <string name="nova_ai_disclaimer">Nova pot cometre errors. Verifica la informació important.</string>
+    <string name="nova_welcome_today_title">Avui amb Nova</string>
+    <string name="nova_welcome_memory_title">Un record de Nova</string>
+    <string name="nova_welcome_continue_title">Continuar</string>
+    <string name="nova_welcome_spark_title">Espurna del dia</string>
+    <string name="nova_welcome_editorial_organize_title">Ajuda’m a ordenar una idea</string>
+    <string name="nova_welcome_editorial_organize_prompt">Ajuda’m a ordenar una idea que tinc</string>
+    <string name="nova_welcome_editorial_write_title">Escriu alguna cosa amb mi</string>
+    <string name="nova_welcome_editorial_write_prompt">Ajuda’m a escriure alguna cosa</string>
+    <string name="nova_welcome_editorial_moments_title">Què puc fer a Moments?</string>
+    <string name="nova_welcome_editorial_moments_prompt">En què em pots ajudar dins de Moments?</string>
 </resources>

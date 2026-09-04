@@ -7,6 +7,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -92,9 +94,6 @@ fun ExploreResultsSection(
             )
             SearchDisplayType.USERS -> UsersResultsView(
                 users = users,
-                userButtonStates = userButtonStates,
-                currentUserInterests = currentUserInterests,
-                onFollowUser = onFollowUser,
                 onUserTap = onUserTap,
             )
             SearchDisplayType.MOMENTS -> MomentsResultsView(
@@ -217,27 +216,21 @@ private fun HashtagResultsView(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun UsersResultsView(
     users: List<AppUser>,
-    userButtonStates: Map<String, FollowButtonState>,
-    currentUserInterests: List<String>,
-    onFollowUser: (String) -> Unit,
     onUserTap: (AppUser) -> Unit,
 ) {
-    val interestSet = currentUserInterests.toSet()
-    Column(
-        Modifier.padding(horizontal = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    FlowRow(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         users.forEach { user ->
-            SearchResultCard(
-                user = user,
-                buttonState = userButtonStates[user.id] ?: FollowButtonState.CAN_FOLLOW,
-                commonInterests = user.interests.toSet().intersect(interestSet).size,
-                onFollow = { onFollowUser(user.id) },
-                onTap = { onUserTap(user) },
-            )
+            MiniUserCard(user = user, onTap = { onUserTap(user) })
         }
     }
 }

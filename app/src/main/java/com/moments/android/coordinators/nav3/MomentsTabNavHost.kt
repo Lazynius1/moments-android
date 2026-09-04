@@ -172,7 +172,7 @@ fun MomentsTabNavHost(
                 Surface(Modifier.fillMaxSize(), color = Color.Transparent) {
                     // ≡ iOS navigationDestination(NovaView) — Back del sistema cierra.
                     androidx.activity.compose.BackHandler { navigator.navigateUp() }
-                    NovaView()
+                    NovaView(onDismiss = { navigator.navigateUp() })
                 }
             }
             is MomentsNavKey.Conversation -> NavEntry(key, metadata = fullScreenDialog) {

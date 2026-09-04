@@ -2894,4 +2894,22 @@
     <string name="message_requests_hidden_words_custom_description">हर लाइन में एक शब्द या वाक्यांश डालें, या उन्हें कॉमा से अलग करें। मिलान इसी डिवाइस पर होता है।</string>
     <string name="notification_message_request_generic">आपके पास मैसेज का नया अनुरोध है।</string>
     <string name="profile_editor_profile_image_rejected">इस फ़ोटो को प्रोफ़ाइल फ़ोटो के रूप में इस्तेमाल नहीं किया जा सकता।</string>
+    <string name="nova_welcome_editorial_greeting">नमस्ते, %1$s।</string>
+    <string name="nova_welcome_editorial_question">आप क्या सोच रहे हैं?</string>
+    <string name="nova_welcome_editorial_question_create">आप क्या बनाना चाहेंगे?</string>
+    <string name="nova_welcome_editorial_question_solve">आप क्या हल करना चाहेंगे?</string>
+    <string name="nova_welcome_editorial_question_begin">हम कहाँ से शुरू करें?</string>
+    <string name="nova_welcome_editorial_support">मैं आपको लिखने, निर्णय लेने, सीखने या Moments में कुछ बनाने में मदद कर सकता हूँ।</string>
+    <string name="nova_welcome_editorial_privacy">मैं आपकी पसंद याद रखता हूँ · निजी</string>
+    <string name="nova_ai_disclaimer">Nova गलतियाँ कर सकता है। महत्वपूर्ण जानकारी की जाँच करें।</string>
+    <string name="nova_welcome_today_title">आज Nova के साथ</string>
+    <string name="nova_welcome_memory_title">Nova की एक याद</string>
+    <string name="nova_welcome_continue_title">जारी रखें</string>
+    <string name="nova_welcome_spark_title">आज की प्रेरणा</string>
+    <string name="nova_welcome_editorial_organize_title">एक विचार व्यवस्थित करने में मेरी मदद करें</string>
+    <string name="nova_welcome_editorial_organize_prompt">मेरे एक विचार को व्यवस्थित करने में मेरी मदद करें</string>
+    <string name="nova_welcome_editorial_write_title">मेरे साथ कुछ लिखें</string>
+    <string name="nova_welcome_editorial_write_prompt">कुछ लिखने में मेरी मदद करें</string>
+    <string name="nova_welcome_editorial_moments_title">Moments में क्या-क्या किया जा सकता है?</string>
+    <string name="nova_welcome_editorial_moments_prompt">Moments में आप मेरी किस तरह मदद कर सकते हैं?</string>
 </resources>

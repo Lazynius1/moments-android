@@ -2293,4 +2293,22 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="chat_request_disclaimer_outgoing">Podes enviar até 5 mensagens enquanto o pedido estiver pendente.</string>
     <string name="notification_message_request_generic">Tens um novo pedido de mensagem.</string>
     <string name="profile_editor_profile_image_rejected">Esta fotografia não pode ser usada como foto de perfil.</string>
+    <string name="nova_welcome_editorial_greeting">Olá, %1$s.</string>
+    <string name="nova_welcome_editorial_question">Em que estás a pensar?</string>
+    <string name="nova_welcome_editorial_question_create">O que gostarias de criar?</string>
+    <string name="nova_welcome_editorial_question_solve">O que gostarias de resolver?</string>
+    <string name="nova_welcome_editorial_question_begin">Por onde começamos?</string>
+    <string name="nova_welcome_editorial_support">Posso ajudar-te a escrever, decidir, aprender ou criar coisas no Moments.</string>
+    <string name="nova_welcome_editorial_privacy">Lembro-me das tuas preferências · Privado</string>
+    <string name="nova_ai_disclaimer">A Nova pode cometer erros. Verifica as informações importantes.</string>
+    <string name="nova_welcome_today_title">Hoje com a Nova</string>
+    <string name="nova_welcome_memory_title">Uma memória da Nova</string>
+    <string name="nova_welcome_continue_title">Continuar</string>
+    <string name="nova_welcome_spark_title">Faísca do dia</string>
+    <string name="nova_welcome_editorial_organize_title">Ajuda-me a organizar uma ideia</string>
+    <string name="nova_welcome_editorial_organize_prompt">Ajuda-me a organizar uma ideia que tenho</string>
+    <string name="nova_welcome_editorial_write_title">Escreve algo comigo</string>
+    <string name="nova_welcome_editorial_write_prompt">Ajuda-me a escrever algo</string>
+    <string name="nova_welcome_editorial_moments_title">O que posso fazer no Moments?</string>
+    <string name="nova_welcome_editorial_moments_prompt">Em que me podes ajudar no Moments?</string>
 </resources>

@@ -9,6 +9,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,17 +21,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Memory
@@ -51,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -61,18 +66,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewModelScope
 import com.moments.android.R
+import com.moments.android.extensions.timeAgoDisplay
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MomentsPressDefaults
 import com.moments.android.utilities.momentsPress
 import com.moments.android.views.nova.agent.NovaAgent
+import com.moments.android.views.nova.NovaConversationTitle
+import com.moments.android.views.nova.memory.NovaFact
+import com.moments.android.views.nova.memory.NovaFactType
 import com.moments.android.views.nova.novacore.NovaBrandIcon
 import com.moments.android.views.nova.novacore.NovaColors
 import kotlinx.coroutines.delay
@@ -90,6 +102,7 @@ import kotlin.random.Random
 @Composable
 fun NovaHeader(
     agent: NovaAgent,
+    onBack: () -> Unit,
     showConversationHistory: (Boolean) -> Unit,
     showSuggestedOptions: (Boolean) -> Unit,
     isShowingMemory: (Boolean) -> Unit,
@@ -181,54 +194,59 @@ fun NovaHeader(
         )
     }
 
+    val backInteraction = remember { MutableInteractionSource() }
     val logoInteraction = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .padding(top = 8.dp)
-            .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 20.dp)
+            .padding(top = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
             modifier = Modifier
                 .size(40.dp)
-                .momentsPress(logoInteraction, MomentsPressDefaults.momentsPress.copy(haptic = MomentsPressDefaults.PressHaptic.NONE))
+                .momentsPress(backInteraction, MomentsPressDefaults.momentsPressIcon)
                 .momentsChromeGlass(CircleShape, interactive = true)
+                .clickable(interactionSource = backInteraction, indication = null, onClick = onBack),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBack,
+                contentDescription = stringResource(R.string.common_back),
+                tint = NovaColors.textPrimary,
+                modifier = Modifier.size(19.dp),
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .momentsPress(logoInteraction, MomentsPressDefaults.momentsPress.copy(haptic = MomentsPressDefaults.PressHaptic.NONE))
                 .clickable(interactionSource = logoInteraction, indication = null, onClick = ::handleLogoTap),
             contentAlignment = Alignment.Center,
         ) {
             NovaBrandIcon(
-                size = 22.dp,
+                size = 34.dp,
                 modifier = Modifier.scale(logoScale * pulseFactor),
             )
         }
 
-        Column(
-            modifier = Modifier.padding(start = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.nova_name),
-                color = NovaColors.textPrimary,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = stringResource(R.string.nova_chrome_subtitle),
-                color = NovaColors.textSecondary,
-                fontSize = 12.sp,
-            )
-        }
+        Text(
+            text = stringResource(R.string.nova_name),
+            color = NovaColors.textPrimary,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+        )
 
         Spacer(Modifier.weight(1f))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NovaChromeIconButton(
-                icon = Icons.Default.Memory,
-                contentDescription = stringResource(R.string.nova_memory_title),
-                onClick = { isShowingMemory(true) },
+                icon = Icons.Default.History,
+                contentDescription = stringResource(R.string.nova_history_title),
+                onClick = { showConversationHistory(true) },
             )
             if (agent.conversationHistory.isNotEmpty()) {
                 NovaChromeIconButton(
@@ -241,9 +259,9 @@ fun NovaHeader(
                 )
             }
             NovaChromeIconButton(
-                icon = Icons.Default.History,
-                contentDescription = stringResource(R.string.nova_history_title),
-                onClick = { showConversationHistory(true) },
+                icon = Icons.Default.Memory,
+                contentDescription = stringResource(R.string.nova_memory_title),
+                onClick = { isShowingMemory(true) },
             )
         }
     }
@@ -258,7 +276,7 @@ private fun NovaChromeIconButton(
     val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = Modifier
-            .size(36.dp)
+            .size(42.dp)
             .momentsPress(interaction, MomentsPressDefaults.momentsPressIcon)
             .momentsChromeGlass(CircleShape, interactive = true)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
@@ -268,7 +286,7 @@ private fun NovaChromeIconButton(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = NovaColors.textPrimary,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(19.dp),
         )
     }
 }
@@ -285,96 +303,294 @@ fun ModernWelcomeSection(
     agent: NovaAgent,
     showSuggestedOptions: Boolean,
     onShowSuggestedOptionsChange: (Boolean) -> Unit = {},
-    /** Hueco bajo header + badge de encriptación (safeAreaTop incluido). */
-    topClearance: Dp = 132.dp,
+    onOpenMemory: () -> Unit,
+    /** Hueco bajo el header (safeAreaTop incluido). */
+    topClearance: Dp = 114.dp,
     /** Hueco sobre el input bar. */
-    bottomClearance: Dp = 88.dp,
+    bottomClearance: Dp = 136.dp,
 ) {
+    val welcomeScrollState = remember { ScrollState(initial = 0) }
+    val questions = listOf(
+        stringResource(R.string.nova_welcome_editorial_question),
+        stringResource(R.string.nova_welcome_editorial_question_create),
+        stringResource(R.string.nova_welcome_editorial_question_solve),
+        stringResource(R.string.nova_welcome_editorial_question_begin),
+    )
+    val suggestions = listOf(
+        NovaEditorialSuggestion(
+            title = stringResource(R.string.nova_welcome_editorial_organize_title),
+            prompt = stringResource(R.string.nova_welcome_editorial_organize_prompt),
+        ),
+        NovaEditorialSuggestion(
+            title = stringResource(R.string.nova_welcome_editorial_write_title),
+            prompt = stringResource(R.string.nova_welcome_editorial_write_prompt),
+        ),
+        NovaEditorialSuggestion(
+            title = stringResource(R.string.nova_welcome_editorial_moments_title),
+            prompt = stringResource(R.string.nova_welcome_editorial_moments_prompt),
+        ),
+    )
+    val highlightedMemory = remember(agent.userMemory) {
+        agent.userMemory?.facts
+            .orEmpty()
+            .filterNot {
+                it.normalizedContent.startsWith("preferred name:") ||
+                    it.normalizedContent.startsWith("pronouns:")
+            }
+            .sortedWith(
+                compareByDescending<NovaFact> { it.type == NovaFactType.PERSONAL }
+                    .thenByDescending { it.importance }
+                    .thenByDescending { it.timestamp },
+            )
+            .firstOrNull()
+    }
+    val latestConversation = remember(agent.conversationTitles) {
+        agent.conversationTitles.maxByOrNull { it.lastUpdated }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = 28.dp)
             .padding(top = topClearance, bottom = bottomClearance)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .verticalScroll(welcomeScrollState),
+        horizontalAlignment = Alignment.Start,
     ) {
         Text(
-            text = stringResource(R.string.nova_welcome_eyebrow),
-            color = NovaColors.textSecondary,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier
-                .clip(CircleShape)
-                .background(NovaColors.materialBackground)
-                .border(1.dp, NovaColors.borderColor, CircleShape)
-                .padding(horizontal = 10.dp, vertical = 5.dp),
+            text = stringResource(R.string.nova_welcome_editorial_greeting, agent.currentUserDisplayName),
+            color = NovaColors.textPrimary,
+            fontFamily = FontFamily.Serif,
+            fontSize = 45.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.nova_hello, agent.currentUserDisplayName),
-                color = NovaColors.textPrimary,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = stringResource(R.string.nova_introduction),
-                color = NovaColors.textSecondary,
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center,
-                lineHeight = 19.sp,
-                modifier = Modifier.padding(horizontal = 4.dp),
-            )
-        }
+        NovaTypewriterQuestion(
+            phrases = questions,
+            modifier = Modifier.padding(top = 2.dp),
+        )
 
-        Column(
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(NovaColors.materialBackground)
-                    .border(1.dp, NovaColors.borderColor, RoundedCornerShape(14.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Memory,
-                    contentDescription = null,
-                    tint = NovaColors.textSecondary,
-                    modifier = Modifier.size(14.dp),
-                )
-                Text(
-                    text = stringResource(R.string.nova_welcome_support),
-                    color = NovaColors.textSecondary,
-                    fontSize = 12.sp,
-                )
-            }
-
-            val interests = agent.userData?.interests.orEmpty()
-            if (interests.isNotEmpty()) {
-                Text(
-                    text = interests.take(3).joinToString(" • "),
-                    color = NovaColors.textTertiary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
+        Text(
+            text = stringResource(R.string.nova_welcome_editorial_support),
+            color = NovaColors.textSecondary,
+            fontSize = 16.sp,
+            lineHeight = 22.sp,
+            modifier = Modifier.padding(top = 20.dp, bottom = 22.dp),
+        )
 
         if (showSuggestedOptions) {
-            SmartSuggestionChips(agent, onShowSuggestedOptionsChange)
+            suggestions.forEach { suggestion ->
+                NovaEditorialSuggestionRow(suggestion) {
+                    agent.inputText = suggestion.prompt
+                    onShowSuggestedOptionsChange(false)
+                    agent.sendMessage()
+                }
+            }
+        }
+
+        NovaWelcomeTodaySection(
+            memory = highlightedMemory,
+            conversation = latestConversation,
+            dailySpark = agent.welcomeSpark,
+            onOpenMemory = onOpenMemory,
+            onContinueConversation = { conversationId ->
+                agent.viewModelScope.launch { agent.loadConversation(conversationId) }
+            },
+            onUseSpark = { agent.openConversationFromSpark() },
+            modifier = Modifier.padding(top = 22.dp),
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 24.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = null,
+                tint = NovaColors.textTertiary,
+                modifier = Modifier.size(12.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.nova_welcome_editorial_privacy),
+                color = NovaColors.textTertiary,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+            )
         }
     }
+}
+
+private data class NovaEditorialSuggestion(val title: String, val prompt: String)
+
+@Composable
+private fun NovaEditorialSuggestionRow(suggestion: NovaEditorialSuggestion, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(NovaColors.borderColor.copy(alpha = 0.62f)))
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = suggestion.title,
+                color = NovaColors.textPrimary,
+                fontSize = 16.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = NovaColors.textSecondary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun NovaWelcomeTodaySection(
+    memory: NovaFact?,
+    conversation: NovaConversationTitle?,
+    dailySpark: String?,
+    onOpenMemory: () -> Unit,
+    onContinueConversation: (String) -> Unit,
+    onUseSpark: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.nova_welcome_today_title).uppercase(),
+            color = NovaColors.textTertiary,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.7.sp,
+            modifier = Modifier.padding(bottom = 10.dp),
+        )
+        NovaWelcomeTodayRow(
+            icon = if (memory == null) Icons.Default.Memory else Icons.Default.AutoAwesome,
+            eyebrow = stringResource(R.string.nova_welcome_memory_title),
+            title = memory?.content ?: stringResource(R.string.nova_memory_empty_subtitle),
+            onClick = onOpenMemory,
+        )
+        conversation?.let {
+            NovaWelcomeTodayRow(
+                icon = Icons.Default.History,
+                eyebrow = stringResource(R.string.nova_welcome_continue_title),
+                title = it.title,
+                detail = it.lastUpdated.timeAgoDisplay(),
+                onClick = { onContinueConversation(it.id) },
+            )
+        }
+        NovaWelcomeTodayRow(
+            icon = Icons.Default.AutoAwesome,
+            eyebrow = stringResource(R.string.nova_welcome_spark_title),
+            title = dailySpark ?: "…",
+            enabled = dailySpark != null,
+            onClick = onUseSpark,
+        )
+    }
+}
+
+@Composable
+private fun NovaWelcomeTodayRow(
+    icon: ImageVector,
+    eyebrow: String,
+    title: String,
+    detail: String? = null,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .alpha(if (enabled) 1f else 0.58f),
+    ) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(NovaColors.borderColor.copy(alpha = 0.5f)))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 58.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(icon, null, tint = NovaColors.textSecondary, modifier = Modifier.size(18.dp).width(28.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(eyebrow, color = NovaColors.textTertiary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    title,
+                    color = NovaColors.textPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            detail?.let {
+                Text(it, color = NovaColors.textTertiary, fontSize = 10.sp, maxLines = 1)
+            }
+            Icon(Icons.Default.ChevronRight, null, tint = NovaColors.textTertiary, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun NovaTypewriterQuestion(phrases: List<String>, modifier: Modifier = Modifier) {
+    var displayedText by remember { mutableStateOf("") }
+    var phraseIndex by remember { mutableIntStateOf(0) }
+    var cursorVisible by remember { mutableStateOf(true) }
+    val phraseKey = phrases.joinToString("\u0000")
+    val currentPhrase = phrases.getOrElse(phraseIndex % max(phrases.size, 1)) { "" }
+
+    LaunchedEffect(phraseKey, MotionPolicy.reduceMotion) {
+        if (phrases.isEmpty()) return@LaunchedEffect
+        if (MotionPolicy.reduceMotion) {
+            displayedText = currentPhrase
+            cursorVisible = false
+            return@LaunchedEffect
+        }
+        while (true) {
+            val phrase = phrases[phraseIndex % phrases.size]
+            displayedText = ""
+            phrase.forEach { character ->
+                displayedText += character
+                delay(65)
+            }
+            delay(1_650)
+            while (displayedText.isNotEmpty()) {
+                displayedText = displayedText.dropLast(1)
+                delay(38)
+            }
+            delay(260)
+            phraseIndex = (phraseIndex + 1) % phrases.size
+        }
+    }
+
+    LaunchedEffect(MotionPolicy.reduceMotion) {
+        if (MotionPolicy.reduceMotion) return@LaunchedEffect
+        while (true) {
+            delay(480)
+            cursorVisible = !cursorVisible
+        }
+    }
+
+    Text(
+        text = displayedText + if (cursorVisible) "│" else " ",
+        color = NovaColors.textPrimary,
+        fontFamily = FontFamily.Serif,
+        fontSize = 45.sp,
+        lineHeight = 48.sp,
+        maxLines = 2,
+        overflow = TextOverflow.Clip,
+        modifier = modifier.fillMaxWidth().heightIn(min = 96.dp),
+    )
 }
 
 // MARK: - Cards

@@ -90,6 +90,7 @@ object NovaInputBarLayout {
     val sheetAboveTabBarGap: Dp = 12.dp
     /** Tab bar clearance (pill flotante ≈ iOS 26). */
     val tabBarClearance: Dp = 74.dp
+    val disclaimerRowHeight: Dp = 18.dp
 
     fun bottomPadding(keyboardHeight: Dp, safeAreaBottom: Dp): Dp =
         if (keyboardHeight > 0.dp) {
@@ -102,7 +103,7 @@ object NovaInputBarLayout {
         }
 
     fun attachmentSheetBottomInset(safeAreaBottom: Dp): Dp =
-        safeAreaBottom + tabBarClearance + sheetAboveTabBarGap
+        safeAreaBottom + tabBarClearance + disclaimerRowHeight + sheetAboveTabBarGap
 }
 
 @Composable

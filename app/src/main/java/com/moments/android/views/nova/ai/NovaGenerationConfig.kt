@@ -39,6 +39,16 @@ object NovaGenerationConfig {
         }
     }
 
+    val welcomeSpark = generationConfig {
+        temperature = 1.25f
+        topP = 0.95f
+        topK = 64
+        maxOutputTokens = 64
+        thinkingConfig = thinkingConfig {
+            thinkingBudget = 0
+        }
+    }
+
     val safetySettings = listOf(
         SafetySetting(HarmCategory.HARASSMENT, HarmBlockThreshold.MEDIUM_AND_ABOVE),
         SafetySetting(HarmCategory.HATE_SPEECH, HarmBlockThreshold.MEDIUM_AND_ABOVE),

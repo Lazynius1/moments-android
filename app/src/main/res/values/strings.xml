@@ -2917,4 +2917,22 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="message_requests_hidden_words_custom_description">Enter one per line or separate them with commas. Matching happens locally.</string>
     <string name="notification_message_request_generic">You have a new message request.</string>
     <string name="profile_editor_profile_image_rejected">This photo can\'t be used as your profile picture.</string>
+    <string name="nova_welcome_editorial_greeting">Hello, %1$s.</string>
+    <string name="nova_welcome_editorial_question">What are you thinking about?</string>
+    <string name="nova_welcome_editorial_question_create">What would you like to create?</string>
+    <string name="nova_welcome_editorial_question_solve">What would you like to solve?</string>
+    <string name="nova_welcome_editorial_question_begin">Where should we begin?</string>
+    <string name="nova_welcome_editorial_support">I can help you write, decide, learn, or make things in Moments.</string>
+    <string name="nova_welcome_editorial_privacy">I remember your preferences · Private</string>
+    <string name="nova_ai_disclaimer">Nova can make mistakes. Check important information.</string>
+    <string name="nova_welcome_today_title">Today with Nova</string>
+    <string name="nova_welcome_memory_title">A memory from Nova</string>
+    <string name="nova_welcome_continue_title">Continue</string>
+    <string name="nova_welcome_spark_title">Spark of the day</string>
+    <string name="nova_welcome_editorial_organize_title">Help me organize an idea</string>
+    <string name="nova_welcome_editorial_organize_prompt">Help me organize an idea I have</string>
+    <string name="nova_welcome_editorial_write_title">Write something with me</string>
+    <string name="nova_welcome_editorial_write_prompt">Help me write something</string>
+    <string name="nova_welcome_editorial_moments_title">What can I do in Moments?</string>
+    <string name="nova_welcome_editorial_moments_prompt">What can you help me do in Moments?</string>
 </resources>

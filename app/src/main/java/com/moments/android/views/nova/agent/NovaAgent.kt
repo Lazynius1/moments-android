@@ -23,6 +23,8 @@ import com.moments.android.views.nova.novacore.NovaChatMessage
 import com.moments.android.views.nova.novacore.NovaGroundingSource
 import com.moments.android.views.nova.ai.NovaAIService.GroundingMetadata
 import com.moments.android.views.nova.ai.NovaAIService.NovaModelContent
+import com.moments.android.views.nova.core.NovaLocaleContext
+import com.moments.android.views.nova.core.NovaWelcomeSparkStore
 import com.moments.android.views.nova.memory.NovaContextStore
 import com.moments.android.views.nova.memory.NovaMemory
 import com.moments.android.views.nova.memory.NovaMemoryEngine
@@ -79,6 +81,10 @@ class NovaAgent(
         private set
     var conversationTitles by mutableStateOf<List<NovaConversationTitle>>(emptyList())
         private set
+    var welcomeSpark by mutableStateOf<String?>(null)
+        private set
+    var isWelcomeSparkLoading by mutableStateOf(false)
+        private set
     var agentStatus by mutableStateOf<NovaAgentStatus>(NovaAgentStatus.Idle)
         private set
     var activeToolDisplayName by mutableStateOf<String?>(null)
@@ -111,14 +117,15 @@ class NovaAgent(
         isLoading = true
         installMemoryObserver(userId)
         viewModelScope.launch {
-            runCatching { firestoreService.fetchUserDataForNova(userId) }
-                .onSuccess { user ->
-                    userData = user
-                    loadMemoryAndContext(userId)
-                    loadConversationTitles()
-                    bootstrapChatSession()
-                }
+            val user = runCatching { firestoreService.fetchUserDataForNova(userId) }.getOrNull()
+            if (user != null) {
+                userData = user
+                loadMemoryAndContext(userId)
+                loadConversationTitles()
+                bootstrapChatSession()
+            }
             isLoading = false
+            if (user != null) generateWelcomeSpark()
         }
     }
 
@@ -172,24 +179,75 @@ class NovaAgent(
         conversationTitles = conversationStore.loadConversationTitles(userId)
     }
 
+    private fun generateWelcomeSpark() {
+        val userId = auth.currentUser?.uid ?: return
+        if (isWelcomeSparkLoading || welcomeSpark != null) return
+
+        val today = NovaWelcomeSparkStore.todayKey()
+        val cached = NovaWelcomeSparkStore.load(appContext, userId)
+        if (cached != null && cached.day == today && cached.text.length in 8..180) {
+            welcomeSpark = cached.text
+            return
+        }
+
+        isWelcomeSparkLoading = true
+        val prompt = NovaPromptCatalog.welcomeSparkPrompt(
+            locale = NovaLocaleContext.appLocaleIdentifier,
+            context = welcomeSparkContext(cached?.text),
+        )
+
+        viewModelScope.launch {
+            val generated = runCatching { ai.generateWelcomeSpark(prompt) }.getOrNull()
+            val cleaned = generated
+                ?.replace('\n', ' ')
+                ?.trim { it.isWhitespace() || it == '"' || it == '“' || it == '”' }
+            if (cleaned != null && cleaned.length in 8..180) {
+                welcomeSpark = cleaned
+                NovaWelcomeSparkStore.save(appContext, userId, today, cleaned)
+            }
+            isWelcomeSparkLoading = false
+        }
+    }
+
+    private fun welcomeSparkContext(previousSpark: String?): List<String> {
+        val lines = mutableListOf<String>()
+        val facts = userMemory?.facts
+            .orEmpty()
+            .filterNot { fact ->
+                val content = fact.normalizedContent
+                content.startsWith("preferred name:") || content.startsWith("pronouns:")
+            }
+            .sortedByDescending { it.relevanceScore }
+            .take(5)
+        facts.randomOrNull()?.let { lines += "- Soft cue: ${it.content}" }
+        userData?.interests.orEmpty().randomOrNull()?.let { lines += "- Interest flavor: $it" }
+        conversationTitles.take(3).forEach { lines += "- Do not reopen this recent topic: ${it.title}" }
+        if (!previousSpark.isNullOrBlank()) {
+            lines += "- Do not repeat or rephrase yesterday's spark: $previousSpark"
+        }
+        return lines
+    }
+
     fun startNewConversation() {
         viewModelScope.launch {
-            finalizeConversationIfNeeded()
-            currentConversationId = null
-            lastFinalizedFingerprint = null
-            internalHistorySummary = null
-            stagedMomentImage = null
-            conversationHistory = listOf(
-                NovaChatMessage(
-                    text = string(R.string.nova_chat_encryption_notice),
-                    isUser = false,
-                    isSystem = true,
-                ),
-            )
-            chatSession = null
+            resetConversationDraft()
+            conversationHistory = listOf(encryptionNotice())
             bootstrapChatSession()
             showSuggestedOptions = true
-            agentStatus = NovaAgentStatus.Idle
+        }
+    }
+
+    fun openConversationFromSpark() {
+        val spark = welcomeSpark?.trim().orEmpty()
+        if (spark.isEmpty()) return
+        viewModelScope.launch {
+            resetConversationDraft()
+            conversationHistory = listOf(
+                encryptionNotice(),
+                NovaChatMessage(text = spark, isUser = false),
+            )
+            rebuildChatFromHistoryAsync()
+            showSuggestedOptions = false
         }
     }
 
@@ -517,13 +575,45 @@ class NovaAgent(
             .getOrElse { modelHistory(messages.takeLast(18)) to null }
     }
 
-    private fun modelHistory(messages: List<NovaChatMessage>): List<NovaModelContent> = messages.mapNotNull { message ->
-        when {
-            message.isUser -> NovaModelContent.user(NovaAIService.userParts(message.text, message.image))
-            message.text.isNotBlank() -> NovaModelContent.modelText(message.text.trim())
-            else -> null
+    private fun modelHistory(messages: List<NovaChatMessage>): List<NovaModelContent> {
+        val mapped = mutableListOf<NovaModelContent>()
+        var startsWithUser = false
+        for (message in messages) {
+            when {
+                message.isUser -> {
+                    if (mapped.isEmpty()) startsWithUser = true
+                    mapped += NovaModelContent.user(NovaAIService.userParts(message.text, message.image))
+                }
+                message.text.isNotBlank() -> mapped += NovaModelContent.modelText(message.text.trim())
+            }
         }
+        if (mapped.isEmpty() || startsWithUser) return mapped
+        mapped.add(0, NovaModelContent.userText(NovaPromptCatalog.assistantOpeningSeed))
+        return mapped
     }
+
+    private suspend fun resetConversationDraft() {
+        sendJob?.cancel()
+        sendJob = null
+        finalizeConversationIfNeeded()
+        currentConversationId = null
+        lastFinalizedFingerprint = null
+        internalHistorySummary = null
+        stagedMomentImage = null
+        conversationHistory = emptyList()
+        chatSession = null
+        inputText = ""
+        selectedImage = null
+        agentStatus = NovaAgentStatus.Idle
+        activeToolDisplayName = null
+        isLoading = false
+    }
+
+    private fun encryptionNotice() = NovaChatMessage(
+        text = string(R.string.nova_chat_encryption_notice),
+        isUser = false,
+        isSystem = true,
+    )
 
     private suspend fun loadMemoryAndContext(userId: String) {
         userMemory = memoryStore.loadMemory(userId)

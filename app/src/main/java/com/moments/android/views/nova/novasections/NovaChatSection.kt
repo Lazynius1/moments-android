@@ -289,7 +289,6 @@ private fun NovaAssistantBubble(
     onRegenerate: (() -> Unit)?,
 ) {
     val context = LocalContext.current
-    val bubbleShape = RoundedCornerShape(20.dp)
 
     fun copyText() {
         context.getSystemService(android.content.ClipboardManager::class.java)
@@ -306,11 +305,10 @@ private fun NovaAssistantBubble(
         )
     }
 
-    Row(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.weight(1f, fill = false).widthIn(max = 330.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
             Row(
                 modifier = Modifier.padding(start = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -374,24 +372,18 @@ private fun NovaAssistantBubble(
                 }
             }
 
-            EnhancedFormattedText(
-                text = displayedText,
-                modifier = Modifier
-                    .clip(bubbleShape)
-                    .background(NovaColors.cardBackground)
-                    .border(1.dp, NovaColors.borderColor, bubbleShape)
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-            )
+        EnhancedFormattedText(
+            text = displayedText,
+            modifier = Modifier.fillMaxWidth(),
+        )
 
-            if (message.groundingSources.isNotEmpty() || !message.searchSuggestionsHtml.isNullOrEmpty()) {
-                NovaGroundingFooter(
-                    sources = message.groundingSources,
-                    searchSuggestionsHtml = message.searchSuggestionsHtml,
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                )
-            }
+        if (message.groundingSources.isNotEmpty() || !message.searchSuggestionsHtml.isNullOrEmpty()) {
+            NovaGroundingFooter(
+                sources = message.groundingSources,
+                searchSuggestionsHtml = message.searchSuggestionsHtml,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
         }
-        Spacer(Modifier.widthIn(min = 50.dp))
     }
 }
 
@@ -561,22 +553,31 @@ fun GoogleSearchSuggestionsView(
 
 // MARK: - Parsing models
 
-enum class NovaTextSectionType { HEADER, BULLET, NUMBERED, LINK, CODE, QUOTE, REGULAR }
+enum class NovaTextSectionType { HEADER, BULLET, NUMBERED, CODE, QUOTE, REGULAR }
 
 data class NovaTextSection(
     val type: NovaTextSectionType,
     val content: String,
     val url: String? = null,
     val number: Int? = null,
+    val headingLevel: Int? = null,
 )
 
 fun parseNovaText(text: String): List<NovaTextSection> {
     val sections = mutableListOf<NovaTextSection>()
     val code = mutableListOf<String>()
+    val paragraph = mutableListOf<String>()
     var language = ""
     var inCode = false
 
+    fun flushParagraph() {
+        if (paragraph.isEmpty()) return
+        sections += NovaTextSection(NovaTextSectionType.REGULAR, paragraph.joinToString(" "))
+        paragraph.clear()
+    }
+
     fun flushCode() {
+        flushParagraph()
         sections += NovaTextSection(
             NovaTextSectionType.CODE,
             code.joinToString("\n"),
@@ -590,6 +591,7 @@ fun parseNovaText(text: String): List<NovaTextSection> {
     text.lines().forEach { line ->
         val trimmed = line.trim()
         if (trimmed.startsWith("```")) {
+            flushParagraph()
             if (inCode) flushCode()
             else {
                 inCode = true
@@ -602,24 +604,23 @@ fun parseNovaText(text: String): List<NovaTextSection> {
             return@forEach
         }
         when {
-            trimmed.isBlank() -> Unit
-            trimmed.startsWith("#") -> {
-                val content = trimmed
-                    .replace("##", "")
-                    .replace("#", "")
-                    .trim()
-                sections += NovaTextSection(NovaTextSectionType.HEADER, content)
+            trimmed.isBlank() -> flushParagraph()
+            Regex("^#{1,6}\\s+").containsMatchIn(trimmed) -> {
+                flushParagraph()
+                val marker = Regex("^(#{1,6})\\s+").find(trimmed) ?: return@forEach
+                sections += NovaTextSection(
+                    type = NovaTextSectionType.HEADER,
+                    content = trimmed.substring(marker.range.last + 1),
+                    headingLevel = marker.groupValues[1].length,
+                )
             }
-            trimmed.startsWith("•") || trimmed.startsWith("-") ||
-                (trimmed.startsWith("*") && !trimmed.startsWith("**")) -> {
-                val cleaned = trimmed
-                    .replace("•", "")
-                    .replaceFirst(Regex("^-\\s*"), "")
-                    .replaceFirst(Regex("^\\*\\s*"), "")
-                    .trim()
+            Regex("^(?:•|-|\\*)\\s+").containsMatchIn(trimmed) -> {
+                flushParagraph()
+                val cleaned = trimmed.replaceFirst(Regex("^(?:•|-|\\*)\\s+"), "")
                 sections += NovaTextSection(NovaTextSectionType.BULLET, cleaned)
             }
             Regex("^\\d+[.)]\\s").containsMatchIn(trimmed) -> {
+                flushParagraph()
                 val match = Regex("^(\\d+)[.)]\\s+(.*)").find(trimmed)
                 if (match != null) {
                     sections += NovaTextSection(
@@ -629,134 +630,82 @@ fun parseNovaText(text: String): List<NovaTextSection> {
                     )
                 }
             }
-            trimmed.contains("[") && trimmed.contains("](") -> sections += parseNovaLinks(trimmed)
-            trimmed.startsWith(">") ->
+            trimmed.startsWith(">") -> {
+                flushParagraph()
                 sections += NovaTextSection(NovaTextSectionType.QUOTE, trimmed.drop(1).trim())
-            else -> sections += NovaTextSection(NovaTextSectionType.REGULAR, trimmed)
+            }
+            else -> paragraph += trimmed
         }
     }
     if (inCode && code.isNotEmpty()) flushCode()
+    flushParagraph()
     return sections
-}
-
-private fun parseNovaLinks(line: String): List<NovaTextSection> {
-    val result = mutableListOf<NovaTextSection>()
-    val regex = Regex("\\[([^]]+)]\\(([^)]+)\\)")
-    var index = 0
-    regex.findAll(line).forEach { match ->
-        if (match.range.first > index) {
-            result += NovaTextSection(NovaTextSectionType.REGULAR, line.substring(index, match.range.first))
-        }
-        result += NovaTextSection(NovaTextSectionType.LINK, match.groupValues[1], match.groupValues[2])
-        index = match.range.last + 1
-    }
-    if (index < line.length) {
-        result += NovaTextSection(NovaTextSectionType.REGULAR, line.substring(index))
-    }
-    return result
 }
 
 // MARK: - Formatted text views
 
 @Composable
 fun EnhancedFormattedText(text: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        parseNovaText(text).forEach { section ->
-            when (section.type) {
-                NovaTextSectionType.HEADER -> HeaderView(section.content)
-                NovaTextSectionType.BULLET -> BulletPointView(section.content)
-                NovaTextSectionType.NUMBERED -> NumberedListView(section.content, section.number ?: 1)
-                NovaTextSectionType.LINK -> LinkView(section.content, section.url.orEmpty())
-                NovaTextSectionType.CODE -> CodeBlockView(section.content, section.url)
-                NovaTextSectionType.QUOTE -> QuoteView(section.content)
-                NovaTextSectionType.REGULAR -> RegularTextView(section.content)
+    SelectionContainer {
+        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            parseNovaText(text).forEach { section ->
+                when (section.type) {
+                    NovaTextSectionType.HEADER -> HeaderView(section.content, section.headingLevel ?: 2)
+                    NovaTextSectionType.BULLET -> BulletPointView(section.content)
+                    NovaTextSectionType.NUMBERED -> NumberedListView(section.content, section.number ?: 1)
+                    NovaTextSectionType.CODE -> CodeBlockView(section.content, section.url)
+                    NovaTextSectionType.QUOTE -> QuoteView(section.content)
+                    NovaTextSectionType.REGULAR -> RegularTextView(section.content)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun HeaderView(text: String) {
-    Column(
-        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            text = text,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            style = TextStyle(
-                brush = Brush.horizontalGradient(listOf(NovaColors.primary, NovaColors.accent)),
-            ),
-        )
-        Box(
-            modifier = Modifier
-                .width(40.dp)
-                .height(3.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(NovaColors.primary.copy(alpha = 0.3f)),
-        )
+private fun HeaderView(text: String, level: Int) {
+    val fontSize = when (level) {
+        1 -> 23.sp
+        2 -> 20.sp
+        else -> 17.sp
     }
+    Text(
+        text = inlineNovaFormatting(text),
+        color = NovaColors.textPrimary,
+        fontSize = fontSize,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(top = if (level <= 2) 10.dp else 6.dp),
+    )
 }
 
 @Composable
 private fun BulletPointView(text: String) {
     Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(
-            modifier = Modifier
-                .padding(top = 8.dp)
-                .size(6.dp)
-                .clip(CircleShape)
-                .background(NovaColors.primary),
+        Text("•", color = NovaColors.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            text = inlineNovaFormatting(text),
+            color = NovaColors.textPrimary,
+            fontSize = 16.sp,
+            modifier = Modifier.weight(1f),
         )
-        Text(text, color = NovaColors.textPrimary, fontSize = 16.sp, modifier = Modifier.weight(1f))
     }
 }
 
 @Composable
 private fun NumberedListView(text: String, number: Int) {
     Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .clip(CircleShape)
-                .background(NovaColors.primary),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = number.toString(),
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        Text(text, color = NovaColors.textPrimary, fontSize = 16.sp, modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun LinkView(text: String, url: String) {
-    val handler = LocalUriHandler.current
-    val shape = RoundedCornerShape(8.dp)
-    Row(
-        modifier = Modifier
-            .clip(shape)
-            .background(NovaColors.primary.copy(alpha = 0.1f))
-            .border(1.dp, NovaColors.primary.copy(alpha = 0.3f), shape)
-            .clickable { handler.openUri(url.ifBlank { "https://google.com" }) }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Icon(Icons.Default.Link, null, tint = NovaColors.primary, modifier = Modifier.size(14.dp))
         Text(
-            text = text,
-            color = NovaColors.primary,
+            text = "$number.",
+            color = NovaColors.textPrimary,
             fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            textDecoration = TextDecoration.Underline,
+            fontWeight = FontWeight.SemiBold,
         )
-        Icon(Icons.AutoMirrored.Filled.OpenInNew, null, tint = NovaColors.primary, modifier = Modifier.size(12.dp))
+        Text(
+            text = inlineNovaFormatting(text),
+            color = NovaColors.textPrimary,
+            fontSize = 16.sp,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -841,12 +790,12 @@ private fun QuoteView(text: String) {
     ) {
         Box(
             modifier = Modifier
-                .width(4.dp)
+                .width(3.dp)
                 .height(42.dp)
-                .background(NovaColors.accent),
+                .background(NovaColors.textSecondary),
         )
         Text(
-            text = text,
+            text = inlineNovaFormatting(text),
             color = NovaColors.textSecondary,
             fontStyle = FontStyle.Italic,
             fontSize = 16.sp,
@@ -858,12 +807,10 @@ private fun QuoteView(text: String) {
 
 @Composable
 private fun RegularTextView(text: String) {
-    SelectionContainer {
-        Text(
-            text = inlineNovaFormatting(text),
-            color = NovaColors.textPrimary,
-            fontSize = 16.sp,
-            lineHeight = 20.sp,
-        )
-    }
+    Text(
+        text = inlineNovaFormatting(text),
+        color = NovaColors.textPrimary,
+        fontSize = 16.sp,
+        lineHeight = 20.sp,
+    )
 }

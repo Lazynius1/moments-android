@@ -2894,4 +2894,22 @@
     <string name="message_requests_hidden_words_custom_description">每行輸入一個，或以逗號分隔。比對會在本機進行。</string>
     <string name="notification_message_request_generic">你有一則新的訊息邀請。</string>
     <string name="profile_editor_profile_image_rejected">這張照片無法用作個人檔案相片。</string>
+    <string name="nova_welcome_editorial_greeting">你好，%1$s。</string>
+    <string name="nova_welcome_editorial_question">你在想什麼？</string>
+    <string name="nova_welcome_editorial_question_create">你想創作什麼？</string>
+    <string name="nova_welcome_editorial_question_solve">你想解決什麼問題？</string>
+    <string name="nova_welcome_editorial_question_begin">我們從哪裡開始？</string>
+    <string name="nova_welcome_editorial_support">我可以協助你寫作、做決定、學習，或在 Moments 中創作。</string>
+    <string name="nova_welcome_editorial_privacy">我會記住你的偏好 · 私密</string>
+    <string name="nova_ai_disclaimer">Nova 可能會出錯。請核實重要資訊。</string>
+    <string name="nova_welcome_today_title">今天與 Nova</string>
+    <string name="nova_welcome_memory_title">Nova 的回憶</string>
+    <string name="nova_welcome_continue_title">繼續</string>
+    <string name="nova_welcome_spark_title">今日靈感</string>
+    <string name="nova_welcome_editorial_organize_title">幫我整理一個想法</string>
+    <string name="nova_welcome_editorial_organize_prompt">幫我整理心中的一個想法</string>
+    <string name="nova_welcome_editorial_write_title">和我一起寫點東西</string>
+    <string name="nova_welcome_editorial_write_prompt">幫我寫點東西</string>
+    <string name="nova_welcome_editorial_moments_title">我可以在 Moments 中做什麼？</string>
+    <string name="nova_welcome_editorial_moments_prompt">你能在 Moments 中幫我做什麼？</string>
 </resources>

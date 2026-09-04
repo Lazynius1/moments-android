@@ -2296,4 +2296,22 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="chat_request_disclaimer_outgoing">Você pode enviar até 5 mensagens enquanto a solicitação estiver pendente.</string>
     <string name="notification_message_request_generic">Você tem uma nova solicitação de mensagem.</string>
     <string name="profile_editor_profile_image_rejected">Esta foto não pode ser usada como foto de perfil.</string>
+    <string name="nova_welcome_editorial_greeting">Olá, %1$s.</string>
+    <string name="nova_welcome_editorial_question">No que você está pensando?</string>
+    <string name="nova_welcome_editorial_question_create">O que você gostaria de criar?</string>
+    <string name="nova_welcome_editorial_question_solve">O que você gostaria de resolver?</string>
+    <string name="nova_welcome_editorial_question_begin">Por onde começamos?</string>
+    <string name="nova_welcome_editorial_support">Posso ajudar você a escrever, decidir, aprender ou criar coisas no Moments.</string>
+    <string name="nova_welcome_editorial_privacy">Lembro das suas preferências · Privado</string>
+    <string name="nova_ai_disclaimer">A Nova pode cometer erros. Confira as informações importantes.</string>
+    <string name="nova_welcome_today_title">Hoje com a Nova</string>
+    <string name="nova_welcome_memory_title">Uma lembrança da Nova</string>
+    <string name="nova_welcome_continue_title">Continuar</string>
+    <string name="nova_welcome_spark_title">Faísca do dia</string>
+    <string name="nova_welcome_editorial_organize_title">Ajude-me a organizar uma ideia</string>
+    <string name="nova_welcome_editorial_organize_prompt">Ajude-me a organizar uma ideia que tenho</string>
+    <string name="nova_welcome_editorial_write_title">Escreva algo comigo</string>
+    <string name="nova_welcome_editorial_write_prompt">Ajude-me a escrever algo</string>
+    <string name="nova_welcome_editorial_moments_title">O que posso fazer no Moments?</string>
+    <string name="nova_welcome_editorial_moments_prompt">No que você pode me ajudar no Moments?</string>
 </resources>

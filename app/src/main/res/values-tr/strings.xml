@@ -2894,4 +2894,22 @@
     <string name="message_requests_hidden_words_custom_description">Her satıra bir tane yaz veya virgülle ayır. Eşleşmeler cihazında gerçekleşir.</string>
     <string name="notification_message_request_generic">Yeni bir mesaj isteğin var.</string>
     <string name="profile_editor_profile_image_rejected">Bu fotoğraf profil fotoğrafı olarak kullanılamaz.</string>
+    <string name="nova_welcome_editorial_greeting">Merhaba, %1$s.</string>
+    <string name="nova_welcome_editorial_question">Ne düşünüyorsun?</string>
+    <string name="nova_welcome_editorial_question_create">Ne yaratmak istersin?</string>
+    <string name="nova_welcome_editorial_question_solve">Neyi çözmek istersin?</string>
+    <string name="nova_welcome_editorial_question_begin">Nereden başlayalım?</string>
+    <string name="nova_welcome_editorial_support">Yazmana, karar vermene, öğrenmene veya Moments’ta bir şeyler oluşturmana yardımcı olabilirim.</string>
+    <string name="nova_welcome_editorial_privacy">Tercihlerini hatırlıyorum · Özel</string>
+    <string name="nova_ai_disclaimer">Nova hata yapabilir. Önemli bilgileri doğrula.</string>
+    <string name="nova_welcome_today_title">Bugün Nova ile</string>
+    <string name="nova_welcome_memory_title">Nova’dan bir anı</string>
+    <string name="nova_welcome_continue_title">Devam et</string>
+    <string name="nova_welcome_spark_title">Günün ilhamı</string>
+    <string name="nova_welcome_editorial_organize_title">Bir fikri düzenlememe yardım et</string>
+    <string name="nova_welcome_editorial_organize_prompt">Aklımdaki bir fikri düzenlememe yardım et</string>
+    <string name="nova_welcome_editorial_write_title">Benimle bir şeyler yaz</string>
+    <string name="nova_welcome_editorial_write_prompt">Bir şey yazmama yardım et</string>
+    <string name="nova_welcome_editorial_moments_title">Moments’ta neler yapabilirim?</string>
+    <string name="nova_welcome_editorial_moments_prompt">Moments’ta bana nasıl yardımcı olabilirsin?</string>
 </resources>

@@ -2894,4 +2894,22 @@
     <string name="message_requests_hidden_words_custom_description">Wpisuj je w osobnych wierszach lub oddzielaj przecinkami. Dopasowanie odbywa się lokalnie.</string>
     <string name="notification_message_request_generic">Masz nową prośbę o wiadomość.</string>
     <string name="profile_editor_profile_image_rejected">Tego zdjęcia nie można użyć jako zdjęcia profilowego.</string>
+    <string name="nova_welcome_editorial_greeting">Cześć, %1$s.</string>
+    <string name="nova_welcome_editorial_question">O czym myślisz?</string>
+    <string name="nova_welcome_editorial_question_create">Co chcesz stworzyć?</string>
+    <string name="nova_welcome_editorial_question_solve">Co chcesz rozwiązać?</string>
+    <string name="nova_welcome_editorial_question_begin">Od czego zaczynamy?</string>
+    <string name="nova_welcome_editorial_support">Mogę pomóc Ci pisać, podejmować decyzje, uczyć się lub tworzyć w Moments.</string>
+    <string name="nova_welcome_editorial_privacy">Pamiętam Twoje preferencje · Prywatne</string>
+    <string name="nova_ai_disclaimer">Nova może popełniać błędy. Sprawdź ważne informacje.</string>
+    <string name="nova_welcome_today_title">Dzisiaj z Novą</string>
+    <string name="nova_welcome_memory_title">Wspomnienie od Novy</string>
+    <string name="nova_welcome_continue_title">Kontynuuj</string>
+    <string name="nova_welcome_spark_title">Iskra dnia</string>
+    <string name="nova_welcome_editorial_organize_title">Pomóż mi uporządkować pomysł</string>
+    <string name="nova_welcome_editorial_organize_prompt">Pomóż mi uporządkować mój pomysł</string>
+    <string name="nova_welcome_editorial_write_title">Napisz coś ze mną</string>
+    <string name="nova_welcome_editorial_write_prompt">Pomóż mi coś napisać</string>
+    <string name="nova_welcome_editorial_moments_title">Co mogę robić w Moments?</string>
+    <string name="nova_welcome_editorial_moments_prompt">W czym możesz mi pomóc w Moments?</string>
 </resources>

@@ -70,6 +70,9 @@ object NovaAIService {
     suspend fun generateTitle(prompt: String): String =
         makeUtilityModel(NovaGenerationConfig.titleGeneration).generateContent(prompt).text?.trim().orEmpty()
 
+    suspend fun generateWelcomeSpark(prompt: String): String =
+        makeUtilityModel(NovaGenerationConfig.welcomeSpark).generateContent(prompt).text?.trim().orEmpty()
+
     suspend fun compactHistory(transcript: String): String {
         val prompt = "${NovaPromptCatalog.historyCompactionPrompt}\n\n$transcript"
         return makeUtilityModel(NovaGenerationConfig.structuredJson).generateContent(prompt).text ?: transcript

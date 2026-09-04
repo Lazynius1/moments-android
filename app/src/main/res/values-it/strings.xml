@@ -2301,4 +2301,22 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="chat_request_disclaimer_outgoing">Puoi inviare fino a 5 messaggi mentre la richiesta è in sospeso.</string>
     <string name="notification_message_request_generic">Hai una nuova richiesta di messaggio.</string>
     <string name="profile_editor_profile_image_rejected">Questa foto non può essere usata come immagine del profilo.</string>
+    <string name="nova_welcome_editorial_greeting">Ciao, %1$s.</string>
+    <string name="nova_welcome_editorial_question">A cosa stai pensando?</string>
+    <string name="nova_welcome_editorial_question_create">Cosa ti piacerebbe creare?</string>
+    <string name="nova_welcome_editorial_question_solve">Cosa vorresti risolvere?</string>
+    <string name="nova_welcome_editorial_question_begin">Da dove cominciamo?</string>
+    <string name="nova_welcome_editorial_support">Posso aiutarti a scrivere, decidere, imparare o creare qualcosa in Moments.</string>
+    <string name="nova_welcome_editorial_privacy">Ricordo le tue preferenze · Privato</string>
+    <string name="nova_ai_disclaimer">Nova può commettere errori. Verifica le informazioni importanti.</string>
+    <string name="nova_welcome_today_title">Oggi con Nova</string>
+    <string name="nova_welcome_memory_title">Un ricordo di Nova</string>
+    <string name="nova_welcome_continue_title">Continua</string>
+    <string name="nova_welcome_spark_title">Spunto del giorno</string>
+    <string name="nova_welcome_editorial_organize_title">Aiutami a mettere in ordine un’idea</string>
+    <string name="nova_welcome_editorial_organize_prompt">Aiutami a organizzare un’idea che ho</string>
+    <string name="nova_welcome_editorial_write_title">Scrivi qualcosa con me</string>
+    <string name="nova_welcome_editorial_write_prompt">Aiutami a scrivere qualcosa</string>
+    <string name="nova_welcome_editorial_moments_title">Cosa posso fare in Moments?</string>
+    <string name="nova_welcome_editorial_moments_prompt">In cosa puoi aiutarmi su Moments?</string>
 </resources>

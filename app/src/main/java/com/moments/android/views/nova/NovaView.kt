@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -45,6 +46,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewModelScope
 import com.moments.android.R
@@ -60,8 +62,8 @@ import com.moments.android.views.nova.novasections.NovaAttachmentMenuPopover
 import com.moments.android.views.nova.novasections.NovaAttachmentSheetKind
 import com.moments.android.views.nova.novasections.NovaAttachmentSheetOverlay
 import com.moments.android.views.nova.novasections.NovaBackground
-import com.moments.android.views.nova.novasections.NovaEncryptionBadge
 import com.moments.android.views.nova.novasections.NovaHeader
+import com.moments.android.views.nova.novacore.NovaColors
 import com.moments.android.views.nova.novasections.NovaInputBarLayout
 import com.moments.android.views.nova.ui.NovaActionConfirmationOverlay
 import com.moments.android.views.shared.MomentsModalSheet
@@ -73,20 +75,20 @@ import kotlinx.coroutines.launch
  * Gate de acceso chat + contenido seguro (conversación, chrome, overlays).
  */
 
-private val TopOverlayHeight = 132.dp
-private val BottomOverlayHeight = 88.dp
+private val TopOverlayHeight = 92.dp
+private val BottomOverlayHeight = 108.dp
 
 @Composable
-fun NovaView() {
+fun NovaView(onDismiss: () -> Unit = {}) {
     // ≡ iOS: Available → content; else ChatRecoveryGateView wrapping content.
     // Android ChatRecoveryGateView ya ramifica Available → content().
     ChatRecoveryGateView(onCancel = null) {
-        NovaSecureContent()
+        NovaSecureContent(onDismiss = onDismiss)
     }
 }
 
 @Composable
-private fun NovaSecureContent() {
+private fun NovaSecureContent(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val agent = remember(context) { NovaAgent(context) }
     val density = LocalDensity.current
@@ -176,8 +178,9 @@ private fun NovaSecureContent() {
                     agent = agent,
                     showSuggestedOptions = agent.showSuggestedOptions,
                     onShowSuggestedOptionsChange = agent::updateShowSuggestedOptions,
-                    topClearance = safeAreaTop + TopOverlayHeight + 12.dp,
-                    bottomClearance = BottomOverlayHeight + safeAreaBottom,
+                    onOpenMemory = { showMemory = true },
+                    topClearance = safeAreaTop + TopOverlayHeight + 22.dp,
+                    bottomClearance = BottomOverlayHeight + safeAreaBottom + 28.dp,
                 )
             } else {
                 val bottomPad = if (keyboardHeight > 0.dp) {
@@ -233,22 +236,20 @@ private fun NovaSecureContent() {
                 modifier = Modifier.align(Alignment.TopCenter),
             )
 
-            // Header + encryption badge — debajo del status bar (edge-to-edge dialog).
-            Column(
+            // Header compartido por welcome y chat, debajo del status bar.
+            Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .padding(top = safeAreaTop + 2.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 NovaHeader(
                     agent = agent,
+                    onBack = onDismiss,
                     showConversationHistory = { showHistory = it },
                     showSuggestedOptions = agent::updateShowSuggestedOptions,
                     isShowingMemory = { showMemory = it },
                 )
-                NovaEncryptionBadge()
             }
 
             // Input bar: cerrado = nav + 8; abierto = solo ime (pegado al teclado).
@@ -269,6 +270,17 @@ private fun NovaSecureContent() {
                         },
                     ),
             ) {
+                Text(
+                    text = stringResource(R.string.nova_ai_disclaimer),
+                    color = NovaColors.textTertiary,
+                    fontSize = 10.sp,
+                    lineHeight = 13.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    maxLines = 2,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 2.dp),
+                )
                 EnhancedInputBar(
                     agent = agent,
                     showSuggestedOptions = agent::updateShowSuggestedOptions,

@@ -2318,4 +2318,22 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="chat_request_disclaimer_outgoing">Du kannst bis zu 5 Nachrichten senden, solange die Anfrage aussteht.</string>
     <string name="notification_message_request_generic">Du hast eine neue Nachrichtenanfrage.</string>
     <string name="profile_editor_profile_image_rejected">Dieses Foto kann nicht als Profilbild verwendet werden.</string>
+    <string name="nova_welcome_editorial_greeting">Hallo, %1$s.</string>
+    <string name="nova_welcome_editorial_question">Woran denkst du?</string>
+    <string name="nova_welcome_editorial_question_create">Was möchtest du erschaffen?</string>
+    <string name="nova_welcome_editorial_question_solve">Was möchtest du lösen?</string>
+    <string name="nova_welcome_editorial_question_begin">Womit sollen wir anfangen?</string>
+    <string name="nova_welcome_editorial_support">Ich kann dir helfen, zu schreiben, Entscheidungen zu treffen, zu lernen oder Dinge in Moments zu erstellen.</string>
+    <string name="nova_welcome_editorial_privacy">Ich merke mir deine Präferenzen · Privat</string>
+    <string name="nova_ai_disclaimer">Nova kann Fehler machen. Überprüfe wichtige Informationen.</string>
+    <string name="nova_welcome_today_title">Heute mit Nova</string>
+    <string name="nova_welcome_memory_title">Eine Erinnerung von Nova</string>
+    <string name="nova_welcome_continue_title">Fortsetzen</string>
+    <string name="nova_welcome_spark_title">Funke des Tages</string>
+    <string name="nova_welcome_editorial_organize_title">Hilf mir, eine Idee zu ordnen</string>
+    <string name="nova_welcome_editorial_organize_prompt">Hilf mir, eine Idee zu ordnen, die ich habe</string>
+    <string name="nova_welcome_editorial_write_title">Schreib etwas mit mir</string>
+    <string name="nova_welcome_editorial_write_prompt">Hilf mir, etwas zu schreiben</string>
+    <string name="nova_welcome_editorial_moments_title">Was kann ich in Moments machen?</string>
+    <string name="nova_welcome_editorial_moments_prompt">Wobei kannst du mir in Moments helfen?</string>
 </resources>

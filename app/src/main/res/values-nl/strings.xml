@@ -2894,4 +2894,22 @@
     <string name="message_requests_hidden_words_custom_description">Voer elk woord of elke zin op een nieuwe regel in, of scheid ze met komma\'s. Er wordt lokaal gezocht naar overeenkomsten.</string>
     <string name="notification_message_request_generic">Je hebt een nieuw berichtverzoek.</string>
     <string name="profile_editor_profile_image_rejected">Deze foto kan niet als profielfoto worden gebruikt.</string>
+    <string name="nova_welcome_editorial_greeting">Hallo, %1$s.</string>
+    <string name="nova_welcome_editorial_question">Waar denk je aan?</string>
+    <string name="nova_welcome_editorial_question_create">Wat zou je willen maken?</string>
+    <string name="nova_welcome_editorial_question_solve">Wat zou je willen oplossen?</string>
+    <string name="nova_welcome_editorial_question_begin">Waar zullen we beginnen?</string>
+    <string name="nova_welcome_editorial_support">Ik kan je helpen schrijven, beslissen, leren of dingen maken in Moments.</string>
+    <string name="nova_welcome_editorial_privacy">Ik onthoud je voorkeuren · Privé</string>
+    <string name="nova_ai_disclaimer">Nova kan fouten maken. Controleer belangrijke informatie.</string>
+    <string name="nova_welcome_today_title">Vandaag met Nova</string>
+    <string name="nova_welcome_memory_title">Een herinnering van Nova</string>
+    <string name="nova_welcome_continue_title">Doorgaan</string>
+    <string name="nova_welcome_spark_title">Vonkje van de dag</string>
+    <string name="nova_welcome_editorial_organize_title">Help me een idee te ordenen</string>
+    <string name="nova_welcome_editorial_organize_prompt">Help me een idee dat ik heb te ordenen</string>
+    <string name="nova_welcome_editorial_write_title">Schrijf iets met me</string>
+    <string name="nova_welcome_editorial_write_prompt">Help me iets te schrijven</string>
+    <string name="nova_welcome_editorial_moments_title">Wat kan ik doen in Moments?</string>
+    <string name="nova_welcome_editorial_moments_prompt">Waarmee kun je me helpen in Moments?</string>
 </resources>
