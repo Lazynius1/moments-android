@@ -704,7 +704,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="sticker_gif_empty_subtitle">Versuch eine andere Suche oder geh zurück zu Trending.</string>
     <string name="sticker_category_time">Zeit</string>
     <string name="sticker_category_weather">Wetter</string>
-    <string name="sticker_category_hashtag">Hashtag</string>
+    <string name="sticker_category_hashtag">hashtag</string>
     <string name="sticker_hashtag_hint">Hashtag eingeben</string>
     <string name="sticker_category_emoji">Emoji</string>
     <string name="sticker_emoji_cat_smileys">Smileys</string>
@@ -717,7 +717,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="sticker_emoji_cat_symbols">Symbole</string>
     <string name="sticker_emoji_cat_flags">Flaggen</string>
 
-    <string name="sticker_category_mention">Erwähnung</string>
+    <string name="sticker_category_mention">Mention</string>
     <string name="sticker_category_poll">Umfrage</string>
     <string name="sticker_category_question">Fragen</string>
     <string name="sticker_mention_hint">Benutzername eingeben</string>
@@ -736,7 +736,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="sticker_link_title">Anzeigetext</string>
     <string name="sticker_link_fallback">Link</string>
 
-    <string name="sticker_category_location">Standort</string>
+    <string name="sticker_category_location">Ort</string>
     <string name="sticker_location_search_title">Standort suchen</string>
     <string name="sticker_location_search_subtitle">Erkunde Orte in der Nähe oder tippe eine Suche</string>
     <string name="sticker_location_refresh">Aktualisieren</string>
@@ -776,7 +776,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="sticker_quiz_option_prompt">Option</string>
     <string name="sticker_quiz_add_option">Option hinzufügen</string>
 
-    <string name="sticker_category_emoji_slider">Emoji-Slider</string>
+    <string name="sticker_category_emoji_slider">Emoji slider</string>
     <string name="sticker_emoji_slider_prompt">Stelle eine Frage...</string>
 
     <string name="sticker_category_selfie">Selfie</string>
@@ -788,7 +788,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="sticker_category_gif">GIF</string>
     <string name="sticker_gif_search_hint">Sticker suchen</string>
     <string name="sticker_gif_empty">Gerade keine Sticker</string>
-    <string name="sticker_category_frame">Rahmen</string>
+    <string name="sticker_category_frame">Sofortbild</string>
     <string name="sticker_frame_title">Polaroid-Rahmen</string>
     <string name="sticker_frame_subtitle">Wähle ein Foto aus, das durch Schütteln des Telefons enthüllt wird</string>
     <string name="sticker_frame_select_photo">Foto auswählen</string>

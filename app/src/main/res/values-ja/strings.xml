@@ -1254,7 +1254,7 @@
     <string name="sticker_catalog_empty_subtitle">別のキーワードで検索してみてください。</string>
     <string name="sticker_loading_stickers">スタンプを読み込み中…</string>
     <string name="sticker_loading_time">数秒かかる場合があります</string>
-    <string name="sticker_category_time">時間</string>
+    <string name="sticker_category_time">時刻</string>
     <string name="sticker_category_weather">天気</string>
     <string name="sticker_category_hashtag">ハッシュタグ</string>
     <string name="sticker_hashtag_hint">ハッシュタグを入力</string>
@@ -1360,7 +1360,7 @@
     <string name="sticker_category_emoji_slider">絵文字スライダー</string>
     <string name="sticker_emoji_slider_prompt">質問を入力…</string>
 
-    <string name="sticker_category_selfie">セルフィー</string>
+    <string name="sticker_category_selfie">自撮り</string>
     <string name="sticker_selfie_title">🤳 セルフィー</string>
     <string name="sticker_selfie_tap_front">タップしてフロントカメラを開く</string>
     <string name="sticker_audio_recording">録音中…</string>
@@ -1370,7 +1370,7 @@
     <string name="sticker_gif_search_hint">GIFを検索…</string>
     <string name="sticker_gif_empty">現在ステッカーはありません</string>
     <string name="sticker_gif_empty_subtitle">別のキーワードで検索するか、トレンドに戻ってください。</string>
-    <string name="sticker_category_frame">フレーム</string>
+    <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">ポラロイドフレーム</string>
     <string name="sticker_frame_subtitle">スマホを振って表示する写真を選択</string>
     <string name="sticker_frame_select_photo">写真を選択</string>

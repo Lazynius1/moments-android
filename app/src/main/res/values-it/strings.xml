@@ -788,7 +788,7 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="sticker_category_gif">GIF</string>
     <string name="sticker_gif_search_hint">Cerca sticker</string>
     <string name="sticker_gif_empty">Nessuno sticker al momento</string>
-    <string name="sticker_category_frame">Cornice</string>
+    <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">Cornice Polaroid</string>
     <string name="sticker_frame_subtitle">Scegli una foto da rivelare scuotendo il telefono</string>
     <string name="sticker_frame_select_photo">Seleziona foto</string>

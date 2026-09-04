@@ -1254,9 +1254,9 @@
     <string name="sticker_catalog_empty_subtitle">Başka bir arama dene.</string>
     <string name="sticker_loading_stickers">Çıkartmalar yükleniyor...</string>
     <string name="sticker_loading_time">Bu işlem birkaç saniye sürebilir</string>
-    <string name="sticker_category_time">Zaman</string>
+    <string name="sticker_category_time">Saat</string>
     <string name="sticker_category_weather">Hava durumu</string>
-    <string name="sticker_category_hashtag">Hashtag</string>
+    <string name="sticker_category_hashtag">hashtag</string>
     <string name="sticker_hashtag_hint">Bir hashtag yaz</string>
     <string name="sticker_category_emoji">Emoji</string>
     <string name="sticker_emoji_cat_smileys">Gülen yüzler</string>
@@ -1370,7 +1370,7 @@
     <string name="sticker_gif_search_hint">GIF ara...</string>
     <string name="sticker_gif_empty">Şu anda çıkartma yok</string>
     <string name="sticker_gif_empty_subtitle">Başka bir arama dene veya trend olanlara dön.</string>
-    <string name="sticker_category_frame">Çerçeve</string>
+    <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">Polaroid Çerçevesi</string>
     <string name="sticker_frame_subtitle">Telefonu sallayarak ortaya çıkaracağın bir fotoğraf seç</string>
     <string name="sticker_frame_select_photo">Fotoğraf seç</string>

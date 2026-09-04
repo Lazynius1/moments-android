@@ -528,12 +528,14 @@ fun ExploreErrorStateView(
 @Composable
 fun ExploreSuggestionsFollowButton(
     buttonState: FollowButtonState,
+    targetUserId: String,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     ModernFollowButton(
         state = buttonState,
         isLoading = false,
+        targetUserId = targetUserId,
         onClick = onTap,
         modifier = modifier,
     )

@@ -49,7 +49,14 @@ fun StickerPillFlowLayout(
         val spacingPx = spacing.roundToPx()
         val rowSpacingPx = rowSpacing.roundToPx()
         val maxWidth = if (constraints.hasBoundedWidth) constraints.maxWidth else 320.dp.roundToPx()
-        val placeables = measurables.map { it.measure(Constraints()) }
+        val placeables = measurables.map {
+            it.measure(
+                Constraints(
+                    maxWidth = maxWidth,
+                    maxHeight = Constraints.Infinity,
+                ),
+            )
+        }
         val rows = mutableListOf<MutableList<androidx.compose.ui.layout.Placeable>>()
         val rowWidths = mutableListOf<Int>()
         val rowHeights = mutableListOf<Int>()
@@ -86,9 +93,12 @@ fun StickerPillFlowLayout(
                     3 -> 4.dp.roundToPx()
                     else -> 0
                 }
-                val centeredX = (width - rowWidth) / 2
-                var currentX = (centeredX + rowShift)
-                    .coerceIn(0, (width - rowWidth).coerceAtLeast(0))
+                // ≡ iOS `centeredX + rowShift`, clamped to [minX, maxX - rowWidth]
+                val centeredX = (width - rowWidth).coerceAtLeast(0) / 2
+                var currentX = (centeredX + rowShift).coerceIn(
+                    0,
+                    (width - rowWidth).coerceAtLeast(0),
+                )
                 val rowY = currentY + if (index % 2 == 0) 0 else 2.dp.roundToPx()
                 row.forEach { placeable ->
                     placeable.placeRelative(

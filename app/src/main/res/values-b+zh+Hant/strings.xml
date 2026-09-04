@@ -1256,9 +1256,9 @@
     <string name="sticker_loading_time">可能需要幾秒鐘</string>
     <string name="sticker_category_time">時間</string>
     <string name="sticker_category_weather">天氣</string>
-    <string name="sticker_category_hashtag">Hashtag</string>
+    <string name="sticker_category_hashtag">主題標籤</string>
     <string name="sticker_hashtag_hint">輸入 Hashtag</string>
-    <string name="sticker_category_emoji">Emoji</string>
+    <string name="sticker_category_emoji">表情符號</string>
     <string name="sticker_emoji_cat_smileys">笑臉</string>
     <string name="sticker_emoji_cat_people">人物</string>
     <string name="sticker_emoji_cat_nature">自然</string>
@@ -1357,7 +1357,7 @@
     <string name="sticker_quiz_option_prompt">選項</string>
     <string name="sticker_quiz_add_option">新增選項</string>
 
-    <string name="sticker_category_emoji_slider">表情符號滑桿</string>
+    <string name="sticker_category_emoji_slider">Emoji 滑桿</string>
     <string name="sticker_emoji_slider_prompt">提出問題…</string>
 
     <string name="sticker_category_selfie">自拍</string>
@@ -1370,7 +1370,7 @@
     <string name="sticker_gif_search_hint">搜尋 GIF…</string>
     <string name="sticker_gif_empty">目前沒有貼圖</string>
     <string name="sticker_gif_empty_subtitle">試試其他搜尋內容，或返回熱門內容。</string>
-    <string name="sticker_category_frame">相框</string>
+    <string name="sticker_category_frame">拍立得</string>
     <string name="sticker_frame_title">拍立得相框</string>
     <string name="sticker_frame_subtitle">選擇一張照片，搖晃手機即可顯示</string>
     <string name="sticker_frame_select_photo">選取照片</string>

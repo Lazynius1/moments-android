@@ -267,10 +267,7 @@ fun ReelVideoView(
         }
         FollowStateStore.state(authorId)?.let { followState = it }
         scope.launch {
-            val authoritative = PrivacyService.getFollowButtonState(viewerId, authorId)
-            val reconciled = FollowStateStore.reconciledState(authoritative, authorId)
-            followState = reconciled
-            FollowStateStore.setState(reconciled, authorId)
+            FollowStateStore.resolve(viewerId, authorId)?.let { followState = it }
         }
     }
 
@@ -670,6 +667,7 @@ fun ReelVideoView(
                                         ModernFollowButton(
                                             state = followState ?: FollowButtonState.CAN_FOLLOW,
                                             isLoading = followLoading,
+                                            targetUserId = video.moment.authorId,
                                             onClick = ::performFollowToggle,
                                             style = ModernFollowButtonStyle.COMPACT,
                                         )

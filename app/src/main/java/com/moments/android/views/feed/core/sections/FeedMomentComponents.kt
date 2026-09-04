@@ -659,10 +659,7 @@ fun ModernPostCardView(
     LaunchedEffect(moment.authorId, viewerId) {
         if (viewerId == null || viewerId == moment.authorId) return@LaunchedEffect
         FollowStateStore.state(moment.authorId)?.let { followState = it }
-        val authoritative = PrivacyService.getFollowButtonState(viewerId, moment.authorId)
-        val reconciled = FollowStateStore.reconciledState(authoritative, moment.authorId)
-        followState = reconciled
-        FollowStateStore.setState(reconciled, moment.authorId)
+        FollowStateStore.resolve(viewerId, moment.authorId)?.let { followState = it }
     }
 
     DisposableEffect(moment.authorId) {
@@ -1052,6 +1049,7 @@ private fun PostHeader(
             ModernFollowButton(
                 state = followState,
                 isLoading = followLoading,
+                targetUserId = moment.authorId,
                 onClick = onFollowClick,
             )
         }

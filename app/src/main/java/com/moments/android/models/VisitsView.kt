@@ -590,6 +590,7 @@ private fun VisitsRelationshipButton(
     ModernFollowButton(
         state = followState,
         isLoading = isFollowLoading,
+        targetUserId = user.id,
         onClick = {
             if (isFollowLoading) return@ModernFollowButton
             when (followState) {

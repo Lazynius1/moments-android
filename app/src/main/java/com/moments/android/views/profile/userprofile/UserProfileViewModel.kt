@@ -439,11 +439,9 @@ class UserProfileViewModel(
                 followButtonState = cached
                 isFollowing = cached.isFollowingOrMutual
             }
-            val state = PrivacyService.getFollowButtonState(current, userId)
-            val reconciled = FollowStateStore.reconciledState(state, userId)
+            val reconciled = FollowStateStore.resolve(current, userId) ?: return@launch
             followButtonState = reconciled
             isFollowing = reconciled.isFollowingOrMutual
-            FollowStateStore.setState(reconciled, userId)
         }
     }
 
@@ -683,8 +681,7 @@ class UserProfileViewModel(
         val current = currentUserId ?: return
         if (current == targetId) return
         viewModelScope.launch {
-            val state = PrivacyService.getFollowButtonState(current, targetId)
-            FollowStateStore.setState(FollowStateStore.reconciledState(state, targetId), targetId)
+            FollowStateStore.resolve(current, targetId)
         }
     }
 

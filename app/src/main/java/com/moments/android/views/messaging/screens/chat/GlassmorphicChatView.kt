@@ -164,6 +164,12 @@ private data class PendingRequestMediaPresentation(
     val isVideo: Boolean,
 )
 
+/** Medio seleccionado y páginas capturados en una única actualización de estado. */
+private data class ChatMediaViewerPresentation(
+    val media: SharedMedia,
+    val mediaItems: List<SharedMedia>,
+)
+
 @Composable
 fun GlassmorphicChatView(
     conversation: Conversation,
@@ -224,8 +230,9 @@ fun GlassmorphicChatView(
     var showingConversationSettings by remember { mutableStateOf(false) }
     var showVanishTimerSheet by remember { mutableStateOf(false) }
     var showingUserReportSheet by remember { mutableStateOf(false) }
-    var selectedChatMedia by remember { mutableStateOf<SharedMedia?>(null) }
-    var selectedChatMediaItems by remember { mutableStateOf<List<SharedMedia>>(emptyList()) }
+    var chatMediaViewerPresentation by remember {
+        mutableStateOf<ChatMediaViewerPresentation?>(null)
+    }
     var pendingRequestMediaPresentation by remember {
         mutableStateOf<PendingRequestMediaPresentation?>(null)
     }
@@ -517,8 +524,10 @@ fun GlassmorphicChatView(
     fun openChatMedia(message: EnhancedMessage) {
         session.hydrateMediaIfNeeded(message)
         val selected = sharedMediaFrom(message) ?: return
-        selectedChatMediaItems = sharedMediaItemsForOverlay(messages, message)
-        selectedChatMedia = selected
+        chatMediaViewerPresentation = ChatMediaViewerPresentation(
+            media = selected,
+            mediaItems = sharedMediaItemsForOverlay(messages, message),
+        )
     }
 
     fun openPendingRequestMedia(pending: com.moments.android.views.messaging.core.PendingChatTimelineMessage) {
@@ -1489,7 +1498,7 @@ fun GlassmorphicChatView(
     }
 
 
-    // ≡ selectedChatMedia / ConversationFullScreenMediaView
+    // ≡ chatMediaViewerPresentation / ConversationFullScreenMediaView
     pendingRequestMediaPresentation?.let { presentation ->
         fun dismissPendingMedia() {
             val uri = Uri.parse(presentation.localUrl)
@@ -1532,10 +1541,10 @@ fun GlassmorphicChatView(
         }
     }
 
-    selectedChatMedia?.let { media ->
+    chatMediaViewerPresentation?.let { presentation ->
         ConversationFullScreenMediaView(
-            media = media,
-            mediaItems = selectedChatMediaItems,
+            media = presentation.media,
+            mediaItems = presentation.mediaItems,
             currentUserId = session.currentUserId,
             otherParticipantName = displayName,
             displayReactions = session::displayReactions,
@@ -1546,8 +1555,7 @@ fun GlassmorphicChatView(
                 reactionPickerMessage = messages.firstOrNull { it.id == messageId }
             },
             onClose = {
-                selectedChatMedia = null
-                selectedChatMediaItems = emptyList()
+                chatMediaViewerPresentation = null
             },
             onSendReply = { shared, text, completion -> sendReplyToOpenedMedia(shared, text, completion) },
             modifier = Modifier.fillMaxSize(),

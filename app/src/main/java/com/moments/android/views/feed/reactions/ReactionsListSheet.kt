@@ -143,10 +143,7 @@ fun ReactionsListSheet(
             for (userId in userProfiles.keys) {
                 if (userId == viewer) continue
                 FollowStateStore.state(userId)?.let { next[userId] = it }
-                val authoritative = PrivacyService.getFollowButtonState(viewer, userId)
-                val reconciled = FollowStateStore.reconciledState(authoritative, userId)
-                next[userId] = reconciled
-                FollowStateStore.setState(reconciled, userId)
+                FollowStateStore.resolve(viewer, userId)?.let { next[userId] = it }
             }
             followStates = next
         }
@@ -493,6 +490,7 @@ private fun ReactionUserRow(
             ReactionFollowChip(
                 state = followState,
                 loading = followLoading,
+                targetUserId = userId,
                 onClick = onFollowClick,
             )
         }
@@ -503,11 +501,13 @@ private fun ReactionUserRow(
 private fun ReactionFollowChip(
     state: FollowButtonState,
     loading: Boolean,
+    targetUserId: String,
     onClick: () -> Unit,
 ) {
     ModernFollowButton(
         state = state,
         isLoading = loading,
+        targetUserId = targetUserId,
         onClick = onClick,
         style = ModernFollowButtonStyle.COMPACT,
     )

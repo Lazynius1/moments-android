@@ -329,7 +329,11 @@ internal fun SuggestedUserRow(
             }
         }
 
-        SuggestedUserFollowButton(state = buttonState, onFollow = onFollow)
+        SuggestedUserFollowButton(
+            state = buttonState,
+            targetUserId = user.id,
+            onFollow = onFollow,
+        )
     }
 }
 
@@ -337,11 +341,13 @@ internal fun SuggestedUserRow(
 @Composable
 internal fun SuggestedUserFollowButton(
     state: FollowButtonState,
+    targetUserId: String,
     onFollow: () -> Unit,
 ) {
     ModernFollowButton(
         state = state,
         isLoading = false,
+        targetUserId = targetUserId,
         onClick = onFollow,
         style = ModernFollowButtonStyle.COMPACT,
     )

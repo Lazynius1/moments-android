@@ -34,97 +34,6 @@ data class VisibleConnectionTypes(
     val canViewMutuals: Boolean,
 )
 
-// MARK: - Follow button states
-
-enum class FollowButtonState {
-    OWN_PROFILE,
-    BLOCKED,
-    FOLLOWING,
-    MUTUALS,
-    CAN_FOLLOW,
-    CAN_REQUEST_FOLLOW,
-    REQUEST_PENDING,
-    REQUEST_PENDING_CANCELLABLE;
-
-    /** True si el estado representa una relación de seguimiento activa (FOLLOWING o MUTUALS). */
-    val isFollowingOrMutual: Boolean
-        get() = this == FOLLOWING || this == MUTUALS
-
-    /** Follow / Request (o cancelar solicitud). En Reels el chip solo se muestra en estos casos. */
-    val showsProspectFollow: Boolean
-        get() = this == CAN_FOLLOW ||
-            this == CAN_REQUEST_FOLLOW ||
-            this == REQUEST_PENDING_CANCELLABLE
-
-    val buttonText: String
-        get() = when (this) {
-            OWN_PROFILE -> "Own profile"
-            BLOCKED -> "Blocked"
-            FOLLOWING -> "Following"
-            MUTUALS -> "Mutuals"
-            CAN_FOLLOW -> "Follow"
-            CAN_REQUEST_FOLLOW -> "Request follow"
-            REQUEST_PENDING -> "Request sent"
-            REQUEST_PENDING_CANCELLABLE -> "Cancel request"
-        }
-
-    val isActionable: Boolean
-        get() = when (this) {
-            OWN_PROFILE, BLOCKED, REQUEST_PENDING -> false
-            FOLLOWING, MUTUALS, CAN_FOLLOW, CAN_REQUEST_FOLLOW, REQUEST_PENDING_CANCELLABLE -> true
-        }
-
-    val buttonColor: String
-        get() = when (this) {
-            OWN_PROFILE -> "gray"
-            BLOCKED -> "red"
-            FOLLOWING, MUTUALS -> "green"
-            CAN_FOLLOW, CAN_REQUEST_FOLLOW -> "blue"
-            REQUEST_PENDING, REQUEST_PENDING_CANCELLABLE -> "orange"
-        }
-}
-
-// MARK: - Follow state store
-
-/**
- * Port de `FollowStateStore` (PrivacyService.swift): mapa en memoria + listeners
- * (equivale a `NotificationCenter` / `didChangeNotification` en iOS). APIs síncronas
- * como el `NSLock` de iOS, para poder leer estado al pintar filas.
- */
-object FollowStateStore {
-    private val statesByUserId = mutableMapOf<String, FollowButtonState>()
-    private val listeners = mutableListOf<(String, FollowButtonState) -> Unit>()
-
-    fun addListener(listener: (String, FollowButtonState) -> Unit) {
-        synchronized(listeners) { listeners.add(listener) }
-    }
-
-    fun removeListener(listener: (String, FollowButtonState) -> Unit) {
-        synchronized(listeners) { listeners.remove(listener) }
-    }
-
-    fun state(userId: String): FollowButtonState? = synchronized(statesByUserId) {
-        statesByUserId[userId]
-    }
-
-    fun setState(state: FollowButtonState, userId: String) {
-        synchronized(statesByUserId) { statesByUserId[userId] = state }
-        val snapshot = synchronized(listeners) { listeners.toList() }
-        snapshot.forEach { it(userId, state) }
-    }
-
-    fun reconciledState(authoritativeState: FollowButtonState, userId: String): FollowButtonState {
-        val cachedState = synchronized(statesByUserId) { statesByUserId[userId] }
-        if ((cachedState == FollowButtonState.REQUEST_PENDING ||
-                cachedState == FollowButtonState.REQUEST_PENDING_CANCELLABLE) &&
-            authoritativeState == FollowButtonState.CAN_REQUEST_FOLLOW
-        ) {
-            return cachedState ?: FollowButtonState.CAN_REQUEST_FOLLOW
-        }
-        return authoritativeState
-    }
-}
-
 // Compatibilidad para los consumidores que aún importan el enum histórico.
 typealias ContentAudience = com.moments.android.views.creator.audienceselector.ContentAudience
 
@@ -347,6 +256,48 @@ object PrivacyService {
             val settings = fetchPrivacySettings(targetUserId)
             if (settings.isPrivate) FollowButtonState.CAN_REQUEST_FOLLOW else FollowButtonState.CAN_FOLLOW
         }.getOrDefault(FollowButtonState.CAN_FOLLOW)
+    }
+
+    /** Resolución estricta para FollowStateStore: ningún error se convierte en estado UI. */
+    suspend fun resolveFollowButtonState(viewerId: String, targetUserId: String): FollowButtonState {
+        if (viewerId == targetUserId) return FollowButtonState.OWN_PROFILE
+
+        val viewerSnapshot = db.collection("users").document(viewerId).get().await()
+        val targetSnapshot = db.collection("users").document(targetUserId).get().await()
+        check(viewerSnapshot.exists() && targetSnapshot.exists()) { "Relationship user document not found" }
+
+        val viewerBlocked = (viewerSnapshot.get("blockedUsers") as? List<*>)
+            ?.filterIsInstance<String>()
+            ?.contains(targetUserId) == true
+        val targetBlocked = (targetSnapshot.get("blockedUsers") as? List<*>)
+            ?.filterIsInstance<String>()
+            ?.contains(viewerId) == true
+        if (viewerBlocked || targetBlocked) return FollowButtonState.BLOCKED
+
+        val following = db.collection("users").document(viewerId)
+            .collection("following").document(targetUserId)
+            .get().await().exists()
+        if (following) {
+            val mutual = db.collection("users").document(viewerId)
+                .collection("mutuals").document(targetUserId)
+                .get().await().exists()
+            return if (mutual) FollowButtonState.MUTUALS else FollowButtonState.FOLLOWING
+        }
+
+        val pending = db.collection("users").document(viewerId).collection("sentFollowRequests")
+            .whereEqualTo("recipientId", targetUserId)
+            .whereEqualTo("status", FollowRequestStatus.PENDING.raw)
+            .limit(1)
+            .get().await()
+            .documents
+            .isNotEmpty()
+        if (pending) return FollowButtonState.REQUEST_PENDING_CANCELLABLE
+
+        return if (targetSnapshot.getBoolean("isPrivate") == true) {
+            FollowButtonState.CAN_REQUEST_FOLLOW
+        } else {
+            FollowButtonState.CAN_FOLLOW
+        }
     }
 
     suspend fun canUsersInteract(user1Id: String, user2Id: String): Boolean =

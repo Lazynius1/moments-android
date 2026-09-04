@@ -755,7 +755,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="creator_upload_persistenceFailed">No se pudo asegurar la recuperación de la subida. Inténtalo de nuevo.</string>
     <string name="moment_video_file_too_large_after_compression">Este vídeo sigue ocupando demasiado después de optimizarlo (%1$s). Los momentos admiten vídeos de hasta %2$s.</string>
     <string name="audience_type_everyone">Todos</string>
-    <string name="audience_type_mutuals">Mutuales</string>
+    <string name="audience_type_mutuals">Mutuos</string>
     <string name="audience_type_best_friends">Mejores amigos</string>
     <string name="audience_type_custom">Personalizada</string>
     <string name="audience_type_only_me">Solo yo</string>
@@ -1128,9 +1128,9 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="sticker_loading_stickers">Cargando stickers...</string>
     <string name="sticker_loading_time">Esto puede tardar unos segundos</string>
     <string name="sticker_gif_empty_subtitle">Prueba otra búsqueda o vuelve a trending.</string>
-    <string name="sticker_category_time">Hora</string>
+    <string name="sticker_category_time">Tiempo</string>
     <string name="sticker_category_weather">Clima</string>
-    <string name="sticker_category_hashtag">Hashtag</string>
+    <string name="sticker_category_hashtag">hashtag</string>
     <string name="sticker_hashtag_hint">Escribe un hashtag</string>
     <string name="sticker_category_emoji">Emoji</string>
     <string name="sticker_emoji_cat_smileys">Caritas</string>
@@ -1144,7 +1144,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="sticker_emoji_cat_flags">Banderas</string>
 
     <string name="sticker_category_mention">Mención</string>
-    <string name="sticker_category_poll">Encuesta</string>
+    <string name="sticker_category_poll">Votación</string>
     <string name="sticker_category_question">Preguntas</string>
     <string name="sticker_mention_hint">Escribe un usuario</string>
     <string name="sticker_mention_search_title">Buscar cuenta</string>
@@ -1192,7 +1192,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="sticker_link_title">Texto para mostrar</string>
     <string name="sticker_link_fallback">Enlace</string>
 
-    <string name="sticker_category_location">Ubicación</string>
+    <string name="sticker_category_location">Lugar</string>
     <string name="sticker_location_search_title">Buscar lugar</string>
     <string name="sticker_location_search_subtitle">Explora sitios cercanos o escribe una búsqueda concreta</string>
     <string name="sticker_location_refresh">Actualizar</string>
@@ -1232,7 +1232,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="sticker_quiz_option_prompt">Opción</string>
     <string name="sticker_quiz_add_option">Añadir opción</string>
 
-    <string name="sticker_category_emoji_slider">Deslizador de emoji</string>
+    <string name="sticker_category_emoji_slider">Emoji slider</string>
     <string name="sticker_emoji_slider_prompt">Haz una pregunta...</string>
 
     <string name="sticker_category_selfie">Selfie</string>
@@ -1244,7 +1244,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="sticker_category_gif">GIF</string>
     <string name="sticker_gif_search_hint">Buscar stickers</string>
     <string name="sticker_gif_empty">No hay stickers ahora mismo</string>
-    <string name="sticker_category_frame">Marco</string>
+    <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">Marco Polaroid</string>
     <string name="sticker_frame_subtitle">Elige una foto para revelar agitando el móvil</string>
     <string name="sticker_frame_select_photo">Seleccionar Foto</string>

@@ -126,10 +126,7 @@ fun NotificationGroupedFollowersOverlay(
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return@LaunchedEffect
         items.forEach { item ->
             FollowStateStore.state(item.id)?.let { followStates[item.id] = it }
-            val network = PrivacyService.getFollowButtonState(currentUserId, item.id)
-            val reconciled = FollowStateStore.reconciledState(network, item.id)
-            followStates[item.id] = reconciled
-            FollowStateStore.setState(reconciled, item.id)
+            FollowStateStore.resolve(currentUserId, item.id)?.let { followStates[item.id] = it }
         }
     }
 
@@ -293,6 +290,7 @@ private fun FollowerRow(
         CompactFollowButton(
             state = state,
             isLoading = isLoading,
+            targetUserId = item.id,
             onClick = onFollowClick,
         )
     }
@@ -302,11 +300,13 @@ private fun FollowerRow(
 private fun CompactFollowButton(
     state: FollowButtonState,
     isLoading: Boolean,
+    targetUserId: String,
     onClick: () -> Unit,
 ) {
     ModernFollowButton(
         state = state,
         isLoading = isLoading,
+        targetUserId = targetUserId,
         onClick = onClick,
         style = ModernFollowButtonStyle.COMPACT,
     )

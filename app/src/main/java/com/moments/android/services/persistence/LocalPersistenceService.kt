@@ -75,6 +75,7 @@ object LocalPersistenceService {
 
     @Volatile private var appContext: Context? = null
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val connectionsLock = Any()
 
     class ActionPersistenceException(message: String) : Exception(message)
 
@@ -235,15 +236,47 @@ object LocalPersistenceService {
 
     fun isFollowing(targetUserId: String): Boolean {
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return false
-        return loadConnectionRecords(currentUserId).any {
-            it.targetId == targetUserId && it.type == "following"
+        return synchronized(connectionsLock) {
+            loadConnectionRecords(currentUserId).any {
+                it.targetId == targetUserId && it.type == "following"
+            }
+        }
+    }
+
+    /** Snapshot positivo para arranque/offline; ausencia no equivale a un estado remoto negativo. */
+    fun cachedFollowRelationship(viewerId: String, targetUserId: String): Pair<Boolean, Boolean> {
+        return synchronized(connectionsLock) {
+            val matching = loadConnectionRecords(viewerId).filter { it.targetId == targetUserId }
+            Pair(
+                matching.any { it.type == "following" },
+                matching.any { it.type == "mutual" },
+            )
+        }
+    }
+
+    fun updateCachedFollowRelationship(
+        viewerId: String,
+        targetUserId: String,
+        isFollowing: Boolean,
+        isMutual: Boolean,
+    ) {
+        synchronized(connectionsLock) {
+            val connections = loadConnectionRecords(viewerId).toMutableList()
+            connections.removeAll {
+                it.targetId == targetUserId && (it.type == "following" || it.type == "mutual")
+            }
+            if (isFollowing) connections += CachedConnection(viewerId, targetUserId, "following")
+            if (isMutual) connections += CachedConnection(viewerId, targetUserId, "mutual")
+            saveConnectionRecords(viewerId, connections)
         }
     }
 
     private fun saveConnectionList(userId: String, users: List<AppUser>, type: String) {
-        val remaining = loadConnectionRecords(userId).filter { it.type != type }
-        val updated = remaining + users.map { CachedConnection(userId, it.id, type) }
-        saveConnectionRecords(userId, updated)
+        synchronized(connectionsLock) {
+            val remaining = loadConnectionRecords(userId).filter { it.type != type }
+            val updated = remaining + users.map { CachedConnection(userId, it.id, type) }
+            saveConnectionRecords(userId, updated)
+        }
         users.forEach { saveUser(it) }
     }
 
@@ -400,12 +433,14 @@ object LocalPersistenceService {
     }
 
     fun toggleFollowLocally(currentUserId: String, targetUserId: String, isFollow: Boolean) {
-        val connections = loadConnectionRecords(currentUserId).toMutableList()
-        connections.removeAll { it.targetId == targetUserId && it.type == "following" }
-        if (isFollow) {
-            connections += CachedConnection(currentUserId, targetUserId, "following")
+        synchronized(connectionsLock) {
+            val connections = loadConnectionRecords(currentUserId).toMutableList()
+            connections.removeAll { it.targetId == targetUserId && it.type == "following" }
+            if (isFollow) {
+                connections += CachedConnection(currentUserId, targetUserId, "following")
+            }
+            saveConnectionRecords(currentUserId, connections)
         }
-        saveConnectionRecords(currentUserId, connections)
     }
 
     fun deleteMoment(momentId: String) {

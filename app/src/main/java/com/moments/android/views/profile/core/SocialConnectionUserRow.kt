@@ -331,6 +331,7 @@ fun SocialConnectionUserRow(
                 ModernFollowButton(
                     state = followState,
                     isLoading = isFollowLoading,
+                    targetUserId = user.id,
                     onClick = ::performRelationshipAction,
                     style = ModernFollowButtonStyle.COMPACT,
                 )

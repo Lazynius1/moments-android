@@ -91,10 +91,7 @@ object EnhancedNotificationRowFollow {
         LaunchedEffect(targetUserId) {
             FollowStateStore.state(targetUserId)?.let { followState = it }
             val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return@LaunchedEffect
-            val authoritative = PrivacyService.getFollowButtonState(currentUserId, targetUserId)
-            val reconciled = FollowStateStore.reconciledState(authoritative, targetUserId)
-            followState = reconciled
-            FollowStateStore.setState(reconciled, targetUserId)
+            FollowStateStore.resolve(currentUserId, targetUserId)?.let { followState = it }
         }
 
         // ≡ onReceive(FollowStateStore.didChangeNotification)
@@ -109,6 +106,7 @@ object EnhancedNotificationRowFollow {
         ModernFollowButton(
             state = followState,
             isLoading = false,
+            targetUserId = targetUserId,
             onClick = {
                 scope.launch { performFollowToggle(targetUserId, followState, viewModel) { followState = it } }
             },

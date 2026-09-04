@@ -1279,7 +1279,7 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="sticker_loading_time">This may take a few seconds</string>
     <string name="sticker_category_time">Time</string>
     <string name="sticker_category_weather">Weather</string>
-    <string name="sticker_category_hashtag">Hashtag</string>
+    <string name="sticker_category_hashtag">hashtag</string>
     <string name="sticker_hashtag_hint">Type a hashtag</string>
     <string name="sticker_category_emoji">Emoji</string>
     <string name="sticker_emoji_cat_smileys">Smileys</string>
@@ -1393,7 +1393,7 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="sticker_gif_search_hint">Search GIFs...</string>
     <string name="sticker_gif_empty">No stickers right now</string>
     <string name="sticker_gif_empty_subtitle">Try another search or go back to trending.</string>
-    <string name="sticker_category_frame">Frame</string>
+    <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">Polaroid Frame</string>
     <string name="sticker_frame_subtitle">Choose a photo to reveal by shaking the phone</string>
     <string name="sticker_frame_select_photo">Select Photo</string>

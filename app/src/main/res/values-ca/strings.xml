@@ -702,9 +702,9 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="sticker_loading_stickers">Carregant stickers...</string>
     <string name="sticker_loading_time">Això pot trigar uns segons</string>
     <string name="sticker_gif_empty_subtitle">Prova una altra cerca o torna a trending.</string>
-    <string name="sticker_category_time">Hora</string>
+    <string name="sticker_category_time">Temps</string>
     <string name="sticker_category_weather">Clima</string>
-    <string name="sticker_category_hashtag">Hashtag</string>
+    <string name="sticker_category_hashtag">hashtag</string>
     <string name="sticker_hashtag_hint">Escriu un hashtag</string>
     <string name="sticker_category_emoji">Emoji</string>
     <string name="sticker_emoji_cat_smileys">Cares</string>
@@ -718,7 +718,7 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="sticker_emoji_cat_flags">Banderes</string>
 
     <string name="sticker_category_mention">Menció</string>
-    <string name="sticker_category_poll">Enquesta</string>
+    <string name="sticker_category_poll">Votació</string>
     <string name="sticker_category_question">Preguntes</string>
     <string name="sticker_mention_hint">Escriu un usuari</string>
     <string name="sticker_poll_hint">Pregunta i dues opcions</string>
@@ -736,7 +736,7 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="sticker_link_title">Text per mostrar</string>
     <string name="sticker_link_fallback">Enllaç</string>
 
-    <string name="sticker_category_location">Ubicació</string>
+    <string name="sticker_category_location">Lloc</string>
     <string name="sticker_location_search_title">Cercar lloc</string>
     <string name="sticker_location_search_subtitle">Explora llocs propers o escriu una cerca concreta</string>
     <string name="sticker_location_refresh">Actualitzar</string>
@@ -788,7 +788,7 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="sticker_category_gif">GIF</string>
     <string name="sticker_gif_search_hint">Cerca adhesius</string>
     <string name="sticker_gif_empty">Ara mateix no hi ha stickers</string>
-    <string name="sticker_category_frame">Marc</string>
+    <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">Marc Polaroid</string>
     <string name="sticker_frame_subtitle">Tria una foto per revelar agitant el mòbil</string>
     <string name="sticker_frame_select_photo">Seleccionar Foto</string>

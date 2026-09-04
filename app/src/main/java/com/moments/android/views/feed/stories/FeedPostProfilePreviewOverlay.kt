@@ -515,6 +515,7 @@ private fun FeedPostProfilePreviewCard(
                 ModernFollowButton(
                     state = viewModel.followButtonState,
                     isLoading = false,
+                    targetUserId = viewModel.userId,
                     onClick = { onFollow(viewModel) },
                     style = ModernFollowButtonStyle.COMPACT,
                 )

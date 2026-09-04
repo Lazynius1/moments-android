@@ -232,10 +232,7 @@ fun FollowButtonForLocation(
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         scope.launch {
             FollowStateStore.state(targetUserId)?.let { followButtonState = it }
-            val authoritative = PrivacyService.getFollowButtonState(currentUserId, targetUserId)
-            val reconciled = FollowStateStore.reconciledState(authoritative, targetUserId)
-            followButtonState = reconciled
-            FollowStateStore.setState(reconciled, targetUserId)
+            FollowStateStore.resolve(currentUserId, targetUserId)?.let { followButtonState = it }
         }
     }
 
@@ -283,6 +280,7 @@ fun FollowButtonForLocation(
     ModernFollowButton(
         state = followButtonState,
         isLoading = isLoading,
+        targetUserId = targetUserId,
         onClick = { performFollowToggle() },
         style = ModernFollowButtonStyle.COMPACT,
         modifier = modifier,

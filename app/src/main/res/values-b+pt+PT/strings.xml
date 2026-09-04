@@ -703,8 +703,8 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="sticker_loading_time">Isto pode demorar alguns segundos</string>
     <string name="sticker_gif_empty_subtitle">Tenta outra pesquisa ou volta ao trending.</string>
     <string name="sticker_category_time">Hora</string>
-    <string name="sticker_category_weather">Clima</string>
-    <string name="sticker_category_hashtag">Hashtag</string>
+    <string name="sticker_category_weather">Tempo</string>
+    <string name="sticker_category_hashtag">hashtag</string>
     <string name="sticker_hashtag_hint">Escreve um hashtag</string>
     <string name="sticker_category_emoji">Emoji</string>
     <string name="sticker_emoji_cat_smileys">Carinhas</string>
@@ -776,7 +776,7 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="sticker_quiz_option_prompt">Opção</string>
     <string name="sticker_quiz_add_option">Adicionar opção</string>
 
-    <string name="sticker_category_emoji_slider">Slider de emoji</string>
+    <string name="sticker_category_emoji_slider">Deslizador de emoji</string>
     <string name="sticker_emoji_slider_prompt">Faz uma pergunta...</string>
 
     <string name="sticker_category_selfie">Selfie</string>
@@ -788,7 +788,7 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="sticker_category_gif">GIF</string>
     <string name="sticker_gif_search_hint">Procurar autocolantes</string>
     <string name="sticker_gif_empty">Sem stickers por agora</string>
-    <string name="sticker_category_frame">Moldura</string>
+    <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">Moldura Polaroid</string>
     <string name="sticker_frame_subtitle">Escolhe uma fotografia para revelar ao abanar o telemóvel</string>
     <string name="sticker_frame_select_photo">Selecionar fotografia</string>

@@ -316,6 +316,7 @@ fun UserModernProfileHeader(
                 ModernFollowButton(
                     state = viewModel.followButtonState,
                     isLoading = false,
+                    targetUserId = viewModel.userId,
                     onClick = onFollowAction,
                     style = ModernFollowButtonStyle.PROFILE_HEADER,
                     destructiveConfirmation = DestructiveConfirmationMode.NONE,

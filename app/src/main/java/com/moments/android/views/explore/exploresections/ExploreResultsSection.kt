@@ -480,7 +480,11 @@ fun SearchResultCard(
             }
         }
         if (buttonState.isActionable) {
-            ExploreSuggestionsFollowButton(buttonState = buttonState, onTap = onFollow)
+            ExploreSuggestionsFollowButton(
+                buttonState = buttonState,
+                targetUserId = user.id,
+                onTap = onFollow,
+            )
         } else {
             PassiveFollowChip(state = buttonState)
         }

@@ -248,6 +248,7 @@ fun UserModernPrivateProfileView(
             ModernFollowButton(
                 state = followButtonState,
                 isLoading = false,
+                targetUserId = userId,
                 onClick = onFollowAction,
                 style = ModernFollowButtonStyle.PROFILE_HEADER,
                 destructiveConfirmation = DestructiveConfirmationMode.NONE,

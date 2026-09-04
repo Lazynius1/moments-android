@@ -1256,7 +1256,7 @@
     <string name="sticker_loading_time">Dit kan enkele seconden duren</string>
     <string name="sticker_category_time">Tijd</string>
     <string name="sticker_category_weather">Weer</string>
-    <string name="sticker_category_hashtag">Hashtag</string>
+    <string name="sticker_category_hashtag">hashtag</string>
     <string name="sticker_hashtag_hint">Typ een hashtag</string>
     <string name="sticker_category_emoji">Emoji</string>
     <string name="sticker_emoji_cat_smileys">Smileys</string>
@@ -1269,7 +1269,7 @@
     <string name="sticker_emoji_cat_symbols">Symbolen</string>
     <string name="sticker_emoji_cat_flags">Vlaggen</string>
 
-    <string name="sticker_category_mention">Vermelding</string>
+    <string name="sticker_category_mention">Vermelden</string>
     <string name="sticker_category_poll">Poll</string>
     <string name="sticker_category_question">Vragen</string>
     <string name="sticker_category_link">Link</string>
@@ -1370,7 +1370,7 @@
     <string name="sticker_gif_search_hint">GIFs zoeken...</string>
     <string name="sticker_gif_empty">Geen stickers gevonden</string>
     <string name="sticker_gif_empty_subtitle">Probeer een andere zoekopdracht of ga terug naar trending.</string>
-    <string name="sticker_category_frame">Frame</string>
+    <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">Polaroid-frame</string>
     <string name="sticker_frame_subtitle">Kies een foto die je onthult door je telefoon te schudden</string>
     <string name="sticker_frame_select_photo">Foto selecteren</string>

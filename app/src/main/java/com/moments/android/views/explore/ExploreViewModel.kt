@@ -265,10 +265,8 @@ class ExploreViewModel(
             FollowStateStore.state(userId)?.let {
                 userButtonStates = userButtonStates + (userId to it)
             }
-            val authoritative = PrivacyService.getFollowButtonState(viewerId, userId)
-            val reconciled = FollowStateStore.reconciledState(authoritative, userId)
+            val reconciled = FollowStateStore.resolve(viewerId, userId) ?: return@launch
             userButtonStates = userButtonStates + (userId to reconciled)
-            FollowStateStore.setState(reconciled, userId)
             if (reconciled.isFollowingOrMutual) {
                 followedUserIds = followedUserIds + userId
                 suggestedUsers = suggestedUsers.filter { it.id != userId }

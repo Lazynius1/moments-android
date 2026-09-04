@@ -527,8 +527,7 @@ class ProfileViewModel(
             return
         }
         viewModelScope.launch {
-            val state = PrivacyService.getFollowButtonState(current, userId)
-            FollowStateStore.setState(FollowStateStore.reconciledState(state, userId), userId)
+            FollowStateStore.resolve(current, userId)
         }
     }
 

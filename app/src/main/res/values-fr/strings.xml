@@ -716,9 +716,9 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="sticker_loading_stickers">Chargement des stickers...</string>
     <string name="sticker_loading_time">Cela peut prendre quelques secondes</string>
     <string name="sticker_gif_empty_subtitle">Essayez une autre recherche ou revenez aux tendances.</string>
-    <string name="sticker_category_time">Heure</string>
+    <string name="sticker_category_time">Time</string>
     <string name="sticker_category_weather">Météo</string>
-    <string name="sticker_category_hashtag">Hashtag</string>
+    <string name="sticker_category_hashtag">hashtag</string>
     <string name="sticker_hashtag_hint">Saisir un hashtag</string>
     <string name="sticker_category_emoji">Emoji</string>
     <string name="sticker_emoji_cat_smileys">Smileys</string>
@@ -790,7 +790,7 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="sticker_quiz_option_prompt">Option</string>
     <string name="sticker_quiz_add_option">Ajouter une option</string>
 
-    <string name="sticker_category_emoji_slider">Curseur emoji</string>
+    <string name="sticker_category_emoji_slider">Emoji slider</string>
     <string name="sticker_emoji_slider_prompt">Pose une question...</string>
 
     <string name="sticker_category_selfie">Selfie</string>
@@ -802,11 +802,11 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="sticker_category_gif">GIF</string>
     <string name="sticker_gif_search_hint">Rechercher des stickers</string>
     <string name="sticker_gif_empty">Aucun sticker pour le moment</string>
-    <string name="sticker_category_frame">Cadre</string>
+    <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">Cadre Polaroid</string>
     <string name="sticker_frame_subtitle">Choisis une photo à révéler en secouant le téléphone</string>
     <string name="sticker_frame_select_photo">Choisir une photo</string>
-    <string name="sticker_category_reveal">Révéler</string><string name="sticker_reveal_title">Révéler</string><string name="sticker_reveal_subtitle">Créez un calque que vos amis devront gratter pour voir la story</string><string name="sticker_reveal_add_layer">AJOUTER UN CALQUE</string><string name="sticker_category_audio">Audio</string><string name="sticker_audio_title">Ajoutez votre voix</string><string name="sticker_audio_add">Ajouter à la story</string>
+    <string name="sticker_category_reveal">Reveal</string><string name="sticker_reveal_title">Révéler</string><string name="sticker_reveal_subtitle">Créez un calque que vos amis devront gratter pour voir la story</string><string name="sticker_reveal_add_layer">AJOUTER UN CALQUE</string><string name="sticker_category_audio">Audio</string><string name="sticker_audio_title">Ajoutez votre voix</string><string name="sticker_audio_add">Ajouter à la story</string>
     <string name="reveal_viewer_hint">Grattez pour révéler</string>
     <string name="profile_header_notifications">Notifications</string>
     <string name="profile_header_more">Plus d’options</string>

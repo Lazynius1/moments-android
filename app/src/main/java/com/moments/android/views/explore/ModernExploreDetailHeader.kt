@@ -79,7 +79,7 @@ fun ModernExploreDetailHeader(
         liveUsername = ""
         FollowStateStore.state(moment?.authorId.orEmpty())?.let { followButtonState = it }
         liveUsername = resolveAuthorUsername(moment)
-        followButtonState = refreshFollowState(moment, currentUserId)
+        refreshFollowState(moment, currentUserId)?.let { followButtonState = it }
     }
 
     Column(modifier.fillMaxWidth()) {
@@ -188,6 +188,7 @@ fun ModernExploreDetailHeader(
                         ModernFollowButton(
                             state = followButtonState,
                             isLoading = isFollowLoading,
+                            targetUserId = m.authorId,
                             onClick = {
                                 scope.launch {
                                     performFollowToggle(
@@ -227,13 +228,11 @@ private suspend fun resolveAuthorUsername(moment: Moment?): String {
 private suspend fun refreshFollowState(
     moment: Moment?,
     currentUserId: String?,
-): FollowButtonState {
+): FollowButtonState? {
     if (moment == null || currentUserId == null || moment.authorId == currentUserId) {
-        return FollowButtonState.CAN_FOLLOW
+        return null
     }
-    val state = PrivacyService.getFollowButtonState(currentUserId, moment.authorId)
-    FollowStateStore.setState(state, moment.authorId)
-    return state
+    return FollowStateStore.resolve(currentUserId, moment.authorId)
 }
 
 private suspend fun performFollowToggle(

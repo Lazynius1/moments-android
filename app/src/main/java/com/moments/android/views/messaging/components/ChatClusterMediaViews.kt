@@ -582,9 +582,9 @@ enum class ClusterGalleryPresentation { MODAL, PUSHED }
 enum class ClusterGalleryScope { CLUSTER, CONVERSATION_SHARED }
 enum class ClusterGalleryTab { MEDIA, LINKS }
 
-/** ≡ iOS `ClusterGalleryDetailRoute` — índice en `visibleMessages` para push de detalle. */
-data class ClusterGalleryDetailRoute(val index: Int) {
-    val id: Int get() = index
+/** ≡ iOS `ClusterGalleryDetailRoute` — identidad estable del mensaje abierto. */
+data class ClusterGalleryDetailRoute(val messageId: String) {
+    val id: String get() = messageId
 }
 
 private const val galleryDeleteEveryoneWindowMillis = 7_200_000L
@@ -661,10 +661,8 @@ fun ClusterGalleryView(
     LaunchedEffect(visible.map { it.id }) {
         visible.forEach { onHydrateMedia?.invoke(it) }
         val route = detailRoute
-        if (route != null && visible.isEmpty()) {
+        if (route != null && visible.none { it.id == route.messageId }) {
             detailRoute = null
-        } else if (route != null && route.index !in visible.indices) {
-            detailRoute = ClusterGalleryDetailRoute(route.index.coerceIn(0, visible.lastIndex))
         }
     }
 
@@ -703,8 +701,7 @@ fun ClusterGalleryView(
             ChatLinkOpener.openFirstLink(message.content.orEmpty(), uriHandler::openUri)
             return
         }
-        val index = visible.indexOfFirst { it.id == message.id }
-        if (index < 0) return
+        if (visible.none { it.id == message.id }) return
         if ((message.type == MessageType.IMAGE || message.type == MessageType.VIDEO) && message.needsDownloadForPlayback) {
             // ≡ iOS: solo descarga; el usuario vuelve a pulsar cuando esté listo.
             (onPrepareDownload ?: onOpenMedia).invoke(message)
@@ -712,7 +709,7 @@ fun ClusterGalleryView(
         }
         if (detail != null) {
             // ≡ modalPath.append / pushedDetailRoute = route
-            detailRoute = ClusterGalleryDetailRoute(index)
+            detailRoute = ClusterGalleryDetailRoute(message.id)
         } else {
             onOpenMedia(message)
         }
@@ -925,8 +922,8 @@ fun ClusterGalleryView(
 
     // ≡ ClusterGalleryDetailHost + navigationDestination(item:)
     val activeRoute = detailRoute
-    if (activeRoute != null && detail != null && visible.isNotEmpty()) {
-        val detailMessage = visible[activeRoute.index.coerceIn(0, visible.lastIndex)]
+    val detailMessage = activeRoute?.let { route -> visible.firstOrNull { it.id == route.messageId } }
+    if (detailMessage != null && detail != null) {
         androidx.activity.compose.BackHandler { dismissDetail() }
         Box(
             Modifier
