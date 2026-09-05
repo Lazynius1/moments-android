@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="caption_translate_post">翻譯這則貼文</string>
+    <string name="caption_translating">翻譯中…</string>
+    <string name="caption_show_original">顯示原文</string>
+    <string name="caption_translation_retry">無法翻譯。重試</string>
+</resources>

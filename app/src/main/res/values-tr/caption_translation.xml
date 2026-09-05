@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="caption_translate_post">Bu gönderiyi çevir</string>
+    <string name="caption_translating">Çevriliyor…</string>
+    <string name="caption_show_original">Orijinali göster</string>
+    <string name="caption_translation_retry">Çeviri yapılamadı. Tekrar dene</string>
+</resources>

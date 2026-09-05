@@ -1,5 +1,9 @@
 package com.moments.android.views.components
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalConfiguration
+import com.moments.android.services.CaptionTranslationService
+import kotlinx.coroutines.CancellationException
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
@@ -43,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
@@ -242,6 +247,59 @@ fun MomentCaptionView(
     val trimmed = content.trim()
     if (trimmed.isEmpty()) return
 
+    val targetLanguage = LocalConfiguration.current.locales[0].toLanguageTag()
+    var translated by remember(trimmed, targetLanguage) { mutableStateOf<String?>(null) }
+    var showingTranslation by remember(trimmed, targetLanguage) { mutableStateOf(false) }
+    val captionReveal = remember(trimmed, targetLanguage) { Animatable(1f) }
+    val translationScope = rememberCoroutineScope()
+    suspend fun revealTranslation(show: Boolean) {
+        val motionEnabled = (kotlinx.coroutines.currentCoroutineContext()[androidx.compose.ui.MotionDurationScale]?.scaleFactor ?: 1f) > 0f
+        if (motionEnabled) captionReveal.animateTo(0f, tween(130))
+        showingTranslation = show
+        captionReveal.animateTo(1f, tween(if (show && motionEnabled) 380 else 180))
+    }
+    var translating by remember(trimmed, targetLanguage) { mutableStateOf(false) }
+    var translationFailed by remember(trimmed, targetLanguage) { mutableStateOf(false) }
+    var canTranslate by remember(trimmed, targetLanguage) { mutableStateOf(false) }
+    LaunchedEffect(trimmed, targetLanguage) {
+        canTranslate = try { CaptionTranslationService.needsTranslation(trimmed, targetLanguage) }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { false }
+    }
+    LaunchedEffect(translating, trimmed, targetLanguage) {
+        if (translating) {
+            translationFailed = false
+            try {
+                translated = CaptionTranslationService.translate(trimmed, targetLanguage)
+                revealTranslation(true)
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { translationFailed = true }
+            finally { translating = false }
+        }
+    }
+    val visibleContent = if (showingTranslation) translated ?: trimmed else trimmed
+    val translationControl: @Composable () -> Unit = {
+        if (canTranslate) {
+            Text(
+                text = stringResource(when {
+                    translating -> R.string.caption_translating
+                    translationFailed -> R.string.caption_translation_retry
+                    showingTranslation -> R.string.caption_show_original
+                    else -> R.string.caption_translate_post
+                }),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (style == MomentCaptionPresentationStyle.Reels) Color.White.copy(alpha = 0.72f)
+                    else captionSecondaryTextColor(isSystemInDarkTheme()),
+                modifier = Modifier.clickable(enabled = !translating && !captionReveal.isRunning, role = androidx.compose.ui.semantics.Role.Button) {
+                    if (translated != null) {
+                        translationScope.launch { revealTranslation(!showingTranslation) }
+                    } else translating = true
+                }.padding(top = 3.dp, bottom = 2.dp).captionTranslationEffect(translating),
+            )
+        }
+    }
+
     val isDark = isSystemInDarkTheme()
     val isMediaOverlay = style == MomentCaptionPresentationStyle.Reels
     val baseColor = if (isMediaOverlay) Color.White.copy(alpha = 0.92f) else captionBaseTextColor(isDark)
@@ -253,8 +311,8 @@ fun MomentCaptionView(
     val cardContent = when (style) {
         MomentCaptionPresentationStyle.Feed,
         MomentCaptionPresentationStyle.Reels,
-        -> MomentCaptionText.flowing(trimmed)
-        MomentCaptionPresentationStyle.Detail -> trimmed
+        -> MomentCaptionText.flowing(visibleContent)
+        MomentCaptionPresentationStyle.Detail -> visibleContent
     }
 
     val seeMoreInline = stringResource(R.string.feed_see_more_inline)
@@ -279,6 +337,7 @@ fun MomentCaptionView(
     var captionBounds by remember { mutableStateOf(Rect.Zero) }
 
     if (style == MomentCaptionPresentationStyle.Reels) {
+        Column(modifier) {
         ReelsCaptionBody(
             content = cardContent,
             needsMore = reelsNeedsMore(cardContent),
@@ -289,8 +348,10 @@ fun MomentCaptionView(
             onMentionTap = onMentionTap,
             isExpandedExternal = isReelsCaptionExpanded,
             onExpandedChange = onReelsCaptionExpandedChange,
-            modifier = modifier,
+            modifier = Modifier.captionTranslationEffect(translating).captionTranslationReveal(captionReveal.value, showingTranslation),
         )
+        translationControl()
+        }
         return
     }
 
@@ -304,6 +365,7 @@ fun MomentCaptionView(
     Column(
         modifier
             .fillMaxWidth()
+            .animateContentSize()
             .onGloballyPositioned { captionBounds = it.boundsInWindow() }
             .padding(horizontal = FeedMomentCardLayout.captionHorizontalPadding)
             .padding(top = if (style == MomentCaptionPresentationStyle.Detail) 0.dp else 2.dp),
@@ -322,7 +384,7 @@ fun MomentCaptionView(
             actionWeight = FontWeight.Normal,
             onActionTap = if (showSeeMore) openFullCaption else null,
             onEmptyTap = if (showSeeMore) openFullCaption else null,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().captionTranslationEffect(translating).captionTranslationReveal(captionReveal.value, showingTranslation),
             onTextLayout = { result ->
                 if (!showSeeMore && result.hasVisualOverflow) {
                     val lastLine = (lineLimit - 1).coerceAtMost(result.lineCount - 1)
@@ -341,6 +403,7 @@ fun MomentCaptionView(
                 }
             },
         )
+        translationControl()
     }
 
     if (showFullCaption) {
@@ -370,12 +433,16 @@ fun MomentCaptionView(
                 },
                 destination = { close, reportContentHeight ->
                     MomentCaptionReaderCard(
-                        content = trimmed,
+                        content = visibleContent,
                         mediaPreviewContext = mediaPreviewContext,
                         onHashtagTap = onHashtagTap,
                         onMentionTap = onMentionTap,
                         onClose = close,
                         onContentHeightChange = reportContentHeight,
+                        translationControl = translationControl,
+                        isTranslating = translating,
+                        revealProgress = captionReveal.value,
+                        showingTranslation = showingTranslation,
                     )
                 },
             )
@@ -660,6 +727,10 @@ private fun MomentCaptionReaderCard(
     onMentionTap: (String) -> Unit,
     onClose: () -> Unit,
     onContentHeightChange: (Int) -> Unit,
+    translationControl: @Composable () -> Unit,
+    isTranslating: Boolean,
+    revealProgress: Float,
+    showingTranslation: Boolean,
 ) {
     val isDark = isSystemInDarkTheme()
     val baseColor = sheetBaseTextColor(isDark)
@@ -735,6 +806,7 @@ private fun MomentCaptionReaderCard(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
+                Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 MomentHashtagText(
                     content = content,
                     onHashtagTap = onHashtagTap,
@@ -743,8 +815,10 @@ private fun MomentCaptionReaderCard(
                     hashtagColor = hashtagColor,
                     mentionColor = captionMentionTextColor,
                     fontSize = 16.sp,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().captionTranslationEffect(isTranslating).captionTranslationReveal(revealProgress, showingTranslation),
                 )
+                translationControl()
+                }
             }
         }
     }

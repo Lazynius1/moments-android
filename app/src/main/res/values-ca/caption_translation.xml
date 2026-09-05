@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="caption_translate_post">Tradueix aquesta publicació</string>
+    <string name="caption_translating">S’està traduint…</string>
+    <string name="caption_show_original">Mostra l’original</string>
+    <string name="caption_translation_retry">No s’ha pogut traduir. Torna-ho a provar</string>
+</resources>

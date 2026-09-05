@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="caption_translate_post">Terjemahkan postingan ini</string>
+    <string name="caption_translating">Menerjemahkan…</string>
+    <string name="caption_show_original">Tampilkan teks asli</string>
+    <string name="caption_translation_retry">Tidak dapat menerjemahkan. Coba lagi</string>
+</resources>

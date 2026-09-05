@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="caption_translate_post">この投稿を翻訳</string>
+    <string name="caption_translating">翻訳中…</string>
+    <string name="caption_show_original">原文を表示</string>
+    <string name="caption_translation_retry">翻訳できませんでした。再試行</string>
+</resources>

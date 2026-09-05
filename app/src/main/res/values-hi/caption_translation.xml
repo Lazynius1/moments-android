@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="caption_translate_post">इस पोस्ट का अनुवाद करें</string>
+    <string name="caption_translating">अनुवाद हो रहा है…</string>
+    <string name="caption_show_original">मूल दिखाएँ</string>
+    <string name="caption_translation_retry">अनुवाद नहीं हो सका। फिर से कोशिश करें</string>
+</resources>

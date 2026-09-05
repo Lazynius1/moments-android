@@ -157,7 +157,8 @@ class EchoViewModel(
             _currentVerticalIndex.value = 0
             _ripplePhase.value = 0.0
             val firstMoment = perspectives[index].moments.firstOrNull()
-            _isVideoPlaying.value = firstMoment?.mediaType == "video"
+            _isVideoPlaying.value = firstMoment?.mediaType == "video" &&
+                _momentAvailability.value[firstMoment.momentId] != false
             kotlinx.coroutines.delay(350)
             _ripplePhase.value = 0.0
         }
@@ -174,7 +175,8 @@ class EchoViewModel(
         scope.launch {
             kotlinx.coroutines.delay(30)
             _currentVerticalIndex.value = index
-            _isVideoPlaying.value = moments[index].mediaType == "video"
+            _isVideoPlaying.value = moments[index].mediaType == "video" &&
+                _momentAvailability.value[moments[index].momentId] != false
         }
     }
 
@@ -265,6 +267,9 @@ class EchoViewModel(
         scope.launch(Dispatchers.IO) {
             fun setAvailable(value: Boolean) {
                 _momentAvailability.value = _momentAvailability.value + (momentRef.momentId to value)
+                if (!value && currentMoment?.momentId == momentRef.momentId) {
+                    _isVideoPlaying.value = false
+                }
             }
             try {
                 val snapshot = db.collection("users").document(momentRef.authorId)

@@ -82,7 +82,7 @@ fun FeedListSection(
     val listState = rememberLazyListState()
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    val rowSpacing = FeedMomentCardLayout.rowSpacing
+    val rowSpacing = 6.dp
     // iOS: availableHeight = screen - headerHeight - selectorHeight - tabbar - 60
     val availableHeightPx = remember(
         configuration.screenHeightDp,

@@ -141,6 +141,7 @@ dependencies {
     implementation(libs.firebase.appcheck.play.integrity)
     implementation(libs.firebase.appcheck.debug)
     implementation(libs.firebase.ai)
+    implementation("com.google.mlkit:language-id:17.0.6")
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
     implementation(libs.androidx.credentials)

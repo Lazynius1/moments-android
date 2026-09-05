@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="caption_translate_post">Dit bericht vertalen</string>
+    <string name="caption_translating">Vertalen…</string>
+    <string name="caption_show_original">Origineel weergeven</string>
+    <string name="caption_translation_retry">Vertalen mislukt. Opnieuw proberen</string>
+</resources>

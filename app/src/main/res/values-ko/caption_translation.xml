@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="caption_translate_post">이 게시물 번역하기</string>
+    <string name="caption_translating">번역 중…</string>
+    <string name="caption_show_original">원문 보기</string>
+    <string name="caption_translation_retry">번역하지 못했습니다. 다시 시도</string>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="caption_translate_post">Diesen Beitrag übersetzen</string>
+    <string name="caption_translating">Wird übersetzt…</string>
+    <string name="caption_show_original">Original anzeigen</string>
+    <string name="caption_translation_retry">Übersetzung fehlgeschlagen. Erneut versuchen</string>
+</resources>
