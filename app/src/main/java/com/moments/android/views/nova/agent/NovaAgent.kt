@@ -415,13 +415,13 @@ class NovaAgent(
     }
 
     private suspend fun handleMomentPublishFallback(userText: String, image: Bitmap, chat: NovaAIService.ChatSession, botId: String): Boolean {
+        val draft = NovaMomentDraftParser.parse(userText) ?: return false
         val nudge = chat.sendMessage(listOf(NovaModelContent.userText(NovaPromptCatalog.createMomentToolNudge)))
         if (nudge.functionCalls.isNotEmpty()) {
             replaceBotText(botId, string(R.string.nova_confirm_preparing))
             handleToolCalls(nudge.functionCalls, chat, mutableSetOf(), botId)?.let { replaceBotText(botId, it) }
             return true
         }
-        val draft = NovaMomentDraftParser.parse(userText) ?: return false
         val args = buildMap<String, Any?> {
             put("content", draft.content)
             put("audience", draft.audience)
