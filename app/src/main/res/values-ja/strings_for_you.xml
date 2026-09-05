@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">興味がない</string>
+    <string name="for_you_feedback_subtitle">似た投稿の表示を減らす</string>
+    <string name="for_you_feedback_saving">設定を保存中…</string>
+    <string name="for_you_feedback_hidden">投稿を非表示にしました。似たコンテンツの表示を減らします。</string>
+    <string name="for_you_feedback_restored">設定を元に戻しました。</string>
+    <string name="for_you_feedback_failed">設定を保存できませんでした。もう一度お試しください。</string>
+    <string name="for_you_feedback_undo">元に戻す</string>
+    <string name="for_you_feedback_dismiss">閉じる</string>
+</resources>

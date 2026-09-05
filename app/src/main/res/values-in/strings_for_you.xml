@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">Tidak tertarik</string>
+    <string name="for_you_feedback_subtitle">Tampilkan lebih sedikit postingan serupa</string>
+    <string name="for_you_feedback_saving">Menyimpan preferensi…</string>
+    <string name="for_you_feedback_hidden">Postingan disembunyikan. Konten serupa akan ditampilkan lebih sedikit.</string>
+    <string name="for_you_feedback_restored">Preferensi dibatalkan.</string>
+    <string name="for_you_feedback_failed">Preferensi tidak dapat disimpan. Coba lagi.</string>
+    <string name="for_you_feedback_undo">Urungkan</string>
+    <string name="for_you_feedback_dismiss">Tutup</string>
+</resources>

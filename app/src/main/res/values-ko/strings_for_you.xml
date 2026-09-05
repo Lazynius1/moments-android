@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">관심 없음</string>
+    <string name="for_you_feedback_subtitle">비슷한 게시물 줄이기</string>
+    <string name="for_you_feedback_saving">설정 저장 중…</string>
+    <string name="for_you_feedback_hidden">게시물을 숨겼어요. 비슷한 콘텐츠가 줄어들어요.</string>
+    <string name="for_you_feedback_restored">설정을 되돌렸어요.</string>
+    <string name="for_you_feedback_failed">설정을 저장하지 못했어요. 다시 시도해 주세요.</string>
+    <string name="for_you_feedback_undo">실행 취소</string>
+    <string name="for_you_feedback_dismiss">닫기</string>
+</resources>

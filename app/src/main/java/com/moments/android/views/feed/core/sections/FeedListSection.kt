@@ -43,6 +43,8 @@ import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.services.cache.ImagePrefetchManager
 import com.moments.android.services.cache.VideoPreloader
 import com.moments.android.services.content.FeedMoment
+import com.moments.android.services.content.ForYouPreferences
+import androidx.compose.runtime.DisposableEffect
 import com.moments.android.services.performance.FeedVisibilityCoordinator
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.feed.controls.FeedType
@@ -79,7 +81,14 @@ fun FeedListSection(
     feedSelectorHeight: Dp = 35.dp,
     modifier: Modifier = Modifier,
 ) {
+    val hiddenKeys = ForYouPreferences.hiddenKeys()
+    val displayedMoments = if (selectedFeedType == FeedType.ForYou)
+        viewModel.moments.filterNot { ForYouPreferences.momentKey(it) in hiddenKeys } else viewModel.moments
     val listState = rememberLazyListState()
+    DisposableEffect(Unit) { onDispose { ForYouPreferences.clearVisibility() } }
+    LaunchedEffect(ForYouPreferences.revision) {
+        if (ForYouPreferences.revision > 0 && selectedFeedType == FeedType.ForYou && displayedMoments.size < 3) onLoadMore()
+    }
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val rowSpacing = 6.dp
@@ -164,7 +173,7 @@ fun FeedListSection(
         }
     }
 
-    LaunchedEffect(listState, viewModel.moments) {
+    LaunchedEffect(listState, displayedMoments, selectedFeedType) {
         snapshotFlow {
             val info = listState.layoutInfo
             val visible = info.visibleItemsInfo
@@ -172,7 +181,7 @@ fun FeedListSection(
             val viewport = (info.viewportEndOffset - info.viewportStartOffset).toFloat().coerceAtLeast(1f)
             buildMap {
                 for (item in visible) {
-                    val moment = viewModel.moments.getOrNull(item.index) ?: continue
+                    val moment = displayedMoments.getOrNull(item.index) ?: continue
                     val visiblePx = minOf(item.offset + item.size, info.viewportEndOffset) -
                         maxOf(item.offset, info.viewportStartOffset)
                     put(moment.id, (visiblePx.toFloat() / viewport).coerceIn(0f, 1f))
@@ -181,21 +190,22 @@ fun FeedListSection(
         }.collect { visibility ->
             FeedVisibilityCoordinator.update(visibility)
             viewModel.syncMomentListeners(visibility)
+            ForYouPreferences.updateVisibility(displayedMoments, visibility, selectedFeedType == FeedType.ForYou)
         }
     }
 
-    LaunchedEffect(viewModel.moments) {
-        viewModel.rebuildVideoMomentsIndex()
+    LaunchedEffect(displayedMoments) {
+        viewModel.rebuildVideoMomentsIndex(displayedMoments)
     }
 
-    // iOS feedReelsVideos = viewModel.moments.videoMoments
-    val feedReelsVideos = remember(viewModel.moments) {
-        viewModel.reelsVideosForFeed()
+    // iOS feedReelsVideos = displayedMoments.videoMoments
+    val feedReelsVideos = remember(displayedMoments) {
+        viewModel.reelsVideosForFeed(displayedMoments)
     }
-    val adAfterIndices = remember(viewModel.moments, selectedFeedType) {
+    val adAfterIndices = remember(displayedMoments, selectedFeedType) {
         val (minGap, maxGap) = if (selectedFeedType == FeedType.ForYou) 3 to 5 else 5 to 7
         FeedAdPlacement.indicesAfterWhichToShowAd(
-            momentIds = viewModel.moments.map { it.id },
+            momentIds = displayedMoments.map { it.id },
             minGap = minGap,
             maxGap = maxGap,
         )
@@ -215,15 +225,17 @@ fun FeedListSection(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(selectedFeedType) {
+        ForYouPreferences.clearVisibility()
+        onHeaderHiddenChangeLatest(false)
         listState.scrollToItem(0)
     }
 
     fun prefetchUpcoming(fromIndex: Int) {
         val next = fromIndex + 1
-        if (next >= viewModel.moments.size) return
-        val end = minOf(next + 8, viewModel.moments.size)
-        val upcoming = viewModel.moments.subList(next, end)
+        if (next >= displayedMoments.size) return
+        val end = minOf(next + 8, displayedMoments.size)
+        val upcoming = displayedMoments.subList(next, end)
         val imageUrls = viewModel.imagePrefetchUrls(upcoming, maxMoments = 8)
         if (imageUrls.isNotEmpty()) ImagePrefetchManager.prefetch(imageUrls)
         val videoUrls = viewModel.videoPreloadUrls(upcoming, maxMoments = 4)
@@ -250,11 +262,11 @@ fun FeedListSection(
                     .fillMaxSize()
                     .momentsScrollEdgeChrome(),
             ) {
-                if (viewModel.isLoading && viewModel.moments.isEmpty()) {
+                if (viewModel.isLoading && displayedMoments.isEmpty()) {
                     items(4) { FeedPostSkeletonView() }
                 } else {
                     itemsIndexed(
-                        viewModel.moments,
+                        displayedMoments,
                         key = { _, m ->
                             if (m.id.isNotEmpty()) "${m.authorId}_${m.id}"
                             else "${m.authorId}_${m.timestamp}_${m.content.take(24)}"
@@ -295,7 +307,7 @@ fun FeedListSection(
                                             onPeek?.invoke(url, ratio, pressing)
                                         },
                                         onNearEnd = {
-                                            if (moment.id == viewModel.moments.lastOrNull()?.id) {
+                                            if (moment.id == displayedMoments.lastOrNull()?.id) {
                                                 onLoadMore()
                                             }
                                         },
@@ -331,7 +343,7 @@ fun FeedListSection(
                 }
             }
 
-            if (viewModel.moments.isEmpty() && !viewModel.isLoading) {
+            if (displayedMoments.isEmpty() && !viewModel.isLoading) {
                 ModernEmptyFeedView(
                     feedType = selectedFeedType,
                     modifier = Modifier.fillMaxSize(),

@@ -55,6 +55,7 @@ fun FeedOverlaysSection(
     onDismissContextMenu: () -> Unit,
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {},
+    onNotInterested: ((FeedMoment) -> Unit)? = null,
     onDismissEchoInvitation: () -> Unit = {},
     onAcceptEchoInvitation: (String) -> Unit = {},
     onDismissNotificationSummary: () -> Unit = {},
@@ -122,6 +123,7 @@ fun FeedOverlaysSection(
                     onEdit = onEdit,
                     onDelete = onDelete,
                     onReport = {},
+                    onNotInterested = onNotInterested?.let { action -> { action(moment) } },
                 )
             }
         }

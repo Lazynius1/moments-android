@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">Niet geïnteresseerd</string>
+    <string name="for_you_feedback_subtitle">Minder soortgelijke berichten tonen</string>
+    <string name="for_you_feedback_saving">Voorkeur opslaan…</string>
+    <string name="for_you_feedback_hidden">Bericht verborgen. Je ziet minder soortgelijke inhoud.</string>
+    <string name="for_you_feedback_restored">Voorkeur ongedaan gemaakt.</string>
+    <string name="for_you_feedback_failed">Je voorkeur kon niet worden opgeslagen. Probeer het opnieuw.</string>
+    <string name="for_you_feedback_undo">Ongedaan maken</string>
+    <string name="for_you_feedback_dismiss">Sluiten</string>
+</resources>

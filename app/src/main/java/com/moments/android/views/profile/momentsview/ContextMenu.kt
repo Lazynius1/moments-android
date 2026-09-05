@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
@@ -119,6 +120,7 @@ fun ModernContextMenuOverlay(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onReport: () -> Unit = {},
+    onNotInterested: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (!isPresented) return
@@ -269,6 +271,7 @@ fun ModernContextMenuOverlay(
                                 onReport()
                             },
                             onCancel = { dismiss() },
+                            onNotInterested = onNotInterested?.let { action -> { dismiss(); action() } },
                         )
                         ContextMenuViewState.DeleteConfirm -> ContextMenuDeleteConfirmPanel(
                             onConfirm = {
@@ -398,6 +401,7 @@ fun ModernContextMenuContent(
     onShare: () -> Unit,
     onReport: () -> Unit,
     onCancel: () -> Unit,
+    onNotInterested: (() -> Unit)? = null,
 ) {
     val isDark = isSystemInDarkTheme()
     val primary = if (isDark) Color.White else Color.Black
@@ -469,6 +473,15 @@ fun ModernContextMenuContent(
             }
 
             if (!isMyMoment) {
+                onNotInterested?.let { action ->
+                    ContextMenuButton(
+                        icon = Icons.Filled.VisibilityOff,
+                        title = stringResource(R.string.for_you_feedback_not_interested),
+                        subtitle = stringResource(R.string.for_you_feedback_subtitle),
+                        forceRedIcon = false,
+                        onClick = action,
+                    )
+                }
                 HorizontalDivider(color = divider, modifier = Modifier.padding(vertical = 8.dp))
                 ContextMenuButton(
                     icon = Icons.Filled.Flag,

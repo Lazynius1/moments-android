@@ -71,6 +71,7 @@ class FeedViewModel {
         FeedType.Following to false,
         FeedType.ForYou to false,
     )
+    private var feedGeneration = 0
     private var activeJob: Job? = null
     private var momentListeners = mutableMapOf<String, ListenerRegistration>()
     private var commentListeners = mutableMapOf<String, ListenerRegistration>()
@@ -171,12 +172,12 @@ class FeedViewModel {
     }
 
     /** iOS FeedListSection.onChange(moments.count) → VideoMomentsIndex.shared.rebuild */
-    fun rebuildVideoMomentsIndex() {
-        VideoMomentsIndex.rebuild(moments.map { it.toIndexMoment() })
+    fun rebuildVideoMomentsIndex(source: List<FeedMoment> = moments) {
+        VideoMomentsIndex.rebuild(source.map { it.toIndexMoment() })
     }
 
     /** iOS `feedReelsVideos = viewModel.moments.videoMoments` — sesión Reels del feed. */
-    fun reelsVideosForFeed(): List<VideoMoment> = moments.toFeedVideoMoments()
+    fun reelsVideosForFeed(source: List<FeedMoment> = moments): List<VideoMoment> = source.toFeedVideoMoments()
 
     /** iOS VideoPlaybackSelector.shared.preloadURLStrings(from:maxMoments:) */
     fun videoPreloadUrls(from: List<FeedMoment>, maxMoments: Int = 4): List<String> =
@@ -187,6 +188,8 @@ class FeedViewModel {
 
     /** Port 1:1 de `fetchMoments(userId:feedType:)`. */
     fun fetchMoments(scope: CoroutineScope, userId: String, feedType: FeedType? = null) {
+        feedGeneration++
+        isLoadingMore = false
         val targetFeedType = feedType ?: currentFeedType
 
         currentFeedType = targetFeedType
@@ -239,6 +242,7 @@ class FeedViewModel {
         if (isLoadingMore || isPausedForUploads) return
         isLoadingMore = true
         val feed = currentFeedType
+        val generation = feedGeneration
 
         if (feedLoadedFromBackend[feed] == true) {
             if (backendReachedEnd[feed] == true) {
@@ -259,6 +263,7 @@ class FeedViewModel {
                     cursor = cursor,
                     limit = FEED_PAGE_SIZE,
                 )
+                if (feedGeneration != generation) return@launch
                 if (result != null) {
                     var newMoments = result.moments
                         .filter { it.isArchived != true }
@@ -360,6 +365,10 @@ class FeedViewModel {
      */
     fun switchFeedType(scope: CoroutineScope, feedType: FeedType, userId: String? = null) {
         val uid = userId ?: viewerId ?: return
+        activeJob?.cancel()
+        feedGeneration++
+        isLoading = false
+        isLoadingMore = false
         currentFeedType = feedType
         clearListeners()
         when (feedType) {

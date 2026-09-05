@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">İlgilenmiyorum</string>
+    <string name="for_you_feedback_subtitle">Benzer gönderileri daha az göster</string>
+    <string name="for_you_feedback_saving">Tercih kaydediliyor…</string>
+    <string name="for_you_feedback_hidden">Gönderi gizlendi. Benzer içerikleri daha az göreceksin.</string>
+    <string name="for_you_feedback_restored">Tercih geri alındı.</string>
+    <string name="for_you_feedback_failed">Tercih kaydedilemedi. Tekrar dene.</string>
+    <string name="for_you_feedback_undo">Geri al</string>
+    <string name="for_you_feedback_dismiss">Kapat</string>
+</resources>

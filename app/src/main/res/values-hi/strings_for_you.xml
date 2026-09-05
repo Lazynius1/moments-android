@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">दिलचस्पी नहीं है</string>
+    <string name="for_you_feedback_subtitle">ऐसी पोस्ट कम दिखाएँ</string>
+    <string name="for_you_feedback_saving">पसंद सहेजी जा रही है…</string>
+    <string name="for_you_feedback_hidden">पोस्ट छिपा दी गई है। ऐसी सामग्री कम दिखाई जाएगी।</string>
+    <string name="for_you_feedback_restored">पसंद वापस कर दी गई है।</string>
+    <string name="for_you_feedback_failed">पसंद सहेजी नहीं जा सकी। फिर से कोशिश करें।</string>
+    <string name="for_you_feedback_undo">पहले जैसा करें</string>
+    <string name="for_you_feedback_dismiss">बंद करें</string>
+</resources>

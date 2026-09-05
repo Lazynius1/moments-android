@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">Nie interesuje mnie to</string>
+    <string name="for_you_feedback_subtitle">Pokazuj mniej podobnych postów</string>
+    <string name="for_you_feedback_saving">Zapisywanie preferencji…</string>
+    <string name="for_you_feedback_hidden">Post ukryty. Zobaczysz mniej podobnych treści.</string>
+    <string name="for_you_feedback_restored">Cofnięto preferencję.</string>
+    <string name="for_you_feedback_failed">Nie udało się zapisać preferencji. Spróbuj ponownie.</string>
+    <string name="for_you_feedback_undo">Cofnij</string>
+    <string name="for_you_feedback_dismiss">Zamknij</string>
+</resources>

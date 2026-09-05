@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">Non mi interessa</string>
+    <string name="for_you_feedback_subtitle">Mostra meno post simili</string>
+    <string name="for_you_feedback_saving">Salvataggio della preferenza…</string>
+    <string name="for_you_feedback_hidden">Post nascosto. Vedrai meno contenuti simili.</string>
+    <string name="for_you_feedback_restored">Preferenza annullata.</string>
+    <string name="for_you_feedback_failed">Impossibile salvare la preferenza. Riprova.</string>
+    <string name="for_you_feedback_undo">Annulla</string>
+    <string name="for_you_feedback_dismiss">Chiudi</string>
+</resources>

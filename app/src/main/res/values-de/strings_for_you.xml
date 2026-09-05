@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">Kein Interesse</string>
+    <string name="for_you_feedback_subtitle">Weniger ähnliche Beiträge anzeigen</string>
+    <string name="for_you_feedback_saving">Einstellung wird gespeichert…</string>
+    <string name="for_you_feedback_hidden">Beitrag ausgeblendet. Du siehst weniger ähnliche Inhalte.</string>
+    <string name="for_you_feedback_restored">Einstellung rückgängig gemacht.</string>
+    <string name="for_you_feedback_failed">Die Einstellung konnte nicht gespeichert werden. Bitte erneut versuchen.</string>
+    <string name="for_you_feedback_undo">Rückgängig</string>
+    <string name="for_you_feedback_dismiss">Schließen</string>
+</resources>

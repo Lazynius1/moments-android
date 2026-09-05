@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">No me interesa</string>
+    <string name="for_you_feedback_subtitle">Ver menos publicaciones similares</string>
+    <string name="for_you_feedback_saving">Guardando preferencia…</string>
+    <string name="for_you_feedback_hidden">Publicación oculta. Verás menos contenido similar.</string>
+    <string name="for_you_feedback_restored">Preferencia deshecha.</string>
+    <string name="for_you_feedback_failed">No se pudo guardar tu preferencia. Inténtalo de nuevo.</string>
+    <string name="for_you_feedback_undo">Deshacer</string>
+    <string name="for_you_feedback_dismiss">Cerrar</string>
+</resources>

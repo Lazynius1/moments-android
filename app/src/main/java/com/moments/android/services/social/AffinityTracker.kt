@@ -6,6 +6,7 @@ import com.moments.android.models.UserAffinity
 import org.json.JSONObject
 import java.util.Calendar
 import java.util.Date
+import kotlin.math.pow
 
 enum class AffinityInteractionType(val raw: String, val scoreValue: Double) {
     DIRECT_MESSAGE("directMessage", 10.0),
@@ -69,6 +70,15 @@ object AffinityTracker {
     }
 
     /** Reduce scores for interactions older than 3 days (15% decay). */
+    fun recommendationScores(): Map<String, Double> {
+        if (appContext == null) return emptyMap()
+        val now = System.currentTimeMillis()
+        return loadAllForCurrentOwner().map { record ->
+            val age = (now - record.lastInteractionDate.time).coerceAtLeast(0).toDouble() / 86_400_000
+            record.targetUserId to (record.score * 0.5.pow(age / 14)).coerceIn(0.0, 100.0)
+        }.filter { it.second > 0.01 }.sortedByDescending { it.second }.take(200).toMap()
+    }
+
     fun applyTimeDecayIfNeeded() {
         val cal = Calendar.getInstance()
         cal.add(Calendar.DAY_OF_YEAR, -3)

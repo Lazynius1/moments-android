@@ -12,6 +12,7 @@ import com.moments.android.models.Story
 import com.moments.android.models.StoryTextOverlayMetadata
 import com.moments.android.models.VideoVariants
 import com.moments.android.models.Point
+import com.moments.android.services.social.AffinityTracker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -276,6 +277,11 @@ object BackendFeedService {
         val body = buildMap {
             put("feedType", feedType)
             put("limit", limit)
+            if (feedType == "forYou") {
+                put("rankingVersion", 2)
+                put("affinityScores", AffinityTracker.recommendationScores())
+                put("seenMoments", ForYouPreferences.seenMoments())
+            }
             cursor?.let { put("cursor", it.toJson()) }
         }
         return postFunction("getFeedPage", body, timeoutMs = 15_000)?.let { json ->

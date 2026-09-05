@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">Not interested</string>
+    <string name="for_you_feedback_subtitle">Show fewer similar posts</string>
+    <string name="for_you_feedback_saving">Saving preference…</string>
+    <string name="for_you_feedback_hidden">Post hidden. We’ll show fewer similar posts.</string>
+    <string name="for_you_feedback_restored">Preference undone.</string>
+    <string name="for_you_feedback_failed">Couldn’t save your preference. Please try again.</string>
+    <string name="for_you_feedback_undo">Undo</string>
+    <string name="for_you_feedback_dismiss">Dismiss</string>
+</resources>

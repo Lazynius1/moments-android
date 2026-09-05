@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">Ça ne m’intéresse pas</string>
+    <string name="for_you_feedback_subtitle">Voir moins de publications similaires</string>
+    <string name="for_you_feedback_saving">Enregistrement…</string>
+    <string name="for_you_feedback_hidden">Publication masquée. Tu verras moins de contenus similaires.</string>
+    <string name="for_you_feedback_restored">Préférence annulée.</string>
+    <string name="for_you_feedback_failed">Impossible d’enregistrer ta préférence. Réessaie.</string>
+    <string name="for_you_feedback_undo">Annuler</string>
+    <string name="for_you_feedback_dismiss">Fermer</string>
+</resources>

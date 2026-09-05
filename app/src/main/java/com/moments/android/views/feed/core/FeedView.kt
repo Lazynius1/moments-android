@@ -781,6 +781,9 @@ fun FeedView(
                 peekIsProtected = peekIsProtected,
                 showShareSheet = showShareSheet,
                 showContextMenu = showGlobalContextMenu,
+                onNotInterested = if (selectedFeedType == FeedType.ForYou) {
+                    { moment -> com.moments.android.services.content.ForYouPreferences.hide(moment) }
+                } else null,
                 selectedMoment = selectedMomentForMenu ?: shareMoment,
                 pendingEchoInvitationRoute = pendingEchoInvitationRoute,
                 showNotificationSummary = showNotificationSummary,
@@ -820,6 +823,10 @@ fun FeedView(
                     selectedPendingEchoId = ""
                 },
                 onDismissNotificationSummary = { showNotificationSummary = false },
+            )
+
+            com.moments.android.services.content.ForYouFeedbackNotice(
+                Modifier.align(Alignment.BottomCenter).padding(bottom = 100.dp).zIndex(1500f)
             )
 
             FeedStoryRingPreviewOverlay(

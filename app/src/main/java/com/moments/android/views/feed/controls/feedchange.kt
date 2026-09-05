@@ -82,7 +82,7 @@ enum class FeedType(val rawValue: String) {
         val allCases = entries
 
         fun fromRaw(raw: String?): FeedType =
-            entries.firstOrNull { it.rawValue == raw } ?: Following
+            entries.firstOrNull { it.rawValue == raw } ?: ForYou
     }
 }
 
@@ -92,7 +92,7 @@ object FeedTypePreferences {
 
     fun load(context: Context): FeedType {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY, FeedType.Following.rawValue)
+            .getString(KEY, FeedType.ForYou.rawValue)
         return FeedType.fromRaw(raw)
     }
 

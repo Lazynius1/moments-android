@@ -16,6 +16,8 @@ import com.google.firebase.firestore.Source
 import com.moments.android.extensions.optStringOrNull
 import com.moments.android.R
 import com.moments.android.models.AppUser
+import com.moments.android.views.feed.controls.FeedType
+import com.moments.android.views.feed.controls.FeedTypePreferences
 import com.moments.android.services.compliance.AgePolicy
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.messaging.MessageCatchUpService
@@ -848,6 +850,7 @@ object AuthService {
         if (check.isSuspended) return
 
         if (check.isActive && check.user != null) {
+            FeedTypePreferences.save(FirebaseApp.getInstance().applicationContext, FeedType.ForYou)
             OnboardingDraftStore.clear()
             hydrateAuthenticatedSession(user, check.user)
             // ≡ iOS: isRegistering→false a +2s; transitionLock→false a +3s (desde éxito)
@@ -866,6 +869,7 @@ object AuthService {
 
         val retry = retryUserFetchForNewUser(user.uid)
         if (retry.isActive && retry.user != null) {
+            FeedTypePreferences.save(FirebaseApp.getInstance().applicationContext, FeedType.ForYou)
             OnboardingDraftStore.clear()
             hydrateAuthenticatedSession(user, retry.user)
             scope.launch {

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="for_you_feedback_not_interested">No m’interessa</string>
+    <string name="for_you_feedback_subtitle">Veure menys publicacions similars</string>
+    <string name="for_you_feedback_saving">Desant la preferència…</string>
+    <string name="for_you_feedback_hidden">Publicació oculta. Veuràs menys contingut similar.</string>
+    <string name="for_you_feedback_restored">Preferència desfeta.</string>
+    <string name="for_you_feedback_failed">No s’ha pogut desar la preferència. Torna-ho a provar.</string>
+    <string name="for_you_feedback_undo">Desfer</string>
+    <string name="for_you_feedback_dismiss">Tancar</string>
+</resources>
