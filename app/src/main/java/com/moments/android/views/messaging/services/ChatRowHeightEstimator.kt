@@ -41,6 +41,7 @@ object ChatRowHeightEstimator {
     private val fileHeight = 72.dp
     private val viewOncePillHeight = 50.dp
     private val viewOnceRowVerticalPadding = 10.dp
+    private val deletedRowHeight = 50.dp
     private val ephemeralHeight = 150.dp
     private val sharedPreviewHeight = 220.dp
     private val sharedProfilePreviewHeight = 248.dp
@@ -106,7 +107,10 @@ object ChatRowHeightEstimator {
 
     private fun estimatedHeight(item: MessageItem, bubbleWidth: Dp): Dp = when (item) {
         is MessageItem.Single -> estimatedHeight(item.message, bubbleWidth)
-        is MessageItem.MediaCluster -> estimatedClusterHeight(item.messages.size)
+        is MessageItem.MediaCluster -> {
+            if (item.messages.all { it.isDeleted }) deletedRowHeight
+            else estimatedClusterHeight(item.messages.count { !it.isDeleted })
+        }
     }
 
     private fun estimatedClusterHeight(count: Int): Dp {
@@ -118,6 +122,7 @@ object ChatRowHeightEstimator {
     }
 
     private fun estimatedHeight(message: EnhancedMessage, bubbleWidth: Dp): Dp {
+        if (message.isDeleted) return deletedRowHeight
         if (message.storyReplyData != null) {
             return if (message.type == MessageType.EPHEMERAL) {
                 storyReplyEphemeralHeight

@@ -216,6 +216,14 @@ fun GlassmorphicMessageRow(
                 repliedMessage?.let {
                     StackedReplyQuote(it, isCurrentUser, otherParticipantName, callbacks.onReplyTap)
                 }
+                ChatTranslationContainer(
+                    text = message.content.orEmpty(),
+                    messageId = message.id,
+                    isOutgoing = isCurrentUser ||
+                        message.isDeleted ||
+                        message.type != MessageType.TEXT ||
+                        message.storyReplyData != null,
+                ) { displayedText ->
                 ChatBubbleReplySwipeContainer(
                     state = swipeState,
                     isOutgoing = isCurrentUser,
@@ -252,6 +260,7 @@ fun GlassmorphicMessageRow(
                         val bubble: @Composable () -> Unit = {
                             GlassmorphicMessageBubble(
                                 message = message,
+                                translatedTextOverride = displayedText,
                                 reactions = resolvedReactions,
                                 isCurrentUser = isCurrentUser,
                                 groupPosition = groupPosition,
@@ -278,6 +287,7 @@ fun GlassmorphicMessageRow(
                             bubble()
                         }
                     }
+                }
                 }
             }
             if (!isCurrentUser) {
@@ -347,6 +357,7 @@ fun GlassmorphicMessageBubble(
     spoilerTapOnChrome: Boolean = false,
     @Suppress("UNUSED_PARAMETER") isFlashing: Boolean = false,
     modifier: Modifier = Modifier,
+    translatedTextOverride: String? = null,
 ) {
     val colors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme())
     if (message.isDeleted) {
@@ -391,20 +402,20 @@ fun GlassmorphicMessageBubble(
                                 )
                             }
                         }
-                        ChatTextBubbleView(
-                            text = content,
-                            isOutgoing = isCurrentUser,
-                            messageId = message.id,
-                            groupPosition = groupPosition,
-                            reactions = reactions,
-                            isStarred = starred,
-                            repliedMessage = null,
-                            otherParticipantName = otherParticipantName,
-                            onReaction = callbacks.onReaction,
-                            onMentionTap = callbacks.onMentionTap,
-                            revealSpoilers = revealSpoilers,
-                            spoilerTapOnChrome = spoilerTapOnChrome,
-                        )
+                            ChatTextBubbleView(
+                                text = translatedTextOverride ?: content,
+                                isOutgoing = isCurrentUser,
+                                messageId = message.id,
+                                groupPosition = groupPosition,
+                                reactions = reactions,
+                                isStarred = starred,
+                                repliedMessage = null,
+                                otherParticipantName = otherParticipantName,
+                                onReaction = callbacks.onReaction,
+                                onMentionTap = callbacks.onMentionTap,
+                                revealSpoilers = revealSpoilers,
+                                spoilerTapOnChrome = spoilerTapOnChrome,
+                            )
                     }
                 }
             }
