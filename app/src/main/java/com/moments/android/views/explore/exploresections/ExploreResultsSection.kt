@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -77,6 +79,13 @@ fun ExploreResultsSection(
     onUserTap: (AppUser) -> Unit,
     onMomentTap: (Moment, Int, List<Moment>) -> Unit,
     modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
+    failed: Boolean = false,
+    hasMore: Boolean = false,
+    filter: String = "mixed",
+    onFilter: (String) -> Unit = {},
+    onLoadMore: () -> Unit = {},
+    onRetry: () -> Unit = {},
 ) {
     val searchType = resolveSearchDisplayType(searchQuery, users, moments)
 
@@ -84,7 +93,15 @@ fun ExploreResultsSection(
         modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        SearchHeader(searchQuery = searchQuery, searchType = searchType, users = users, moments = moments)
+        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("mixed" to R.string.explore_global_filter_mixed, "username" to R.string.explore_global_filter_username,
+                "hashtag" to R.string.explore_global_filter_hashtag, "location" to R.string.explore_global_filter_location).forEach { (value, label) ->
+                FilterChip(selected = filter == value, onClick = { onFilter(value) }, label = { Text(stringResource(label)) })
+            }
+        }
+        if (users.isNotEmpty() || moments.isNotEmpty()) {
+            SearchHeader(searchQuery = searchQuery, searchType = searchType, users = users, moments = moments)
+        }
 
         when (searchType) {
             SearchDisplayType.HASHTAG -> HashtagResultsView(
@@ -106,7 +123,22 @@ fun ExploreResultsSection(
                 onUserTap = onUserTap,
                 onMomentTap = onMomentTap,
             )
-            SearchDisplayType.EMPTY -> EmptySearchView()
+            SearchDisplayType.EMPTY -> if (!isLoading && !failed && !hasMore) EmptySearchView()
+        }
+        ExplorePagingFooter(isLoading, failed, hasMore, onLoadMore, onRetry)
+    }
+}
+
+@Composable
+fun ExplorePagingFooter(isLoading: Boolean, failed: Boolean, hasMore: Boolean, onLoadMore: () -> Unit, onRetry: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        when {
+            isLoading -> CircularProgressIndicator(Modifier.size(24.dp), color = SearchAccent)
+            failed -> {
+                Text(stringResource(R.string.explore_global_error))
+                TextButton(onClick = onRetry) { Text(stringResource(R.string.explore_global_retry)) }
+            }
+            hasMore -> TextButton(onClick = onLoadMore) { Text(stringResource(R.string.explore_global_more)) }
         }
     }
 }
@@ -116,6 +148,7 @@ private fun resolveSearchDisplayType(
     users: List<AppUser>,
     moments: List<Moment>,
 ): SearchDisplayType = when {
+    users.isEmpty() && moments.isEmpty() -> SearchDisplayType.EMPTY
     searchQuery.startsWith("#") -> SearchDisplayType.HASHTAG
     searchQuery.startsWith("@") -> SearchDisplayType.USERS
     users.isNotEmpty() && moments.isNotEmpty() -> SearchDisplayType.MIXED

@@ -129,6 +129,9 @@ data class FeedCursor(
     val globalStreamAuthorId: String? = null,
 )
 
+data class BackendSearchPage(val moments: List<Moment>, val nextCursor: String?)
+data class BackendExplorePage(val moments: List<Moment>, val nextCursor: FeedCursor?)
+
 data class BackendTagsCursor(val timestamp: Double)
 
 data class StoryRingCursor(val offset: Int)
@@ -349,6 +352,30 @@ object BackendFeedService {
         }
     }
 
+    suspend fun searchMoments(query: String, mode: String, cursor: String?): BackendSearchPage? {
+        val body = buildMap<String, Any> {
+            put("query", query)
+            put("mode", mode)
+            put("limit", 24)
+            cursor?.let { put("cursor", it) }
+        }
+        return postFunction("searchMoments", body, timeoutMs = 60_000, independent = true)?.let {
+            BackendSearchPage(it.optJSONArray("moments").toMoments(), it.optStringOrNull("nextCursor"))
+        }
+    }
+
+    suspend fun fetchExplorePage(cursor: FeedCursor?): BackendExplorePage? {
+        val body = buildMap<String, Any> {
+            put("limit", 24)
+            put("affinityScores", AffinityTracker.recommendationScores())
+            put("seenMoments", ForYouPreferences.seenMoments())
+            cursor?.let { put("cursor", JSONObject().put("timestamp", it.timestamp).put("momentId", it.momentId)) }
+        }
+        return postFunction("getExplorePage", body, timeoutMs = 60_000, independent = true)?.let {
+            BackendExplorePage(it.optJSONArray("moments").toMoments(), it.optJSONObject("nextCursor")?.toFeedCursor())
+        }
+    }
+
     suspend fun fetchVisibleHighlights(
         targetUserId: String? = null,
         limit: Int = 30,
@@ -384,8 +411,9 @@ object BackendFeedService {
         functionName: String,
         body: Map<String, Any>,
         timeoutMs: Int = 15_000,
+        independent: Boolean = false,
     ): JSONObject? = withContext(Dispatchers.IO) {
-        if (isCircuitOpen) return@withContext null
+        if (!independent && isCircuitOpen) return@withContext null
         val user = FirebaseAuth.getInstance().currentUser ?: return@withContext null
         try {
             val token = user.getIdToken(false).await().token ?: return@withContext null
@@ -404,17 +432,19 @@ object BackendFeedService {
                     it.write(JSONObject(body).toString().toByteArray())
                 }
                 if (connection.responseCode != 200) {
-                    recordFailure()
+                    if (!independent) recordFailure()
                     return@withContext null
                 }
-                JSONObject(connection.inputStream.bufferedReader().readText())
+                val response = JSONObject(connection.inputStream.bufferedReader().readText())
+                if (independent && FirebaseAuth.getInstance().currentUser?.uid != user.uid) return@withContext null
+                response
             } finally {
                 connection.disconnect()
             }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            recordFailure()
+            if (!independent) recordFailure()
             null
         }
     }

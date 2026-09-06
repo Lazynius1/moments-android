@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explore_global_filter_mixed">全部</string>
+    <string name="explore_global_filter_username">用戶</string>
+    <string name="explore_global_filter_hashtag">主題標籤</string>
+    <string name="explore_global_filter_location">地點</string>
+    <string name="explore_global_loading">正在載入結果</string>
+    <string name="explore_global_error">無法載入結果，請再試一次。</string>
+    <string name="explore_global_retry">重試</string>
+    <string name="explore_global_more">載入更多</string>
+</resources>

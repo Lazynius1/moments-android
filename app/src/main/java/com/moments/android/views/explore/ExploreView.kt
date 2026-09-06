@@ -66,6 +66,8 @@ import com.moments.android.models.cache.CachedSearch
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.components.MomentRefreshOverlayHost
 import com.moments.android.views.components.momentRefresh
+import com.moments.android.services.content.ForYouPreferences
+import com.moments.android.views.explore.exploresections.ExplorePagingFooter
 import com.moments.android.views.explore.exploresections.ExploreErrorStateView
 import com.moments.android.views.explore.exploresections.ExploreLoadingStateView
 import com.moments.android.views.explore.exploresections.ExploreResultsSection
@@ -80,7 +82,6 @@ import com.moments.android.views.profile.core.sections.MomentZoomPresentationKin
 import com.moments.android.views.profile.core.sections.UserProfileZoomNavigationHost
 import com.moments.android.views.shared.AppErrorBanner
 import com.moments.android.views.shared.MomentsContainerTransformOverlay
-import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.MomentsSharedTransitionLayout
 import com.moments.android.views.story.StoryRingAvatarView
 import kotlinx.coroutines.delay
@@ -178,7 +179,7 @@ fun ExploreView(
         Modifier
             .fillMaxSize()
             .momentRefresh {
-                viewModel.refreshAllContent()
+                if (searchText.isBlank()) viewModel.refreshAllContent() else viewModel.retrySearch()
                 delay(900)
             },
     ) {
@@ -223,10 +224,10 @@ fun ExploreView(
 
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
-                    viewModel.isLoading && viewModel.moments.isEmpty() && viewModel.errorMessage == null -> {
+                    searchText.isBlank() && viewModel.isLoading && viewModel.moments.isEmpty() && viewModel.errorMessage == null -> {
                         ExploreLoadingStateView(Modifier.fillMaxSize())
                     }
-                    viewModel.errorMessage != null && viewModel.moments.isEmpty() -> {
+                    searchText.isBlank() && viewModel.errorMessage != null && viewModel.moments.isEmpty() -> {
                         ExploreErrorStateView(
                             message = viewModel.errorMessage.orEmpty(),
                             onRetry = { viewModel.fetchMomentsByInterests() },
@@ -244,15 +245,10 @@ fun ExploreView(
                             if (searchText.isBlank()) {
                                 ExploreSuggestionsSection(
                                     users = viewModel.suggestedUsers,
-                                    moments = viewModel.moments,
-                                    userButtonStates = viewModel.userButtonStates,
-                                    currentUserInterests = viewModel.currentUserInterests,
-                                    onFollowUser = viewModel::followUser,
                                     onUserTap = { user ->
                                         openProfile(user.id)
                                     },
                                     onShowMore = { showSuggestedUsers = true },
-                                    modifier = Modifier.padding(horizontal = 2.dp),
                                 )
                                 LaunchedEffect(viewModel.suggestedUsers) {
                                     viewModel.suggestedUsers.forEach { viewModel.checkUserButtonState(it.id) }
@@ -264,6 +260,7 @@ fun ExploreView(
                                         onMomentTap = { moment, index, source ->
                                             scope.launch {
                                                 if (viewModel.canViewContent(moment.authorId)) {
+                                                    ForYouPreferences.recordOpenedMoment(moment.toExploreFeedMoment())
                                                     openMomentZoom(
                                                         moment = moment,
                                                         index = index,
@@ -279,9 +276,21 @@ fun ExploreView(
                                         modifier = Modifier.padding(bottom = 80.dp),
                                     )
                                 }
+                                ExplorePagingFooter(viewModel.isLoadingMoreExplore, viewModel.explorePageFailed,
+                                    viewModel.hasMoreExplore, viewModel::loadMoreExplore, viewModel::loadMoreExplore)
                             } else {
                                 ExploreResultsSection(
                                     searchQuery = searchText,
+                                    isLoading = viewModel.isSearching,
+                                    failed = viewModel.searchFailed,
+                                    hasMore = viewModel.hasMoreSearchResults,
+                                    filter = if (searchText.startsWith("#")) "hashtag" else if (searchText.startsWith("@")) "username" else viewModel.searchFilter,
+                                    onFilter = { filter ->
+                                        if (searchText.startsWith("#") || searchText.startsWith("@")) searchText = searchText.drop(1)
+                                        viewModel.setSearchFilter(filter)
+                                    },
+                                    onLoadMore = viewModel::loadMoreSearchResults,
+                                    onRetry = viewModel::retrySearch,
                                     users = viewModel.searchedUsers,
                                     moments = viewModel.filteredMoments,
                                     userButtonStates = viewModel.userButtonStates,
@@ -294,6 +303,7 @@ fun ExploreView(
                                     onMomentTap = { moment, index, source ->
                                         scope.launch {
                                             if (viewModel.canViewContent(moment.authorId)) {
+                                                ForYouPreferences.recordOpenedMoment(moment.toExploreFeedMoment())
                                                 openMomentZoom(
                                                     moment = moment,
                                                     index = index,
@@ -345,6 +355,12 @@ fun ExploreView(
             }
         }
     }
+    MomentsContainerTransformOverlay(visible = showSuggestedUsers) {
+        SuggestedUsersView(
+            onNavigateBack = { showSuggestedUsers = false },
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
     } // UserProfileZoomNavigationHost
     } // MomentsSharedTransitionLayout
 
@@ -359,22 +375,6 @@ fun ExploreView(
                 }
             },
         )
-    }
-
-    // ≡ iOS `.sheet` + presentationDetents([.medium, .large])
-    if (showSuggestedUsers) {
-        MomentsModalSheet(
-            onDismissRequest = { showSuggestedUsers = false },
-            largeOnly = false,
-            showDragHandle = true,
-        ) {
-            SuggestedUsersView(
-                onNavigateBack = { showSuggestedUsers = false },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            )
-        }
     }
 
     // ≡ iOS navigationDestination DiscoverMapView (fullscreen)

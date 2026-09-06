@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explore_global_filter_mixed">전체</string>
+    <string name="explore_global_filter_username">사람</string>
+    <string name="explore_global_filter_hashtag">해시태그</string>
+    <string name="explore_global_filter_location">장소</string>
+    <string name="explore_global_loading">결과 불러오는 중</string>
+    <string name="explore_global_error">결과를 불러오지 못했어요. 다시 시도해 주세요.</string>
+    <string name="explore_global_retry">다시 시도</string>
+    <string name="explore_global_more">더 불러오기</string>
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explore_global_filter_mixed">सभी</string>
+    <string name="explore_global_filter_username">लोग</string>
+    <string name="explore_global_filter_hashtag">हैशटैग</string>
+    <string name="explore_global_filter_location">स्थान</string>
+    <string name="explore_global_loading">नतीजे लोड हो रहे हैं</string>
+    <string name="explore_global_error">नतीजे लोड नहीं हो सके। फिर से कोशिश करें।</string>
+    <string name="explore_global_retry">फिर से कोशिश करें</string>
+    <string name="explore_global_more">और लोड करें</string>
+</resources>

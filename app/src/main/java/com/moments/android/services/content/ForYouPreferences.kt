@@ -72,6 +72,19 @@ object ForYouPreferences {
             }
         }
     }
+    fun recordOpenedMoment(moment: FeedMoment) {
+        val uid = owner() ?: return
+        if (moment.id.isBlank() || IncognitoModeService.isActiveSnapshot) return
+        val key = momentKey(moment)
+        val previous = seenMoments()
+        val now = System.currentTimeMillis().toDouble()
+        if (now - (previous[key] ?: 0.0) > 86_400_000) {
+            AffinityTracker.trackInteraction(AffinityInteractionType.MOMENT_VIEW, moment.authorId)
+        }
+        val seen = (previous + (key to now)).entries.sortedByDescending { it.value }.take(500).associate { it.key to it.value }
+        prefs(uid).edit().putString("seen", JSONObject(seen).toString()).apply()
+    }
+
     fun clearVisibility() {
         visibilityJobs.values.forEach { it.cancel() }
         visibilityJobs.clear()
@@ -84,6 +97,18 @@ object ForYouPreferences {
         noticeDismissJob = null
         notice = null
         undoMoment = null
+    }
+
+    fun clearAccountData(owner: String) {
+        noticeDismissJob?.cancel()
+        noticeDismissJob = null
+        clearVisibility()
+        prefs(owner).edit().clear().apply()
+        notice = null
+        undoMoment = null
+        noticeOwner = null
+        isBusy = false
+        revision++
     }
 
     private fun scheduleNoticeDismiss() {

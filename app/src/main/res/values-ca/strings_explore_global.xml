@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explore_global_filter_mixed">Tot</string>
+    <string name="explore_global_filter_username">Persones</string>
+    <string name="explore_global_filter_hashtag">Hashtags</string>
+    <string name="explore_global_filter_location">Llocs</string>
+    <string name="explore_global_loading">Carregant resultats</string>
+    <string name="explore_global_error">No s’han pogut carregar els resultats. Torna-ho a provar.</string>
+    <string name="explore_global_retry">Torna-ho a provar</string>
+    <string name="explore_global_more">Carrega’n més</string>
+</resources>

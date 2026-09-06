@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explore_global_filter_mixed">All</string>
+    <string name="explore_global_filter_username">People</string>
+    <string name="explore_global_filter_hashtag">Hashtags</string>
+    <string name="explore_global_filter_location">Places</string>
+    <string name="explore_global_loading">Loading results</string>
+    <string name="explore_global_error">Could not load results. Try again.</string>
+    <string name="explore_global_retry">Try again</string>
+    <string name="explore_global_more">Load more</string>
+</resources>

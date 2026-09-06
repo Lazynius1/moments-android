@@ -21,6 +21,9 @@ import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.services.privacy.PrivacyService
+import com.moments.android.services.content.BackendFeedService
+import com.moments.android.services.content.FeedCursor
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -66,6 +69,33 @@ class ExploreViewModel(
     private var blockedUsers: Set<String> = emptySet()
     private var searchJob: Job? = null
     private var activeSearchQuery: String = ""
+    var isSearchingMoments by mutableStateOf(false)
+        private set
+    var isSearchingUsers by mutableStateOf(false)
+        private set
+    var searchFailed by mutableStateOf(false)
+        private set
+    var hasMoreSearchResults by mutableStateOf(false)
+        private set
+    @set:JvmName("assignSearchFilter")
+    var searchFilter by mutableStateOf("mixed")
+        private set
+    var isLoadingMoreExplore by mutableStateOf(false)
+        private set
+    var hasMoreExplore by mutableStateOf(false)
+        private set
+    var explorePageFailed by mutableStateOf(false)
+        private set
+    val isSearching: Boolean get() = isSearchingMoments || isSearchingUsers
+    private var searchGeneration = 0
+    private var contentSearchJob: Job? = null
+    private var searchCursor: String? = null
+    private var contentSearchQuery = ""
+    private var contentSearchMode = "mixed"
+    private var exploreCursor: FeedCursor? = null
+    private var exploreJob: Job? = null
+    private var exploreGeneration = 0
+
 
     private val followListener: (String, FollowButtonState) -> Unit = { userId, state ->
         userButtonStates = userButtonStates + (userId to state)
@@ -91,13 +121,14 @@ class ExploreViewModel(
             return
         }
         currentUserId = userId
+        loadExplorePage(reset = true)
         isLoading = true
         errorMessage = null
 
         val cached = LocalPersistenceService.loadExploreMoments()
         if (cached.isNotEmpty() && moments.isEmpty()) {
             moments = cached
-            filteredMoments = cached
+            if (activeSearchQuery.isEmpty()) filteredMoments = cached
             isLoading = false
         }
 
@@ -126,6 +157,10 @@ class ExploreViewModel(
     }
 
     fun clearData() {
+        smartSearch("")
+        exploreGeneration++
+        exploreJob?.cancel()
+        hasMoreExplore = false
         moments = emptyList()
         filteredMoments = emptyList()
         searchedUsers = emptyList()
@@ -149,36 +184,105 @@ class ExploreViewModel(
 
     // MARK: - Smart search
 
+    fun setSearchFilter(filter: String) {
+        searchFilter = filter
+        smartSearch(activeSearchQuery)
+    }
+
     fun smartSearch(query: String) {
-        activeSearchQuery = query
+        activeSearchQuery = query.trim()
         searchJob?.cancel()
-        if (query.isEmpty()) {
-            searchedUsers = emptyList()
+        contentSearchJob?.cancel()
+        contentSearchJob = null
+        searchGeneration++
+        val generation = searchGeneration
+        searchCursor = null
+        hasMoreSearchResults = false
+        searchFailed = false
+        searchedUsers = emptyList()
+        filteredMoments = emptyList()
+        isSearchingMoments = false
+        isSearchingUsers = false
+        if (activeSearchQuery.isEmpty()) {
             filteredMoments = moments
             return
         }
+        val raw = activeSearchQuery
+        val mode = when {
+            raw.startsWith("#") -> "hashtag"
+            raw.startsWith("@") -> "username"
+            else -> searchFilter
+        }
+        val clean = if (raw.startsWith("#") || raw.startsWith("@")) raw.drop(1) else raw
+        contentSearchQuery = clean
+        contentSearchMode = mode
+        if (clean.isEmpty()) return
+        isSearchingMoments = mode != "username"
+        isSearchingUsers = mode == "username" || mode == "mixed"
         searchJob = viewModelScope.launch {
             delay(300)
-            if (activeSearchQuery != query) return@launch
-            when (val type = detectSearchType(query)) {
-                is SearchType.Hashtag -> searchHashtags(type.value)
-                is SearchType.Username -> searchUsers(type.value)
-                is SearchType.Location -> searchLocations(type.value)
-                is SearchType.Mixed -> searchEverything(type.value)
-            }
+            if (searchGeneration != generation) return@launch
+            if (isSearchingMoments) loadMoreSearchResults()
+            if (isSearchingUsers) searchUsers(clean)
         }
     }
 
     fun searchByHashtag(hashtag: String) {
-        searchedUsers = emptyList()
-        val tag = "#${hashtag.lowercase()}"
-        filteredMoments = moments.filter { it.content.lowercase().contains(tag) }
+        searchFilter = "hashtag"
+        smartSearch("#" + hashtag.trimStart('#'))
     }
 
     fun exploreByLocation(locationName: String) {
-        searchedUsers = emptyList()
-        val q = locationName.lowercase()
-        filteredMoments = moments.filter { (it.location ?: "").lowercase().contains(q) }
+        searchFilter = "location"
+        smartSearch(locationName)
+    }
+
+    fun retrySearch() = smartSearch(activeSearchQuery)
+
+    fun loadMoreSearchResults() {
+        if (contentSearchJob?.isActive == true || contentSearchMode == "username" || contentSearchQuery.isEmpty()) return
+        val generation = searchGeneration
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        isSearchingMoments = true
+        searchFailed = false
+        contentSearchJob = viewModelScope.launch {
+            val page = BackendFeedService.searchMoments(contentSearchQuery, contentSearchMode, searchCursor)
+            if (searchGeneration != generation || FirebaseAuth.getInstance().currentUser?.uid != uid) return@launch
+            isSearchingMoments = false
+            if (page == null) { searchFailed = true; return@launch }
+            filteredMoments = (filteredMoments + page.moments).distinctBy { "${it.authorId}/${it.id}" }
+            searchCursor = page.nextCursor
+            hasMoreSearchResults = page.nextCursor != null
+        }
+    }
+
+    fun loadMoreExplore() = loadExplorePage(reset = false)
+
+    private fun loadExplorePage(reset: Boolean) {
+        if (!reset && (isLoadingMoreExplore || (!hasMoreExplore && !explorePageFailed))) return
+        if (reset) {
+            exploreGeneration++
+            exploreJob?.cancel()
+            exploreCursor = null
+            hasMoreExplore = false
+        }
+        val generation = exploreGeneration
+        val replacesResults = reset || exploreCursor == null
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        isLoadingMoreExplore = true
+        explorePageFailed = false
+        exploreJob = viewModelScope.launch {
+            val page = BackendFeedService.fetchExplorePage(exploreCursor)
+            if (exploreGeneration != generation || FirebaseAuth.getInstance().currentUser?.uid != uid) return@launch
+            isLoading = false
+            isLoadingMoreExplore = false
+            if (page == null) { explorePageFailed = true; return@launch }
+            moments = ((if (replacesResults) emptyList() else moments) + page.moments).distinctBy { "${it.authorId}/${it.id}" }
+            if (activeSearchQuery.isEmpty()) filteredMoments = moments
+            exploreCursor = page.nextCursor
+            hasMoreExplore = page.nextCursor != null
+            LocalPersistenceService.saveExploreMoments(moments.take(120), sync = true)
+        }
     }
 
     // MARK: - Historial
@@ -378,104 +482,32 @@ class ExploreViewModel(
 
         suggestedUsers = discovered.take(10)
         filterFollowedUsersFromSuggestions()
-        loadMomentsFromUsers(discovered.take(100).map { it.id })
+        // The ranked backend loads recommendations independently.
     }
 
     private suspend fun fetchPopularUsersForExplore(excludingUserId: String): List<AppUser> =
         runCatching { firestore.fetchPublicUsersForExplore(excludingUserId) }.getOrDefault(emptyList())
 
-    private suspend fun loadMomentsFromUsers(userIds: List<String>) {
-        try {
-            val all = firestore.fetchMomentsFromUsers(userIds)
-            val visible = filterMomentsForExploreVisibility(all)
-            moments = visible
-            filteredMoments = visible
-            LocalPersistenceService.saveExploreMoments(visible, sync = true)
-            isLoading = false
-        } catch (e: Exception) {
-            isLoading = false
-            errorMessage = ExploreVmErrors.momentsLoadFailed(e.message)
-        }
-    }
-
-    private suspend fun filterMomentsForExploreVisibility(source: List<Moment>): List<Moment> {
-        val viewerId = currentUserId ?: return emptyList()
-        return coroutineScope {
-            source.map { moment ->
-                async {
-                    if (moment.authorId == viewerId) return@async null
-                    if (moment.authorId in blockedUsers) return@async null
-                    if (PrivacyService.canUserViewMomentInExplore(moment, viewerId)) moment else null
-                }
-            }.awaitAll().filterNotNull().let { visible ->
-                source.filter { m -> visible.any { it.id == m.id } }
-            }
-        }
-    }
-
     private fun detectSearchType(query: String): SearchType {
         val trimmed = query.trim()
         if (trimmed.startsWith("#")) return SearchType.Hashtag(trimmed.drop(1).lowercase())
         if (trimmed.startsWith("@")) return SearchType.Username(trimmed.drop(1).lowercase())
-        val locationKeywords = listOf("en ", "lugar ", "city ", "ciudad ", "beach ", "playa ", "restaurant ", "cafe ")
-        if (locationKeywords.any { trimmed.lowercase().contains(it) }) {
-            return SearchType.Location(trimmed)
-        }
         return SearchType.Mixed(trimmed)
     }
 
     private suspend fun searchUsers(username: String) {
-        filteredMoments = emptyList()
-        val clean = username.lowercase().trim()
-        if (clean.isEmpty()) {
-            searchedUsers = emptyList()
-            return
-        }
+        val generation = searchGeneration
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
         try {
-            val users = firestore.searchUsers(clean, limit = 20)
-            val uid = currentUserId.orEmpty()
-            searchedUsers = users.filter { user ->
-                user.id != uid &&
-                    user.id !in blockedUsers &&
-                    uid !in user.blockedUsers
-            }
+            val users = firestore.searchUsers(username.lowercase(), limit = 20)
+            if (searchGeneration != generation || FirebaseAuth.getInstance().currentUser?.uid != uid) return
+            searchedUsers = users.filter { it.id != uid && it.id !in blockedUsers && uid !in it.blockedUsers }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            errorMessage = ExploreVmErrors.searchUsersFailed(e.message)
-        }
-    }
-
-    private fun searchHashtags(hashtag: String) {
-        searchedUsers = emptyList()
-        val tag = "#$hashtag"
-        val uid = currentUserId
-        filteredMoments = moments.filter { moment ->
-            moment.content.lowercase().contains(tag) &&
-                moment.authorId !in blockedUsers &&
-                moment.authorId != uid
-        }
-    }
-
-    private fun searchLocations(location: String) {
-        searchedUsers = emptyList()
-        val q = location.lowercase()
-        val uid = currentUserId
-        filteredMoments = moments.filter { moment ->
-            val loc = moment.location ?: return@filter false
-            loc.lowercase().contains(q) &&
-                moment.authorId !in blockedUsers &&
-                moment.authorId != uid
-        }
-    }
-
-    private suspend fun searchEverything(query: String) {
-        val q = query.lowercase()
-        searchUsers(q)
-        val uid = currentUserId
-        filteredMoments = moments.filter { moment ->
-            val match = moment.content.lowercase().contains(q) ||
-                (moment.location ?: "").lowercase().contains(q) ||
-                moment.username.lowercase().contains(q)
-            match && moment.authorId !in blockedUsers && moment.authorId != uid
+            if (searchGeneration == generation) searchFailed = true
+        } finally {
+            if (searchGeneration == generation) isSearchingUsers = false
         }
     }
 

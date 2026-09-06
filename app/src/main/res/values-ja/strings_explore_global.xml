@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explore_global_filter_mixed">すべて</string>
+    <string name="explore_global_filter_username">ユーザー</string>
+    <string name="explore_global_filter_hashtag">ハッシュタグ</string>
+    <string name="explore_global_filter_location">場所</string>
+    <string name="explore_global_loading">結果を読み込み中</string>
+    <string name="explore_global_error">結果を読み込めませんでした。もう一度お試しください。</string>
+    <string name="explore_global_retry">再試行</string>
+    <string name="explore_global_more">さらに読み込む</string>
+</resources>

@@ -4,7 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -87,6 +85,7 @@ import com.moments.android.views.components.MomentRefreshOverlayHost
 import com.moments.android.views.components.momentRefresh
 import com.moments.android.views.feed.FeedCanvas
 import com.moments.android.views.feed.FeedInk
+import com.moments.android.views.shared.MomentsFillScrollTabRow
 import com.moments.android.views.messaging.services.ChatNavigationIntentStore
 import com.moments.android.views.profile.core.sections.MomentZoomDestination
 import com.moments.android.views.profile.core.sections.MomentZoomDetailDestination
@@ -384,53 +383,48 @@ private fun NotificationTabBar(
             .fillMaxWidth()
             .background(if (isDark) FeedInk else FeedCanvas),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .padding(top = 8.dp, bottom = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            NotificationsViewModel.NotificationsTab.entries.forEach { tab ->
-                Column(
-                    modifier = Modifier.clickable { onTabSelected(tab) },
-                    horizontalAlignment = Alignment.CenterHorizontally,
+        MomentsFillScrollTabRow(
+            items = NotificationsViewModel.NotificationsTab.entries,
+            modifier = Modifier.padding(top = 8.dp, bottom = 10.dp),
+        ) { tab, itemModifier ->
+            Column(
+                modifier = itemModifier.clickable { onTabSelected(tab) },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = stringResource(tab.labelRes),
-                            fontSize = 14.sp,
-                            fontWeight = if (selectedTab == tab) FontWeight.SemiBold else FontWeight.Medium,
-                            color = if (selectedTab == tab) ink else Color.Gray.copy(alpha = 0.82f),
-                        )
-                        if (tab == NotificationsViewModel.NotificationsTab.REQUESTS && pendingRequestsCount > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .size(18.dp)
-                                    .background(Color.Red, CircleShape),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    pendingRequestsCount.toString(),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                )
-                            }
+                    Text(
+                        text = stringResource(tab.labelRes),
+                        fontSize = 14.sp,
+                        fontWeight = if (selectedTab == tab) FontWeight.SemiBold else FontWeight.Medium,
+                        color = if (selectedTab == tab) ink else Color.Gray.copy(alpha = 0.82f),
+                        maxLines = 1,
+                    )
+                    if (tab == NotificationsViewModel.NotificationsTab.REQUESTS && pendingRequestsCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .background(Color.Red, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                pendingRequestsCount.toString(),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                            )
                         }
                     }
-                    Spacer(Modifier.height(7.dp))
-                    Box(
-                        modifier = Modifier
-                            .height(2.dp)
-                            .fillMaxWidth(0.85f)
-                            .background(if (selectedTab == tab) ink else Color.Transparent, CircleShape),
-                    )
                 }
+                Spacer(Modifier.height(7.dp))
+                Box(
+                    modifier = Modifier
+                        .height(2.dp)
+                        .fillMaxWidth(0.85f)
+                        .background(if (selectedTab == tab) ink else Color.Transparent, CircleShape),
+                )
             }
         }
         Box(

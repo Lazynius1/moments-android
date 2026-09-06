@@ -1,5 +1,12 @@
 package com.moments.android.views.explore
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.statusBarsPadding
+import com.moments.android.views.profile.core.sections.UserProfileZoomNavigationHost
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -28,7 +35,6 @@ import com.moments.android.views.components.ModernFollowButtonStyle
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -50,8 +56,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
@@ -60,12 +64,11 @@ import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.views.components.VerifiedBadge
 import com.moments.android.views.feed.core.FeedProfileSheetRoute
 import com.moments.android.views.feed.rememberAdaptiveColors
-import com.moments.android.views.profile.userprofile.UserProfileView
 import kotlinx.coroutines.launch
 
 /**
  * Port de `SuggestedUsersView.swift`.
- * Header centrado (sheet iOS sin back); lista + infinite scroll + pull-to-refresh.
+ * Full-page navigation with back; list position survives profile navigation.
  * Tap → `UserProfileView` (≡ userProfileNavigationDestination).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -100,23 +103,32 @@ fun SuggestedUsersView(
         }
     }
 
+    BackHandler {
+        if (selectedProfileRoute != null) selectedProfileRoute = null else onNavigateBack()
+    }
+
+    UserProfileZoomNavigationHost(
+        profileRoute = selectedProfileRoute,
+        onProfileRouteChange = { selectedProfileRoute = it },
+        modifier = modifier.fillMaxSize(),
+    ) { _ ->
     Column(
-        modifier
-            .fillMaxSize()
-            .background(colors.surfaceBackground),
+        Modifier.fillMaxSize().background(colors.surfaceBackground),
     ) {
-        // ≡ headerView (sin back — dismiss del sheet)
-        Text(
-            stringResource(R.string.explore_suggested_users_title),
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .padding(top = 20.dp, bottom = 16.dp),
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 20.sp,
-            color = colors.primary,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
+        Row(
+            Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onNavigateBack) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = stringResource(R.string.common_back), tint = colors.primary)
+            }
+            Text(stringResource(R.string.explore_suggested_users_title),
+                modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold,
+                fontSize = 18.sp, color = colors.primary,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Spacer(Modifier.size(48.dp))
+        }
 
         when {
             viewModel.isLoading && viewModel.users.isEmpty() -> {
@@ -172,14 +184,13 @@ fun SuggestedUsersView(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 20.dp),
                     ) {
                         items(viewModel.users, key = { it.id }) { user ->
-                            SuggestedUserRow(
+                            SuggestedDiscoveryRow(
                                 user = user,
-                                commonInterests = user.interests.toSet()
-                                    .intersect(viewModel.currentUserInterests.toSet()).size,
+                                viewerInterests = viewModel.currentUserInterests,
                                 buttonState = viewModel.userButtonStates[user.id]
                                     ?: FollowButtonState.CAN_FOLLOW,
                                 onFollow = { viewModel.followUser(user.id) },
@@ -220,18 +231,58 @@ fun SuggestedUsersView(
         }
     }
 
-    // ≡ userProfileNavigationDestination
-    selectedProfileRoute?.let { route ->
-        Dialog(
-            onDismissRequest = { selectedProfileRoute = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            Surface(Modifier.fillMaxSize()) {
-                UserProfileView(
-                    userId = route.userId,
-                    onDismiss = { selectedProfileRoute = null },
-                )
+    } // UserProfileZoomNavigationHost
+}
+
+@Composable
+private fun SuggestedDiscoveryRow(
+    user: AppUser,
+    viewerInterests: List<String>,
+    buttonState: FollowButtonState,
+    onFollow: () -> Unit,
+    onTap: () -> Unit,
+) {
+    val colors = rememberAdaptiveColors()
+    val own = viewerInterests.map { it.trim().lowercase() }.toSet()
+    val shared = user.interests.filter { it.trim().lowercase() in own }.distinctBy { it.trim().lowercase() }
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(52.dp).clip(CircleShape).background(colors.secondary.copy(alpha = 0.12f)).clickable(onClick = onTap),
+                    contentAlignment = Alignment.Center) {
+                    if (user.profileImagePath.isNullOrBlank()) {
+                        Icon(Icons.Filled.Person, contentDescription = user.username, tint = colors.secondary)
+                    } else {
+                        AsyncImage(model = user.profileImagePath, contentDescription = user.username,
+                            contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    }
+                }
+                Column(Modifier.weight(1f).clickable(onClick = onTap), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(user.username, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = colors.primary,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                        if (user.isVerified) VerifiedBadge(size = 12.dp)
+                    }
+                    if (shared.isNotEmpty()) {
+                        Text(stringResource(R.string.explore_suggested_users_common_interests, shared.size),
+                            fontSize = 12.sp, color = colors.secondary)
+                    }
+                }
+                SuggestedUserFollowButton(state = buttonState, targetUserId = user.id, onFollow = onFollow)
             }
+            Column(Modifier.fillMaxWidth().clickable(onClick = onTap), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                user.bio?.trim()?.takeIf { it.isNotEmpty() }?.let { bio ->
+                    Text(bio, fontSize = 14.sp, color = colors.secondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                val interests = shared.ifEmpty { user.interests }
+                if (interests.isNotEmpty()) {
+                    Text(interests.take(3).joinToString(" · "), fontSize = 14.sp,
+                        color = if (shared.isEmpty()) colors.secondary else colors.primary,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            HorizontalDivider(Modifier.padding(top = 6.dp), color = colors.secondary.copy(alpha = 0.15f))
         }
     }
 }

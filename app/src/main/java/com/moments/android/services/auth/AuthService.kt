@@ -19,6 +19,7 @@ import com.moments.android.models.AppUser
 import com.moments.android.views.feed.controls.FeedType
 import com.moments.android.views.feed.controls.FeedTypePreferences
 import com.moments.android.services.compliance.AgePolicy
+import com.moments.android.services.content.ForYouPreferences
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.messaging.MessageCatchUpService
 import com.moments.android.views.messaging.services.ChatAccessCoordinator
@@ -1496,6 +1497,7 @@ object AuthService {
     }
 
     private fun finishAccountDeletionLocally() {
+        auth.currentUser?.uid?.let { ForYouPreferences.clearAccountData(it) }
         runCatching { auth.signOut() }
         LocalPersistenceService.clearCurrentUser()
         OnboardingDraftStore.clear()

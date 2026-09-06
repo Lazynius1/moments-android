@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,9 +32,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Person
@@ -48,24 +44,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -78,220 +70,72 @@ import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
-import com.moments.android.models.Moment
 import com.moments.android.services.privacy.FollowButtonState
-import com.moments.android.utilities.HapticManager
 import com.moments.android.views.components.ModernFollowButton
-import com.moments.android.views.components.VerifiedBadgeView
 import com.moments.android.views.feed.rememberAdaptiveColors
 
-/**
- * Port de `SuggestedUsersSection` (ExploreSuggestionsSection.swift).
- * Nombre `ExploreSuggestionsSection` conservado por call sites Android.
- *
- * `SearchResultCard` / `EmptySearchView` viven en [ExploreResultsSection]
- * (mismo split Swift; ya cableados desde resultados).
- */
+/** Suggested people use a compact avatar row, matching iOS. */
 @Composable
 fun ExploreSuggestionsSection(
     users: List<AppUser>,
-    moments: List<Moment>,
-    userButtonStates: Map<String, FollowButtonState>,
-    currentUserInterests: List<String>,
-    onFollowUser: (String) -> Unit,
     onUserTap: (AppUser) -> Unit,
     onShowMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
     if (users.isEmpty()) return
-
-    val interestSet = remember(currentUserInterests) { currentUserInterests.toSet() }
-
-    Column(
-        modifier
-            .fillMaxWidth()
-            .padding(horizontal = 10.dp)
-            .padding(top = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    stringResource(R.string.explore_suggested_users_title),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 20.sp,
-                    color = colors.primary,
-                )
-                Text(
-                    stringResource(R.string.explore_suggested_users_subtitle),
-                    fontSize = 13.sp,
-                    color = colors.secondary,
-                )
-            }
-            TextButton(onClick = onShowMore) {
-                Text(
-                    stringResource(R.string.explore_suggested_users_see_more),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    color = colors.accent,
-                )
-            }
-        }
-
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 0.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(users, key = { it.id }) { user ->
-                val latestMoment = moments.firstOrNull { it.authorId == user.id }
-                SuggestedUserCard(
-                    user = user,
-                    backgroundMoment = latestMoment,
-                    commonInterests = user.interests.toSet().intersect(interestSet).size,
-                    buttonState = userButtonStates[user.id] ?: FollowButtonState.CAN_FOLLOW,
-                    onFollow = { onFollowUser(user.id) },
-                    onTap = { onUserTap(user) },
-                )
-            }
-        }
-    }
-}
-
-/** Port de `SuggestedUserCard`. */
-@Composable
-fun SuggestedUserCard(
-    user: AppUser,
-    backgroundMoment: Moment?,
-    commonInterests: Int,
-    buttonState: FollowButtonState,
-    onFollow: () -> Unit,
-    onTap: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = rememberAdaptiveColors()
-    val bgUrl = backgroundMoment?.previewImageURLString
-    val hasPhotoBg = !bgUrl.isNullOrBlank()
-    val isPassive = buttonState == FollowButtonState.REQUEST_PENDING
-
-    Box(
-        modifier
-            .width(132.dp)
-            .height(176.dp)
-            .shadow(6.dp, RoundedCornerShape(18.dp), ambientColor = Color.Black.copy(alpha = 0.10f))
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color.Black)
-            .border(0.8.dp, Color.White.copy(alpha = 0.24f), RoundedCornerShape(18.dp))
-            .clickable(onClick = onTap),
-    ) {
-        if (hasPhotoBg) {
-            AsyncImage(
-                model = bgUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(4.dp),
-            )
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Black.copy(alpha = 0.18f), Color.Black.copy(alpha = 0.50f)),
-                        ),
-                    ),
-            )
-        } else {
-            // iOS defaultBackground: primary 6% sobre base negra (sin chrome opaco light).
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(colors.primary.copy(alpha = 0.06f)),
-            )
-        }
-
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(10.dp)
-                .padding(bottom = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(9.dp),
-        ) {
-            Spacer(Modifier.weight(1f))
-
-            Box(contentAlignment = Alignment.Center) {
-                Box(
-                    Modifier
-                        .size(48.dp)
-                        .blur(6.dp)
-                        .background(colors.accent.copy(alpha = 0.3f), CircleShape),
-                )
-                ExploreProfileImage(imagePath = user.profileImagePath, size = 42.dp)
-            }
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        user.username,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    VerifiedBadgeView(userId = user.id, size = 10.dp)
-                }
-                Text(
-                    if (commonInterests > 0) {
-                        stringResource(R.string.explore_common_interests, commonInterests)
-                    } else {
-                        stringResource(R.string.explore_suggested_users_suggested_for_you)
-                    },
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 10.sp,
-                    color = Color.White.copy(alpha = 0.82f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
             Text(
-                suggestedFollowButtonTitle(buttonState),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 11.sp,
-                color = colors.primary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer { alpha = if (isPassive) 0.78f else 1f }
-                    .momentsChromeGlass(RoundedCornerShape(50), interactive = buttonState.isActionable)
-                    .clickable(enabled = buttonState.isActionable, onClick = onFollow)
-                    .padding(vertical = 6.dp),
+                stringResource(R.string.explore_suggested_users_title),
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp,
+                color = colors.secondary,
+                modifier = Modifier.weight(1f).semantics { heading() },
             )
+            TextButton(onClick = onShowMore) {
+                Text(stringResource(R.string.explore_suggested_users_see_more), fontSize = 14.sp, color = colors.accent)
+            }
+        }
+        LazyRow(
+            contentPadding = PaddingValues(0.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(users, key = { it.id }) { user ->
+                SuggestedUserAvatar(user = user, onTap = { onUserTap(user) })
+            }
         }
     }
 }
 
 @Composable
-private fun suggestedFollowButtonTitle(state: FollowButtonState): String = when (state) {
-    FollowButtonState.FOLLOWING -> stringResource(R.string.user_profile_following)
-    FollowButtonState.CAN_REQUEST_FOLLOW -> stringResource(R.string.feed_follow_request)
-    FollowButtonState.REQUEST_PENDING -> stringResource(R.string.feed_follow_requested)
-    FollowButtonState.REQUEST_PENDING_CANCELLABLE -> stringResource(R.string.feed_follow_cancel_request)
-    FollowButtonState.BLOCKED -> stringResource(R.string.user_profile_blocked)
-    else -> stringResource(R.string.feed_follow)
+private fun SuggestedUserAvatar(user: AppUser, onTap: () -> Unit) {
+    val colors = rememberAdaptiveColors()
+    Column(
+        Modifier.width(76.dp)
+            .clickable(role = Role.Button, onClick = onTap)
+            .padding(vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            Modifier.size(44.dp).clip(CircleShape).background(colors.secondary.copy(alpha = 0.10f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (user.profileImagePath.isNullOrBlank()) {
+                Icon(Icons.Filled.Person, contentDescription = null, tint = colors.secondary, modifier = Modifier.size(22.dp))
+            } else {
+                AsyncImage(model = user.profileImagePath, contentDescription = null,
+                    contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            }
+        }
+        Text(user.username, fontSize = 12.sp, color = colors.primary,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
 }
 
 /** Port de `SearchBarView` (no cableado en ExploreView.swift — usa `.searchable`). */

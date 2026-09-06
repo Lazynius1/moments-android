@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explore_global_filter_mixed">Tümü</string>
+    <string name="explore_global_filter_username">Kişiler</string>
+    <string name="explore_global_filter_hashtag">Etiketler</string>
+    <string name="explore_global_filter_location">Yerler</string>
+    <string name="explore_global_loading">Sonuçlar yükleniyor</string>
+    <string name="explore_global_error">Sonuçlar yüklenemedi. Tekrar dene.</string>
+    <string name="explore_global_retry">Tekrar dene</string>
+    <string name="explore_global_more">Daha fazla yükle</string>
+</resources>

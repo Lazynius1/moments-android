@@ -7,17 +7,12 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,9 +38,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -701,48 +698,39 @@ fun SocialConnectionUnderlineTabBar(
     val primary = if (dark) Color.White else Color.Black
     val secondary = if (dark) Color.White.copy(0.45f) else Color.Black.copy(0.45f)
     val divider = if (dark) Color.White.copy(0.12f) else Color.Black.copy(0.1f)
-    val listState = rememberLazyListState()
 
-    LaunchedEffect(selected, items.size) {
-        if (selected in items.indices) listState.animateScrollToItem(selected)
-    }
-
-    Box(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth()) {
+            items.forEachIndexed { index, item ->
+                Text(
+                    item.titleText(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onSelect(index) }
+                        .padding(horizontal = 8.dp, vertical = 10.dp),
+                    color = if (index == selected) primary else secondary,
+                    fontWeight = if (index == selected) FontWeight.SemiBold else FontWeight.Normal,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(0.5.dp)
-                .background(divider)
-                .align(Alignment.BottomCenter),
-        )
-        LazyRow(
-            state = listState,
-            contentPadding = PaddingValues(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .height(1.5.dp)
+                .background(divider),
         ) {
-            itemsIndexed(items, key = { _, item -> item.tab }) { index, item ->
-                Column(
-                    modifier = Modifier
-                        .widthIn(min = 88.dp)
-                        .clickable { onSelect(index) },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        item.titleText(),
-                        color = if (index == selected) primary else secondary,
-                        fontWeight = if (index == selected) FontWeight.SemiBold else FontWeight.Normal,
-                        fontSize = 13.sp,
-                        maxLines = 1,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    )
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(1.5.dp)
-                            .background(if (index == selected) primary else Color.Transparent),
-                    )
-                }
-            }
+            val count = items.size.coerceAtLeast(1)
+            Box(
+                Modifier
+                    .fillMaxWidth(1f / count)
+                    .height(1.5.dp)
+                    .background(primary)
+                    .align(Alignment.CenterStart)
+                    .graphicsLayer { translationX = size.width * selected },
+            )
         }
     }
 }

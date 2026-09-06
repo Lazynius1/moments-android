@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explore_global_filter_mixed">Semua</string>
+    <string name="explore_global_filter_username">Orang</string>
+    <string name="explore_global_filter_hashtag">Tagar</string>
+    <string name="explore_global_filter_location">Tempat</string>
+    <string name="explore_global_loading">Memuat hasil</string>
+    <string name="explore_global_error">Hasil tidak dapat dimuat. Coba lagi.</string>
+    <string name="explore_global_retry">Coba lagi</string>
+    <string name="explore_global_more">Muat lebih banyak</string>
+</resources>

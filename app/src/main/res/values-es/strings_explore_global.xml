@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explore_global_filter_mixed">Todo</string>
+    <string name="explore_global_filter_username">Personas</string>
+    <string name="explore_global_filter_hashtag">Hashtags</string>
+    <string name="explore_global_filter_location">Lugares</string>
+    <string name="explore_global_loading">Cargando resultados</string>
+    <string name="explore_global_error">No se pudieron cargar los resultados. Inténtalo de nuevo.</string>
+    <string name="explore_global_retry">Reintentar</string>
+    <string name="explore_global_more">Cargar más</string>
+</resources>
