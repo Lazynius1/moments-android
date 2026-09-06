@@ -224,7 +224,10 @@ fun ModernContextMenuOverlay(
             Modifier
                 .fillMaxSize()
                 .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 20.dp),
+                .padding(horizontal = 12.dp)
+                // ≡ iOS MomentsFloatingTabBarMetrics.overlayGap. En el feed el dock ya está
+                // consumido; en Reels/detalle esto se suma al home indicator.
+                .padding(bottom = 8.dp),
             verticalArrangement = Arrangement.Bottom,
         ) {
             Box(

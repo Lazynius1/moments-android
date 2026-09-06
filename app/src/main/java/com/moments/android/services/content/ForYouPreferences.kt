@@ -32,6 +32,8 @@ object ForYouPreferences {
     var notice by mutableStateOf<Int?>(null)
         private set
     private var noticeOwner: String? = null
+    private var noticeDismissJob: Job? = null
+    private const val NOTICE_DURATION_MS = 5_000L
     private fun owner() = FirebaseAuth.getInstance().currentUser?.uid
     private fun prefs(uid: String) = FirebaseApp.getInstance().applicationContext
         .getSharedPreferences("forYou.$uid", Context.MODE_PRIVATE)
@@ -76,7 +78,21 @@ object ForYouPreferences {
     }
     fun hide(moment: FeedMoment) = send(moment, true)
     fun undo() { undoMoment?.let { send(it, false) } }
-    fun dismissNotice() { if (!isBusy) { notice = null; undoMoment = null } }
+    fun dismissNotice() {
+        if (isBusy) return
+        noticeDismissJob?.cancel()
+        noticeDismissJob = null
+        notice = null
+        undoMoment = null
+    }
+
+    private fun scheduleNoticeDismiss() {
+        noticeDismissJob?.cancel()
+        noticeDismissJob = scope.launch {
+            delay(NOTICE_DURATION_MS)
+            dismissNotice()
+        }
+    }
 
     private fun send(moment: FeedMoment, hiding: Boolean) {
         val user = FirebaseAuth.getInstance().currentUser ?: return
@@ -89,6 +105,7 @@ object ForYouPreferences {
         revision++
         isBusy = true
         noticeOwner = uid
+        noticeDismissJob?.cancel()
         notice = R.string.for_you_feedback_saving
         undoMoment = null
         scope.launch {
@@ -115,6 +132,7 @@ object ForYouPreferences {
                 if (owner() == uid) {
                     notice = if (hiding) R.string.for_you_feedback_hidden else R.string.for_you_feedback_restored
                     undoMoment = if (hiding) moment else null
+                    scheduleNoticeDismiss()
                 }
             } catch (error: Exception) {
                 prefs(uid).edit().putStringSet("hidden", original).apply()
@@ -122,6 +140,7 @@ object ForYouPreferences {
                 if (owner() == uid) {
                     notice = R.string.for_you_feedback_failed
                     undoMoment = if (hiding) null else moment
+                    scheduleNoticeDismiss()
                 }
             } finally { isBusy = false }
         }

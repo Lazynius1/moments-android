@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -577,15 +578,18 @@ fun FeedView(
         // Scaffold/tab: laterales + bottom (tab bar docked) + laterales.
         // iOS: fondo under status bar; header con padding.top -8 (sin doble inset).
         val layoutDir = LocalLayoutDirection.current
+        val tabBarPadding = PaddingValues(
+            start = padding.calculateStartPadding(layoutDir),
+            end = padding.calculateEndPadding(layoutDir),
+            bottom = padding.calculateBottomPadding(),
+        )
         Box(
             Modifier
                 .fillMaxSize()
                 .background(surface)
-                .padding(
-                    start = padding.calculateStartPadding(layoutDir),
-                    end = padding.calculateEndPadding(layoutDir),
-                    bottom = padding.calculateBottomPadding(),
-                ),
+                .padding(tabBarPadding)
+                // El dock ya se comió el inset inferior; el menú/aviso no deben volver a sumarlo.
+                .consumeWindowInsets(tabBarPadding),
         ) {
             // modernBackground ya aplicado vía surface
 
@@ -826,7 +830,11 @@ fun FeedView(
             )
 
             com.moments.android.services.content.ForYouFeedbackNotice(
-                Modifier.align(Alignment.BottomCenter).padding(bottom = 100.dp).zIndex(1500f)
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    // ≡ iOS overlayGap 8pt sobre la tab bar (el dock ya está fuera del Box).
+                    .padding(bottom = 8.dp)
+                    .zIndex(1500f)
             )
 
             FeedStoryRingPreviewOverlay(
