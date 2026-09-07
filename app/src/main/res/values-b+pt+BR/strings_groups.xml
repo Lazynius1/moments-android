@@ -50,11 +50,18 @@
     <string name="groups_invite_forbidden_one">%1$s não permite convites para grupos.</string>
     <string name="groups_invite_forbidden_many">%1$s não permitem convites para grupos.</string>
     <string name="groups_invite_link">Link de convite</string>
+    <string name="groups_invitation">Convite</string>
+    <string name="groups_join_body">Você foi convidado a entrar neste grupo.</string>
     <string name="groups_link_body">Qualquer pessoa com este link pode entrar. Novos membros só veem as mensagens a partir do momento em que entram. Renovar ou desativar o link invalida o anterior.</string>
     <string name="groups_get_link">Obter link</string>
     <string name="groups_share_link">Compartilhar link</string>
     <string name="groups_renew_link">Renovar link</string>
     <string name="groups_disable_link">Desativar link</string>
+    <string name="groups_edit">Editar grupo</string>
+    <string name="groups_copy_link">Copiar link</string>
+    <string name="groups_link_copied">Copiado</string>
+    <string name="groups_renew_body">Renovar cria um novo link. O anterior deixa de funcionar.</string>
+    <string name="groups_disable_body">Ninguém poderá entrar com este link. Você pode obter um novo depois.</string>
     <string name="groups_join_link">Entrar no grupo</string>
     <string name="groups_link_error">Este link está indisponível, o grupo está cheio ou não foi possível carregar suas chaves do chat. Tente novamente ou peça um novo link a um admin.</string>
     <string name="groups_notice_joined">%1$s entrou no grupo</string>
@@ -67,4 +74,8 @@
     <string name="groups_history_start">Início do grupo</string>
     <string name="groups_history_start_joined">Você pode ver as mensagens desde que entrou.</string>
     <string name="groups_joined_on">Entrou em %1$s</string>
+    <string name="groups_you">Você</string>
+    <string name="groups_following_section">Seguindo</string>
+    <string name="groups_others_section">Outros</string>
+    <string name="groups_link_admin_only">Só os administradores podem ativar o link de convite.</string>
 </resources>

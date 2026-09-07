@@ -1465,6 +1465,8 @@
     <string name="conversation_settings_vanish_desc">Bepaal hoelang je berichten en reacties zichtbaar blijven in de chat. Je kunt ze direct laten verdwijnen nadat ze zijn gelezen en je de chat hebt gesloten, of ze maximaal 7 dagen bewaren. Voor je privacy wordt er een melding geplaatst als iemand een screenshot maakt of het scherm opneemt.</string>
     <string name="conversation_settings_vanish">Verdwijnende berichten</string>
     <string name="conversation_settings_preferences">Chatvoorkeuren</string>
+    <string name="conversation_settings_privacy_and_security">Privacy en beveiliging</string>
+    <string name="conversation_settings_hide">Verbergen</string>
     <string name="conversation_settings_preferences_desc">Meldingen, voorvertoningen en privacy</string>
     <string name="conversation_settings_storage">Mediaopslag</string>
     <string name="conversation_settings_storage_desc">Gecachte foto\'s en video\'s op dit apparaat</string>
@@ -1487,8 +1489,11 @@
     <string name="conversation_settings_buzz_desc">Als je dit uitschakelt, kunnen anderen je in deze chat niet meer porren.</string>
     <string name="conversation_settings_preview_desc">Toon de tekst van berichten in meldingen en in de gesprekkenlijst.</string>
     <string name="conversation_settings_read_receipts_desc">Als je leesbevestigingen in deze chat uitschakelt, kun je niet meer zien wanneer de andere persoon je berichten leest.</string>
+    <string name="conversation_settings_read_receipts_desc_group">Als je leesbevestigingen in deze groep uitschakelt, kun je niet meer zien wanneer anderen je berichten lezen.</string>
     <string name="conversation_settings_typing_desc">Als je dit uitschakelt, zie je ook niet meer wanneer de andere persoon aan het typen is.</string>
+    <string name="conversation_settings_typing_desc_group">Als je dit uitschakelt, zie je ook niet meer wanneer anderen aan het typen zijn.</string>
     <string name="conversation_settings_forwarding_desc">Als je dit uitschakelt, kan de andere persoon je tekstberichten in deze chat niet meer doorsturen of kopiëren.</string>
+    <string name="conversation_settings_forwarding_desc_group">Als je dit uitschakelt, kunnen anderen je tekstberichten in deze groep niet meer doorsturen of kopiëren.</string>
     <string name="conversation_settings_created">Aangemaakt</string>
     <string name="conversation_settings_messages">Berichten</string>
     <string name="conversation_settings_buzz">Porren toestaan</string>
@@ -1498,6 +1503,7 @@
     <string name="conversation_settings_reply">Beantwoorden</string>
     <string name="conversation_settings_send">Versturen</string>
     <string name="conversation_settings_clear_conversation">Chat wissen</string>
+    <string name="conversation_settings_clear_conversation_group">Chat wissen</string>
     <string name="conversation_settings_media_save_title">Media opslaan</string>
     <string name="conversation_settings_media_save_success">Deze media zijn opgeslagen in je bibliotheek.</string>
     <string name="conversation_settings_media_save_error">Deze media konden niet worden opgeslagen.</string>
@@ -1671,6 +1677,7 @@
     <string name="chat_action_delete_for_me">Voor mij verwijderen</string>
     <string name="chat_action_more_reactions">Meer reacties</string>
     <string name="chat_edited">Bewerkt</string>
+    <string name="chat_read_and_more">en nog %1$d</string>
     <string name="chat_seen">Gezien</string>
     <string name="chat_recovery_loading">Chatbeveiliging voorbereiden</string>
     <string name="chat_recovery_pin">Herstelpincode</string>

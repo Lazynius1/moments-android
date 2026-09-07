@@ -1465,6 +1465,8 @@
     <string name="conversation_settings_vanish_desc">तय करें कि आपके मैसेज और रिएक्शन चैट में कितनी देर तक दिखें। आप उन्हें पढ़ने और चैट बंद करने के तुरंत बाद गायब होने के लिए सेट कर सकते हैं या 7 दिनों तक रख सकते हैं। आपकी निजता के लिए, कोई स्क्रीनशॉट लेने या स्क्रीन रिकॉर्ड करने पर सूचना दिखाई जाएगी।</string>
     <string name="conversation_settings_vanish">गायब होने वाले मैसेज</string>
     <string name="conversation_settings_preferences">चैट की प्राथमिकताएँ</string>
+    <string name="conversation_settings_privacy_and_security">गोपनीयता और सुरक्षा</string>
+    <string name="conversation_settings_hide">छिपाएँ</string>
     <string name="conversation_settings_preferences_desc">नोटिफ़िकेशन, प्रीव्यू और निजता</string>
     <string name="conversation_settings_storage">मीडिया स्टोरेज</string>
     <string name="conversation_settings_storage_desc">इस डिवाइस पर कैश की गई फ़ोटो और वीडियो</string>
@@ -1487,8 +1489,11 @@
     <string name="conversation_settings_buzz_desc">इसे बंद करने पर दूसरे लोग इस चैट में आपको बज़ नहीं कर पाएँगे।</string>
     <string name="conversation_settings_preview_desc">सूचनाओं और बातचीत की सूची में मैसेज का टेक्स्ट दिखाएँ।</string>
     <string name="conversation_settings_read_receipts_desc">अगर आप इस चैट में रीड रिसीट्स बंद करते हैं, तो आप यह नहीं देख पाएँगे कि दूसरे व्यक्ति ने आपके मैसेज पढ़े हैं या नहीं।</string>
+    <string name="conversation_settings_read_receipts_desc_group">अगर आप इस समूह में रीड रिसीट बंद करते हैं, तो आप यह नहीं देख पाएँगे कि दूसरों ने आपके मैसेज पढ़े हैं या नहीं।</string>
     <string name="conversation_settings_typing_desc">इसे बंद करने पर आपको यह भी नहीं दिखेगा कि दूसरा व्यक्ति टाइप कर रहा है।</string>
+    <string name="conversation_settings_typing_desc_group">इसे बंद करने पर आपको यह भी नहीं दिखेगा कि दूसरे टाइप कर रहे हैं।</string>
     <string name="conversation_settings_forwarding_desc">इसे बंद करने पर दूसरा व्यक्ति इस चैट में आपके टेक्स्ट मैसेज फ़ॉरवर्ड या कॉपी नहीं कर पाएगा।</string>
+    <string name="conversation_settings_forwarding_desc_group">इसे बंद करने पर दूसरे इस समूह में आपके टेक्स्ट मैसेज फ़ॉरवर्ड या कॉपी नहीं कर पाएँगे।</string>
     <string name="conversation_settings_created">बनाया गया</string>
     <string name="conversation_settings_messages">मैसेज</string>
     <string name="conversation_settings_buzz">बज़ की अनुमति दें</string>
@@ -1498,6 +1503,7 @@
     <string name="conversation_settings_reply">जवाब दें</string>
     <string name="conversation_settings_send">भेजें</string>
     <string name="conversation_settings_clear_conversation">बातचीत साफ़ करें</string>
+    <string name="conversation_settings_clear_conversation_group">चैट साफ़ करें</string>
     <string name="conversation_settings_media_save_title">मीडिया सेव करें</string>
     <string name="conversation_settings_media_save_success">यह मीडिया आपकी लाइब्रेरी में सेव हो गया है।</string>
     <string name="conversation_settings_media_save_error">यह मीडिया सेव नहीं किया जा सका।</string>
@@ -1671,6 +1677,7 @@
     <string name="chat_action_delete_for_me">मेरे लिए डिलीट करें</string>
     <string name="chat_action_more_reactions">और रिएक्शन</string>
     <string name="chat_edited">एडिट किया गया</string>
+    <string name="chat_read_and_more">और %1$d</string>
     <string name="chat_seen">देख लिया</string>
     <string name="chat_recovery_loading">चैट की सुरक्षा तैयार की जा रही है</string>
     <string name="chat_recovery_pin">रिकवरी PIN</string>

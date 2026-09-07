@@ -50,11 +50,18 @@
     <string name="groups_invite_forbidden_one">%1$sさんはグループへの招待を許可していません。</string>
     <string name="groups_invite_forbidden_many">%1$sさんはグループへの招待を許可していません。</string>
     <string name="groups_invite_link">招待リンク</string>
+    <string name="groups_invitation">招待</string>
+    <string name="groups_join_body">このグループに招待されています。</string>
     <string name="groups_link_body">このリンクを持つ人は誰でも参加できます。新しいメンバーには参加時点以降のメッセージだけが表示されます。更新または無効化すると以前のリンクは使えなくなります。</string>
     <string name="groups_get_link">リンクを取得</string>
     <string name="groups_share_link">リンクを共有</string>
     <string name="groups_renew_link">リンクを更新</string>
     <string name="groups_disable_link">リンクを無効化</string>
+    <string name="groups_edit">グループを編集</string>
+    <string name="groups_copy_link">リンクをコピー</string>
+    <string name="groups_link_copied">コピーしました</string>
+    <string name="groups_renew_body">更新すると新しいリンクが作成され、以前のリンクは使えなくなります。</string>
+    <string name="groups_disable_body">このリンクでは参加できなくなります。後で新しいリンクを取得できます。</string>
     <string name="groups_join_link">グループに参加</string>
     <string name="groups_link_error">リンクが利用できないか、グループが満員か、チャットの鍵を読み込めませんでした。再試行するか、管理者に新しいリンクを依頼してください。</string>
     <string name="groups_notice_joined">%1$sがグループに参加しました</string>
@@ -67,4 +74,8 @@
     <string name="groups_history_start">グループの始まり</string>
     <string name="groups_history_start_joined">参加してからのメッセージを表示できます。</string>
     <string name="groups_joined_on">%1$sに参加</string>
+    <string name="groups_you">あなた</string>
+    <string name="groups_following_section">フォロー中</string>
+    <string name="groups_others_section">その他</string>
+    <string name="groups_link_admin_only">招待リンクをオンにできるのは管理者だけです。</string>
 </resources>

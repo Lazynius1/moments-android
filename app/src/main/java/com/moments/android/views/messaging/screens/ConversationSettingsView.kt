@@ -37,6 +37,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
@@ -44,6 +45,7 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -53,7 +55,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -85,6 +87,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -110,6 +114,10 @@ import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.groups.GroupChatAvatar
+import com.moments.android.views.messaging.groups.GroupChatStore
+import com.moments.android.views.messaging.groups.GroupDirectory
+import com.moments.android.views.messaging.groups.GroupEditView
+import com.moments.android.views.messaging.groups.GroupInviteLinkManageView
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.core.PresenceDisplay
 import kotlin.math.roundToInt
@@ -824,6 +832,8 @@ fun ConversationSettingsView(
     var showPreferences by remember { mutableStateOf(false) }
     var showVanish by remember { mutableStateOf(false) }
     var showGroupManagement by remember { mutableStateOf(false) }
+    var showGroupEdit by remember { mutableStateOf(false) }
+    var showGroupInviteManage by remember { mutableStateOf(false) }
     var showBlockConfirm by remember { mutableStateOf(false) }
     var showReport by remember { mutableStateOf(false) }
     var selectedMedia by remember { mutableStateOf<SharedMedia?>(null) }
@@ -831,6 +841,13 @@ fun ConversationSettingsView(
     var clearConversationConfirm by remember { mutableStateOf(false) }
     // ≡ iOS showingUserProfile → navigationDestination UserProfileView
     var showingUserProfile by remember { mutableStateOf(false) }
+    var showLeaveGroup by remember { mutableStateOf(false) }
+    var showHideChat by remember { mutableStateOf(false) }
+    var showLinkAdminOnly by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val groups by GroupDirectory.groups.collectAsState()
+    val groupSnapshot = conversation.id?.let { groups[it] }
+    val isGroupAdmin = groupSnapshot?.admins?.contains(FirebaseAuth.getInstance().currentUser?.uid) == true
     LaunchedEffect(conversation.id) { model.loadConversationData(conversation, context) }
 
     Box(modifier.fillMaxSize()) {
@@ -838,16 +855,45 @@ fun ConversationSettingsView(
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }
                 Text(stringResource(R.string.conversation_settings_title), modifier = Modifier.weight(1f), color = colors.primary, fontWeight = FontWeight.SemiBold)
-                // ≡ iOS: Block/Report solo en 1:1
-                if (!conversation.isGroup) {
-                    Box {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = colors.primary)
-                        }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false },
-                        ) {
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = colors.primary)
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                    ) {
+                        if (conversation.isGroup) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(R.string.groups_leave),
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    showLeaveGroup = true
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Logout,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                    )
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.conversation_settings_hide)) },
+                                onClick = {
+                                    showMenu = false
+                                    showHideChat = true
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.VisibilityOff, contentDescription = null, tint = colors.primary)
+                                },
+                            )
+                        } else {
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -886,8 +932,8 @@ fun ConversationSettingsView(
                                 )
                             },
                         )
+                        }
                     }
-                }
                 }
             }
             Column(
@@ -898,9 +944,31 @@ fun ConversationSettingsView(
             ) {
                 ConversationSettingsHeader(
                     conversation = conversation,
-                    liveUsername = model.liveOtherParticipantUsername,
+                    displayName = if (conversation.isGroup) {
+                        groupSnapshot?.name?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: conversation.otherParticipantUsername.orEmpty()
+                    } else {
+                        model.liveOtherParticipantUsername.ifBlank {
+                            conversation.otherParticipantUsername.orEmpty()
+                        }
+                    },
+                    avatarURL = if (conversation.isGroup) {
+                        groupSnapshot?.image?.trim()?.takeIf { it.isNotEmpty() }
+                            ?: conversation.otherParticipantProfileImagePath
+                    } else {
+                        conversation.otherParticipantProfileImagePath
+                    },
                     colors = colors,
                     notificationsEnabled = model.notificationsEnabled,
+                    showsIdentityEdit = isGroupAdmin,
+                    onIdentityTap = if (isGroupAdmin) {
+                        {
+                            HapticManager.shared.lightImpact()
+                            showGroupEdit = true
+                        }
+                    } else {
+                        null
+                    },
                     onProfile = {
                         if (conversation.isGroup) showGroupManagement = true
                         else showingUserProfile = true
@@ -908,21 +976,19 @@ fun ConversationSettingsView(
                     onSearch = onSearchRequested,
                     onToggleMute = { model.toggleNotifications() },
                 )
-                if (conversation.isGroup) {
-                    Column(Modifier.padding(horizontal = 16.dp)) {
-                        SettingsRow(
-                            Icons.Default.Groups,
-                            R.string.groups_members,
-                            conversation.participants.size.takeIf { it > 0 }?.toString(),
-                            colors,
-                            { showGroupManagement = true },
-                        )
-                    }
-                }
                 SettingsRows(
                     model = model,
                     colors = colors,
                     onStarred = { showStarred = true },
+                    onInviteLink = if (conversation.isGroup) {
+                        {
+                            HapticManager.shared.lightImpact()
+                            if (isGroupAdmin) showGroupInviteManage = true
+                            else showLinkAdminOnly = true
+                        }
+                    } else {
+                        null
+                    },
                     onVanish = { showVanish = true },
                     onPreferences = { showPreferences = true },
                     onOpenGallery = {
@@ -932,7 +998,7 @@ fun ConversationSettingsView(
                     onClearMedia = { clearMediaConfirm = true },
                 )
                 // ≡ iOS: settingsFooter debajo de vaciar media, antes de Media/Links
-                SettingsFooter(model, colors)
+                if (!conversation.isGroup) SettingsFooter(model, colors)
                 SharedContentTabs(tab, { tab = it }, model, colors, onOpenMedia = { model.openMediaForViewing(it) { resolved -> selectedMedia = resolved } })
             }
         }
@@ -942,6 +1008,16 @@ fun ConversationSettingsView(
                 com.moments.android.views.messaging.groups.GroupManagementView(conversation.id.orEmpty()) {
                     showGroupManagement = false
                 }
+            }
+        }
+        if (showGroupEdit) {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                GroupEditView(conversation.id.orEmpty()) { showGroupEdit = false }
+            }
+        }
+        if (showGroupInviteManage) {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                GroupInviteLinkManageView(conversation.id.orEmpty()) { showGroupInviteManage = false }
             }
         }
         // Preferences / Vanish = push full-screen (≡ navigationDestination iOS).
@@ -1073,13 +1149,70 @@ fun ConversationSettingsView(
         },
         dismissButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable { showBlockConfirm = false }.padding(16.dp)) },
     )
+    if (showLeaveGroup) AlertDialog(
+        onDismissRequest = { showLeaveGroup = false },
+        title = { Text(stringResource(R.string.groups_leave)) },
+        text = { Text(stringResource(R.string.groups_leave_body)) },
+        confirmButton = {
+            Text(
+                stringResource(R.string.groups_leave),
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.clickable {
+                    showLeaveGroup = false
+                    val group = groupSnapshot ?: return@clickable
+                    scope.launch {
+                        if (GroupChatStore(scope).command("leave", group)) onBack()
+                    }
+                }.padding(16.dp),
+            )
+        },
+        dismissButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable { showLeaveGroup = false }.padding(16.dp)) },
+    )
+    if (showHideChat) AlertDialog(
+        onDismissRequest = { showHideChat = false },
+        title = { Text(stringResource(R.string.conversation_settings_hide)) },
+        confirmButton = {
+            Text(
+                stringResource(R.string.conversation_settings_hide),
+                modifier = Modifier.clickable {
+                    showHideChat = false
+                    val conversationId = conversation.id ?: return@clickable
+                    val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return@clickable
+                    scope.launch { ChatService.archiveConversation(conversationId, userId) }
+                    onBack()
+                }.padding(16.dp),
+            )
+        },
+        dismissButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable { showHideChat = false }.padding(16.dp)) },
+    )
+    if (showLinkAdminOnly) AlertDialog(
+        onDismissRequest = { showLinkAdminOnly = false },
+        title = { Text(stringResource(R.string.groups_invite_link)) },
+        text = { Text(stringResource(R.string.groups_link_admin_only)) },
+        confirmButton = {
+            Text(
+                stringResource(R.string.groups_ok),
+                modifier = Modifier.clickable { showLinkAdminOnly = false }.padding(16.dp),
+            )
+        },
+    )
     // ≡ confirmationDialog clearConversation (prefs)
     if (clearConversationConfirm) AlertDialog(
         onDismissRequest = { clearConversationConfirm = false },
-        title = { Text(stringResource(R.string.conversation_settings_clear_conversation)) },
+        title = {
+            Text(
+                stringResource(
+                    if (conversation.isGroup) R.string.conversation_settings_clear_conversation_group
+                    else R.string.conversation_settings_clear_conversation,
+                ),
+            )
+        },
         confirmButton = {
             Text(
-                stringResource(R.string.conversation_settings_clear_conversation),
+                stringResource(
+                    if (conversation.isGroup) R.string.conversation_settings_clear_conversation_group
+                    else R.string.conversation_settings_clear_conversation,
+                ),
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.clickable {
                     clearConversationConfirm = false
@@ -1137,9 +1270,12 @@ fun ConversationSettingsView(
 @Composable
 private fun ConversationSettingsHeader(
     conversation: Conversation,
-    liveUsername: String,
+    displayName: String,
+    avatarURL: String?,
     colors: AdaptiveColors,
     notificationsEnabled: Boolean,
+    showsIdentityEdit: Boolean,
+    onIdentityTap: (() -> Unit)?,
     onProfile: () -> Unit,
     onSearch: () -> Unit,
     onToggleMute: () -> Unit,
@@ -1159,8 +1295,10 @@ private fun ConversationSettingsHeader(
     Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         if (isGroup) {
             GroupChatAvatar(
-                image = conversation.otherParticipantProfileImagePath.orEmpty(),
+                image = avatarURL.orEmpty(),
                 size = 92.dp,
+                camera = showsIdentityEdit,
+                onClick = onIdentityTap,
             )
         } else {
             AsyncProfileImageView(
@@ -1169,11 +1307,13 @@ private fun ConversationSettingsHeader(
             )
         }
         Text(
-            liveUsername.ifBlank { conversation.otherParticipantUsername.orEmpty() },
+            displayName,
             color = colors.primary,
             fontWeight = FontWeight.Bold,
             fontSize = 24.sp,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier
+                .padding(top = 12.dp)
+                .then(if (onIdentityTap != null) Modifier.clickable(onClick = onIdentityTap) else Modifier),
         )
         if (!isGroup) {
             presence?.let { p ->
@@ -1237,6 +1377,7 @@ private fun SettingsRows(
     model: ConversationSettingsViewModel,
     colors: AdaptiveColors,
     onStarred: () -> Unit,
+    onInviteLink: (() -> Unit)?,
     onVanish: () -> Unit,
     onPreferences: () -> Unit,
     onOpenGallery: () -> Unit,
@@ -1245,6 +1386,9 @@ private fun SettingsRows(
     val context = LocalContext.current
     Column(Modifier.padding(horizontal = 16.dp)) {
         SettingsRow(Icons.Default.Star, R.string.conversation_settings_starred, model.starredMessages.size.takeIf { it > 0 }?.toString() ?: stringResource(R.string.conversation_settings_starred_none), colors, onStarred)
+        onInviteLink?.let { openLink ->
+            SettingsRow(Icons.Default.Link, R.string.groups_invite_link, null, colors, openLink)
+        }
         if (model.conversation?.isGroup != true) SettingsRow(
             Icons.Default.Timer,
             R.string.conversation_settings_vanish,
@@ -1259,8 +1403,8 @@ private fun SettingsRows(
             onVanish,
         )
         SettingsRow(
-            Icons.Default.Tune,
-            R.string.conversation_settings_preferences,
+            Icons.Default.Lock,
+            R.string.conversation_settings_privacy_and_security,
             detail = null,
             subtitle = stringResource(R.string.conversation_settings_preferences_desc),
             colors = colors,
@@ -1646,9 +1790,10 @@ private fun ConversationChatPreferencesView(
     Column(modifier.fillMaxSize().background(colors.chatBackground.first())) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }
-            Text(stringResource(R.string.conversation_settings_preferences), color = colors.primary, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.conversation_settings_privacy_and_security), color = colors.primary, fontWeight = FontWeight.SemiBold)
         }
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            val isGroup = model.conversation?.isGroup == true
             Text(
                 stringResource(R.string.conversation_settings_group_notifications),
                 color = colors.secondary,
@@ -1656,7 +1801,7 @@ private fun ConversationChatPreferencesView(
                 fontSize = 13.sp,
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
             )
-            if (model.conversation?.isGroup != true) PreferenceToggleRow(
+            if (!isGroup) PreferenceToggleRow(
                 title = R.string.conversation_settings_buzz,
                 description = R.string.conversation_settings_buzz_desc,
                 checked = model.buzzEnabled,
@@ -1685,7 +1830,11 @@ private fun ConversationChatPreferencesView(
             )
             PreferenceToggleRow(
                 title = R.string.conversation_settings_read_receipts,
-                description = R.string.conversation_settings_read_receipts_desc,
+                description = if (isGroup) {
+                    R.string.conversation_settings_read_receipts_desc_group
+                } else {
+                    R.string.conversation_settings_read_receipts_desc
+                },
                 checked = model.readReceiptsEnabled,
                 colors = colors,
             ) {
@@ -1696,7 +1845,11 @@ private fun ConversationChatPreferencesView(
             PreferenceDivider(colors)
             PreferenceToggleRow(
                 title = R.string.conversation_settings_typing,
-                description = R.string.conversation_settings_typing_desc,
+                description = if (isGroup) {
+                    R.string.conversation_settings_typing_desc_group
+                } else {
+                    R.string.conversation_settings_typing_desc
+                },
                 checked = model.typingIndicatorEnabled,
                 colors = colors,
             ) {
@@ -1706,7 +1859,11 @@ private fun ConversationChatPreferencesView(
             PreferenceDivider(colors)
             PreferenceToggleRow(
                 title = R.string.conversation_settings_forwarding,
-                description = R.string.conversation_settings_forwarding_desc,
+                description = if (isGroup) {
+                    R.string.conversation_settings_forwarding_desc_group
+                } else {
+                    R.string.conversation_settings_forwarding_desc
+                },
                 checked = model.forwardingEnabled,
                 colors = colors,
             ) {
@@ -1714,7 +1871,10 @@ private fun ConversationChatPreferencesView(
                 model.toggleForwarding(context)
             }
             Text(
-                stringResource(R.string.conversation_settings_clear_conversation),
+                stringResource(
+                    if (isGroup) R.string.conversation_settings_clear_conversation_group
+                    else R.string.conversation_settings_clear_conversation,
+                ),
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.fillMaxWidth().clickable(onClick = onRequestClearConversation).padding(vertical = 14.dp),
             )

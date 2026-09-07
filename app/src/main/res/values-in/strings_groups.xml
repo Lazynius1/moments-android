@@ -50,11 +50,18 @@
     <string name="groups_invite_forbidden_one">%1$s tidak mengizinkan undangan grup.</string>
     <string name="groups_invite_forbidden_many">%1$s tidak mengizinkan undangan grup.</string>
     <string name="groups_invite_link">Tautan undangan</string>
+    <string name="groups_invitation">Undangan</string>
+    <string name="groups_join_body">Kamu diundang untuk bergabung ke grup ini.</string>
     <string name="groups_link_body">Siapa pun yang memiliki tautan ini dapat bergabung. Anggota baru hanya melihat pesan sejak mereka bergabung. Memperbarui atau menonaktifkannya membatalkan tautan sebelumnya.</string>
     <string name="groups_get_link">Dapatkan tautan</string>
     <string name="groups_share_link">Bagikan tautan</string>
     <string name="groups_renew_link">Perbarui tautan</string>
     <string name="groups_disable_link">Nonaktifkan tautan</string>
+    <string name="groups_edit">Edit grup</string>
+    <string name="groups_copy_link">Salin tautan</string>
+    <string name="groups_link_copied">Disalin</string>
+    <string name="groups_renew_body">Memperbarui membuat tautan baru. Tautan sebelumnya tidak akan berfungsi.</string>
+    <string name="groups_disable_body">Tidak ada yang dapat bergabung dengan tautan ini. Kamu bisa mendapatkan tautan baru nanti.</string>
     <string name="groups_join_link">Gabung grup</string>
     <string name="groups_link_error">Tautan ini tidak tersedia, grup penuh, atau kunci chat tidak dapat dimuat. Coba lagi atau minta tautan baru dari admin.</string>
     <string name="groups_notice_joined">%1$s bergabung dengan grup</string>
@@ -67,4 +74,8 @@
     <string name="groups_history_start">Awal grup</string>
     <string name="groups_history_start_joined">Kamu bisa melihat pesan sejak bergabung.</string>
     <string name="groups_joined_on">Bergabung %1$s</string>
+    <string name="groups_you">Anda</string>
+    <string name="groups_following_section">Mengikuti</string>
+    <string name="groups_others_section">Lainnya</string>
+    <string name="groups_link_admin_only">Hanya admin yang dapat mengaktifkan tautan undangan.</string>
 </resources>

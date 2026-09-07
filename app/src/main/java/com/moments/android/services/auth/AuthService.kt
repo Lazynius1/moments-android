@@ -1562,6 +1562,7 @@ object AuthService {
             FCMTokenService.clearFCMToken()
             NotificationService.resetOnSignOut()
             InAppNotificationService.stopListening()
+            com.moments.android.views.messaging.services.ChatService.stopConversationsListener()
             NotificationBadgeService.cleanup()
             MessageIngestService.resetOnSignOut()
             MessageCatchUpService.resetOnSignOut()

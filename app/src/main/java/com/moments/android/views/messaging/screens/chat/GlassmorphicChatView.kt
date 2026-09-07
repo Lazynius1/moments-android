@@ -1252,6 +1252,7 @@ fun GlassmorphicChatView(
         currentUserId = session.currentUserId,
         forwardingPreferences = forwardingPreferences,
         starredMessageIds = starredMessageIds,
+        isGroup = conversation.isGroup,
         callbacks = ChatMessageMenuCallbacks(
             onDeleteForEveryone = session::deleteMessageForEveryone,
             onDeleteForMe = session::deleteMessageForMe,

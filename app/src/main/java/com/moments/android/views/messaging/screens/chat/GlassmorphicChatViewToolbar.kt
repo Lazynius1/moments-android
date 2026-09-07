@@ -37,7 +37,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
@@ -82,15 +84,18 @@ fun GlassmorphicChatToolbar(
     modifier: Modifier = Modifier,
 ) {
     val hasStory = storyRing.hasStory
-    Row(
+    Box(
         modifier
             .fillMaxWidth()
             .background(adaptiveColors.chatBackground.first())
             .statusBarsPadding()
             .padding(horizontal = 6.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        Row(
+            Modifier.align(Alignment.CenterStart),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
         // ≡ iOS ProfileChromeIconButton(.navigationBack) — solo chevron, sin glass standalone
         if (showBackButton) {
             ProfileChromeIconButton(
@@ -112,7 +117,8 @@ fun GlassmorphicChatToolbar(
                 .size(headerRingOuter)
                 .momentsPressIcon()
                 .clickable {
-                    if (isUnavailable && !isBlockedByMe) callbacks.onProfile()
+                    if (isGroup) callbacks.onSettings()
+                    else if (isUnavailable && !isBlockedByMe) callbacks.onProfile()
                     else if (hasStory && !isBlockedByMe) callbacks.onStory()
                     else callbacks.onProfile()
                 },
@@ -144,27 +150,34 @@ fun GlassmorphicChatToolbar(
                 )
             }
         }
+        }
         Column(
             Modifier
-                .weight(1f)
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .padding(horizontal = 96.dp)
                 .clickable(onClick = callbacks.onSettings),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(
+                Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
             ) {
                 Text(
                     displayName,
                     color = adaptiveColors.primary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
                     autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 17.sp),
                     textDecoration = if (!isGroup && isUnavailable && !isBlockedByMe) {
                         TextDecoration.LineThrough
                     } else {
                         TextDecoration.None
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 if (!isGroup && !isUnavailable) {
                     VerifiedBadgeView(userId = userId, size = 14.dp)
@@ -205,6 +218,7 @@ private fun ChatToolbarSubtitle(
             color = adaptiveColors.secondary,
             fontSize = 11.sp,
             maxLines = 1,
+            textAlign = TextAlign.Center,
         )
         isBlockedByMe -> Text(
             stringResource(R.string.chat_blocked_by_me_subtitle),

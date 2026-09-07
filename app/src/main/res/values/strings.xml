@@ -1488,6 +1488,8 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="conversation_settings_vanish_desc">Decide how long your messages and reactions stay visible in the chat. You can set them to disappear right after being read and closing the chat, or keep them for up to 7 days. For your privacy, a notification will be posted if someone takes a screenshot or records the screen.</string>
     <string name="conversation_settings_vanish">Disappearing messages</string>
     <string name="conversation_settings_preferences">Chat preferences</string>
+    <string name="conversation_settings_privacy_and_security">Privacy and security</string>
+    <string name="conversation_settings_hide">Hide</string>
     <string name="conversation_settings_preferences_desc">Notifications, previews and privacy</string>
     <string name="conversation_settings_storage">Media storage</string>
     <string name="conversation_settings_storage_desc">Cached photos and videos on this device</string>
@@ -1510,8 +1512,11 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="conversation_settings_buzz_desc">If you turn this off, others won\'t be able to buzz you in this chat.</string>
     <string name="conversation_settings_preview_desc">Show the message text in notifications and the conversation list.</string>
     <string name="conversation_settings_read_receipts_desc">If you turn off read receipts in this chat, you won\'t be able to see when the other person reads your messages.</string>
+    <string name="conversation_settings_read_receipts_desc_group">If you turn off read receipts in this group, you won\'t be able to see when others read your messages.</string>
     <string name="conversation_settings_typing_desc">If you turn this off, you also won\'t see when the other person is typing.</string>
+    <string name="conversation_settings_typing_desc_group">If you turn this off, you also won\'t see when others are typing.</string>
     <string name="conversation_settings_forwarding_desc">If you turn this off, the other person won\'t be able to forward or copy your text messages in this chat.</string>
+    <string name="conversation_settings_forwarding_desc_group">If you turn this off, others won\'t be able to forward or copy your text messages in this group.</string>
     <string name="conversation_settings_created">Created</string>
     <string name="conversation_settings_messages">Messages</string>
     <string name="conversation_settings_buzz">Allow buzzes</string>
@@ -1521,6 +1526,7 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="conversation_settings_reply">Reply</string>
     <string name="conversation_settings_send">Send</string>
     <string name="conversation_settings_clear_conversation">Clear conversation</string>
+    <string name="conversation_settings_clear_conversation_group">Clear chat</string>
     <string name="conversation_settings_media_save_title">Save media</string>
     <string name="conversation_settings_media_save_success">This media was saved to your library.</string>
     <string name="conversation_settings_media_save_error">This media couldn\'t be saved.</string>
@@ -1694,6 +1700,7 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="chat_action_delete_for_me">Delete for me</string>
     <string name="chat_action_more_reactions">More reactions</string>
     <string name="chat_edited">Edited</string>
+    <string name="chat_read_and_more">and %1$d more</string>
     <string name="chat_seen">Seen</string>
     <string name="chat_recovery_loading">Preparing chat security</string>
     <string name="chat_recovery_pin">Recovery PIN</string>

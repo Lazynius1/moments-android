@@ -1465,6 +1465,8 @@
     <string name="conversation_settings_vanish_desc">メッセージやリアクションをチャットに表示しておく期間を設定できます。既読にしてチャットを閉じるとすぐに消えるようにすることも、最長7日間残すこともできます。プライバシー保護のため、スクリーンショットの撮影や画面録画が行われると通知が表示されます。</string>
     <string name="conversation_settings_vanish">消えるメッセージ</string>
     <string name="conversation_settings_preferences">チャットの設定</string>
+    <string name="conversation_settings_privacy_and_security">プライバシーとセキュリティ</string>
+    <string name="conversation_settings_hide">非表示</string>
     <string name="conversation_settings_preferences_desc">通知、プレビュー、プライバシー</string>
     <string name="conversation_settings_storage">メディアの保存</string>
     <string name="conversation_settings_storage_desc">このデバイスにキャッシュされた写真と動画</string>
@@ -1487,8 +1489,11 @@
     <string name="conversation_settings_buzz_desc">オフにすると、このチャットで他のユーザーからバズを受け取れなくなります。</string>
     <string name="conversation_settings_preview_desc">通知と会話一覧にメッセージの本文を表示します。</string>
     <string name="conversation_settings_read_receipts_desc">このチャットで既読通知をオフにすると、相手がメッセージを読んだかどうか確認できなくなります。</string>
+    <string name="conversation_settings_read_receipts_desc_group">このグループで既読通知をオフにすると、他のメンバーがメッセージを読んだかどうか確認できなくなります。</string>
     <string name="conversation_settings_typing_desc">オフにすると、相手の入力中表示も見えなくなります。</string>
+    <string name="conversation_settings_typing_desc_group">オフにすると、他のメンバーの入力中表示も見えなくなります。</string>
     <string name="conversation_settings_forwarding_desc">オフにすると、このチャットで相手がテキストメッセージを転送またはコピーできなくなります。</string>
+    <string name="conversation_settings_forwarding_desc_group">オフにすると、このグループで他のメンバーがテキストメッセージを転送またはコピーできなくなります。</string>
     <string name="conversation_settings_created">作成日</string>
     <string name="conversation_settings_messages">メッセージ</string>
     <string name="conversation_settings_buzz">バズを許可</string>
@@ -1498,6 +1503,7 @@
     <string name="conversation_settings_reply">返信</string>
     <string name="conversation_settings_send">送信</string>
     <string name="conversation_settings_clear_conversation">会話を消去</string>
+    <string name="conversation_settings_clear_conversation_group">チャットを消去</string>
     <string name="conversation_settings_media_save_title">メディアを保存</string>
     <string name="conversation_settings_media_save_success">メディアをライブラリに保存しました。</string>
     <string name="conversation_settings_media_save_error">メディアを保存できませんでした。</string>
@@ -1671,6 +1677,7 @@
     <string name="chat_action_delete_for_me">自分から削除</string>
     <string name="chat_action_more_reactions">その他のリアクション</string>
     <string name="chat_edited">編集済み</string>
+    <string name="chat_read_and_more">他%1$d人</string>
     <string name="chat_seen">既読</string>
     <string name="chat_recovery_loading">チャットのセキュリティを準備中</string>
     <string name="chat_recovery_pin">復元用PIN</string>

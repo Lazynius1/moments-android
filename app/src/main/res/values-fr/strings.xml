@@ -1087,6 +1087,8 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="conversation_settings_vanish_desc">Choisissez combien de temps vos messages et réactions restent visibles dans le chat. Vous pouvez faire en sorte qu\'ils disparaissent juste après avoir été vus et la fermeture de la conversation, ou les conserver jusqu\'à 7 jours. Pour votre confidentialité, une notification sera envoyée si quelqu\'un effectue une capture ou enregistre l\'écran.</string>
     <string name="conversation_settings_vanish">Messages éphémères</string>
     <string name="conversation_settings_preferences">Préférences du chat</string>
+    <string name="conversation_settings_privacy_and_security">Confidentialité et sécurité</string>
+    <string name="conversation_settings_hide">Masquer</string>
     <string name="conversation_settings_preferences_desc">Notifications, aperçus et confidentialité</string>
     <string name="conversation_settings_storage_desc">Photos et vidéos en cache sur cet appareil</string>
     <string name="conversation_settings_clear_media">Vider le cache des médias</string>
@@ -1097,6 +1099,7 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="conversation_settings_typing">Indicateur de saisie</string>
     <string name="conversation_settings_forwarding">Autoriser le transfert</string>
     <string name="conversation_settings_clear_conversation">Vider la conversation</string>
+    <string name="conversation_settings_clear_conversation_group">Vider le chat</string>
     <string name="conversation_settings_media_save_title">Enregistrer le média</string>
     <string name="conversation_settings_media_save_success">Ce média a été enregistré dans votre bibliothèque.</string>
     <string name="conversation_settings_media_save_error">Ce média n’a pas pu être enregistré.</string>
@@ -1198,6 +1201,7 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="chat_reply_replied_to">%1$s a répondu</string>
     <string name="chat_error">Erreur</string>
     <string name="chat_edited">modifié</string>
+    <string name="chat_read_and_more">et %1$d de plus</string>
     <string name="chat_seen">Vu</string>
     <string name="chat_recovery_six_digits">6 chiffres</string>
     <string name="chat_vanish_swipe_release">Relâchez pour activer les messages éphémères</string>
@@ -1890,8 +1894,11 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="conversation_settings_preview_desc">Affiche le texte du message dans les notifications et la liste des conversations.</string>
     <string name="conversation_settings_read_receipts">Accusés de lecture</string>
     <string name="conversation_settings_read_receipts_desc">Si vous désactivez les accusés de lecture dans ce chat, vous ne pourrez pas voir quand l’autre personne lit vos messages.</string>
+    <string name="conversation_settings_read_receipts_desc_group">Si vous désactivez les accusés de lecture dans ce groupe, vous ne pourrez pas voir quand les autres lisent vos messages.</string>
     <string name="conversation_settings_typing_desc">Si vous désactivez cette option, vous ne verrez pas non plus quand l’autre personne est en train d’écrire.</string>
+    <string name="conversation_settings_typing_desc_group">Si vous désactivez cette option, vous ne verrez pas non plus quand les autres sont en train d’écrire.</string>
     <string name="conversation_settings_forwarding_desc">Si vous désactivez cette option, l\'autre personne ne pourra pas transférer ni copier vos messages texte dans ce chat.</string>
+    <string name="conversation_settings_forwarding_desc_group">Si vous désactivez cette option, les autres ne pourront pas transférer ni copier vos messages texte dans ce groupe.</string>
     <string name="conversation_settings_created">Créée</string>
     <string name="conversation_settings_messages">Messages</string>
     <string name="conversation_settings_buzz">Wizz</string>

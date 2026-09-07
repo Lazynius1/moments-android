@@ -1671,6 +1671,8 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="conversation_settings_vanish_desc">Elige cuánto tiempo permanecen visibles tus mensajes y reacciones en el chat. Puedes hacer que desaparezcan justo después de leerse y cerrar la conversación, o conservarlos hasta 7 días. Por tu privacidad, se enviará una notificación al chat si alguien hace una captura o graba la pantalla.</string>
     <string name="conversation_settings_vanish">Mensajes temporales</string>
     <string name="conversation_settings_preferences">Preferencias del chat</string>
+    <string name="conversation_settings_privacy_and_security">Privacidad y seguridad</string>
+    <string name="conversation_settings_hide">Ocultar</string>
     <string name="conversation_settings_preferences_desc">Notificaciones, vistas previas y privacidad</string>
     <string name="conversation_settings_storage_desc">Fotos y vídeos en caché en este dispositivo</string>
     <string name="conversation_settings_clear_media">Vaciar media en caché</string>
@@ -1681,6 +1683,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="conversation_settings_typing">Indicador de escritura</string>
     <string name="conversation_settings_forwarding">Permitir reenvío</string>
     <string name="conversation_settings_clear_conversation">Limpiar conversación</string>
+    <string name="conversation_settings_clear_conversation_group">Limpiar chat</string>
     <string name="conversation_settings_media_save_title">Guardar contenido</string>
     <string name="conversation_settings_media_save_success">El contenido se ha guardado correctamente en tu biblioteca.</string>
     <string name="conversation_settings_media_save_error">No se ha podido guardar este contenido.</string>
@@ -1777,6 +1780,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="chat_action_copy">Copiar</string>
     <string name="chat_action_delete_for_me">Eliminar para mí</string>
     <string name="chat_edited">editado</string>
+    <string name="chat_read_and_more">y %1$d más</string>
     <string name="chat_seen">Visto</string>
     <string name="chat_recovery_six_digits">6 dígitos</string>
     <string name="chat_vanish_swipe_release">Suelta para activar mensajes que desaparecen</string>
@@ -2339,8 +2343,11 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="conversation_settings_preview_desc">Muestra el texto del mensaje en las notificaciones y en la lista de conversaciones.</string>
     <string name="conversation_settings_read_receipts">Confirmación de lectura</string>
     <string name="conversation_settings_read_receipts_desc">Si desactivas el \'visto\' en este chat, no podrás ver cuándo la otra persona lee tus mensajes.</string>
+    <string name="conversation_settings_read_receipts_desc_group">Si desactivas el \'visto\' en este grupo, no podrás ver cuándo los demás leen tus mensajes.</string>
     <string name="conversation_settings_typing_desc">Si lo desactivas, tampoco verás cuándo la otra persona está escribiendo.</string>
+    <string name="conversation_settings_typing_desc_group">Si lo desactivas, tampoco verás cuándo los demás están escribiendo.</string>
     <string name="conversation_settings_forwarding_desc">Si lo desactivas, la otra persona no podrá reenviar ni copiar tus mensajes de texto en este chat.</string>
+    <string name="conversation_settings_forwarding_desc_group">Si lo desactivas, los demás no podrán reenviar ni copiar tus mensajes de texto en este grupo.</string>
     <string name="conversation_settings_created">Creada</string>
     <string name="conversation_settings_messages">Mensajes</string>
     <string name="conversation_settings_buzz">Zumbidos</string>

@@ -1465,6 +1465,8 @@
     <string name="conversation_settings_vanish_desc">Mesajlarının ve tepkilerinin sohbette ne kadar süre görünür kalacağına karar ver. Mesajları okunduktan ve sohbet kapatıldıktan hemen sonra kaybolacak şekilde ayarlayabilir ya da 7 güne kadar saklayabilirsin. Gizliliğin için biri ekran görüntüsü alır veya ekran kaydı yaparsa bildirim gönderilir.</string>
     <string name="conversation_settings_vanish">Kaybolan mesajlar</string>
     <string name="conversation_settings_preferences">Sohbet tercihleri</string>
+    <string name="conversation_settings_privacy_and_security">Gizlilik ve güvenlik</string>
+    <string name="conversation_settings_hide">Gizle</string>
     <string name="conversation_settings_preferences_desc">Bildirimler, önizlemeler ve gizlilik</string>
     <string name="conversation_settings_storage">Medya depolama</string>
     <string name="conversation_settings_storage_desc">Bu cihazdaki önbelleğe alınmış fotoğraf ve videolar</string>
@@ -1487,8 +1489,11 @@
     <string name="conversation_settings_buzz_desc">Bunu kapatırsan diğer kişiler bu sohbette sana dürtme gönderemez.</string>
     <string name="conversation_settings_preview_desc">Bildirimlerde ve sohbet listesinde mesaj metnini göster.</string>
     <string name="conversation_settings_read_receipts_desc">Bu sohbette okundu bilgisini kapatırsan diğer kişinin mesajlarını ne zaman okuduğunu göremezsin.</string>
+    <string name="conversation_settings_read_receipts_desc_group">Bu grupta okundu bilgisini kapatırsan diğerlerinin mesajlarını ne zaman okuduğunu göremezsin.</string>
     <string name="conversation_settings_typing_desc">Bunu kapatırsan diğer kişinin ne zaman yazdığını da göremezsin.</string>
+    <string name="conversation_settings_typing_desc_group">Bunu kapatırsan diğerlerinin ne zaman yazdığını da göremezsin.</string>
     <string name="conversation_settings_forwarding_desc">Bunu kapatırsan diğer kişi bu sohbetteki yazılı mesajlarını iletemez veya kopyalayamaz.</string>
+    <string name="conversation_settings_forwarding_desc_group">Bunu kapatırsan diğerleri bu gruptaki yazılı mesajlarını iletemez veya kopyalayamaz.</string>
     <string name="conversation_settings_created">Oluşturuldu</string>
     <string name="conversation_settings_messages">Mesajlar</string>
     <string name="conversation_settings_buzz">Dürtmelere izin ver</string>
@@ -1498,6 +1503,7 @@
     <string name="conversation_settings_reply">Yanıtla</string>
     <string name="conversation_settings_send">Gönder</string>
     <string name="conversation_settings_clear_conversation">Sohbeti temizle</string>
+    <string name="conversation_settings_clear_conversation_group">Sohbeti temizle</string>
     <string name="conversation_settings_media_save_title">Medyayı kaydet</string>
     <string name="conversation_settings_media_save_success">Bu medya galerine kaydedildi.</string>
     <string name="conversation_settings_media_save_error">Bu medya kaydedilemedi.</string>
@@ -1671,6 +1677,7 @@
     <string name="chat_action_delete_for_me">Benden sil</string>
     <string name="chat_action_more_reactions">Diğer tepkiler</string>
     <string name="chat_edited">Düzenlendi</string>
+    <string name="chat_read_and_more">ve %1$d kişi daha</string>
     <string name="chat_seen">Görüldü</string>
     <string name="chat_recovery_loading">Sohbet güvenliği hazırlanıyor</string>
     <string name="chat_recovery_pin">Kurtarma PIN\'i</string>

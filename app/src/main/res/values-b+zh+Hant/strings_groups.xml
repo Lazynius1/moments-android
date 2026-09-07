@@ -50,11 +50,18 @@
     <string name="groups_invite_forbidden_one">%1$s 未開放群組邀請。</string>
     <string name="groups_invite_forbidden_many">%1$s 未開放群組邀請。</string>
     <string name="groups_invite_link">邀請連結</string>
+    <string name="groups_invitation">邀請</string>
+    <string name="groups_join_body">你受邀加入這個群組。</string>
     <string name="groups_link_body">任何擁有此連結的人都可以加入。新成員只能看到加入當下之後的訊息。更新或停用會使先前的連結失效。</string>
     <string name="groups_get_link">取得連結</string>
     <string name="groups_share_link">分享連結</string>
     <string name="groups_renew_link">更新連結</string>
     <string name="groups_disable_link">停用連結</string>
+    <string name="groups_edit">編輯群組</string>
+    <string name="groups_copy_link">複製連結</string>
+    <string name="groups_link_copied">已複製</string>
+    <string name="groups_renew_body">更新會建立新連結，先前的連結將失效。</string>
+    <string name="groups_disable_body">無法再透過此連結加入。之後可以再取得新連結。</string>
     <string name="groups_join_link">加入群組</string>
     <string name="groups_link_error">此連結無法使用、群組已滿，或無法載入聊天金鑰。請重試或向管理員索取新連結。</string>
     <string name="groups_notice_joined">%1$s已加入群組</string>
@@ -67,4 +74,8 @@
     <string name="groups_history_start">群組的開始</string>
     <string name="groups_history_start_joined">你只能看到加入之後的訊息。</string>
     <string name="groups_joined_on">於%1$s加入</string>
+    <string name="groups_you">你</string>
+    <string name="groups_following_section">追蹤中</string>
+    <string name="groups_others_section">其他</string>
+    <string name="groups_link_admin_only">只有管理員可以開啟邀請連結。</string>
 </resources>

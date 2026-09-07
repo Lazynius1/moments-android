@@ -97,14 +97,16 @@ class MessagingViewModel(
     }
 
     fun fetchConversations(userId: String) {
-        val cached = sortConversationsForInbox(LocalPersistenceService.loadConversations())
-        if (cached.isNotEmpty()) {
-            val active = reconcilingOptimisticReadState(cached.filterNot { it.isArchived(userId) }, userId)
-            val archived = reconcilingOptimisticReadState(cached.filter { it.isArchived(userId) }, userId)
-            conversations = active
-            archivedConversations = archived
-            hasUnreadMessages = (active + archived).any { it.isUnreadFor(userId) }
-            isLoading = false
+        if (conversations.isEmpty()) {
+            val cached = sortConversationsForInbox(LocalPersistenceService.loadConversations())
+            if (cached.isNotEmpty()) {
+                val active = reconcilingOptimisticReadState(cached.filterNot { it.isArchived(userId) }, userId)
+                val archived = reconcilingOptimisticReadState(cached.filter { it.isArchived(userId) }, userId)
+                conversations = active
+                archivedConversations = archived
+                hasUnreadMessages = (active + archived).any { it.isUnreadFor(userId) }
+                isLoading = false
+            }
         }
 
         ChatService.fetchConversations(userId) { result ->
@@ -118,8 +120,8 @@ class MessagingViewModel(
                     sortConversationsForInbox(filtered.filter { it.isArchived(userId) }),
                     userId,
                 )
-                conversations = active
-                archivedConversations = archived
+                conversations = applyingInboxSnapshot(conversations, active)
+                archivedConversations = applyingInboxSnapshot(archivedConversations, archived)
                 hasUnreadMessages = (active + archived).any { it.isUnreadFor(userId) }
                 errorMessage = null
                 isLoading = false
@@ -191,6 +193,23 @@ class MessagingViewModel(
         conversations = sortConversationsForInbox(conversations)
         archivedConversations = sortConversationsForInbox(archivedConversations)
         filteredConversations = sortConversationsForInbox(filteredConversations)
+    }
+
+    /** Misma fila por `id`. Conserva si no cambió; sustituye / inserta / quita el resto. */
+    private fun mergingInboxById(existing: List<Conversation>, incoming: List<Conversation>): List<Conversation> {
+        if (existing.isEmpty()) return incoming
+        val existingById = existing.mapNotNull { conversation ->
+            conversation.id?.takeIf { it.isNotEmpty() }?.let { it to conversation }
+        }.toMap()
+        return incoming.map { next ->
+            val previous = next.id?.let { existingById[it] }
+            if (previous != null && previous == next) previous else next
+        }
+    }
+
+    private fun applyingInboxSnapshot(existing: List<Conversation>, incoming: List<Conversation>): List<Conversation> {
+        val merged = mergingInboxById(existing, incoming)
+        return if (existing == merged) existing else merged
     }
 
     fun archivedUnreadCount(userId: String): Int =
@@ -700,7 +719,6 @@ class MessagingViewModel(
         searchJob?.cancel()
         userSearchJob?.cancel()
         targetWaitJob?.cancel()
-        ChatService.stopConversationsListener()
         super.onCleared()
     }
 }

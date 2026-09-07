@@ -123,6 +123,14 @@ object ChatService {
     /** Registro legacy + clave en `activeListeners` (`conversations_{uid}`). */
     private var groupConversationsListener: com.google.firebase.firestore.ListenerRegistration? = null
     private var conversationsListener: com.google.firebase.firestore.ListenerRegistration? = null
+    private var inboxUserId: String? = null
+    private var inboxOnUpdate: ((Result<List<Conversation>>) -> Unit)? = null
+    private var lastPublishedInbox: List<Conversation>? = null
+    private var hasDirectInbox = false
+    private var hasGroupInbox = false
+    private var directInbox = emptyList<Conversation>()
+    private var groupInbox = emptyList<Conversation>()
+    private var groupInboxRevision = 0
 
     /** ≡ `ChatService.MessageHistoryPage`. */
     data class MessageHistoryPage(
@@ -1652,6 +1660,12 @@ object ChatService {
         userId: String,
         onUpdate: (Result<List<Conversation>>) -> Unit,
     ) {
+        inboxOnUpdate = onUpdate
+        if (inboxUserId == userId && conversationsListener != null && groupConversationsListener != null) {
+            lastPublishedInbox?.let { onUpdate(Result.success(it)) }
+            return
+        }
+
         val staleKeys = activeListeners.keys.filter {
             it.startsWith("conversations_") && it != "conversations_$userId"
         }
@@ -1665,20 +1679,23 @@ object ChatService {
         conversationsListener = null
 
         groupConversationsListener?.remove()
-        var directInbox = emptyList<Conversation>()
-        var groupInbox = emptyList<Conversation>()
-        var groupRevision = 0
-        fun publishInbox() {
-            if (FirebaseAuth.getInstance().currentUser?.uid != userId) return
-            val merged = (directInbox + groupInbox).sortedByDescending { it.timestamp }
-            archivedConversationIds = merged.filter { it.isArchived(userId) }.mapNotNull { it.id }.toSet()
-            LocalPersistenceService.saveConversations(merged, sync = true)
-            onUpdate(Result.success(merged))
-        }
+        inboxUserId = userId
+        hasDirectInbox = false
+        hasGroupInbox = false
+        directInbox = emptyList()
+        groupInbox = emptyList()
+        lastPublishedInbox = null
+        groupInboxRevision = 0
         groupConversationsListener = db.collection("groupConversations").whereArrayContains("participants", userId)
             .addSnapshotListener { snapshot, error ->
-                if (error != null || FirebaseAuth.getInstance().currentUser?.uid != userId) return@addSnapshotListener
-                val revision = ++groupRevision
+                if (FirebaseAuth.getInstance().currentUser?.uid != userId) return@addSnapshotListener
+                if (error != null) {
+                    groupInbox = emptyList()
+                    hasGroupInbox = true
+                    publishInbox()
+                    return@addSnapshotListener
+                }
+                val revision = ++groupInboxRevision
                 com.moments.android.views.messaging.groups.GroupDirectory.groups.value = snapshot?.documents.orEmpty()
                     .map(com.moments.android.views.messaging.groups.GroupConversation::from).associateBy { it.id }
                 scope.launch {
@@ -1697,7 +1714,13 @@ object ChatService {
                         }
                     }
                     val hydrated = hydrateConversationPreviews(parsed)
-                    withContext(Dispatchers.Main) { if (revision == groupRevision) { groupInbox = hydrated; publishInbox() } }
+                    withContext(Dispatchers.Main) {
+                        if (revision == groupInboxRevision) {
+                            groupInbox = hydrated
+                            hasGroupInbox = true
+                            publishInbox()
+                        }
+                    }
                 }
             }
         val listener = db.collection("conversations")
@@ -1708,9 +1731,11 @@ object ChatService {
                     if (error != null) {
                         withContext(Dispatchers.Main) {
                             if (FirebaseAuth.getInstance().currentUser == null) {
-                                onUpdate(Result.success(emptyList()))
+                                inboxOnUpdate?.invoke(Result.success(emptyList()))
                             } else {
-                                onUpdate(Result.failure(error))
+                                directInbox = emptyList()
+                                hasDirectInbox = true
+                                publishInbox()
                             }
                         }
                         return@launch
@@ -1766,6 +1791,7 @@ object ChatService {
                     val hydrated = hydrateConversationPreviews(conversations)
                     withContext(Dispatchers.Main) {
                         directInbox = hydrated
+                        hasDirectInbox = true
                         publishInbox()
                     }
                 }
@@ -1780,10 +1806,28 @@ object ChatService {
         groupConversationsListener = null
         conversationsListener?.remove()
         conversationsListener = null
-        val keys = activeListeners.keys.filter { it.startsWith("conversations_") }
+        val keys = activeListeners.keys.filter { it.startsWith("conversations_") || it.startsWith("group_conversations_") }
         for (key in keys) {
             activeListeners.remove(key)?.remove()
         }
+        inboxUserId = null
+        inboxOnUpdate = null
+        lastPublishedInbox = null
+        hasDirectInbox = false
+        hasGroupInbox = false
+        directInbox = emptyList()
+        groupInbox = emptyList()
+    }
+
+    private fun publishInbox() {
+        val userId = inboxUserId ?: return
+        if (FirebaseAuth.getInstance().currentUser?.uid != userId) return
+        if (!hasDirectInbox || !hasGroupInbox) return
+        val merged = (directInbox + groupInbox).sortedByDescending { it.timestamp }
+        archivedConversationIds = merged.filter { it.isArchived(userId) }.mapNotNull { it.id }.toSet()
+        lastPublishedInbox = merged
+        LocalPersistenceService.saveConversations(merged, sync = true)
+        inboxOnUpdate?.invoke(Result.success(merged))
     }
 
     // MARK: - Inbox preview hydration (≡ hydrateConversationPreviews / resolveLatest…)

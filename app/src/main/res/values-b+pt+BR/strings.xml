@@ -1073,6 +1073,8 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="conversation_settings_vanish_desc">Escolha por quanto tempo suas mensagens e reações permanecem visíveis no chat. Você pode fazer com que elas desapareçam logo após serem lidas e fechar a conversa, ou mantê-las por até 7 dias. Para sua privacidade, um alerta será enviado no chat se alguém tirar print ou gravar a tela.</string>
     <string name="conversation_settings_vanish">Mensagens temporárias</string>
     <string name="conversation_settings_preferences">Preferências do chat</string>
+    <string name="conversation_settings_privacy_and_security">Privacidade e segurança</string>
+    <string name="conversation_settings_hide">Ocultar</string>
     <string name="conversation_settings_preferences_desc">Notificações, prévias e privacidade</string>
     <string name="conversation_settings_storage_desc">Fotos e vídeos em cache neste dispositivo</string>
     <string name="conversation_settings_clear_media">Limpar mídia em cache</string>
@@ -1083,6 +1085,7 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="conversation_settings_typing">Indicador de digitação</string>
     <string name="conversation_settings_forwarding">Permitir encaminhamento</string>
     <string name="conversation_settings_clear_conversation">Limpar conversa</string>
+    <string name="conversation_settings_clear_conversation_group">Limpar chat</string>
     <string name="conversation_settings_media_save_title">Salvar mídia</string>
     <string name="conversation_settings_media_save_success">Esta mídia foi salva na sua biblioteca.</string>
     <string name="conversation_settings_media_save_error">Não foi possível salvar esta mídia.</string>
@@ -1183,6 +1186,7 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="chat_reply_replied_to">%1$s respondeu</string>
     <string name="chat_error">Erro</string>
     <string name="chat_edited">editado</string>
+    <string name="chat_read_and_more">e mais %1$d</string>
     <string name="chat_seen">Visto</string>
     <string name="chat_recovery_six_digits">6 dígitos</string>
     <string name="chat_vanish_swipe_release">Solte para ativar mensagens que desaparecem</string>
@@ -1875,8 +1879,11 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="conversation_settings_preview_desc">Mostra o texto da mensagem nas notificações e na lista de conversas.</string>
     <string name="conversation_settings_read_receipts">Confirmações de leitura</string>
     <string name="conversation_settings_read_receipts_desc">Se você desativar as confirmações de leitura neste chat, também não poderá ver quando a outra pessoa ler suas mensagens.</string>
+    <string name="conversation_settings_read_receipts_desc_group">Se você desativar as confirmações de leitura neste grupo, não poderá ver quando os outros lerem suas mensagens.</string>
     <string name="conversation_settings_typing_desc">Se você desativar isso, também deixará de ver quando a outra pessoa estiver digitando.</string>
+    <string name="conversation_settings_typing_desc_group">Se você desativar isso, também deixará de ver quando outras pessoas estiverem digitando.</string>
     <string name="conversation_settings_forwarding_desc">Se você desativar isso, a outra pessoa não poderá encaminhar nem copiar suas mensagens de texto neste chat.</string>
+    <string name="conversation_settings_forwarding_desc_group">Se você desativar isso, os outros não poderão encaminhar nem copiar suas mensagens de texto neste grupo.</string>
     <string name="conversation_settings_created">Criada</string>
     <string name="conversation_settings_messages">Mensagens</string>
     <string name="conversation_settings_buzz">Chacoalhões</string>

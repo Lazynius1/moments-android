@@ -1465,6 +1465,8 @@
     <string name="conversation_settings_vanish_desc">Zdecyduj, jak długo Twoje wiadomości i reakcje mają być widoczne na czacie. Możesz ustawić ich znikanie zaraz po odczytaniu i zamknięciu czatu albo przechowywać je nawet przez 7 dni. Dla Twojej prywatności pojawi się powiadomienie, jeśli ktoś zrobi zrzut ekranu lub nagra ekran.</string>
     <string name="conversation_settings_vanish">Znikające wiadomości</string>
     <string name="conversation_settings_preferences">Preferencje czatu</string>
+    <string name="conversation_settings_privacy_and_security">Prywatność i bezpieczeństwo</string>
+    <string name="conversation_settings_hide">Ukryj</string>
     <string name="conversation_settings_preferences_desc">Powiadomienia, podglądy i prywatność</string>
     <string name="conversation_settings_storage">Pamięć multimediów</string>
     <string name="conversation_settings_storage_desc">Buforowane zdjęcia i filmy na tym urządzeniu</string>
@@ -1487,8 +1489,11 @@
     <string name="conversation_settings_buzz_desc">Jeśli to wyłączysz, inni nie będą mogli Cię szturchnąć w tej rozmowie.</string>
     <string name="conversation_settings_preview_desc">Pokazuj treść wiadomości w powiadomieniach i na liście rozmów.</string>
     <string name="conversation_settings_read_receipts_desc">Jeśli wyłączysz potwierdzenia odczytu w tej rozmowie, nie zobaczysz, kiedy druga osoba przeczyta Twoje wiadomości.</string>
+    <string name="conversation_settings_read_receipts_desc_group">Jeśli wyłączysz potwierdzenia odczytu w tej grupie, nie zobaczysz, kiedy inni przeczytają Twoje wiadomości.</string>
     <string name="conversation_settings_typing_desc">Jeśli to wyłączysz, nie zobaczysz też, kiedy druga osoba pisze.</string>
+    <string name="conversation_settings_typing_desc_group">Jeśli to wyłączysz, nie zobaczysz też, kiedy inni piszą.</string>
     <string name="conversation_settings_forwarding_desc">Jeśli to wyłączysz, druga osoba nie będzie mogła przekazywać dalej ani kopiować Twoich wiadomości tekstowych w tej rozmowie.</string>
+    <string name="conversation_settings_forwarding_desc_group">Jeśli to wyłączysz, inni nie będą mogli przekazywać dalej ani kopiować Twoich wiadomości tekstowych w tej grupie.</string>
     <string name="conversation_settings_created">Utworzono</string>
     <string name="conversation_settings_messages">Wiadomości</string>
     <string name="conversation_settings_buzz">Zezwalaj na szturchnięcia</string>
@@ -1498,6 +1503,7 @@
     <string name="conversation_settings_reply">Odpowiedz</string>
     <string name="conversation_settings_send">Wyślij</string>
     <string name="conversation_settings_clear_conversation">Wyczyść rozmowę</string>
+    <string name="conversation_settings_clear_conversation_group">Wyczyść czat</string>
     <string name="conversation_settings_media_save_title">Zapisz multimedia</string>
     <string name="conversation_settings_media_save_success">Multimedia zapisano w bibliotece.</string>
     <string name="conversation_settings_media_save_error">Nie udało się zapisać tych multimediów.</string>
@@ -1671,6 +1677,7 @@
     <string name="chat_action_delete_for_me">Usuń u mnie</string>
     <string name="chat_action_more_reactions">Więcej reakcji</string>
     <string name="chat_edited">Edytowano</string>
+    <string name="chat_read_and_more">i jeszcze %1$d</string>
     <string name="chat_seen">Wyświetlono</string>
     <string name="chat_recovery_loading">Przygotowywanie zabezpieczeń czatu</string>
     <string name="chat_recovery_pin">PIN odzyskiwania</string>

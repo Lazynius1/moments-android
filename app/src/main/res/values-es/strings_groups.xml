@@ -50,11 +50,18 @@
     <string name="groups_invite_forbidden_one">%1$s no permite invitaciones a grupos.</string>
     <string name="groups_invite_forbidden_many">%1$s no permiten invitaciones a grupos.</string>
     <string name="groups_invite_link">Enlace de invitación</string>
+    <string name="groups_invitation">Invitación</string>
+    <string name="groups_join_body">Te han invitado a unirte a este grupo.</string>
     <string name="groups_link_body">Cualquiera que tenga este enlace puede unirse. Los nuevos miembros solo ven los mensajes desde que entran. Renovarlo o desactivarlo invalida el enlace anterior.</string>
     <string name="groups_get_link">Obtener enlace</string>
     <string name="groups_share_link">Compartir enlace</string>
     <string name="groups_renew_link">Renovar enlace</string>
     <string name="groups_disable_link">Desactivar enlace</string>
+    <string name="groups_edit">Editar grupo</string>
+    <string name="groups_copy_link">Copiar enlace</string>
+    <string name="groups_link_copied">Copiado</string>
+    <string name="groups_renew_body">Renovar crea un enlace nuevo. El anterior dejará de funcionar.</string>
+    <string name="groups_disable_body">Nadie podrá unirse con este enlace. Más adelante puedes obtener uno nuevo.</string>
     <string name="groups_join_link">Unirme al grupo</string>
     <string name="groups_link_error">Este enlace no está disponible, el grupo está lleno o no se han podido cargar tus claves del chat. Inténtalo de nuevo o pide otro enlace a un admin.</string>
     <string name="groups_notice_joined">%1$s se ha unido al grupo</string>
@@ -67,4 +74,8 @@
     <string name="groups_history_start">Inicio del grupo</string>
     <string name="groups_history_start_joined">Puedes ver los mensajes desde que te uniste.</string>
     <string name="groups_joined_on">Se unió el %1$s</string>
+    <string name="groups_you">Tú</string>
+    <string name="groups_following_section">Siguiendo</string>
+    <string name="groups_others_section">Otros</string>
+    <string name="groups_link_admin_only">Solo los administradores pueden activar el enlace de invitación.</string>
 </resources>

@@ -50,11 +50,18 @@
     <string name="groups_invite_forbidden_one">%1$s erlaubt keine Gruppeneinladungen.</string>
     <string name="groups_invite_forbidden_many">%1$s erlauben keine Gruppeneinladungen.</string>
     <string name="groups_invite_link">Einladungslink</string>
+    <string name="groups_invitation">Einladung</string>
+    <string name="groups_join_body">Du wurdest zu dieser Gruppe eingeladen.</string>
     <string name="groups_link_body">Alle mit diesem Link können beitreten. Neue Mitglieder sehen nur Nachrichten ab dem Moment, in dem sie beitreten. Erneuern oder Deaktivieren macht den bisherigen Link ungültig.</string>
     <string name="groups_get_link">Link abrufen</string>
     <string name="groups_share_link">Link teilen</string>
     <string name="groups_renew_link">Link erneuern</string>
     <string name="groups_disable_link">Link deaktivieren</string>
+    <string name="groups_edit">Gruppe bearbeiten</string>
+    <string name="groups_copy_link">Link kopieren</string>
+    <string name="groups_link_copied">Kopiert</string>
+    <string name="groups_renew_body">Durch Erneuern wird ein neuer Link erstellt. Der bisherige funktioniert dann nicht mehr.</string>
+    <string name="groups_disable_body">Niemand kann mit diesem Link beitreten. Du kannst später einen neuen erstellen.</string>
     <string name="groups_join_link">Gruppe beitreten</string>
     <string name="groups_link_error">Dieser Link ist nicht verfügbar, die Gruppe ist voll oder deine Chatschlüssel konnten nicht geladen werden. Versuche es erneut oder bitte einen Admin um einen neuen Link.</string>
     <string name="groups_notice_joined">%1$s ist der Gruppe beigetreten</string>
@@ -67,4 +74,8 @@
     <string name="groups_history_start">Beginn der Gruppe</string>
     <string name="groups_history_start_joined">Du siehst Nachrichten ab dem Zeitpunkt, an dem du beigetreten bist.</string>
     <string name="groups_joined_on">Beigetreten %1$s</string>
+    <string name="groups_you">Du</string>
+    <string name="groups_following_section">Gefolgt</string>
+    <string name="groups_others_section">Andere</string>
+    <string name="groups_link_admin_only">Nur Admins können den Einladungslink aktivieren.</string>
 </resources>

@@ -1107,6 +1107,8 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="conversation_settings_vanish_desc">Bestimme, wie lange deine Nachrichten und Reaktionen im Chat sichtbar bleiben. Du kannst festlegen, dass sie direkt nach dem Lesen und Schließen des Chats verschwinden, oder sie bis zu 7 Tage lang behalten. Zum Schutz deiner Privatsphäre wird eine Benachrichtigung im Chat gesendet, wenn jemand einen Screenshot oder eine Bildschirmaufnahme macht.</string>
     <string name="conversation_settings_vanish">Verschwindende Nachrichten</string>
     <string name="conversation_settings_preferences">Chat-Einstellungen</string>
+    <string name="conversation_settings_privacy_and_security">Privatsphäre und Sicherheit</string>
+    <string name="conversation_settings_hide">Ausblenden</string>
     <string name="conversation_settings_preferences_desc">Mitteilungen, Vorschauen und Privatsphäre</string>
     <string name="conversation_settings_storage_desc">Zwischengespeicherte Fotos und Videos auf diesem Gerät</string>
     <string name="conversation_settings_clear_media">Medien-Cache leeren</string>
@@ -1117,6 +1119,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="conversation_settings_typing">Tippanzeige</string>
     <string name="conversation_settings_forwarding">Weiterleitung erlauben</string>
     <string name="conversation_settings_clear_conversation">Unterhaltung leeren</string>
+    <string name="conversation_settings_clear_conversation_group">Chat leeren</string>
     <string name="conversation_settings_media_save_title">Medium speichern</string>
     <string name="conversation_settings_media_save_success">Dieses Medium wurde in deiner Mediathek gespeichert.</string>
     <string name="conversation_settings_media_save_error">Dieses Medium konnte nicht gespeichert werden.</string>
@@ -1218,6 +1221,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="chat_reply_replied_to">%1$s hat geantwortet</string>
     <string name="chat_error">Fehler</string>
     <string name="chat_edited">bearbeitet</string>
+    <string name="chat_read_and_more">und %1$d weitere</string>
     <string name="chat_seen">Gesehen</string>
     <string name="chat_recovery_six_digits">6 Ziffern</string>
     <string name="chat_vanish_swipe_release">Loslassen, um verschwindende Nachrichten zu aktivieren</string>
@@ -1902,8 +1906,11 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="conversation_settings_preview_desc">Zeigt den Nachrichtentext in Mitteilungen und der Konversationsliste an.</string>
     <string name="conversation_settings_read_receipts">Lesebestätigungen</string>
     <string name="conversation_settings_read_receipts_desc">Wenn du Lesebestätigungen in diesem Chat deaktivierst, kannst du nicht mehr sehen, wann die andere Person deine Nachrichten liest.</string>
+    <string name="conversation_settings_read_receipts_desc_group">Wenn du Lesebestätigungen in dieser Gruppe deaktivierst, kannst du nicht mehr sehen, wann andere deine Nachrichten lesen.</string>
     <string name="conversation_settings_typing_desc">Wenn du dies ausschaltest, siehst du auch nicht mehr, wenn die andere Person schreibt.</string>
+    <string name="conversation_settings_typing_desc_group">Wenn du dies ausschaltest, siehst du auch nicht mehr, wenn andere schreiben.</string>
     <string name="conversation_settings_forwarding_desc">Wenn du dies deaktivierst, kann die andere Person deine Textnachrichten in diesem Chat nicht weiterleiten oder kopieren.</string>
+    <string name="conversation_settings_forwarding_desc_group">Wenn du dies deaktivierst, können andere deine Textnachrichten in dieser Gruppe nicht weiterleiten oder kopieren.</string>
     <string name="conversation_settings_created">Erstellt</string>
     <string name="conversation_settings_messages">Nachrichten</string>
     <string name="conversation_settings_buzz">Anstupser</string>

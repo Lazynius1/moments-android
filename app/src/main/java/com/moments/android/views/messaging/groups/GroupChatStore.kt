@@ -272,17 +272,28 @@ private fun JSONObject?.skippedInvites(): List<GroupSkippedInvite> {
 internal data class GroupInviteLink(val groupId: String, val token: String, val secret: ByteArray) {
     companion object {
         fun parse(uri: android.net.Uri): GroupInviteLink? {
-            if (uri.scheme !in listOf("moments", "glowsy") || uri.host != "group") return null
-            val parts = uri.pathSegments
             val fragment = uri.fragment.orEmpty()
-            if (parts.size != 2 || !com.moments.android.services.messaging.GroupChatScope.isGroup(parts[0]) ||
-                !parts[1].matches(Regex("[a-f0-9]{64}")) || !fragment.matches(Regex("[a-f0-9]{64}"))) return null
-            return GroupInviteLink(parts[0], parts[1], fragment.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
+            if (!fragment.matches(Regex("[a-f0-9]{64}"))) return null
+            val parts = uri.pathSegments
+            val scheme = uri.scheme.orEmpty()
+            val host = uri.host.orEmpty().lowercase()
+            val pair = when {
+                scheme in listOf("moments", "glowsy") && host == "group" && parts.size == 2 ->
+                    parts[0] to parts[1]
+                scheme == "https" && host in setOf("momentsapp.app", "www.momentsapp.app") &&
+                    parts.size == 3 && parts[0] == "g" ->
+                    parts[1] to parts[2]
+                scheme == "https" && host.contains("cloudfunctions.net") &&
+                    parts.size >= 4 && parts[parts.size - 3] == "join" ->
+                    parts[parts.size - 2] to parts[parts.size - 1]
+                else -> null
+            } ?: return null
+            if (!com.moments.android.services.messaging.GroupChatScope.isGroup(pair.first) ||
+                !pair.second.matches(Regex("[a-f0-9]{64}"))) return null
+            return GroupInviteLink(pair.first, pair.second, fragment.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
         }
-        fun url(groupId: String, token: String, secret: ByteArray): String {
-            val project = FirebaseApp.getInstance().options.projectId ?: error("Missing project")
-            return "https://europe-southwest1-$project.cloudfunctions.net/manageGroup/join/$groupId/$token#${secret.joinToString("") { "%02x".format(it) }}"
-        }
+        fun url(groupId: String, token: String, secret: ByteArray): String =
+            "https://momentsapp.app/g/$groupId/$token#${secret.joinToString("") { "%02x".format(it) }}"
     }
 }
 internal object GroupLinkNavigation { val pending = MutableStateFlow<GroupInviteLink?>(null) }

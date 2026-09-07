@@ -50,11 +50,18 @@
     <string name="groups_invite_forbidden_one">%1$s nie zezwala na zaproszenia do grup.</string>
     <string name="groups_invite_forbidden_many">%1$s nie zezwalają na zaproszenia do grup.</string>
     <string name="groups_invite_link">Link z zaproszeniem</string>
+    <string name="groups_invitation">Zaproszenie</string>
+    <string name="groups_join_body">Zaproszono cię do tej grupy.</string>
     <string name="groups_link_body">Każdy, kto ma ten link, może dołączyć. Nowi członkowie widzą wiadomości dopiero od chwili dołączenia. Odnowienie lub wyłączenie unieważnia poprzedni link.</string>
     <string name="groups_get_link">Pobierz link</string>
     <string name="groups_share_link">Udostępnij link</string>
     <string name="groups_renew_link">Odnów link</string>
     <string name="groups_disable_link">Wyłącz link</string>
+    <string name="groups_edit">Edytuj grupę</string>
+    <string name="groups_copy_link">Kopiuj link</string>
+    <string name="groups_link_copied">Skopiowano</string>
+    <string name="groups_renew_body">Odnowienie tworzy nowy link. Poprzedni przestanie działać.</string>
+    <string name="groups_disable_body">Nikt nie będzie mógł dołączyć za pomocą tego linku. Później możesz utworzyć nowy.</string>
     <string name="groups_join_link">Dołącz do grupy</string>
     <string name="groups_link_error">Link jest niedostępny, grupa jest pełna lub nie udało się wczytać kluczy czatu. Spróbuj ponownie lub poproś administratora o nowy link.</string>
     <string name="groups_notice_joined">%1$s dołączył(a) do grupy</string>
@@ -67,4 +74,8 @@
     <string name="groups_history_start">Początek grupy</string>
     <string name="groups_history_start_joined">Widzisz wiadomości od momentu dołączenia.</string>
     <string name="groups_joined_on">Dołączył(a) %1$s</string>
+    <string name="groups_you">Ty</string>
+    <string name="groups_following_section">Obserwowane</string>
+    <string name="groups_others_section">Inni</string>
+    <string name="groups_link_admin_only">Tylko administratorzy mogą włączyć link z zaproszeniem.</string>
 </resources>

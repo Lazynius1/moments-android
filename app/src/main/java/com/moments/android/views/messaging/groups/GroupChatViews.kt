@@ -35,12 +35,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
+import com.moments.android.coordinators.AsyncProfileImageView
+import com.moments.android.views.feed.core.FeedProfileSheetRoute
+import com.moments.android.views.profile.core.sections.UserProfileZoomNavigationHost
+import com.moments.android.views.profile.core.sections.userProfileZoomSource
 import com.moments.android.models.OnlineStatus
+import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.messaging.OnlineStatusService
+import com.moments.android.services.privacy.FollowButtonState
+import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.utilities.MomentsFormat
+import com.moments.android.views.components.ModernFollowButton
+import com.moments.android.views.components.ModernFollowButtonStyle
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.core.PresenceDisplay
+import com.moments.android.views.shared.MomentsModalSheet
 import coil.compose.AsyncImage
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Date
@@ -108,6 +119,7 @@ private fun String.limitedGroupName(): String {
     detail: String = "",
     joinedAt: Date? = null,
     showsPresence: Boolean = false,
+    onProfileTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
@@ -122,13 +134,29 @@ private fun String.limitedGroupName(): String {
             onDispose { stop() }
         }
     }
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface.copy(alpha = .06f)), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Person, null)
-            if (member.image.isNotBlank()) AsyncImage(member.image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        }
+    Row(
+        modifier,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncProfileImageView(
+            userId = member.id,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .userProfileZoomSource(userId = member.id, cornerRadius = 24.dp)
+                .then(if (onProfileTap != null) Modifier.clickable(onClick = onProfileTap) else Modifier),
+        )
         Column(Modifier.weight(1f).padding(start = 14.dp)) {
-            Text(member.name, fontWeight = FontWeight.Medium, maxLines = 1)
+            Text(
+                member.name,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                modifier = if (onProfileTap != null) {
+                    Modifier.fillMaxWidth().clickable(onClick = onProfileTap)
+                } else {
+                    Modifier
+                },
+            )
             if (showsPresence) {
                 presence?.let { p ->
                     Row(
@@ -159,6 +187,95 @@ private fun groupPresenceColor(status: OnlineStatus): Color = when (status) {
     OnlineStatus.BUSY -> Color(0xFFFF3B30)
     OnlineStatus.OFFLINE, OnlineStatus.INVISIBLE -> Color(0xFF8E8E93)
 }
+
+@Composable
+private fun GroupMemberFollowButton(userId: String) {
+    var followState by remember(userId) { mutableStateOf(FollowButtonState.CAN_FOLLOW) }
+    var loading by remember(userId) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val firestore = remember { FirestoreService() }
+
+    LaunchedEffect(userId) {
+        FollowStateStore.state(userId)?.let { followState = it }
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return@LaunchedEffect
+        FollowStateStore.resolve(currentUserId, userId)?.let { followState = it }
+    }
+    DisposableEffect(userId) {
+        val listener: (String, FollowButtonState) -> Unit = { id, state ->
+            if (id == userId) followState = state
+        }
+        FollowStateStore.addListener(listener)
+        onDispose { FollowStateStore.removeListener(listener) }
+    }
+
+    ModernFollowButton(
+        state = followState,
+        isLoading = loading,
+        targetUserId = userId,
+        style = ModernFollowButtonStyle.COMPACT,
+        onClick = {
+            scope.launch {
+                val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
+                val previous = followState
+                val optimistic = when (previous) {
+                    FollowButtonState.FOLLOWING, FollowButtonState.MUTUALS -> FollowButtonState.CAN_FOLLOW
+                    FollowButtonState.CAN_REQUEST_FOLLOW -> FollowButtonState.REQUEST_PENDING_CANCELLABLE
+                    FollowButtonState.REQUEST_PENDING_CANCELLABLE -> FollowButtonState.CAN_REQUEST_FOLLOW
+                    FollowButtonState.CAN_FOLLOW -> FollowButtonState.FOLLOWING
+                    else -> previous
+                }
+                followState = optimistic
+                FollowStateStore.setState(optimistic, userId)
+                loading = true
+                val result = runCatching {
+                    when {
+                        previous.isFollowingOrMutual -> firestore.unfollowUser(currentUserId, userId)
+                        previous == FollowButtonState.REQUEST_PENDING_CANCELLABLE -> firestore.cancelFollowRequest(currentUserId, userId)
+                        else -> firestore.followUser(currentUserId, userId)
+                    }
+                }
+                loading = false
+                if (result.isFailure) {
+                    followState = previous
+                    FollowStateStore.setState(previous, userId)
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun GroupMemberLine(
+    member: GroupMember,
+    group: GroupConversation,
+    store: GroupChatStore,
+    admin: Boolean,
+    onRemove: (GroupMember) -> Unit,
+    onOpenProfile: (String) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var menu by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        GroupPersonRow(
+            member,
+            if (member.id == group.owner) g("owner") else if (member.id in group.admins) g("admin") else "",
+            joinedAt = group.joinedDate(member.id),
+            showsPresence = true,
+            onProfileTap = { onOpenProfile(member.id) },
+            modifier = Modifier.weight(1f),
+        )
+        if (member.id != store.uid) GroupMemberFollowButton(member.id)
+        if (admin && member.id != group.owner && member.id != store.uid) Box {
+            IconButton(onClick = { menu = true }, enabled = !store.busy) { Icon(Icons.Default.MoreHoriz, g("manage")) }
+            DropdownMenu(menu, { menu = false }) {
+                if (member.id !in group.admins) DropdownMenuItem(text = { Text(g("promote")) }, onClick = { menu = false; scope.launch { store.command("promote", group, member.id) } })
+                else if (store.uid == group.owner) DropdownMenuItem(text = { Text(g("demote")) }, onClick = { menu = false; scope.launch { store.command("demote", group, member.id) } })
+                if (member.id !in group.admins || store.uid == group.owner) DropdownMenuItem(text = { Text(g("remove")) }, onClick = { menu = false; onRemove(member) })
+            }
+        }
+    }
+}
+
 @Composable private fun GroupMemberPicker(store: GroupChatStore, group: GroupConversation?, onBack: () -> Unit, onSaved: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
@@ -226,110 +343,95 @@ private fun groupPresenceColor(status: OnlineStatus): Color = when (status) {
     }
 }
 
-@Composable private fun GroupDetailsView(store: GroupChatStore, onBack: () -> Unit, onAdd: () -> Unit, onLeft: () -> Unit) {
+@Composable private fun GroupDetailsView(store: GroupChatStore, onBack: () -> Unit, onAdd: () -> Unit, onOpenProfile: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val group = store.active
-    var name by remember { mutableStateOf(group?.name.orEmpty()) }
-    var leaving by remember { mutableStateOf(false) }
-    var shareURL by remember { mutableStateOf<String?>(null) }
-    val context = LocalContext.current
     var removing by remember { mutableStateOf<GroupMember?>(null) }
-    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        val bitmap = uri?.let { context.contentResolver.openInputStream(it)?.use(BitmapFactory::decodeStream) } ?: return@rememberLauncherForActivityResult
-        scope.launch { store.active?.let { store.setPhoto(bitmap, it) } }
+    var followEpoch by remember { mutableIntStateOf(0) }
+    val memberIds = group?.members?.map { it.id }.orEmpty()
+    DisposableEffect(memberIds) {
+        val listener: (String, FollowButtonState) -> Unit = { _, _ -> followEpoch++ }
+        FollowStateStore.addListener(listener)
+        onDispose { FollowStateStore.removeListener(listener) }
     }
-    GroupHeader(g("details"), onBack)
+    LaunchedEffect(memberIds) {
+        val active = store.active ?: return@LaunchedEffect
+        active.members.filter { it.id != store.uid }.forEach { FollowStateStore.resolve(store.uid, it.id) }
+        followEpoch++
+    }
+    val members = group?.members.orEmpty()
+    val you = remember(members, followEpoch, store.uid) { members.filter { it.id == store.uid } }
+    val rest = remember(members, followEpoch, store.uid) { members.filter { it.id != store.uid } }
+    val following = remember(rest, followEpoch) {
+        rest.filter { FollowStateStore.state(it.id)?.isFollowingOrMutual == true }.sortedBy { it.name.lowercase() }
+    }
+    val others = remember(rest, followEpoch) {
+        rest.filter { FollowStateStore.state(it.id)?.isFollowingOrMutual != true }.sortedBy { it.name.lowercase() }
+    }
+    GroupHeader(g("members"), onBack)
     if (group == null) { Text(g("unavailable"), Modifier.padding(20.dp)); return }
     val admin = store.uid in group.admins
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            GroupChatAvatar(
-                image = group.image,
-                size = 96.dp,
-                camera = admin,
-                onClick = if (admin) {
-                    { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
-                } else null,
-            )
+            GroupChatAvatar(image = group.image, size = 72.dp)
             Text(
                 group.name,
-                Modifier.fillMaxWidth().padding(top = 16.dp),
+                Modifier.fillMaxWidth().padding(top = 12.dp),
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
-                autoSize = TextAutoSize.StepBased(minFontSize = 16.sp, maxFontSize = 24.sp),
+                autoSize = TextAutoSize.StepBased(minFontSize = 16.sp, maxFontSize = 22.sp),
             )
             Text(stringResource(R.string.groups_member_count, group.members.size))
         } }
         if (admin) {
-            item { Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(name, { name = it.limitedGroupName() }, Modifier.weight(1f), label = { Text(g("name")) }, enabled = !store.busy, singleLine = true)
-                TextButton(onClick = { scope.launch { store.command("rename", group, name = name) } }, enabled = !store.busy && name.isNotBlank() && name != group.name) { Text(g("save")) }
-            } }
             item { TextButton(onClick = onAdd, enabled = group.members.size < 50 && !store.busy) { Icon(Icons.Default.PersonAdd, null); Spacer(Modifier.width(8.dp)); Text(g("add")) } }
         }
-        if (admin) item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(g("inviteLink"), style = MaterialTheme.typography.titleMedium)
-                Text(g("linkBody"), style = MaterialTheme.typography.bodySmall)
-                TextButton(enabled = !store.busy, onClick = { scope.launch { shareURL = store.invitationLink(group) } }) { Text(g("getLink")) }
-                shareURL?.let { url ->
-                    val title = g("shareLink")
-                    TextButton(enabled = !store.busy, onClick = {
-                        context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = "text/plain"; putExtra(android.content.Intent.EXTRA_TEXT, url)
-                        }, title))
-                    }) { Text(title) }
-                }
-                TextButton(enabled = !store.busy, onClick = { scope.launch { shareURL = store.invitationLink(group, renew = true) } }) { Text(g("renewLink")) }
-                TextButton(enabled = !store.busy, onClick = { scope.launch {
-                    if (store.command("revokeLink", group)) shareURL = null
-                } }) { Text(g("disableLink")) }
-            }
-        }
-        item { Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(g("mute"), Modifier.weight(1f))
-            Switch(store.uid in group.muted, { value -> scope.launch { store.command("mute", group, muted = value) } }, enabled = !store.busy)
-        } }
         if (admin && group.pendingNames.isNotEmpty()) {
             item { Text(g("pendingInvitations"), style = MaterialTheme.typography.titleMedium) }
             items(group.pendingNames.keys.sorted(), key = { "invite-$it" }) { id ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(group.pendingNames[id].orEmpty(), Modifier.weight(1f))
+                    GroupPersonRow(
+                        GroupMember(id, group.pendingNames[id].orEmpty(), ""),
+                        onProfileTap = { onOpenProfile(id) },
+                        modifier = Modifier.weight(1f),
+                    )
                     TextButton(enabled = !store.busy, onClick = { scope.launch { store.command("cancelInvite", group, memberId = id) } }) { Text(g("cancel")) }
                 }
             }
         }
         item { Text(g("members"), style = MaterialTheme.typography.titleMedium) }
-        items(group.members, key = { it.id }) { member ->
-            var menu by remember { mutableStateOf(false) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                GroupPersonRow(
-                    member,
-                    if (member.id == group.owner) g("owner") else if (member.id in group.admins) g("admin") else "",
-                    joinedAt = group.joinedDate(member.id),
-                    showsPresence = true,
-                    modifier = Modifier.weight(1f),
-                )
-                if (admin && member.id != group.owner && member.id != store.uid) Box {
-                    IconButton(onClick = { menu = true }, enabled = !store.busy) { Icon(Icons.Default.MoreHoriz, g("manage")) }
-                    DropdownMenu(menu, { menu = false }) {
-                        if (member.id !in group.admins) DropdownMenuItem(text = { Text(g("promote")) }, onClick = { menu = false; scope.launch { store.command("promote", group, member.id) } })
-                        else if (store.uid == group.owner) DropdownMenuItem(text = { Text(g("demote")) }, onClick = { menu = false; scope.launch { store.command("demote", group, member.id) } })
-                        if (member.id !in group.admins || store.uid == group.owner) DropdownMenuItem(text = { Text(g("remove")) }, onClick = { menu = false; removing = member })
-                    }
-                }
+        if (you.isNotEmpty()) {
+            item { Text(g("you"), style = MaterialTheme.typography.titleSmall, color = rememberAdaptiveColors().secondary) }
+            items(you, key = { it.id }) { member ->
+                GroupMemberLine(member, group, store, admin, { removing = it }, onOpenProfile)
             }
         }
-        item { TextButton(onClick = { leaving = true }, enabled = !store.busy) { Text(g("leave"), color = MaterialTheme.colorScheme.error) } }
+        if (following.isNotEmpty()) {
+            item { Text(g("followingSection"), style = MaterialTheme.typography.titleSmall, color = rememberAdaptiveColors().secondary) }
+            items(following, key = { it.id }) { member ->
+                GroupMemberLine(member, group, store, admin, { removing = it }, onOpenProfile)
+            }
+        }
+        if (others.isNotEmpty()) {
+            item { Text(g("othersSection"), style = MaterialTheme.typography.titleSmall, color = rememberAdaptiveColors().secondary) }
+            items(others, key = { it.id }) { member ->
+                GroupMemberLine(member, group, store, admin, { removing = it }, onOpenProfile)
+            }
+        }
     }
-    if (leaving || removing != null) AlertDialog(onDismissRequest = { leaving = false; removing = null }, title = { Text(g(if (leaving) "leave" else "remove")) }, text = { Text(g(if (leaving) "leaveBody" else "removeBody")) },
-        dismissButton = { TextButton(onClick = { leaving = false; removing = null }) { Text(g("cancel")) } },
-        confirmButton = { TextButton(onClick = {
-            val isLeaving = leaving; val member = removing
-            leaving = false; removing = null
-            scope.launch { if (store.command(if (isLeaving) "leave" else "remove", group, memberId = member?.id.orEmpty()) && isLeaving) onLeft() }
-        }) { Text(g(if (leaving) "leave" else "remove")) } })
+    removing?.let { member ->
+        AlertDialog(
+            onDismissRequest = { removing = null },
+            title = { Text(g("remove")) },
+            text = { Text(g("removeBody")) },
+            dismissButton = { TextButton(onClick = { removing = null }) { Text(g("cancel")) } },
+            confirmButton = { TextButton(onClick = {
+                removing = null
+                scope.launch { store.command("remove", group, memberId = member.id) }
+            }) { Text(g("remove")) } },
+        )
+    }
 }
 
 @Composable
@@ -347,18 +449,170 @@ fun NewGroupView(onBack: () -> Unit, onCreated: (com.moments.android.views.messa
     }
     GroupError(store)
 }
+
+@Composable
+fun GroupEditView(groupId: String, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val store = remember { GroupChatStore(scope) }
+    val group = store.active
+    var name by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val bitmap = uri?.let { context.contentResolver.openInputStream(it)?.use(BitmapFactory::decodeStream) } ?: return@rememberLauncherForActivityResult
+        scope.launch { store.active?.let { store.setPhoto(bitmap, it) } }
+    }
+    DisposableEffect(groupId) { store.open(groupId); onDispose { store.stop() } }
+    LaunchedEffect(group?.name) {
+        if (name.isBlank()) name = group?.name.orEmpty()
+    }
+    BackHandler(onBack = onBack)
+    Column(Modifier.fillMaxSize().background(rememberAdaptiveColors().surfaceBackground).statusBarsPadding().navigationBarsPadding().imePadding()) {
+        GroupHeader(g("edit"), onBack)
+        if (group == null) {
+            Text(g("unavailable"), Modifier.padding(20.dp))
+        } else {
+            Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                GroupChatAvatar(
+                    image = group.image,
+                    size = 96.dp,
+                    camera = true,
+                    onClick = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                )
+                OutlinedTextField(name, { name = it.limitedGroupName() }, Modifier.fillMaxWidth(), label = { Text(g("name")) }, enabled = !store.busy, singleLine = true)
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            val trimmed = name.trim()
+                            if (trimmed.isNotBlank() && trimmed != group.name) store.command("rename", group, name = trimmed)
+                            onBack()
+                        }
+                    },
+                    enabled = name.isNotBlank() && !store.busy,
+                ) { Text(g("save")) }
+            }
+        }
+    }
+    GroupError(store)
+}
+
+@Composable
+fun GroupInviteLinkManageView(groupId: String, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val store = remember { GroupChatStore(scope) }
+    val group = store.active
+    var shareURL by remember { mutableStateOf<String?>(null) }
+    var copied by remember { mutableStateOf(false) }
+    var confirmRenew by remember { mutableStateOf(false) }
+    var confirmDisable by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    DisposableEffect(groupId) { store.open(groupId); onDispose { store.stop() } }
+    LaunchedEffect(group?.id) {
+        if (group != null && shareURL == null) shareURL = store.invitationLink(group)
+    }
+    val colors = rememberAdaptiveColors()
+    val inviteLinkLabel = g("inviteLink")
+    val shareLinkLabel = g("shareLink")
+    BackHandler(onBack = onBack)
+    Column(Modifier.fillMaxSize().background(colors.surfaceBackground).statusBarsPadding().navigationBarsPadding().imePadding()) {
+        GroupHeader(inviteLinkLabel, onBack)
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(g("linkBody"), style = MaterialTheme.typography.bodySmall, color = colors.secondary)
+            shareURL?.let { url ->
+                Text(
+                    url,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                        .padding(14.dp),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(onClick = {
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(inviteLinkLabel, url))
+                        copied = true
+                    }) {
+                        Icon(if (copied) Icons.Default.Check else Icons.Default.ContentCopy, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (copied) g("linkCopied") else g("copyLink"))
+                    }
+                    TextButton(onClick = {
+                        context.startActivity(
+                            android.content.Intent.createChooser(
+                                android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(android.content.Intent.EXTRA_TEXT, url)
+                                },
+                                shareLinkLabel,
+                            ),
+                        )
+                    }) {
+                        Icon(Icons.Default.Share, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(g("shareLink"))
+                    }
+                }
+                HorizontalDivider()
+                TextButton(enabled = !store.busy, onClick = { confirmRenew = true }) { Text(g("renewLink")) }
+                TextButton(enabled = !store.busy, onClick = { confirmDisable = true }) { Text(g("disableLink"), color = MaterialTheme.colorScheme.error) }
+            } ?: run {
+                if (store.busy || group != null) LinearProgressIndicator(Modifier.fillMaxWidth())
+                else TextButton(onClick = { scope.launch { shareURL = store.active?.let { store.invitationLink(it) } } }) { Text(g("getLink")) }
+            }
+        }
+    }
+    if (confirmRenew) AlertDialog(
+        onDismissRequest = { confirmRenew = false },
+        title = { Text(g("renewLink")) },
+        text = { Text(g("renewBody")) },
+        dismissButton = { TextButton(onClick = { confirmRenew = false }) { Text(g("cancel")) } },
+        confirmButton = { TextButton(onClick = {
+            confirmRenew = false
+            scope.launch { shareURL = store.active?.let { store.invitationLink(it, renew = true) } }
+        }) { Text(g("renewLink")) } },
+    )
+    if (confirmDisable) AlertDialog(
+        onDismissRequest = { confirmDisable = false },
+        title = { Text(g("disableLink")) },
+        text = { Text(g("disableBody")) },
+        dismissButton = { TextButton(onClick = { confirmDisable = false }) { Text(g("cancel")) } },
+        confirmButton = { TextButton(onClick = {
+            confirmDisable = false
+            scope.launch {
+                val active = store.active ?: return@launch
+                if (store.command("revokeLink", active)) shareURL = null
+            }
+        }) { Text(g("disableLink")) } },
+    )
+    GroupError(store)
+}
+
 @Composable
 fun GroupManagementView(groupId: String, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val store = remember { GroupChatStore(scope) }
     var adding by remember { mutableStateOf(false) }
+    var profileRoute by remember { mutableStateOf<FeedProfileSheetRoute?>(null) }
     DisposableEffect(groupId) { store.open(groupId); onDispose { store.stop() } }
-    BackHandler { if (adding) adding = false else onBack() }
-    Column(Modifier.fillMaxSize().background(rememberAdaptiveColors().surfaceBackground).statusBarsPadding().navigationBarsPadding().imePadding()) {
-        if (adding) GroupMemberPicker(store, store.active, { adding = false }) { adding = false }
-        else GroupDetailsView(store, onBack, { adding = true }, onBack)
+    UserProfileZoomNavigationHost(
+        profileRoute = profileRoute,
+        onProfileRouteChange = { profileRoute = it },
+        modifier = Modifier.fillMaxSize(),
+    ) { profileOpen ->
+        BackHandler {
+            when {
+                profileOpen -> profileRoute = null
+                adding -> adding = false
+                else -> onBack()
+            }
+        }
+        Column(Modifier.fillMaxSize().background(rememberAdaptiveColors().surfaceBackground).statusBarsPadding().navigationBarsPadding().imePadding()) {
+            if (adding) GroupMemberPicker(store, store.active, { adding = false }) { adding = false }
+            else GroupDetailsView(store, onBack, { adding = true }) { profileRoute = FeedProfileSheetRoute(it) }
+        }
+        GroupError(store)
     }
-    GroupError(store)
 }
 @Composable private fun GroupError(store: GroupChatStore) {
     val skipped = skippedNames(store.skippedInvites, store.candidates)
@@ -444,22 +698,59 @@ internal fun GroupJoinLinkDialog(link: GroupInviteLink, onDismiss: () -> Unit, o
     val store = remember(link.groupId, link.token) { GroupChatStore(scope) }
     var name by remember(link.groupId, link.token) { mutableStateOf<String?>(null) }
     var image by remember(link.groupId, link.token) { mutableStateOf("") }
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize()) {
-            com.moments.android.views.messaging.components.ChatRecoveryGateView(onCancel = onDismiss) {
-                Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically)) {
-                    GroupChatAvatar(image = image, size = 88.dp)
-                    Text(name ?: g("inviteLink"), style = MaterialTheme.typography.headlineSmall)
-                    if (name != null) {
-                        Text(g("linkBody"))
-                        Button(enabled = !store.busy, onClick = { scope.launch { if (store.joinLink(link)) onJoined() } }) { Text(g("joinLink")) }
-                    } else if (store.error == null) CircularProgressIndicator()
-                    else Text(g("linkError"))
-                    TextButton(onClick = onDismiss) { Text(g("cancel")) }
+    val colors = rememberAdaptiveColors()
+    MomentsModalSheet(onDismissRequest = onDismiss, largeOnly = false) { _ ->
+        com.moments.android.views.messaging.components.ChatRecoveryGateView(onCancel = onDismiss) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Spacer(Modifier.height(20.dp))
+                GroupChatAvatar(image = image, size = 104.dp)
+                Spacer(Modifier.height(14.dp))
+                val groupName = name
+                if (groupName != null) {
+                    Text(
+                        groupName,
+                        color = colors.primary,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        g("joinBody"),
+                        color = colors.secondary,
+                        fontSize = 15.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                } else if (store.error == null) {
+                    CircularProgressIndicator(Modifier.padding(top = 12.dp), color = colors.primary)
+                } else {
+                    Text(g("linkError"), color = colors.secondary, fontSize = 15.sp, textAlign = TextAlign.Center)
                 }
-                LaunchedEffect(link.groupId, link.token) {
-                    store.previewLink(link)?.let { name = it.first; image = it.second }
+                Spacer(Modifier.height(28.dp))
+                Button(
+                    onClick = { scope.launch { if (store.joinLink(link)) onJoined() } },
+                    enabled = !store.busy && name != null,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.primary,
+                        contentColor = colors.surfaceBackground,
+                        disabledContainerColor = colors.primary.copy(alpha = 0.35f),
+                        disabledContentColor = colors.surfaceBackground,
+                    ),
+                ) {
+                    Text(g("joinLink"), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                 }
+            }
+            LaunchedEffect(link.groupId, link.token) {
+                store.previewLink(link)?.let { name = it.first; image = it.second }
             }
         }
     }

@@ -50,11 +50,18 @@
     <string name="groups_invite_forbidden_one">%1$s staat geen groepsuitnodigingen toe.</string>
     <string name="groups_invite_forbidden_many">%1$s staan geen groepsuitnodigingen toe.</string>
     <string name="groups_invite_link">Uitnodigingslink</string>
+    <string name="groups_invitation">Uitnodiging</string>
+    <string name="groups_join_body">Je bent uitgenodigd om lid te worden van deze groep.</string>
     <string name="groups_link_body">Iedereen met deze link kan deelnemen. Nieuwe leden zien alleen berichten vanaf het moment dat ze lid worden. Vernieuwen of uitschakelen maakt de vorige link ongeldig.</string>
     <string name="groups_get_link">Link ophalen</string>
     <string name="groups_share_link">Link delen</string>
     <string name="groups_renew_link">Link vernieuwen</string>
     <string name="groups_disable_link">Link uitschakelen</string>
+    <string name="groups_edit">Groep bewerken</string>
+    <string name="groups_copy_link">Link kopiëren</string>
+    <string name="groups_link_copied">Gekopieerd</string>
+    <string name="groups_renew_body">Vernieuwen maakt een nieuwe link. De vorige werkt dan niet meer.</string>
+    <string name="groups_disable_body">Niemand kan met deze link deelnemen. Je kunt later een nieuwe ophalen.</string>
     <string name="groups_join_link">Deelnemen aan groep</string>
     <string name="groups_link_error">Deze link is niet beschikbaar, de groep is vol of je chatsleutels konden niet worden geladen. Probeer opnieuw of vraag een beheerder om een nieuwe link.</string>
     <string name="groups_notice_joined">%1$s is lid geworden van de groep</string>
@@ -67,4 +74,8 @@
     <string name="groups_history_start">Begin van de groep</string>
     <string name="groups_history_start_joined">Je ziet berichten vanaf het moment dat je lid werd.</string>
     <string name="groups_joined_on">Lid sinds %1$s</string>
+    <string name="groups_you">Jij</string>
+    <string name="groups_following_section">Volgend</string>
+    <string name="groups_others_section">Anderen</string>
+    <string name="groups_link_admin_only">Alleen beheerders kunnen de uitnodigingslink inschakelen.</string>
 </resources>

@@ -50,11 +50,18 @@
     <string name="groups_invite_forbidden_one">%1$s non consente inviti ai gruppi.</string>
     <string name="groups_invite_forbidden_many">%1$s non consentono inviti ai gruppi.</string>
     <string name="groups_invite_link">Link di invito</string>
+    <string name="groups_invitation">Invito</string>
+    <string name="groups_join_body">Sei stato invitato a unirti a questo gruppo.</string>
     <string name="groups_link_body">Chiunque abbia questo link può unirsi. I nuovi membri vedono i messaggi solo da quando entrano. Rinnovarlo o disattivarlo invalida il link precedente.</string>
     <string name="groups_get_link">Ottieni link</string>
     <string name="groups_share_link">Condividi link</string>
     <string name="groups_renew_link">Rinnova link</string>
     <string name="groups_disable_link">Disattiva link</string>
+    <string name="groups_edit">Modifica gruppo</string>
+    <string name="groups_copy_link">Copia link</string>
+    <string name="groups_link_copied">Copiato</string>
+    <string name="groups_renew_body">Il rinnovo crea un nuovo link. Quello precedente non funzionerà più.</string>
+    <string name="groups_disable_body">Nessuno potrà unirsi con questo link. Potrai ottenerne uno nuovo in seguito.</string>
     <string name="groups_join_link">Unisciti al gruppo</string>
     <string name="groups_link_error">Il link non è disponibile, il gruppo è pieno o non è stato possibile caricare le chiavi della chat. Riprova o chiedi un nuovo link a un admin.</string>
     <string name="groups_notice_joined">%1$s si è unito al gruppo</string>
@@ -67,4 +74,8 @@
     <string name="groups_history_start">Inizio del gruppo</string>
     <string name="groups_history_start_joined">Puoi vedere i messaggi da quando sei entrato.</string>
     <string name="groups_joined_on">Entrato il %1$s</string>
+    <string name="groups_you">Tu</string>
+    <string name="groups_following_section">Seguiti</string>
+    <string name="groups_others_section">Altri</string>
+    <string name="groups_link_admin_only">Solo gli admin possono attivare il link di invito.</string>
 </resources>

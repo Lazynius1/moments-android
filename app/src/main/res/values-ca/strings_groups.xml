@@ -50,11 +50,18 @@
     <string name="groups_invite_forbidden_one">%1$s no permet invitacions a grups.</string>
     <string name="groups_invite_forbidden_many">%1$s no permeten invitacions a grups.</string>
     <string name="groups_invite_link">Enllaç d’invitació</string>
+    <string name="groups_invitation">Invitació</string>
+    <string name="groups_join_body">T’han convidat a unir-te a aquest grup.</string>
     <string name="groups_link_body">Qualsevol persona amb aquest enllaç pot unir-se. Els membres nous només veuen els missatges des que entren. Renovar-lo o desactivar-lo invalida l’enllaç anterior.</string>
     <string name="groups_get_link">Obtenir enllaç</string>
     <string name="groups_share_link">Compartir enllaç</string>
     <string name="groups_renew_link">Renovar enllaç</string>
     <string name="groups_disable_link">Desactivar enllaç</string>
+    <string name="groups_edit">Editar grup</string>
+    <string name="groups_copy_link">Copiar enllaç</string>
+    <string name="groups_link_copied">Copiat</string>
+    <string name="groups_renew_body">Renovar crea un enllaç nou. L’anterior deixarà de funcionar.</string>
+    <string name="groups_disable_body">Ningú no podrà unir-se amb aquest enllaç. Més endavant en pots obtenir un de nou.</string>
     <string name="groups_join_link">Unir-me al grup</string>
     <string name="groups_link_error">L’enllaç no està disponible, el grup és ple o no s’han pogut carregar les claus del xat. Torna-ho a provar o demana un enllaç nou a un admin.</string>
     <string name="groups_notice_joined">%1$s s’ha unit al grup</string>
@@ -67,4 +74,8 @@
     <string name="groups_history_start">Inici del grup</string>
     <string name="groups_history_start_joined">Pots veure els missatges des que t’hi has unit.</string>
     <string name="groups_joined_on">S’hi va unir el %1$s</string>
+    <string name="groups_you">Tu</string>
+    <string name="groups_following_section">Seguint</string>
+    <string name="groups_others_section">Altres</string>
+    <string name="groups_link_admin_only">Només els administradors poden activar l’enllaç d’invitació.</string>
 </resources>

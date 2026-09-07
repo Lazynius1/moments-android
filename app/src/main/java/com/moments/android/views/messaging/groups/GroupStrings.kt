@@ -54,11 +54,18 @@ internal fun groupStringId(key: String): Int = when (key) {
     "inviteForbiddenOne" -> R.string.groups_invite_forbidden_one
     "inviteForbiddenMany" -> R.string.groups_invite_forbidden_many
     "inviteLink" -> R.string.groups_invite_link
+    "invitation" -> R.string.groups_invitation
+    "joinBody" -> R.string.groups_join_body
     "linkBody" -> R.string.groups_link_body
     "getLink" -> R.string.groups_get_link
     "shareLink" -> R.string.groups_share_link
     "renewLink" -> R.string.groups_renew_link
     "disableLink" -> R.string.groups_disable_link
+    "edit" -> R.string.groups_edit
+    "copyLink" -> R.string.groups_copy_link
+    "linkCopied" -> R.string.groups_link_copied
+    "renewBody" -> R.string.groups_renew_body
+    "disableBody" -> R.string.groups_disable_body
     "joinLink" -> R.string.groups_join_link
     "linkError" -> R.string.groups_link_error
     "notice.joined" -> R.string.groups_notice_joined
@@ -69,5 +76,9 @@ internal fun groupStringId(key: String): Int = when (key) {
     "intro.encrypted" -> R.string.groups_intro_encrypted
     "historyStart" -> R.string.groups_history_start
     "historyStartJoined" -> R.string.groups_history_start_joined
+    "you" -> R.string.groups_you
+    "followingSection" -> R.string.groups_following_section
+    "othersSection" -> R.string.groups_others_section
+    "linkAdminOnly" -> R.string.groups_link_admin_only
     else -> R.string.groups_error
 }

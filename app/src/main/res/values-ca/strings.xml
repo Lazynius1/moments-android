@@ -1107,6 +1107,8 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="conversation_settings_vanish_desc">Tria quant de temps romanen visibles els teus missatges i reaccions al xat. Pots fer que desapareguin just després de llegir-se i tancar la conversa, o conservar-los fins a 7 dies. Per la teva privacitat, s\'enviarà una notificació al xat si algú fa una captura o grava la pantalla.</string>
     <string name="conversation_settings_vanish">Missatges temporals</string>
     <string name="conversation_settings_preferences">Preferències del xat</string>
+    <string name="conversation_settings_privacy_and_security">Privacitat i seguretat</string>
+    <string name="conversation_settings_hide">Amaga</string>
     <string name="conversation_settings_preferences_desc">Notificacions, vistes prèvies i privacitat</string>
     <string name="conversation_settings_storage_desc">Fotos i vídeos en memòria cau en aquest dispositiu</string>
     <string name="conversation_settings_clear_media">Buida la memòria cau</string>
@@ -1117,6 +1119,7 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="conversation_settings_typing">Indicador d\'escriptura</string>
     <string name="conversation_settings_forwarding">Permetre reenviament</string>
     <string name="conversation_settings_clear_conversation">Netejar conversa</string>
+    <string name="conversation_settings_clear_conversation_group">Netejar el xat</string>
     <string name="conversation_settings_media_save_title">Desar contingut</string>
     <string name="conversation_settings_media_save_success">Aquest contingut s\'ha desat correctament a la teva biblioteca.</string>
     <string name="conversation_settings_media_save_error">No s\'ha pogut desar aquest contingut.</string>
@@ -1217,6 +1220,7 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="chat_reply_replied_to">%1$s ha respost</string>
     <string name="chat_error">Error</string>
     <string name="chat_edited">editat</string>
+    <string name="chat_read_and_more">i %1$d més</string>
     <string name="chat_seen">Vist</string>
     <string name="chat_recovery_six_digits">6 dígits</string>
     <string name="chat_vanish_swipe_release">Deixa anar per activar missatges que desapareixen</string>
@@ -1901,8 +1905,11 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="conversation_settings_preview_desc">Mostra el text del missatge a les notificacions i a la llista de converses.</string>
     <string name="conversation_settings_read_receipts">Confirmació de lectura</string>
     <string name="conversation_settings_read_receipts_desc">Si desactives el \'vist\' en aquest xat, no podràs veure quan l\'altra persona llegeix els teus missatges.</string>
+    <string name="conversation_settings_read_receipts_desc_group">Si desactives el \'vist\' en aquest grup, no podràs veure quan els altres llegeixen els teus missatges.</string>
     <string name="conversation_settings_typing_desc">Si ho desactives, tampoc veuràs quan l\'altra persona està escrivint.</string>
+    <string name="conversation_settings_typing_desc_group">Si ho desactives, tampoc veuràs quan els altres estan escrivint.</string>
     <string name="conversation_settings_forwarding_desc">Si ho desactives, l\'altra persona no podrà reenviar ni copiar els teus missatges de text en aquest xat.</string>
+    <string name="conversation_settings_forwarding_desc_group">Si ho desactives, els altres no podran reenviar ni copiar els teus missatges de text en aquest grup.</string>
     <string name="conversation_settings_created">Creada</string>
     <string name="conversation_settings_messages">Missatges</string>
     <string name="conversation_settings_buzz">Brunzits</string>

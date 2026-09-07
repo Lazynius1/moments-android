@@ -1073,6 +1073,8 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="conversation_settings_vanish_desc">Scegli quanto tempo rimangono visibili i tuoi messaggi e le tue reazioni nella chat. Puoi fare in modo che scompaiano subito dopo essere stati letti e aver chiuso la conversazione, oppure conservarli fino a 7 giorni. Per la tua privacy, verrà inviata una notifica nella chat se qualcuno fa uno screenshot o registra lo schermo.</string>
     <string name="conversation_settings_vanish">Messaggi temporanei</string>
     <string name="conversation_settings_preferences">Preferenze chat</string>
+    <string name="conversation_settings_privacy_and_security">Privacy e sicurezza</string>
+    <string name="conversation_settings_hide">Nascondi</string>
     <string name="conversation_settings_preferences_desc">Notifiche, anteprime e privacy</string>
     <string name="conversation_settings_storage_desc">Foto e video nella cache di questo dispositivo</string>
     <string name="conversation_settings_clear_media">Svuota cache media</string>
@@ -1083,6 +1085,7 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="conversation_settings_typing">Indicatore di digitazione</string>
     <string name="conversation_settings_forwarding">Consenti inoltro</string>
     <string name="conversation_settings_clear_conversation">Cancella conversazione</string>
+    <string name="conversation_settings_clear_conversation_group">Cancella chat</string>
     <string name="conversation_settings_media_save_title">Salva media</string>
     <string name="conversation_settings_media_save_success">Questo media è stato salvato nella tua libreria.</string>
     <string name="conversation_settings_media_save_error">Non è stato possibile salvare questo media.</string>
@@ -1183,6 +1186,7 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="chat_reply_replied_to">%1$s ha risposto</string>
     <string name="chat_error">Errore</string>
     <string name="chat_edited">modificato</string>
+    <string name="chat_read_and_more">e altre %1$d</string>
     <string name="chat_seen">Visto</string>
     <string name="chat_recovery_six_digits">6 cifre</string>
     <string name="chat_vanish_swipe_release">Rilascia per attivare i messaggi che scompaiono</string>
@@ -1875,8 +1879,11 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="conversation_settings_preview_desc">Mostra il testo del messaggio nelle notifiche e nell\'elenco delle conversazioni.</string>
     <string name="conversation_settings_read_receipts">Conferme di lettura</string>
     <string name="conversation_settings_read_receipts_desc">Se disattivi le conferme di lettura in questa chat, non potrai vedere quando l\'altra persona legge i tuoi messaggi.</string>
+    <string name="conversation_settings_read_receipts_desc_group">Se disattivi le conferme di lettura in questo gruppo, non potrai vedere quando gli altri leggono i tuoi messaggi.</string>
     <string name="conversation_settings_typing_desc">Se lo disattivi, non vedrai nemmeno quando l\'altra persona sta scrivendo.</string>
+    <string name="conversation_settings_typing_desc_group">Se lo disattivi, non vedrai nemmeno quando gli altri stanno scrivendo.</string>
     <string name="conversation_settings_forwarding_desc">Se disattivi questa opzione, l\'altra persona non potrà inoltrare né copiare i tuoi messaggi di testo in questa chat.</string>
+    <string name="conversation_settings_forwarding_desc_group">Se disattivi questa opzione, gli altri non potranno inoltrare né copiare i tuoi messaggi di testo in questo gruppo.</string>
     <string name="conversation_settings_created">Creata</string>
     <string name="conversation_settings_messages">Messaggi</string>
     <string name="conversation_settings_buzz">Trilli</string>

@@ -66,11 +66,15 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -83,11 +87,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.moments.android.R
+import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.utilities.EmojiReactionDefaults
@@ -312,6 +318,7 @@ fun ChatMessageContextMenuOverlay(
     currentUserId: String,
     forwardingPreferences: Map<String, Boolean> = emptyMap(),
     starredMessageIds: Set<String> = emptySet(),
+    isGroup: Boolean = false,
     callbacks: ChatMessageMenuCallbacks = ChatMessageMenuCallbacks(),
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -328,13 +335,15 @@ fun ChatMessageContextMenuOverlay(
     val menuCorner = ChatAttachmentSheetMetrics.cornerRadius
     val isCurrentUser = item.message.senderId == currentUserId
     val showsMessageInfo = shouldShowMessageInfo(item.message, isCurrentUser)
+    val showsGroupReaders = shouldShowGroupReaders(item.message, isCurrentUser, isGroup)
+    val extraHeaderHeightDp = extraMenuHeaderHeight(showsMessageInfo, showsGroupReaders)
     val isStarred = item.message.id in starredMessageIds || item.message.isStarred(currentUserId)
     val rowCount = visibleMenuRowsCount(item.message, isCurrentUser, currentUserId, forwardingPreferences)
     val systemBars = WindowInsets.systemBars
     var overlayOriginInWindow by remember { mutableStateOf(Offset.Zero) }
     var reactionsSizePx by remember { mutableStateOf(Offset(300f, 54f)) }
-    var menuSizePx by remember(item.rowId, showsMessageInfo) {
-        val infoHeight = if (showsMessageInfo) 37f else 0f
+    var menuSizePx by remember(item.rowId, showsMessageInfo, showsGroupReaders) {
+        val infoHeight = extraHeaderHeightDp.value
         mutableStateOf(Offset(240f, (rowCount * 36f + 16f + infoHeight).coerceAtLeast(36f)))
     }
     var presented by remember(item.rowId) { mutableStateOf(false) }
@@ -393,23 +402,19 @@ fun ChatMessageContextMenuOverlay(
             systemBars.getBottom(this).toFloat() + 12.dp.toPx()
         }
         // iOS usa puntos ≈ dp; clamp/offsets deben ir en px de densidad.
-        val metrics = remember(density, showsMessageInfo) {
+        val metrics = remember(density, showsMessageInfo, showsGroupReaders) {
             with(density) {
                 MenuLayoutMetrics(
                     menuRowHeight = 36.dp.toPx(),
                     menuVerticalPadding = (
-                        16.dp + if (showsMessageInfo) {
-                            37.dp
-                        } else {
-                            0.dp
-                        }
+                        16.dp + extraHeaderHeightDp
                     ).toPx(),
                     stackGap = 10.dp.toPx(),
                     reactionsBarHeight = 54.dp.toPx(),
                     expandedReactionsHeight = 232.dp.toPx(),
                     horizontalInset = 16.dp.toPx(),
                     reactionsBarEstimatedWidth = 300.dp.toPx(),
-                    menuEstimatedWidth = 218.dp.toPx(),
+                    menuEstimatedWidth = 240.dp.toPx(),
                     extraMessageLift = 18.dp.toPx(),
                 )
             }
@@ -510,7 +515,7 @@ fun ChatMessageContextMenuOverlay(
         if (!item.message.isDeleted && rowCount > 0 && !reactionsExpanded) {
             Column(
                 Modifier
-                    .width(minOf(218.dp, with(density) { maxPanelWidth.toDp() }))
+                    .width(minOf(240.dp, with(density) { maxPanelWidth.toDp() }))
                     .onGloballyPositioned { coords ->
                         menuSizePx = Offset(coords.size.width.toFloat(), coords.size.height.toFloat())
                     }
@@ -536,10 +541,17 @@ fun ChatMessageContextMenuOverlay(
                         scaleX = 0.92f + 0.08f * presentationProgress
                         scaleY = 0.92f + 0.08f * presentationProgress
                     }
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                    .clipToBounds(),
             ) {
                 if (showsMessageInfo) {
                     MessageInfoRow(item.message, primaryText, context)
+                }
+                if (showsGroupReaders) {
+                    GroupReadReceiptsRow(item.message, primaryText)
+                }
+                if (showsMessageInfo || showsGroupReaders) {
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(primaryText.copy(alpha = 0.08f)))
                 }
                 MenuRow(R.string.chat_action_reply, Icons.AutoMirrored.Filled.Reply, primaryText) {
                     dismissThen { callbacks.onReply(item.message) }
@@ -833,7 +845,11 @@ private fun MessageInfoRow(
 ) {
     val receiptTime = readReceiptTime(message)
     Row(
-        Modifier.fillMaxWidth().height(36.dp).padding(horizontal = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .height(36.dp)
+            .clipToBounds()
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -843,14 +859,130 @@ private fun MessageInfoRow(
                 "${com.moments.android.views.messaging.core.MessageStatus.READ.displayName(context)} ${DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(receiptTime)}",
                 color = primaryText,
                 fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
+        if (message.editedAt != null) {
+            Text(
+                stringResource(R.string.chat_edited),
+                color = primaryText.copy(alpha = 0.52f),
+                fontSize = 10.sp,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+    }
+}
+
+private const val MaxVisibleGroupReaders = 7
+
+private fun groupReaderIds(message: EnhancedMessage): List<String> {
+    val distantPast = Date(0)
+    return message.readBy
+        .orEmpty()
+        .filter { it != message.senderId }
+        .sortedWith(
+            compareByDescending<String> { message.readAtBy?.get(it) ?: distantPast }
+                .thenBy { it },
+        )
+}
+
+private fun shouldShowGroupReaders(
+    message: EnhancedMessage,
+    isCurrentUser: Boolean,
+    isGroup: Boolean,
+): Boolean = isGroup && isCurrentUser && groupReaderIds(message).isNotEmpty()
+
+private fun extraMenuHeaderHeight(showsMessageInfo: Boolean, showsGroupReaders: Boolean): androidx.compose.ui.unit.Dp {
+    var extra = 0.dp
+    if (showsMessageInfo) extra += 36.dp
+    if (showsGroupReaders) extra += 36.dp
+    if (showsMessageInfo || showsGroupReaders) extra += 1.dp
+    return extra
+}
+
+@Composable
+private fun GroupReadReceiptsRow(
+    message: EnhancedMessage,
+    primaryText: Color,
+) {
+    val ids = remember(message.id, message.readBy, message.readAtBy) { groupReaderIds(message) }
+    val visible = ids.take(MaxVisibleGroupReaders)
+    val remaining = ids.size - visible.size
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(36.dp)
+            .clipToBounds()
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        StackedReaderAvatars(visible)
+        if (remaining > 0) {
+            Text(
+                stringResource(R.string.chat_read_and_more, remaining),
+                color = primaryText,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+                modifier = Modifier.weight(1f, fill = false),
             )
         }
         Spacer(Modifier.weight(1f))
-        if (message.editedAt != null) {
-            Text(stringResource(R.string.chat_edited), color = primaryText.copy(alpha = 0.52f), fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun StackedReaderAvatars(
+    userIds: List<String>,
+    avatarSize: androidx.compose.ui.unit.Dp = 22.dp,
+    overlap: androidx.compose.ui.unit.Dp = 8.dp,
+) {
+    if (userIds.isEmpty()) return
+    val cutoutDiameter = avatarSize + 3.dp
+    val width = avatarSize + (avatarSize - overlap) * max(0, userIds.lastIndex)
+    Box(Modifier.size(width, avatarSize)) {
+        userIds.forEachIndexed { index, id ->
+            val isLast = index == userIds.lastIndex
+            Box(
+                Modifier
+                    .offset(x = (avatarSize - overlap) * index)
+                    .size(avatarSize)
+                    .zIndex(index.toFloat())
+                    .then(
+                        if (isLast) {
+                            Modifier
+                        } else {
+                            Modifier
+                                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                .drawWithContent {
+                                    drawContent()
+                                    val cutCenter = Offset(
+                                        x = center.x + (avatarSize - overlap).toPx(),
+                                        y = center.y,
+                                    )
+                                    drawCircle(
+                                        color = Color.Black,
+                                        radius = cutoutDiameter.toPx() / 2f,
+                                        center = cutCenter,
+                                        blendMode = BlendMode.Clear,
+                                    )
+                                }
+                        },
+                    )
+                    .clip(CircleShape),
+            ) {
+                AsyncProfileImageView(userId = id, modifier = Modifier.matchParentSize())
+            }
         }
     }
-    Box(Modifier.fillMaxWidth().height(1.dp).background(primaryText.copy(alpha = 0.08f)))
 }
 
 private fun readReceiptTime(message: EnhancedMessage): Date? = message.readAtBy
@@ -906,6 +1038,7 @@ private fun MenuRow(
         Modifier
             .fillMaxWidth()
             .height(36.dp)
+            .clipToBounds()
             .clickable {
                 // ≡ iOS `MomentRowButton(feedback: .menu)`
                 HapticManager.shared.selection()
@@ -922,9 +1055,10 @@ private fun MenuRow(
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             softWrap = false,
+            modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.weight(1f))
     }
 }
 

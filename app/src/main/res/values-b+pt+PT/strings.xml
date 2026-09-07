@@ -1073,6 +1073,8 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="conversation_settings_vanish_desc">Escolhe por quanto tempo as tuas mensagens e reações permanecem visíveis no chat. Podes fazer com que elas desapareçam logo após serem lidas e fechares a conversa, ou mantê-las por até 7 dias. Para a tua privacidade, um alerta será enviado no chat se alguém tirar uma captura de ecrã ou gravar o ecrã.</string>
     <string name="conversation_settings_vanish">Mensagens temporárias</string>
     <string name="conversation_settings_preferences">Preferências do chat</string>
+    <string name="conversation_settings_privacy_and_security">Privacidade e segurança</string>
+    <string name="conversation_settings_hide">Ocultar</string>
     <string name="conversation_settings_preferences_desc">Notificações, pré-visualizações e privacidade</string>
     <string name="conversation_settings_storage_desc">Fotos e vídeos em cache neste dispositivo</string>
     <string name="conversation_settings_clear_media">Limpar multimédia em cache</string>
@@ -1083,6 +1085,7 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="conversation_settings_typing">Indicador de escrita</string>
     <string name="conversation_settings_forwarding">Permitir reencaminhamento</string>
     <string name="conversation_settings_clear_conversation">Limpar conversa</string>
+    <string name="conversation_settings_clear_conversation_group">Limpar chat</string>
     <string name="conversation_settings_media_save_title">Guardar multimédia</string>
     <string name="conversation_settings_media_save_success">Este conteúdo foi guardado na tua biblioteca.</string>
     <string name="conversation_settings_media_save_error">Não foi possível guardar este conteúdo.</string>
@@ -1183,6 +1186,7 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="chat_reply_replied_to">%1$s respondeu</string>
     <string name="chat_error">Erro</string>
     <string name="chat_edited">editada</string>
+    <string name="chat_read_and_more">e mais %1$d</string>
     <string name="chat_seen">Visto</string>
     <string name="chat_recovery_six_digits">6 dígitos</string>
     <string name="chat_vanish_swipe_release">Solta para ativar mensagens que desaparecem</string>
@@ -1875,8 +1879,11 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="conversation_settings_preview_desc">Mostra o texto da mensagem nas notificações e na lista de conversas.</string>
     <string name="conversation_settings_read_receipts">Recibos de leitura</string>
     <string name="conversation_settings_read_receipts_desc">Se desativares os recibos de leitura neste chat, deixarás de conseguir ver quando a outra pessoa lê as tuas mensagens.</string>
+    <string name="conversation_settings_read_receipts_desc_group">Se desativares os recibos de leitura neste grupo, deixarás de conseguir ver quando os outros lêem as tuas mensagens.</string>
     <string name="conversation_settings_typing_desc">Se desativares esta opção, também deixarás de ver quando a outra pessoa está a escrever.</string>
+    <string name="conversation_settings_typing_desc_group">Se desativares esta opção, também deixarás de ver quando os outros estão a escrever.</string>
     <string name="conversation_settings_forwarding_desc">Se desativares isto, a outra pessoa não poderá reencaminhar nem copiar as tuas mensagens de texto neste chat.</string>
+    <string name="conversation_settings_forwarding_desc_group">Se desativares isto, os outros não poderão reencaminhar nem copiar as tuas mensagens de texto neste grupo.</string>
     <string name="conversation_settings_created">Criada</string>
     <string name="conversation_settings_messages">Mensagens</string>
     <string name="conversation_settings_buzz">Abanões</string>

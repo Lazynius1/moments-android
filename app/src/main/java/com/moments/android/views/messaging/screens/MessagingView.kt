@@ -279,8 +279,6 @@ fun MessagingView(
     DisposableEffect(Unit) {
         onDispose {
             actionToastMessage = null
-            viewModel.stopListening()
-            requestService.removeAllListeners()
         }
     }
 

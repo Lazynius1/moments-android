@@ -50,11 +50,18 @@
     <string name="groups_invite_forbidden_one">%1$s n’autorise pas les invitations aux groupes.</string>
     <string name="groups_invite_forbidden_many">%1$s n’autorisent pas les invitations aux groupes.</string>
     <string name="groups_invite_link">Lien d’invitation</string>
+    <string name="groups_invitation">Invitation</string>
+    <string name="groups_join_body">Tu as été invité(e) à rejoindre ce groupe.</string>
     <string name="groups_link_body">Toute personne disposant de ce lien peut rejoindre le groupe. Les nouveaux membres ne voient les messages qu’à partir de leur arrivée. Le renouveler ou le désactiver invalide le lien précédent.</string>
     <string name="groups_get_link">Obtenir le lien</string>
     <string name="groups_share_link">Partager le lien</string>
     <string name="groups_renew_link">Renouveler le lien</string>
     <string name="groups_disable_link">Désactiver le lien</string>
+    <string name="groups_edit">Modifier le groupe</string>
+    <string name="groups_copy_link">Copier le lien</string>
+    <string name="groups_link_copied">Copié</string>
+    <string name="groups_renew_body">Le renouvellement crée un nouveau lien. L’ancien ne fonctionnera plus.</string>
+    <string name="groups_disable_body">Personne ne pourra rejoindre le groupe avec ce lien. Vous pourrez en obtenir un nouveau plus tard.</string>
     <string name="groups_join_link">Rejoindre le groupe</string>
     <string name="groups_link_error">Ce lien est indisponible, le groupe est complet ou vos clés de discussion n’ont pas pu être chargées. Réessayez ou demandez un nouveau lien à un admin.</string>
     <string name="groups_notice_joined">%1$s a rejoint le groupe</string>
@@ -67,4 +74,8 @@
     <string name="groups_history_start">Début du groupe</string>
     <string name="groups_history_start_joined">Tu peux voir les messages à partir de ton arrivée.</string>
     <string name="groups_joined_on">A rejoint le %1$s</string>
+    <string name="groups_you">Toi</string>
+    <string name="groups_following_section">Abonnements</string>
+    <string name="groups_others_section">Autres</string>
+    <string name="groups_link_admin_only">Seuls les administrateurs peuvent activer le lien d’invitation.</string>
 </resources>

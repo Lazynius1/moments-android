@@ -1465,6 +1465,8 @@
     <string name="conversation_settings_vanish_desc">設定訊息和回應在聊天室中保留的時間。你可以設定為在訊息讀取完畢並關閉聊天室後立即消失，也可以保留最多 7 天。為保障你的隱私，如果有人截圖或錄製螢幕，系統會在聊天室中顯示通知。</string>
     <string name="conversation_settings_vanish">限時訊息</string>
     <string name="conversation_settings_preferences">聊天偏好設定</string>
+    <string name="conversation_settings_privacy_and_security">隱私權與安全性</string>
+    <string name="conversation_settings_hide">隱藏</string>
     <string name="conversation_settings_preferences_desc">通知、預覽和隱私</string>
     <string name="conversation_settings_storage">媒體儲存空間</string>
     <string name="conversation_settings_storage_desc">這部裝置上的照片和影片快取</string>
@@ -1487,8 +1489,11 @@
     <string name="conversation_settings_buzz_desc">如果關閉此功能，其他人將無法在這個聊天室提醒你。</string>
     <string name="conversation_settings_preview_desc">在通知和對話列表中顯示訊息內容。</string>
     <string name="conversation_settings_read_receipts_desc">如果關閉這個聊天室的已讀回條，你將無法查看對方何時讀取你的訊息。</string>
+    <string name="conversation_settings_read_receipts_desc_group">如果關閉這個群組的已讀回條，你將無法查看其他人何時讀取你的訊息。</string>
     <string name="conversation_settings_typing_desc">如果關閉此功能，你也不會看到對方何時正在輸入。</string>
+    <string name="conversation_settings_typing_desc_group">如果關閉此功能，你也不會看到其他人何時正在輸入。</string>
     <string name="conversation_settings_forwarding_desc">如果關閉此功能，對方將無法轉傳或複製你在這個聊天室中的文字訊息。</string>
+    <string name="conversation_settings_forwarding_desc_group">如果關閉此功能，其他人將無法轉傳或複製你在這個群組中的文字訊息。</string>
     <string name="conversation_settings_created">建立時間</string>
     <string name="conversation_settings_messages">訊息</string>
     <string name="conversation_settings_buzz">允許提醒</string>
@@ -1498,6 +1503,7 @@
     <string name="conversation_settings_reply">回覆</string>
     <string name="conversation_settings_send">傳送</string>
     <string name="conversation_settings_clear_conversation">清除對話</string>
+    <string name="conversation_settings_clear_conversation_group">清除聊天</string>
     <string name="conversation_settings_media_save_title">儲存媒體</string>
     <string name="conversation_settings_media_save_success">此媒體已儲存至你的圖庫。</string>
     <string name="conversation_settings_media_save_error">無法儲存此媒體。</string>
@@ -1671,6 +1677,7 @@
     <string name="chat_action_delete_for_me">僅對我刪除</string>
     <string name="chat_action_more_reactions">更多表情符號</string>
     <string name="chat_edited">已編輯</string>
+    <string name="chat_read_and_more">還有 %1$d 位</string>
     <string name="chat_seen">已讀</string>
     <string name="chat_recovery_loading">正在準備聊天安全功能</string>
     <string name="chat_recovery_pin">復原 PIN</string>

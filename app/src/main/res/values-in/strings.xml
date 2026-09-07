@@ -1465,6 +1465,8 @@
     <string name="conversation_settings_vanish_desc">Tentukan berapa lama pesan dan reaksimu tetap terlihat di chat. Kamu bisa mengaturnya agar langsung menghilang setelah dibaca dan chat ditutup, atau menyimpannya hingga 7 hari. Demi privasi, notifikasi akan muncul jika seseorang mengambil screenshot atau merekam layar.</string>
     <string name="conversation_settings_vanish">Pesan yang menghilang</string>
     <string name="conversation_settings_preferences">Preferensi chat</string>
+    <string name="conversation_settings_privacy_and_security">Privasi dan keamanan</string>
+    <string name="conversation_settings_hide">Sembunyikan</string>
     <string name="conversation_settings_preferences_desc">Notifikasi, pratinjau, dan privasi</string>
     <string name="conversation_settings_storage">Penyimpanan media</string>
     <string name="conversation_settings_storage_desc">Foto dan video yang disimpan sementara di perangkat ini</string>
@@ -1487,8 +1489,11 @@
     <string name="conversation_settings_buzz_desc">Jika dinonaktifkan, orang lain tidak akan bisa mengirim buzz kepada Anda di chat ini.</string>
     <string name="conversation_settings_preview_desc">Tampilkan isi pesan di notifikasi dan daftar percakapan.</string>
     <string name="conversation_settings_read_receipts_desc">Jika Anda menonaktifkan tanda dibaca di chat ini, Anda juga tidak akan bisa melihat kapan orang lain membaca pesan Anda.</string>
+    <string name="conversation_settings_read_receipts_desc_group">Jika tanda dibaca dinonaktifkan di grup ini, kamu tidak bisa melihat kapan orang lain membaca pesanmu.</string>
     <string name="conversation_settings_typing_desc">Jika dinonaktifkan, Anda juga tidak akan bisa melihat saat orang lain sedang mengetik.</string>
+    <string name="conversation_settings_typing_desc_group">Jika dinonaktifkan, kamu juga tidak akan melihat saat orang lain sedang mengetik.</string>
     <string name="conversation_settings_forwarding_desc">Jika dinonaktifkan, orang lain tidak akan bisa meneruskan atau menyalin pesan teks Anda di chat ini.</string>
+    <string name="conversation_settings_forwarding_desc_group">Jika dinonaktifkan, orang lain tidak bisa meneruskan atau menyalin pesan teksmu di grup ini.</string>
     <string name="conversation_settings_created">Dibuat</string>
     <string name="conversation_settings_messages">Pesan</string>
     <string name="conversation_settings_buzz">Izinkan buzz</string>
@@ -1498,6 +1503,7 @@
     <string name="conversation_settings_reply">Balas</string>
     <string name="conversation_settings_send">Kirim</string>
     <string name="conversation_settings_clear_conversation">Hapus percakapan</string>
+    <string name="conversation_settings_clear_conversation_group">Hapus chat</string>
     <string name="conversation_settings_media_save_title">Simpan media</string>
     <string name="conversation_settings_media_save_success">Media ini telah disimpan ke perpustakaan Anda.</string>
     <string name="conversation_settings_media_save_error">Media ini tidak dapat disimpan.</string>
@@ -1671,6 +1677,7 @@
     <string name="chat_action_delete_for_me">Hapus untuk saya</string>
     <string name="chat_action_more_reactions">Reaksi lainnya</string>
     <string name="chat_edited">Diedit</string>
+    <string name="chat_read_and_more">dan %1$d lainnya</string>
     <string name="chat_seen">Dilihat</string>
     <string name="chat_recovery_loading">Menyiapkan keamanan chat</string>
     <string name="chat_recovery_pin">PIN pemulihan</string>

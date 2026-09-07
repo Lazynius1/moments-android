@@ -50,11 +50,18 @@
     <string name="groups_invite_forbidden_one">%1$s doesn\'t allow group invitations.</string>
     <string name="groups_invite_forbidden_many">%1$s don\'t allow group invitations.</string>
     <string name="groups_invite_link">Invitation link</string>
+    <string name="groups_invitation">Invitation</string>
+    <string name="groups_join_body">You\'ve been invited to join this group.</string>
     <string name="groups_link_body">Anyone with this link can join. New members only see messages from the moment they join. Renewing or disabling it invalidates the previous link.</string>
     <string name="groups_get_link">Get link</string>
     <string name="groups_share_link">Share link</string>
     <string name="groups_renew_link">Renew link</string>
     <string name="groups_disable_link">Disable link</string>
+    <string name="groups_edit">Edit group</string>
+    <string name="groups_copy_link">Copy link</string>
+    <string name="groups_link_copied">Copied</string>
+    <string name="groups_renew_body">Renewing creates a new link. The previous one will no longer work.</string>
+    <string name="groups_disable_body">Nobody will be able to join with this link. You can get a new one later.</string>
     <string name="groups_join_link">Join group</string>
     <string name="groups_link_error">This link is unavailable, the group is full, or your chat keys could not be loaded. Try again or ask an admin for a new link.</string>
     <string name="groups_notice_joined">%1$s joined the group</string>
@@ -67,4 +74,8 @@
     <string name="groups_history_start">Beginning of the group</string>
     <string name="groups_history_start_joined">You can see messages from when you joined.</string>
     <string name="groups_joined_on">Joined %1$s</string>
+    <string name="groups_you">You</string>
+    <string name="groups_following_section">Following</string>
+    <string name="groups_others_section">Others</string>
+    <string name="groups_link_admin_only">Only admins can turn on the invite link.</string>
 </resources>
