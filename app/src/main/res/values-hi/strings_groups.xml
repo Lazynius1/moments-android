@@ -12,7 +12,7 @@
     <string name="groups_add">लोगों को आमंत्रित करें</string>
     <string name="groups_search">लोगों को खोजें</string>
     <string name="groups_details">समूह की जानकारी</string>
-    <string name="groups_privacy">संदेश एंड-टू-एंड एन्क्रिप्टेड हैं। आमंत्रण स्वीकार करने वाले लोग समूह का पुराना चैट इतिहास पढ़ सकते हैं।</string>
+    <string name="groups_privacy">संदेश एंड-टू-एंड एन्क्रिप्टेड हैं। नए सदस्य केवल शामिल होने के बाद भेजे गए संदेश देख सकते हैं।</string>
     <string name="groups_older">पुराने संदेश</string>
     <string name="groups_reply">जवाब दें</string>
     <string name="groups_photo">फ़ोटो</string>
@@ -47,4 +47,24 @@
     <string name="groups_invited">आमंत्रण भेजा गया</string>
     <string name="groups_pending_invitations">लंबित आमंत्रण</string>
     <string name="groups_invite_forbidden">कुछ लोग समूह आमंत्रण की अनुमति नहीं देते।</string>
+    <string name="groups_invite_forbidden_one">%1$s समूह आमंत्रण की अनुमति नहीं देते।</string>
+    <string name="groups_invite_forbidden_many">%1$s समूह आमंत्रण की अनुमति नहीं देते।</string>
+    <string name="groups_invite_link">आमंत्रण लिंक</string>
+    <string name="groups_link_body">इस लिंक वाला कोई भी व्यक्ति जुड़ सकता है। नए सदस्य केवल शामिल होने के बाद के संदेश देख सकते हैं। इसे बदलने या बंद करने से पुराना लिंक अमान्य हो जाता है।</string>
+    <string name="groups_get_link">लिंक प्राप्त करें</string>
+    <string name="groups_share_link">लिंक साझा करें</string>
+    <string name="groups_renew_link">नया लिंक बनाएँ</string>
+    <string name="groups_disable_link">लिंक बंद करें</string>
+    <string name="groups_join_link">समूह में शामिल हों</string>
+    <string name="groups_link_error">यह लिंक उपलब्ध नहीं है, समूह भर गया है या आपकी चैट कुंजियाँ लोड नहीं हो सकीं। फिर से कोशिश करें या एडमिन से नया लिंक माँगें।</string>
+    <string name="groups_notice_joined">%1$s समूह में शामिल हुए</string>
+    <string name="groups_notice_left">%1$s ने समूह छोड़ दिया</string>
+    <string name="groups_notice_removed">%1$s को समूह से हटा दिया गया</string>
+    <string name="groups_invited_you">%1$s ने आपको समूह में आमंत्रित किया</string>
+    <string name="groups_intro_created_by">%1$s द्वारा बनाया गया</string>
+    <string name="groups_intro_created_on">%1$s को बनाया गया</string>
+    <string name="groups_intro_encrypted">संदेश एंड-टू-एंड एन्क्रिप्टेड हैं।</string>
+    <string name="groups_history_start">समूह की शुरुआत</string>
+    <string name="groups_history_start_joined">आप जुड़ने के बाद के संदेश देख सकते हैं।</string>
+    <string name="groups_joined_on">%1$s को शामिल हुए</string>
 </resources>

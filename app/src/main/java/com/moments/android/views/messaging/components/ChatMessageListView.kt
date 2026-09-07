@@ -320,6 +320,7 @@ fun chatRenderRowVisualSignature(row: ChatRenderRow): Int = when (row) {
     // El contexto se enriquece de forma asíncrona con estadísticas, verificación y
     // relación. Usar solo el id dejaba la primera versión vacía fijada en LazyColumn.
     is ChatRenderRow.ConversationIntro -> 31 * 5 + (row.context?.hashCode() ?: 0)
+    ChatRenderRow.GroupIntro -> 10
     is ChatRenderRow.RequestDisclaimer -> 31 * 6 + (row.context?.id?.hashCode() ?: 0) + (row.context?.status?.hashCode() ?: 0)
     is ChatRenderRow.PendingRequestMessage ->
         31 * 7 + row.message.id.hashCode() + row.message.text.hashCode() + row.message.isOutgoing.hashCode()

@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -176,12 +177,14 @@ fun ChatHistoryLoadingIndicator(
 fun ChatHistoryStartHeader(
     adaptiveColors: com.moments.android.views.feed.AdaptiveColors,
     modifier: Modifier = Modifier,
+    @StringRes textRes: Int = R.string.chat_history_start,
 ) {
     Text(
-        stringResource(R.string.chat_history_start),
+        stringResource(textRes),
         color = adaptiveColors.secondary.copy(alpha = .85f),
         fontSize = 12.sp,
         modifier = modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
     )
 }
 
@@ -231,6 +234,80 @@ fun ChatConversationIntroRow(
             stats?.let { Text(it, color = adaptiveColors.secondary, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1) }
             if (subtitle != null) Text(stringResource(subtitle), color = adaptiveColors.secondary, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 3)
             relationship?.let { Text(it, color = adaptiveColors.secondary, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 2) }
+        }
+    }
+}
+
+@Composable
+internal fun ChatGroupConversationIntroRow(
+    group: com.moments.android.views.messaging.groups.GroupConversation?,
+    fallbackName: String,
+    fallbackImage: String,
+    memberCount: Int,
+    adaptiveColors: com.moments.android.views.feed.AdaptiveColors,
+    modifier: Modifier = Modifier,
+    onTap: () -> Unit = {},
+) {
+    val name = group?.name?.trim().orEmpty().ifEmpty { fallbackName }
+    val defaultUser = stringResource(R.string.messaging_user_default)
+    val creator = group?.let { current ->
+        val named = current.allMemberNames[current.createdBy]?.trim().orEmpty()
+        if (named.isNotEmpty()) named
+        else current.members.firstOrNull { it.id == current.createdBy }?.name?.trim().orEmpty().ifEmpty { defaultUser }
+    }.orEmpty()
+    val createdAt = group?.createdAt
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onTap)
+            .padding(horizontal = 24.dp, vertical = 22.dp)
+            .padding(top = 46.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        com.moments.android.views.messaging.groups.GroupChatAvatar(
+            image = group?.image?.ifEmpty { fallbackImage } ?: fallbackImage,
+            size = 96.dp,
+        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Text(name, color = adaptiveColors.primary, fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+            Text(
+                stringResource(R.string.groups_member_count, group?.members?.size ?: memberCount),
+                color = adaptiveColors.secondary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            if (creator.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.groups_intro_created_by, creator),
+                    color = adaptiveColors.secondary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            if (createdAt != null) {
+                Text(
+                    stringResource(
+                        R.string.groups_intro_created_on,
+                        com.moments.android.utilities.MomentsFormat.smartDate(
+                            createdAt,
+                            com.moments.android.utilities.MomentsFormat.DateContext.MEDIUM_DATE,
+                        ),
+                    ),
+                    color = adaptiveColors.secondary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            Text(
+                stringResource(R.string.groups_intro_encrypted),
+                color = adaptiveColors.secondary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
         }
     }
 }

@@ -12,7 +12,7 @@
     <string name="groups_add">Personen einladen</string>
     <string name="groups_search">Personen suchen</string>
     <string name="groups_details">Gruppendetails</string>
-    <string name="groups_privacy">Nachrichten sind Ende-zu-Ende-verschlüsselt. Wer eine Einladung annimmt, kann den Gruppenverlauf lesen.</string>
+    <string name="groups_privacy">Nachrichten sind Ende-zu-Ende-verschlüsselt. Neue Mitglieder sehen nur Nachrichten, die nach ihrem Beitritt gesendet wurden.</string>
     <string name="groups_older">Ältere Nachrichten</string>
     <string name="groups_reply">Antworten</string>
     <string name="groups_photo">Foto</string>
@@ -47,4 +47,24 @@
     <string name="groups_invited">Einladung gesendet</string>
     <string name="groups_pending_invitations">Ausstehende Einladungen</string>
     <string name="groups_invite_forbidden">Manche Personen erlauben keine Gruppeneinladungen.</string>
+    <string name="groups_invite_forbidden_one">%1$s erlaubt keine Gruppeneinladungen.</string>
+    <string name="groups_invite_forbidden_many">%1$s erlauben keine Gruppeneinladungen.</string>
+    <string name="groups_invite_link">Einladungslink</string>
+    <string name="groups_link_body">Alle mit diesem Link können beitreten. Neue Mitglieder sehen nur Nachrichten ab dem Moment, in dem sie beitreten. Erneuern oder Deaktivieren macht den bisherigen Link ungültig.</string>
+    <string name="groups_get_link">Link abrufen</string>
+    <string name="groups_share_link">Link teilen</string>
+    <string name="groups_renew_link">Link erneuern</string>
+    <string name="groups_disable_link">Link deaktivieren</string>
+    <string name="groups_join_link">Gruppe beitreten</string>
+    <string name="groups_link_error">Dieser Link ist nicht verfügbar, die Gruppe ist voll oder deine Chatschlüssel konnten nicht geladen werden. Versuche es erneut oder bitte einen Admin um einen neuen Link.</string>
+    <string name="groups_notice_joined">%1$s ist der Gruppe beigetreten</string>
+    <string name="groups_notice_left">%1$s hat die Gruppe verlassen</string>
+    <string name="groups_notice_removed">%1$s wurde aus der Gruppe entfernt</string>
+    <string name="groups_invited_you">%1$s hat dich in die Gruppe eingeladen</string>
+    <string name="groups_intro_created_by">Erstellt von %1$s</string>
+    <string name="groups_intro_created_on">Erstellt %1$s</string>
+    <string name="groups_intro_encrypted">Nachrichten sind Ende-zu-Ende-verschlüsselt.</string>
+    <string name="groups_history_start">Beginn der Gruppe</string>
+    <string name="groups_history_start_joined">Du siehst Nachrichten ab dem Zeitpunkt, an dem du beigetreten bist.</string>
+    <string name="groups_joined_on">Beigetreten %1$s</string>
 </resources>

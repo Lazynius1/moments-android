@@ -2,6 +2,7 @@ package com.moments.android.views.messaging.services
 
 import com.moments.android.services.messaging.messagingThread
 import com.moments.android.services.messaging.messagingMessages
+import com.moments.android.services.messaging.applyingHistoryCutoff
 import android.net.Uri
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
@@ -13,6 +14,7 @@ import com.moments.android.MomentsApplication
 import com.moments.android.views.messaging.core.ChatMediaPurpose
 import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.ConversationLastMessageReaction
+import com.moments.android.views.messaging.core.MessageHistoryCutoff
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.models.MediaMessagePayload
 import com.moments.android.views.messaging.core.MessageStatus
@@ -112,6 +114,7 @@ object ChatService {
 
     /** ≡ `conversationCutoffs` — poblado en `fetchConversations`. */
     private val conversationCutoffs = ConcurrentHashMap<String, Date>()
+    private val conversationJoinCutoffs = ConcurrentHashMap<String, Date>()
 
     /** ≡ `archivedConversationIds` — poblado en `fetchConversations`. */
     @Volatile
@@ -168,6 +171,7 @@ object ChatService {
         preloadEncryption(conversationId)
         val snapshot = db.messagingThread(conversationId)
             .messagingMessages
+            .applyingHistoryCutoff(resolvedHistoryCutoff(conversationId, cutoffDate))
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .limitToLast(limit.toLong())
             .get()
@@ -188,6 +192,7 @@ object ChatService {
     ): Result<List<EnhancedMessage>> = runCatching {
         preloadEncryption(conversationId)
         val collection = db.messagingThread(conversationId).messagingMessages
+            .applyingHistoryCutoff(resolvedHistoryCutoff(conversationId, cutoffDate))
         val snapshot = if (after.messageId.isEmpty()) {
             collection
                 .whereGreaterThan("timestamp", Timestamp(after.timestamp))
@@ -223,6 +228,7 @@ object ChatService {
     ): Result<MessageHistoryPage> = runCatching {
         preloadEncryption(conversationId)
         val collection = db.messagingThread(conversationId).messagingMessages
+            .applyingHistoryCutoff(resolvedHistoryCutoff(conversationId, cutoffDate))
         val beforeTs = Timestamp(before.timestamp)
         val snapshot = if (before.messageId.isEmpty()) {
             collection
@@ -308,7 +314,7 @@ object ChatService {
 
         preloadEncryption(conversationId)
 
-        val cutoffDateToUse = cutoffDate ?: conversationCutoffs[conversationId]
+        val cutoffDateToUse = resolvedHistoryCutoff(conversationId, cutoffDate)?.exclusiveDate
 
         var messages: List<EnhancedMessage> = if (LocalFirstMessagingSettings.isEnabled) {
             val queryDocs = docs.filterIsInstance<com.google.firebase.firestore.QueryDocumentSnapshot>()
@@ -371,6 +377,21 @@ object ChatService {
     /** Punto de corte en memoria (≡ `deletedAtCutoff(for:)`). */
     fun deletedAtCutoff(conversationId: String): Date? = conversationCutoffs[conversationId]
 
+    fun joinedAtCutoff(conversationId: String): Date? = conversationJoinCutoffs[conversationId]
+
+    fun rememberHistoryCutoffs(conversationId: String, deletedAt: Date?, joinedAt: Date?) {
+        if (deletedAt != null) conversationCutoffs[conversationId] = deletedAt
+        else conversationCutoffs.remove(conversationId)
+        if (joinedAt != null) conversationJoinCutoffs[conversationId] = joinedAt
+        else conversationJoinCutoffs.remove(conversationId)
+    }
+
+    fun resolvedHistoryCutoff(conversationId: String, cutoffDate: Date? = null): MessageHistoryCutoff? =
+        MessageHistoryCutoff.combining(
+            cutoffDate ?: conversationCutoffs[conversationId],
+            conversationJoinCutoffs[conversationId],
+        )
+
     /** ≡ `isConversationArchived` — set en memoria desde `fetchConversations`. */
     fun isConversationArchived(conversationId: String, userId: String = ""): Boolean =
         archivedConversationIds.contains(conversationId)
@@ -414,6 +435,7 @@ object ChatService {
             if (!isCurrentListenerGeneration(generation, conversationId)) return
             val listener = db.messagingThread(conversationId)
                 .messagingMessages
+                .applyingHistoryCutoff(resolvedHistoryCutoff(conversationId, cutoffDate))
                 .orderBy("timestamp", Query.Direction.ASCENDING)
                 .limitToLast(limit.toLong())
                 .addSnapshotListener { snapshot, error ->
@@ -716,6 +738,7 @@ object ChatService {
         listenerGenerations.clear()
         _typingUsers.value = emptyMap()
         conversationCutoffs.clear()
+        conversationJoinCutoffs.clear()
         archivedConversationIds = emptySet()
         removeAllMessageReactionsListeners()
         removeAllBuzzListeners()
@@ -1665,7 +1688,13 @@ object ChatService {
                         val cutoff = (data["lastDeletedAt"] as? Map<String, *>)?.get(userId) as? Timestamp
                         val latest = data["timestamp"] as? Timestamp
                         if (userId in (data["deletedFor"] as? List<*>).orEmpty() && (cutoff == null || latest == null || latest <= cutoff)) null
-                        else parseConversation(doc.id, data, userId)
+                        else parseConversation(doc.id, data, userId)?.also { conversation ->
+                            rememberHistoryCutoffs(
+                                doc.id,
+                                conversation.deletedAtCutoff(userId),
+                                conversation.memberJoinedAt?.get(userId),
+                            )
+                        }
                     }
                     val hydrated = hydrateConversationPreviews(parsed)
                     withContext(Dispatchers.Main) { if (revision == groupRevision) { groupInbox = hydrated; publishInbox() } }
@@ -1722,12 +1751,7 @@ object ChatService {
 
                     for (conversation in conversations) {
                         val convId = conversation.id ?: continue
-                        val cutoff = conversation.deletedAtCutoff(userId)
-                        if (cutoff != null) {
-                            conversationCutoffs[convId] = cutoff
-                        } else {
-                            conversationCutoffs.remove(convId)
-                        }
+                        rememberHistoryCutoffs(convId, conversation.deletedAtCutoff(userId), null)
                     }
 
                     for (ref in toRestore) {
@@ -1893,6 +1917,7 @@ object ChatService {
         return try {
             val snapshot = db.messagingThread(conversationId)
                 .messagingMessages
+                .applyingHistoryCutoff(resolvedHistoryCutoff(conversationId))
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .limit(5)
                 .get()
@@ -2083,7 +2108,7 @@ object ChatService {
             readStatus = readStatus,
             otherParticipantId = if (com.moments.android.services.messaging.GroupChatScope.isGroup(id)) "" else otherId,
             otherParticipantUsername = if (com.moments.android.services.messaging.GroupChatScope.isGroup(id)) data["groupName"] as? String else username,
-            otherParticipantProfileImagePath = if (com.moments.android.services.messaging.GroupChatScope.isGroup(id)) null else avatar,
+            otherParticipantProfileImagePath = if (com.moments.android.services.messaging.GroupChatScope.isGroup(id)) data["groupImagePath"] as? String else avatar,
             isPinned = isPinned,
             pinnedByUserIds = pinnedByUserIds,
             pinnedBy = legacyPinnedBy,
@@ -2098,6 +2123,7 @@ object ChatService {
             forwardingPreferences = (data["forwardingPreferences"] as? Map<String, Boolean>),
             buzzPreferences = (data["buzzPreferences"] as? Map<String, Boolean>),
             lastDeletedAt = timestampMap("lastDeletedAt"),
+            memberJoinedAt = timestampMap("memberJoinedAt"),
             lastReadAt = timestampMap("lastReadAt"),
             vanishModeActive = data["vanishModeActive"] as? Boolean ?: false,
             vanishModeEnabledBy = data["vanishModeEnabledBy"] as? String,

@@ -32,6 +32,7 @@ import com.moments.android.views.messaging.components.chatRenderRowVisualSignatu
 import com.moments.android.views.messaging.components.ChatMessageListView
 import com.moments.android.views.messaging.components.PendingRequestMessageRow
 import com.moments.android.views.messaging.components.ChatConversationIntroRow
+import com.moments.android.views.messaging.components.ChatGroupConversationIntroRow
 import com.moments.android.views.messaging.components.ChatHistoryStartHeader
 import com.moments.android.views.messaging.components.ChatRequestDisclaimerRow
 import com.moments.android.views.messaging.components.chatMenuDimmedWhenOpen
@@ -61,6 +62,7 @@ data class ChatMessageListCallbacks(
     val renderPendingRequest: @Composable (PendingChatTimelineMessage) -> Unit = {},
     val renderIncomingRequestActions: @Composable (Boolean) -> Unit = {},
     val renderOutgoingRequestControls: @Composable (Int, Boolean) -> Unit = { _, _ -> },
+    val onGroupIntroTap: () -> Unit = {},
 )
 
 @Stable
@@ -95,34 +97,42 @@ fun chatListRows(
     canLoadMore: Boolean,
     hasCompletedInitialScroll: Boolean,
     hasTypingUsers: Boolean,
+    isGroup: Boolean = false,
 ): List<ChatRenderRow> {
     val rows = baseRows.toMutableList()
     val pending = pendingChatContext != null
     if (pending || (!canLoadMore && (hasCompletedInitialScroll || rows.isEmpty()))) {
         if (!pending) rows.add(0, ChatRenderRow.HistoryStart)
-        if (pendingChatContext?.status !in setOf(
-                PendingChatContext.Status.OUTGOING_REQUEST_DRAFT,
-                PendingChatContext.Status.OUTGOING_REQUEST_BLOCKED,
-                PendingChatContext.Status.INCOMING_REQUEST_PENDING,
-                null,
-            )
-        ) {
-            rows.add(0, ChatRenderRow.RequestDisclaimer(pendingChatContext))
-        }
-        rows.add(0, ChatRenderRow.ConversationIntro(pendingChatContext ?: conversationIntroContext))
-        pendingTimelineMessages.forEachIndexed { index, message ->
-            rows.add(minOf(3 + index, rows.size), ChatRenderRow.PendingRequestMessage(message))
-        }
-        if (pendingChatContext?.direction == PendingChatContext.Direction.OUTGOING &&
-            pendingChatContext.status in setOf(
-                PendingChatContext.Status.OUTGOING_REQUEST_DRAFT,
-                PendingChatContext.Status.OUTGOING_REQUEST_SENT,
-            )
-        ) {
-            rows += ChatRenderRow.OutgoingRequestControls(
-                messageCount = pendingChatContext.request?.messageCount ?: pendingTimelineMessages.size,
-                limitReached = pendingChatContext.status == PendingChatContext.Status.OUTGOING_REQUEST_SENT && !pendingChatCanType,
-            )
+        if (isGroup) {
+            rows.add(0, ChatRenderRow.GroupIntro)
+        } else {
+            if (pendingChatContext?.status !in setOf(
+                    PendingChatContext.Status.OUTGOING_REQUEST_DRAFT,
+                    PendingChatContext.Status.OUTGOING_REQUEST_BLOCKED,
+                    PendingChatContext.Status.INCOMING_REQUEST_PENDING,
+                    null,
+                )
+            ) {
+                rows.add(0, ChatRenderRow.RequestDisclaimer(pendingChatContext))
+            }
+            rows.add(0, ChatRenderRow.ConversationIntro(pendingChatContext ?: conversationIntroContext))
+            pendingTimelineMessages.forEachIndexed { index, message ->
+                rows.add(minOf(3 + index, rows.size), ChatRenderRow.PendingRequestMessage(message))
+            }
+            if (pendingChatContext?.direction == PendingChatContext.Direction.OUTGOING &&
+                pendingChatContext.status in setOf(
+                    PendingChatContext.Status.OUTGOING_REQUEST_DRAFT,
+                    PendingChatContext.Status.OUTGOING_REQUEST_SENT,
+                )
+            ) {
+                rows += ChatRenderRow.OutgoingRequestControls(
+                    messageCount = pendingChatContext.request?.messageCount ?: pendingTimelineMessages.size,
+                    limitReached = pendingChatContext.status == PendingChatContext.Status.OUTGOING_REQUEST_SENT && !pendingChatCanType,
+                )
+            }
+            if (pendingChatContext?.status == PendingChatContext.Status.INCOMING_REQUEST_PENDING) {
+                rows += ChatRenderRow.IncomingRequestActions(isLoading = requestLoading)
+            }
         }
     }
     if (hasTypingUsers) rows += ChatRenderRow.Typing
@@ -245,6 +255,20 @@ fun GlassmorphicChatMessageList(
                             row.context, fallbackName, fallbackUserId, adaptiveColors,
                             Modifier.chatMenuDimmedWhenOpen(menuOpen),
                         )
+                        ChatRenderRow.GroupIntro -> {
+                            val directory by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
+                            ChatGroupConversationIntroRow(
+                                group = directory[viewModel.conversation.id],
+                                fallbackName = fallbackName,
+                                fallbackImage = viewModel.conversation.otherParticipantProfileImagePath.orEmpty(),
+                                memberCount = viewModel.conversation.participants.size,
+                                adaptiveColors = adaptiveColors,
+                                onTap = callbacks.onGroupIntroTap,
+                                modifier = Modifier
+                                    .chatMenuDimmedWhenOpen(menuOpen)
+                                    .padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 8.dp),
+                            )
+                        }
                         is ChatRenderRow.RequestDisclaimer -> ChatRequestDisclaimerRow(
                             requestDisclaimerRes(row.context), adaptiveColors,
                             Modifier.chatMenuDimmedWhenOpen(menuOpen).padding(horizontal = 14.dp, vertical = 8.dp),
@@ -255,6 +279,7 @@ fun GlassmorphicChatMessageList(
                         is ChatRenderRow.HistoryStart -> ChatHistoryStartHeader(
                             adaptiveColors,
                             Modifier.chatMenuDimmedWhenOpen(menuOpen),
+                            textRes = historyStartTextRes(viewModel),
                         )
                         is ChatRenderRow.Message -> callbacks.renderMessage(row.item)
                         is ChatRenderRow.Header -> callbacks.renderHeader(row)
@@ -290,4 +315,13 @@ private fun requestDisclaimerRes(context: PendingChatContext?): Int = when (cont
     PendingChatContext.Status.OUTGOING_REQUEST_BLOCKED -> R.string.chat_request_disclaimer_outgoing
     PendingChatContext.Status.NORMAL_CONVERSATION,
     null -> R.string.chat_intro_disclaimer_normal
+}
+
+private fun historyStartTextRes(viewModel: EnhancedChatViewModel): Int {
+    if (!viewModel.conversation.isGroup) return R.string.chat_history_start
+    return if (viewModel.conversation.memberJoinedAt?.get(viewModel.currentUserId) != null) {
+        R.string.groups_history_start_joined
+    } else {
+        R.string.groups_history_start
+    }
 }

@@ -12,7 +12,7 @@
     <string name="groups_add">Undang orang</string>
     <string name="groups_search">Cari orang</string>
     <string name="groups_details">Detail grup</string>
-    <string name="groups_privacy">Pesan dienkripsi secara end-to-end. Orang yang menerima undangan dapat membaca riwayat grup.</string>
+    <string name="groups_privacy">Pesan dienkripsi secara end-to-end. Anggota baru hanya melihat pesan yang dikirim setelah mereka bergabung.</string>
     <string name="groups_older">Pesan sebelumnya</string>
     <string name="groups_reply">Balas</string>
     <string name="groups_photo">Foto</string>
@@ -47,4 +47,24 @@
     <string name="groups_invited">Undangan terkirim</string>
     <string name="groups_pending_invitations">Undangan tertunda</string>
     <string name="groups_invite_forbidden">Beberapa orang tidak mengizinkan undangan grup.</string>
+    <string name="groups_invite_forbidden_one">%1$s tidak mengizinkan undangan grup.</string>
+    <string name="groups_invite_forbidden_many">%1$s tidak mengizinkan undangan grup.</string>
+    <string name="groups_invite_link">Tautan undangan</string>
+    <string name="groups_link_body">Siapa pun yang memiliki tautan ini dapat bergabung. Anggota baru hanya melihat pesan sejak mereka bergabung. Memperbarui atau menonaktifkannya membatalkan tautan sebelumnya.</string>
+    <string name="groups_get_link">Dapatkan tautan</string>
+    <string name="groups_share_link">Bagikan tautan</string>
+    <string name="groups_renew_link">Perbarui tautan</string>
+    <string name="groups_disable_link">Nonaktifkan tautan</string>
+    <string name="groups_join_link">Gabung grup</string>
+    <string name="groups_link_error">Tautan ini tidak tersedia, grup penuh, atau kunci chat tidak dapat dimuat. Coba lagi atau minta tautan baru dari admin.</string>
+    <string name="groups_notice_joined">%1$s bergabung dengan grup</string>
+    <string name="groups_notice_left">%1$s keluar dari grup</string>
+    <string name="groups_notice_removed">%1$s dikeluarkan dari grup</string>
+    <string name="groups_invited_you">%1$s mengundangmu ke grup</string>
+    <string name="groups_intro_created_by">Dibuat oleh %1$s</string>
+    <string name="groups_intro_created_on">Dibuat %1$s</string>
+    <string name="groups_intro_encrypted">Pesan dienkripsi ujung ke ujung.</string>
+    <string name="groups_history_start">Awal grup</string>
+    <string name="groups_history_start_joined">Kamu bisa melihat pesan sejak bergabung.</string>
+    <string name="groups_joined_on">Bergabung %1$s</string>
 </resources>

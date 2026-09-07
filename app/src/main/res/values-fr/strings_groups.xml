@@ -12,7 +12,7 @@
     <string name="groups_add">Inviter des personnes</string>
     <string name="groups_search">Rechercher des personnes</string>
     <string name="groups_details">Détails du groupe</string>
-    <string name="groups_privacy">Les messages sont chiffrés de bout en bout. Les personnes qui acceptent une invitation peuvent lire l’historique du groupe.</string>
+    <string name="groups_privacy">Les messages sont chiffrés de bout en bout. Les nouveaux membres ne voient que les messages envoyés après leur arrivée.</string>
     <string name="groups_older">Messages précédents</string>
     <string name="groups_reply">Répondre</string>
     <string name="groups_photo">Photo</string>
@@ -47,4 +47,24 @@
     <string name="groups_invited">Invitation envoyée</string>
     <string name="groups_pending_invitations">Invitations en attente</string>
     <string name="groups_invite_forbidden">Certaines personnes n’autorisent pas les invitations aux groupes.</string>
+    <string name="groups_invite_forbidden_one">%1$s n’autorise pas les invitations aux groupes.</string>
+    <string name="groups_invite_forbidden_many">%1$s n’autorisent pas les invitations aux groupes.</string>
+    <string name="groups_invite_link">Lien d’invitation</string>
+    <string name="groups_link_body">Toute personne disposant de ce lien peut rejoindre le groupe. Les nouveaux membres ne voient les messages qu’à partir de leur arrivée. Le renouveler ou le désactiver invalide le lien précédent.</string>
+    <string name="groups_get_link">Obtenir le lien</string>
+    <string name="groups_share_link">Partager le lien</string>
+    <string name="groups_renew_link">Renouveler le lien</string>
+    <string name="groups_disable_link">Désactiver le lien</string>
+    <string name="groups_join_link">Rejoindre le groupe</string>
+    <string name="groups_link_error">Ce lien est indisponible, le groupe est complet ou vos clés de discussion n’ont pas pu être chargées. Réessayez ou demandez un nouveau lien à un admin.</string>
+    <string name="groups_notice_joined">%1$s a rejoint le groupe</string>
+    <string name="groups_notice_left">%1$s a quitté le groupe</string>
+    <string name="groups_notice_removed">%1$s a été exclu du groupe</string>
+    <string name="groups_invited_you">%1$s t’a invité(e) dans le groupe</string>
+    <string name="groups_intro_created_by">Créé par %1$s</string>
+    <string name="groups_intro_created_on">Créé le %1$s</string>
+    <string name="groups_intro_encrypted">Les messages sont chiffrés de bout en bout.</string>
+    <string name="groups_history_start">Début du groupe</string>
+    <string name="groups_history_start_joined">Tu peux voir les messages à partir de ton arrivée.</string>
+    <string name="groups_joined_on">A rejoint le %1$s</string>
 </resources>

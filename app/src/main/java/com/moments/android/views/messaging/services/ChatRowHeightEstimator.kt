@@ -62,6 +62,7 @@ object ChatRowHeightEstimator {
         val bubbleWidth = maxOf(120.dp, containerWidth * maxBubbleWidthFraction)
         return when (row) {
             is ChatRenderRow.ConversationIntro -> conversationIntroHeight
+            ChatRenderRow.GroupIntro -> 240.dp
             is ChatRenderRow.RequestDisclaimer -> requestDisclaimerHeight
             is ChatRenderRow.PendingRequestMessage -> {
                 if (row.message.hasStoryReplyContext) {

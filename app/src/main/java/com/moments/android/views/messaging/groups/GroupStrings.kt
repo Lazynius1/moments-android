@@ -48,7 +48,26 @@ internal fun groupStringId(key: String): Int = when (key) {
     "accept" -> R.string.groups_accept
     "decline" -> R.string.groups_decline
     "invited" -> R.string.groups_invited
+    "invitedYou" -> R.string.groups_invited_you
     "pendingInvitations" -> R.string.groups_pending_invitations
     "inviteForbidden" -> R.string.groups_invite_forbidden
+    "inviteForbiddenOne" -> R.string.groups_invite_forbidden_one
+    "inviteForbiddenMany" -> R.string.groups_invite_forbidden_many
+    "inviteLink" -> R.string.groups_invite_link
+    "linkBody" -> R.string.groups_link_body
+    "getLink" -> R.string.groups_get_link
+    "shareLink" -> R.string.groups_share_link
+    "renewLink" -> R.string.groups_renew_link
+    "disableLink" -> R.string.groups_disable_link
+    "joinLink" -> R.string.groups_join_link
+    "linkError" -> R.string.groups_link_error
+    "notice.joined" -> R.string.groups_notice_joined
+    "notice.left" -> R.string.groups_notice_left
+    "notice.removed" -> R.string.groups_notice_removed
+    "intro.createdBy" -> R.string.groups_intro_created_by
+    "intro.createdOn" -> R.string.groups_intro_created_on
+    "intro.encrypted" -> R.string.groups_intro_encrypted
+    "historyStart" -> R.string.groups_history_start
+    "historyStartJoined" -> R.string.groups_history_start_joined
     else -> R.string.groups_error
 }

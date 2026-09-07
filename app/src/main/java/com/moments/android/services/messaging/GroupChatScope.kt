@@ -3,6 +3,7 @@ package com.moments.android.services.messaging
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.CollectionReference
+import com.google.firebase.firestore.Query
 import java.util.UUID
 
 /** Group identity survives offline queues and never depends on participant count. */
@@ -25,3 +26,21 @@ fun FirebaseFirestore.messagingThread(id: String): DocumentReference =
     collection(if (GroupChatScope.isGroup(id)) "groupConversations" else "conversations").document(id)
 val DocumentReference.messagingMessages: CollectionReference
     get() = collection(if (parent.id == "groupConversations") "groupMessages" else "messages")
+
+fun Query.applyingHistoryCutoff(cutoff: com.moments.android.views.messaging.core.MessageHistoryCutoff?): Query {
+    cutoff ?: return this
+    val timestamp = com.google.firebase.Timestamp(cutoff.date)
+    return if (cutoff.inclusive) whereGreaterThanOrEqualTo("timestamp", timestamp)
+    else whereGreaterThan("timestamp", timestamp)
+}
+
+internal fun groupNoticeText(context: android.content.Context, content: String): String? {
+    val data = runCatching { org.json.JSONObject(content) }.getOrNull() ?: return null
+    val resource = when (data.optString("groupNotice")) {
+        "joined" -> com.moments.android.R.string.groups_notice_joined
+        "left" -> com.moments.android.R.string.groups_notice_left
+        "removed" -> com.moments.android.R.string.groups_notice_removed
+        else -> return null
+    }
+    return context.getString(resource, data.optString("name"))
+}

@@ -28,6 +28,10 @@ sealed interface ChatRenderRow {
         override val id: String get() = "row:synthetic:conversation-intro:${context?.id ?: "normal"}"
     }
 
+    data object GroupIntro : ChatRenderRow {
+        override val id: String = "row:synthetic:group-intro"
+    }
+
     data class RequestDisclaimer(val context: PendingChatContext?) : ChatRenderRow {
         override val id: String get() = "row:synthetic:request-disclaimer:${context?.id ?: "normal"}"
     }

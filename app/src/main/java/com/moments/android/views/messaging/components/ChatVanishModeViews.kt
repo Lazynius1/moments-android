@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -736,6 +737,13 @@ fun ChatNoticeTimelineRow(
     onTurnOn: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    val groupText = com.moments.android.services.messaging.groupNoticeText(androidx.compose.ui.platform.LocalContext.current, noticeKey)
+    if (groupText != null) {
+        Text(groupText, modifier.fillMaxWidth().padding(vertical = 8.dp),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        return
+    }
     ChatDisappearingNoticeRow(
         noticeToken = noticeKey,
         actorUserId = actorUserId,

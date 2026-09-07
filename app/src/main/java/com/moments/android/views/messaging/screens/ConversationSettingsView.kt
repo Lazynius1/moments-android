@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
@@ -108,6 +109,7 @@ import com.moments.android.services.messaging.OnlineStatusService
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.groups.GroupChatAvatar
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.core.PresenceDisplay
 import kotlin.math.roundToInt
@@ -244,9 +246,13 @@ class ConversationSettingsViewModel(
             }
             loadPrivacySettings(prefsCtx)
         }
-        value.otherParticipantId.takeIf { it.isNotBlank() }?.let { userId ->
-            UserCacheService.refreshUser(userId) { user ->
-                liveOtherParticipantUsername = user?.username?.trim().orEmpty()
+        if (value.isGroup) {
+            liveOtherParticipantUsername = value.otherParticipantUsername.orEmpty()
+        } else {
+            value.otherParticipantId.takeIf { it.isNotBlank() }?.let { userId ->
+                UserCacheService.refreshUser(userId) { user ->
+                    liveOtherParticipantUsername = user?.username?.trim().orEmpty()
+                }
             }
         }
     }
@@ -739,6 +745,7 @@ class ConversationSettingsViewModel(
     }
 
     fun blockOtherParticipant(onBlocked: () -> Unit = {}) {
+        if (conversation?.isGroup == true) return
         val targetUserId = conversation?.otherParticipantId?.takeIf { it.isNotBlank() } ?: return
         if (currentUserId.isBlank()) return
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
@@ -831,15 +838,16 @@ fun ConversationSettingsView(
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }
                 Text(stringResource(R.string.conversation_settings_title), modifier = Modifier.weight(1f), color = colors.primary, fontWeight = FontWeight.SemiBold)
-                // ≡ iOS ToolbarItem trailing Menu { Block, Report } + ellipsis
-                Box {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = colors.primary)
-                    }
-                    DropdownMenu(
-                        expanded = showMenu && !conversation.isGroup,
-                        onDismissRequest = { showMenu = false },
-                    ) {
+                // ≡ iOS: Block/Report solo en 1:1
+                if (!conversation.isGroup) {
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = colors.primary)
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                        ) {
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -880,6 +888,7 @@ fun ConversationSettingsView(
                         )
                     }
                 }
+                }
             }
             Column(
                 Modifier
@@ -894,14 +903,22 @@ fun ConversationSettingsView(
                     notificationsEnabled = model.notificationsEnabled,
                     onProfile = {
                         if (conversation.isGroup) showGroupManagement = true
-                        val userId = conversation.otherParticipantId.trim()
-                        if (userId.isNotEmpty()) {
-                            showingUserProfile = true
-                        }
+                        else showingUserProfile = true
                     },
                     onSearch = onSearchRequested,
                     onToggleMute = { model.toggleNotifications() },
                 )
+                if (conversation.isGroup) {
+                    Column(Modifier.padding(horizontal = 16.dp)) {
+                        SettingsRow(
+                            Icons.Default.Groups,
+                            R.string.groups_members,
+                            conversation.participants.size.takeIf { it > 0 }?.toString(),
+                            colors,
+                            { showGroupManagement = true },
+                        )
+                    }
+                }
                 SettingsRows(
                     model = model,
                     colors = colors,
@@ -921,7 +938,11 @@ fun ConversationSettingsView(
         }
 
         if (showGroupManagement) {
-            com.moments.android.views.messaging.groups.GroupManagementView(conversation.id.orEmpty()) { showGroupManagement = false }
+            Surface(modifier = Modifier.fillMaxSize()) {
+                com.moments.android.views.messaging.groups.GroupManagementView(conversation.id.orEmpty()) {
+                    showGroupManagement = false
+                }
+            }
         }
         // Preferences / Vanish = push full-screen (≡ navigationDestination iOS).
         // Chat edge-to-edge: mismo padding que ChatCamera (status+nav), no solo statusBarsPadding
@@ -1001,7 +1022,7 @@ fun ConversationSettingsView(
             )
         }
 
-        if (showingUserProfile) {
+        if (showingUserProfile && !conversation.isGroup) {
             val profileUserId = conversation.otherParticipantId.trim()
             if (profileUserId.isNotEmpty()) {
                 Dialog(
@@ -1119,23 +1140,34 @@ private fun ConversationSettingsHeader(
     liveUsername: String,
     colors: AdaptiveColors,
     notificationsEnabled: Boolean,
-    onProfile: (String) -> Unit,
+    onProfile: () -> Unit,
     onSearch: () -> Unit,
     onToggleMute: () -> Unit,
 ) {
+    val isGroup = conversation.isGroup
     var presence by remember { mutableStateOf<PresenceDisplay?>(null) }
-    DisposableEffect(conversation.otherParticipantId) {
-        val stop = OnlineStatusService.shared.observeUserStatus(conversation.otherParticipantId) { status, lastSeen ->
-            presence = OnlineStatusService.shared.presenceDisplay(status, lastSeen)
+    DisposableEffect(conversation.otherParticipantId, isGroup) {
+        if (isGroup) {
+            onDispose { }
+        } else {
+            val stop = OnlineStatusService.shared.observeUserStatus(conversation.otherParticipantId) { status, lastSeen ->
+                presence = OnlineStatusService.shared.presenceDisplay(status, lastSeen)
+            }
+            onDispose { stop() }
         }
-        onDispose { stop() }
     }
     Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        // ≡ iOS KFImage(path) — en Android resolver por userId (path Storage a menudo no es URL HTTP)
-        AsyncProfileImageView(
-            userId = conversation.otherParticipantId,
-            modifier = Modifier.size(92.dp),
-        )
+        if (isGroup) {
+            GroupChatAvatar(
+                image = conversation.otherParticipantProfileImagePath.orEmpty(),
+                size = 92.dp,
+            )
+        } else {
+            AsyncProfileImageView(
+                userId = conversation.otherParticipantId,
+                modifier = Modifier.size(92.dp),
+            )
+        }
         Text(
             liveUsername.ifBlank { conversation.otherParticipantUsername.orEmpty() },
             color = colors.primary,
@@ -1143,21 +1175,26 @@ private fun ConversationSettingsHeader(
             fontSize = 24.sp,
             modifier = Modifier.padding(top = 12.dp),
         )
-        presence?.let { p ->
-            Row(
-                Modifier.padding(top = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(presenceStatusColor(p.status)))
-                Text(p.statusText, color = colors.secondary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                p.supplementalText?.let { Text("• $it", color = colors.tertiary, fontSize = 13.sp) }
+        if (!isGroup) {
+            presence?.let { p ->
+                Row(
+                    Modifier.padding(top = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(presenceStatusColor(p.status)))
+                    Text(p.statusText, color = colors.secondary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                    p.supplementalText?.let { Text("• $it", color = colors.tertiary, fontSize = 13.sp) }
+                }
             }
         }
         Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(34.dp)) {
-            HeaderAction(Icons.Default.Person, if (conversation.isGroup) R.string.groups_details else R.string.conversation_settings_quick_action_profile) {
+            HeaderAction(
+                if (isGroup) Icons.Default.Groups else Icons.Default.Person,
+                if (isGroup) R.string.groups_members else R.string.conversation_settings_quick_action_profile,
+            ) {
                 HapticManager.shared.lightImpact()
-                onProfile(conversation.otherParticipantId)
+                onProfile()
             }
             HeaderAction(Icons.Default.Search, R.string.conversation_settings_quick_action_search) {
                 HapticManager.shared.lightImpact()

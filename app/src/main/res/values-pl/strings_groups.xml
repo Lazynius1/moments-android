@@ -12,7 +12,7 @@
     <string name="groups_add">Zaproś osoby</string>
     <string name="groups_search">Szukaj osób</string>
     <string name="groups_details">Szczegóły grupy</string>
-    <string name="groups_privacy">Wiadomości są szyfrowane od końca do końca. Osoby, które przyjmą zaproszenie, mogą czytać historię grupy.</string>
+    <string name="groups_privacy">Wiadomości są szyfrowane od końca do końca. Nowi członkowie widzą tylko wiadomości wysłane po dołączeniu.</string>
     <string name="groups_older">Wcześniejsze wiadomości</string>
     <string name="groups_reply">Odpowiedz</string>
     <string name="groups_photo">Zdjęcie</string>
@@ -47,4 +47,24 @@
     <string name="groups_invited">Zaproszenie wysłane</string>
     <string name="groups_pending_invitations">Oczekujące zaproszenia</string>
     <string name="groups_invite_forbidden">Niektórzy nie zezwalają na zaproszenia do grup.</string>
+    <string name="groups_invite_forbidden_one">%1$s nie zezwala na zaproszenia do grup.</string>
+    <string name="groups_invite_forbidden_many">%1$s nie zezwalają na zaproszenia do grup.</string>
+    <string name="groups_invite_link">Link z zaproszeniem</string>
+    <string name="groups_link_body">Każdy, kto ma ten link, może dołączyć. Nowi członkowie widzą wiadomości dopiero od chwili dołączenia. Odnowienie lub wyłączenie unieważnia poprzedni link.</string>
+    <string name="groups_get_link">Pobierz link</string>
+    <string name="groups_share_link">Udostępnij link</string>
+    <string name="groups_renew_link">Odnów link</string>
+    <string name="groups_disable_link">Wyłącz link</string>
+    <string name="groups_join_link">Dołącz do grupy</string>
+    <string name="groups_link_error">Link jest niedostępny, grupa jest pełna lub nie udało się wczytać kluczy czatu. Spróbuj ponownie lub poproś administratora o nowy link.</string>
+    <string name="groups_notice_joined">%1$s dołączył(a) do grupy</string>
+    <string name="groups_notice_left">%1$s opuścił(a) grupę</string>
+    <string name="groups_notice_removed">%1$s został(a) usunięty(-a) z grupy</string>
+    <string name="groups_invited_you">%1$s zaprasza cię do grupy</string>
+    <string name="groups_intro_created_by">Utworzona przez %1$s</string>
+    <string name="groups_intro_created_on">Utworzona %1$s</string>
+    <string name="groups_intro_encrypted">Wiadomości są szyfrowane end-to-end.</string>
+    <string name="groups_history_start">Początek grupy</string>
+    <string name="groups_history_start_joined">Widzisz wiadomości od momentu dołączenia.</string>
+    <string name="groups_joined_on">Dołączył(a) %1$s</string>
 </resources>

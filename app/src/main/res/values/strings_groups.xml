@@ -12,7 +12,7 @@
     <string name="groups_add">Invite people</string>
     <string name="groups_search">Search people</string>
     <string name="groups_details">Group details</string>
-    <string name="groups_privacy">Messages are end-to-end encrypted. People who accept an invitation can read the group history.</string>
+    <string name="groups_privacy">Messages are end-to-end encrypted. New members only see messages sent after they join.</string>
     <string name="groups_older">Earlier messages</string>
     <string name="groups_reply">Reply</string>
     <string name="groups_photo">Photo</string>
@@ -47,4 +47,24 @@
     <string name="groups_invited">Invitation sent</string>
     <string name="groups_pending_invitations">Pending invitations</string>
     <string name="groups_invite_forbidden">Some people don\'t allow group invitations.</string>
+    <string name="groups_invite_forbidden_one">%1$s doesn\'t allow group invitations.</string>
+    <string name="groups_invite_forbidden_many">%1$s don\'t allow group invitations.</string>
+    <string name="groups_invite_link">Invitation link</string>
+    <string name="groups_link_body">Anyone with this link can join. New members only see messages from the moment they join. Renewing or disabling it invalidates the previous link.</string>
+    <string name="groups_get_link">Get link</string>
+    <string name="groups_share_link">Share link</string>
+    <string name="groups_renew_link">Renew link</string>
+    <string name="groups_disable_link">Disable link</string>
+    <string name="groups_join_link">Join group</string>
+    <string name="groups_link_error">This link is unavailable, the group is full, or your chat keys could not be loaded. Try again or ask an admin for a new link.</string>
+    <string name="groups_notice_joined">%1$s joined the group</string>
+    <string name="groups_notice_left">%1$s left the group</string>
+    <string name="groups_notice_removed">%1$s was removed from the group</string>
+    <string name="groups_invited_you">%1$s invited you to the group</string>
+    <string name="groups_intro_created_by">Created by %1$s</string>
+    <string name="groups_intro_created_on">Created %1$s</string>
+    <string name="groups_intro_encrypted">Messages are end-to-end encrypted.</string>
+    <string name="groups_history_start">Beginning of the group</string>
+    <string name="groups_history_start_joined">You can see messages from when you joined.</string>
+    <string name="groups_joined_on">Joined %1$s</string>
 </resources>

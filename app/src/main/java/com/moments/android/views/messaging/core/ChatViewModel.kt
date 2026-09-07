@@ -717,6 +717,11 @@ open class EnhancedChatViewModel(
     fun attachChatListenersIfNeeded() {
         if (conversationId.isBlank() || sessionListenersAttached) return
         sessionListenersAttached = true
+        chatService.rememberHistoryCutoffs(
+            conversationId,
+            conversation.deletedAtCutoff(currentUserId),
+            conversation.memberJoinedAt?.get(currentUserId),
+        )
         chatService.listenToMessages(
             conversationId,
             cutoffDate = effectiveDeletedAtCutoff(),
@@ -799,11 +804,27 @@ open class EnhancedChatViewModel(
         if (fresh.lastDeletedAt != conversation.lastDeletedAt) {
             conversation.lastDeletedAt = fresh.lastDeletedAt
         }
+        if (fresh.memberJoinedAt != conversation.memberJoinedAt) {
+            conversation.memberJoinedAt = fresh.memberJoinedAt
+        }
+        conversation.id?.let { id ->
+            chatService.rememberHistoryCutoffs(
+                id,
+                conversation.deletedAtCutoff(currentUserId),
+                conversation.memberJoinedAt?.get(currentUserId),
+            )
+        }
     }
 
-    /** Port de `effectiveDeletedAtCutoff()`: los eventos previos al borrado del usuario no cuentan. */
-    private fun effectiveDeletedAtCutoff(): Date? =
-        conversation.deletedAtCutoff(currentUserId) ?: chatService.deletedAtCutoff(conversationId)
+    /** Port de `effectiveDeletedAtCutoff()`: borrado para mí o unión al grupo. */
+    private fun effectiveHistoryCutoff(): MessageHistoryCutoff? =
+        conversation.messageHistoryCutoff(currentUserId)
+            ?: MessageHistoryCutoff.combining(
+                chatService.deletedAtCutoff(conversationId),
+                chatService.joinedAtCutoff(conversationId),
+            )
+
+    private fun effectiveDeletedAtCutoff(): Date? = effectiveHistoryCutoff()?.exclusiveDate
 
     /** Consumido por la UI tras reproducir el shake, para no repetirlo. */
     fun clearLatestBuzzEvent() {

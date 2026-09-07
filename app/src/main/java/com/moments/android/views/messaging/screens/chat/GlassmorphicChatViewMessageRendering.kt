@@ -37,6 +37,7 @@ import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.messaging.components.ChatBuzzTimelineEventRow
 import com.moments.android.views.messaging.components.ChatBuzzToast
 import com.moments.android.views.messaging.components.ChatConversationIntroRow
+import com.moments.android.views.messaging.components.ChatGroupConversationIntroRow
 import com.moments.android.views.messaging.components.ChatFailedMessageRetryAction
 import com.moments.android.views.messaging.components.ChatGlassmorphicBackground
 import com.moments.android.views.messaging.components.ChatHistoryStartHeader
@@ -100,6 +101,19 @@ fun GlassmorphicChatRenderRow(
                 .chatMenuDimmedWhenOpen(menuOpen)
                 .padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 8.dp),
         )
+        ChatRenderRow.GroupIntro -> {
+            val directory by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
+            ChatGroupConversationIntroRow(
+                group = directory[viewModel.conversation.id],
+                fallbackName = otherParticipantName,
+                fallbackImage = viewModel.conversation.otherParticipantProfileImagePath.orEmpty(),
+                memberCount = viewModel.conversation.participants.size,
+                adaptiveColors = adaptiveColors,
+                modifier = modifier
+                    .chatMenuDimmedWhenOpen(menuOpen)
+                    .padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 8.dp),
+            )
+        }
         is ChatRenderRow.RequestDisclaimer -> ChatRequestDisclaimerRow(
             requestDisclaimerForRendering(row.context),
             adaptiveColors,
@@ -145,10 +159,6 @@ fun GlassmorphicChatRenderRow(
                 val directory by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
                 val groupSenderName = directory[viewModel.conversation.id]?.allMemberNames?.get(groupSenderId)
                     ?: viewModel.conversation.groupMemberNames[groupSenderId].orEmpty()
-                if (viewModel.conversation.isGroup && groupSenderId != viewModel.currentUserId) {
-                    Text(groupSenderName, color = adaptiveColors.secondary, fontSize = 12.sp,
-                        modifier = Modifier.padding(start = 52.dp, top = 6.dp))
-                }
                 GlassmorphicChatMessageItem(
                     row.item,
                     viewModel.messages.value,
@@ -175,6 +185,13 @@ fun GlassmorphicChatRenderRow(
         ChatRenderRow.HistoryStart -> ChatHistoryStartHeader(
             adaptiveColors,
             modifier.chatMenuDimmedWhenOpen(menuOpen),
+            textRes = if (!viewModel.conversation.isGroup) {
+                R.string.chat_history_start
+            } else if (viewModel.conversation.memberJoinedAt?.get(viewModel.currentUserId) != null) {
+                R.string.groups_history_start_joined
+            } else {
+                R.string.groups_history_start
+            },
         )
     }
 }

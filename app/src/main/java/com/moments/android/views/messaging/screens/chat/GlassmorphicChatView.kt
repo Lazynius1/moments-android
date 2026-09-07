@@ -700,6 +700,7 @@ fun GlassmorphicChatView(
         messages,
         scroll.hasCompletedInitialScroll,
         typingUsers,
+        conversation.isGroup,
     ) {
         chatListRows(
             baseRows = session.chatRenderRows,
@@ -711,6 +712,7 @@ fun GlassmorphicChatView(
             canLoadMore = canLoadMore,
             hasCompletedInitialScroll = scroll.hasCompletedInitialScroll,
             hasTypingUsers = typingUsers.isNotEmpty(),
+            isGroup = conversation.isGroup,
         )
     }
     val transaction = remember(rows, timelineMutation) {
@@ -1036,6 +1038,7 @@ fun GlassmorphicChatView(
                                 )
                             }
                         },
+                        onGroupIntroTap = { showingConversationSettings = true },
                     ),
                 )
                 val navigation = ChatFloatingNavigationState.resolve(
@@ -1207,7 +1210,12 @@ fun GlassmorphicChatView(
             isGroup = conversation.isGroup,
             displayName = displayName,
             userId = conversation.otherParticipantId,
-            profileImagePath = conversation.otherParticipantProfileImagePath,
+            profileImagePath = if (conversation.isGroup) {
+                groupDirectory[conversation.id]?.image?.ifBlank { null }
+                    ?: conversation.otherParticipantProfileImagePath
+            } else {
+                conversation.otherParticipantProfileImagePath
+            },
             adaptiveColors = colors,
             isUnavailable = lifecycle.isOtherParticipantUnavailable,
             isBlockedByMe = lifecycle.isOtherParticipantBlockedByCurrentUser,
@@ -1215,6 +1223,8 @@ fun GlassmorphicChatView(
             hasTypingUsers = typingUsers.isNotEmpty(),
             presence = lifecycle.presenceDisplay,
             showBackButton = showBackButton,
+            memberCount = groupDirectory[conversation.id]?.members?.size
+                ?: conversation.participants.size,
             callbacks = ChatToolbarCallbacks(
                 onBack = onBack,
                 onProfile = { if (conversation.isGroup) showingGroupManagement = true else onProfile(conversation.otherParticipantId) },

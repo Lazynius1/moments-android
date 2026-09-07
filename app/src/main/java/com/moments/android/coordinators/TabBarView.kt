@@ -921,6 +921,13 @@ object TabBarDeepLinkHandler {
         val path = uri.path.orEmpty()
         val scheme = uri.scheme?.lowercase()
 
+        com.moments.android.views.messaging.groups.GroupInviteLink.parse(uri)?.let { link ->
+            com.moments.android.views.messaging.groups.GroupLinkNavigation.pending.value = link
+            openDeepLink(MomentsNavKey.ShowMessages, fromNewTask)
+            onHandled()
+            return
+        }
+
         // profile/visits: padre sintético = tab Profile
         if (scheme in setOf("moments", "glowsy") && host == "profile" && path == "/visits") {
             openDeepLink(MomentsNavKey.ShowProfileVisits, fromNewTask)

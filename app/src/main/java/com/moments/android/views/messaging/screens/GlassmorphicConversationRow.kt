@@ -103,7 +103,13 @@ fun GlassmorphicConversationRow(
             }
         }
     }
-    LaunchedEffect(conversation.otherParticipantId) {
+    LaunchedEffect(conversation.otherParticipantId, conversation.isGroup) {
+        if (conversation.isGroup) {
+            liveUsername = ""
+            isUnavailable = false
+            isBlockedByCurrentUser = false
+            return@LaunchedEffect
+        }
         val otherId = conversation.otherParticipantId.trim()
         if (otherId.isEmpty()) return@LaunchedEffect
         liveUsername = ""
@@ -203,7 +209,14 @@ fun GlassmorphicConversationRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (showsUnavailablePreview) {
+        if (conversation.isGroup) {
+            Box(Modifier.clickable(onClick = onTap)) {
+                com.moments.android.views.messaging.groups.GroupChatAvatar(
+                    image = conversation.otherParticipantProfileImagePath.orEmpty(),
+                    size = 56.dp,
+                )
+            }
+        } else if (showsUnavailablePreview) {
             // Sin historia → abrir conversación
             Box(Modifier.clickable(onClick = onTap)) {
                 ProfileUnavailableAvatar(size = 56.dp)
@@ -238,12 +251,12 @@ fun GlassmorphicConversationRow(
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    textDecoration = if (showsUnavailablePreview) TextDecoration.LineThrough else TextDecoration.None,
+                    textDecoration = if (!conversation.isGroup && showsUnavailablePreview) TextDecoration.LineThrough else TextDecoration.None,
                     color = (if (isDark) Color.White else Color.Black).copy(
-                        if (isUnavailable) 0.72f else 1f,
+                        if (!conversation.isGroup && isUnavailable) 0.72f else 1f,
                     ),
                 )
-                if (!isUnavailable) {
+                if (!conversation.isGroup && !isUnavailable) {
                     VerifiedBadgeView(userId = conversation.otherParticipantId, size = 14.dp)
                 }
                 if (conversation.isPinned(uid)) {

@@ -12,7 +12,7 @@
     <string name="groups_add">Kişileri davet et</string>
     <string name="groups_search">Kişi ara</string>
     <string name="groups_details">Grup ayrıntıları</string>
-    <string name="groups_privacy">Mesajlar uçtan uca şifrelenir. Daveti kabul edenler grubun geçmişini okuyabilir.</string>
+    <string name="groups_privacy">Mesajlar uçtan uca şifrelenir. Yeni üyeler yalnızca katıldıktan sonra gönderilen mesajları görür.</string>
     <string name="groups_older">Önceki mesajlar</string>
     <string name="groups_reply">Yanıtla</string>
     <string name="groups_photo">Fotoğraf</string>
@@ -47,4 +47,24 @@
     <string name="groups_invited">Davet gönderildi</string>
     <string name="groups_pending_invitations">Bekleyen davetler</string>
     <string name="groups_invite_forbidden">Bazı kişiler grup davetlerine izin vermiyor.</string>
+    <string name="groups_invite_forbidden_one">%1$s grup davetlerine izin vermiyor.</string>
+    <string name="groups_invite_forbidden_many">%1$s grup davetlerine izin vermiyor.</string>
+    <string name="groups_invite_link">Davet bağlantısı</string>
+    <string name="groups_link_body">Bu bağlantıya sahip herkes katılabilir. Yeni üyeler yalnızca katıldıkları andan itibaren mesajları görür. Yenilemek veya devre dışı bırakmak önceki bağlantıyı geçersiz kılar.</string>
+    <string name="groups_get_link">Bağlantıyı al</string>
+    <string name="groups_share_link">Bağlantıyı paylaş</string>
+    <string name="groups_renew_link">Bağlantıyı yenile</string>
+    <string name="groups_disable_link">Bağlantıyı devre dışı bırak</string>
+    <string name="groups_join_link">Gruba katıl</string>
+    <string name="groups_link_error">Bu bağlantı kullanılamıyor, grup dolu veya sohbet anahtarlarınız yüklenemedi. Tekrar deneyin ya da yöneticiden yeni bir bağlantı isteyin.</string>
+    <string name="groups_notice_joined">%1$s gruba katıldı</string>
+    <string name="groups_notice_left">%1$s gruptan ayrıldı</string>
+    <string name="groups_notice_removed">%1$s gruptan çıkarıldı</string>
+    <string name="groups_invited_you">%1$s seni gruba davet etti</string>
+    <string name="groups_intro_created_by">%1$s tarafından oluşturuldu</string>
+    <string name="groups_intro_created_on">%1$s tarihinde oluşturuldu</string>
+    <string name="groups_intro_encrypted">Mesajlar uçtan uca şifrelenir.</string>
+    <string name="groups_history_start">Grubun başlangıcı</string>
+    <string name="groups_history_start_joined">Katıldığın andan itibaren mesajları görebilirsin.</string>
+    <string name="groups_joined_on">%1$s tarihinde katıldı</string>
 </resources>

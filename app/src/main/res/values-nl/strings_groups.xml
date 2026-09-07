@@ -12,7 +12,7 @@
     <string name="groups_add">Mensen uitnodigen</string>
     <string name="groups_search">Mensen zoeken</string>
     <string name="groups_details">Groepsdetails</string>
-    <string name="groups_privacy">Berichten zijn end-to-end versleuteld. Wie een uitnodiging accepteert, kan de groepsgeschiedenis lezen.</string>
+    <string name="groups_privacy">Berichten zijn end-to-end versleuteld. Nieuwe leden zien alleen berichten die na hun toetreding zijn verstuurd.</string>
     <string name="groups_older">Eerdere berichten</string>
     <string name="groups_reply">Beantwoorden</string>
     <string name="groups_photo">Foto</string>
@@ -47,4 +47,24 @@
     <string name="groups_invited">Uitnodiging verstuurd</string>
     <string name="groups_pending_invitations">Openstaande uitnodigingen</string>
     <string name="groups_invite_forbidden">Sommige mensen staan geen groepsuitnodigingen toe.</string>
+    <string name="groups_invite_forbidden_one">%1$s staat geen groepsuitnodigingen toe.</string>
+    <string name="groups_invite_forbidden_many">%1$s staan geen groepsuitnodigingen toe.</string>
+    <string name="groups_invite_link">Uitnodigingslink</string>
+    <string name="groups_link_body">Iedereen met deze link kan deelnemen. Nieuwe leden zien alleen berichten vanaf het moment dat ze lid worden. Vernieuwen of uitschakelen maakt de vorige link ongeldig.</string>
+    <string name="groups_get_link">Link ophalen</string>
+    <string name="groups_share_link">Link delen</string>
+    <string name="groups_renew_link">Link vernieuwen</string>
+    <string name="groups_disable_link">Link uitschakelen</string>
+    <string name="groups_join_link">Deelnemen aan groep</string>
+    <string name="groups_link_error">Deze link is niet beschikbaar, de groep is vol of je chatsleutels konden niet worden geladen. Probeer opnieuw of vraag een beheerder om een nieuwe link.</string>
+    <string name="groups_notice_joined">%1$s is lid geworden van de groep</string>
+    <string name="groups_notice_left">%1$s heeft de groep verlaten</string>
+    <string name="groups_notice_removed">%1$s is uit de groep verwijderd</string>
+    <string name="groups_invited_you">%1$s heeft je uitgenodigd voor de groep</string>
+    <string name="groups_intro_created_by">Aangemaakt door %1$s</string>
+    <string name="groups_intro_created_on">Aangemaakt op %1$s</string>
+    <string name="groups_intro_encrypted">Berichten zijn end-to-end versleuteld.</string>
+    <string name="groups_history_start">Begin van de groep</string>
+    <string name="groups_history_start_joined">Je ziet berichten vanaf het moment dat je lid werd.</string>
+    <string name="groups_joined_on">Lid sinds %1$s</string>
 </resources>

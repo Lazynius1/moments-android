@@ -66,6 +66,14 @@ object StorageService {
     // MARK: - Profile
 
     suspend fun uploadProfileImage(userId: String, image: Bitmap): String {
+        return uploadModeratedAvatar(image, conversationId = null)
+    }
+
+    suspend fun uploadGroupImage(groupId: String, image: Bitmap): String {
+        return uploadModeratedAvatar(image, conversationId = groupId)
+    }
+
+    private suspend fun uploadModeratedAvatar(image: Bitmap, conversationId: String?): String {
         val imageData = image.storageUploadJpegData(
             compressionQuality = 0.75f,
             maxPixelDimension = 1080,
@@ -75,6 +83,7 @@ object StorageService {
             "imageBase64",
             Base64.encodeToString(imageData, Base64.NO_WRAP),
         )
+        if (conversationId != null) payload.put("conversationId", conversationId)
         return try {
             val response = CloudFunctionsClient.postJson(
                 function = "uploadModeratedProfileImage",

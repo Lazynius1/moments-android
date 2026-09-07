@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -37,7 +38,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
@@ -77,6 +77,7 @@ fun GlassmorphicChatToolbar(
     presence: PresenceDisplay?,
     showBackButton: Boolean = true,
     isGroup: Boolean = false,
+    memberCount: Int = 0,
     callbacks: ChatToolbarCallbacks,
     modifier: Modifier = Modifier,
 ) {
@@ -118,7 +119,10 @@ fun GlassmorphicChatToolbar(
             contentAlignment = Alignment.Center,
         ) {
             if (isGroup) {
-                Icon(Icons.Default.Groups, null, Modifier.size(headerAvatarSize), tint = adaptiveColors.primary)
+                com.moments.android.views.messaging.groups.GroupChatAvatar(
+                    image = profileImagePath.orEmpty(),
+                    size = headerAvatarSize,
+                )
             } else if (isUnavailable && !isBlockedByMe) {
                 ProfileUnavailableAvatar(size = headerAvatarSize)
             } else {
@@ -152,18 +156,17 @@ fun GlassmorphicChatToolbar(
                 Text(
                     displayName,
                     color = adaptiveColors.primary,
-                    fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textDecoration = if (isUnavailable && !isBlockedByMe) {
+                    autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 17.sp),
+                    textDecoration = if (!isGroup && isUnavailable && !isBlockedByMe) {
                         TextDecoration.LineThrough
                     } else {
                         TextDecoration.None
                     },
-                    modifier = Modifier.weight(1f, fill = false),
+                    modifier = Modifier.weight(1f),
                 )
-                if (!isUnavailable) {
+                if (!isGroup && !isUnavailable) {
                     VerifiedBadgeView(userId = userId, size = 14.dp)
                 }
                 Icon(
@@ -174,6 +177,8 @@ fun GlassmorphicChatToolbar(
                 )
             }
             ChatToolbarSubtitle(
+                isGroup = isGroup,
+                memberCount = memberCount,
                 isBlockedByMe = isBlockedByMe,
                 isUnavailable = isUnavailable,
                 hasTypingUsers = hasTypingUsers,
@@ -186,6 +191,8 @@ fun GlassmorphicChatToolbar(
 
 @Composable
 private fun ChatToolbarSubtitle(
+    isGroup: Boolean,
+    memberCount: Int,
     isBlockedByMe: Boolean,
     isUnavailable: Boolean,
     hasTypingUsers: Boolean,
@@ -193,6 +200,12 @@ private fun ChatToolbarSubtitle(
     adaptiveColors: AdaptiveColors,
 ) {
     when {
+        isGroup -> Text(
+            stringResource(R.string.groups_member_count, memberCount),
+            color = adaptiveColors.secondary,
+            fontSize = 11.sp,
+            maxLines = 1,
+        )
         isBlockedByMe -> Text(
             stringResource(R.string.chat_blocked_by_me_subtitle),
             color = adaptiveColors.secondary,

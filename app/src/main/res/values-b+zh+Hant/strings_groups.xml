@@ -12,7 +12,7 @@
     <string name="groups_add">邀請成員</string>
     <string name="groups_search">搜尋使用者</string>
     <string name="groups_details">群組資訊</string>
-    <string name="groups_privacy">訊息採用端對端加密。接受邀請的人可以閱讀群組的聊天記錄。</string>
+    <string name="groups_privacy">訊息採用端對端加密。新成員只能看到加入後傳送的訊息。</string>
     <string name="groups_older">較早的訊息</string>
     <string name="groups_reply">回覆</string>
     <string name="groups_photo">照片</string>
@@ -47,4 +47,24 @@
     <string name="groups_invited">已傳送邀請</string>
     <string name="groups_pending_invitations">待處理的邀請</string>
     <string name="groups_invite_forbidden">有些人未開放群組邀請。</string>
+    <string name="groups_invite_forbidden_one">%1$s 未開放群組邀請。</string>
+    <string name="groups_invite_forbidden_many">%1$s 未開放群組邀請。</string>
+    <string name="groups_invite_link">邀請連結</string>
+    <string name="groups_link_body">任何擁有此連結的人都可以加入。新成員只能看到加入當下之後的訊息。更新或停用會使先前的連結失效。</string>
+    <string name="groups_get_link">取得連結</string>
+    <string name="groups_share_link">分享連結</string>
+    <string name="groups_renew_link">更新連結</string>
+    <string name="groups_disable_link">停用連結</string>
+    <string name="groups_join_link">加入群組</string>
+    <string name="groups_link_error">此連結無法使用、群組已滿，或無法載入聊天金鑰。請重試或向管理員索取新連結。</string>
+    <string name="groups_notice_joined">%1$s已加入群組</string>
+    <string name="groups_notice_left">%1$s已離開群組</string>
+    <string name="groups_notice_removed">%1$s已被移出群組</string>
+    <string name="groups_invited_you">%1$s邀請你加入群組</string>
+    <string name="groups_intro_created_by">由%1$s建立</string>
+    <string name="groups_intro_created_on">建立於%1$s</string>
+    <string name="groups_intro_encrypted">訊息採用端對端加密。</string>
+    <string name="groups_history_start">群組的開始</string>
+    <string name="groups_history_start_joined">你只能看到加入之後的訊息。</string>
+    <string name="groups_joined_on">於%1$s加入</string>
 </resources>

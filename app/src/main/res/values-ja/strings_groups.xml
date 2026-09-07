@@ -12,7 +12,7 @@
     <string name="groups_add">メンバーを招待</string>
     <string name="groups_search">ユーザーを検索</string>
     <string name="groups_details">グループの詳細</string>
-    <string name="groups_privacy">メッセージはエンドツーエンドで暗号化されます。招待を承認した人はグループの履歴を読むことができます。</string>
+    <string name="groups_privacy">メッセージはエンドツーエンドで暗号化されます。新しいメンバーには参加後のメッセージだけが表示されます。</string>
     <string name="groups_older">以前のメッセージ</string>
     <string name="groups_reply">返信</string>
     <string name="groups_photo">写真</string>
@@ -47,4 +47,24 @@
     <string name="groups_invited">招待を送信しました</string>
     <string name="groups_pending_invitations">承認待ちの招待</string>
     <string name="groups_invite_forbidden">グループへの招待を許可していない人がいます。</string>
+    <string name="groups_invite_forbidden_one">%1$sさんはグループへの招待を許可していません。</string>
+    <string name="groups_invite_forbidden_many">%1$sさんはグループへの招待を許可していません。</string>
+    <string name="groups_invite_link">招待リンク</string>
+    <string name="groups_link_body">このリンクを持つ人は誰でも参加できます。新しいメンバーには参加時点以降のメッセージだけが表示されます。更新または無効化すると以前のリンクは使えなくなります。</string>
+    <string name="groups_get_link">リンクを取得</string>
+    <string name="groups_share_link">リンクを共有</string>
+    <string name="groups_renew_link">リンクを更新</string>
+    <string name="groups_disable_link">リンクを無効化</string>
+    <string name="groups_join_link">グループに参加</string>
+    <string name="groups_link_error">リンクが利用できないか、グループが満員か、チャットの鍵を読み込めませんでした。再試行するか、管理者に新しいリンクを依頼してください。</string>
+    <string name="groups_notice_joined">%1$sがグループに参加しました</string>
+    <string name="groups_notice_left">%1$sがグループを退出しました</string>
+    <string name="groups_notice_removed">%1$sがグループから削除されました</string>
+    <string name="groups_invited_you">%1$sさんからグループに招待されました</string>
+    <string name="groups_intro_created_by">%1$sが作成</string>
+    <string name="groups_intro_created_on">%1$sに作成</string>
+    <string name="groups_intro_encrypted">メッセージはエンドツーエンドで暗号化されています。</string>
+    <string name="groups_history_start">グループの始まり</string>
+    <string name="groups_history_start_joined">参加してからのメッセージを表示できます。</string>
+    <string name="groups_joined_on">%1$sに参加</string>
 </resources>

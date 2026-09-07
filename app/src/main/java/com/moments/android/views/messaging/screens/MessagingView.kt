@@ -157,6 +157,15 @@ fun MessagingView(
     var isSearching by remember { mutableStateOf(false) }
     var isSearchFocused by remember { mutableStateOf(false) }
     var showingNewConversation by remember { mutableStateOf(false) }
+    val groupLink by com.moments.android.views.messaging.groups.GroupLinkNavigation.pending.collectAsState()
+    if (uid != null) groupLink?.let { link ->
+        com.moments.android.views.messaging.groups.GroupJoinLinkDialog(link,
+            onDismiss = { com.moments.android.views.messaging.groups.GroupLinkNavigation.pending.value = null },
+            onJoined = {
+                com.moments.android.views.messaging.groups.GroupLinkNavigation.pending.value = null
+                GroupNavigation.pendingId.value = link.groupId
+            })
+    }
     val groupTarget by GroupNavigation.pendingId.collectAsState()
     LaunchedEffect(groupTarget) {
         val id = groupTarget ?: return@LaunchedEffect

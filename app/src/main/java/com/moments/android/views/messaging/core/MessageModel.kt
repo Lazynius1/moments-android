@@ -676,6 +676,7 @@ data class EnhancedMessage(
     companion object {
         /** ≡ `EnhancedMessage.chatNoticePreviewText(for:)`. */
         fun chatNoticePreviewText(context: Context, token: String): String {
+            com.moments.android.services.messaging.groupNoticeText(context, token)?.let { return it }
             if (VanishMessageTimer.parseEnabledNotice(token) != null || token == "chat.vanish.enabled") {
                 return context.getString(R.string.chat_vanish_notice_preview_enabled)
             }
@@ -796,6 +797,25 @@ data class ConversationLastMessageReaction(
     val byUserId: String,
 )
 
+data class MessageHistoryCutoff(
+    val date: Date,
+    val inclusive: Boolean,
+) {
+    fun allows(timestamp: Date): Boolean = if (inclusive) !timestamp.before(date) else timestamp.after(date)
+    val exclusiveDate: Date
+        get() = if (inclusive) Date(date.time - 1L) else date
+
+    companion object {
+        fun combining(deletedAt: Date?, joinedAt: Date?): MessageHistoryCutoff? = when {
+            deletedAt != null && joinedAt != null && !deletedAt.before(joinedAt) ->
+                MessageHistoryCutoff(deletedAt, inclusive = false)
+            joinedAt != null -> MessageHistoryCutoff(joinedAt, inclusive = true)
+            deletedAt != null -> MessageHistoryCutoff(deletedAt, inclusive = false)
+            else -> null
+        }
+    }
+}
+
 data class Conversation(
     var id: String? = null,
     val participants: List<String> = emptyList(),
@@ -819,6 +839,7 @@ data class Conversation(
     var buzzPreferences: Map<String, Boolean>? = emptyMap(),
     var forwardingPreferences: Map<String, Boolean>? = emptyMap(),
     var lastDeletedAt: Map<String, Date>? = null,
+    var memberJoinedAt: Map<String, Date>? = null,
     var lastReadAt: Map<String, Date>? = null,
     var vanishModeActive: Boolean? = false,
     var vanishModeEnabledBy: String? = null,
@@ -849,6 +870,8 @@ data class Conversation(
     }
     fun isArchived(userId: String?): Boolean = !userId.isNullOrBlank() && userId in archivedByUserIds.orEmpty()
     fun deletedAtCutoff(userId: String): Date? = lastDeletedAt?.get(userId)
+    fun messageHistoryCutoff(userId: String): MessageHistoryCutoff? =
+        MessageHistoryCutoff.combining(lastDeletedAt?.get(userId), memberJoinedAt?.get(userId))
     fun unreadCount(currentUserId: String): Int {
         if (readStatus[currentUserId] != false) return 0
         val conversationId = id ?: return 1
@@ -1324,6 +1347,7 @@ object PendingChatContextFactory {
     private val db get() = FirebaseFirestore.getInstance()
 
     suspend fun conversationIntro(conversation: Conversation, currentUserId: String): PendingChatContext? {
+        if (conversation.isGroup) return null
         val otherId = conversation.otherParticipantId
         if (currentUserId.isBlank() || otherId.isBlank()) return null
         val key = "$currentUserId::$otherId"

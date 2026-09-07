@@ -12,7 +12,7 @@
     <string name="groups_add">Invitar personas</string>
     <string name="groups_search">Buscar personas</string>
     <string name="groups_details">Detalles del grupo</string>
-    <string name="groups_privacy">Los mensajes están cifrados de extremo a extremo. Quienes acepten la invitación podrán leer el historial del grupo.</string>
+    <string name="groups_privacy">Los mensajes están cifrados de extremo a extremo. Los nuevos miembros solo ven los mensajes posteriores a su llegada.</string>
     <string name="groups_older">Mensajes anteriores</string>
     <string name="groups_reply">Responder</string>
     <string name="groups_photo">Foto</string>
@@ -47,4 +47,24 @@
     <string name="groups_invited">Invitación enviada</string>
     <string name="groups_pending_invitations">Invitaciones pendientes</string>
     <string name="groups_invite_forbidden">Algunas personas no permiten invitaciones a grupos.</string>
+    <string name="groups_invite_forbidden_one">%1$s no permite invitaciones a grupos.</string>
+    <string name="groups_invite_forbidden_many">%1$s no permiten invitaciones a grupos.</string>
+    <string name="groups_invite_link">Enlace de invitación</string>
+    <string name="groups_link_body">Cualquiera que tenga este enlace puede unirse. Los nuevos miembros solo ven los mensajes desde que entran. Renovarlo o desactivarlo invalida el enlace anterior.</string>
+    <string name="groups_get_link">Obtener enlace</string>
+    <string name="groups_share_link">Compartir enlace</string>
+    <string name="groups_renew_link">Renovar enlace</string>
+    <string name="groups_disable_link">Desactivar enlace</string>
+    <string name="groups_join_link">Unirme al grupo</string>
+    <string name="groups_link_error">Este enlace no está disponible, el grupo está lleno o no se han podido cargar tus claves del chat. Inténtalo de nuevo o pide otro enlace a un admin.</string>
+    <string name="groups_notice_joined">%1$s se ha unido al grupo</string>
+    <string name="groups_notice_left">%1$s ha salido del grupo</string>
+    <string name="groups_notice_removed">Se ha expulsado a %1$s del grupo</string>
+    <string name="groups_invited_you">%1$s te invitó al grupo</string>
+    <string name="groups_intro_created_by">Creado por %1$s</string>
+    <string name="groups_intro_created_on">Creado el %1$s</string>
+    <string name="groups_intro_encrypted">Los mensajes están cifrados de extremo a extremo.</string>
+    <string name="groups_history_start">Inicio del grupo</string>
+    <string name="groups_history_start_joined">Puedes ver los mensajes desde que te uniste.</string>
+    <string name="groups_joined_on">Se unió el %1$s</string>
 </resources>
