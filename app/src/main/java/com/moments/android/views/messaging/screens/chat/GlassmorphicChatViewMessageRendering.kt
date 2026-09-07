@@ -137,12 +137,28 @@ fun GlassmorphicChatRenderRow(
             ) {
                 // ≡ iOS: unread divider con padding h18/v6 antes del mensaje (mismo VStack).
                 callbacks.onUnreadDivider(row)
+                val groupMessage = when (val item = row.item) {
+                    is MessageItem.Single -> item.message
+                    is MessageItem.MediaCluster -> item.messages.firstOrNull()
+                }
+                val groupSenderId = groupMessage?.senderId.orEmpty()
+                val directory by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
+                val groupSenderName = directory[viewModel.conversation.id]?.allMemberNames?.get(groupSenderId)
+                    ?: viewModel.conversation.groupMemberNames[groupSenderId].orEmpty()
+                if (viewModel.conversation.isGroup && groupSenderId != viewModel.currentUserId) {
+                    Text(groupSenderName, color = adaptiveColors.secondary, fontSize = 12.sp,
+                        modifier = Modifier.padding(start = 52.dp, top = 6.dp))
+                }
                 GlassmorphicChatMessageItem(
                     row.item,
                     viewModel.messages.value,
                     viewModel,
                     messagePresentation,
-                    callbacks.renderer,
+                    if (viewModel.conversation.isGroup) callbacks.renderer.copy(
+                        otherParticipantId = groupSenderId,
+                        otherParticipantName = groupSenderName,
+                        onAvatarTap = {},
+                    ) else callbacks.renderer,
                     quickReactionEmoji,
                     timestampRevealState,
                 )

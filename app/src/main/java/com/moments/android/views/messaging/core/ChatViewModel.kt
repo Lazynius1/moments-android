@@ -155,7 +155,7 @@ open class EnhancedChatViewModel(
     var isChatVisible = false
     val conversationId: String get() = conversation.id.orEmpty()
     val isDraftConversation: Boolean get() = conversationId.isBlank()
-    val canSendBuzz: Boolean get() = ChatMessagePolicy.canSendBuzz(conversation.participants, currentUserId, _buzzPreferences.value)
+    val canSendBuzz: Boolean get() = !conversation.isGroup && ChatMessagePolicy.canSendBuzz(conversation.participants, currentUserId, _buzzPreferences.value)
 
     init {
         // ≡ setupLocalStatusListener / progress + MessageStatusUpdated
@@ -758,7 +758,7 @@ open class EnhancedChatViewModel(
             result.onSuccess { update -> applyReactionUpdate(update, conversationId) }
                 .onFailure { _error.value = it.message }
         }
-        chatService.listenToBuzzEvents(
+        if (!conversation.isGroup) chatService.listenToBuzzEvents(
             conversationId = conversationId,
             cutoffDate = effectiveDeletedAtCutoff(),
             replaceExisting = false,
@@ -2086,6 +2086,7 @@ open class EnhancedChatViewModel(
     }
 
     fun toggleVanishMode(completion: ((Throwable?) -> Unit)? = null) {
+        if (conversation.isGroup) return
         if (conversationId.isBlank()) { completion?.invoke(IllegalStateException()); return }
         val target = !_vanishModeActive.value
         scope.launch {
@@ -2108,6 +2109,7 @@ open class EnhancedChatViewModel(
     }
 
     fun setVanishMessageTimer(timer: VanishMessageTimer?, completion: ((Throwable?) -> Unit)? = null) {
+        if (conversation.isGroup) return
         if (timer == null) {
             if (_vanishModeActive.value) toggleVanishMode(completion) else completion?.invoke(null)
             return

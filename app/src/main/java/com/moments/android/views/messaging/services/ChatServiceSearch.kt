@@ -1,5 +1,7 @@
 package com.moments.android.views.messaging.services
 
+import com.moments.android.services.messaging.messagingThread
+import com.moments.android.services.messaging.messagingMessages
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Query
 import com.moments.android.views.messaging.core.EnhancedMessage
@@ -24,8 +26,8 @@ suspend fun ChatService.searchMessages(
     var lastDocument: DocumentSnapshot? = null
     var hasMore = true
     while (hasMore && matches.size < limit) {
-        var request: Query = firestore.collection("conversations").document(conversationId)
-            .collection("messages")
+        var request: Query = firestore.messagingThread(conversationId)
+            .messagingMessages
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .limit(remoteSearchBatchSize)
         lastDocument?.let { request = request.startAfter(it) }

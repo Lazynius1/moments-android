@@ -26,7 +26,8 @@ fun resolvedIncomingIsRead(data: Map<String, Any?>, senderId: String): Boolean {
     val docIsRead = data["isRead"] as? Boolean ?: false
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid
     return if (currentUid != null && senderId != currentUid) {
-        docIsRead || currentUid in readBy
+        if (com.moments.android.services.messaging.GroupChatScope.isGroup(data["conversationId"] as? String)) currentUid in readBy
+        else docIsRead || currentUid in readBy
     } else {
         docIsRead
     }
@@ -147,6 +148,7 @@ private fun snapshotNeedsFullHydrate(data: Map<String, Any?>, cached: EnhancedMe
 }
 
 private fun applySnapshotMetadata(message: EnhancedMessage, data: Map<String, Any?>): EnhancedMessage {
+    val data = com.moments.android.services.messaging.GroupChatScope.recipientMetadata(data, message.conversationId)
     fun stringList(key: String): List<String>? =
         (data[key] as? List<*>)?.filterIsInstance<String>()
 

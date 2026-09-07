@@ -1,5 +1,7 @@
 package com.moments.android.views.messaging.screens
 
+import com.moments.android.services.messaging.messagingThread
+import com.moments.android.services.messaging.messagingMessages
 import android.text.format.Formatter
 import android.content.ContentValues
 import android.net.Uri
@@ -259,7 +261,7 @@ class ConversationSettingsViewModel(
                 firestoreService.fetchUsersAsync(listOf(currentUserId)).firstOrNull()?.showReadReceipts
             }.getOrNull() ?: true
             val convData = runCatching {
-                FirebaseFirestore.getInstance().collection("conversations").document(conversationId).get().await().data
+                FirebaseFirestore.getInstance().messagingThread(conversationId).get().await().data
             }.getOrNull()
             withContext(Dispatchers.Main) {
                 if (requestVersion != privacyMutationVersion || conversation?.id != conversationId) {
@@ -347,7 +349,7 @@ class ConversationSettingsViewModel(
         val id = conversation?.id ?: return
         notificationsEnabled = !notificationsEnabled
         val isMuted = !notificationsEnabled
-        FirebaseFirestore.getInstance().collection("conversations").document(id).update(
+        FirebaseFirestore.getInstance().messagingThread(id).update(
             "mutedByUserIds",
             if (notificationsEnabled) FieldValue.arrayRemove(currentUserId) else FieldValue.arrayUnion(currentUserId),
         ).addOnSuccessListener {
@@ -372,7 +374,7 @@ class ConversationSettingsViewModel(
                 ChatDraftEvents.emit(ChatDraftEvent.VanishModeChanged(id, active))
             }
 
-            val conversationRef = FirebaseFirestore.getInstance().collection("conversations").document(id)
+            val conversationRef = FirebaseFirestore.getInstance().messagingThread(id)
             if (active) {
                 conversation?.vanishDisabledNoticeMessageId?.let { disabledId ->
                     ChatService.deleteMessageForEveryone(id, disabledId)
@@ -415,7 +417,7 @@ class ConversationSettingsViewModel(
             .putBoolean("typing_$id", typingIndicatorEnabled)
             .putBoolean("buzz_$id", buzzEnabled)
             .apply()
-        FirebaseFirestore.getInstance().collection("conversations").document(id).update(
+        FirebaseFirestore.getInstance().messagingThread(id).update(
             mapOf(
                 "readReceiptPreferences.$currentUserId" to readReceiptsEnabled,
                 "forwardingPreferences.$currentUserId" to forwardingEnabled,
@@ -437,7 +439,7 @@ class ConversationSettingsViewModel(
         val requestedValue = readReceiptsEnabled
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
             val error = runCatching {
-                FirebaseFirestore.getInstance().collection("conversations").document(id)
+                FirebaseFirestore.getInstance().messagingThread(id)
                     .update("readReceiptPreferences.$currentUserId", requestedValue)
                     .await()
             }.exceptionOrNull()
@@ -463,7 +465,7 @@ class ConversationSettingsViewModel(
             .putBoolean("chat_forwarding_enabled_$id", forwardingEnabled)
             .putBoolean("forwarding_$id", forwardingEnabled)
             .apply()
-        FirebaseFirestore.getInstance().collection("conversations").document(id)
+        FirebaseFirestore.getInstance().messagingThread(id)
             .update("forwardingPreferences.$currentUserId", forwardingEnabled)
         ConversationForwardingPreferenceEvents.emit(id, currentUserId, forwardingEnabled)
     }
@@ -491,7 +493,7 @@ class ConversationSettingsViewModel(
             .putBoolean("chat_buzz_enabled_$id", buzzEnabled)
             .putBoolean("buzz_$id", buzzEnabled)
             .apply()
-        FirebaseFirestore.getInstance().collection("conversations").document(id)
+        FirebaseFirestore.getInstance().messagingThread(id)
             .update("buzzPreferences.$currentUserId", buzzEnabled)
         ConversationBuzzPreferenceEvents.emit(id, currentUserId, buzzEnabled)
     }
@@ -746,6 +748,20 @@ class ConversationSettingsViewModel(
     }
 
     fun clearConversation(onCleared: () -> Unit = {}) {
+        val groupId = conversation?.takeIf { it.isGroup }?.id
+        if (groupId != null) {
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                runCatching {
+                    FirebaseFirestore.getInstance().collection("groupConversations").document(groupId).update(mapOf(
+                        "deletedFor" to FieldValue.arrayUnion(currentUserId), "lastDeletedAt.$currentUserId" to FieldValue.serverTimestamp()
+                    )).await()
+                }.onSuccess {
+                    LocalPersistenceService.deleteConversationCache(groupId)
+                    withContext(Dispatchers.Main) { onCleared() }
+                }
+            }
+            return
+        }
         val targetUserId = conversation?.otherParticipantId?.takeIf { it.isNotBlank() } ?: return
         if (currentUserId.isBlank()) return
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
@@ -800,6 +816,7 @@ fun ConversationSettingsView(
     var showMenu by remember { mutableStateOf(false) }
     var showPreferences by remember { mutableStateOf(false) }
     var showVanish by remember { mutableStateOf(false) }
+    var showGroupManagement by remember { mutableStateOf(false) }
     var showBlockConfirm by remember { mutableStateOf(false) }
     var showReport by remember { mutableStateOf(false) }
     var selectedMedia by remember { mutableStateOf<SharedMedia?>(null) }
@@ -820,7 +837,7 @@ fun ConversationSettingsView(
                         Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = colors.primary)
                     }
                     DropdownMenu(
-                        expanded = showMenu,
+                        expanded = showMenu && !conversation.isGroup,
                         onDismissRequest = { showMenu = false },
                     ) {
                         DropdownMenuItem(
@@ -876,6 +893,7 @@ fun ConversationSettingsView(
                     colors = colors,
                     notificationsEnabled = model.notificationsEnabled,
                     onProfile = {
+                        if (conversation.isGroup) showGroupManagement = true
                         val userId = conversation.otherParticipantId.trim()
                         if (userId.isNotEmpty()) {
                             showingUserProfile = true
@@ -902,6 +920,9 @@ fun ConversationSettingsView(
             }
         }
 
+        if (showGroupManagement) {
+            com.moments.android.views.messaging.groups.GroupManagementView(conversation.id.orEmpty()) { showGroupManagement = false }
+        }
         // Preferences / Vanish = push full-screen (≡ navigationDestination iOS).
         // Chat edge-to-edge: mismo padding que ChatCamera (status+nav), no solo statusBarsPadding
         // (puede quedar a 0 si un ancestro ya consumió insets).
@@ -1134,7 +1155,7 @@ private fun ConversationSettingsHeader(
             }
         }
         Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(34.dp)) {
-            HeaderAction(Icons.Default.Person, R.string.conversation_settings_quick_action_profile) {
+            HeaderAction(Icons.Default.Person, if (conversation.isGroup) R.string.groups_details else R.string.conversation_settings_quick_action_profile) {
                 HapticManager.shared.lightImpact()
                 onProfile(conversation.otherParticipantId)
             }
@@ -1187,7 +1208,7 @@ private fun SettingsRows(
     val context = LocalContext.current
     Column(Modifier.padding(horizontal = 16.dp)) {
         SettingsRow(Icons.Default.Star, R.string.conversation_settings_starred, model.starredMessages.size.takeIf { it > 0 }?.toString() ?: stringResource(R.string.conversation_settings_starred_none), colors, onStarred)
-        SettingsRow(
+        if (model.conversation?.isGroup != true) SettingsRow(
             Icons.Default.Timer,
             R.string.conversation_settings_vanish,
             when {
@@ -1598,7 +1619,7 @@ private fun ConversationChatPreferencesView(
                 fontSize = 13.sp,
                 modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
             )
-            PreferenceToggleRow(
+            if (model.conversation?.isGroup != true) PreferenceToggleRow(
                 title = R.string.conversation_settings_buzz,
                 description = R.string.conversation_settings_buzz_desc,
                 checked = model.buzzEnabled,

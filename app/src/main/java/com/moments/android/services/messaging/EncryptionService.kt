@@ -817,6 +817,15 @@ object EncryptionService {
     @Suppress("UNCHECKED_CAST")
     private suspend fun getConversationKeyFromFirestore(conversationId: String): ByteArray =
         withContext(Dispatchers.IO) {
+            if (GroupChatScope.isGroup(conversationId)) {
+                val uid = FirebaseAuth.getInstance().currentUser?.uid ?: throw EncryptionError.KeyNotFound
+                val doc = db.collection("groupConversations").document(conversationId).get().await()
+                val maps = doc.get("wrappedKeys") as? Map<String, Map<String, Any?>> ?: throw EncryptionError.KeyNotFound
+                val key = unwrapGroupKey(maps[uid] ?: throw EncryptionError.KeyNotFound)
+                cacheConversationKeyLocally(conversationId, key)
+                return@withContext key
+            }
+
             val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
                 ?: throw EncryptionError.KeyNotFound
 
@@ -985,6 +994,12 @@ object EncryptionService {
     }
 
     /** Desenvuelve clave de conversación (paridad unwrapConversationKey iOS). */
+    /** Group-only envelope unwrap. No direct-conversation lookup, cache or writes. */
+    fun unwrapGroupKey(envelope: Map<String, Any?>): ByteArray {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: throw EncryptionError.KeyNotFound
+        return unwrapConversationKey(WrappedConversationKey.from(envelope) ?: throw EncryptionError.InvalidInput, uid)
+    }
+
     private fun unwrapConversationKey(wrappedKey: WrappedConversationKey, userId: String): ByteArray {
         val privateKeyData = EncryptionKeyStore.retrieve(CHAT_IDENTITY_KEY_PREFIX + userId)
             ?: throw EncryptionError.KeyNotFound

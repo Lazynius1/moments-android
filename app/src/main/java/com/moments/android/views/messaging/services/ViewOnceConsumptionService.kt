@@ -23,7 +23,7 @@ object ViewOnceConsumptionService {
         completion: (Exception?) -> Unit,
     ) {
         functions
-            .getHttpsCallable("consumeViewOnceMessage")
+            .getHttpsCallable(if (com.moments.android.services.messaging.GroupChatScope.isGroup(conversationId)) "consumeGroupViewOnceMessage" else "consumeViewOnceMessage")
             .call(mapOf("conversationId" to conversationId, "messageId" to messageId, "reason" to reason.raw))
             .addOnSuccessListener { completion(null) }
             .addOnFailureListener { error ->

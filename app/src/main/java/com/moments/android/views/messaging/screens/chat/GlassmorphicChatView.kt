@@ -228,6 +228,7 @@ fun GlassmorphicChatView(
         )
     }
     var showingConversationSettings by remember { mutableStateOf(false) }
+    var showingGroupManagement by remember { mutableStateOf(false) }
     var showVanishTimerSheet by remember { mutableStateOf(false) }
     var showingUserReportSheet by remember { mutableStateOf(false) }
     var chatMediaViewerPresentation by remember {
@@ -362,7 +363,7 @@ fun GlassmorphicChatView(
             }
         }
 
-        if ((composer.pendingChatContext ?: pendingChatContext) == null &&
+        if (!conversation.isGroup && (composer.pendingChatContext ?: pendingChatContext) == null &&
             conversationIntroContext == null &&
             viewerId.isNotBlank()
         ) {
@@ -451,7 +452,15 @@ fun GlassmorphicChatView(
             onStoriesDisabled = { chatStoryRouteHolder.value = null },
         )
     }
-    val displayName = lifecycle.liveOtherParticipantUsername.ifBlank {
+    val groupDirectory by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
+    var wasGroupMember by remember(conversation.id) { mutableStateOf(false) }
+    LaunchedEffect(groupDirectory, conversation.id) {
+        if (conversation.isGroup) {
+            if (groupDirectory.containsKey(conversation.id)) wasGroupMember = true
+            else if (wasGroupMember) onBack()
+        }
+    }
+    val displayName = if (conversation.isGroup) groupDirectory[conversation.id]?.name ?: conversation.otherParticipantUsername.orEmpty() else lifecycle.liveOtherParticipantUsername.ifBlank {
         conversation.otherParticipantUsername.orEmpty()
     }
     // ≡ NSLocalizedString("chat.reply.you") — no Auth.displayName
@@ -873,7 +882,7 @@ fun GlassmorphicChatView(
                     composerGap = if (
                         effectivePendingContext?.status == PendingChatContext.Status.INCOMING_REQUEST_PENDING
                     ) 2.dp else ChatComposerChromeMetrics.messageListGap,
-                    isVanishGestureEnabled = effectivePendingContext == null &&
+                    isVanishGestureEnabled = !conversation.isGroup && effectivePendingContext == null &&
                         scroll.hasCompletedInitialScroll && !search.isSearchVisible,
                     searchHighlightTerm = search.activeSearchHighlightTerm,
                     searchActiveMessageId = search.currentSearchMatchId,
@@ -1195,6 +1204,7 @@ fun GlassmorphicChatView(
         )
     } else {
         GlassmorphicChatToolbar(
+            isGroup = conversation.isGroup,
             displayName = displayName,
             userId = conversation.otherParticipantId,
             profileImagePath = conversation.otherParticipantProfileImagePath,
@@ -1207,7 +1217,7 @@ fun GlassmorphicChatView(
             showBackButton = showBackButton,
             callbacks = ChatToolbarCallbacks(
                 onBack = onBack,
-                onProfile = { onProfile(conversation.otherParticipantId) },
+                onProfile = { if (conversation.isGroup) showingGroupManagement = true else onProfile(conversation.otherParticipantId) },
                 onStory = {
                     val uid = conversation.otherParticipantId
                     if (uid.isNotBlank()) {
@@ -1317,6 +1327,10 @@ fun GlassmorphicChatView(
                 )
             }
         }
+    }
+
+    if (showingGroupManagement) {
+        com.moments.android.views.messaging.groups.GroupManagementView(conversation.id.orEmpty()) { showingGroupManagement = false }
     }
 
     // ≡ navigationDestination(showingConversationSettings)

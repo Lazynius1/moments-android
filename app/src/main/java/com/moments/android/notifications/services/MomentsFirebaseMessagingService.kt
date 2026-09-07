@@ -41,6 +41,12 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         super.onMessageReceived(message)
         val userInfo = message.data.mapValues { it.value as Any? }
         if (userInfo.isEmpty()) return
+        if (userInfo["type"] == "group_message" || userInfo["type"] == "group_invitation") {
+            val isOpen = isAppInForeground() && userInfo["type"] == "group_message" && userInfo["groupId"] == com.moments.android.views.messaging.services.ChatSessionEngine.activeConversationId
+            if (!isOpen) scope.launch { showSystemNotificationIfNeeded(message, userInfo) }
+            NotificationBadgeService.setupListeners()
+            return
+        }
         if ((userInfo["type"] as? String)?.lowercase() == "message_request_v2") {
             scope.launch { handleMessageRequestPush(message, userInfo) }
             return
@@ -150,6 +156,16 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
     ): ResolvedContent {
         val genericBody = getString(R.string.notification_message_single_default)
         val type = (userInfo["type"] as? String)?.lowercase()
+
+        if (type == "group_invitation") {
+            return ResolvedContent(getString(com.moments.android.R.string.groups_invitations), userInfo["groupName"] as? String ?: "")
+        }
+        if (type == "group_message") {
+            return ResolvedContent(
+                userInfo["groupName"] as? String ?: getString(R.string.groups_title),
+                getString(R.string.groups_notification, userInfo["senderUsername"] as? String ?: ""),
+            )
+        }
 
         if (type == "message_request_v2") {
             return ResolvedContent(

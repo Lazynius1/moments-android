@@ -37,7 +37,7 @@ fun ChatService.listenToMessageReactions(
     val generation = beginReactionListenerGeneration(listenerKey)
     reactionListeners.remove(listenerKey)?.remove()
 
-    reactionListeners[listenerKey] = firestore.collectionGroup("messageReactions")
+    reactionListeners[listenerKey] = firestore.collectionGroup(com.moments.android.services.messaging.GroupChatScope.reactions(conversationId))
         .whereEqualTo("conversationId", conversationId)
         .addSnapshotListener { snapshot, error ->
             if (!isCurrentReactionListenerGeneration(generation, listenerKey)) return@addSnapshotListener
@@ -84,7 +84,7 @@ suspend fun ChatService.fetchReactionMap(
     val aggregated = mutableMapOf<String, Map<String, List<String>>>()
     for (chunk in chunkMessageIds(ids, size = 10)) {
         runCatching {
-            firestore.collectionGroup("messageReactions")
+            firestore.collectionGroup(com.moments.android.services.messaging.GroupChatScope.reactions(conversationId))
                 .whereEqualTo("conversationId", conversationId)
                 .whereIn("messageId", chunk)
                 .get()

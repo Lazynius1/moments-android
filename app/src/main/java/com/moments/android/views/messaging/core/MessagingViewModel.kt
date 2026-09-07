@@ -27,6 +27,7 @@ import com.moments.android.views.messaging.services.ChatSessionEngine
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.Date
 
 /** ≡ iOS `!(readStatus[uid] ?? true)` — missing cuenta como leído. */
@@ -198,6 +199,7 @@ class MessagingViewModel(
     // MARK: - Refresh de perfiles visibles (≡ refreshUserData / refreshVisibleUsers)
 
     fun refreshUserData(userId: String) {
+        if (userId.isBlank()) return
         UserCacheService.refreshUser(userId) { user ->
             val username = user?.username ?: localized(R.string.messaging_user_default)
             val imagePath = user?.profileImagePath.orEmpty()
@@ -216,7 +218,7 @@ class MessagingViewModel(
     ): List<Conversation> {
         var changed = false
         list.forEach { conversation ->
-            if (conversation.otherParticipantId == userId) {
+            if (!conversation.isGroup && conversation.otherParticipantId == userId) {
                 if (conversation.otherParticipantUsername != username ||
                     conversation.otherParticipantProfileImagePath != imagePath
                 ) {
@@ -230,7 +232,7 @@ class MessagingViewModel(
     }
 
     fun refreshVisibleUsers() {
-        conversations.take(10).forEach { refreshUserData(it.otherParticipantId) }
+        conversations.filterNot { it.isGroup }.take(10).forEach { refreshUserData(it.otherParticipantId) }
     }
 
     /**
@@ -562,7 +564,11 @@ class MessagingViewModel(
         LocalPersistenceService.deleteConversationCache(conversationId)
 
         viewModelScope.launch {
-            ChatService.deleteConversationsBetweenUsers(userId, conversation.otherParticipantId)
+            (if (conversation.isGroup) runCatching {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("groupConversations").document(conversationId)
+                    .update(mapOf("deletedFor" to com.google.firebase.firestore.FieldValue.arrayUnion(userId), "lastDeletedAt.$userId" to com.google.firebase.firestore.FieldValue.serverTimestamp())).await()
+                Unit
+            } else ChatService.deleteConversationsBetweenUsers(userId, conversation.otherParticipantId))
                 .onFailure { errorMessage = localized(R.string.messaging_error_delete_conversation, it.message.orEmpty()) }
         }
     }

@@ -355,7 +355,9 @@ object ChatServiceMediaPipeline {
         originalContentType: String,
         objectPath: String? = null,
     ): StorageUploadTarget {
-        val path = objectPath ?: StoragePathBuilder.build(
+        val path = if (com.moments.android.services.messaging.GroupChatScope.isGroup(conversationId))
+            "groupChat/$conversationId/$userId/$messageId/$fileId.enc"
+        else objectPath ?: StoragePathBuilder.build(
             userId,
             StorageUploadDomain.ChatMedia(
                 conversationId = conversationId,

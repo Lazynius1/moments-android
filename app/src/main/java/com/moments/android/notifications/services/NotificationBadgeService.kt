@@ -36,6 +36,9 @@ object NotificationBadgeService {
     private val _unreadTagsCount = MutableStateFlow(0)
     val unreadTagsCount: StateFlow<Int> = _unreadTagsCount.asStateFlow()
 
+    private var groupMessageListener: ListenerRegistration? = null
+    private var directMessageCount = 0
+    private var groupMessageCount = 0
     private var messageListener: ListenerRegistration? = null
     private var currentUserId: String? = null
     private var notificationCollectJob: kotlinx.coroutines.Job? = null
@@ -56,6 +59,8 @@ object NotificationBadgeService {
         if (currentUserId != userId) {
             messageListener?.remove()
             messageListener = null
+            groupMessageListener?.remove(); groupMessageListener = null
+            directMessageCount = 0; groupMessageCount = 0
             notificationCollectJob?.cancel()
             currentUserId = userId
         }
@@ -98,7 +103,10 @@ object NotificationBadgeService {
                     .whereArrayContains("participants", userId)
                     .get()
                     .await()
-                _unreadMessagesCount.value = countUnreadMessages(snapshot.documents.mapNotNull { it.data }, userId)
+                directMessageCount = countUnreadMessages(snapshot.documents.mapNotNull { it.data }, userId)
+                val groups = db.collection("groupConversations").whereArrayContains("participants", userId).get().await()
+                groupMessageCount = countUnreadMessages(groups.documents.mapNotNull { it.data }, userId)
+                _unreadMessagesCount.value = directMessageCount + groupMessageCount
                 MomentsWidgetStore.putBadgeCounts(
                     unreadMessages = _unreadMessagesCount.value,
                     reload = false,
@@ -110,12 +118,23 @@ object NotificationBadgeService {
     }
 
     private fun setupMessageListener(userId: String) {
+        groupMessageListener?.remove()
+        groupMessageListener = db.collection("groupConversations").whereArrayContains("participants", userId)
+            .addSnapshotListener { snapshot, _ ->
+                val docs = snapshot?.documents ?: return@addSnapshotListener
+                if (FirebaseAuth.getInstance().currentUser?.uid != userId) return@addSnapshotListener
+                groupMessageCount = countUnreadMessages(docs.mapNotNull { it.data }, userId)
+                _unreadMessagesCount.value = directMessageCount + groupMessageCount
+                MomentsWidgetStore.putBadgeCounts(unreadMessages = _unreadMessagesCount.value, reload = false)
+                updateAppBadgeFromCounts()
+            }
         messageListener?.remove()
         messageListener = db.collection("conversations")
             .whereArrayContains("participants", userId)
             .addSnapshotListener { snapshot, _ ->
                 val docs = snapshot?.documents ?: return@addSnapshotListener
-                _unreadMessagesCount.value = countUnreadMessages(docs.mapNotNull { it.data }, userId)
+                directMessageCount = countUnreadMessages(docs.mapNotNull { it.data }, userId)
+                _unreadMessagesCount.value = directMessageCount + groupMessageCount
                 MomentsWidgetStore.putBadgeCounts(
                     unreadMessages = _unreadMessagesCount.value,
                     reload = false,
@@ -158,7 +177,8 @@ object NotificationBadgeService {
         unreadEchoes: Int = 0,
         unreadTags: Int = 0,
     ): Boolean {
-        _unreadMessagesCount.value = unreadMessages.coerceAtLeast(0)
+        directMessageCount = unreadMessages.coerceAtLeast(0)
+        _unreadMessagesCount.value = directMessageCount + groupMessageCount
         _unreadNotificationsCount.value = unreadNotifications.coerceAtLeast(0)
         _unreadEchoesCount.value = unreadEchoes.coerceAtLeast(0)
         _unreadTagsCount.value = unreadTags.coerceAtLeast(0)
@@ -182,6 +202,8 @@ object NotificationBadgeService {
     fun clearAppBadge() = Unit
 
     fun cleanup() {
+        groupMessageListener?.remove(); groupMessageListener = null
+        directMessageCount = 0; groupMessageCount = 0
         messageListener?.remove()
         messageListener = null
         notificationCollectJob?.cancel()

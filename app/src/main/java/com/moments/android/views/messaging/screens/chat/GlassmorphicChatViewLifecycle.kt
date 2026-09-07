@@ -99,6 +99,7 @@ class GlassmorphicChatLifecycleController(
         }
 
     fun setupOnlineStatusObserver() {
+        if (viewModel.conversation.isGroup) return
         removeStatusObserver?.invoke()
         val otherUserId = viewModel.conversation.otherParticipantId
         if (otherUserId.isBlank()) return
@@ -111,6 +112,7 @@ class GlassmorphicChatLifecycleController(
 
     /** ≡ `checkUserStories()` en ComposerAndChrome. */
     fun checkUserStories() {
+        if (viewModel.conversation.isGroup) return
         val authorId = viewModel.conversation.otherParticipantId.trim()
         val viewerId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
         val empty = StoryRingSnapshot(
@@ -271,6 +273,7 @@ class GlassmorphicChatLifecycleController(
     }
 
     fun refreshOtherParticipantUsername() {
+        if (viewModel.conversation.isGroup) return
         val userId = viewModel.conversation.otherParticipantId.trim()
         if (userId.isEmpty()) {
             liveOtherParticipantUsername = ""
@@ -284,6 +287,7 @@ class GlassmorphicChatLifecycleController(
     }
 
     fun refreshOtherParticipantAvailability() {
+        if (viewModel.conversation.isGroup) return
         val userId = viewModel.conversation.otherParticipantId.trim()
         if (userId.isEmpty() || !NetworkMonitor.isConnected) return
         scope.launch {
@@ -295,6 +299,7 @@ class GlassmorphicChatLifecycleController(
     }
 
     fun refreshOtherParticipantBlockAvailability(userId: String) {
+        if (viewModel.conversation.isGroup) return
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         scope.launch {
             val result = firestoreService.checkIfBlocked(currentUserId, userId)

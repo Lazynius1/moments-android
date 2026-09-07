@@ -1,5 +1,7 @@
 package com.moments.android.views.messaging.screens
 
+import com.moments.android.views.messaging.groups.NewGroupView
+import com.moments.android.views.messaging.groups.GroupNavigation
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -36,6 +38,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Groups
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -120,6 +123,7 @@ import com.moments.android.adaptive.LocalAdaptiveWindowState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.Date
 
 /**
@@ -153,6 +157,15 @@ fun MessagingView(
     var isSearching by remember { mutableStateOf(false) }
     var isSearchFocused by remember { mutableStateOf(false) }
     var showingNewConversation by remember { mutableStateOf(false) }
+    val groupTarget by GroupNavigation.pendingId.collectAsState()
+    LaunchedEffect(groupTarget) {
+        val id = groupTarget ?: return@LaunchedEffect
+        runCatching {
+            val doc = com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("groupConversations").document(id).get().await()
+            com.moments.android.views.messaging.services.ChatService.parseConversation(doc.id, doc.data.orEmpty(), uid.orEmpty())?.let(viewModel::openConversation)
+        }
+        GroupNavigation.pendingId.value = null
+    }
     var showingRequests by remember { mutableStateOf(false) }
     var showingArchived by remember { mutableStateOf(false) }
     var showingStatusSelector by remember { mutableStateOf(false) }
@@ -287,6 +300,7 @@ fun MessagingView(
             return
         }
         showingNewConversation -> {
+            DisposableEffect(Unit) { onSuppressTabBarChange(true); onDispose { onSuppressTabBarChange(false) } }
             BackHandler { showingNewConversation = false }
             GlassmorphicNewConversationView(
                 viewModel = viewModel,
@@ -386,6 +400,7 @@ fun MessagingView(
                 pendingRequestCount = pendingRequestCount,
                 currentStatus = currentStatus,
             )
+            com.moments.android.views.messaging.groups.GroupInvitationRows(onAccepted = viewModel::openConversation)
             val showSearch =
                 viewModel.conversations.isNotEmpty() ||
                     viewModel.archivedConversations.isNotEmpty() ||
@@ -1194,17 +1209,35 @@ private fun GlassmorphicNewConversationView(
 ) {
     val colors = rememberAdaptiveColors()
     var searchText by remember { mutableStateOf("") }
+    var showingGroupCreation by remember { mutableStateOf(false) }
     val uid = FirebaseAuth.getInstance().currentUser?.uid
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { viewModel.searchUsers("") }
     LaunchedEffect(searchText) { viewModel.searchUsers(searchText) }
 
+    if (showingGroupCreation) {
+        ChatRecoveryGateView(onCancel = { showingGroupCreation = false }) {
+            NewGroupView(
+                onBack = { showingGroupCreation = false },
+                onCreated = onConversationReady,
+            )
+        }
+        return
+    }
+
     Column(modifier.fillMaxSize().background(colors.surfaceBackground).statusBarsPadding()) {
         MessagingDestinationHeader(
             title = stringResource(R.string.messaging_new_title),
             onBack = onDismiss,
         )
+        Row(
+            Modifier.fillMaxWidth().clickable { showingGroupCreation = true }.padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Groups, null, tint = colors.primary)
+            Text(stringResource(R.string.groups_create), Modifier.padding(start = 12.dp), color = colors.primary)
+        }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,

@@ -1,5 +1,7 @@
 package com.moments.android.views.messaging.services
 
+import com.moments.android.services.messaging.messagingThread
+import com.moments.android.services.messaging.messagingMessages
 import com.google.firebase.firestore.FieldValue
 import com.moments.android.MomentsApplication
 import com.moments.android.views.messaging.core.EnhancedMessage
@@ -213,14 +215,20 @@ fun ChatService.deleteViewOnceAfterViewing(
 
 fun ChatService.cleanupConsumedViewOnceMessages(conversationId: String) {
     if (conversationId.isBlank()) return
-    firestore.collection("conversations").document(conversationId).collection("messages")
+    firestore.messagingThread(conversationId).messagingMessages
         .whereEqualTo("isViewOnce", true)
         .whereEqualTo("isDeleted", false)
         .limit(50)
         .get()
         .addOnSuccessListener { snapshot ->
             snapshot.documents.forEach { document ->
-                val data = document.data.orEmpty()
+                var data: Map<String, Any?> = document.data.orEmpty()
+                if (com.moments.android.services.messaging.GroupChatScope.isGroup(conversationId)) {
+                    val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return@forEach
+                    if (uid !in (data["recipientIds"] as? List<*>).orEmpty()) return@forEach
+                    val viewed = (data["viewedBy"] as? List<*>).orEmpty().filter { it == uid }
+                    data = data + mapOf("viewedBy" to viewed, "isViewed" to viewed.isNotEmpty(), "replayedBy" to (data["replayedBy"] as? List<*>).orEmpty().filter { it == uid })
+                }
                 val reason = consumptionReasonForConsumedViewOnce(data) ?: return@forEach
                 val messageId = document.getString("id") ?: document.id
                 ViewOnceConsumptionService.consume(conversationId, messageId, reason) { }
@@ -307,12 +315,13 @@ private suspend fun ChatService.saveViewOnceMessage(
     message: EnhancedMessage,
     customData: Map<String, Any>,
 ): EnhancedMessage {
-    val messageRef = firestore.collection("conversations")
-        .document(message.conversationId)
-        .collection("messages")
+    val messageRef = firestore.messagingThread(message.conversationId)
+        .messagingMessages
         .document(message.id)
     try {
-        messageRef.set(customData).await()
+        if (com.moments.android.services.messaging.GroupChatScope.isGroup(message.conversationId)) {
+            com.moments.android.services.messaging.GroupChatAPI.request("sendGroupMessage", mapOf("groupId" to message.conversationId, "messageId" to message.id, "message" to customData))
+        } else messageRef.set(customData).await()
     } catch (error: Exception) {
         updateLocalMessageStatus(message.conversationId, message.id, MessageStatus.FAILED)
         throw error
@@ -337,9 +346,8 @@ suspend fun ChatService.markViewOnceAsViewed(
     messageId: String,
     viewerId: String,
 ): Result<Unit> = runCatching {
-    val messageRef = firestore.collection("conversations")
-        .document(conversationId)
-        .collection("messages")
+    val messageRef = firestore.messagingThread(conversationId)
+        .messagingMessages
         .document(messageId)
     // firestore.rules `onlyViewOnceFieldsUpdated` solo permite isViewed/viewedBy/replayedBy.
     // Incluir `status` hace fallar el write (PERMISSION_DENIED) → CF replay ve viewedBy vacío.
@@ -377,9 +385,8 @@ suspend fun ChatService.markViewOnceReplayed(
     messageId: String,
     viewerId: String,
 ): Result<Unit> = runCatching {
-    firestore.collection("conversations")
-        .document(conversationId)
-        .collection("messages")
+    firestore.messagingThread(conversationId)
+        .messagingMessages
         .document(messageId)
         .update("replayedBy", FieldValue.arrayUnion(viewerId))
         .await()

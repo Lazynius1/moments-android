@@ -189,6 +189,7 @@ suspend fun ChatService.buildEnhancedMessage(
     conversationId: String,
     decryptedContentOverride: String? = null,
 ): EnhancedMessage {
+    val data = com.moments.android.services.messaging.GroupChatScope.recipientMetadata(data, conversationId)
     val id = data["id"] as? String ?: docId
     val senderId = data["senderId"] as? String ?: ""
     val type = MessageType.from(data["type"] as? String)

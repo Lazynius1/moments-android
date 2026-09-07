@@ -831,7 +831,9 @@ data class Conversation(
     var lastMessageReaction: ConversationLastMessageReaction? = null,
     var lastMessageType: MessageType? = null,
     var lastMessageViewOncePending: Boolean = false,
+    val groupMemberNames: Map<String, String> = emptyMap(),
 ) {
+    val isGroup: Boolean get() = com.moments.android.services.messaging.GroupChatScope.isGroup(id)
     fun allowsForwarding(senderId: String): Boolean = forwardingPreferences?.get(senderId) ?: true
     fun isMuted(userId: String?): Boolean = when {
         userId.isNullOrBlank() -> isMuted == true

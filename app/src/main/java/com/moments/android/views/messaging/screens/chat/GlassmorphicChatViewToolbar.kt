@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Circle
@@ -75,6 +76,7 @@ fun GlassmorphicChatToolbar(
     hasTypingUsers: Boolean,
     presence: PresenceDisplay?,
     showBackButton: Boolean = true,
+    isGroup: Boolean = false,
     callbacks: ChatToolbarCallbacks,
     modifier: Modifier = Modifier,
 ) {
@@ -115,7 +117,9 @@ fun GlassmorphicChatToolbar(
                 },
             contentAlignment = Alignment.Center,
         ) {
-            if (isUnavailable && !isBlockedByMe) {
+            if (isGroup) {
+                Icon(Icons.Default.Groups, null, Modifier.size(headerAvatarSize), tint = adaptiveColors.primary)
+            } else if (isUnavailable && !isBlockedByMe) {
                 ProfileUnavailableAvatar(size = headerAvatarSize)
             } else {
                 AsyncProfileImageView(

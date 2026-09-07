@@ -60,6 +60,18 @@ object NotificationNavigationService {
 
     fun handleNotificationData(userInfo: Map<String, Any?>) {
         val type = userInfo["type"] as? String ?: return
+        if (type == "group_invitation") {
+            AppRouter.navigate(AppRouter.Destination.ShowMessages)
+            return
+        }
+        if (type == "group_message") {
+            val id = userInfo["groupId"] as? String ?: return
+            if (id.isNotBlank()) {
+                com.moments.android.views.messaging.groups.GroupNavigation.pendingId.value = id
+                AppRouter.navigate(AppRouter.Destination.ShowMessages)
+            }
+            return
+        }
         when (normalizedType(type)) {
             "reaction", "comment" -> {
                 val momentId = firstString(userInfo, listOf("momentId", "targetId"))

@@ -1,5 +1,7 @@
 package com.moments.android.views.messaging.services
 
+import com.moments.android.services.messaging.messagingThread
+import com.moments.android.services.messaging.messagingMessages
 import com.google.firebase.firestore.FieldValue
 import com.moments.android.MomentsApplication
 import com.moments.android.views.messaging.core.EnhancedMessage
@@ -43,7 +45,9 @@ suspend fun ChatService.updateConversation(
     senderId: String,
     messageType: MessageType? = null,
 ): Result<Unit> = runCatching {
-    val doc = firestore.collection("conversations").document(conversationId).get().await()
+    if (com.moments.android.services.messaging.GroupChatScope.isGroup(conversationId)) return@runCatching
+
+    val doc = firestore.messagingThread(conversationId).get().await()
     if (!doc.exists()) {
         error("Conversation not found.")
     }
@@ -70,7 +74,7 @@ suspend fun ChatService.updateConversation(
     if (shouldRestoreSender) {
         updateData["deletedFor"] = FieldValue.arrayRemove(senderId)
     }
-    firestore.collection("conversations").document(conversationId).update(updateData).await()
+    firestore.messagingThread(conversationId).update(updateData).await()
 }
 
 suspend fun ChatService.forwardTextMessage(
@@ -155,9 +159,8 @@ suspend fun ChatService.toggleMessageStar(
     } else {
         mapOf("starredBy" to FieldValue.arrayRemove(userId))
     }
-    firestore.collection("conversations")
-        .document(conversationId)
-        .collection("messages")
+    firestore.messagingThread(conversationId)
+        .messagingMessages
         .document(messageId)
         .update(fieldUpdate)
         .await()

@@ -1,5 +1,7 @@
 package com.moments.android.views.messaging.services
 
+import com.moments.android.services.messaging.messagingThread
+import com.moments.android.services.messaging.messagingMessages
 import android.net.Uri
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
@@ -116,6 +118,7 @@ object ChatService {
     private var archivedConversationIds: Set<String> = emptySet()
 
     /** Registro legacy + clave en `activeListeners` (`conversations_{uid}`). */
+    private var groupConversationsListener: com.google.firebase.firestore.ListenerRegistration? = null
     private var conversationsListener: com.google.firebase.firestore.ListenerRegistration? = null
 
     /** ≡ `ChatService.MessageHistoryPage`. */
@@ -163,8 +166,8 @@ object ChatService {
         cutoffDate: Date? = null,
     ): Result<List<EnhancedMessage>> = runCatching {
         preloadEncryption(conversationId)
-        val snapshot = db.collection("conversations").document(conversationId)
-            .collection("messages")
+        val snapshot = db.messagingThread(conversationId)
+            .messagingMessages
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .limitToLast(limit.toLong())
             .get()
@@ -184,7 +187,7 @@ object ChatService {
         cutoffDate: Date? = null,
     ): Result<List<EnhancedMessage>> = runCatching {
         preloadEncryption(conversationId)
-        val collection = db.collection("conversations").document(conversationId).collection("messages")
+        val collection = db.messagingThread(conversationId).messagingMessages
         val snapshot = if (after.messageId.isEmpty()) {
             collection
                 .whereGreaterThan("timestamp", Timestamp(after.timestamp))
@@ -219,7 +222,7 @@ object ChatService {
         limit: Int = 25,
     ): Result<MessageHistoryPage> = runCatching {
         preloadEncryption(conversationId)
-        val collection = db.collection("conversations").document(conversationId).collection("messages")
+        val collection = db.messagingThread(conversationId).messagingMessages
         val beforeTs = Timestamp(before.timestamp)
         val snapshot = if (before.messageId.isEmpty()) {
             collection
@@ -266,8 +269,8 @@ object ChatService {
         messageId: String,
     ): Result<EnhancedMessage?> = runCatching {
         preloadEncryption(conversationId)
-        val document = db.collection("conversations").document(conversationId)
-            .collection("messages").document(messageId).get().await()
+        val document = db.messagingThread(conversationId)
+            .messagingMessages.document(messageId).get().await()
         if (!document.exists()) return@runCatching null
         val data = document.data ?: return@runCatching null
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
@@ -409,8 +412,8 @@ object ChatService {
 
         fun attachListener() {
             if (!isCurrentListenerGeneration(generation, conversationId)) return
-            val listener = db.collection("conversations").document(conversationId)
-                .collection("messages")
+            val listener = db.messagingThread(conversationId)
+                .messagingMessages
                 .orderBy("timestamp", Query.Direction.ASCENDING)
                 .limitToLast(limit.toLong())
                 .addSnapshotListener { snapshot, error ->
@@ -444,7 +447,7 @@ object ChatService {
         if (conversationId.isBlank()) return
         val key = typingListenerKey(conversationId)
         if (activeListeners[key] != null) return
-        activeListeners[key] = db.collection("conversations").document(conversationId)
+        activeListeners[key] = db.messagingThread(conversationId)
             .collection("typing")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) return@addSnapshotListener
@@ -475,7 +478,7 @@ object ChatService {
         if (activeListeners[key] != null) return
         val generation = beginListenerGeneration(key)
         activeListeners.remove(key)?.remove()
-        activeListeners[key] = db.collection("conversations").document(conversationId)
+        activeListeners[key] = db.messagingThread(conversationId)
             .addSnapshotListener { snapshot, error ->
                 if (!isCurrentListenerGeneration(generation, key)) return@addSnapshotListener
                 if (error != null) return@addSnapshotListener
@@ -540,13 +543,17 @@ object ChatService {
         }
         val conversationId = message.conversationId
         val messageId = message.id
-        val messageRef = db.collection("conversations").document(conversationId)
-            .collection("messages").document(messageId)
+        val messageRef = db.messagingThread(conversationId)
+            .messagingMessages.document(messageId)
         val messageData = messageToFirestoreData(message, useServerTimestamp)
 
         // Escritura no cancelada al timeout (≡ setData callback iOS sigue vivo tras el sleep).
         val writeJob = scope.async {
-            runCatching { messageRef.set(messageData).await() }
+            runCatching {
+                if (com.moments.android.services.messaging.GroupChatScope.isGroup(conversationId)) {
+                    com.moments.android.services.messaging.GroupChatAPI.request("sendGroupMessage", mapOf("groupId" to conversationId, "messageId" to messageId, "message" to messageData))
+                } else messageRef.set(messageData).await()
+            }
         }
         val writeResult = withTimeoutOrNull(SEND_ACK_TIMEOUT_MS) { writeJob.await() }
 
@@ -703,6 +710,7 @@ object ChatService {
 
     /** ≡ `removeAllListeners()` — logout / cambio de usuario. */
     fun removeAllListeners() {
+        com.moments.android.views.messaging.groups.GroupDirectory.groups.value = emptyMap()
         activeListeners.values.forEach { it.remove() }
         activeListeners.clear()
         listenerGenerations.clear()
@@ -900,8 +908,8 @@ object ChatService {
     ): Result<Unit> = runCatching {
         val payload = ChatLocationPayload(lat = latitude, lng = longitude).encodedJSON().orEmpty()
         val encrypted = EncryptionService.encryptChatMessage(payload, conversationId)
-        db.collection("conversations").document(conversationId)
-            .collection("messages").document(messageId)
+        db.messagingThread(conversationId)
+            .messagingMessages.document(messageId)
             .update(
                 mapOf(
                     "content" to encrypted,
@@ -912,7 +920,7 @@ object ChatService {
 
     /** Port de `restoreConversation`: deshace el borrado local de la conversación. */
     suspend fun restoreConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
-        db.collection("conversations").document(conversationId)
+        db.messagingThread(conversationId)
             .update("deletedFor", FieldValue.arrayRemove(userId)).await()
     }
 
@@ -923,7 +931,7 @@ object ChatService {
         emoji: String,
         byUserId: String,
     ): Result<Unit> = runCatching {
-        db.collection("conversations").document(conversationId).update(
+        db.messagingThread(conversationId).update(
             mapOf(
                 "lastMessageReaction" to mapOf(
                     "messageId" to messageId,
@@ -936,7 +944,7 @@ object ChatService {
 
     /** Port de `clearLastMessageReaction`. */
     suspend fun clearLastMessageReaction(conversationId: String): Result<Unit> = runCatching {
-        db.collection("conversations").document(conversationId)
+        db.messagingThread(conversationId)
             .update("lastMessageReaction", FieldValue.delete()).await()
     }
 
@@ -952,8 +960,8 @@ object ChatService {
             .documents
         for (conversationDoc in conversations) {
             val conversationId = conversationDoc.id
-            val messages = db.collection("conversations").document(conversationId)
-                .collection("messages")
+            val messages = db.messagingThread(conversationId)
+                .messagingMessages
                 .whereNotEqualTo("senderId", currentUserId)
                 .whereEqualTo("status", MessageStatus.SENT.raw)
                 .get()
@@ -972,8 +980,8 @@ object ChatService {
         conversationId: String,
         currentUserId: String,
     ): Result<Unit> = runCatching {
-        val snapshot = db.collection("conversations").document(conversationId)
-            .collection("messages")
+        val snapshot = db.messagingThread(conversationId)
+            .messagingMessages
             .whereEqualTo("status", MessageStatus.SENT.raw)
             .get()
             .await()
@@ -988,15 +996,15 @@ object ChatService {
     }
 
     suspend fun stopLiveLocationMessage(conversationId: String, messageId: String) {
-        db.collection("conversations").document(conversationId)
-            .collection("messages").document(messageId)
+        db.messagingThread(conversationId)
+            .messagingMessages.document(messageId)
             .update(mapOf("liveLocationStoppedAt" to FieldValue.serverTimestamp()))
             .await()
     }
 
     suspend fun fetchLiveLocationStatus(conversationId: String, messageId: String): LiveLocationStatus? = runCatching {
-        val snap = db.collection("conversations").document(conversationId)
-            .collection("messages").document(messageId).get().await()
+        val snap = db.messagingThread(conversationId)
+            .messagingMessages.document(messageId).get().await()
         if (!snap.exists()) {
             return@runCatching LiveLocationStatus(exists = false, senderId = null, isStopped = true, expiresAt = null)
         }
@@ -1031,8 +1039,8 @@ object ChatService {
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         scope.launch {
             runCatching {
-                val snap = db.collection("conversations").document(conversationId)
-                    .collection("messages").document(messageId).get().await()
+                val snap = db.messagingThread(conversationId)
+                    .messagingMessages.document(messageId).get().await()
                 val data = snap.data ?: return@runCatching
                 val senderId = data["senderId"] as? String ?: return@runCatching
                 val status = data["status"] as? String ?: return@runCatching
@@ -1057,7 +1065,7 @@ object ChatService {
 
         val userSettings = db.collection("users").document(readerId).get().await().data
         val globalEnabled = userSettings?.get("showReadReceipts") as? Boolean ?: true
-        val conversationRef = db.collection("conversations").document(conversationId)
+        val conversationRef = db.messagingThread(conversationId)
         val conversation = conversationRef.get().await().data
         @Suppress("UNCHECKED_CAST")
         val preferences = conversation?.get("readReceiptPreferences") as? Map<String, Boolean> ?: emptyMap()
@@ -1071,7 +1079,7 @@ object ChatService {
                 update["status"] = MessageStatus.READ.raw
                 update["readAtBy.$readerId"] = FieldValue.serverTimestamp()
             }
-            batch.update(conversationRef.collection("messages").document(messageId), update)
+            batch.update(conversationRef.messagingMessages.document(messageId), update)
         }
         val conversationUpdate = mutableMapOf<String, Any>(
             "readStatus.$readerId" to true,
@@ -1086,7 +1094,7 @@ object ChatService {
 
     /** ≡ `markConversationAsRead` — iOS no corta por incógnito aquí (sí en `markMessagesAsRead`). */
     suspend fun markConversationAsRead(conversationId: String, userId: String) {
-        db.collection("conversations").document(conversationId).update(
+        db.messagingThread(conversationId).update(
             mapOf(
                 "readStatus.$userId" to true,
                 "lastReadAt.$userId" to FieldValue.serverTimestamp(),
@@ -1095,15 +1103,15 @@ object ChatService {
     }
 
     suspend fun markConversationAsUnread(conversationId: String, userId: String): Result<Unit> = runCatching {
-        db.collection("conversations").document(conversationId).update("readStatus.$userId", false).await()
+        db.messagingThread(conversationId).update("readStatus.$userId", false).await()
     }
 
     suspend fun archiveConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
-        db.collection("conversations").document(conversationId).update("archivedByUserIds", FieldValue.arrayUnion(userId)).await()
+        db.messagingThread(conversationId).update("archivedByUserIds", FieldValue.arrayUnion(userId)).await()
     }
 
     suspend fun unarchiveConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
-        db.collection("conversations").document(conversationId).update("archivedByUserIds", FieldValue.arrayRemove(userId)).await()
+        db.messagingThread(conversationId).update("archivedByUserIds", FieldValue.arrayRemove(userId)).await()
     }
 
     // Fijar y silenciar conversaciones: mismo contrato Firestore que iOS (array de ids + mapa de
@@ -1111,7 +1119,7 @@ object ChatService {
     // faltaban estas escrituras, así que la acción no se podía completar.
 
     suspend fun pinConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
-        db.collection("conversations").document(conversationId).update(
+        db.messagingThread(conversationId).update(
             mapOf(
                 "pinnedByUserIds" to FieldValue.arrayUnion(userId),
                 "pinnedByTimestamps.$userId" to FieldValue.serverTimestamp(),
@@ -1120,7 +1128,7 @@ object ChatService {
     }
 
     suspend fun unpinConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
-        db.collection("conversations").document(conversationId).update(
+        db.messagingThread(conversationId).update(
             mapOf(
                 "pinnedByUserIds" to FieldValue.arrayRemove(userId),
                 "pinnedByTimestamps.$userId" to FieldValue.delete(),
@@ -1129,7 +1137,7 @@ object ChatService {
     }
 
     suspend fun muteConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
-        db.collection("conversations").document(conversationId).update(
+        db.messagingThread(conversationId).update(
             mapOf(
                 "mutedByUserIds" to FieldValue.arrayUnion(userId),
                 "mutedByTimestamps.$userId" to FieldValue.serverTimestamp(),
@@ -1138,7 +1146,7 @@ object ChatService {
     }
 
     suspend fun unmuteConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
-        db.collection("conversations").document(conversationId).update(
+        db.messagingThread(conversationId).update(
             mapOf(
                 "mutedByUserIds" to FieldValue.arrayRemove(userId),
                 "mutedByTimestamps.$userId" to FieldValue.delete(),
@@ -1156,8 +1164,8 @@ object ChatService {
         messageId: String,
         status: MessageStatus,
     ) {
-        db.collection("conversations").document(conversationId)
-            .collection("messages").document(messageId)
+        db.messagingThread(conversationId)
+            .messagingMessages.document(messageId)
             .update(mapOf("status" to status.raw))
             .await()
     }
@@ -1449,7 +1457,7 @@ object ChatService {
         if (conversationId.isBlank() || userId.isBlank()) return
         scope.launch {
             runCatching {
-                db.collection("conversations").document(conversationId)
+                db.messagingThread(conversationId)
                     .collection("typing").document(userId)
                     .set(
                         mapOf(
@@ -1473,7 +1481,7 @@ object ChatService {
         typingAutoStopJob = null
         scope.launch {
             runCatching {
-                db.collection("conversations").document(conversationId)
+                db.messagingThread(conversationId)
                     .collection("typing").document(userId).delete().await()
             }
         }
@@ -1485,7 +1493,7 @@ object ChatService {
         newContent: String,
     ): Result<Unit> = runCatching {
         val encrypted = EncryptionService.encryptChatMessage(newContent, conversationId)
-        db.collection("conversations").document(conversationId).collection("messages").document(messageId)
+        db.messagingThread(conversationId).messagingMessages.document(messageId)
             .update(mapOf("content" to encrypted, "editedAt" to FieldValue.serverTimestamp()))
             .await()
     }
@@ -1498,9 +1506,9 @@ object ChatService {
         userId: String,
     ): Result<Unit> = runCatching {
         LocalPersistenceService.toggleMessageReactionLocally(messageId, emoji, userId)
-        val reactionRef = db.collection("conversations").document(conversationId)
-            .collection("messages").document(messageId)
-            .collection("messageReactions").document(userId)
+        val reactionRef = db.messagingThread(conversationId)
+            .messagingMessages.document(messageId)
+            .collection(com.moments.android.services.messaging.GroupChatScope.reactions(conversationId)).document(userId)
         val snapshot = reactionRef.get().await()
         val existingEmoji = snapshot.data?.get("emoji") as? String
         if (existingEmoji == emoji) {
@@ -1532,7 +1540,7 @@ object ChatService {
      * Alias [deleteMessageForEveryone] para call sites Android existentes.
      */
     suspend fun deleteMessage(conversationId: String, messageId: String): Result<Unit> = runCatching {
-        db.collection("conversations").document(conversationId).collection("messages").document(messageId)
+        db.messagingThread(conversationId).messagingMessages.document(messageId)
             .update(
                 mapOf(
                     "isDeleted" to true,
@@ -1550,8 +1558,8 @@ object ChatService {
 
     /** ≡ `deleteMessageWithCleanup` — borra campos media/overlays y archivos Storage. */
     suspend fun deleteMessageWithCleanup(conversationId: String, messageId: String): Result<Unit> = runCatching {
-        val document = db.collection("conversations").document(conversationId)
-            .collection("messages").document(messageId).get().await()
+        val document = db.messagingThread(conversationId)
+            .messagingMessages.document(messageId).get().await()
         if (!document.exists()) error("Mensaje no encontrado")
         val data = document.data.orEmpty()
         val mediaResources = listOfNotNull(
@@ -1585,7 +1593,7 @@ object ChatService {
     }
 
     suspend fun deleteMessageForMe(conversationId: String, messageId: String, userId: String): Result<Unit> = runCatching {
-        db.collection("conversations").document(conversationId).collection("messages").document(messageId)
+        db.messagingThread(conversationId).messagingMessages.document(messageId)
             .update("deletedFor", FieldValue.arrayUnion(userId))
             .await()
     }
@@ -1633,6 +1641,36 @@ object ChatService {
         conversationsListener?.remove()
         conversationsListener = null
 
+        groupConversationsListener?.remove()
+        var directInbox = emptyList<Conversation>()
+        var groupInbox = emptyList<Conversation>()
+        var groupRevision = 0
+        fun publishInbox() {
+            if (FirebaseAuth.getInstance().currentUser?.uid != userId) return
+            val merged = (directInbox + groupInbox).sortedByDescending { it.timestamp }
+            archivedConversationIds = merged.filter { it.isArchived(userId) }.mapNotNull { it.id }.toSet()
+            LocalPersistenceService.saveConversations(merged, sync = true)
+            onUpdate(Result.success(merged))
+        }
+        groupConversationsListener = db.collection("groupConversations").whereArrayContains("participants", userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null || FirebaseAuth.getInstance().currentUser?.uid != userId) return@addSnapshotListener
+                val revision = ++groupRevision
+                com.moments.android.views.messaging.groups.GroupDirectory.groups.value = snapshot?.documents.orEmpty()
+                    .map(com.moments.android.views.messaging.groups.GroupConversation::from).associateBy { it.id }
+                scope.launch {
+                    val parsed = snapshot?.documents.orEmpty().mapNotNull { doc ->
+                        val data = doc.data.orEmpty()
+                        @Suppress("UNCHECKED_CAST")
+                        val cutoff = (data["lastDeletedAt"] as? Map<String, *>)?.get(userId) as? Timestamp
+                        val latest = data["timestamp"] as? Timestamp
+                        if (userId in (data["deletedFor"] as? List<*>).orEmpty() && (cutoff == null || latest == null || latest <= cutoff)) null
+                        else parseConversation(doc.id, data, userId)
+                    }
+                    val hydrated = hydrateConversationPreviews(parsed)
+                    withContext(Dispatchers.Main) { if (revision == groupRevision) { groupInbox = hydrated; publishInbox() } }
+                }
+            }
         val listener = db.collection("conversations")
             .whereArrayContains("participants", userId)
             .orderBy("timestamp", Query.Direction.DESCENDING)
@@ -1699,12 +1737,12 @@ object ChatService {
                     }
 
                     conversations.sortByDescending { it.timestamp }
-                    archivedConversationIds = archivedIds.toSet()
+
 
                     val hydrated = hydrateConversationPreviews(conversations)
-                    LocalPersistenceService.saveConversations(hydrated, sync = true)
                     withContext(Dispatchers.Main) {
-                        onUpdate(Result.success(hydrated))
+                        directInbox = hydrated
+                        publishInbox()
                     }
                 }
             }
@@ -1714,6 +1752,8 @@ object ChatService {
     }
 
     fun stopConversationsListener() {
+        groupConversationsListener?.remove()
+        groupConversationsListener = null
         conversationsListener?.remove()
         conversationsListener = null
         val keys = activeListeners.keys.filter { it.startsWith("conversations_") }
@@ -1851,8 +1891,8 @@ object ChatService {
         }
 
         return try {
-            val snapshot = db.collection("conversations").document(conversationId)
-                .collection("messages")
+            val snapshot = db.messagingThread(conversationId)
+                .messagingMessages
                 .orderBy("timestamp", Query.Direction.DESCENDING)
                 .limit(5)
                 .get()
@@ -1956,7 +1996,7 @@ object ChatService {
         return ""
     }
 
-    private fun parseConversation(
+    fun parseConversation(
         id: String,
         data: Map<String, Any?>,
         viewerId: String,
@@ -2037,12 +2077,13 @@ object ChatService {
         return Conversation(
             id = id,
             participants = participants,
+            groupMemberNames = if (com.moments.android.services.messaging.GroupChatScope.isGroup(id)) participantData.orEmpty().mapValues { (_, value) -> value["username"] as? String ?: "" } else emptyMap(),
             lastMessage = lastMessage,
             timestamp = timestamp,
             readStatus = readStatus,
-            otherParticipantId = otherId,
-            otherParticipantUsername = username,
-            otherParticipantProfileImagePath = avatar,
+            otherParticipantId = if (com.moments.android.services.messaging.GroupChatScope.isGroup(id)) "" else otherId,
+            otherParticipantUsername = if (com.moments.android.services.messaging.GroupChatScope.isGroup(id)) data["groupName"] as? String else username,
+            otherParticipantProfileImagePath = if (com.moments.android.services.messaging.GroupChatScope.isGroup(id)) null else avatar,
             isPinned = isPinned,
             pinnedByUserIds = pinnedByUserIds,
             pinnedBy = legacyPinnedBy,
