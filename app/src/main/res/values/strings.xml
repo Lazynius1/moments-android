@@ -2382,6 +2382,11 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="settings_privacy_message_requests_everyone">Everyone</string>
     <string name="settings_privacy_message_requests_following">People you follow</string>
     <string name="settings_privacy_message_requests_nobody">No one</string>
+    <string name="settings_privacy_group_invites_title">Group invitations</string>
+    <string name="settings_privacy_group_invites_desc">Who can invite you to groups</string>
+    <string name="settings_privacy_group_invites_everyone">Everyone</string>
+    <string name="settings_privacy_group_invites_following">People you follow</string>
+    <string name="settings_privacy_group_invites_nobody">No one</string>
     <string name="settings_privacy_control_title">Privacy Control</string>
     <string name="settings_privacy_control_description">When you enable these options, other users won\'t be able to see these lists on your profile. You can always change these settings.</string>
     <string name="settings_privacy_hide_following">Hide my following list</string>

@@ -2359,6 +2359,11 @@
     <string name="settings_privacy_message_requests_everyone">모든 사람</string>
     <string name="settings_privacy_message_requests_following">내가 팔로우하는 사람</string>
     <string name="settings_privacy_message_requests_nobody">아무도 없음</string>
+    <string name="settings_privacy_group_invites_title">그룹 초대</string>
+    <string name="settings_privacy_group_invites_desc">그룹에 초대할 수 있는 사람</string>
+    <string name="settings_privacy_group_invites_everyone">모든 사람</string>
+    <string name="settings_privacy_group_invites_following">내가 팔로우하는 사람</string>
+    <string name="settings_privacy_group_invites_nobody">아무도 없음</string>
     <string name="settings_privacy_control_title">개인정보 보호 설정</string>
     <string name="settings_privacy_control_description">이 옵션을 켜면 다른 사용자가 내 프로필에서 이 목록을 볼 수 없어요. 언제든지 설정을 변경할 수 있어요.</string>
     <string name="settings_privacy_hide_following">팔로잉 목록 숨기기</string>

@@ -2359,6 +2359,11 @@
     <string name="settings_privacy_message_requests_everyone">Wszyscy</string>
     <string name="settings_privacy_message_requests_following">Osoby, które obserwujesz</string>
     <string name="settings_privacy_message_requests_nobody">Nikt</string>
+    <string name="settings_privacy_group_invites_title">Zaproszenia do grup</string>
+    <string name="settings_privacy_group_invites_desc">Kto może zapraszać Cię do grup</string>
+    <string name="settings_privacy_group_invites_everyone">Wszyscy</string>
+    <string name="settings_privacy_group_invites_following">Osoby, które obserwujesz</string>
+    <string name="settings_privacy_group_invites_nobody">Nikt</string>
     <string name="settings_privacy_control_title">Kontrola prywatności</string>
     <string name="settings_privacy_control_description">Po włączeniu tych opcji inni użytkownicy nie będą mogli zobaczyć tych list na Twoim profilu. W każdej chwili możesz zmienić te ustawienia.</string>
     <string name="settings_privacy_hide_following">Ukryj listę obserwowanych</string>

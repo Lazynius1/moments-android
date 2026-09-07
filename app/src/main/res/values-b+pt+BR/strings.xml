@@ -2314,4 +2314,9 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="nova_welcome_editorial_write_prompt">Ajude-me a escrever algo</string>
     <string name="nova_welcome_editorial_moments_title">O que posso fazer no Moments?</string>
     <string name="nova_welcome_editorial_moments_prompt">No que você pode me ajudar no Moments?</string>
+    <string name="settings_privacy_group_invites_title">Convites para grupos</string>
+    <string name="settings_privacy_group_invites_desc">Quem pode te convidar para grupos</string>
+    <string name="settings_privacy_group_invites_everyone">Todos</string>
+    <string name="settings_privacy_group_invites_following">Pessoas que você segue</string>
+    <string name="settings_privacy_group_invites_nobody">Ninguém</string>
 </resources>

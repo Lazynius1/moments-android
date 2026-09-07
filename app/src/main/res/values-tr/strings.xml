@@ -2359,6 +2359,11 @@
     <string name="settings_privacy_message_requests_everyone">Herkes</string>
     <string name="settings_privacy_message_requests_following">Takip ettiklerin</string>
     <string name="settings_privacy_message_requests_nobody">Hiç kimse</string>
+    <string name="settings_privacy_group_invites_title">Grup davetleri</string>
+    <string name="settings_privacy_group_invites_desc">Seni gruplara kim davet edebilir</string>
+    <string name="settings_privacy_group_invites_everyone">Herkes</string>
+    <string name="settings_privacy_group_invites_following">Takip ettiklerin</string>
+    <string name="settings_privacy_group_invites_nobody">Hiç kimse</string>
     <string name="settings_privacy_control_title">Gizlilik kontrolü</string>
     <string name="settings_privacy_control_description">Bu seçenekleri etkinleştirdiğinde diğer kullanıcılar profilindeki bu listeleri göremez. Bu ayarları istediğin zaman değiştirebilirsin.</string>
     <string name="settings_privacy_hide_following">Takip ettiklerim listesini gizle</string>

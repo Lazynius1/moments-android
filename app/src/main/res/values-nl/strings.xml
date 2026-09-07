@@ -2359,6 +2359,11 @@
     <string name="settings_privacy_message_requests_everyone">Iedereen</string>
     <string name="settings_privacy_message_requests_following">Mensen die je volgt</string>
     <string name="settings_privacy_message_requests_nobody">Niemand</string>
+    <string name="settings_privacy_group_invites_title">Groepsuitnodigingen</string>
+    <string name="settings_privacy_group_invites_desc">Wie je in groepen mag uitnodigen</string>
+    <string name="settings_privacy_group_invites_everyone">Iedereen</string>
+    <string name="settings_privacy_group_invites_following">Mensen die je volgt</string>
+    <string name="settings_privacy_group_invites_nobody">Niemand</string>
     <string name="settings_privacy_control_title">Privacybeheer</string>
     <string name="settings_privacy_control_description">Als je deze opties inschakelt, kunnen andere gebruikers deze lijsten niet op je profiel zien. Je kunt deze instellingen altijd wijzigen.</string>
     <string name="settings_privacy_hide_following">Mijn volglijst verbergen</string>

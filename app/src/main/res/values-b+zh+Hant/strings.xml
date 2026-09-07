@@ -2359,6 +2359,11 @@
     <string name="settings_privacy_message_requests_everyone">所有人</string>
     <string name="settings_privacy_message_requests_following">你追蹤的人</string>
     <string name="settings_privacy_message_requests_nobody">沒有人</string>
+    <string name="settings_privacy_group_invites_title">群組邀請</string>
+    <string name="settings_privacy_group_invites_desc">誰可以邀請你加入群組</string>
+    <string name="settings_privacy_group_invites_everyone">所有人</string>
+    <string name="settings_privacy_group_invites_following">你追蹤的人</string>
+    <string name="settings_privacy_group_invites_nobody">沒有人</string>
     <string name="settings_privacy_control_title">隱私控制</string>
     <string name="settings_privacy_control_description">啟用這些選項後，其他使用者將無法在你的個人檔案中查看這些名單。你隨時都可以變更這些設定。</string>
     <string name="settings_privacy_hide_following">隱藏我的追蹤名單</string>

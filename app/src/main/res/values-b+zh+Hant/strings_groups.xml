@@ -46,4 +46,5 @@
     <string name="groups_decline">拒絕</string>
     <string name="groups_invited">已傳送邀請</string>
     <string name="groups_pending_invitations">待處理的邀請</string>
+    <string name="groups_invite_forbidden">有些人未開放群組邀請。</string>
 </resources>

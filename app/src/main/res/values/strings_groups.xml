@@ -46,4 +46,5 @@
     <string name="groups_decline">Decline</string>
     <string name="groups_invited">Invitation sent</string>
     <string name="groups_pending_invitations">Pending invitations</string>
+    <string name="groups_invite_forbidden">Some people don\'t allow group invitations.</string>
 </resources>

@@ -46,4 +46,5 @@
     <string name="groups_decline">Rifiuta</string>
     <string name="groups_invited">Invito inviato</string>
     <string name="groups_pending_invitations">Inviti in attesa</string>
+    <string name="groups_invite_forbidden">Alcune persone non consentono inviti ai gruppi.</string>
 </resources>

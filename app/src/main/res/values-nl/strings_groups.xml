@@ -46,4 +46,5 @@
     <string name="groups_decline">Weigeren</string>
     <string name="groups_invited">Uitnodiging verstuurd</string>
     <string name="groups_pending_invitations">Openstaande uitnodigingen</string>
+    <string name="groups_invite_forbidden">Sommige mensen staan geen groepsuitnodigingen toe.</string>
 </resources>

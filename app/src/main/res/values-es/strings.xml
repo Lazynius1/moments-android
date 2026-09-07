@@ -1407,6 +1407,11 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="settings_privacy_message_requests_everyone">Todo el mundo</string>
     <string name="settings_privacy_message_requests_following">Personas que sigues</string>
     <string name="settings_privacy_message_requests_nobody">Nadie</string>
+    <string name="settings_privacy_group_invites_title">Invitaciones a grupos</string>
+    <string name="settings_privacy_group_invites_desc">Quién puede invitarte a grupos</string>
+    <string name="settings_privacy_group_invites_everyone">Todos</string>
+    <string name="settings_privacy_group_invites_following">Personas que sigues</string>
+    <string name="settings_privacy_group_invites_nobody">Nadie</string>
     <string name="settings_privacy_control_title">Control de privacidad</string>
     <string name="settings_privacy_control_description">Al activar estas opciones, otros usuarios no podrán ver estas listas en tu perfil. Puedes cambiarlas cuando quieras.</string>
     <string name="settings_privacy_hide_following">Ocultar a quién sigo</string>

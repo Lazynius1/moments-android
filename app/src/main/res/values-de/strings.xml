@@ -2336,4 +2336,9 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="nova_welcome_editorial_write_prompt">Hilf mir, etwas zu schreiben</string>
     <string name="nova_welcome_editorial_moments_title">Was kann ich in Moments machen?</string>
     <string name="nova_welcome_editorial_moments_prompt">Wobei kannst du mir in Moments helfen?</string>
+    <string name="settings_privacy_group_invites_title">Gruppeneinladungen</string>
+    <string name="settings_privacy_group_invites_desc">Wer dich in Gruppen einladen darf</string>
+    <string name="settings_privacy_group_invites_everyone">Alle</string>
+    <string name="settings_privacy_group_invites_following">Personen, denen du folgst</string>
+    <string name="settings_privacy_group_invites_nobody">Niemand</string>
 </resources>

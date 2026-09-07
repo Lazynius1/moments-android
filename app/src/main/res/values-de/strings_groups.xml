@@ -46,4 +46,5 @@
     <string name="groups_decline">Ablehnen</string>
     <string name="groups_invited">Einladung gesendet</string>
     <string name="groups_pending_invitations">Ausstehende Einladungen</string>
+    <string name="groups_invite_forbidden">Manche Personen erlauben keine Gruppeneinladungen.</string>
 </resources>

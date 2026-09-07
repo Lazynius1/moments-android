@@ -2359,6 +2359,11 @@
     <string name="settings_privacy_message_requests_everyone">Semua orang</string>
     <string name="settings_privacy_message_requests_following">Orang yang Anda ikuti</string>
     <string name="settings_privacy_message_requests_nobody">Tidak seorang pun</string>
+    <string name="settings_privacy_group_invites_title">Undangan grup</string>
+    <string name="settings_privacy_group_invites_desc">Siapa yang boleh mengundang Anda ke grup</string>
+    <string name="settings_privacy_group_invites_everyone">Semua orang</string>
+    <string name="settings_privacy_group_invites_following">Orang yang Anda ikuti</string>
+    <string name="settings_privacy_group_invites_nobody">Tidak seorang pun</string>
     <string name="settings_privacy_control_title">Kontrol Privasi</string>
     <string name="settings_privacy_control_description">Saat opsi ini diaktifkan, pengguna lain tidak dapat melihat daftar ini di profil Anda. Pengaturan ini bisa diubah kapan saja.</string>
     <string name="settings_privacy_hide_following">Sembunyikan daftar yang saya ikuti</string>

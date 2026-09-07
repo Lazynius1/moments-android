@@ -49,5 +49,6 @@ internal fun groupStringId(key: String): Int = when (key) {
     "decline" -> R.string.groups_decline
     "invited" -> R.string.groups_invited
     "pendingInvitations" -> R.string.groups_pending_invitations
+    "inviteForbidden" -> R.string.groups_invite_forbidden
     else -> R.string.groups_error
 }

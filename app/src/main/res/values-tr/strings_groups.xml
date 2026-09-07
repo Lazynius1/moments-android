@@ -46,4 +46,5 @@
     <string name="groups_decline">Reddet</string>
     <string name="groups_invited">Davet gönderildi</string>
     <string name="groups_pending_invitations">Bekleyen davetler</string>
+    <string name="groups_invite_forbidden">Bazı kişiler grup davetlerine izin vermiyor.</string>
 </resources>

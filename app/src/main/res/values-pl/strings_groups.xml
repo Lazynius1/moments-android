@@ -46,4 +46,5 @@
     <string name="groups_decline">Odrzuć</string>
     <string name="groups_invited">Zaproszenie wysłane</string>
     <string name="groups_pending_invitations">Oczekujące zaproszenia</string>
+    <string name="groups_invite_forbidden">Niektórzy nie zezwalają na zaproszenia do grup.</string>
 </resources>

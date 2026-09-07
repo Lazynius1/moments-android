@@ -46,4 +46,5 @@
     <string name="groups_decline">Tolak</string>
     <string name="groups_invited">Undangan terkirim</string>
     <string name="groups_pending_invitations">Undangan tertunda</string>
+    <string name="groups_invite_forbidden">Beberapa orang tidak mengizinkan undangan grup.</string>
 </resources>

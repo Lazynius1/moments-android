@@ -2319,4 +2319,9 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="nova_welcome_editorial_write_prompt">Aiutami a scrivere qualcosa</string>
     <string name="nova_welcome_editorial_moments_title">Cosa posso fare in Moments?</string>
     <string name="nova_welcome_editorial_moments_prompt">In cosa puoi aiutarmi su Moments?</string>
+    <string name="settings_privacy_group_invites_title">Inviti ai gruppi</string>
+    <string name="settings_privacy_group_invites_desc">Chi può invitarti nei gruppi</string>
+    <string name="settings_privacy_group_invites_everyone">Tutti</string>
+    <string name="settings_privacy_group_invites_following">Persone che segui</string>
+    <string name="settings_privacy_group_invites_nobody">Nessuno</string>
 </resources>

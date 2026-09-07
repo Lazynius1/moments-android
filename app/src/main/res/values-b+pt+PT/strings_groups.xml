@@ -46,4 +46,5 @@
     <string name="groups_decline">Recusar</string>
     <string name="groups_invited">Convite enviado</string>
     <string name="groups_pending_invitations">Convites pendentes</string>
+    <string name="groups_invite_forbidden">Algumas pessoas não permitem convites para grupos.</string>
 </resources>

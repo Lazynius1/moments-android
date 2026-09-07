@@ -2359,6 +2359,11 @@
     <string name="settings_privacy_message_requests_everyone">हर कोई</string>
     <string name="settings_privacy_message_requests_following">जिन्हें आप फ़ॉलो करते हैं</string>
     <string name="settings_privacy_message_requests_nobody">कोई नहीं</string>
+    <string name="settings_privacy_group_invites_title">समूह आमंत्रण</string>
+    <string name="settings_privacy_group_invites_desc">आपको समूहों में कौन आमंत्रित कर सकता है</string>
+    <string name="settings_privacy_group_invites_everyone">हर कोई</string>
+    <string name="settings_privacy_group_invites_following">जिन्हें आप फ़ॉलो करते हैं</string>
+    <string name="settings_privacy_group_invites_nobody">कोई नहीं</string>
     <string name="settings_privacy_control_title">प्राइवेसी कंट्रोल</string>
     <string name="settings_privacy_control_description">इन विकल्पों को चालू करने पर दूसरे यूज़र आपकी प्रोफ़ाइल पर ये सूचियाँ नहीं देख पाएँगे। आप इन सेटिंग्स को कभी भी बदल सकते हैं।</string>
     <string name="settings_privacy_hide_following">मेरी फ़ॉलोइंग सूची छिपाएँ</string>

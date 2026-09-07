@@ -46,4 +46,5 @@
     <string name="groups_decline">अस्वीकार करें</string>
     <string name="groups_invited">आमंत्रण भेजा गया</string>
     <string name="groups_pending_invitations">लंबित आमंत्रण</string>
+    <string name="groups_invite_forbidden">कुछ लोग समूह आमंत्रण की अनुमति नहीं देते।</string>
 </resources>

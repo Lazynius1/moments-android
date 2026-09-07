@@ -2359,6 +2359,11 @@
     <string name="settings_privacy_message_requests_everyone">全員</string>
     <string name="settings_privacy_message_requests_following">フォロー中の人</string>
     <string name="settings_privacy_message_requests_nobody">誰からも受け取らない</string>
+    <string name="settings_privacy_group_invites_title">グループへの招待</string>
+    <string name="settings_privacy_group_invites_desc">グループに招待できる人</string>
+    <string name="settings_privacy_group_invites_everyone">全員</string>
+    <string name="settings_privacy_group_invites_following">フォロー中の人</string>
+    <string name="settings_privacy_group_invites_nobody">誰からも受け取らない</string>
     <string name="settings_privacy_control_title">プライバシー管理</string>
     <string name="settings_privacy_control_description">これらの設定をオンにすると、他のユーザーはあなたのプロフィールでこれらのリストを見られなくなります。設定はいつでも変更できます。</string>
     <string name="settings_privacy_hide_following">フォロー中のリストを非表示</string>

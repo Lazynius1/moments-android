@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -107,6 +108,7 @@ fun PrivacySection(
             onClick = { onRoute(SettingsRoute.MUTE) },
         )
         MessageRequestPolicyRow(viewModel = viewModel)
+        GroupInvitePolicyRow(viewModel = viewModel)
         SettingsToggleRow(
             title = stringResource(R.string.settings_privacy_read_receipts_title),
             subtitle = stringResource(R.string.settings_privacy_read_receipts_desc),
@@ -220,10 +222,101 @@ fun MessageRequestPolicyRow(viewModel: SettingsViewModel) {
 }
 
 @Composable
+fun GroupInvitePolicyRow(viewModel: SettingsViewModel) {
+    val isDark = isSystemInDarkTheme()
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val primary = if (isDark) Color.White else Color.Black
+    var policy by remember { mutableStateOf(MessageRequestPolicy.EVERYONE) }
+    var hasLoaded by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (hasLoaded) return@LaunchedEffect
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return@LaunchedEffect
+        hasLoaded = true
+        runCatching {
+            val snap = FirebaseFirestore.getInstance().collection("users").document(userId).get().await()
+            policy = MessageRequestPolicy.from(snap.getString("groupInvitePolicy"))
+        }
+    }
+
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = SettingsRowHorizontalPadding,
+                    vertical = 11.dp,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.width(SettingsIconSlotWidth), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Groups, null, tint = primary, modifier = Modifier.size(19.dp))
+            }
+            Spacer(Modifier.width(SettingsIconTextSpacing))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.settings_privacy_group_invites_title),
+                    fontSize = with(density) { legacyPoppinsSize(context, 15).toSp() },
+                    fontWeight = FontWeight.Medium,
+                    color = primary,
+                )
+                Text(
+                    stringResource(R.string.settings_privacy_group_invites_desc),
+                    fontSize = with(density) { legacyPoppinsSize(context, 12).toSp() },
+                    color = Color.Gray,
+                )
+            }
+            Box {
+                TextButton(onClick = { menuExpanded = true }) {
+                    Text(
+                        groupInviteLabel(policy),
+                        fontSize = with(density) { legacyPoppinsSize(context, 13).toSp() },
+                        fontWeight = FontWeight.Medium,
+                        color = Color.Gray,
+                    )
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    MessageRequestPolicy.entries.forEach { option ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    if (option == policy) "✓ ${groupInviteLabel(option)}" else groupInviteLabel(option),
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                if (option != policy) {
+                                    policy = option
+                                    viewModel.updateGroupInvitePolicy(option)
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        HorizontalDivider(
+            Modifier.padding(start = SettingsDividerStart),
+            color = SettingsProfileColors.outlineVariant(isDark),
+            thickness = 1.dp,
+        )
+    }
+}
+
+@Composable
 private fun policyLabel(policy: MessageRequestPolicy): String = when (policy) {
     MessageRequestPolicy.EVERYONE -> stringResource(R.string.settings_privacy_message_requests_everyone)
     MessageRequestPolicy.FOLLOWING -> stringResource(R.string.settings_privacy_message_requests_following)
     MessageRequestPolicy.NOBODY -> stringResource(R.string.settings_privacy_message_requests_nobody)
+}
+
+@Composable
+private fun groupInviteLabel(policy: MessageRequestPolicy): String = when (policy) {
+    MessageRequestPolicy.EVERYONE -> stringResource(R.string.settings_privacy_group_invites_everyone)
+    MessageRequestPolicy.FOLLOWING -> stringResource(R.string.settings_privacy_group_invites_following)
+    MessageRequestPolicy.NOBODY -> stringResource(R.string.settings_privacy_group_invites_nobody)
 }
 
 /**

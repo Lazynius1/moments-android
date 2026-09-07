@@ -46,4 +46,5 @@
     <string name="groups_decline">辞退</string>
     <string name="groups_invited">招待を送信しました</string>
     <string name="groups_pending_invitations">承認待ちの招待</string>
+    <string name="groups_invite_forbidden">グループへの招待を許可していない人がいます。</string>
 </resources>

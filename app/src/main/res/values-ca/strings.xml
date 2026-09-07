@@ -2318,4 +2318,9 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="nova_welcome_editorial_write_prompt">Ajuda’m a escriure alguna cosa</string>
     <string name="nova_welcome_editorial_moments_title">Què puc fer a Moments?</string>
     <string name="nova_welcome_editorial_moments_prompt">En què em pots ajudar dins de Moments?</string>
+    <string name="settings_privacy_group_invites_title">Invitacions a grups</string>
+    <string name="settings_privacy_group_invites_desc">Qui et pot convidar a grups</string>
+    <string name="settings_privacy_group_invites_everyone">Tothom</string>
+    <string name="settings_privacy_group_invites_following">Persones que segueixes</string>
+    <string name="settings_privacy_group_invites_nobody">Ningú</string>
 </resources>

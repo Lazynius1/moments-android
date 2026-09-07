@@ -101,6 +101,13 @@ class SettingsViewModel {
         )
     }
 
+    fun updateGroupInvitePolicy(policy: MessageRequestPolicy) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        firestoreService.db.collection("users").document(userId).update(
+            mapOf("groupInvitePolicy" to policy.raw),
+        )
+    }
+
     fun updateActiveHours(
         startTime: Date,
         endTime: Date,

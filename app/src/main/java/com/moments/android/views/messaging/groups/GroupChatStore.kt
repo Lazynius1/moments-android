@@ -138,7 +138,10 @@ internal class GroupChatStore(private val scope: CoroutineScope) {
                     "name" to name, "memberIds" to ids, "wrappedKeys" to envelopes, "revision" to (group?.revision ?: 0)))
                 id
             }
-        } catch (_: Exception) { error = "manageError"; null } finally { busy = false }
+        } catch (error: Exception) {
+            this.error = if (error.message == "inviteForbidden") "inviteForbidden" else "manageError"
+            null
+        } finally { busy = false }
     }
     suspend fun command(action: String, group: GroupConversation, memberId: String = "", name: String = "", muted: Boolean = false): Boolean {
         if (busy) return false
@@ -157,8 +160,13 @@ internal class GroupChatStore(private val scope: CoroutineScope) {
                 connection.requestMethod = "POST"; connection.connectTimeout = 20000; connection.readTimeout = 60000; connection.doOutput = true
                 connection.setRequestProperty("Authorization", "Bearer $token"); connection.setRequestProperty("Content-Type", "application/json")
                 connection.outputStream.use { it.write(JSONObject(body).toString().toByteArray(Charsets.UTF_8)) }
-                check(connection.responseCode == 200 && uid == user.uid)
-                JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                val payload = (if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream)
+                    ?.bufferedReader()?.use { it.readText() }.orEmpty()
+                if (connection.responseCode != 200 || uid != user.uid) {
+                    val code = runCatching { JSONObject(payload).optString("error") }.getOrDefault("")
+                    error(if (code == "inviteForbidden") "inviteForbidden" else "failed")
+                }
+                JSONObject(payload)
             } finally { connection.disconnect() }
         }
     }
