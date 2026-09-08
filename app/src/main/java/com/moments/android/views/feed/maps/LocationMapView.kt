@@ -75,6 +75,7 @@ import com.moments.android.views.profile.core.sections.MomentZoomDetailDestinati
 import com.moments.android.views.profile.core.sections.MomentZoomOpener
 import com.moments.android.views.profile.core.sections.MomentZoomPresentationKind
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -97,6 +98,7 @@ fun LocationMapView(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    MomentsTabBarHidden()
     val uriHandler = LocalUriHandler.current
     val isDark = isSystemInDarkTheme()
     val colors = rememberAdaptiveColors()

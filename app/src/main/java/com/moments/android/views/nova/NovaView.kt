@@ -67,6 +67,7 @@ import com.moments.android.views.nova.novacore.NovaColors
 import com.moments.android.views.nova.novasections.NovaInputBarLayout
 import com.moments.android.views.nova.ui.NovaActionConfirmationOverlay
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -80,6 +81,7 @@ private val BottomOverlayHeight = 108.dp
 
 @Composable
 fun NovaView(onDismiss: () -> Unit = {}) {
+    MomentsTabBarHidden()
     // ≡ iOS: Available → content; else ChatRecoveryGateView wrapping content.
     // Android ChatRecoveryGateView ya ramifica Available → content().
     ChatRecoveryGateView(onCancel = null) {

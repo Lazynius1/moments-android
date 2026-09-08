@@ -54,9 +54,9 @@ import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.utilities.momentsPress
 import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
+import com.moments.android.views.components.bestFriendsAudienceTint
 
 private val AudienceBlue = Color(0xFF007AFF)
-private val BestFriendsGreen = Color(0xFF34C759)
 private val CardShape = RoundedCornerShape(16.dp)
 
 private fun CustomAudienceList.tint(): Color = Color.fromHex(color ?: "00A896")
@@ -188,7 +188,7 @@ fun AudienceGridCard(
 ) {
     val dark = isSystemInDarkTheme()
     val primaryText = if (dark) Color.White else Color.Black
-    val iconColor = if (audience == ContentAudience.BEST_FRIENDS) BestFriendsGreen else primaryText
+    val iconColor = if (audience == ContentAudience.BEST_FRIENDS) bestFriendsAudienceTint(dark) else primaryText
     val iconSize = when (audience) {
         ContentAudience.ONLY_ME -> AudienceIconMetrics.gridCard
         else -> AudienceIconMetrics.gridCardEmphasis

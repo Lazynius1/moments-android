@@ -55,7 +55,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -84,7 +83,9 @@ import com.moments.android.utilities.momentsEmptyStateAppear
 import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
 import com.moments.android.views.creator.audienceselector.ContentAudience
+import com.moments.android.views.shared.Ink
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.Surface
 import com.moments.android.views.story.StoryReaction
 import com.moments.android.views.story.StoryViewer
 import com.moments.android.views.story.VerifiedBadgeView
@@ -98,14 +99,20 @@ fun GlassmorphicProgressBar(
     audience: String?,
     modifier: Modifier = Modifier,
 ) {
+    val isDark = isSystemInDarkTheme()
+    val everyoneFill = if (isDark) Surface else Ink
     val normalizedAudience = audience?.trim()?.lowercase().orEmpty()
-    val (colors, shadowColor) = when (normalizedAudience) {
+    val fill = when (normalizedAudience) {
         "bestfriends", "best_friends", "best-friends" ->
-            listOf(Color.fromHex("24C26A"), Color.fromHex("5BE584")) to Color.fromHex("24C26A").copy(0.65f)
+            if (isDark) Color.fromHex("3A9A72") else Color.fromHex("185C45")
         "mutuals", "mutual" ->
-            listOf(Color.fromHex("00B4D8"), Color.fromHex("4CC9F0")) to Color.fromHex("00B4D8").copy(0.55f)
-        else ->
-            listOf(Color.Blue, Color(0xFF9C27B0), Color(0xFFFF4081)) to Color(0xFF9C27B0).copy(0.6f)
+            if (isDark) Color.fromHex("3D5F9A") else Color.fromHex("1E3866")
+        else -> everyoneFill
+    }
+    val shadowColor = when (normalizedAudience) {
+        "bestfriends", "best_friends", "best-friends" -> fill.copy(0.65f)
+        "mutuals", "mutual" -> fill.copy(0.55f)
+        else -> everyoneFill.copy(0.45f)
     }
     val animatedProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
@@ -122,7 +129,7 @@ fun GlassmorphicProgressBar(
             Modifier
                 .fillMaxSize()
                 .clip(barShape)
-                .background(Color.White.copy(0.15f)),
+                .background(everyoneFill.copy(0.15f)),
         )
         Box(
             Modifier
@@ -130,7 +137,7 @@ fun GlassmorphicProgressBar(
                 .height(2.5.dp)
                 .shadow(3.dp, barShape, ambientColor = shadowColor, spotColor = shadowColor, clip = false)
                 .clip(barShape)
-                .background(Brush.horizontalGradient(colors)),
+                .background(fill),
         )
     }
 }

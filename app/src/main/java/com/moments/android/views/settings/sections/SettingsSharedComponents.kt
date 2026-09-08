@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.moments.android.R
 import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
+import com.moments.android.views.components.bestFriendsAudienceTint
 import com.moments.android.views.creator.audienceselector.ContentAudience
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
@@ -140,7 +141,7 @@ fun SettingsRow(
     audienceIcon: ContentAudience? = null,
     isDestructive: Boolean = false,
     isExternal: Boolean = false,
-    /** ≡ iOS `icon == "star.fill"` → verde. */
+    /** ≡ iOS `icon == "star.fill"` → esmeralda Best Friends según tema. */
     starFillTint: Boolean = false,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
@@ -152,7 +153,7 @@ fun SettingsRow(
     }
     val iconColor = when {
         isDestructive -> Color.Red
-        starFillTint -> Color(0xFF34C759)
+        starFillTint -> bestFriendsAudienceTint(isDark)
         else -> SettingsProfileColors.onSurface(isDark)
     }
 
@@ -177,7 +178,7 @@ fun SettingsRow(
                         audience = audienceIcon,
                         size = AudienceIconMetrics.row,
                         tintColor = if (audienceIcon == ContentAudience.BEST_FRIENDS) {
-                            Color(0xFF34C759)
+                            bestFriendsAudienceTint(isDark)
                         } else {
                             null
                         },

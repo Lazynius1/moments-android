@@ -42,6 +42,7 @@ import com.moments.android.services.firestore.fetchStoriesByIds
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.profile.core.ProfileColors
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import com.moments.android.views.story.StoriesView
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -62,6 +63,8 @@ fun HighlightViewer(
     var stories by remember(highlight.id) { mutableStateOf<List<Story>>(emptyList()) }
     var isLoading by remember(highlight.id) { mutableStateOf(true) }
     val dragOffset = remember { Animatable(0f) }
+
+    MomentsTabBarHidden()
 
     LaunchedEffect(highlight.id) {
         isLoading = true

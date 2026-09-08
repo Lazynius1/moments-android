@@ -2,6 +2,7 @@ package com.moments.android.views.messaging.screens
 
 import com.moments.android.views.messaging.groups.NewGroupView
 import com.moments.android.views.messaging.groups.GroupNavigation
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -183,7 +184,7 @@ fun MessagingView(
     var conversationRowFrames by remember { mutableStateOf<Map<String, Rect>>(emptyMap()) }
     var actionToastMessage by remember { mutableStateOf<String?>(null) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
-    var storyUserId by remember { mutableStateOf<String?>(null) }
+    var inboxStory by remember { mutableStateOf<InboxStoryLaunch?>(null) }
     // ≡ iOS MessagingView.profileRoute → UserProfileView
     var profileUserId by remember { mutableStateOf<String?>(null) }
 
@@ -198,10 +199,11 @@ fun MessagingView(
     val currentStatus by onlineStatusService.currentUserStatus.collectAsState()
     val pendingRequestCount = pendingRequests.size
 
-    // ≡ iOS: lista de conversaciones muestra tab bar; chat individual la oculta.
+    // ≡ iOS: lista muestra tab bar; chat / visor de historias la ocultan (como el feed).
     val suppressTabBar =
         (viewModel.selectedConversation != null && !adaptiveWindow.supportsTwoPanes) ||
-            pendingChatContext != null
+            pendingChatContext != null ||
+            inboxStory != null
     LaunchedEffect(suppressTabBar) {
         onSuppressTabBarChange(suppressTabBar)
     }
@@ -301,9 +303,23 @@ fun MessagingView(
     }
 
     when {
-        storyUserId != null -> {
-            BackHandler { storyUserId = null }
-            StoriesView(startWithUserId = storyUserId, onDismiss = { storyUserId = null })
+        inboxStory != null -> {
+            val launch = inboxStory!!
+            BackHandler { inboxStory = null }
+            if (launch.ringUserIds.size > 1) {
+                StoriesView(
+                    startAtUserId = launch.startUserId,
+                    ringNavigationUserIds = launch.ringUserIds,
+                    onDismiss = { inboxStory = null },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                StoriesView(
+                    startWithUserId = launch.startUserId,
+                    onDismiss = { inboxStory = null },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             return
         }
         showingNewConversation -> {
@@ -351,7 +367,7 @@ fun MessagingView(
                     viewModel.openConversation(it)
                 },
                 onOpenProfile = { openConversationProfile(it) },
-                onOpenStory = { storyUserId = it },
+                onOpenStory = { inboxStory = it },
                 onMarkUnread = { viewModel.markConversationAsUnread(it) },
                 onPin = { viewModel.togglePinned(it) },
                 onMute = { viewModel.toggleMuted(it) },
@@ -455,7 +471,7 @@ fun MessagingView(
                             pendingChatContext = PendingChatContextFactory.outgoing(user, current)
                         }
                     },
-                    onOpenStory = { storyUserId = it },
+                    onOpenStory = { inboxStory = it },
                     onCompose = { showingNewConversation = true },
                     onLongPressConversation = { conv ->
                         val id = conv.id ?: return@MessagingConversationList
@@ -540,7 +556,7 @@ fun MessagingView(
                                 onProfile = { openConversationProfile(it) },
                                 onStory = { route ->
                                     when (route) {
-                                        is ChatStoryRoute.UserStories -> storyUserId = route.userId
+                                        is ChatStoryRoute.UserStories -> inboxStory = InboxStoryLaunch(route.userId, route.ringUserIds)
                                         is ChatStoryRoute.SharedStory -> Unit
                                     }
                                 },
@@ -555,7 +571,7 @@ fun MessagingView(
                     onProfile = { openConversationProfile(it) },
                     onStory = { route ->
                         when (route) {
-                            is ChatStoryRoute.UserStories -> storyUserId = route.userId
+                            is ChatStoryRoute.UserStories -> inboxStory = InboxStoryLaunch(route.userId, route.ringUserIds)
                             is ChatStoryRoute.SharedStory -> Unit // cubierto dentro del chat
                         }
                     },
@@ -811,7 +827,7 @@ private fun MessagingConversationList(
     onOpenConversation: (Conversation) -> Unit,
     onOpenArchived: () -> Unit,
     onOpenOutgoing: (AppUser) -> Unit,
-    onOpenStory: (String) -> Unit,
+    onOpenStory: (InboxStoryLaunch) -> Unit,
     onCompose: () -> Unit,
     onLongPressConversation: (Conversation) -> Unit,
     onRowFrame: (String, Rect) -> Unit,
@@ -1093,7 +1109,7 @@ private fun MessagingSearchResults(
     viewModel: MessagingViewModel,
     searchText: String,
     onOpenConversation: (Conversation) -> Unit,
-    onOpenStory: (String) -> Unit,
+    onOpenStory: (InboxStoryLaunch) -> Unit,
     onOpenSearchMessage: (GlobalMessageSearchResult) -> Unit,
     onStartDraftWithUser: (AppUser) -> Unit,
 ) {
@@ -1219,6 +1235,7 @@ private fun GlassmorphicNewConversationView(
     var showingGroupCreation by remember { mutableStateOf(false) }
     val uid = FirebaseAuth.getInstance().currentUser?.uid
     val scope = rememberCoroutineScope()
+    MomentsTabBarHidden()
 
     LaunchedEffect(Unit) { viewModel.searchUsers("") }
     LaunchedEffect(searchText) { viewModel.searchUsers(searchText) }

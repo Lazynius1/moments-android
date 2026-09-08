@@ -47,6 +47,7 @@ import com.moments.android.views.settings.savedmoments.SavedMomentsView
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.LocalMomentsSharedAnimatedVisibilityScope
 import com.moments.android.views.shared.LocalMomentsSharedTransitionScope
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import com.moments.android.views.story.ArchivedStoriesView
 import com.moments.android.views.profile.core.ProfileContextFlipConfiguration
 import com.moments.android.views.profile.core.ProfileContextFlipTransition
@@ -124,6 +125,7 @@ fun SettingsView(
     val primary = SettingsProfileColors.accent(isDark)
 
     val viewModel = remember { SettingsViewModel() }
+    MomentsTabBarHidden()
     val firebaseUser by AuthService.currentFirebaseUser.collectAsState()
 
     var isPrivate by remember { mutableStateOf(false) }
@@ -387,6 +389,7 @@ private fun SettingsDestinationHost(
     onEndTimeChange: (Date) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    MomentsTabBarHidden()
     when (route) {
         SettingsRoute.CONTENT_VISIBILITY -> ContentVisibilityView(onNavigateBack = onDismiss)
         SettingsRoute.CONNECTIONS -> ConnectionVisibilityView(

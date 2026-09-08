@@ -69,6 +69,7 @@ import com.moments.android.views.settings.ActivityReactionItem
 import com.moments.android.views.settings.ReactionsDateFilter
 import com.moments.android.views.settings.SettingsToolbarBackButton
 import com.moments.android.views.story.StoryRingAvatarView
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -397,6 +398,7 @@ fun SharedActivityDetailView(
     val viewModel = remember(category, currentUser?.id, otherUser.id) {
         SharedActivityDetailViewModel(category, currentUser, otherUser)
     }
+    MomentsTabBarHidden()
     val scope = rememberCoroutineScope()
     val dark = isSystemInDarkTheme()
     val primary = if (dark) Color.White else Color.Black

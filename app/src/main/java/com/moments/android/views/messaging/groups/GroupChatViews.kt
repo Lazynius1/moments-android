@@ -50,6 +50,7 @@ import com.moments.android.views.components.ModernFollowButtonStyle
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.core.PresenceDisplay
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
@@ -296,6 +297,7 @@ private fun GroupMemberLine(
         name.isBlank() -> g("create")
         else -> name.trim()
     }
+    MomentsTabBarHidden()
     LaunchedEffect(search) { loading = true; kotlinx.coroutines.delay(250); store.loadCandidates(search); loading = false }
     GroupHeader(headerTitle, onBack) {
         TextButton(enabled = valid && !store.busy, onClick = { scope.launch {
@@ -438,6 +440,7 @@ private fun GroupMemberLine(
 fun NewGroupView(onBack: () -> Unit, onCreated: (com.moments.android.views.messaging.core.Conversation) -> Unit) {
     val scope = rememberCoroutineScope()
     val store = remember { GroupChatStore(scope) }
+    MomentsTabBarHidden()
     BackHandler(onBack = onBack)
     Column(Modifier.fillMaxSize().background(rememberAdaptiveColors().surfaceBackground).statusBarsPadding().navigationBarsPadding().imePadding()) {
         GroupMemberPicker(store, null, onBack) { id -> scope.launch {
@@ -454,6 +457,7 @@ fun NewGroupView(onBack: () -> Unit, onCreated: (com.moments.android.views.messa
 fun GroupEditView(groupId: String, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val store = remember { GroupChatStore(scope) }
+    MomentsTabBarHidden()
     val group = store.active
     var name by remember { mutableStateOf("") }
     val context = LocalContext.current
@@ -499,6 +503,7 @@ fun GroupEditView(groupId: String, onBack: () -> Unit) {
 fun GroupInviteLinkManageView(groupId: String, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val store = remember { GroupChatStore(scope) }
+    MomentsTabBarHidden()
     val group = store.active
     var shareURL by remember { mutableStateOf<String?>(null) }
     var copied by remember { mutableStateOf(false) }
@@ -592,6 +597,7 @@ fun GroupInviteLinkManageView(groupId: String, onBack: () -> Unit) {
 fun GroupManagementView(groupId: String, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val store = remember { GroupChatStore(scope) }
+    MomentsTabBarHidden()
     var adding by remember { mutableStateOf(false) }
     var profileRoute by remember { mutableStateOf<FeedProfileSheetRoute?>(null) }
     DisposableEffect(groupId) { store.open(groupId); onDispose { store.stop() } }

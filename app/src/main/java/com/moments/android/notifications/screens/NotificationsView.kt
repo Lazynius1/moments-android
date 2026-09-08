@@ -95,6 +95,7 @@ import com.moments.android.views.profile.core.sections.ProfileMomentZoomNavigati
 import com.moments.android.views.shared.MomentsContainerTransformOverlay
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.MomentsSharedTransitionLayout
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -121,6 +122,7 @@ fun NotificationsScreen(
     val groupedByDate by viewModel.groupedByDate.collectAsState()
     val pendingDeletion by viewModel.pendingDeletion.collectAsState()
     val pendingRequestsCount by viewModel.pendingRequestsCount.collectAsState()
+    MomentsTabBarHidden()
     val canLoadMore by viewModel.canLoadMore.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val showError by viewModel.showError.collectAsState()

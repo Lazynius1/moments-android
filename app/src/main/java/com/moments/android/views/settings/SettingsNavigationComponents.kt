@@ -34,6 +34,7 @@ import com.moments.android.R
 import com.moments.android.views.messaging.components.momentsScrollEdgeChrome
 import com.moments.android.views.profile.core.sections.momentZoomNavigationSurface
 import com.moments.android.views.profile.core.sections.profileGridNavigationChrome
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 
 /**
  * Port 1:1 de `SettingsNavigationComponents.swift`.
@@ -130,6 +131,7 @@ fun SettingsSubsectionWrapper(
     val canvas = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     val titleColor = if (isDark) Color.White else Color.Black
 
+    MomentsTabBarHidden()
     BackHandler(onBack = onNavigateBack)
 
     Scaffold(

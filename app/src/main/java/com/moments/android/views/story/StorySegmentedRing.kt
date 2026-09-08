@@ -11,6 +11,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -43,6 +44,8 @@ fun StorySegmentedRing(
     hasUnseenStory: Boolean,
     storyViewedStatus: List<Boolean>,
     storyAudiences: List<String?> = emptyList(),
+    nestedStoryAudiences: List<List<String?>> = emptyList(),
+    nestedStoryViewedStatus: List<List<Boolean>> = emptyList(),
     isOwnStory: Boolean,
     ringSize: Dp = 50.dp,
     lineWidth: Dp = 2.5.dp,
@@ -57,6 +60,16 @@ fun StorySegmentedRing(
     val ringPadding = lineWidth / 2 + 1.dp
     val outerSize = ringSize + lineWidth + 2.dp
 
+    val viewedGrayColors = if (isDark) {
+        listOf(Color.Gray.copy(alpha = 0.58f), Color.Gray.copy(alpha = 0.82f))
+    } else {
+        listOf(Color.Gray.copy(alpha = 0.76f), Color.Gray.copy(alpha = 0.94f))
+    }
+    val bestFriendsColor = if (isDark) Color(0xFF3A9A72) else Color(0xFF185C45)
+    val mutualsColor = if (isDark) Color(0xFF3D5F9A) else Color(0xFF1E3866)
+    val bestFriendsColors = listOf(bestFriendsColor, bestFriendsColor)
+    val mutualsColors = listOf(mutualsColor, mutualsColor)
+
     val litBrush = remember {
         Brush.linearGradient(
             colors = StoryRingLitColors,
@@ -66,29 +79,13 @@ fun StorySegmentedRing(
     }
     val viewedGrayBrush = remember(isDark) {
         Brush.linearGradient(
-            colors = if (isDark) {
-                listOf(Color.Gray.copy(alpha = 0.58f), Color.Gray.copy(alpha = 0.82f))
-            } else {
-                listOf(Color.Gray.copy(alpha = 0.76f), Color.Gray.copy(alpha = 0.94f))
-            },
+            colors = viewedGrayColors,
             start = Offset.Zero,
             end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
         )
     }
-    val bestFriendsBrush = remember {
-        Brush.linearGradient(
-            colors = listOf(Color(0xFF24C26A), Color(0xFF5BE584)),
-            start = Offset.Zero,
-            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
-        )
-    }
-    val mutualsBrush = remember {
-        Brush.linearGradient(
-            colors = listOf(Color(0xFF00B4D8), Color(0xFF4CC9F0)),
-            start = Offset.Zero,
-            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
-        )
-    }
+    val bestFriendsBrush = remember(isDark) { SolidColor(bestFriendsColor) }
+    val mutualsBrush = remember(isDark) { SolidColor(mutualsColor) }
 
     fun normalizedAudience(raw: String?): String =
         raw?.trim()?.lowercase()
@@ -96,13 +93,16 @@ fun StorySegmentedRing(
             ?.replace("-", "")
             .orEmpty()
 
-    fun audienceStyle(index: Int): AudienceStyle? {
-        if (index !in storyAudiences.indices) return null
-        return when (normalizedAudience(storyAudiences[index])) {
+    fun audienceStyleFor(raw: String?): AudienceStyle? =
+        when (normalizedAudience(raw)) {
             "bestfriends", "bestfriend" -> AudienceStyle.BestFriends
             "mutuals", "mutual" -> AudienceStyle.Mutuals
             else -> null
         }
+
+    fun audienceStyle(index: Int): AudienceStyle? {
+        if (index !in storyAudiences.indices) return null
+        return audienceStyleFor(storyAudiences[index])
     }
 
     fun audienceGradient(style: AudienceStyle): Brush = when (style) {
@@ -110,8 +110,48 @@ fun StorySegmentedRing(
         AudienceStyle.Mutuals -> mutualsBrush
     }
 
+    fun colorsForStop(stop: SliceStop): List<Color> = when (stop) {
+        SliceStop.Viewed -> viewedGrayColors
+        SliceStop.Everyone -> StoryRingLitColors
+        SliceStop.BestFriends -> bestFriendsColors
+        SliceStop.Mutuals -> mutualsColors
+    }
+
+    fun sliceStop(audience: String?, viewed: Boolean): SliceStop {
+        if (!isOwnStory && viewed) return SliceStop.Viewed
+        return when (audienceStyleFor(audience)) {
+            AudienceStyle.BestFriends -> SliceStop.BestFriends
+            AudienceStyle.Mutuals -> SliceStop.Mutuals
+            null -> SliceStop.Everyone
+        }
+    }
+
+    fun nestedSliceGradient(audiences: List<String?>, viewed: List<Boolean>): Brush {
+        val stops = audiences.mapIndexed { index, audience ->
+            sliceStop(audience, viewed.getOrElse(index) { false })
+        }
+        val first = stops.firstOrNull() ?: return litBrush
+        val colors = if (stops.all { it == first }) {
+            colorsForStop(first)
+        } else {
+            stops.flatMap { colorsForStop(it) }
+        }
+        return Brush.linearGradient(
+            colors = colors,
+            start = Offset.Zero,
+            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
+        )
+    }
+
     // ≡ segmentGradient(for:)
     fun segmentGradient(index: Int): Brush {
+        val nested = nestedStoryAudiences.getOrNull(index)
+        if (!nested.isNullOrEmpty()) {
+            return nestedSliceGradient(
+                audiences = nested,
+                viewed = nestedStoryViewedStatus.getOrElse(index) { emptyList() },
+            )
+        }
         val wasViewed = if (index < storyViewedStatus.size) storyViewedStatus[index] else false
         // Externos: vista → gris siempre (incluye bestfriends/mutuals)
         if (!isOwnStory && wasViewed) return viewedGrayBrush
@@ -126,8 +166,15 @@ fun StorySegmentedRing(
         }
     }
 
-    // ≡ storyRingGradient (1 historia)
+    // ≡ storyRingGradient (1 corte)
     fun storyRingGradient(): Brush {
+        val nested = nestedStoryAudiences.getOrNull(0)
+        if (!nested.isNullOrEmpty()) {
+            return nestedSliceGradient(
+                audiences = nested,
+                viewed = nestedStoryViewedStatus.getOrElse(0) { emptyList() },
+            )
+        }
         val wasViewed = !hasUnseenStory
         if (!isOwnStory && wasViewed) return viewedGrayBrush
         audienceStyle(0)?.let { return audienceGradient(it) }
@@ -198,6 +245,13 @@ fun StorySegmentedRing(
 }
 
 private enum class AudienceStyle {
+    BestFriends,
+    Mutuals,
+}
+
+private enum class SliceStop {
+    Viewed,
+    Everyone,
     BestFriends,
     Mutuals,
 }

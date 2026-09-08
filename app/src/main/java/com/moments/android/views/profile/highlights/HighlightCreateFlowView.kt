@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.views.profile.core.ProfileColors
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 
 /** Port de `HighlightCreateFlowView.swift`. */
 @Composable
@@ -49,6 +50,7 @@ fun HighlightCreateFlowView(
 ) {
     val context = LocalContext.current
     val vm = remember(mode) { HighlightCreateFlowViewModel(mode, context.applicationContext) }
+    MomentsTabBarHidden()
     var deleteConfirm by remember { mutableStateOf(false) }
     var overflowExpanded by remember { mutableStateOf(false) }
     val canvas = if (isSystemInDarkTheme()) Color(0xFF0B1215) else Color(0xFFFAF9F6)

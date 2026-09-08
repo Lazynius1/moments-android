@@ -6,11 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -28,9 +26,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.services.cache.VideoPreloader
 import com.moments.android.services.performance.VideoMoment
@@ -217,29 +212,6 @@ fun ReelsViewerPlaceholder(
         )
         @Suppress("UNUSED_VARIABLE")
         val start = initialStartSeconds
-    }
-}
-
-/** Port de badge Reels en feed (CroppedVideoPlayer overlay). */
-@Composable
-fun ReelsBadgeOverlay(
-    onTap: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier
-            .padding(12.dp)
-            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
-            .clickable(onClick = onTap)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            stringResource(R.string.feed_reels_badge),
-            color = Color.White,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
     }
 }
 

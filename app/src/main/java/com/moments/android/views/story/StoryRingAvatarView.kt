@@ -32,6 +32,9 @@ import com.moments.android.services.social.StoryRingCacheService
 import com.moments.android.services.social.StoryRingResolverService
 import com.moments.android.services.social.StoryRingSnapshot
 import com.moments.android.utilities.momentsPressIcon
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 /**
  * Port de `StoryRingLayout` + `StoryRingAvatarView` (`Views/story/StoryRingAvatarView.swift`).
@@ -204,6 +207,106 @@ fun Modifier.storyRingGapMask(avatarSize: Dp): Modifier =
             }
         }
     }
+
+/**
+ * Port de `GroupStoryRingAvatarView` (`StoryRingAvatarView.swift`).
+ * Anillo de historias del inbox de grupo: miembros excepto el visor.
+ * Privacidad = 1:1 (`StoryRingResolverService` / `canUserViewStoryEnhanced`).
+ */
+@Composable
+fun GroupStoryRingAvatarView(
+    memberUserIds: List<String>,
+    groupImage: String,
+    size: Dp,
+    modifier: Modifier = Modifier,
+    lineWidth: Dp? = null,
+    hapticsEnabled: Boolean = false,
+    onTap: (hasStory: Boolean, startUserId: String?, ringUserIds: List<String>) -> Unit,
+) {
+    val viewerId = FirebaseAuth.getInstance().currentUser?.uid
+    val resolvedLineWidth = lineWidth ?: StoryRingLayout.defaultLineWidth(size)
+    val ringStrokeDiameter = StoryRingLayout.ringStrokeDiameter(size, resolvedLineWidth)
+    val outerSize = StoryRingLayout.outerFrameSize(size, resolvedLineWidth)
+    val authors = remember(memberUserIds, viewerId) {
+        memberUserIds.filter { it.isNotEmpty() && it != viewerId }
+    }
+
+    var snapshot by remember(authors) { mutableStateOf(StoryRingSnapshot.Empty) }
+    var storyAuthorIds by remember(authors) { mutableStateOf<List<String>>(emptyList()) }
+    var startAuthorId by remember(authors) { mutableStateOf<String?>(null) }
+    var nestedStoryAudiences by remember(authors) { mutableStateOf<List<List<String?>>>(emptyList()) }
+    var nestedStoryViewedStatus by remember(authors) { mutableStateOf<List<List<Boolean>>>(emptyList()) }
+
+    LaunchedEffect(authors, viewerId) {
+        if (viewerId.isNullOrEmpty() || authors.isEmpty()) {
+            snapshot = StoryRingSnapshot.Empty
+            storyAuthorIds = emptyList()
+            startAuthorId = null
+            nestedStoryAudiences = emptyList()
+            nestedStoryViewedStatus = emptyList()
+            return@LaunchedEffect
+        }
+        val collected = coroutineScope {
+            authors.map { authorId ->
+                async {
+                    authorId to StoryRingResolverService.resolve(
+                        viewerId = viewerId,
+                        authorId = authorId,
+                        useCache = true,
+                    )
+                }
+            }.awaitAll().toMap()
+        }
+        val withStories = authors.mapNotNull { id ->
+            val snap = collected[id] ?: return@mapNotNull null
+            if (snap.hasStory) id to snap else null
+        }
+        storyAuthorIds = withStories.map { it.first }
+        startAuthorId = withStories.firstOrNull { it.second.hasUnseenStory }?.first
+            ?: withStories.firstOrNull()?.first
+        nestedStoryAudiences = withStories.map { it.second.storyAudiences }
+        nestedStoryViewedStatus = withStories.map { it.second.storyViewedStatus }
+        snapshot = StoryRingSnapshot(
+            hasStory = withStories.isNotEmpty(),
+            hasUnseenStory = withStories.any { it.second.hasUnseenStory },
+            storyCount = withStories.size,
+            storyViewedStatus = withStories.map { !it.second.hasUnseenStory },
+            storyAudiences = withStories.map { it.second.groupRingAudience },
+        )
+    }
+
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        modifier
+            .requiredSize(outerSize)
+            .momentsPressIcon()
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = { onTap(snapshot.hasStory, startAuthorId, storyAuthorIds) },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        StorySegmentedRing(
+            storyCount = snapshot.storyCount,
+            hasStory = snapshot.hasStory,
+            hasUnseenStory = snapshot.hasUnseenStory,
+            storyViewedStatus = snapshot.storyViewedStatus,
+            storyAudiences = snapshot.storyAudiences,
+            nestedStoryAudiences = nestedStoryAudiences,
+            nestedStoryViewedStatus = nestedStoryViewedStatus,
+            isOwnStory = false,
+            ringSize = ringStrokeDiameter,
+            lineWidth = resolvedLineWidth,
+            hapticsEnabled = hapticsEnabled,
+            modifier = Modifier.storyRingGapMask(avatarSize = size),
+        )
+        com.moments.android.views.messaging.groups.GroupChatAvatar(
+            image = groupImage,
+            size = size,
+        )
+    }
+}
 
 private suspend fun resolveSnapshot(
     userId: String,

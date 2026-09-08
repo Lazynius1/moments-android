@@ -59,7 +59,7 @@ import com.moments.android.views.story.StorySegmentedRing
 data class ChatToolbarCallbacks(
     val onBack: () -> Unit = {},
     val onProfile: () -> Unit = {},
-    val onStory: () -> Unit = {},
+    val onStory: (userId: String, ringUserIds: List<String>) -> Unit = { _, _ -> },
     val onSettings: () -> Unit = {},
     val onSearchClose: () -> Unit = {},
     val onSearchClear: () -> Unit = {},
@@ -80,6 +80,7 @@ fun GlassmorphicChatToolbar(
     showBackButton: Boolean = true,
     isGroup: Boolean = false,
     memberCount: Int = 0,
+    memberUserIds: List<String> = emptyList(),
     callbacks: ChatToolbarCallbacks,
     modifier: Modifier = Modifier,
 ) {
@@ -107,29 +108,38 @@ fun GlassmorphicChatToolbar(
                 contentDescriptionKey = com.moments.android.extensions.ChromeIconDescription.BACK,
             )
         }
-        // ≡ iOS chatToolbarAvatar: AsyncProfileImageView + StorySegmentedRing overlay.
-        // iOS `.overlay` no recorta; el Box deja sitio al stroke (lineWidth/2+1).
+        // ≡ iOS chatToolbarAvatar: 1:1 overlay StorySegmentedRing; grupo = GroupStoryRingAvatarView.
         val headerAvatarSize = 40.dp
         val headerRingLineWidth = 2.7.dp
         val headerRingOuter = headerAvatarSize + headerRingLineWidth + 2.dp
+        if (isGroup) {
+            com.moments.android.views.story.GroupStoryRingAvatarView(
+                memberUserIds = memberUserIds,
+                groupImage = profileImagePath.orEmpty(),
+                size = headerAvatarSize,
+                lineWidth = headerRingLineWidth,
+                hapticsEnabled = true,
+                onTap = { hasStory, startUserId, ringUserIds ->
+                    if (hasStory && !startUserId.isNullOrBlank()) {
+                        callbacks.onStory(startUserId, ringUserIds)
+                    } else {
+                        callbacks.onSettings()
+                    }
+                },
+            )
+        } else {
         Box(
             Modifier
                 .size(headerRingOuter)
                 .momentsPressIcon()
                 .clickable {
-                    if (isGroup) callbacks.onSettings()
-                    else if (isUnavailable && !isBlockedByMe) callbacks.onProfile()
-                    else if (hasStory && !isBlockedByMe) callbacks.onStory()
+                    if (isUnavailable && !isBlockedByMe) callbacks.onProfile()
+                    else if (hasStory && !isBlockedByMe) callbacks.onStory(userId, emptyList())
                     else callbacks.onProfile()
                 },
             contentAlignment = Alignment.Center,
         ) {
-            if (isGroup) {
-                com.moments.android.views.messaging.groups.GroupChatAvatar(
-                    image = profileImagePath.orEmpty(),
-                    size = headerAvatarSize,
-                )
-            } else if (isUnavailable && !isBlockedByMe) {
+            if (isUnavailable && !isBlockedByMe) {
                 ProfileUnavailableAvatar(size = headerAvatarSize)
             } else {
                 AsyncProfileImageView(
@@ -149,6 +159,7 @@ fun GlassmorphicChatToolbar(
                     lineWidth = headerRingLineWidth,
                 )
             }
+        }
         }
         }
         Column(

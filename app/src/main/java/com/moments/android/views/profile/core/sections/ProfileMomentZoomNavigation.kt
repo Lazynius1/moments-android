@@ -29,6 +29,7 @@ import com.moments.android.views.shared.MomentsZoomSourceCorner
 import com.moments.android.views.shared.momentdetail.SingleMomentDetailView
 import com.moments.android.views.shared.rememberMomentsContainerTransformEnter
 import com.moments.android.views.shared.rememberMomentsContainerTransformExit
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 
 /** Port de `ProfileMomentZoomNavigation.swift`. */
 enum class ProfileMomentZoomFeedKind {
@@ -186,6 +187,7 @@ fun ProfileMomentZoomDetailDestination(
     onRemoveSavedMoment: ((Moment) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    MomentsTabBarHidden()
     MomentZoomContainerTransformScaffold(
         zoomSourceID = destination.zoomSourceID,
         modifier = modifier,
@@ -229,6 +231,7 @@ fun MomentZoomDetailDestination(
     onMapPresentedChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    MomentsTabBarHidden()
     MomentZoomContainerTransformScaffold(
         zoomSourceID = destination.zoomSourceID,
         modifier = modifier,
@@ -307,6 +310,7 @@ fun HighlightZoomDetailDestination(
     content: @Composable (HighlightedStory, () -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    MomentsTabBarHidden()
     MomentZoomContainerTransformScaffold(
         zoomSourceID = destination.zoomSourceID,
         modifier = modifier,

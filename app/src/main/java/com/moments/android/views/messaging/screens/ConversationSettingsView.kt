@@ -150,6 +150,7 @@ import com.moments.android.views.messaging.components.ClusterGalleryView
 import com.moments.android.views.messaging.components.LinkPreviewCard
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.shared.ChatPreviewPrivacy
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -825,6 +826,7 @@ fun ConversationSettingsView(
     val colors = rememberAdaptiveColors()
     val context = LocalContext.current
     val model = remember(conversation.id) { ConversationSettingsViewModel() }
+    MomentsTabBarHidden()
     var tab by remember { mutableStateOf(SharedContentTab.MEDIA) }
     var clearMediaConfirm by remember { mutableStateOf(false) }
     var showStarred by remember { mutableStateOf(false) }
@@ -1787,6 +1789,7 @@ private fun ConversationChatPreferencesView(
 ) {
     val context = LocalContext.current
     val colors = rememberAdaptiveColors()
+    MomentsTabBarHidden()
     Column(modifier.fillMaxSize().background(colors.chatBackground.first())) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }
@@ -1927,6 +1930,7 @@ private fun ConversationVanishModeView(
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
+    MomentsTabBarHidden()
     Column(modifier.fillMaxSize().background(colors.chatBackground.first())) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }

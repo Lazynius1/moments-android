@@ -98,6 +98,7 @@ import com.moments.android.views.profile.userprofile.sections.UserRelationshipMa
 import com.moments.android.views.settings.QRCodeView
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.OfflineBannerOverlay
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import com.moments.android.views.story.StoriesView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -318,6 +319,7 @@ fun UserProfileView(
 ) {
     val viewModel = remember(userId) { UserProfileViewModel(userId) }
     val messagingViewModel = remember { MessagingViewModel() }
+    MomentsTabBarHidden()
     val heroCoordinator = remember { ProfileGridHeroTransitionCoordinator() }
     val scope = rememberCoroutineScope()
     val insets = WindowInsets.systemBars.asPaddingValues()

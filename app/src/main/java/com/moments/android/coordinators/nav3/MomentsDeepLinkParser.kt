@@ -37,7 +37,7 @@ object MomentsDeepLinkParser {
 
         return when {
             host == "moment" && segments.size > 1 ->
-                MomentsNavKey.Moment(id = segments[1], authorId = "")
+                MomentsNavKey.Moment(id = segments[1], authorId = shareAuthorId(uri))
             host == "story" && path == "/create" ->
                 MomentsNavKey.Creator
             host == "profile" && path == "/visits" ->
@@ -60,8 +60,11 @@ object MomentsDeepLinkParser {
         if (host !in universalHosts) return null
         val segments = uri.pathSegments
         if (segments.size >= 2 && segments[0] == "moment") {
-            return MomentsNavKey.Moment(id = segments[1], authorId = "")
+            return MomentsNavKey.Moment(id = segments[1], authorId = shareAuthorId(uri))
         }
         return null
     }
+
+    /** Query `a` del share (`https://momentsapp.app/moment/{id}?a={authorId}`). */
+    private fun shareAuthorId(uri: Uri): String = uri.getQueryParameter("a")?.trim().orEmpty()
 }

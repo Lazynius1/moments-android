@@ -59,6 +59,7 @@ import com.moments.android.services.privacy.VisibleConnectionTypes
 import com.moments.android.views.profile.userprofile.UserProfileViewModel
 import com.moments.android.views.settings.ActivityCollapsibleFilterScroll
 import com.moments.android.views.settings.SettingsToolbarBackButton
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -128,6 +129,7 @@ fun SocialConnectionsScreen(
 ) {
     val scope = rememberCoroutineScope()
     val firestore = remember { FirestoreService() }
+    MomentsTabBarHidden()
     val visitsViewModel = remember { VisitsViewModel() }
     var selectedTabIndex by remember(route, availableTabs) {
         mutableIntStateOf(availableTabs.indexOf(route.initialTab).coerceAtLeast(0))

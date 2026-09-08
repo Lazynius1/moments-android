@@ -89,6 +89,7 @@ import com.moments.android.views.permissions.CameraAccessBoundary
 import com.moments.android.views.profile.editor.sections.ProfileLibraryCropEntryView
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.MomentsSheetHeader
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -149,6 +150,7 @@ fun ModernEditProfileView(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    MomentsTabBarHidden()
     val resources = context.resources
     val dark = isSystemInDarkTheme()
     val canvas = if (dark) Color(0xFF0B1215) else Color(0xFFFAF9F6)

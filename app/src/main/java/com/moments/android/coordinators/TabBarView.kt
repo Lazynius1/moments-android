@@ -89,6 +89,8 @@ import com.moments.android.services.auth.AuthService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchUserByUsername
 import com.moments.android.views.shared.OfflineBannerOverlay
+import com.moments.android.views.shared.tabbar.LocalTabBarHide
+import com.moments.android.views.shared.tabbar.TabBarHideController
 import com.moments.android.views.components.InAppBannerView
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.story.StoryRingAvatarView
@@ -152,6 +154,7 @@ fun TabBarScreen(
     var echoInvitationRoute by remember { mutableStateOf<String?>(null) }
     // ≡ iOS `.toolbar(.hidden, for: .tabBar)` desde Settings / edit / moment zoom
     var suppressTabBar by remember { mutableStateOf(false) }
+    val tabBarHide = remember { TabBarHideController() }
     val reelsHost = remember { FeedReelsHostState() }
     val adaptiveWindow = LocalAdaptiveWindowState.current
 
@@ -328,7 +331,8 @@ fun TabBarScreen(
         }
     }
 
-    val navigationVisible = !suppressTabBar && !tabNavigator.shouldHideTabBarForPush()
+    val navigationVisible =
+        !suppressTabBar && !tabBarHide.isHidden && !tabNavigator.shouldHideTabBarForPush()
     val navigationSuiteState = rememberNavigationSuiteScaffoldState()
     LaunchedEffect(navigationVisible, adaptiveWindow.isCompactHandset) {
         if (!adaptiveWindow.isCompactHandset) {
@@ -348,7 +352,10 @@ fun TabBarScreen(
         )
     }
 
-    CompositionLocalProvider(LocalFeedReelsHost provides reelsHost) {
+    CompositionLocalProvider(
+        LocalFeedReelsHost provides reelsHost,
+        LocalTabBarHide provides tabBarHide,
+    ) {
     Box(Modifier.fillMaxSize()) {
         // Skill edge-to-edge: bottom insets los consume el tab bar (navigationBarsPadding).
         // Top/horizontal → contentPadding del Scaffold; no doble-padear el dock.

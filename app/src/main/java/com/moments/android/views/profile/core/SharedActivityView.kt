@@ -68,6 +68,7 @@ import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.settings.AnimatedReactionIcon
 import com.moments.android.views.settings.SettingsToolbarBackButton
 import com.moments.android.views.story.StoryRingAvatarView
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.Date
@@ -91,6 +92,7 @@ fun SharedActivityView(
 ) {
     val scope = rememberCoroutineScope()
     val dark = isSystemInDarkTheme()
+    MomentsTabBarHidden()
     val background = if (dark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     val primary = if (dark) Color.White else Color.Black
     val secondary = if (dark) Color.White.copy(0.62f) else Color.Black.copy(0.58f)

@@ -46,6 +46,7 @@ import com.moments.android.views.messaging.components.ConversationMenuData
 import com.moments.android.views.messaging.components.ConversationMenuSelection
 import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.MessagingViewModel
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 
 /**
  * Port de `Views/Messaging/Screens/ArchivedConversationsView.swift`.
@@ -57,7 +58,7 @@ fun ArchivedConversationsView(
     onBack: () -> Unit,
     onOpenConversation: (Conversation) -> Unit,
     onOpenProfile: (String) -> Unit = {},
-    onOpenStory: (String) -> Unit = {},
+    onOpenStory: (InboxStoryLaunch) -> Unit = {},
     onMarkUnread: (Conversation) -> Unit = { viewModel.markConversationAsUnread(it) },
     onPin: (Conversation) -> Unit = { viewModel.togglePinned(it) },
     onMute: (Conversation) -> Unit = { viewModel.toggleMuted(it) },
@@ -67,6 +68,7 @@ fun ArchivedConversationsView(
 ) {
     val colors = rememberAdaptiveColors()
     val uid = FirebaseAuth.getInstance().currentUser?.uid
+    MomentsTabBarHidden()
     var conversationMenuSelection by remember { mutableStateOf<ConversationMenuSelection?>(null) }
     var conversationRowFrames by remember { mutableStateOf<Map<String, Rect>>(emptyMap()) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
@@ -126,9 +128,11 @@ fun ArchivedConversationsView(
                                 if (trimmed.isNotEmpty()) onOpenProfile(trimmed)
                             },
                             onTap = { onOpenConversation(conversation) },
-                            onOpenStory = { userId ->
-                                val trimmed = userId.trim()
-                                if (trimmed.isNotEmpty()) onOpenStory(trimmed)
+                            onOpenStory = { launch ->
+                                val trimmed = launch.startUserId.trim()
+                                if (trimmed.isNotEmpty()) {
+                                    onOpenStory(launch.copy(startUserId = trimmed))
+                                }
                             },
                             isMenuSelected = selected,
                             listInteraction = ConversationListInteraction(

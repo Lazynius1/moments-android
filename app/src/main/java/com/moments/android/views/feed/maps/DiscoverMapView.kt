@@ -107,6 +107,7 @@ import com.moments.android.services.social.StoryRingSnapshot
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.feed.FeedInk
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import com.moments.android.views.feed.maps.mapssections.MapFilterChipsSection
 import com.moments.android.views.permission.shared.LocationPermissionGate
 import com.moments.android.views.permission.shared.LocationPermissionGateHost
@@ -138,6 +139,7 @@ fun DiscoverMapView(
 ) {
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
+    MomentsTabBarHidden()
     val colors = rememberAdaptiveColors()
     val primary = if (isDark) Color.White else FeedInk
     val secondary = primary.copy(alpha = 0.72f)

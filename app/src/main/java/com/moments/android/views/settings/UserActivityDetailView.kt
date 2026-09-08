@@ -94,6 +94,7 @@ import com.moments.android.views.profile.core.sections.MomentZoomDestination
 import com.moments.android.views.profile.core.sections.MomentZoomOpener
 import com.moments.android.views.profile.core.sections.MomentZoomPresentationKind
 import com.moments.android.views.shared.MomentsModalSheet
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import com.moments.android.views.story.ArchiveDayStoriesViewer
 import com.moments.android.views.story.StoriesView
 import kotlinx.coroutines.Job
@@ -140,6 +141,7 @@ fun ActivityInteractionDetailView(
     val viewModel = remember(category, recentlyDeletedKind) {
         ActivityInteractionDetailViewModel(category, recentlyDeletedKind)
     }
+    MomentsTabBarHidden()
     val scope = rememberCoroutineScope()
     val isDark = isSystemInDarkTheme()
     val ink = if (isDark) Color.White else Color.Black

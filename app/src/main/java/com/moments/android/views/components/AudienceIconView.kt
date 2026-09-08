@@ -16,6 +16,10 @@ import androidx.compose.ui.unit.dp
 import com.moments.android.R
 import com.moments.android.services.privacy.ContentAudience
 
+/** ≡ iOS `AudienceIdentityTint.bestFriends`. */
+fun bestFriendsAudienceTint(isDark: Boolean): Color =
+    if (isDark) Color(0xFF3A9A72) else Color(0xFF185C45)
+
 /** Medidas ópticas — port 1:1 de `AudienceIconMetrics` (iOS points → dp). */
 object AudienceIconMetrics {
     /** Filas (Settings, visibilidad). SF Symbol ~19pt en slot 28pt. */
@@ -42,7 +46,7 @@ object AudienceIconMetrics {
  *
  * Tint (mismo orden que iOS):
  * 1. `tintColor` explícito
- * 2. Best Friends → `#34C759`
+ * 2. Best Friends → esmeralda según tema (`#3A9A72` oscuro / `#185C45` claro)
  * 3. `isDark` / sistema → blanco / negro (equiv. `colorScheme` / `.primary`)
  */
 @Composable
@@ -56,7 +60,7 @@ fun AudienceIconView(
 ) {
     val dark = isDark ?: isSystemInDarkTheme()
     val tint = tintColor ?: when {
-        audience == ContentAudience.BEST_FRIENDS -> Color(0xFF34C759)
+        audience == ContentAudience.BEST_FRIENDS -> bestFriendsAudienceTint(dark)
         dark -> Color.White
         else -> Color.Black
     }
@@ -83,7 +87,7 @@ fun ActivityGridAudienceIcon(
         audience = audience,
         size = size,
         tintColor = if (audience == ContentAudience.BEST_FRIENDS) {
-            Color(0xFF34C759)
+            bestFriendsAudienceTint(isSystemInDarkTheme())
         } else {
             Color.White
         },

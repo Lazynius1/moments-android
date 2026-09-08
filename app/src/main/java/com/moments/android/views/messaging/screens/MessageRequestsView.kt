@@ -51,6 +51,7 @@ import com.moments.android.utilities.MomentsFormat
 import com.moments.android.utilities.momentsEmptyStateAppear
 import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import com.moments.android.views.messaging.core.MessageRequest
 import com.moments.android.views.messaging.core.MessageRequestFolder
 
@@ -68,6 +69,7 @@ fun MessageRequestsView(
 ) {
     val colors = rememberAdaptiveColors()
     val ownedService = remember { MessageRequestService() }
+    MomentsTabBarHidden()
     val requestService = service ?: ownedService
     val ownsListeners = service == null
     val requests by requestService.pendingRequests.collectAsState()

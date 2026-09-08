@@ -46,6 +46,7 @@ import com.moments.android.views.messaging.components.chatBuzzShakeEffect
 import com.moments.android.views.profile.core.sections.MomentZoomDestination
 import com.moments.android.views.profile.core.sections.MomentZoomDetailDestination
 import com.moments.android.views.profile.core.sections.MomentZoomPresentationKind
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import com.moments.android.views.story.StoriesView
 import com.moments.android.views.messaging.screens.ConversationFullScreenMediaView
 import com.moments.android.views.messaging.screens.SharedMedia
@@ -149,7 +150,10 @@ import kotlinx.coroutines.launch
 sealed class ChatStoryRoute {
     abstract val id: String
 
-    data class UserStories(val userId: String) : ChatStoryRoute() {
+    data class UserStories(
+        val userId: String,
+        val ringUserIds: List<String> = emptyList(),
+    ) : ChatStoryRoute() {
         override val id: String get() = userId
     }
 
@@ -197,6 +201,7 @@ fun GlassmorphicChatView(
 ) {
     val context = LocalContext.current
     val colors = rememberAdaptiveColors()
+    MomentsTabBarHidden()
     val messages by session.messages.collectAsState()
     val timelineMutation by session.chatTimelineMutation.collectAsState()
     val downloadProgress by session.downloadProgress.collectAsState()
@@ -1225,14 +1230,20 @@ fun GlassmorphicChatView(
             showBackButton = showBackButton,
             memberCount = groupDirectory[conversation.id]?.members?.size
                 ?: conversation.participants.size,
+            memberUserIds = run {
+                val uid = session.currentUserId
+                var ids = conversation.participants
+                if (ids.isEmpty()) {
+                    ids = groupDirectory[conversation.id]?.members?.map { it.id }.orEmpty()
+                }
+                ids.filter { it.isNotBlank() && it != uid }
+            },
             callbacks = ChatToolbarCallbacks(
                 onBack = onBack,
                 onProfile = { if (conversation.isGroup) showingGroupManagement = true else onProfile(conversation.otherParticipantId) },
-                onStory = {
-                    val uid = conversation.otherParticipantId
+                onStory = { uid, ringUserIds ->
                     if (uid.isNotBlank()) {
-                        // ≡ iOS fullScreenCover sobre el chat (no reemplaza MessagingView)
-                        chatStoryRoute = ChatStoryRoute.UserStories(uid)
+                        onStory(ChatStoryRoute.UserStories(uid, ringUserIds))
                     }
                 },
                 onSettings = { showingConversationSettings = true },
@@ -1689,10 +1700,20 @@ fun GlassmorphicChatView(
             ),
         ) {
             when (route) {
-                is ChatStoryRoute.UserStories -> StoriesView(
-                    startWithUserId = route.userId,
-                    onDismiss = { chatStoryRoute = null },
-                )
+                is ChatStoryRoute.UserStories -> {
+                    if (route.ringUserIds.size > 1) {
+                        StoriesView(
+                            startAtUserId = route.userId,
+                            ringNavigationUserIds = route.ringUserIds,
+                            onDismiss = { chatStoryRoute = null },
+                        )
+                    } else {
+                        StoriesView(
+                            startWithUserId = route.userId,
+                            onDismiss = { chatStoryRoute = null },
+                        )
+                    }
+                }
                 is ChatStoryRoute.SharedStory -> StoriesView(
                     explicitStories = listOf(route.story),
                     startAtIndex = 0,

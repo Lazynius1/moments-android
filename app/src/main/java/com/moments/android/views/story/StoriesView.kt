@@ -61,6 +61,7 @@ import com.moments.android.reportes.ReportTarget
 import com.moments.android.services.auth.AuthService
 import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import com.moments.android.views.story.storyviewer.GlassmorphicEmptyState
 import com.moments.android.views.story.storyviewer.StoryDeckPageRole
 import com.moments.android.views.story.storyviewer.StoryUserDeckPager
@@ -108,6 +109,8 @@ fun StoriesView(
     val firestore = remember { FirestoreService() }
     val scope = rememberCoroutineScope()
     val deckGestureGate = remember { StoryDeckGestureGate() }
+
+    MomentsTabBarHidden()
 
     // El visor adaptado aprovecha el espacio extra ocultando solo la status bar.
     // En móvil conservamos la barra y su safe area, igual que el visor original.

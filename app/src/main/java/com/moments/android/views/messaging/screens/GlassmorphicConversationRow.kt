@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,6 +61,11 @@ import kotlin.coroutines.resume
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.suspendCancellableCoroutine
 
+data class InboxStoryLaunch(
+    val startUserId: String,
+    val ringUserIds: List<String> = emptyList(),
+)
+
 /**
  * Port de `GlassmorphicConversationRow` (`MessagingView.swift`).
  */
@@ -69,7 +75,7 @@ fun GlassmorphicConversationRow(
     conversation: Conversation,
     onOpenProfile: () -> Unit,
     onTap: () -> Unit,
-    onOpenStory: (String) -> Unit = {},
+    onOpenStory: (InboxStoryLaunch) -> Unit = {},
     listInteraction: ConversationListInteraction? = null,
     isMenuSelected: Boolean = false,
     pressScale: Float = 1f,
@@ -79,6 +85,7 @@ fun GlassmorphicConversationRow(
     val context = LocalContext.current
     val firestore = remember { FirestoreService() }
     val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+    val groups by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
 
     var liveUsername by remember(conversation.otherParticipantId) { mutableStateOf("") }
     var isUnavailable by remember(conversation.otherParticipantId) { mutableStateOf(false) }
@@ -210,12 +217,27 @@ fun GlassmorphicConversationRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (conversation.isGroup) {
-            Box(Modifier.clickable(onClick = onTap)) {
-                com.moments.android.views.messaging.groups.GroupChatAvatar(
-                    image = conversation.otherParticipantProfileImagePath.orEmpty(),
-                    size = 56.dp,
-                )
+            val memberIds = remember(conversation.participants, conversation.id, uid, groups) {
+                var ids = conversation.participants
+                if (ids.isEmpty()) {
+                    ids = groups[conversation.id]?.members?.map { it.id }.orEmpty()
+                }
+                ids.filter { it.isNotBlank() && it != uid }
             }
+            com.moments.android.views.story.GroupStoryRingAvatarView(
+                memberUserIds = memberIds,
+                groupImage = conversation.otherParticipantProfileImagePath.orEmpty(),
+                size = 56.dp,
+                lineWidth = 2.5.dp,
+                hapticsEnabled = true,
+                onTap = { hasStory, startUserId, ringUserIds ->
+                    if (hasStory && !startUserId.isNullOrBlank()) {
+                        onOpenStory(InboxStoryLaunch(startUserId, ringUserIds))
+                    } else {
+                        onTap()
+                    }
+                },
+            )
         } else if (showsUnavailablePreview) {
             // Sin historia → abrir conversación
             Box(Modifier.clickable(onClick = onTap)) {
@@ -230,7 +252,7 @@ fun GlassmorphicConversationRow(
                 hapticsEnabled = true,
                 onTap = { hasStory ->
                     if (hasStory && !isBlockedByCurrentUser) {
-                        onOpenStory(conversation.otherParticipantId)
+                        onOpenStory(InboxStoryLaunch(conversation.otherParticipantId))
                     } else {
                         // Sin historia → abrir el chat
                         onTap()

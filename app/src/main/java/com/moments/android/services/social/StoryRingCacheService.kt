@@ -21,7 +21,47 @@ data class StoryRingSnapshot(
     val storyCount: Int,
     val storyViewedStatus: List<Boolean>,
     val storyAudiences: List<String?>,
-)
+) {
+    /**
+     * Audiencia de un único corte de grupo.
+     * Prioridad: no vistas, bestFriends → mutuals → resto. ≡ iOS `groupRingAudience`.
+     */
+    val groupRingAudience: String?
+        get() {
+            val count = maxOf(storyAudiences.size, storyViewedStatus.size)
+            val all = ArrayList<String?>(count)
+            val unseen = ArrayList<String?>(count)
+            for (index in 0 until count) {
+                val audience = storyAudiences.getOrNull(index)
+                val viewed = storyViewedStatus.getOrNull(index) ?: false
+                all.add(audience)
+                if (!viewed) unseen.add(audience)
+            }
+            val pool = if (unseen.isEmpty()) all else unseen
+            fun normalized(raw: String?): String =
+                raw?.trim()?.lowercase()
+                    ?.replace("_", "")
+                    ?.replace("-", "")
+                    .orEmpty()
+            if (pool.any { val key = normalized(it); key == "bestfriends" || key == "bestfriend" }) {
+                return "bestFriends"
+            }
+            if (pool.any { val key = normalized(it); key == "mutuals" || key == "mutual" }) {
+                return "mutuals"
+            }
+            return pool.firstOrNull { it != null }
+        }
+
+    companion object {
+        val Empty = StoryRingSnapshot(
+            hasStory = false,
+            hasUnseenStory = false,
+            storyCount = 0,
+            storyViewedStatus = emptyList(),
+            storyAudiences = emptyList(),
+        )
+    }
+}
 
 /** Port de StoryRingCacheService (actor) en StoryRingCacheService.swift. */
 object StoryRingCacheService {

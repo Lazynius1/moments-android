@@ -54,6 +54,7 @@ import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.CustomAudienceList
 import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
+import com.moments.android.views.components.bestFriendsAudienceTint
 import com.moments.android.views.creator.audienceselector.ContentAudience
 import com.moments.android.views.creator.audienceselector.listIconVector
 import com.moments.android.views.feed.rememberAdaptiveColors
@@ -236,7 +237,7 @@ private fun RelationshipMainContent(
             AudienceIconView(
                 audience = ContentAudience.BEST_FRIENDS,
                 size = AudienceIconMetrics.row,
-                tintColor = if (isBestFriend) Color(0xFF34C759) else content,
+                tintColor = if (isBestFriend) bestFriendsAudienceTint(colors.isDark) else content,
                 modifier = Modifier.width(24.dp),
             )
         }

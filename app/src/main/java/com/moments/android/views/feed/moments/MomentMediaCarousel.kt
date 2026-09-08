@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,7 +53,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
@@ -79,7 +77,6 @@ import com.moments.android.views.feed.video.FeedVideoPage
 import com.moments.android.views.feed.video.LiveVideoTimeLabel
 import com.moments.android.views.feed.video.LocalFeedReelsHost
 import com.moments.android.views.feed.video.ReelsViewer
-import com.moments.android.views.feed.video.ReelsBadgeOverlay
 import com.moments.android.views.feed.video.VideoPosterOverlay
 import com.moments.android.views.feed.video.switchVideoSurfaceToFeed
 import com.moments.android.views.shared.PhotoTagOverlayView
@@ -582,33 +579,6 @@ private fun CroppedVideoPlayer(
                     exit = fadeOut(),
                 ) {
                     Box(Modifier.fillMaxSize()) {
-                        Row(
-                            Modifier
-                                .align(Alignment.TopStart)
-                                .padding(start = 12.dp, top = 12.dp)
-                                .clip(RoundedCornerShape(percent = 50))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(Color(0xFFAF52DE).copy(0.8f), Color(0xFFFF2D55).copy(0.8f)),
-                                    ),
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Icon(
-                                Icons.Filled.PlayArrow,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(10.dp),
-                            )
-                            Text(
-                                stringResource(R.string.feed_reels_badge),
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
                         LiveVideoTimeLabel(
                             consumerId = consumerId,
                             totalDuration = totalDuration,
