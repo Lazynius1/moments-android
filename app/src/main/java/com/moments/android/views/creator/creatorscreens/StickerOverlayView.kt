@@ -64,6 +64,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.creator.StoryStickerDraft
+import com.moments.android.views.creator.components.StoryAlignmentGuideBroker
+import com.moments.android.views.creator.components.StoryMediaTransformLimits
+import com.moments.android.views.creator.components.storyAlignAndKeepVisible
+import com.moments.android.views.creator.components.storyKeepOverlayVisibleCenter
 import com.moments.android.views.creator.creatoruikit.creatorNormalizedUp
 import java.io.File
 import java.util.UUID
@@ -102,6 +106,7 @@ fun StickerOverlayView(
         if (overTrash) onDelete() else onUpdate(draft)
     },
     onStickerTapped: (StoryStickerDraft) -> Unit,
+    alignmentGuides: StoryAlignmentGuideBroker,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -158,6 +163,7 @@ fun StickerOverlayView(
     val latestOnDragEnded by rememberUpdatedState(onDragEnded)
     val latestOnUpdate by rememberUpdatedState(onUpdate)
     val latestOnStickerTapped by rememberUpdatedState(onStickerTapped)
+    val latestGuides by rememberUpdatedState(alignmentGuides)
     val latestLayoutCoords by rememberUpdatedState(layoutCoords)
 
     Box(
@@ -362,12 +368,38 @@ fun StickerOverlayView(
                                     liveX = proposedX
                                     liveY = proposedY
                                     liveScale = (
-                                        gestureStartScale * dampedStickerMagnification(cumulativeZoom)
+                                        gestureStartScale * cumulativeZoom
                                         ).coerceIn(latestMinScale, latestMaxScale)
                                     liveRotation = gestureStartRotation + Math.toRadians(
                                         cumulativeRotationDegrees.toDouble(),
                                     ).toFloat()
 
+                                    isOverTrash = dragged && isPointOverStoryOverlayTrash(
+                                        liveX,
+                                        liveY,
+                                        canvasWidthPx.toFloat(),
+                                        canvasHeightPx.toFloat(),
+                                        density,
+                                    )
+                                    val width = latestContentW * liveScale
+                                    val height = latestContentH * liveScale
+                                    val cosine = abs(cos(liveRotation))
+                                    val sine = abs(sin(liveRotation))
+                                    val boundsWidth = width * cosine + height * sine
+                                    val boundsHeight = width * sine + height * cosine
+                                    val aligned = storyAlignAndKeepVisible(
+                                        proposedX = liveX,
+                                        proposedY = liveY,
+                                        itemWidth = boundsWidth,
+                                        itemHeight = boundsHeight,
+                                        canvasWidth = canvasWidthPx.toFloat(),
+                                        canvasHeight = canvasHeightPx.toFloat(),
+                                        overTrash = isOverTrash || liveY > canvasHeightPx - 96f,
+                                        broker = latestGuides,
+                                        density = density.density,
+                                    )
+                                    liveX = aligned.x
+                                    liveY = aligned.y
                                     val visual = clampStickerPosition(
                                         x = liveX,
                                         y = liveY,
@@ -377,15 +409,6 @@ fun StickerOverlayView(
                                         rotationRadians = liveRotation,
                                         canvasWidthPx = canvasWidthPx,
                                         canvasHeightPx = canvasHeightPx,
-                                    )
-                                    // Papelera con centro propuesto sin clamp: con scale grande
-                                    // el clamp deja el centro lejos de la zona inferior.
-                                    isOverTrash = dragged && isPointOverStoryOverlayTrash(
-                                        liveX,
-                                        liveY,
-                                        canvasWidthPx.toFloat(),
-                                        canvasHeightPx.toFloat(),
-                                        density,
                                     )
                                     val updated = active.copy(
                                         normalizedX = (visual.first / canvasWidthPx).toDouble(),
@@ -407,6 +430,7 @@ fun StickerOverlayView(
                             } while (event.changes.any { it.pressed })
 
                             if (transformed) {
+                                latestGuides.clear()
                                 latestDraft?.let { draft ->
                                     if (dragged) {
                                         latestOnDragEnded(draft, isOverTrash)
@@ -440,6 +464,7 @@ fun StickerOverlayView(
                     scaleY = currentScale * feedbackScale
                     rotationZ = Math.toDegrees(currentRotation.toDouble()).toFloat()
                     transformOrigin = TransformOrigin.Center
+                    clip = false
                 },
         ) {
             content()
@@ -447,22 +472,12 @@ fun StickerOverlayView(
     }
 }
 
-private fun dampedStickerMagnification(magnification: Float): Float {
-    val damping = .55f
-    return if (magnification >= 1f) {
-        1f + (magnification - 1f) * damping
-    } else {
-        1f - (1f - magnification) * damping
-    }
+@Suppress("UNUSED_PARAMETER")
+private fun stickerMinimumScale(type: String): Float {
+    return StoryMediaTransformLimits.minScale
 }
 
-private fun stickerMinimumScale(type: String): Float = when (type) {
-    "poll", "question", "quiz" -> .42f
-    "time", "weather", "location", "mention", "hashtag", "link", "countdown", "emojiSlider" -> .35f
-    "frame", "selfie" -> .3f
-    else -> .28f
-}
-
+@Suppress("UNUSED_PARAMETER")
 private fun stickerMaximumScale(
     sticker: StoryStickerDraft,
     baseWidthPx: Int,
@@ -470,34 +485,14 @@ private fun stickerMaximumScale(
     canvasWidthPx: Int,
     canvasHeightPx: Int,
 ): Float {
-    if (baseWidthPx <= 0 || baseHeightPx <= 0 || canvasWidthPx <= 0 || canvasHeightPx <= 0) return 4f
-    if (
-        sticker.type == "shareMoment" &&
-        !sticker.videoURL.isNullOrBlank() &&
-        (sticker.mediaCount ?: 1) == 1 &&
-        (sticker.cardLayoutVariant ?: 0) % 2 == 1
-    ) {
-        return maxOf(
-            canvasWidthPx.toFloat() / baseWidthPx,
-            canvasHeightPx.toFloat() / baseHeightPx,
-        ).coerceAtLeast(stickerMinimumScale(sticker.type))
-    }
-    val type = sticker.type
-    val (widthPadding, heightRatio, typeCap) = when (type) {
-        "poll", "question", "quiz", "emojiSlider" -> Triple(34f, .42f, 1.45f)
-        "countdown" -> Triple(40f, .34f, 1.35f)
-        "time", "weather", "location", "mention", "hashtag", "link" -> Triple(44f, .28f, 1.85f)
-        "frame" -> Triple(28f, .68f, 2.4f)
-        "selfie" -> Triple(28f, .42f, 2f)
-        else -> Triple(24f, .78f, 4f)
+    if (baseWidthPx <= 0 || baseHeightPx <= 0 || canvasWidthPx <= 0 || canvasHeightPx <= 0) {
+        return StoryMediaTransformLimits.maxScale
     }
     val hardLimit = minOf(2048f / baseWidthPx, 2048f / baseHeightPx)
-    val visualWidth = (canvasWidthPx - widthPadding).coerceAtLeast(120f)
-    val visualHeight = (canvasHeightPx * heightRatio).coerceAtLeast(120f)
-    return minOf(typeCap, hardLimit, visualWidth / baseWidthPx, visualHeight / baseHeightPx)
-        .coerceAtLeast(stickerMinimumScale(type))
+    return minOf(StoryMediaTransformLimits.maxScale, hardLimit)
 }
 
+@Suppress("UNUSED_PARAMETER")
 private fun clampStickerPosition(
     x: Float,
     y: Float,
@@ -508,19 +503,15 @@ private fun clampStickerPosition(
     canvasWidthPx: Int,
     canvasHeightPx: Int,
 ): Pair<Float, Float> {
-    if (canvasWidthPx <= 0 || canvasHeightPx <= 0 || contentWidthPx <= 0 || contentHeightPx <= 0) {
+    if (canvasWidthPx <= 0 || canvasHeightPx <= 0) {
         return x to y
     }
-    val width = contentWidthPx * scale
-    val height = contentHeightPx * scale
-    val cos = abs(cos(rotationRadians))
-    val sin = abs(sin(rotationRadians))
-    val boundsWidth = width * cos + height * sin
-    val boundsHeight = width * sin + height * cos
-    val halfWidth = minOf(boundsWidth, canvasWidthPx.toFloat()) / 2f
-    val halfHeight = minOf(boundsHeight, canvasHeightPx.toFloat()) / 2f
-    return x.coerceIn(halfWidth, canvasWidthPx - halfWidth) to
-        y.coerceIn(halfHeight, canvasHeightPx - halfHeight)
+    return storyKeepOverlayVisibleCenter(
+        x = x,
+        y = y,
+        canvasWidth = canvasWidthPx.toFloat(),
+        canvasHeight = canvasHeightPx.toFloat(),
+    )
 }
 
 private fun clampFrameContentOffset(

@@ -419,6 +419,7 @@ object UploadPayloadDecoder {
             put("isLiveOverlay", meta.isLiveOverlay)
             meta.gradientStopHexes?.let { put("gradientStopHexes", JSONArray(it)) }
             meta.gradientAngle?.let { put("gradientAngle", it) }
+            put("rotationRadians", meta.rotationRadians)
         }
         payload.textOverlayMetadata?.let { json.put("textOverlayMetadata", encodeOverlay(it)) }
         payload.textOverlays?.takeIf { it.isNotEmpty() }?.let { list ->
@@ -611,6 +612,7 @@ object UploadPayloadDecoder {
                 (0 until arr.length()).map { arr.getString(it) }
             },
             gradientAngle = obj.optInt("gradientAngle").takeIf { obj.has("gradientAngle") },
+            rotationRadians = obj.optDouble("rotationRadians").takeIf { obj.has("rotationRadians") } ?: 0.0,
         )
     }
 

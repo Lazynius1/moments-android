@@ -10,9 +10,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.moments.android.models.StoryTextOverlayMetadata
 import com.moments.android.views.creator.components.StoryTextOverlayLabel
@@ -49,21 +51,30 @@ fun StoryLiveTextOverlayView(
         if (!styleKnown) return@BoxWithConstraints
 
         // iOS usa points; Android container está en px → dp para el factor 375.
-        val containerWidthDp = with(density) { container.width.toDp().value }
-        val config = metadata.scaledRenderConfiguration(containerWidthDp)
+        val containerWidthDp = with(density) { container.width.toDp() }
+        val config = metadata.scaledRenderConfiguration(containerWidthDp.value)
         val anchor = metadata.displayPosition(container)
-        val maxWidth = with(density) { (container.width - 48f).coerceAtLeast(120f).toDp() }
+        // ≡ iOS overlayMaxWidth: live = width−48pt; thumbnail = width×(327/375)
+        val maxWidth = if (animates) {
+            (containerWidthDp - 48.dp).coerceAtLeast(120.dp)
+        } else {
+            (containerWidthDp * (327f / 375f)).coerceAtLeast(1.dp)
+        }
         var contentWidthPx by remember(metadata.id) { mutableFloatStateOf(0f) }
         var contentHeightPx by remember(metadata.id) { mutableFloatStateOf(0f) }
 
         // ≡ .position(x:y:) ancla el centro del label
         Box(
-            Modifier.offset {
-                IntOffset(
-                    (anchor.x - contentWidthPx / 2f).roundToInt(),
-                    (anchor.y - contentHeightPx / 2f).roundToInt(),
-                )
-            },
+            Modifier
+                .offset {
+                    IntOffset(
+                        (anchor.x - contentWidthPx / 2f).roundToInt(),
+                        (anchor.y - contentHeightPx / 2f).roundToInt(),
+                    )
+                }
+                .graphicsLayer {
+                    rotationZ = Math.toDegrees(metadata.rotationRadians).toFloat()
+                },
         ) {
             StoryTextOverlayLabel(
                 configuration = config,

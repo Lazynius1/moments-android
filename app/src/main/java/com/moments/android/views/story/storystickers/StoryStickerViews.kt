@@ -19,8 +19,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -37,7 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -48,11 +48,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -60,8 +57,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -107,6 +104,7 @@ import com.moments.android.views.story.StoryDeckGestureGate
 import com.moments.android.views.story.storyviewer.LocalStoryStickerHitTesting
 import com.moments.android.views.story.storyviewer.StoryGestureSuppressionScope
 import com.moments.android.views.story.storyviewer.StoryViewerLayoutHelpers
+import com.moments.android.views.story.storyviewer.storyStickerCanvasPlacement
 import com.moments.android.views.story.storyviewer.emojiSliderVotePan
 import com.moments.android.views.story.storyviewer.storyDeckInteractionExclusion
 import com.moments.android.views.components.AnimatedMomentsCardStickerHeaderSurface
@@ -120,8 +118,6 @@ import androidx.compose.animation.core.tween
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.Date
-import kotlin.math.max
-import kotlin.math.roundToInt
 
 /** Port de `InteractivePollData`. */
 data class InteractivePollData(
@@ -708,6 +704,15 @@ fun StoryStickerRendererLayer(
     }
 }
 
+/** ≡ iOS visor `.frame` / `storyStickerBaseLayoutSize` — chip fijo, no el canvas. */
+private fun storyStickerViewerLayoutSize(sticker: StickerData): DpSize? = when (sticker.type) {
+    "poll" -> DpSize(300.dp, 172.dp)
+    "question", "questionResponse" -> DpSize(300.dp, 132.dp)
+    "time" -> DpSize(164.dp, 56.dp)
+    "emojiSlider" -> emojiSliderRenderingSize(sticker.sliderPrompt.orEmpty())
+    else -> null
+}
+
 @Composable
 private fun StoryStickerRendererContent(
     storyId: String,
@@ -723,78 +728,68 @@ private fun StoryStickerRendererContent(
     onMentionTap: (String) -> Unit,
     onMomentTap: (momentId: String, authorId: String) -> Unit,
 ) {
-    val density = LocalDensity.current.density
-    stickers
-        .filterNot { it.type == "frame" || it.type == "reveal" }
-        .sortedBy { it.zIndex ?: 0 }
-        .forEach { sticker ->
-            // ≡ iOS StoryMediaOverlayRendererView.stickerForDisplay + .position (centro)
-            val (centerX, centerY) = StoryViewerLayoutHelpers.stickerDisplayPosition(
-                sticker.position,
-                widthPx,
-                heightPx,
-            )
-            val displayScale = StoryViewerLayoutHelpers.stickerDisplayScale(
-                sticker.scale,
-                widthPx,
-                density,
-            )
-            android.util.Log.d(
-                "StoryStickerScale",
-                "view type=${sticker.type} firestoreScale=${sticker.scale} " +
-                    "canvasPx=$widthPx density=$density " +
-                    "widthDp=${StoryViewerLayoutHelpers.canvasWidthDp(widthPx, density)} " +
-                    "displayScale=$displayScale",
-            )
-            var contentWidthPx by remember(sticker.stickerId, sticker.content) { mutableFloatStateOf(0f) }
-            var contentHeightPx by remember(sticker.stickerId, sticker.content) { mutableFloatStateOf(0f) }
-            val exclusionId = "sticker.$storyId.${sticker.stickerId.orEmpty()}"
-            Box(
-                Modifier
-                    .zIndex((sticker.zIndex ?: 0).toFloat())
-                    .onSizeChanged {
-                        contentWidthPx = it.width.toFloat()
-                        contentHeightPx = it.height.toFloat()
-                    }
-                    .offset {
-                        IntOffset(
-                            (centerX - contentWidthPx / 2f).roundToInt(),
-                            (centerY - contentHeightPx / 2f).roundToInt(),
-                        )
-                    }
-                    .graphicsLayer {
-                        scaleX = displayScale
-                        scaleY = displayScale
-                        rotationZ = Math.toDegrees(sticker.rotation).toFloat()
-                        transformOrigin = TransformOrigin.Center
-                    }
-                    .storyDeckInteractionExclusion(
-                        id = exclusionId,
-                        gate = gestureGate,
-                        enabled = reportsDeckInteractionExclusion && sticker.needsInteractionRegion(),
-                    ),
-            ) {
-                if (isThumbnail) {
-                    StoryStaticStickerView(
-                        sticker = sticker,
-                        storyId = storyId,
-                        userId = userId,
-                        gestureGate = gestureGate,
+    val density = LocalDensity.current
+    Box(Modifier.fillMaxSize()) {
+        stickers
+            .filterNot { it.type == "frame" || it.type == "reveal" }
+            .sortedBy { it.zIndex ?: 0 }
+            .forEach { sticker ->
+                key(sticker.stickerId ?: "${sticker.type}_${sticker.position.x}_${sticker.position.y}") {
+                    // ≡ iOS StoryMediaOverlayRendererView.stickerForDisplay + .position (centro)
+                    val (centerX, centerY) = StoryViewerLayoutHelpers.stickerDisplayPosition(
+                        sticker.position,
+                        widthPx,
+                        heightPx,
                     )
-                } else {
-                    StoryStickerView(
-                        sticker = sticker,
-                        storyId = storyId,
-                        userId = userId,
-                        gestureGate = gestureGate,
-                        onPauseStory = onPauseStory,
-                        onResumeStory = onResumeStory,
-                        onMentionTap = onMentionTap,
-                        onMomentTap = onMomentTap,
+                    val displayScale = StoryViewerLayoutHelpers.stickerDisplayScale(
+                        sticker.scale,
+                        widthPx,
+                        density.density,
                     )
+                    val exclusionId = "sticker.$storyId.${sticker.stickerId.orEmpty()}"
+                    val layoutSize = storyStickerViewerLayoutSize(sticker)
+                    val layoutWidthPx = layoutSize?.let { with(density) { it.width.roundToPx() } }
+                    val layoutHeightPx = layoutSize?.let { with(density) { it.height.roundToPx() } }
+                    Box(
+                        Modifier
+                            .zIndex((sticker.zIndex ?: 0).toFloat())
+                            .storyStickerCanvasPlacement(
+                                centerX = centerX,
+                                centerY = centerY,
+                                displayScale = displayScale,
+                                rotationRadians = sticker.rotation,
+                                layoutWidthPx = layoutWidthPx,
+                                layoutHeightPx = layoutHeightPx,
+                            )
+                            .storyDeckInteractionExclusion(
+                                id = exclusionId,
+                                gate = gestureGate,
+                                enabled = reportsDeckInteractionExclusion && sticker.needsInteractionRegion(),
+                            ),
+                    ) {
+                        if (isThumbnail) {
+                            StoryStaticStickerView(
+                                sticker = sticker,
+                                storyId = storyId,
+                                userId = userId,
+                                gestureGate = gestureGate,
+                            )
+                        } else {
+                            StoryStickerView(
+                                sticker = sticker,
+                                storyId = storyId,
+                                userId = userId,
+                                gestureGate = gestureGate,
+                                onPauseStory = onPauseStory,
+                                onResumeStory = onResumeStory,
+                                onMentionTap = onMentionTap,
+                                onMomentTap = onMomentTap,
+                            )
+                        }
+                    }
                 }
             }
-        }
+    }
 }
 
 /** Visual idéntico al visor, pero sin reproducción, animación ni interacción. */
@@ -906,7 +901,7 @@ fun StoryStickerView(
             userId = userId,
             stickerId = sticker.stickerId.orEmpty(),
             styleVariant = sticker.styleVariant ?: 0,
-            modifier = modifier.width(300.dp),
+            modifier = modifier.requiredSize(300.dp, 172.dp),
         )
         sticker.type == "emojiSlider" -> InteractiveEmojiSliderSticker(
             prompt = sticker.sliderPrompt.orEmpty(),
@@ -920,8 +915,9 @@ fun StoryStickerView(
         )
         sticker.type == "weather" -> AnimatedWeatherSticker(
             weatherSymbol = sticker.weatherSymbol.orEmpty(),
-            temperature = sticker.questionText ?: sticker.content,
-            modifier = modifier.width(140.dp).height(50.dp),
+            temperature = sticker.questionText ?: "🌤️",
+            styleVariant = sticker.styleVariant ?: 0,
+            modifier = modifier,
         )
         sticker.type == "question" -> InteractiveQuestionSticker(
             questionText = sticker.questionText ?: sticker.content,
@@ -932,12 +928,12 @@ fun StoryStickerView(
             onPauseStory = onPauseStory,
             onResumeStory = onResumeStory,
             onOpenProfile = gatedMentionTap,
-            modifier = modifier.width(300.dp),
+            modifier = modifier.requiredSize(300.dp, 132.dp),
         )
         sticker.type == "questionResponse" -> QuestionResponseStoryStickerCardView(
             questionText = sticker.questionText ?: sticker.content,
             styleVariant = sticker.styleVariant ?: 0,
-            modifier = modifier,
+            modifier = modifier.requiredSize(300.dp, 132.dp),
         )
         sticker.type == "mention" -> InteractiveMentionSticker(
             username = sticker.username ?: sticker.content,
@@ -1014,9 +1010,7 @@ fun StoryStickerView(
             dateText = sticker.caption?.takeIf { it.isNotBlank() }
                 ?: MomentsFormat.smartDate(Date(), MomentsFormat.DateContext.NUMERIC_DATE),
             styleVariant = sticker.styleVariant ?: 0,
-            // Same intrinsic layout as the editor. 56 dp cannot contain both text
-            // lines plus the card's 28 dp vertical padding and compressed the viewer.
-            modifier = modifier,
+            modifier = modifier.requiredSize(164.dp, 56.dp),
         )
         sticker.type == "audio" -> {
             val url = sticker.audioURL
@@ -1193,11 +1187,16 @@ private fun StoryStaticSticker(sticker: StickerData, modifier: Modifier) {
             decodeShareMomentBitmap(sticker.content)
         }
         if (decodedEmoji != null) {
+            // ≡ iOS stickerUIImage(..., normalizeEmojiSide: 200)
+            val (layoutW, layoutH) = StoryViewerLayoutHelpers.emojiStickerLayoutSizeDp(
+                decodedEmoji.width,
+                decodedEmoji.height,
+            )
             Image(
                 bitmap = decodedEmoji.asImageBitmap(),
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
-                modifier = shaped.size(decodedEmoji.width.dp, decodedEmoji.height.dp),
+                modifier = shaped.size(layoutW.dp, layoutH.dp),
             )
             return
         }

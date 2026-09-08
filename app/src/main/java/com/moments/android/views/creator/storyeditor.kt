@@ -3,6 +3,8 @@ package com.moments.android.views.creator
 import com.moments.android.views.creator.components.ActiveEditorMode
 import com.moments.android.services.social.StoryChainLimitError
 import com.moments.android.services.social.StoryChainLimitsService
+import com.moments.android.views.creator.components.StoryAlignmentGuideBroker
+import com.moments.android.views.creator.components.StoryAlignmentGuidesOverlay
 import com.moments.android.views.creator.components.StoryBackgroundPreset
 import com.moments.android.views.creator.components.StoryMediaBackgroundView
 import com.moments.android.views.creator.components.EditableImageView
@@ -12,12 +14,12 @@ import com.moments.android.views.creator.components.storyDominantBackgroundColor
 import com.moments.android.views.creator.components.StoryDrawingEditorOverlay
 import com.moments.android.views.creator.components.StoryFilterSelectorView
 import com.moments.android.views.creator.components.StoryTextOverlayDraft
+import com.moments.android.views.creator.components.StoryTextCanvasPlacement
 import com.moments.android.views.creator.components.StoryTextStyle
 import com.moments.android.views.creator.components.StoryTextGradientSettings
 import com.moments.android.views.creator.components.StoryVideoGravity
 import com.moments.android.views.creator.components.StoryVideoPlayerView
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.foundation.layout.requiredSize
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import android.media.MediaMetadataRetriever
@@ -113,7 +115,6 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Download
@@ -306,6 +307,7 @@ fun StoryEditingView(
     var nextLayerOrder by remember { mutableIntStateOf(0) }
     var deleteArmedId by remember { mutableStateOf<String?>(null) }
     var overlayDragState by remember { mutableStateOf(StoryOverlayDragState()) }
+    val alignmentGuideBroker = remember { StoryAlignmentGuideBroker() }
     var drawingImage by remember { mutableStateOf<Bitmap?>(null) }
     var drawingOffsetX by remember { mutableFloatStateOf(0f) }
     var drawingOffsetY by remember { mutableFloatStateOf(0f) }
@@ -463,7 +465,6 @@ fun StoryEditingView(
         }
     }
     var activeEditingStickerId by remember { mutableStateOf<String?>(null) }
-    var deleteArmedStickerId by remember { mutableStateOf<String?>(null) }
     var focusedInlineStickerOriginal by remember { mutableStateOf<StoryStickerDraft?>(null) }
     var editingPolaroidId by remember { mutableStateOf<String?>(null) }
     var editingPolaroidOriginal by remember { mutableStateOf<StoryStickerDraft?>(null) }
@@ -654,8 +655,8 @@ fun StoryEditingView(
 
     fun tapCyclesStickerStyle(type: String): Boolean =
         type == "location" || type == "mention" || type == "link" ||
-            type == "hashtag" || type == "time" || type == "questionResponse" ||
-            type == "shareMoment"
+            type == "hashtag" || type == "time" || type == "weather" ||
+            type == "questionResponse" || type == "shareMoment"
 
     fun restoreFocusedInlineSticker() {
         val original = focusedInlineStickerOriginal ?: return
@@ -696,7 +697,6 @@ fun StoryEditingView(
             }
         }
         activeEditingStickerId = sticker.id
-        deleteArmedStickerId = null
         HapticManager.shared.mediumImpact()
     }
 
@@ -711,7 +711,6 @@ fun StoryEditingView(
                 item
             }
         }
-        deleteArmedStickerId = null
         HapticManager.shared.mediumImpact()
     }
 
@@ -781,8 +780,7 @@ fun StoryEditingView(
                 }
             }
             else -> {
-                // Android: segundo tap armado para borrar (iOS usa trash zone).
-                deleteArmedStickerId = sticker.id
+                selectedStickerId = sticker.id
             }
         }
     }
@@ -830,7 +828,6 @@ fun StoryEditingView(
         )
         stickers = stickers + placed
         activeEditingStickerId = null
-        deleteArmedStickerId = null
         HapticManager.shared.mediumImpact()
     }
     val selfiePermissionLauncher = rememberLauncherForActivityResult(
@@ -1361,12 +1358,6 @@ fun StoryEditingView(
                     containerWidthPx = capturedCanvasW,
                     density = capturedDensity,
                 )
-                android.util.Log.d(
-                    "StoryStickerScale",
-                    "upload canvasPx=$capturedCanvasW density=$capturedDensity " +
-                        "widthDp=${StoryViewerLayoutHelpers.canvasWidthDp(capturedCanvasW, capturedDensity)} " +
-                        "scaleNorm=$scaleNorm",
-                )
                 capturedStickers.sortedBy { it.zIndex }.map { draft ->
                     // ≡ iOS: el fallback bitmap del GIF va en `content` (Base64) para el frame;
                     // sin él iOS usa SF Symbol ~20pt y el GIF queda invisible.
@@ -1391,10 +1382,6 @@ fun StoryEditingView(
                     val normalizedX = draft.normalizedX.takeIf { it.isFinite() }?.coerceIn(0.0, 1.0) ?: 0.5
                     val normalizedY = draft.normalizedY.takeIf { it.isFinite() }?.coerceIn(0.0, 1.0) ?: 0.5
                     val normalizedScale = (draft.scale * scaleNorm).takeIf { it.isFinite() } ?: draft.scale
-                    android.util.Log.d(
-                        "StoryStickerScale",
-                        "upload type=${draft.type} editorScale=${draft.scale} → firestoreScale=$normalizedScale",
-                    )
                     CachedSticker(
                         id = draft.id,
                         localImageName = localName,
@@ -1648,11 +1635,7 @@ fun StoryEditingView(
                                 paletteOverride = resolvedStoryBackgroundPalette(),
                                 isInteractionEnabled = activeEditorMode == ActiveEditorMode.IDLE &&
                                     activeEditingStickerId == null &&
-                                    editingPolaroidId == null &&
-                                    editingRevealId == null &&
-                                    drawingImage == null &&
-                                    textOverlays.none { it.isReady } &&
-                                    stickers.isEmpty(),
+                                    editingPolaroidId == null,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         } else {
@@ -1685,11 +1668,7 @@ fun StoryEditingView(
                                     paletteOverride = resolvedStoryBackgroundPalette(),
                                     isInteractionEnabled = activeEditorMode == ActiveEditorMode.IDLE &&
                                         activeEditingStickerId == null &&
-                                        editingPolaroidId == null &&
-                                        editingRevealId == null &&
-                                        drawingImage == null &&
-                                        textOverlays.none { it.isReady } &&
-                                        stickers.isEmpty(),
+                                        editingPolaroidId == null,
                                     modifier = Modifier.fillMaxSize(),
                                 ) { _ ->
                                     StoryVideoPlayerView(
@@ -1789,6 +1768,7 @@ fun StoryEditingView(
                                 overlayDragState = state
                             },
                             onBackgroundTap = { selectedStickerId = null },
+                            alignmentGuides = alignmentGuideBroker,
                         )
                     }
                 }
@@ -1836,10 +1816,9 @@ fun StoryEditingView(
                 if (activeEditorMode == ActiveEditorMode.IDLE) {
                     stickers.sortedBy { it.zIndex }.forEach { sticker ->
                         if (sticker.type == "reveal") return@forEach
-                        val armed = deleteArmedStickerId == sticker.id
                         val editing = activeEditingStickerId == sticker.id
                         val polaroidEditing = editingPolaroidId == sticker.id
-                        val selected = selectedStickerId == sticker.id || armed || editing
+                        val selected = selectedStickerId == sticker.id || editing || polaroidEditing
                         val effectiveZ = when {
                             editing -> 3000f
                             // Sobre el fondo de foco (1500); caption va in-place en el marco.
@@ -1860,7 +1839,6 @@ fun StoryEditingView(
                             },
                             onDelete = {
                                 stickers = stickers.filterNot { it.id == sticker.id }
-                                deleteArmedStickerId = null
                                 activeEditingStickerId = null
                                 selectedStickerId = null
                                 HapticManager.shared.warning()
@@ -1871,8 +1849,10 @@ fun StoryEditingView(
                                 if (!overlayDragState.isOverTrash && overTrash) {
                                     HapticManager.shared.mediumImpact()
                                 }
-                                overlayDragState = StoryOverlayDragState(isDragging = true, isOverTrash = overTrash)
-                                deleteArmedStickerId = null
+                                overlayDragState = StoryOverlayDragState(
+                                    isDragging = true,
+                                    isOverTrash = overTrash,
+                                )
                                 stickers = stickers.map { if (it.id == updated.id) updated else it }
                             },
                             onDragEnded = { updated, overTrash ->
@@ -1889,14 +1869,6 @@ fun StoryEditingView(
                             },
                             onStickerTapped = {
                                 when {
-                                    armed -> {
-                                        stickers = stickers.filterNot { item -> item.id == sticker.id }
-                                        deleteArmedStickerId = null
-                                        activeEditingStickerId = null
-                                        selectedStickerId = null
-                                        restoreFocusedInlineSticker()
-                                        HapticManager.shared.warning()
-                                    }
                                     // ≡ isInlineEditableSticker → focusInlineEditableSticker
                                     stickerSupportsInlineEdit(sticker) -> {
                                         if (editing) {
@@ -1916,35 +1888,17 @@ fun StoryEditingView(
                                     else -> handleStickerTap(sticker)
                                 }
                             },
+                            alignmentGuides = alignmentGuideBroker,
                             modifier = Modifier.zIndex(effectiveZ),
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                StoryStickerChip(
-                                    sticker = sticker,
-                                    isEditingInline = editing,
-                                    isContentEditing = polaroidEditing,
-                                    onUpdate = { updated ->
-                                        stickers = stickers.map { if (it.id == updated.id) updated else it }
-                                    },
-                                    modifier = Modifier,
-                                )
-                                if (armed || editing) {
-                                    Icon(
-                                        Icons.Filled.Delete,
-                                        null,
-                                        tint = Color(0xFFE91E63),
-                                        modifier = Modifier
-                                            .padding(start = 4.dp)
-                                            .size(18.dp)
-                                            .clickable {
-                                                stickers = stickers.filterNot { it.id == sticker.id }
-                                                deleteArmedStickerId = null
-                                                activeEditingStickerId = null
-                                                HapticManager.shared.warning()
-                                            },
-                                    )
-                                }
-                            }
+                            StoryStickerChip(
+                                sticker = sticker,
+                                isEditingInline = editing,
+                                isContentEditing = polaroidEditing,
+                                onUpdate = { updated ->
+                                    stickers = stickers.map { if (it.id == updated.id) updated else it }
+                                },
+                            )
                         }
                     }
 
@@ -1975,9 +1929,10 @@ fun StoryEditingView(
                                 }
                                 overlayDragState = state
                             },
+                            alignmentGuides = alignmentGuideBroker,
                         ) {
                             // Sin plate inventado: el fill lo decide `backgroundFillRaw` (none/solid/…).
-                            StoryCanvasTextLabel(overlay = overlay)
+                            StoryCanvasTextLabel(overlay = overlay, canvasWidthPx = boxW)
                         }
                     }
 
@@ -1997,6 +1952,10 @@ fun StoryEditingView(
                         )
                     }
 
+                    StoryAlignmentGuidesOverlay(
+                        broker = alignmentGuideBroker,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                     StoryOverlayTrashZone(overlayDragState)
                 }
 
@@ -2716,7 +2675,6 @@ fun StoryEditingView(
                     showingStickerPicker = false
                     activeEditingStickerId =
                         if (stickerSupportsInlineEdit(draft)) draft.id else null
-                    deleteArmedStickerId = null
                 },
                 onSelfieRequested = ::requestSelfieSticker,
                 hasRevealSticker = stickers.any { it.type == "reveal" },
@@ -3005,11 +2963,11 @@ private fun StoryStickerChip(
             }
         }
         "weather" -> {
-            // ≡ iOS AnimatedWeatherSticker + `.frame(width: 140, height: 50)`
             AnimatedWeatherSticker(
                 weatherSymbol = sticker.weatherSymbol ?: sticker.content,
                 temperature = sticker.questionText ?: "🌤️",
-                modifier = modifier.width(140.dp).height(50.dp),
+                styleVariant = sticker.styleVariant ?: 0,
+                modifier = modifier,
             )
         }
         "time" -> {
@@ -3245,12 +3203,17 @@ private fun InlineStickerField(
 @Composable
 private fun StoryCanvasTextLabel(
     overlay: StoryTextOverlayDraft,
+    canvasWidthPx: Float,
     modifier: Modifier = Modifier,
 ) {
+    val density = LocalDensity.current
+    val maxWidthDp = with(density) {
+        StoryTextCanvasPlacement.maxLayoutWidth(canvasWidthPx).toDp()
+    }
     // ≡ StoryTextOverlayLabel — treatments + motion (no Text plano).
     StoryTextOverlayLabel(
         overlay = overlay,
-        maxWidth = 280.dp,
+        maxWidth = maxWidthDp,
         modifier = modifier,
     )
 }

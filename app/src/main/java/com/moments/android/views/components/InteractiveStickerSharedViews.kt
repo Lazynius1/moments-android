@@ -48,6 +48,16 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Air
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.Thunderstorm
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.WbCloudy
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -251,6 +261,40 @@ fun emojiSliderHasPrompt(prompt: String): Boolean = prompt.trim().isNotEmpty()
 
 fun emojiSliderRenderingSize(prompt: String = ""): DpSize =
     if (emojiSliderHasPrompt(prompt)) DpSize(260.dp, 110.dp) else DpSize(260.dp, 78.dp)
+
+/** ≡ iOS `weatherStickerRenderingSize(temperature:)`. */
+fun weatherStickerRenderingSize(temperature: String, context: Context): DpSize {
+    val measured = temperature.trim()
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = 18f * context.resources.displayMetrics.scaledDensity
+        typeface = android.graphics.Typeface.create(
+            android.graphics.Typeface.DEFAULT,
+            android.graphics.Typeface.BOLD,
+        )
+    }
+    val textWidth = ceil(paint.measureText(measured.ifEmpty { "0°C" }))
+    val horizontalChrome = 20f + 20f + 20f + 8f
+    val density = context.resources.displayMetrics.density.coerceAtLeast(0.01f)
+    val widthDp = min(max(textWidth + horizontalChrome, 96f), 220f) / density
+    return DpSize(widthDp.dp, 46.dp)
+}
+
+/** ≡ iOS `weatherStickerSystemImageName(for:)`. */
+fun weatherStickerImageVector(symbol: String): ImageVector = when (symbol) {
+    "☀️" -> Icons.Filled.WbSunny
+    "🌤️", "⛅" -> Icons.Filled.WbTwilight
+    "🌥️", "☁️" -> Icons.Filled.Cloud
+    "🌧️" -> Icons.Filled.WaterDrop
+    "⛈️" -> Icons.Filled.Thunderstorm
+    "❄️", "🌨️" -> Icons.Filled.AcUnit
+    "💨" -> Icons.Filled.Air
+    "🌙", "🌃" -> Icons.Filled.NightsStay
+    "🌅", "🌄" -> Icons.Filled.WbTwilight
+    "🔥" -> Icons.Filled.LocalFireDepartment
+    "🥶" -> Icons.Filled.AcUnit
+    "🌫️" -> Icons.Filled.Cloud
+    else -> Icons.Filled.WbCloudy
+}
 
 fun emojiSliderMomentsGradientColors(): List<Color> = listOf(
     Color(0xFF007AFF), // system blue
@@ -1172,7 +1216,7 @@ fun linkStickerFallbackTitle(): String = stringResource(R.string.story_editor_li
 // MARK: - StickerLinkCardView / Hashtag / Time / Countdown helpers
 
 @Composable
-private fun TapCycleForegroundText(
+internal fun TapCycleForegroundText(
     text: String,
     foreground: MomentsTapCycleForeground,
     fontSize: androidx.compose.ui.unit.TextUnit,

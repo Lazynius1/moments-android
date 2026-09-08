@@ -19,6 +19,9 @@ object StoryTextCanvasPlacement {
     fun defaultPosition(canvasSize: Size): Offset =
         Offset(canvasSize.width / 2f, maxOf(canvasSize.height * 0.42f, 80f))
 
+    fun maxLayoutWidth(canvasWidth: Float): Float =
+        maxOf(canvasWidth * StoryMediaTransformLimits.maxScale, 120f)
+
     fun needsSeed(position: Offset, canvasSize: Size): Boolean {
         if (canvasSize.width <= 1f || canvasSize.height <= 1f) return false
         return position == Offset.Zero ||
@@ -49,6 +52,7 @@ data class StoryTextOverlayDraft(
     val layerOrder: Int = 0,
     val gradientStopHexes: List<String> = emptyList(),
     val gradientAngle: Int = 0,
+    val rotationRadians: Double = 0.0,
 ) {
     val isReady: Boolean get() = text.trim().isNotEmpty()
 
@@ -77,6 +81,7 @@ data class StoryTextOverlayDraft(
             forcesAllCaps = forcesAllCaps,
             gradientStopHexes = gradientStopHexes,
             gradientAngle = gradientAngle,
+            rotationRadians = rotationRadians,
         )
 
     /** Atajo cuando la posición ya está normalizada (sin rect de contenido). */
@@ -106,6 +111,7 @@ data class StoryTextOverlayDraft(
                 effect == StoryTextEffect.GRADIENT && it.isNotEmpty()
             },
             gradientAngle = gradientAngle.takeIf { effect == StoryTextEffect.GRADIENT },
+            rotationRadians = rotationRadians,
         )
     }
 
@@ -139,6 +145,7 @@ data class StoryTextOverlayDraft(
                 gradientStopHexes = metadata.gradientStopHexes
                     ?: StoryTextGradientSettings.encodeStops(StoryTextGradientSettings.defaultStops(color)),
                 gradientAngle = metadata.gradientAngle ?: 0,
+                rotationRadians = metadata.rotationRadians,
             )
         }
 
@@ -169,6 +176,7 @@ fun buildStoryTextOverlayMetadata(
     forcesAllCaps: Boolean,
     gradientStopHexes: List<String> = emptyList(),
     gradientAngle: Int = 0,
+    rotationRadians: Double = 0.0,
 ): StoryTextOverlayMetadata? {
     val trimmed = text.trim()
     if (trimmed.isEmpty()) return null
@@ -197,6 +205,7 @@ fun buildStoryTextOverlayMetadata(
             effect == StoryTextEffect.GRADIENT && it.isNotEmpty()
         },
         gradientAngle = gradientAngle.takeIf { effect == StoryTextEffect.GRADIENT },
+        rotationRadians = rotationRadians,
     )
 }
 

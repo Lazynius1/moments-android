@@ -949,6 +949,7 @@ data class StoryTextOverlayMetadata(
     val isLiveOverlay: Boolean = true,
     val gradientStopHexes: List<String>? = null,
     val gradientAngle: Int? = null,
+    val rotationRadians: Double = 0.0,
 ) {
     companion object {
         fun from(data: Map<String, Any?>): StoryTextOverlayMetadata = StoryTextOverlayMetadata(
@@ -968,6 +969,7 @@ data class StoryTextOverlayMetadata(
             isLiveOverlay = data["isLiveOverlay"] as? Boolean ?: true,
             gradientStopHexes = (data["gradientStopHexes"] as? List<*>)?.filterIsInstance<String>(),
             gradientAngle = (data["gradientAngle"] as? Number)?.toInt(),
+            rotationRadians = (data["rotationRadians"] as? Number)?.toDouble() ?: 0.0,
         )
     }
 }
@@ -1536,6 +1538,7 @@ fun StoryTextOverlayMetadata.toMap(): Map<String, Any> = buildMap {
     put("forcesAllCaps", forcesAllCaps); put("isLiveOverlay", isLiveOverlay)
     gradientStopHexes?.let { put("gradientStopHexes", it) }
     gradientAngle?.let { put("gradientAngle", it) }
+    put("rotationRadians", rotationRadians)
 }
 
 fun StickerData.toMap(): Map<String, Any> = buildMap {

@@ -247,6 +247,7 @@ private fun FirestoreService.makeStoryPayload(
                 overlay.motionRaw?.let { put("motionRaw", it) }
                 put("forcesAllCaps", overlay.forcesAllCaps)
                 put("isLiveOverlay", overlay.isLiveOverlay)
+                put("rotationRadians", overlay.rotationRadians)
             }
         }
     }

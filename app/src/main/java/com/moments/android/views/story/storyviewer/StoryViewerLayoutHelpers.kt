@@ -2,9 +2,14 @@ package com.moments.android.views.story.storyviewer
 
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import com.moments.android.models.Point
+import kotlin.math.roundToInt
 
 /** Port de los helpers estáticos de `StoryViewerLayoutHelpers.swift`. */
 object StoryViewerLayoutHelpers {
@@ -145,4 +150,59 @@ object StoryViewerLayoutHelpers {
 
     /** @deprecated Usar [STORY_STICKER_REFERENCE_WIDTH]; el nombre “PX” era engañoso. */
     const val STORY_STICKER_REFERENCE_WIDTH_PX = STORY_STICKER_REFERENCE_WIDTH
+
+    /**
+     * ≡ iOS `stickerUIImage(..., normalizeEmojiSide: 200)`:
+     * PNG @2x/@3x (~400–600px) se muestra a ~200pt, no a 400.dp.
+     */
+    fun emojiStickerLayoutSizeDp(
+        widthPx: Int,
+        heightPx: Int,
+        targetSideDp: Float = 200f,
+    ): Pair<Float, Float> {
+        val maxSide = maxOf(widthPx, heightPx).toFloat()
+        return if (maxSide > targetSideDp * 1.5f) {
+            val scale = maxSide / targetSideDp
+            widthPx / scale to heightPx / scale
+        } else {
+            widthPx.toFloat() to heightPx.toFloat()
+        }
+    }
+}
+
+/**
+ * ≡ iOS `.position(center)` + `scaleEffect` + `rotationEffect` sobre un frame fijo.
+ *
+ * El layout es el chip (p. ej. cápsula wrap del clima), no el canvas. Si el layer
+ * midiera el lienzo, `scale` grande y `rotation` cubren entero y la diagonal
+ * no coincide con iOS.
+ */
+fun Modifier.storyStickerCanvasPlacement(
+    centerX: Float,
+    centerY: Float,
+    displayScale: Float,
+    rotationRadians: Double,
+    layoutWidthPx: Int? = null,
+    layoutHeightPx: Int? = null,
+): Modifier = this.layout { measurable, _ ->
+    val placeable = if (layoutWidthPx != null && layoutHeightPx != null) {
+        measurable.measure(Constraints.fixed(layoutWidthPx, layoutHeightPx))
+    } else {
+        measurable.measure(
+            Constraints(maxWidth = Constraints.Infinity, maxHeight = Constraints.Infinity),
+        )
+    }
+    val width = layoutWidthPx ?: placeable.width.coerceAtLeast(1)
+    val height = layoutHeightPx ?: placeable.height.coerceAtLeast(1)
+    layout(width, height) {
+        placeable.placeWithLayer(0, 0) {
+            translationX = centerX - width / 2f
+            translationY = centerY - height / 2f
+            scaleX = displayScale
+            scaleY = displayScale
+            rotationZ = Math.toDegrees(rotationRadians).toFloat()
+            transformOrigin = TransformOrigin.Center
+            clip = false
+        }
+    }
 }

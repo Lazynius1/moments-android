@@ -55,6 +55,7 @@ import com.moments.android.views.creator.components.StoryColorPickerPanel
 import com.moments.android.views.creator.components.StoryDominantColorsExtractor
 import com.moments.android.views.creator.components.StoryEditorChromeColor
 import com.moments.android.views.creator.components.StoryMomentsEditorChrome
+import com.moments.android.views.creator.components.StoryMediaTransformLimits
 import com.moments.android.views.creator.components.StoryTextBackgroundFill
 import com.moments.android.views.creator.components.StoryTextEditorContext
 import com.moments.android.views.creator.components.StoryTextEditorInput
@@ -339,7 +340,10 @@ fun StoryTextEditor(
 
         if (isTextFieldFocused) {
             StoryFontSizeSlider(
-                value = textFontSize.coerceIn(16f, 72f),
+                value = textFontSize.coerceIn(
+                    StoryMediaTransformLimits.minFontSize,
+                    StoryMediaTransformLimits.maxFontSize,
+                ),
                 onValueChange = onTextFontSizeChange,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
@@ -439,7 +443,9 @@ private fun StoryFontSizeSlider(
                     val trackHeight = (height - 32f).coerceAtLeast(1f)
                     val clampedY = location.y.coerceIn(16f, height - 16f)
                     val inverseProgress = 1f - ((clampedY - 16f) / trackHeight)
-                    onValueChange((16f + inverseProgress * (72f - 16f)).coerceIn(16f, 72f))
+                    val minFont = StoryMediaTransformLimits.minFontSize
+                    val maxFont = StoryMediaTransformLimits.maxFontSize
+                    onValueChange((minFont + inverseProgress * (maxFont - minFont)).coerceIn(minFont, maxFont))
                     val step = (inverseProgress * 16f).toInt()
                     if (step != lastHapticStep) {
                         lastHapticStep = step

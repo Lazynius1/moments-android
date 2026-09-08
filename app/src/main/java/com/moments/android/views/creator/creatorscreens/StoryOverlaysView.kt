@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroidSize
 import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
@@ -62,8 +64,13 @@ import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.creator.components.StoryAlignmentGuideBroker
 import com.moments.android.views.creator.components.StoryEditorChromeColor
+import com.moments.android.views.creator.components.StoryMediaTransformLimits
 import com.moments.android.views.creator.components.StoryTextOverlayDraft
+import com.moments.android.views.creator.components.storyAlignAndKeepVisible
+import com.moments.android.views.creator.components.storyClampedOverlayCenterOffset
+import com.moments.android.views.creator.components.storyKeepOverlayVisibleCenter
 import kotlinx.coroutines.delay
 import kotlin.math.hypot
 import kotlin.math.roundToInt
@@ -278,13 +285,14 @@ fun StoryPolaroidCaptionField(
 /**
  * Gestos Android (docs Compose + multitouch SO):
  * - 1 dedo → `positionChange()` (drag 1:1)
- * - 2+ dedos → `calculatePan` + `calculateZoom`
+ * - 2+ dedos → `calculatePan` + `calculateZoom` + `calculateRotation`
  * Un solo `pointerInput` (sin `detectTapGestures` hermano que robe el stream).
  */
 private data class OverlayTransformDelta(
     val pan: Offset,
     val zoom: Float,
     val pointerCount: Int,
+    val rotationDegrees: Float = 0f,
 )
 
 private fun androidx.compose.ui.input.pointer.PointerEvent.overlayTransformDelta(): OverlayTransformDelta {
@@ -294,6 +302,7 @@ private fun androidx.compose.ui.input.pointer.PointerEvent.overlayTransformDelta
             pan = calculatePan(),
             zoom = calculateZoom(),
             pointerCount = pressed.size,
+            rotationDegrees = calculateRotation(),
         )
         pressed.size == 1 -> {
             val change = pressed.first()
@@ -328,6 +337,7 @@ fun StoryDrawingCanvasOverlay(
     onClear: () -> Unit,
     onDragStateChange: (StoryOverlayDragState) -> Unit,
     onBackgroundTap: () -> Unit,
+    alignmentGuides: StoryAlignmentGuideBroker,
     modifier: Modifier = Modifier,
 ) {
     var isOverTrash by remember { mutableStateOf(false) }
@@ -340,6 +350,8 @@ fun StoryDrawingCanvasOverlay(
     val latestOnClear by rememberUpdatedState(onClear)
     val latestOnDragState by rememberUpdatedState(onDragStateChange)
     val latestOnTap by rememberUpdatedState(onBackgroundTap)
+    val latestGuides by rememberUpdatedState(alignmentGuides)
+    val latestHasText by rememberUpdatedState(hasTextOverlays)
 
     Box(
         modifier
@@ -393,6 +405,8 @@ fun StoryDrawingCanvasOverlay(
                                         zoomMotion > viewConfiguration.touchSlop
                                 }
                                 if (!gesturePastTouchSlop) continue
+                                // ≡ iOS: `if !textOverlays.isEmpty { return }`
+                                if (latestHasText) continue
                                 val effectivePan = if (!wasPastTouchSlop) cumulativePan else delta.pan
                                 moved = true
                                 dragged = dragged ||
@@ -401,13 +415,17 @@ fun StoryDrawingCanvasOverlay(
                                 liveX += effectivePan.x
                                 liveY += effectivePan.y
                                 if (delta.pointerCount >= 2) {
-                                    liveScale = (gestureStartScale * cumulativeZoom).coerceIn(0.3f, 4f)
+                                    liveScale = (gestureStartScale * cumulativeZoom).coerceIn(
+                                        StoryMediaTransformLimits.minScale,
+                                        StoryMediaTransformLimits.maxScale,
+                                    )
                                 }
-                                latestOnOffset(liveX, liveY)
-                                latestOnScale(liveScale)
-
+                                val drawingSizeX = canvasWidthPx * liveScale
+                                val drawingSizeY = canvasHeightPx * liveScale
+                                val proposedCenterX = canvasWidthPx / 2f + liveX
+                                val proposedCenterY = canvasHeightPx / 2f + liveY
                                 val interactionPoint = event.changes.firstOrNull { it.pressed }?.position
-                                    ?: Offset(canvasWidthPx / 2f + liveX, canvasHeightPx / 2f + liveY)
+                                    ?: Offset(proposedCenterX, proposedCenterY)
                                 val over = dragged && isPointOverStoryOverlayTrash(
                                     interactionPoint.x,
                                     interactionPoint.y,
@@ -417,8 +435,32 @@ fun StoryDrawingCanvasOverlay(
                                 )
                                 if (!isOverTrash && over) HapticManager.shared.mediumImpact()
                                 isOverTrash = over
+                                val aligned = storyAlignAndKeepVisible(
+                                    proposedX = proposedCenterX,
+                                    proposedY = proposedCenterY,
+                                    itemWidth = drawingSizeX,
+                                    itemHeight = drawingSizeY,
+                                    canvasWidth = canvasWidthPx,
+                                    canvasHeight = canvasHeightPx,
+                                    overTrash = over,
+                                    broker = latestGuides,
+                                    density = density.density,
+                                )
+                                liveX = aligned.x - canvasWidthPx / 2f
+                                liveY = aligned.y - canvasHeightPx / 2f
+                                val clampedOffset = storyClampedOverlayCenterOffset(
+                                    proposedOffset = Offset(liveX, liveY),
+                                    canvasSize = Size(canvasWidthPx, canvasHeightPx),
+                                )
+                                liveX = clampedOffset.x
+                                liveY = clampedOffset.y
+                                latestOnOffset(liveX, liveY)
+                                latestOnScale(liveScale)
                                 latestOnDragState(
-                                    StoryOverlayDragState(isDragging = dragged, isOverTrash = over),
+                                    StoryOverlayDragState(
+                                        isDragging = dragged,
+                                        isOverTrash = over,
+                                    ),
                                 )
                                 event.changes.forEach { change ->
                                     if (change.positionChanged()) change.consume()
@@ -433,6 +475,7 @@ fun StoryDrawingCanvasOverlay(
                                 latestOnTap()
                             }
                             isOverTrash = false
+                            latestGuides.clear()
                             latestOnDragState(StoryOverlayDragState())
                         }
                     }
@@ -442,7 +485,7 @@ fun StoryDrawingCanvasOverlay(
 }
 
 /**
- * Texto en canvas: drag 1 dedo + pinch 2 dedos (patrón Compose multitouch).
+ * Texto en canvas: drag 1 dedo + pinch/rotar 2 dedos (patrón Compose multitouch).
  * Hit mínimo 48dp para que el pellizco sea usable.
  */
 @Composable
@@ -455,6 +498,7 @@ fun StoryTextOverlayItem(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onDragStateChange: (StoryOverlayDragState) -> Unit,
+    alignmentGuides: StoryAlignmentGuideBroker,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -469,19 +513,29 @@ fun StoryTextOverlayItem(
     val latestOnEdit by rememberUpdatedState(onEdit)
     val latestOnDelete by rememberUpdatedState(onDelete)
     val latestOnDragState by rememberUpdatedState(onDragStateChange)
+    val latestGuides by rememberUpdatedState(alignmentGuides)
 
     fun boundedDraft(
         x: Float,
         y: Float,
         fontSize: Float,
+        rotationRadians: Double,
         base: StoryTextOverlayDraft,
     ): StoryTextOverlayDraft {
-        val halfWidth = minOf(latestContentW / 2f, canvasWidthPx / 2f).coerceAtLeast(1f)
-        val halfHeight = minOf(latestContentH / 2f, canvasHeightPx / 2f).coerceAtLeast(1f)
+        val (cx, cy) = storyKeepOverlayVisibleCenter(
+            x = x,
+            y = y,
+            canvasWidth = canvasWidthPx,
+            canvasHeight = canvasHeightPx,
+        )
         return base.copy(
-            normalizedX = (x.coerceIn(halfWidth, canvasWidthPx - halfWidth) / canvasWidthPx).toDouble(),
-            normalizedY = (y.coerceIn(halfHeight, canvasHeightPx - halfHeight) / canvasHeightPx).toDouble(),
-            fontSize = fontSize.coerceIn(16f, 72f).toDouble(),
+            normalizedX = (cx / canvasWidthPx).toDouble(),
+            normalizedY = (cy / canvasHeightPx).toDouble(),
+            fontSize = fontSize.coerceIn(
+                StoryMediaTransformLimits.minFontSize,
+                StoryMediaTransformLimits.maxFontSize,
+            ).toDouble(),
+            rotationRadians = rotationRadians,
         )
     }
 
@@ -495,11 +549,14 @@ fun StoryTextOverlayItem(
                     (centerY - contentHeightPx / 2f).roundToInt(),
                 )
             }
+            .graphicsLayer {
+                rotationZ = Math.toDegrees(overlay.rotationRadians).toFloat()
+            }
             .onSizeChanged {
                 contentWidthPx = it.width
                 contentHeightPx = it.height
             }
-            .wrapContentSize(unbounded = false)
+            .wrapContentSize(unbounded = true)
             .defaultMinSize(minWidth = 56.dp, minHeight = 56.dp)
             .then(
                 if (isEditorPresented) {
@@ -511,14 +568,20 @@ fun StoryTextOverlayItem(
                             val start = latestOverlay
                             var liveX = start.normalizedX.toFloat() * canvasWidthPx
                             var liveY = start.normalizedY.toFloat() * canvasHeightPx
-                            var liveFont = start.fontSize.toFloat().coerceIn(16f, 72f)
+                            var liveFont = start.fontSize.toFloat().coerceIn(
+                                StoryMediaTransformLimits.minFontSize,
+                                StoryMediaTransformLimits.maxFontSize,
+                            )
+                            var liveRotation = start.rotationRadians
                             isOverTrash = false
                             var moved = false
                             var dragged = false
                             var cumulativePan = Offset.Zero
                             var cumulativeZoom = 1f
+                            var cumulativeRotationDegrees = 0f
                             var gesturePastTouchSlop = false
                             val gestureStartFont = liveFont
+                            val gestureStartRotation = liveRotation
                             latestOnDragState(StoryOverlayDragState())
                             try {
                                 do {
@@ -528,13 +591,18 @@ fun StoryTextOverlayItem(
                                     val delta = event.overlayTransformDelta()
                                     cumulativePan += delta.pan
                                     cumulativeZoom *= delta.zoom
+                                    cumulativeRotationDegrees += delta.rotationDegrees
                                     val wasPastTouchSlop = gesturePastTouchSlop
                                     if (!gesturePastTouchSlop) {
                                         val centroidSize = event.calculateCentroidSize(useCurrent = false)
                                         val zoomMotion = kotlin.math.abs(1f - cumulativeZoom) * centroidSize
+                                        val rotationMotion = kotlin.math.abs(
+                                            Math.toRadians(cumulativeRotationDegrees.toDouble()).toFloat(),
+                                        ) * centroidSize
                                         gesturePastTouchSlop =
                                             cumulativePan.getDistance() > viewConfiguration.touchSlop ||
-                                            zoomMotion > viewConfiguration.touchSlop
+                                            zoomMotion > viewConfiguration.touchSlop ||
+                                            rotationMotion > viewConfiguration.touchSlop
                                     }
                                     if (!gesturePastTouchSlop) continue
                                     val effectivePan = if (!wasPastTouchSlop) cumulativePan else delta.pan
@@ -545,10 +613,15 @@ fun StoryTextOverlayItem(
                                     liveX += effectivePan.x
                                     liveY += effectivePan.y
                                     if (delta.pointerCount >= 2) {
-                                        liveFont = (gestureStartFont * cumulativeZoom).coerceIn(16f, 72f)
+                                        liveFont = (gestureStartFont * cumulativeZoom).coerceIn(
+                                            StoryMediaTransformLimits.minFontSize,
+                                            StoryMediaTransformLimits.maxFontSize,
+                                        )
+                                        liveRotation = gestureStartRotation + Math.toRadians(
+                                            cumulativeRotationDegrees.toDouble(),
+                                        )
                                     }
 
-                                    val updated = boundedDraft(liveX, liveY, liveFont, start)
                                     isOverTrash = dragged && isPointOverStoryOverlayTrash(
                                         liveX,
                                         liveY,
@@ -556,6 +629,22 @@ fun StoryTextOverlayItem(
                                         canvasHeightPx,
                                         density,
                                     )
+                                    val itemW = latestContentW.toFloat().coerceAtLeast(1f)
+                                    val itemH = latestContentH.toFloat().coerceAtLeast(1f)
+                                    val aligned = storyAlignAndKeepVisible(
+                                        proposedX = liveX,
+                                        proposedY = liveY,
+                                        itemWidth = itemW,
+                                        itemHeight = itemH,
+                                        canvasWidth = canvasWidthPx,
+                                        canvasHeight = canvasHeightPx,
+                                        overTrash = isOverTrash,
+                                        broker = latestGuides,
+                                        density = density.density,
+                                    )
+                                    liveX = aligned.x
+                                    liveY = aligned.y
+                                    val updated = boundedDraft(liveX, liveY, liveFont, liveRotation, start)
                                     latestOnUpdate(updated)
                                     latestOnDragState(
                                         StoryOverlayDragState(
@@ -574,6 +663,7 @@ fun StoryTextOverlayItem(
                                     latestOnEdit()
                                 }
                                 isOverTrash = false
+                                latestGuides.clear()
                                 latestOnDragState(StoryOverlayDragState())
                             }
                         }

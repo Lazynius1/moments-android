@@ -41,8 +41,12 @@ import kotlin.math.min
 
 /** ≡ `StoryMediaTransformLimits`. */
 object StoryMediaTransformLimits {
-    const val minScale = 0.45f
-    const val maxScale = 1.8f
+    const val minScale = 0.05f
+    const val maxScale = 8f
+    const val minVisibleSliver = 28f
+    const val minVisibleCanvasFraction = 0.42f
+    const val minFontSize = 8f
+    const val maxFontSize = 480f
     const val snapScaleThreshold = 0.08f
     const val snapRotationThresholdRadians = (Math.PI / 36.0).toFloat()
 }
@@ -88,6 +92,89 @@ fun storyClampedMediaScale(proposedScale: Float): Float =
         proposedScale.coerceIn(StoryMediaTransformLimits.minScale, StoryMediaTransformLimits.maxScale)
     }
 
+/** Port de `storyKeepVisibleLength`. */
+fun storyKeepVisibleLength(item: Float, canvas: Float): Float {
+    val sliver = StoryMediaTransformLimits.minVisibleSliver
+    return if (item > canvas) {
+        min(item, max(sliver, canvas * StoryMediaTransformLimits.minVisibleCanvasFraction))
+    } else {
+        min(sliver, item)
+    }
+}
+
+/** Port de `storyKeepVisibleCenter`: el ítem puede colgar del borde; siempre queda un sliver. */
+fun storyKeepVisibleCenter(
+    x: Float,
+    y: Float,
+    itemWidth: Float,
+    itemHeight: Float,
+    canvasWidth: Float,
+    canvasHeight: Float,
+): Pair<Float, Float> {
+    val width = max(itemWidth, 1f)
+    val height = max(itemHeight, 1f)
+    val keepX = storyKeepVisibleLength(item = width, canvas = canvasWidth)
+    val keepY = storyKeepVisibleLength(item = height, canvas = canvasHeight)
+    val minX = keepX - width / 2f
+    val maxX = canvasWidth - keepX + width / 2f
+    val minY = keepY - height / 2f
+    val maxY = canvasHeight - keepY + height / 2f
+    val safeX = if (x.isFinite()) x else canvasWidth / 2f
+    val safeY = if (y.isFinite()) y else canvasHeight / 2f
+    return safeX.coerceIn(min(minX, maxX), max(minX, maxX)) to
+        safeY.coerceIn(min(minY, maxY), max(minY, maxY))
+}
+
+/** Port de `storyKeepOverlayVisibleCenter`: el centro del overlay no sale del canvas. */
+fun storyKeepOverlayVisibleCenter(
+    x: Float,
+    y: Float,
+    canvasWidth: Float,
+    canvasHeight: Float,
+): Pair<Float, Float> {
+    if (canvasWidth <= 1f || canvasHeight <= 1f) {
+        return maxOf(canvasWidth, 0f) / 2f to maxOf(canvasHeight, 0f) / 2f
+    }
+    val insetX = min(StoryMediaTransformLimits.minVisibleSliver, canvasWidth / 2f)
+    val insetY = min(StoryMediaTransformLimits.minVisibleSliver, canvasHeight / 2f)
+    val safeX = if (x.isFinite()) x else canvasWidth / 2f
+    val safeY = if (y.isFinite()) y else canvasHeight / 2f
+    return safeX.coerceIn(insetX, canvasWidth - insetX) to
+        safeY.coerceIn(insetY, canvasHeight - insetY)
+}
+
+/** Port de `storyClampedOverlayCenterOffset`. */
+fun storyClampedOverlayCenterOffset(
+    proposedOffset: Offset,
+    canvasSize: Size,
+): Offset {
+    val (cx, cy) = storyKeepOverlayVisibleCenter(
+        x = canvasSize.width / 2f + if (proposedOffset.x.isFinite()) proposedOffset.x else 0f,
+        y = canvasSize.height / 2f + if (proposedOffset.y.isFinite()) proposedOffset.y else 0f,
+        canvasWidth = canvasSize.width,
+        canvasHeight = canvasSize.height,
+    )
+    return Offset(cx - canvasSize.width / 2f, cy - canvasSize.height / 2f)
+}
+
+/** Port de `storyClampedCenterOffset`. */
+fun storyClampedCenterOffset(
+    proposedOffset: Offset,
+    canvasSize: Size,
+    scaledWidth: Float,
+    scaledHeight: Float,
+): Offset {
+    val (cx, cy) = storyKeepVisibleCenter(
+        x = canvasSize.width / 2f + if (proposedOffset.x.isFinite()) proposedOffset.x else 0f,
+        y = canvasSize.height / 2f + if (proposedOffset.y.isFinite()) proposedOffset.y else 0f,
+        itemWidth = scaledWidth,
+        itemHeight = scaledHeight,
+        canvasWidth = canvasSize.width,
+        canvasHeight = canvasSize.height,
+    )
+    return Offset(cx - canvasSize.width / 2f, cy - canvasSize.height / 2f)
+}
+
 /** Port de `storyClampedMediaOffset`: conserva una porción mínima visible del medio. */
 fun storyClampedMediaOffset(
     proposedOffset: Offset,
@@ -95,21 +182,13 @@ fun storyClampedMediaOffset(
     mediaSize: Size,
     scale: Float,
 ): Offset {
-    val safeOffset = Offset(
-        if (proposedOffset.x.isFinite()) proposedOffset.x else 0f,
-        if (proposedOffset.y.isFinite()) proposedOffset.y else 0f,
-    )
     val safeScale = storyClampedMediaScale(scale)
     val base = storyMediaBaseRect(mediaSize, canvasSize)
-    val scaledWidth = base.width * safeScale
-    val scaledHeight = base.height * safeScale
-    val minVisibleX = min(max(44f, scaledWidth * 0.24f), scaledWidth)
-    val minVisibleY = min(max(44f, scaledHeight * 0.24f), scaledHeight)
-    val horizontalLimit = max(0f, canvasSize.width / 2f + scaledWidth / 2f - minVisibleX)
-    val verticalLimit = max(0f, canvasSize.height / 2f + scaledHeight / 2f - minVisibleY)
-    return Offset(
-        safeOffset.x.coerceIn(-horizontalLimit, horizontalLimit),
-        safeOffset.y.coerceIn(-verticalLimit, verticalLimit),
+    return storyClampedCenterOffset(
+        proposedOffset = proposedOffset,
+        canvasSize = canvasSize,
+        scaledWidth = base.width * safeScale,
+        scaledHeight = base.height * safeScale,
     )
 }
 

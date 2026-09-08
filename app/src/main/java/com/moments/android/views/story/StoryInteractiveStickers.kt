@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -97,6 +98,7 @@ import com.moments.android.views.story.storyviewer.StoryGestureIntent
 import com.moments.android.views.story.storyviewer.StoryGestureSuppressionScope
 import com.moments.android.views.story.storyviewer.StoryViewerLayoutHelpers
 import com.moments.android.views.story.storyviewer.storyDeckInteractionExclusion
+import com.moments.android.views.story.storyviewer.storyStickerCanvasPlacement
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -342,62 +344,66 @@ private fun StoryInteractiveFrameStickers(
     val density = LocalDensity.current
     val canvasScaleFactor = StoryViewerLayoutHelpers.stickerDisplayScale(1.0, widthPx, density.density)
 
-    stickers
-        .filter { it.type == "frame" }
-        .sortedBy { it.zIndex ?: 0 }
-        .forEach { sticker ->
-            val xPx = (sticker.position.x * widthPx).toFloat()
-            val yPx = (sticker.position.y * heightPx).toFloat()
-            val frameWidthPx = with(density) { 200.dp.toPx() }
-            val frameHeightPx = with(density) { 240.dp.toPx() }
-            val exclusionId = "sticker.$storyId.${sticker.stickerId.orEmpty()}"
-            val displayScale = sticker.scale.toFloat() * canvasScaleFactor
+    Box(Modifier.fillMaxSize()) {
+        stickers
+            .filter { it.type == "frame" }
+            .sortedBy { it.zIndex ?: 0 }
+            .forEach { sticker ->
+                key(sticker.stickerId ?: "frame_${sticker.position.x}_${sticker.position.y}") {
+                    val (centerX, centerY) = StoryViewerLayoutHelpers.stickerDisplayPosition(
+                        sticker.position,
+                        widthPx,
+                        heightPx,
+                    )
+                    val frameWidthPx = with(density) { 200.dp.roundToPx() }
+                    val frameHeightPx = with(density) { 240.dp.roundToPx() }
+                    val exclusionId = "sticker.$storyId.${sticker.stickerId.orEmpty()}"
+                    val displayScale = sticker.scale.toFloat() * canvasScaleFactor
 
-            val frameModifier = Modifier
-                    .zIndex((sticker.zIndex ?: 0).toFloat())
-                    .size(width = 200.dp, height = 240.dp)
-                    .offset {
-                        IntOffset(
-                            (xPx - frameWidthPx / 2f).roundToInt(),
-                            (yPx - frameHeightPx / 2f).roundToInt(),
+                    val frameModifier = Modifier
+                        .zIndex((sticker.zIndex ?: 0).toFloat())
+                        .storyStickerCanvasPlacement(
+                            centerX = centerX,
+                            centerY = centerY,
+                            displayScale = displayScale,
+                            rotationRadians = sticker.rotation,
+                            layoutWidthPx = frameWidthPx,
+                            layoutHeightPx = frameHeightPx,
+                        )
+                        .storyDeckInteractionExclusion(
+                            id = exclusionId,
+                            gate = gestureGate,
+                            enabled = reportsDeckInteractionExclusion && !isThumbnail,
+                        )
+                        .size(width = 200.dp, height = 240.dp)
+                    if (isThumbnail) {
+                        StickerPolaroidFrameView(
+                            image = remember(sticker.content) { decodeStickerBitmap(sticker.content) },
+                            caption = sticker.caption,
+                            frameStyle = StoryPolaroidFrameStyle.fromRawOrDefault(sticker.frameStyle),
+                            contentScale = sticker.contentScale?.toFloat() ?: 1f,
+                            contentOffsetX = sticker.contentOffsetX?.toFloat() ?: 0f,
+                            contentOffsetY = sticker.contentOffsetY?.toFloat() ?: 0f,
+                            progress = 0f,
+                            modifier = frameModifier,
+                        )
+                    } else {
+                        InteractiveFrameSticker(
+                            storyId = "$storyId.${sticker.stickerId.orEmpty()}",
+                            imageContent = sticker.content,
+                            caption = sticker.caption,
+                            frameStyle = StoryPolaroidFrameStyle.fromRawOrDefault(sticker.frameStyle),
+                            contentScale = sticker.contentScale?.toFloat() ?: 1f,
+                            contentOffsetX = sticker.contentOffsetX?.toFloat() ?: 0f,
+                            contentOffsetY = sticker.contentOffsetY?.toFloat() ?: 0f,
+                            onPauseStory = onPauseStory,
+                            onResumeStory = onResumeStory,
+                            modifier = frameModifier,
                         )
                     }
-                    .graphicsLayer {
-                        scaleX = displayScale
-                        scaleY = displayScale
-                        rotationZ = Math.toDegrees(sticker.rotation).toFloat()
-                    }
-                    .storyDeckInteractionExclusion(
-                        id = exclusionId,
-                        gate = gestureGate,
-                        enabled = reportsDeckInteractionExclusion && !isThumbnail,
-                    )
-            if (isThumbnail) {
-                StickerPolaroidFrameView(
-                    image = remember(sticker.content) { decodeStickerBitmap(sticker.content) },
-                    caption = sticker.caption,
-                    frameStyle = StoryPolaroidFrameStyle.fromRawOrDefault(sticker.frameStyle),
-                    contentScale = sticker.contentScale?.toFloat() ?: 1f,
-                    contentOffsetX = sticker.contentOffsetX?.toFloat() ?: 0f,
-                    contentOffsetY = sticker.contentOffsetY?.toFloat() ?: 0f,
-                    progress = 0f,
-                    modifier = frameModifier,
-                )
-            } else {
-                InteractiveFrameSticker(
-                    storyId = "$storyId.${sticker.stickerId.orEmpty()}",
-                    imageContent = sticker.content,
-                    caption = sticker.caption,
-                    frameStyle = StoryPolaroidFrameStyle.fromRawOrDefault(sticker.frameStyle),
-                    contentScale = sticker.contentScale?.toFloat() ?: 1f,
-                    contentOffsetX = sticker.contentOffsetX?.toFloat() ?: 0f,
-                    contentOffsetY = sticker.contentOffsetY?.toFloat() ?: 0f,
-                    onPauseStory = onPauseStory,
-                    onResumeStory = onResumeStory,
-                    modifier = frameModifier,
-                )
+                }
             }
-        }
+    }
 }
 
 /** Equivalente Compose de `InteractiveFrameSticker`. */

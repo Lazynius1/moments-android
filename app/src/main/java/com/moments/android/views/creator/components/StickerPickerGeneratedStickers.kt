@@ -1,6 +1,5 @@
 package com.moments.android.views.creator.components
 
-import androidx.compose.ui.graphics.Color
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.creator.StoryStickerDraft
 import com.moments.android.views.feed.maps.MapLocationServices
@@ -124,23 +123,6 @@ fun weatherSymbolForConditionName(condition: String, now: Date = Date()): String
         lowercased.contains("hot") -> "🔥"
         lowercased.contains("cold") -> "🥶"
         else -> if (night) "🌙" else "🌤️"
-    }
-}
-
-/**
- * ≡ `getWeatherGradientColors(for:)` — colores system* @ 0.9 alpha.
- * Usado por renderers / previews; `AnimatedWeatherSticker` tiene su propia tabla.
- */
-fun weatherGradientColors(symbol: String): Pair<Color, Color> {
-    val a = 0.9f
-    return when (symbol) {
-        "☀️" -> Color(0xFFFF9500).copy(alpha = a) to Color(0xFFFFCC00).copy(alpha = a) // orange/yellow
-        "🌧️", "⛈️" -> Color(0xFF007AFF).copy(alpha = a) to Color(0xFF5856D6).copy(alpha = a) // blue/indigo
-        "❄️", "🌨️" -> Color(0xFF32ADE6).copy(alpha = a) to Color(0xFF007AFF).copy(alpha = a) // cyan/blue
-        "☁️", "⛅" -> Color(0xFF8E8E93).copy(alpha = a) to Color(0xFF007AFF).copy(alpha = a) // gray/blue
-        "🔥" -> Color(0xFFFF3B30).copy(alpha = a) to Color(0xFFFF9500).copy(alpha = a) // red/orange
-        "🥶" -> Color(0xFF32ADE6).copy(alpha = a) to Color(0xFF007AFF).copy(alpha = a) // cyan/blue
-        else -> Color(0xFF007AFF).copy(alpha = a) to Color(0xFF32ADE6).copy(alpha = a) // blue/cyan
     }
 }
 
