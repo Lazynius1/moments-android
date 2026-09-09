@@ -958,6 +958,7 @@
     <string name="creator_story_camera_permission">Aby nagrać relację, potrzebny jest dostęp do aparatu</string>
     <string name="creator_story_text_mode">Aa</string>
     <string name="story_editor_saved_to_gallery">Relacja została zapisana w galerii</string>
+    <string name="story_editor_saving_to_gallery">Zapisywanie w galerii…</string>
     <string name="story_editor_discard_title">Odrzucić zawartość multimedialną?</string>
     <string name="story_editor_discard_message">Jeśli teraz wyjdziesz, utracisz wprowadzone zmiany.</string>
     <string name="story_editor_discard_confirm">Odrzuć</string>
@@ -1598,7 +1599,9 @@
     <string name="stories_replies_disabled_placeholder">Odpowiedzi są wyłączone</string>
     <string name="stories_saved_image">Zapisano zdjęcie</string>
     <string name="stories_saved_video">Zapisano film</string>
+    <string name="stories_saving_video">Zapisywanie filmu…</string>
     <string name="stories_message_sent">Wiadomość wysłana</string>
+    <string name="stories_sending_message">Wysyłanie wiadomości…</string>
     <string name="stories_moment_sent">Moment wysłany</string>
     <string name="stories_reactions">Reakcje</string>
 

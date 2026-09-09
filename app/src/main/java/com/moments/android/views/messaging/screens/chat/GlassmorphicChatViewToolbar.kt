@@ -76,6 +76,7 @@ fun GlassmorphicChatToolbar(
     isBlockedByMe: Boolean,
     storyRing: StoryRingSnapshot,
     hasTypingUsers: Boolean,
+    groupTypingSubtitle: String? = null,
     presence: PresenceDisplay?,
     showBackButton: Boolean = true,
     isGroup: Boolean = false,
@@ -206,6 +207,7 @@ fun GlassmorphicChatToolbar(
                 isBlockedByMe = isBlockedByMe,
                 isUnavailable = isUnavailable,
                 hasTypingUsers = hasTypingUsers,
+                groupTypingSubtitle = groupTypingSubtitle,
                 presence = presence,
                 adaptiveColors = adaptiveColors,
             )
@@ -220,12 +222,13 @@ private fun ChatToolbarSubtitle(
     isBlockedByMe: Boolean,
     isUnavailable: Boolean,
     hasTypingUsers: Boolean,
+    groupTypingSubtitle: String?,
     presence: PresenceDisplay?,
     adaptiveColors: AdaptiveColors,
 ) {
     when {
         isGroup -> Text(
-            stringResource(R.string.groups_member_count, memberCount),
+            groupTypingSubtitle ?: stringResource(R.string.groups_member_count, memberCount),
             color = adaptiveColors.secondary,
             fontSize = 11.sp,
             maxLines = 1,

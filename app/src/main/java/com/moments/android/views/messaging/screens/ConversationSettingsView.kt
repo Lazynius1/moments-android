@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flag
@@ -102,6 +103,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
@@ -287,8 +289,16 @@ class ConversationSettingsViewModel(
                     val mutedByUserIds = convData["mutedByUserIds"] as? List<String> ?: emptyList()
                     val legacyIsMuted = convData["isMuted"] as? Boolean ?: false
                     val legacyMutedBy = convData["mutedBy"] as? String
+                    @Suppress("UNCHECKED_CAST")
+                    val untilRaw = (convData["mutedUntil"] as? Map<String, Any?>)?.get(currentUserId)
+                    val untilDate = when (untilRaw) {
+                        is Timestamp -> untilRaw.toDate()
+                        is java.util.Date -> untilRaw
+                        else -> null
+                    }
+                    val muteStillActive = untilDate == null || untilDate.after(java.util.Date())
                     val isMutedForCurrentUser =
-                        currentUserId in mutedByUserIds || (legacyIsMuted && legacyMutedBy == currentUserId)
+                        (currentUserId in mutedByUserIds && muteStillActive) || (legacyIsMuted && legacyMutedBy == currentUserId)
                     notificationsEnabled = !isMutedForCurrentUser
 
                     @Suppress("UNCHECKED_CAST")
@@ -364,11 +374,23 @@ class ConversationSettingsViewModel(
         val id = conversation?.id ?: return
         notificationsEnabled = !notificationsEnabled
         val isMuted = !notificationsEnabled
-        FirebaseFirestore.getInstance().messagingThread(id).update(
-            "mutedByUserIds",
-            if (notificationsEnabled) FieldValue.arrayRemove(currentUserId) else FieldValue.arrayUnion(currentUserId),
-        ).addOnSuccessListener {
-            ConversationMuteEvents.emit(id, isMuted)
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            if (notificationsEnabled) ChatService.unmuteConversation(id, currentUserId)
+            else ChatService.muteConversation(id, currentUserId)
+            withContext(Dispatchers.Main.immediate) {
+                ConversationMuteEvents.emit(id, isMuted)
+            }
+        }
+    }
+
+    fun muteNotifications(until: java.util.Date?) {
+        val id = conversation?.id ?: return
+        notificationsEnabled = false
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            ChatService.muteConversation(id, currentUserId, until)
+            withContext(Dispatchers.Main.immediate) {
+                ConversationMuteEvents.emit(id, true)
+            }
         }
     }
 
@@ -846,10 +868,14 @@ fun ConversationSettingsView(
     var showLeaveGroup by remember { mutableStateOf(false) }
     var showHideChat by remember { mutableStateOf(false) }
     var showLinkAdminOnly by remember { mutableStateOf(false) }
+    var showDissolveGroup by remember { mutableStateOf(false) }
+    var showMuteDuration by remember { mutableStateOf(false) }
+    var showGroupReport by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val groups by GroupDirectory.groups.collectAsState()
     val groupSnapshot = conversation.id?.let { groups[it] }
     val isGroupAdmin = groupSnapshot?.admins?.contains(FirebaseAuth.getInstance().currentUser?.uid) == true
+    val isGroupOwner = groupSnapshot?.owner == FirebaseAuth.getInstance().currentUser?.uid
     LaunchedEffect(conversation.id) { model.loadConversationData(conversation, context) }
 
     Box(modifier.fillMaxSize()) {
@@ -866,6 +892,27 @@ fun ConversationSettingsView(
                         onDismissRequest = { showMenu = false },
                     ) {
                         if (conversation.isGroup) {
+                            if (isGroupOwner) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            stringResource(R.string.groups_dissolve),
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        showDissolveGroup = true
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Cancel,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                )
+                            }
                             DropdownMenuItem(
                                 text = {
                                     Text(
@@ -895,6 +942,27 @@ fun ConversationSettingsView(
                                     Icon(Icons.Default.VisibilityOff, contentDescription = null, tint = colors.primary)
                                 },
                             )
+                            if (!isGroupOwner) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            stringResource(R.string.groups_report),
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                    onClick = {
+                                        showMenu = false
+                                        showGroupReport = true
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Flag,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
+                                )
+                            }
                         } else {
                         DropdownMenuItem(
                             text = {
@@ -976,7 +1044,14 @@ fun ConversationSettingsView(
                         else showingUserProfile = true
                     },
                     onSearch = onSearchRequested,
-                    onToggleMute = { model.toggleNotifications() },
+                    onToggleMute = {
+                        if (conversation.isGroup && model.notificationsEnabled) {
+                            showMuteDuration = true
+                        } else {
+                            model.toggleNotifications()
+                        }
+                    },
+                    identitySubtitle = groupSnapshot?.groupDescription?.trim()?.takeIf { it.isNotEmpty() },
                 )
                 SettingsRows(
                     model = model,
@@ -1170,6 +1245,56 @@ fun ConversationSettingsView(
         },
         dismissButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable { showLeaveGroup = false }.padding(16.dp)) },
     )
+    if (showDissolveGroup) AlertDialog(
+        onDismissRequest = { showDissolveGroup = false },
+        title = { Text(stringResource(R.string.groups_dissolve)) },
+        text = { Text(stringResource(R.string.groups_dissolve_body)) },
+        confirmButton = {
+            Text(
+                stringResource(R.string.groups_dissolve),
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.clickable {
+                    showDissolveGroup = false
+                    val group = groupSnapshot ?: return@clickable
+                    scope.launch {
+                        if (GroupChatStore(scope).command("dissolve", group)) onBack()
+                    }
+                }.padding(16.dp),
+            )
+        },
+        dismissButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable { showDissolveGroup = false }.padding(16.dp)) },
+    )
+    if (showMuteDuration) AlertDialog(
+        onDismissRequest = { showMuteDuration = false },
+        title = { Text(stringResource(R.string.conversation_settings_quick_action_mute)) },
+        text = {
+            Column {
+                Text(
+                    stringResource(R.string.groups_mute_8h),
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        showMuteDuration = false
+                        model.muteNotifications(java.util.Date(System.currentTimeMillis() + 8 * 3600_000L))
+                    }.padding(vertical = 12.dp),
+                )
+                Text(
+                    stringResource(R.string.groups_mute_week),
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        showMuteDuration = false
+                        model.muteNotifications(java.util.Date(System.currentTimeMillis() + 7 * 24 * 3600_000L))
+                    }.padding(vertical = 12.dp),
+                )
+                Text(
+                    stringResource(R.string.groups_mute_always),
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        showMuteDuration = false
+                        model.muteNotifications(null)
+                    }.padding(vertical = 12.dp),
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable { showMuteDuration = false }.padding(16.dp)) },
+    )
     if (showHideChat) AlertDialog(
         onDismissRequest = { showHideChat = false },
         title = { Text(stringResource(R.string.conversation_settings_hide)) },
@@ -1267,6 +1392,17 @@ fun ConversationSettingsView(
             onDismiss = { showReport = false },
         )
     }
+    if (showGroupReport) {
+        com.moments.android.reportes.ReportBottomSheet(
+            target = com.moments.android.reportes.ReportTarget.GroupTarget(
+                groupId = conversation.id.orEmpty(),
+                groupName = groupSnapshot?.name?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: conversation.otherParticipantUsername.orEmpty(),
+                ownerId = groupSnapshot?.owner ?: conversation.otherParticipantId,
+            ),
+            onDismiss = { showGroupReport = false },
+        )
+    }
 }
 
 @Composable
@@ -1281,6 +1417,7 @@ private fun ConversationSettingsHeader(
     onProfile: () -> Unit,
     onSearch: () -> Unit,
     onToggleMute: () -> Unit,
+    identitySubtitle: String? = null,
 ) {
     val isGroup = conversation.isGroup
     var presence by remember { mutableStateOf<PresenceDisplay?>(null) }
@@ -1317,6 +1454,15 @@ private fun ConversationSettingsHeader(
                 .padding(top = 12.dp)
                 .then(if (onIdentityTap != null) Modifier.clickable(onClick = onIdentityTap) else Modifier),
         )
+        if (!identitySubtitle.isNullOrBlank()) {
+            Text(
+                identitySubtitle,
+                color = colors.secondary,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 6.dp, start = 16.dp, end = 16.dp),
+            )
+        }
         if (!isGroup) {
             presence?.let { p ->
                 Row(
@@ -1789,6 +1935,14 @@ private fun ConversationChatPreferencesView(
 ) {
     val context = LocalContext.current
     val colors = rememberAdaptiveColors()
+    val scope = rememberCoroutineScope()
+    val groups by GroupDirectory.groups.collectAsState()
+    val group = model.conversation?.id?.let { groups[it] }
+    val isGroupAdmin = group?.admins?.contains(FirebaseAuth.getInstance().currentUser?.uid) == true
+    var adminsOnly by remember { mutableStateOf(false) }
+    LaunchedEffect(group?.sendPermission) {
+        adminsOnly = group?.sendPermission == "admins"
+    }
     MomentsTabBarHidden()
     Column(modifier.fillMaxSize().background(colors.chatBackground.first())) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1873,6 +2027,27 @@ private fun ConversationChatPreferencesView(
                 model.forwardingEnabled = it
                 model.toggleForwarding(context)
             }
+            if (isGroup) {
+                PreferenceDivider(colors)
+                PreferenceToggleRow(
+                    title = R.string.groups_send_admins,
+                    description = R.string.groups_send_locked,
+                    checked = adminsOnly,
+                    colors = colors,
+                    enabled = isGroupAdmin,
+                ) { checked ->
+                    val current = group ?: return@PreferenceToggleRow
+                    if (!isGroupAdmin) return@PreferenceToggleRow
+                    val permission = if (checked) "admins" else "everyone"
+                    if (permission == current.sendPermission) return@PreferenceToggleRow
+                    adminsOnly = checked
+                    scope.launch {
+                        if (!GroupChatStore(scope).command("setSendPermission", current, extra = mapOf("sendPermission" to permission))) {
+                            adminsOnly = current.sendPermission == "admins"
+                        }
+                    }
+                }
+            }
             Text(
                 stringResource(
                     if (isGroup) R.string.conversation_settings_clear_conversation_group
@@ -1901,6 +2076,7 @@ private fun PreferenceToggleRow(
     description: Int,
     checked: Boolean,
     colors: AdaptiveColors,
+    enabled: Boolean = true,
     onChecked: (Boolean) -> Unit,
 ) {
     Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1919,6 +2095,7 @@ private fun PreferenceToggleRow(
                 HapticManager.shared.lightImpact()
                 onChecked(it)
             },
+            enabled = enabled,
         )
     }
 }

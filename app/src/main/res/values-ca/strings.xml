@@ -1169,7 +1169,9 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="stories_replies_disabled_placeholder">No es permeten respostes</string>
     <string name="stories_saved_image">Imatge desada</string>
     <string name="stories_saved_video">Vídeo desat</string>
+    <string name="stories_saving_video">Desant el vídeo…</string>
     <string name="stories_message_sent">Missatge enviat</string>
+    <string name="stories_sending_message">Enviant el missatge…</string>
     <string name="stories_moment_sent">Moment enviat</string>
     <string name="stories_reactions">Reaccions</string>
 
@@ -1713,6 +1715,7 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="hidden_layers_audio_recording">Enregistrant...</string>
     <string name="hidden_layers_audio_tap_to_record">Toca per gravar</string>
     <string name="story_editor_saved_to_gallery">Història desada a la teva galeria</string>
+    <string name="story_editor_saving_to_gallery">Desant a la galeria…</string>
     <string name="story_editor_discard_title">Vols descartar el contingut multimèdia?</string>
     <string name="story_editor_discard_message">Si surts ara, perdràs els canvis que hagis fet.</string>
     <string name="story_editor_discard_confirm">Descartar</string>

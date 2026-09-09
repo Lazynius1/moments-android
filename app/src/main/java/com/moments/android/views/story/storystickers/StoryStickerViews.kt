@@ -1,7 +1,10 @@
 package com.moments.android.views.story.storystickers
 
+import kotlin.math.roundToInt
 import android.content.Intent
 import android.os.Build
+import com.moments.android.views.story.storyviewer.LocalStoryExportGifFrames
+import com.moments.android.views.story.storyviewer.LocalStoryExportTime
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -1122,9 +1125,30 @@ private fun StoryAnimatedVideoSticker(
 /** Rama iOS `AnimatedStickerView` (GIF). El tamaño lo fija el caller (≡ sticker.image.size). */
 @Composable
 private fun StoryGifSticker(gifURL: String, modifier: Modifier) {
+    val exportFrames = LocalStoryExportGifFrames.current
+    if (exportFrames != null) {
+        val time = LocalStoryExportTime.current
+        exportFrames[gifURL]?.let { bitmap ->
+            androidx.compose.foundation.Canvas(modifier) {
+                // Read video time in the draw scope: the decoder reuses its bitmap.
+                if (time != null) {
+                    val ratio = minOf(size.width / bitmap.width, size.height / bitmap.height)
+                    val frameWidth = (bitmap.width * ratio).roundToInt().coerceAtLeast(1)
+                    val frameHeight = (bitmap.height * ratio).roundToInt().coerceAtLeast(1)
+                    drawImage(bitmap.asImageBitmap(),
+                        dstOffset = androidx.compose.ui.unit.IntOffset(
+                            ((size.width - frameWidth) / 2).roundToInt(),
+                            ((size.height - frameHeight) / 2).roundToInt()),
+                        dstSize = androidx.compose.ui.unit.IntSize(frameWidth, frameHeight))
+                }
+            }
+        }
+        return
+    }
     val context = LocalContext.current
     val request = ImageRequest.Builder(context)
         .data(gifURL)
+        .allowHardware(false)
         .crossfade(false)
         .decoderFactory(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {

@@ -1520,8 +1520,17 @@ open class EnhancedChatViewModel(
             type = MessageType.TEXT, content = text, timestamp = Date(), status = MessageStatus.SENDING,
             replyTo = replyTo, isVanishModeMessage = _vanishModeActive.value,
         ))
+        val mentionedUserIds = if (com.moments.android.services.messaging.GroupChatScope.isGroup(conversationId)) {
+            val members = com.moments.android.views.messaging.groups.GroupDirectory.groups.value[conversationId]
+                ?.members.orEmpty().map { it.id to it.name }
+            com.moments.android.services.messaging.GroupChatScope.mentionedMemberIds(text, members, currentUserId)
+                .takeIf { it.isNotEmpty() }
+        } else null
         scope.launch {
-            chatService.sendTextMessage(conversationId, currentUserId, text, replyTo, messageId, _vanishModeActive.value)
+            chatService.sendTextMessage(
+                conversationId, currentUserId, text, replyTo, messageId, _vanishModeActive.value,
+                mentionedUserIds = mentionedUserIds,
+            )
                 .onSuccess {
                     applyOutgoingMessageUpdate(messageId, it.status)
                     trackSuccessfulDirectMessage()

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -85,6 +86,15 @@ fun GlassmorphicConversationRow(
     val context = LocalContext.current
     val firestore = remember { FirestoreService() }
     val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+    val muteDeadline = conversation.mutedUntil?.get(uid)
+    val showsMute by produceState(conversation.isMuted(uid), uid,
+        listOf(conversation.mutedByUserIds, muteDeadline, conversation.isMuted, conversation.mutedBy)) {
+        value = conversation.isMuted(uid)
+        if (value && muteDeadline != null) {
+            kotlinx.coroutines.delay((muteDeadline.time - System.currentTimeMillis()).coerceAtLeast(0))
+            value = conversation.isMuted(uid)
+        }
+    }
     val groups by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
 
     var liveUsername by remember(conversation.otherParticipantId) { mutableStateOf("") }
@@ -284,7 +294,7 @@ fun GlassmorphicConversationRow(
                 if (conversation.isPinned(uid)) {
                     Icon(Icons.Filled.PushPin, null, tint = Color(0xFF007AFF), modifier = Modifier.size(12.dp))
                 }
-                if (conversation.isMuted(uid)) {
+                if (showsMute) {
                     Icon(Icons.Filled.NotificationsOff, null, tint = Color(0xFFFF9500), modifier = Modifier.size(12.dp))
                 }
             }

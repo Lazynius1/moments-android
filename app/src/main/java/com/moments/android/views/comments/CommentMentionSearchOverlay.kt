@@ -171,34 +171,6 @@ fun CommentMentionSearchOverlay(
                     Icon(Icons.Filled.Close, contentDescription = null, tint = colors.primary, modifier = Modifier.size(14.dp))
                 }
             }
-        } else {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .momentsChromeGlass(capsuleShape, interactive = true)
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("@", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color.Gray)
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    if (!query.isNullOrEmpty()) "@$query" else placeholder,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
-                    color = colors.primary,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f),
-                )
-                Box(
-                    Modifier
-                        .size(30.dp)
-                        .momentsChromeGlass(CircleShape, interactive = true)
-                        .clickable(onClick = onCancel),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Filled.Close, contentDescription = null, tint = colors.primary, modifier = Modifier.size(14.dp))
-                }
-            }
         }
 
         if (shouldShowResults) {

@@ -29,6 +29,10 @@ import androidx.compose.ui.geometry.Size
 import com.moments.android.views.creator.components.storyMediaBaseRect
 import com.moments.android.views.creator.creatoruikit.CREATOR_MOMENTS_CAPTURE_ASPECT_RATIO
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import android.os.Handler
+import android.os.Looper
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
@@ -215,20 +219,21 @@ internal suspend fun exportVideoWithCurrentOverlays(
     editorCanvasWidth: Float = targetWidth.toFloat(),
     editorCanvasHeight: Float = targetHeight.toFloat(),
 ): Uri {
-    val durationUs = videoDurationUs(context, source).coerceAtLeast(1_000_000L)
+    val durationUs = videoDurationUs(context, source).also { require(it > 0) { "Missing video duration" } }
     val mediaSize = videoDisplaySize(context, source)
         ?: Size(targetWidth.toFloat(), targetHeight.toFloat())
     val canvasSize = Size(targetWidth.toFloat(), targetHeight.toFloat())
     val baseRect = storyMediaBaseRect(mediaSize, canvasSize)
-    val overlayScaleX = ((baseRect.width / canvasSize.width) * imageScale).coerceIn(0.05f, 3f)
-    val overlayScaleY = ((baseRect.height / canvasSize.height) * imageScale).coerceIn(0.05f, 3f)
+    // OverlaySettings scales the input texture in pixels, before mapping it to the output.
+    val overlayScaleX = (baseRect.width / mediaSize.width) * imageScale
+    val overlayScaleY = (baseRect.height / mediaSize.height) * imageScale
     val scaleFactorX = targetWidth / editorCanvasWidth.coerceAtLeast(1f)
     val scaleFactorY = targetHeight / editorCanvasHeight.coerceAtLeast(1f)
     val mappedOffsetX = imageOffsetX * scaleFactorX
     val mappedOffsetY = imageOffsetY * scaleFactorY
-    val anchorX = (0.5f + mappedOffsetX / targetWidth).coerceIn(0f, 1f)
-    val anchorY = (0.5f + mappedOffsetY / targetHeight).coerceIn(0f, 1f)
-    val rotationDegrees = Math.toDegrees(imageRotationRadians.toDouble()).toFloat()
+    val anchorX = 2f * mappedOffsetX / targetWidth
+    val anchorY = -2f * mappedOffsetY / targetHeight
+    val rotationDegrees = -Math.toDegrees(imageRotationRadians.toDouble()).toFloat()
 
     val paletteBmp = renderStoryPaletteBackgroundBitmap(backgroundPalette, targetWidth, targetHeight)
     val paletteFile = File(context.cacheDir, "story_palette_bg_${UUID.randomUUID()}.png")
@@ -238,7 +243,8 @@ internal suspend fun exportVideoWithCurrentOverlays(
     paletteBmp.recycle()
 
     val output = File(context.cacheDir, "story_palette_comp_${UUID.randomUUID()}.mp4")
-    val bgItem = EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(paletteFile)))
+    val bgItem = EditedMediaItem.Builder(MediaItem.Builder().setUri(Uri.fromFile(paletteFile))
+        .setImageDurationMs((durationUs + 999) / 1000).build())
         .setDurationUs(durationUs)
         .setFrameRate(30)
         .build()
@@ -251,8 +257,9 @@ internal suspend fun exportVideoWithCurrentOverlays(
     }
 
     val composition = Composition.Builder(
-        EditedMediaItemSequence.withVideoFrom(listOf(bgItem)),
+        // Media3 draws the first sequence on top.
         EditedMediaItemSequence.withAudioAndVideoFrom(listOf(fgItem)),
+        EditedMediaItemSequence.withVideoFrom(listOf(bgItem)),
     )
         .setVideoCompositorSettings(
             StoryPaletteVideoCompositorSettings(
@@ -265,6 +272,7 @@ internal suspend fun exportVideoWithCurrentOverlays(
                 backgroundAnchorY = anchorY,
             ),
         )
+        .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
         .setEffects(Effects(/* audioProcessors = */ emptyList(), compositionEffects))
         .build()
 
@@ -316,7 +324,7 @@ internal suspend fun prepareMediaForStoryUpload(
 }
 
 /**
- * Compositor: input 0 = paleta a pantalla completa; input 1 = vídeo con fit + transforms.
+ * Compositor: input 0 = vídeo con fit + transforms; input 1 = paleta de fondo.
  */
 private class StoryPaletteVideoCompositorSettings(
     private val outputWidth: Int,
@@ -331,48 +339,89 @@ private class StoryPaletteVideoCompositorSettings(
         Media3Size(outputWidth, outputHeight)
 
     override fun getOverlaySettings(inputIndex: Int, presentationTimeUs: Long): OverlaySettings {
-        if (inputIndex == 0) {
+        if (inputIndex == 1) {
             return StaticOverlaySettings.Builder().build()
         }
-        return StaticOverlaySettings.Builder()
+        val settings = StaticOverlaySettings.Builder()
             .setScale(videoScaleX, videoScaleY)
             .setRotationDegrees(rotationDegrees)
-            .setBackgroundFrameAnchor(backgroundAnchorX, backgroundAnchorY)
-            .setOverlayFrameAnchor(0.5f, 0.5f)
+            .setOverlayFrameAnchor(0f, 0f)
             .build()
+        // A zoomed/panned video may have its center outside the canvas. Preserve
+        // that translation and let the output clip it, just like the editor.
+        return object : OverlaySettings by settings {
+            override fun getBackgroundFrameAnchor(): android.util.Pair<Float, Float> =
+                android.util.Pair(backgroundAnchorX, backgroundAnchorY)
+        }
     }
 }
 
-private suspend fun transformComposition(
+internal suspend fun transformComposition(
     context: Context,
     composition: Composition,
     output: File,
-): Uri = suspendCancellableCoroutine { cont ->
-    val transformer = Transformer.Builder(context)
-        .setVideoMimeType(MimeTypes.VIDEO_H264)
-        .addListener(object : Transformer.Listener {
-            override fun onCompleted(composition: Composition, exportResult: ExportResult) {
-                if (cont.isActive) cont.resume(Uri.fromFile(output))
-            }
+): Uri = withContext(Dispatchers.Main.immediate) {
+    suspendCancellableCoroutine { cont ->
+        val transformer = Transformer.Builder(context)
+            .setVideoMimeType(MimeTypes.VIDEO_H264)
+            .setAudioMimeType(MimeTypes.AUDIO_AAC)
+            .addListener(object : Transformer.Listener {
+                override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                    if (cont.isActive) cont.resume(Uri.fromFile(output))
+                }
 
-            override fun onError(
-                composition: Composition,
-                exportResult: ExportResult,
-                exportException: ExportException,
-            ) {
+                override fun onError(
+                    composition: Composition,
+                    exportResult: ExportResult,
+                    exportException: ExportException,
+                ) {
+                    output.delete()
+                    if (cont.isActive) cont.resumeWithException(exportException)
+                }
+            })
+            .build()
+        try {
+            transformer.start(composition, output.absolutePath)
+        } catch (error: Exception) {
+            transformer.cancel()
+            output.delete()
+            if (cont.isActive) cont.resumeWithException(error)
+        }
+        cont.invokeOnCancellation {
+            Handler(Looper.getMainLooper()).post {
+                transformer.cancel()
                 output.delete()
-                if (cont.isActive) cont.resumeWithException(exportException)
             }
-        })
-        .build()
-    transformer.start(composition, output.absolutePath)
-    cont.invokeOnCancellation {
-        runCatching { transformer.cancel() }
-        output.delete()
+        }
     }
 }
 
-private fun videoDurationUs(context: Context, uri: Uri): Long {
+internal suspend fun exportStillImageVideo(
+    context: Context,
+    bitmap: Bitmap,
+    durationUs: Long = 5_000_000L,
+): Uri {
+    val png = File(context.cacheDir, "story_download_still_${UUID.randomUUID()}.png")
+    FileOutputStream(png).use { out ->
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+    }
+    val output = File(context.cacheDir, "story_download_${UUID.randomUUID()}.mp4")
+    val item = EditedMediaItem.Builder(MediaItem.Builder().setUri(Uri.fromFile(png))
+        .setImageDurationMs((durationUs.coerceAtLeast(1_000_000L) + 999) / 1000).build())
+        .setDurationUs(durationUs.coerceAtLeast(1_000_000L))
+        .setFrameRate(30)
+        .build()
+    val composition = Composition.Builder(
+        EditedMediaItemSequence.withVideoFrom(listOf(item)),
+    ).build()
+    return try {
+        transformComposition(context, composition, output)
+    } finally {
+        png.delete()
+    }
+}
+
+internal fun videoDurationUs(context: Context, uri: Uri): Long {
     val retriever = MediaMetadataRetriever()
     return try {
         retriever.setDataSource(context, uri)

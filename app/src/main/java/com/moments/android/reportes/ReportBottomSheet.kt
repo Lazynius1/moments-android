@@ -26,6 +26,15 @@ fun ReportBottomSheet(
                 onDismiss = dismiss,
                 modifier = Modifier.fillMaxWidth(),
             )
+            is ReportTarget.GroupTarget -> UserReportContent(
+                reportedUserId = target.ownerId,
+                reportedUsername = target.groupName,
+                reportedContentType = "group",
+                reportedContentId = target.groupId,
+                onBack = dismiss,
+                onDismiss = dismiss,
+                modifier = Modifier.fillMaxWidth(),
+            )
             is ReportTarget.MomentTarget -> ModernReportContent(
                 moment = target.moment,
                 story = null,

@@ -1,5 +1,6 @@
 package com.moments.android.views.creator.components
 
+import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -566,35 +567,46 @@ private fun SparklePulseText(
     @Suppress("UNUSED_PARAMETER") attrs: StoryTextCoreAttributes,
 ) {
     val tint = configuration.textColor
-    BoxWithConstraints {
-        Text(
-            configuration.displayText,
-            style = baseStyle.copy(
-                color = tint,
-                shadow = Shadow(tint.copy(alpha = 0.55f), Offset.Zero, 12f),
-            ),
-        )
-        val w = constraints.maxWidth.toFloat().coerceAtLeast(1f)
-        val h = constraints.maxHeight.toFloat().coerceAtLeast(1f)
-        val density = LocalDensity.current
+    val transition = rememberInfiniteTransition(label = "sparkleAccents")
+    // Same five accents, stagger and 1.9 s keyframes as iOS.
+    val anchors = listOf(Offset(0.14f, 0.22f), Offset(0.82f, 0.16f), Offset(0.91f, 0.60f),
+        Offset(0.22f, 0.84f), Offset(0.66f, 0.90f))
+    val delays = listOf(0, 220, 440, 160, 360)
+    val sizes = listOf(10f, 8f, 9f, 7f, 6f)
+    val colors = listOf(Color.White.copy(alpha = 0.95f), Color.White.copy(alpha = 0.92f),
+        tint.copy(alpha = 0.88f), Color.White.copy(alpha = 0.84f), tint.copy(alpha = 0.72f))
+    val opacity = delays.mapIndexed { index, delay ->
+        transition.animateFloat(0.18f, 0.2f,
+            infiniteRepeatable(keyframes {
+                durationMillis = 1_900
+                0.18f at 0
+                1f at 475
+                0.32f at 950
+                0.88f at 1_368
+                0.2f at 1_900
+            }, initialStartOffset = StartOffset(delay)), label = "sparkleOpacity$index")
+    }
+    val scales = delays.mapIndexed { index, delay ->
+        transition.animateFloat(0.72f, 0.76f,
+            infiniteRepeatable(keyframes {
+                durationMillis = 1_900
+                0.72f at 0
+                1.12f at 475
+                0.86f at 950
+                1.02f at 1_368
+                0.76f at 1_900
+            }, initialStartOffset = StartOffset(delay)), label = "sparkleScale$index")
+    }
+    Box {
+        Text(configuration.displayText, style = baseStyle.copy(color = tint,
+            shadow = Shadow(tint.copy(alpha = 0.55f), Offset.Zero, 12f)))
         Canvas(Modifier.matchParentSize()) {
-            val anchors = listOf(
-                Offset(0.12f, 0.18f), Offset(0.88f, 0.22f), Offset(0.18f, 0.82f),
-                Offset(0.82f, 0.78f), Offset(0.50f, 0.08f), Offset(0.50f, 0.92f),
-            )
             anchors.forEachIndexed { index, unit ->
-                val cx = unit.x * w
-                val cy = unit.y * h
-                val starSize = with(density) { (if (index % 2 == 0) 10.dp else 7.dp).toPx() }
-                drawPath(
-                    path = sparklePath(Offset(cx, cy), starSize),
-                    color = tint.copy(alpha = 0.85f),
-                )
-                drawPath(
-                    path = sparklePath(Offset(cx, cy), starSize),
-                    color = Color.White.copy(alpha = 0.35f),
-                    style = Stroke(width = 1f),
-                )
+                val color = colors[index]
+                val path = sparklePath(Offset(unit.x * size.width, unit.y * size.height),
+                    sizes[index].dp.toPx() * scales[index].value)
+                drawPath(path, color.copy(alpha = color.alpha * opacity[index].value))
+                drawPath(path, Color.White.copy(alpha = 0.35f * opacity[index].value), style = Stroke(1f))
             }
         }
     }

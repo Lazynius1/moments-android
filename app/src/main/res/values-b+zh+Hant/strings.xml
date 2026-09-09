@@ -958,6 +958,7 @@
     <string name="creator_story_camera_permission">需要相機權限才能拍攝限時動態</string>
     <string name="creator_story_text_mode">Aa</string>
     <string name="story_editor_saved_to_gallery">限時動態已儲存至相簿</string>
+    <string name="story_editor_saving_to_gallery">正在儲存至相簿…</string>
     <string name="story_editor_discard_title">捨棄多媒體內容？</string>
     <string name="story_editor_discard_message">現在離開將會遺失你所做的變更。</string>
     <string name="story_editor_discard_confirm">捨棄</string>
@@ -1598,7 +1599,9 @@
     <string name="stories_replies_disabled_placeholder">不允許回覆</string>
     <string name="stories_saved_image">圖片已儲存</string>
     <string name="stories_saved_video">影片已儲存</string>
+    <string name="stories_saving_video">正在儲存影片…</string>
     <string name="stories_message_sent">訊息已傳送</string>
+    <string name="stories_sending_message">正在傳送訊息…</string>
     <string name="stories_moment_sent">貼文已傳送</string>
     <string name="stories_reactions">反應</string>
 

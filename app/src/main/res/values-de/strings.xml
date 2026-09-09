@@ -1170,7 +1170,9 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="stories_replies_disabled_placeholder">Antworten sind nicht erlaubt</string>
     <string name="stories_saved_image">Bild gespeichert</string>
     <string name="stories_saved_video">Video gespeichert</string>
+    <string name="stories_saving_video">Video wird gespeichert…</string>
     <string name="stories_message_sent">Nachricht gesendet</string>
+    <string name="stories_sending_message">Nachricht wird gesendet…</string>
     <string name="stories_moment_sent">Moment gesendet</string>
     <string name="stories_reactions">Reaktionen</string>
 
@@ -1714,6 +1716,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="hidden_layers_audio_recording">Aufnahme läuft...</string>
     <string name="hidden_layers_audio_tap_to_record">Tippen zum Aufnehmen</string>
     <string name="story_editor_saved_to_gallery">Story in deiner Galerie gespeichert</string>
+    <string name="story_editor_saving_to_gallery">Wird in der Galerie gespeichert…</string>
     <string name="story_editor_discard_title">Multimedia-Inhalt verwerfen?</string>
     <string name="story_editor_discard_message">Wenn du jetzt gehst, verlierst du alle vorgenommenen Änderungen.</string>
     <string name="story_editor_discard_confirm">Verwerfen</string>

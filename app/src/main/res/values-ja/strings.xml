@@ -958,6 +958,7 @@
     <string name="creator_story_camera_permission">ストーリーを撮影するにはカメラへのアクセスが必要です</string>
     <string name="creator_story_text_mode">Aa</string>
     <string name="story_editor_saved_to_gallery">ストーリーをギャラリーに保存しました</string>
+    <string name="story_editor_saving_to_gallery">ギャラリーに保存しています…</string>
     <string name="story_editor_discard_title">コンテンツを破棄しますか？</string>
     <string name="story_editor_discard_message">このまま移動すると、変更内容が失われます。</string>
     <string name="story_editor_discard_confirm">破棄</string>
@@ -1598,7 +1599,9 @@
     <string name="stories_replies_disabled_placeholder">返信はできません</string>
     <string name="stories_saved_image">画像を保存しました</string>
     <string name="stories_saved_video">動画を保存しました</string>
+    <string name="stories_saving_video">動画を保存しています…</string>
     <string name="stories_message_sent">メッセージを送信しました</string>
+    <string name="stories_sending_message">メッセージを送信しています…</string>
     <string name="stories_moment_sent">Momentを送信しました</string>
     <string name="stories_reactions">リアクション</string>
 

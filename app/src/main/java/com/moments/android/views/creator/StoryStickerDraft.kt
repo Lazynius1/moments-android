@@ -70,3 +70,64 @@ data class StoryStickerDraft(
     val momentId: String? = null,
     val mediaCount: Int? = null,
 )
+
+/** ≡ iOS `normalizedChatStickerData` / `StickerData.from` — posiciones ya normalizadas. */
+fun StoryStickerDraft.toStickerData(zIndex: Int = this.zIndex): com.moments.android.models.StickerData {
+    val encodedImage = image?.takeUnless { it.isRecycled }?.let { bmp ->
+        if (type == "emoji") return@let null
+        runCatching {
+            java.io.ByteArrayOutputStream().use { out ->
+                bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+            }
+        }.getOrNull()
+    }
+    return com.moments.android.models.StickerData(
+        stickerId = id,
+        type = type,
+        content = encodedImage ?: content,
+        position = com.moments.android.models.Point(normalizedX, normalizedY),
+        scale = scale,
+        rotation = rotationRadians,
+        zIndex = zIndex,
+        username = username,
+        userId = userId,
+        hashtag = hashtag,
+        location = location,
+        latitude = latitude,
+        longitude = longitude,
+        styleVariant = styleVariant,
+        cardLayoutVariant = cardLayoutVariant,
+        questionText = questionText,
+        pollOptions = pollOptions,
+        weatherSymbol = weatherSymbol,
+        linkURL = linkURL,
+        linkTitle = linkTitle,
+        countdownTitle = countdownTitle,
+        countdownTargetAtMs = countdownTargetAtMs,
+        sliderEmoji = sliderEmoji,
+        sliderPrompt = sliderPrompt,
+        caption = caption,
+        profileImagePath = profileImagePath,
+        sharedMediaPath = sharedMediaPath,
+        momentId = momentId,
+        mediaCount = mediaCount,
+        quizQuestion = quizQuestion,
+        quizOptions = quizOptions,
+        quizCorrectIndex = quizCorrectIndex,
+        revealType = revealType,
+        revealPattern = revealPattern,
+        revealPrimaryColor = revealPrimaryColor,
+        revealSecondaryColor = revealSecondaryColor,
+        revealEffectColor = revealEffectColor,
+        frameStyle = frameStyle,
+        contentScale = contentScale,
+        contentOffsetX = contentOffsetX,
+        contentOffsetY = contentOffsetY,
+        audioURL = audioURL,
+        audioDuration = audioDuration,
+        isAnimated = isAnimated,
+        gifURL = gifURL,
+        videoURL = videoURL,
+    )
+}

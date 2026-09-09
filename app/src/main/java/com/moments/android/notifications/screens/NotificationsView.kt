@@ -3,21 +3,21 @@ package com.moments.android.notifications.screens
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Comment
@@ -50,6 +50,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -270,31 +271,50 @@ fun NotificationsScreen(
                 },
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                NotificationTabBar(
-                    selectedTab = selectedTab,
-                    pendingRequestsCount = pendingRequestsCount,
-                    ink = ink,
-                    isDark = isDark,
-                    onTabSelected = viewModel::setSelectedTab,
-                )
                 when {
                     isLoading -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp, vertical = 20.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            repeat(5) { NotificationSkeletonRow(isDark) }
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            item {
+                                NotificationTabBar(
+                                    selectedTab = selectedTab,
+                                    pendingRequestsCount = pendingRequestsCount,
+                                    ink = ink,
+                                    canvas = canvas,
+                                    onTabSelected = viewModel::setSelectedTab,
+                                )
+                            }
+                            items(5) {
+                                Box(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                                    NotificationSkeletonRow(isDark)
+                                }
+                            }
                         }
                     }
-                    groupedNotifications.isEmpty() -> EmptyNotifications(selectedTab, isDark, ink)
+                    groupedNotifications.isEmpty() -> {
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            item {
+                                NotificationTabBar(
+                                    selectedTab = selectedTab,
+                                    pendingRequestsCount = pendingRequestsCount,
+                                    ink = ink,
+                                    canvas = canvas,
+                                    onTabSelected = viewModel::setSelectedTab,
+                                )
+                            }
+                            item {
+                                EmptyNotifications(selectedTab, isDark, ink)
+                            }
+                        }
+                    }
                     else -> NotificationsList(
                         dateKeys = dateKeys,
                         groupedByDate = groupedByDate,
                         viewModel = viewModel,
                         isDark = isDark,
                         canvas = canvas,
+                        selectedTab = selectedTab,
+                        pendingRequestsCount = pendingRequestsCount,
+                        ink = ink,
                         canLoadMore = canLoadMore,
                         isLoadingMore = isLoadingMore,
                         onShowGroupedFollowers = { overlayGroup = it },
@@ -377,64 +397,53 @@ private fun NotificationTabBar(
     selectedTab: NotificationsViewModel.NotificationsTab,
     pendingRequestsCount: Int,
     ink: Color,
-    isDark: Boolean,
+    canvas: Color,
     onTabSelected: (NotificationsViewModel.NotificationsTab) -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(if (isDark) FeedInk else FeedCanvas),
-    ) {
-        MomentsFillScrollTabRow(
-            items = NotificationsViewModel.NotificationsTab.entries,
-            modifier = Modifier.padding(top = 8.dp, bottom = 10.dp),
-        ) { tab, itemModifier ->
-            Column(
-                modifier = itemModifier.clickable { onTabSelected(tab) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stringResource(tab.labelRes),
-                        fontSize = 14.sp,
-                        fontWeight = if (selectedTab == tab) FontWeight.SemiBold else FontWeight.Medium,
-                        color = if (selectedTab == tab) ink else Color.Gray.copy(alpha = 0.82f),
-                        maxLines = 1,
-                    )
-                    if (tab == NotificationsViewModel.NotificationsTab.REQUESTS && pendingRequestsCount > 0) {
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .background(Color.Red, CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                pendingRequestsCount.toString(),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(7.dp))
+    val capsule = RoundedCornerShape(50)
+    MomentsFillScrollTabRow(
+        items = NotificationsViewModel.NotificationsTab.entries,
+        modifier = Modifier.padding(top = 8.dp, bottom = 10.dp),
+    ) { tab, itemModifier ->
+        val selected = selectedTab == tab
+        Row(
+            modifier = itemModifier
+                .clip(capsule)
+                .background(if (selected) ink else Color.Transparent, capsule)
+                .border(
+                    1.dp,
+                    if (selected) ink else ink.copy(alpha = 0.18f),
+                    capsule,
+                )
+                .clickable { onTabSelected(tab) }
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(tab.labelRes),
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (selected) canvas else ink,
+                maxLines = 1,
+                softWrap = false,
+            )
+            if (tab == NotificationsViewModel.NotificationsTab.REQUESTS && pendingRequestsCount > 0) {
                 Box(
                     modifier = Modifier
-                        .height(2.dp)
-                        .fillMaxWidth(0.85f)
-                        .background(if (selectedTab == tab) ink else Color.Transparent, CircleShape),
-                )
+                        .size(18.dp)
+                        .background(Color.Red, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        pendingRequestsCount.toString(),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    )
+                }
             }
         }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(0.5.dp)
-                .background(if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)),
-        )
     }
 }
 
@@ -446,6 +455,9 @@ private fun NotificationsList(
     viewModel: NotificationsViewModel,
     isDark: Boolean,
     canvas: Color,
+    selectedTab: NotificationsViewModel.NotificationsTab,
+    pendingRequestsCount: Int,
+    ink: Color,
     canLoadMore: Boolean,
     isLoadingMore: Boolean,
     onShowGroupedFollowers: (NotificationGroup) -> Unit,
@@ -454,7 +466,16 @@ private fun NotificationsList(
     onTapAction: (NotificationGroup) -> Unit,
 ) {
     val listState = rememberLazyListState()
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+        item {
+            NotificationTabBar(
+                selectedTab = selectedTab,
+                pendingRequestsCount = pendingRequestsCount,
+                ink = ink,
+                canvas = canvas,
+                onTabSelected = viewModel::setSelectedTab,
+            )
+        }
         dateKeys.forEach { section ->
             item(key = "header-$section") { NotificationDateHeader(section, isDark) }
             groupedByDate[section]?.forEach { group ->
@@ -584,8 +605,9 @@ private fun EmptyNotifications(
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 28.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 28.dp)
+            .padding(top = 36.dp, bottom = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -620,7 +642,6 @@ private fun EmptyNotifications(
                 textAlign = TextAlign.Center,
             )
         }
-        Spacer(modifier = Modifier.weight(1f))
     }
 }
 

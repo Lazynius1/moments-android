@@ -541,6 +541,7 @@ object ChatService {
         messageId: String? = null,
         isVanishModeMessage: Boolean = false,
         vanishExpiresAt: Date? = null,
+        mentionedUserIds: List<String>? = null,
     ): Result<EnhancedMessage> = runCatching {
         val encrypted = EncryptionService.encryptChatMessage(content, conversationId)
         val message = EnhancedMessage(
@@ -554,6 +555,7 @@ object ChatService {
             replyTo = replyTo,
             isVanishModeMessage = isVanishModeMessage,
             vanishExpiresAt = vanishExpiresAt,
+            mentionedUserIds = mentionedUserIds,
         )
         sendMessage(message, useServerTimestamp = true).getOrThrow()
     }
@@ -689,6 +691,7 @@ object ChatService {
         message.readBy?.let { data["readBy"] = it }
         message.readAtBy?.let { values -> data["readAtBy"] = values.mapValues { Timestamp(it.value) } }
         message.starredBy?.takeIf { it.isNotEmpty() }?.let { data["starredBy"] = it }
+        message.mentionedUserIds?.takeIf { it.isNotEmpty() }?.let { data["mentionedUserIds"] = it }
         if (message.isForwarded == true) data["isForwarded"] = true
         if (message.isVanishModeMessage) data["isVanishModeMessage"] = true
         message.vanishExpiresAt?.let { data["vanishExpiresAt"] = Timestamp(it) }
@@ -1167,13 +1170,13 @@ object ChatService {
         ).await()
     }
 
-    suspend fun muteConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
-        db.messagingThread(conversationId).update(
-            mapOf(
-                "mutedByUserIds" to FieldValue.arrayUnion(userId),
-                "mutedByTimestamps.$userId" to FieldValue.serverTimestamp(),
-            ),
-        ).await()
+    suspend fun muteConversation(conversationId: String, userId: String, until: Date? = null): Result<Unit> = runCatching {
+        val data = mutableMapOf<String, Any>(
+            "mutedByUserIds" to FieldValue.arrayUnion(userId),
+            "mutedByTimestamps.$userId" to FieldValue.serverTimestamp(),
+        )
+        data["mutedUntil.$userId"] = until?.let { Timestamp(it) } ?: FieldValue.delete()
+        db.messagingThread(conversationId).update(data).await()
     }
 
     suspend fun unmuteConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
@@ -1181,6 +1184,7 @@ object ChatService {
             mapOf(
                 "mutedByUserIds" to FieldValue.arrayRemove(userId),
                 "mutedByTimestamps.$userId" to FieldValue.delete(),
+                "mutedUntil.$userId" to FieldValue.delete(),
             ),
         ).await()
     }
@@ -2158,6 +2162,7 @@ object ChatService {
             pinnedBy = legacyPinnedBy,
             isMuted = isMuted,
             mutedByUserIds = mutedByUserIds,
+            mutedUntil = timestampMap("mutedUntil"),
             mutedBy = legacyMutedBy,
             archivedByUserIds = archivedByUserIds,
             encryptionVersion = encryptionVersion,

@@ -40,6 +40,8 @@ fun UserReportContent(
     onBack: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    reportedContentType: String = "user",
+    reportedContentId: String? = null,
 ) {
     val scope = rememberCoroutineScope()
     val persistence = remember { LocalPersistenceService }
@@ -53,7 +55,9 @@ fun UserReportContent(
     var isSubmitting by remember { mutableStateOf(false) }
     var showSuccessMessage by remember { mutableStateOf(false) }
 
-    val reportTitle = if (!reportedUsername.isNullOrEmpty()) {
+    val reportTitle = if (reportedContentType == "group") {
+        stringResource(R.string.groups_report)
+    } else if (!reportedUsername.isNullOrEmpty()) {
         stringResource(R.string.report_user_title_username, reportedUsername)
     } else {
         stringResource(R.string.report_user_title)
@@ -79,7 +83,10 @@ fun UserReportContent(
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
                     Text(
-                        stringResource(R.string.report_user_subtitle),
+                        stringResource(
+                            if (reportedContentType == "group") R.string.groups_report_subtitle
+                            else R.string.report_user_subtitle,
+                        ),
                         modifier = Modifier.padding(horizontal = 20.dp),
                         color = secondaryText,
                         fontSize = 15.sp,
@@ -127,8 +134,8 @@ fun UserReportContent(
                                 persistence.reportContent(
                                     reporterId = currentUserId,
                                     reportedUserId = reportedUserId,
-                                    reportedContentType = "user",
-                                    reportedContentId = reportedUserId,
+                                    reportedContentType = reportedContentType,
+                                    reportedContentId = reportedContentId ?: reportedUserId,
                                     category = reason.raw,
                                     description = additionalDetails.trim(),
                                     priority = reason.priority.raw,

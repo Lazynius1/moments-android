@@ -1,9 +1,6 @@
 package com.moments.android.views.story.storyviewer
 
-import android.content.ContentValues
 import android.content.Context
-import android.os.Build
-import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
@@ -159,7 +156,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import java.net.URL
 
 /** ≡ `StoryConfirmationKind` en StoryViewerScreen.swift. */
 private enum class StoryConfirmationKind {
@@ -226,6 +222,8 @@ fun StoryViewerScreen(
     var messageText by remember { mutableStateOf("") }
     var showReactions by remember { mutableStateOf(false) }
     var showQuickActions by remember { mutableStateOf(false) }
+    var isSavingStory by remember { mutableStateOf(false) }
+    var downloadLayoutWidthDp by remember { mutableFloatStateOf(375f) }
     var showActivity by remember { mutableStateOf(false) }
     var activityTab by remember { mutableIntStateOf(0) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
@@ -245,6 +243,9 @@ fun StoryViewerScreen(
     var isVanishActiveWithAuthor by remember { mutableStateOf(false) }
     var floatingHearts by remember { mutableStateOf<List<FloatingHeart>>(emptyList()) }
     var successMessageText by remember { mutableStateOf<String?>(null) }
+    var successMessageIsError by remember { mutableStateOf(false) }
+    var successMessageIsProgress by remember { mutableStateOf(false) }
+    var successHideJob by remember { mutableStateOf<Job?>(null) }
     var suppressNavigationTapUntil by remember { mutableLongStateOf(0L) }
     var lastPreparedStoryId by remember { mutableStateOf<String?>(null) }
     var didApplyInitialElapsed by remember { mutableStateOf(false) }
@@ -481,12 +482,25 @@ fun StoryViewerScreen(
         }
     }
 
-    fun showSuccess(text: String) {
+    fun showFeedback(text: String, isError: Boolean = false, isProgress: Boolean = false) {
+        successHideJob?.cancel()
         successMessageText = text
-        scope.launch {
-            delay(2_000)
-            if (successMessageText == text) successMessageText = null
+        successMessageIsError = isError
+        successMessageIsProgress = isProgress
+        if (!isProgress) {
+            successHideJob = scope.launch {
+                delay(2_000)
+                if (successMessageText == text) successMessageText = null
+            }
         }
+    }
+
+    fun showSuccess(text: String) {
+        showFeedback(text, isError = false, isProgress = false)
+    }
+
+    fun showProgress(text: String) {
+        showFeedback(text, isError = false, isProgress = true)
     }
 
     fun markStoryAsViewedIfNeeded() {
@@ -604,13 +618,17 @@ fun StoryViewerScreen(
         messageText = ""
         isTextFieldFocused = false
         focusManager.clearFocus()
+        showProgress(context.getString(R.string.stories_sending_message))
         storyViewModel?.sendMessage(story.authorId, storyId, text) { result ->
             result.onSuccess {
                 onSendMessage(text)
                 showSuccess(context.getString(R.string.stories_message_sent))
             }.onFailure { error ->
                 messageText = text
-                showSuccess(error.localizedMessage ?: context.getString(R.string.story_context_menu_action_failed))
+                showFeedback(
+                    error.localizedMessage ?: context.getString(R.string.story_context_menu_action_failed),
+                    isError = true,
+                )
             }
         } ?: run {
             onSendMessage(text)
@@ -945,6 +963,7 @@ fun StoryViewerScreen(
                 else -> 25.dp
             }
             val canvasRect = Rect(captureRect.left, captureRect.top, captureRect.right, captureRect.bottom)
+            SideEffect { downloadLayoutWidthDp = captureRect.width / density.density }
             val corner = storyViewerCanvasCornerRadius
             val regions = deckGestureGate?.interactionRegions.orEmpty()
 
@@ -1585,6 +1604,27 @@ fun StoryViewerScreen(
                     }
                 }
             }
+
+            // MARK: Canvas-bottom status toast ≡ iOS GlassmorphicSuccessMessage at captureRect.maxY
+            successMessageText?.let { msg ->
+                Box(
+                    Modifier
+                        .offset {
+                            IntOffset(
+                                captureRect.left.roundToInt(),
+                                (captureRect.bottom - with(density) { 62.dp.toPx() }).roundToInt(),
+                            )
+                        }
+                        .width(with(density) { captureRect.width.toDp() }),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    GlassmorphicSuccessMessage(
+                        text = msg,
+                        isError = successMessageIsError,
+                        isProgress = successMessageIsProgress,
+                    )
+                }
+            }
         }
 
         // MARK: Quick actions overlay
@@ -1607,19 +1647,29 @@ fun StoryViewerScreen(
                 onSave = {
                     dismissQuickActions(resume = false)
                     photosSaveGate.requestAccess(context) {
-                        scope.launch {
-                            val ok = saveStoryMediaToDevice(context, story)
-                            showSuccess(
-                                context.getString(
-                                    when {
-                                        !ok -> R.string.story_context_menu_action_failed
-                                        story.mediaItem.type == MediaItem.MediaType.VIDEO -> R.string.stories_saved_video
-                                        else -> R.string.stories_saved_image
-                                    },
-                                ),
-                            )
-                            onSaveStory()
-                            resumeStoryPlayback()
+                        if (!isSavingStory) {
+                            isSavingStory = true
+                            showProgress(context.getString(R.string.stories_saving_video))
+                            scope.launch {
+                                try {
+                                    val ok = StoryDownloadComposer.exportAndSave(
+                                        context = context, story = story, stickers = storyStickers,
+                                        layoutWidthDp = downloadLayoutWidthDp,
+                                    )
+                                    if (ok) {
+                                        showSuccess(context.getString(R.string.stories_saved_video))
+                                        onSaveStory()
+                                    } else {
+                                        showFeedback(
+                                            context.getString(R.string.story_context_menu_action_failed),
+                                            isError = true,
+                                        )
+                                    }
+                                } finally {
+                                    isSavingStory = false
+                                    resumeStoryPlayback()
+                                }
+                            }
                         }
                     }
                 },
@@ -1772,17 +1822,6 @@ fun StoryViewerScreen(
         // MARK: profileRoute via UserProfileZoomNavigationHost (shared-element, no Dialog)
 
         PermissionPrimerGateHost(gate = photosSaveGate)
-
-        // MARK: Success toast
-        successMessageText?.let { msg ->
-            GlassmorphicSuccessMessage(
-                text = msg,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 72.dp),
-            )
-        }
     }
     } // UserProfileZoomNavigationHost
 }
@@ -2002,49 +2041,3 @@ private fun StoryViewerReplyActionButton(
         content()
     }
 }
-
-/** ≡ `saveStoryToDevice()` de Swift. */
-private suspend fun saveStoryMediaToDevice(context: android.content.Context, story: Story): Boolean =
-    withContext(Dispatchers.IO) {
-        val isVideo = story.mediaItem.type == MediaItem.MediaType.VIDEO
-        val resolver = context.contentResolver
-        val mimeType = if (isVideo) "video/mp4" else "image/jpeg"
-        val collection = if (isVideo) {
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-        } else {
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        }
-        val values = ContentValues().apply {
-            put(
-                MediaStore.MediaColumns.DISPLAY_NAME,
-                "Moment_${System.currentTimeMillis()}${if (isVideo) ".mp4" else ".jpg"}",
-            )
-            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(
-                    MediaStore.MediaColumns.RELATIVE_PATH,
-                    if (isVideo) "Movies/Moments" else "Pictures/Moments",
-                )
-                put(MediaStore.MediaColumns.IS_PENDING, 1)
-            }
-        }
-        val target = resolver.insert(collection, values) ?: return@withContext false
-        try {
-            URL(story.mediaItem.url).openStream().use { input ->
-                resolver.openOutputStream(target)?.use { output -> input.copyTo(output) }
-                    ?: error("MediaStore")
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                resolver.update(
-                    target,
-                    ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) },
-                    null,
-                    null,
-                )
-            }
-            true
-        } catch (_: Exception) {
-            resolver.delete(target, null, null)
-            false
-        }
-    }

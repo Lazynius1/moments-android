@@ -150,4 +150,5 @@ sealed class ReportTarget {
     data class MomentTarget(val moment: Moment) : ReportTarget()
     data class StoryTarget(val story: Story) : ReportTarget()
     data class UserTarget(val userId: String, val username: String? = null) : ReportTarget()
+    data class GroupTarget(val groupId: String, val groupName: String, val ownerId: String) : ReportTarget()
 }

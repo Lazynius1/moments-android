@@ -37,6 +37,7 @@ fun StoryLiveTextOverlayView(
     modifier: Modifier = Modifier,
     containerSize: Size? = null,
     animates: Boolean = true,
+    maxLayoutWidthDp: Float? = null,
 ) {
     BoxWithConstraints(modifier.zIndex(metadata.layerOrder.toFloat())) {
         val density = LocalDensity.current
@@ -55,7 +56,9 @@ fun StoryLiveTextOverlayView(
         val config = metadata.scaledRenderConfiguration(containerWidthDp.value)
         val anchor = metadata.displayPosition(container)
         // ≡ iOS overlayMaxWidth: live = width−48pt; thumbnail = width×(327/375)
-        val maxWidth = if (animates) {
+        val maxWidth = if (maxLayoutWidthDp != null) {
+            maxLayoutWidthDp.dp
+        } else if (animates) {
             (containerWidthDp - 48.dp).coerceAtLeast(120.dp)
         } else {
             (containerWidthDp * (327f / 375f)).coerceAtLeast(1.dp)

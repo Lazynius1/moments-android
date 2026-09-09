@@ -1,5 +1,6 @@
 package com.moments.android.views.components
 
+import com.moments.android.views.story.storyviewer.LocalStoryExportTime
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Paint
@@ -1712,7 +1713,9 @@ fun StickerCountdownCardView(
     val isLight = styleVariant % 6 == 0
     val ink = if (isLight) momentsStickerInk(isDark) else Color.White
     val headerInk = if (isLight) momentsStickerInverseInk(isDark) else Color.White
-    var now by remember { mutableStateOf(Date()) }
+    var liveNow by remember { mutableStateOf(Date()) }
+    val exportTime = LocalStoryExportTime.current
+    val now = exportTime?.let { Date(it.dateMs) } ?: liveNow
     val eventTitlePlaceholder = stringResource(R.string.story_editor_countdown_event_title)
     val placeholder = stringResource(R.string.story_editor_countdown_placeholder)
     val labelDays = stringResource(R.string.story_editor_countdown_days)
@@ -1720,10 +1723,11 @@ fun StickerCountdownCardView(
     val labelMinutes = stringResource(R.string.story_editor_countdown_minutes)
     val labelSeconds = stringResource(R.string.story_editor_countdown_seconds)
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(exportTime == null) {
+        if (exportTime != null) return@LaunchedEffect
         while (true) {
             kotlinx.coroutines.delay(1_000)
-            now = Date()
+            liveNow = Date()
         }
     }
 
@@ -2462,6 +2466,7 @@ fun InteractiveAudioStickerView(
     @Suppress("UNUSED_PARAMETER")
     val unusedDuration = duration
 
+    val exportTime = LocalStoryExportTime.current
     val context = LocalContext.current
     var isPlaying by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
@@ -2583,10 +2588,11 @@ fun InteractiveAudioStickerView(
     }
 
     LaunchedEffect(Unit) {
-        startPlayback()
+        if (exportTime == null) startPlayback()
     }
 
     LaunchedEffect(isPlaying) {
+        if (exportTime != null) return@LaunchedEffect
         if (isPlaying) startWaveAnimation()
         else {
             waveJob?.cancel()
@@ -2598,6 +2604,17 @@ fun InteractiveAudioStickerView(
     DisposableEffect(Unit) {
         onDispose { stopPlayback() }
     }
+
+    val exportSeconds = (exportTime?.timeUs ?: 0L) / 1_000_000.0
+    val displayedPlaying = if (exportTime != null) exportSeconds < duration else isPlaying
+    val displayedProgress = if (exportTime != null) {
+        if (displayedPlaying) (exportSeconds / duration.coerceAtLeast(0.001)).toFloat().coerceIn(0f, 1f) else 0f
+    } else progress
+    val displayedHeights = if (exportTime != null && displayedPlaying) {
+        listOf(0.0, 1.4, 2.8).mapIndexed { index, phase ->
+            ((if (index == 1) 15.0 else 11.0) + 5.0 * kotlin.math.sin(exportSeconds * 10 + phase)).toFloat()
+        }
+    } else animatedHeights
 
     Box(
         modifier = modifier
@@ -2617,7 +2634,7 @@ fun InteractiveAudioStickerView(
                     colors = listOf(foregroundColor, foregroundColor.copy(alpha = 0.8f)),
                 ),
                 startAngle = -90f,
-                sweepAngle = 360f * progress,
+                sweepAngle = 360f * displayedProgress,
                 useCenter = false,
                 style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
             )
@@ -2628,7 +2645,7 @@ fun InteractiveAudioStickerView(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(
-                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.Mic,
+                imageVector = if (displayedPlaying) Icons.Filled.Pause else Icons.Filled.Mic,
                 contentDescription = null,
                 tint = foregroundColor,
                 modifier = Modifier.size(20.dp),
@@ -2637,7 +2654,7 @@ fun InteractiveAudioStickerView(
                 horizontalArrangement = Arrangement.spacedBy(3.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                animatedHeights.forEach { barHeight ->
+                displayedHeights.forEach { barHeight ->
                     Box(
                         Modifier
                             .width(3.dp)

@@ -958,6 +958,7 @@
     <string name="creator_story_camera_permission">Hikâye çekmek için kamera erişimi gerekiyor</string>
     <string name="creator_story_text_mode">Aa</string>
     <string name="story_editor_saved_to_gallery">Hikâye galerine kaydedildi</string>
+    <string name="story_editor_saving_to_gallery">Galeriye kaydediliyor…</string>
     <string name="story_editor_discard_title">Medya içeriği silinsin mi?</string>
     <string name="story_editor_discard_message">Şimdi çıkarsan yaptığın değişiklikleri kaybedersin.</string>
     <string name="story_editor_discard_confirm">Sil</string>
@@ -1598,7 +1599,9 @@
     <string name="stories_replies_disabled_placeholder">Yanıtlara izin verilmiyor</string>
     <string name="stories_saved_image">Görsel kaydedildi</string>
     <string name="stories_saved_video">Video kaydedildi</string>
+    <string name="stories_saving_video">Video kaydediliyor…</string>
     <string name="stories_message_sent">Mesaj gönderildi</string>
+    <string name="stories_sending_message">Mesaj gönderiliyor…</string>
     <string name="stories_moment_sent">Moment gönderildi</string>
     <string name="stories_reactions">Tepkiler</string>
 

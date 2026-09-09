@@ -1171,6 +1171,12 @@ fun GlassmorphicChatView(
                     focusManager.clearFocus()
                     keyboardController?.hide()
                 },
+                isGroup = conversation.isGroup,
+                groupSendLocked = conversation.isGroup &&
+                    groupDirectory[conversation.id]?.sendPermission == "admins" &&
+                    session.currentUserId !in (groupDirectory[conversation.id]?.admins ?: emptyList()),
+                groupMentionMembers = groupDirectory[conversation.id]?.members.orEmpty(),
+                currentUserId = session.currentUserId,
                 onReplyAfterAcceptance = { conversationId, text ->
                     val uid = session.currentUserId
                     val ctx = composer.pendingChatContext ?: pendingChatContext
@@ -1226,6 +1232,14 @@ fun GlassmorphicChatView(
             isBlockedByMe = lifecycle.isOtherParticipantBlockedByCurrentUser,
             storyRing = lifecycle.storyRing,
             hasTypingUsers = typingUsers.isNotEmpty(),
+            groupTypingSubtitle = if (conversation.isGroup && typingUsers.isNotEmpty()) {
+                val names = groupDirectory[conversation.id]?.members.orEmpty().associate { it.id to it.name }
+                com.moments.android.services.messaging.GroupChatScope.typingSubtitle(
+                    context,
+                    typingUsers,
+                    names,
+                )
+            } else null,
             presence = lifecycle.presenceDisplay,
             showBackButton = showBackButton,
             memberCount = groupDirectory[conversation.id]?.members?.size

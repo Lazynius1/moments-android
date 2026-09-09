@@ -1135,7 +1135,9 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="stories_replies_disabled_placeholder">Não são permitidas respostas</string>
     <string name="stories_saved_image">Imagem guardada</string>
     <string name="stories_saved_video">Vídeo guardado</string>
+    <string name="stories_saving_video">A guardar vídeo…</string>
     <string name="stories_message_sent">Mensagem enviada</string>
+    <string name="stories_sending_message">A enviar mensagem…</string>
     <string name="stories_moment_sent">Momento enviado</string>
     <string name="stories_reactions">Reações</string>
 
@@ -1687,6 +1689,7 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="hidden_layers_audio_recording">A gravar...</string>
     <string name="hidden_layers_audio_tap_to_record">Toca para gravar</string>
     <string name="story_editor_saved_to_gallery">Story guardada na tua galeria</string>
+    <string name="story_editor_saving_to_gallery">A guardar na galeria…</string>
     <string name="story_editor_discard_title">Descartar conteúdo multimédia?</string>
     <string name="story_editor_discard_message">Se saíres agora, vais perder todas as alterações que fizeste.</string>
     <string name="story_editor_discard_confirm">Descartar</string>

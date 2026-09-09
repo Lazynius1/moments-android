@@ -958,6 +958,7 @@
     <string name="creator_story_camera_permission">Cameratoegang is nodig om een story te maken</string>
     <string name="creator_story_text_mode">Aa</string>
     <string name="story_editor_saved_to_gallery">Story opgeslagen in je galerij</string>
+    <string name="story_editor_saving_to_gallery">Opslaan in galerij…</string>
     <string name="story_editor_discard_title">Multimedia-inhoud weggooien?</string>
     <string name="story_editor_discard_message">Als je nu weggaat, gaan je wijzigingen verloren.</string>
     <string name="story_editor_discard_confirm">Weggooien</string>
@@ -1598,7 +1599,9 @@
     <string name="stories_replies_disabled_placeholder">Antwoorden zijn niet toegestaan</string>
     <string name="stories_saved_image">Afbeelding opgeslagen</string>
     <string name="stories_saved_video">Video opgeslagen</string>
+    <string name="stories_saving_video">Video opslaan…</string>
     <string name="stories_message_sent">Bericht verzonden</string>
+    <string name="stories_sending_message">Bericht verzenden…</string>
     <string name="stories_moment_sent">Moment verzonden</string>
     <string name="stories_reactions">Reacties</string>
 

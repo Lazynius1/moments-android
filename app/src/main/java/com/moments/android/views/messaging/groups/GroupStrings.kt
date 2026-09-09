@@ -80,5 +80,29 @@ internal fun groupStringId(key: String): Int = when (key) {
     "followingSection" -> R.string.groups_following_section
     "othersSection" -> R.string.groups_others_section
     "linkAdminOnly" -> R.string.groups_link_admin_only
+    "typing.one" -> R.string.groups_typing_one
+    "typing.two" -> R.string.groups_typing_two
+    "typing.several" -> R.string.groups_typing_several
+    "searchMembers" -> R.string.groups_search_members
+    "noMembersFound" -> R.string.groups_no_members_found
+    "mention.placeholder" -> R.string.groups_mention_placeholder
+    "notification.mention" -> R.string.groups_notification_mention
+    "description" -> R.string.groups_description
+    "descriptionPlaceholder" -> R.string.groups_description_placeholder
+    "send.everyone" -> R.string.groups_send_everyone
+    "send.admins" -> R.string.groups_send_admins
+    "send.locked" -> R.string.groups_send_locked
+    "dissolve" -> R.string.groups_dissolve
+    "dissolveBody" -> R.string.groups_dissolve_body
+    "notice.dissolved" -> R.string.groups_notice_dissolved
+    "mute.8h" -> R.string.groups_mute_8h
+    "mute.week" -> R.string.groups_mute_week
+    "mute.always" -> R.string.groups_mute_always
+    "link.approval" -> R.string.groups_link_approval
+    "join.requested" -> R.string.groups_join_requested
+    "joinRequests" -> R.string.groups_join_requests
+    "approveJoin" -> R.string.groups_approve_join
+    "report" -> R.string.groups_report
+    "report.subtitle" -> R.string.groups_report_subtitle
     else -> R.string.groups_error
 }

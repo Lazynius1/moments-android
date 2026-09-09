@@ -40,6 +40,8 @@ import com.moments.android.views.components.StoryPolaroidFrameStyle
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.story.QuestionResponseStoryStickerCardView
 import com.moments.android.views.story.storystickers.AnimatedWeatherSticker
+import com.moments.android.views.story.storyviewer.GlassmorphicSuccessMessage
+import com.moments.android.views.story.storyviewer.StoryDownloadComposer
 import com.moments.android.views.story.storystickers.InteractivePollSticker
 import com.moments.android.views.story.storystickers.InteractiveQuestionSticker
 import com.moments.android.views.story.storyviewer.StoryViewerLayoutHelpers
@@ -285,6 +287,11 @@ fun StoryEditingView(
     var customSelectedUsers by remember { mutableStateOf<List<String>>(emptyList()) }
     var expirationHours by remember { mutableIntStateOf(24) }
     var isPublishing by remember { mutableStateOf(false) }
+    var isSavingToGallery by remember { mutableStateOf(false) }
+    var galleryFeedbackText by remember { mutableStateOf<String?>(null) }
+    var galleryFeedbackIsError by remember { mutableStateOf(false) }
+    var galleryFeedbackIsProgress by remember { mutableStateOf(false) }
+    var galleryFeedbackHideJob by remember { mutableStateOf<Job?>(null) }
     var showingAudience by remember { mutableStateOf(false) }
     var pendingTool by remember { mutableStateOf<String?>(null) }
 
@@ -587,7 +594,48 @@ fun StoryEditingView(
         HapticManager.shared.lightImpact()
     }
 
+    fun commitActiveTextOverlay() {
+        val id = activeTextOverlayId ?: return
+        val trimmed = editorBuffer.trim()
+        textOverlays = if (trimmed.isEmpty()) {
+            textOverlays.filterNot { it.id == id }
+        } else {
+            textOverlays.map {
+                if (it.id != id) it
+                else it.copy(
+                    text = trimmed,
+                    styleRaw = editorStyle.raw,
+                    colorHex = editorColorHex,
+                    alignmentRaw = editorTextAlignmentRaw,
+                    backgroundFillRaw = editorTextBackgroundFillRaw,
+                    fontSize = editorTextFontSize.toDouble(),
+                    strokeRaw = editorTextStrokeRaw,
+                    motionRaw = editorTextMotionRaw,
+                    visualEffectRaw = editorVisualEffectRaw,
+                    forcesAllCaps = editorForcesAllCaps,
+                    gradientStopHexes = StoryTextGradientSettings.encodeStops(editorGradientStops),
+                    gradientAngle = editorGradientAngle,
+                )
+            }
+        }
+    }
+
+    fun showGalleryFeedback(text: String, isError: Boolean = false, isProgress: Boolean = false) {
+        galleryFeedbackHideJob?.cancel()
+        galleryFeedbackText = text
+        galleryFeedbackIsError = isError
+        galleryFeedbackIsProgress = isProgress
+        if (!isProgress) {
+            galleryFeedbackHideJob = scope.launch {
+                delay(2_000)
+                if (galleryFeedbackText == text) galleryFeedbackText = null
+            }
+        }
+    }
+
     fun saveToGalleryAuthorized() {
+        if (isSavingToGallery) return
+        commitActiveTextOverlay()
         val current = selectedMediaItems.firstOrNull()
         val palette = resolvedStoryBackgroundPalette()
         val canvasW = mediaCanvasWidthPx
@@ -600,50 +648,105 @@ fun StoryEditingView(
         val drawingOx = drawingOffsetX
         val drawingOy = drawingOffsetY
         val filterBmp = filteredImage
+        val capturedFilter = selectedFilter
+        val capturedStickers = stickers.map { draft ->
+            draft.toStickerData().copy(scale = StoryViewerLayoutHelpers.normalizeStickerScaleForFirestore(
+                draft.scale, canvasW, densityScale,
+            ))
+        }
+        val capturedTexts = textOverlays.mapNotNull { draft ->
+            draft.toMetadata()?.let { metadata ->
+                metadata.copy(
+                    fontSize = metadata.fontSize * 375.0 / (canvasW / densityScale).coerceAtLeast(1f),
+                    normalizedPosition = com.moments.android.models.Point(draft.normalizedX, draft.normalizedY),
+                )
+            }
+        }
+        val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        isSavingToGallery = true
+        showGalleryFeedback(context.getString(R.string.story_editor_saving_to_gallery), isProgress = true)
         scope.launch {
-            withContext(Dispatchers.IO) {
+            val ok = try {
                 runCatching {
-                    if (current != null && current.isVideo) {
-                        // iOS: vídeo fuente sin bake; overlays van en metadata al publicar.
-                        saveUriToGallery(context, current.uri, isVideo = true)
-                    } else {
-                        val mediaBmp = when {
-                            current == null -> null
-                            filterBmp != null &&
-                                selectedFilter != FilterService.FilterType.NORMAL &&
-                                !filterBmp.isRecycled -> filterBmp
-                            else ->
-                                context.contentResolver.openInputStream(current.uri)
-                                    ?.use(BitmapFactory::decodeStream)
-                        }
-                        val composed = renderStoryWithOverlays(
-                            mediaImage = mediaBmp,
-                            backgroundPalette = palette,
-                            drawing = drawing,
-                            drawingScale = drawingS,
-                            drawingOffsetX = drawingOx,
-                            drawingOffsetY = drawingOy,
-                            imageScale = scale,
-                            imageOffsetX = offset.x,
-                            imageOffsetY = offset.y,
-                            imageRotationRadians = rotation,
-                            editorCanvasWidth = canvasW,
-                            editorCanvasHeight = canvasH,
-                        )
-                        saveBitmapToGallery(context, composed).also {
-                            composed.recycle()
-                            if (mediaBmp != null && mediaBmp !== filterBmp && !mediaBmp.isRecycled) {
-                                mediaBmp.recycle()
+                    val overlay: Bitmap? = null
+                    withContext(Dispatchers.IO) {
+                        val (width, height) = StoryDownloadComposer.evenCanvasSize()
+                        if (current != null && current.isVideo) {
+                            val drawingOverlay = renderStoryOverlayImage(
+                                drawing = drawing, drawingScale = drawingS,
+                                drawingOffsetX = drawingOx, drawingOffsetY = drawingOy,
+                                targetWidth = width, targetHeight = height,
+                                screenWidth = canvasW, screenHeight = canvasH,
+                            )
+                            try {
+                                val uri = exportVideoWithCurrentOverlays(
+                                    context = context.applicationContext, source = current.uri,
+                                    overlay = drawingOverlay, backgroundPalette = palette,
+                                    targetWidth = width, targetHeight = height,
+                                    imageScale = scale, imageOffsetX = offset.x, imageOffsetY = offset.y,
+                                    imageRotationRadians = rotation,
+                                    editorCanvasWidth = canvasW, editorCanvasHeight = canvasH,
+                                )
+                                val file = java.io.File(uri.path ?: error("Missing exported video"))
+                                StoryDownloadComposer.saveEditorVideo(
+                                    context, file, capturedStickers, capturedTexts, uid, canvasW / densityScale,
+                                )
+                            } finally { drawingOverlay?.recycle() }
+                        } else {
+                            val mediaBmp = when {
+                                current == null -> null
+                                filterBmp != null &&
+                                    capturedFilter != FilterService.FilterType.NORMAL &&
+                                    !filterBmp.isRecycled -> filterBmp
+                                else ->
+                                    context.contentResolver.openInputStream(current.uri)
+                                        ?.use(BitmapFactory::decodeStream)?.let { decoded ->
+                                            decoded.creatorNormalizedUp(context, current.uri).also {
+                                                if (it !== decoded) decoded.recycle()
+                                            }
+                                        }
+                            }
+                            val composed = renderStoryWithOverlays(
+                                mediaImage = mediaBmp,
+                                backgroundPalette = palette,
+                                drawing = drawing,
+                                drawingScale = drawingS,
+                                drawingOffsetX = drawingOx,
+                                drawingOffsetY = drawingOy,
+                                imageScale = scale,
+                                imageOffsetX = offset.x,
+                                imageOffsetY = offset.y,
+                                imageRotationRadians = rotation,
+                                editorCanvasWidth = canvasW,
+                                editorCanvasHeight = canvasH,
+                                targetWidth = width,
+                                targetHeight = height,
+                            )
+                            try {
+                                val file = StoryDownloadComposer.exportEditorStill(context, composed, overlay)
+                                StoryDownloadComposer.saveEditorVideo(
+                                    context, file, capturedStickers, capturedTexts, uid, canvasW / densityScale,
+                                )
+                            } finally {
+                                composed.recycle()
+                                if (mediaBmp != null && mediaBmp !== filterBmp && !mediaBmp.isRecycled) {
+                                    mediaBmp.recycle()
+                                }
                             }
                         }
                     }
+                }.onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    android.util.Log.e("StoryDownload", "Editor export failed", it)
                 }.getOrDefault(false)
-            }
-            Toast.makeText(
-                context,
-                context.getString(R.string.story_editor_saved_to_gallery),
-                Toast.LENGTH_SHORT,
-            ).show()
+            } finally { isSavingToGallery = false }
+            showGalleryFeedback(
+                context.getString(
+                    if (ok) R.string.story_editor_saved_to_gallery
+                    else R.string.story_context_menu_action_failed,
+                ),
+                isError = !ok,
+            )
         }
     }
 
@@ -864,32 +967,6 @@ fun StoryEditingView(
                 }
             }
             filteredImage = processed
-        }
-    }
-
-    fun commitActiveTextOverlay() {
-        val id = activeTextOverlayId ?: return
-        val trimmed = editorBuffer.trim()
-        textOverlays = if (trimmed.isEmpty()) {
-            textOverlays.filterNot { it.id == id }
-        } else {
-            textOverlays.map {
-                if (it.id != id) it
-                else it.copy(
-                    text = trimmed,
-                    styleRaw = editorStyle.raw,
-                    colorHex = editorColorHex,
-                    alignmentRaw = editorTextAlignmentRaw,
-                    backgroundFillRaw = editorTextBackgroundFillRaw,
-                    fontSize = editorTextFontSize.toDouble(),
-                    strokeRaw = editorTextStrokeRaw,
-                    motionRaw = editorTextMotionRaw,
-                    visualEffectRaw = editorVisualEffectRaw,
-                    forcesAllCaps = editorForcesAllCaps,
-                    gradientStopHexes = StoryTextGradientSettings.encodeStops(editorGradientStops),
-                    gradientAngle = editorGradientAngle,
-                )
-            }
         }
     }
 
@@ -2106,6 +2183,7 @@ fun StoryEditingView(
                                 ChromeTool(
                                     onClick = { saveToGallery() },
                                     stroke = controlStroke,
+                                    enabled = !isSavingToGallery,
                                 ) {
                                     Icon(Icons.Filled.Download, null, tint = controlFg, modifier = Modifier.size(18.dp))
                                 }
@@ -2715,6 +2793,30 @@ fun StoryEditingView(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+        }
+
+        // ≡ iOS gallery save toast at canvas bottom
+        galleryFeedbackText?.let { msg ->
+            if (mediaCaptureRect.width > 1f && mediaCaptureRect.height > 1f) {
+                Box(
+                    Modifier
+                        .offset {
+                            IntOffset(
+                                mediaCaptureRect.left.roundToInt(),
+                                (mediaCaptureRect.bottom - with(density) { 62.dp.toPx() }).roundToInt(),
+                            )
+                        }
+                        .width(with(density) { mediaCaptureRect.width.toDp() })
+                        .zIndex(50f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    GlassmorphicSuccessMessage(
+                        text = msg,
+                        isError = galleryFeedbackIsError,
+                        isProgress = galleryFeedbackIsProgress,
+                    )
+                }
             }
         }
 
@@ -3456,14 +3558,15 @@ private fun StoryEditorPaletteChip(
 private fun ChromeTool(
     onClick: () -> Unit,
     stroke: Color,
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     Box(
         Modifier
             .size(42.dp)
-            .momentsChromeGlass(CircleShape, interactive = true)
+            .momentsChromeGlass(CircleShape, interactive = enabled)
             .border(1.dp, stroke, CircleShape)
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { content() }
 }

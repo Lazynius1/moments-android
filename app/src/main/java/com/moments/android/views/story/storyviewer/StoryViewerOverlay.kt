@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
@@ -177,7 +178,12 @@ fun GlassmorphicActionButton(
 }
 
 @Composable
-fun GlassmorphicSuccessMessage(text: String, modifier: Modifier = Modifier) {
+fun GlassmorphicSuccessMessage(
+    text: String,
+    modifier: Modifier = Modifier,
+    isError: Boolean = false,
+    isProgress: Boolean = false,
+) {
     val chromeFg = MomentsChromeGlass.contentColor(isSystemInDarkTheme())
     Row(
         modifier
@@ -187,12 +193,25 @@ fun GlassmorphicSuccessMessage(text: String, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(
-            Icons.Filled.CheckCircle,
-            contentDescription = null,
-            tint = Color.fromHex("007AFF"),
-            modifier = Modifier.size(20.dp),
-        )
+        when {
+            isProgress -> CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = Color.fromHex("007AFF"),
+                strokeWidth = 2.dp,
+            )
+            isError -> Icon(
+                Icons.Filled.Error,
+                contentDescription = null,
+                tint = Color.fromHex("FF453A"),
+                modifier = Modifier.size(20.dp),
+            )
+            else -> Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = Color.fromHex("007AFF"),
+                modifier = Modifier.size(20.dp),
+            )
+        }
         Text(
             text,
             color = chromeFg,

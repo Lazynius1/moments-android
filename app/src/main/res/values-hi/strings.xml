@@ -958,6 +958,7 @@
     <string name="creator_story_camera_permission">स्टोरी बनाने के लिए कैमरे का ऐक्सेस ज़रूरी है</string>
     <string name="creator_story_text_mode">Aa</string>
     <string name="story_editor_saved_to_gallery">स्टोरी आपकी गैलरी में सेव हो गई</string>
+    <string name="story_editor_saving_to_gallery">गैलरी में सेव हो रहा है…</string>
     <string name="story_editor_discard_title">मल्टीमीडिया सामग्री हटाएँ?</string>
     <string name="story_editor_discard_message">अगर आप अभी बाहर निकलते हैं, तो आपके किए गए बदलाव खो जाएँगे।</string>
     <string name="story_editor_discard_confirm">हटाएँ</string>
@@ -1598,7 +1599,9 @@
     <string name="stories_replies_disabled_placeholder">जवाब देने की अनुमति नहीं है</string>
     <string name="stories_saved_image">इमेज सेव हो गई</string>
     <string name="stories_saved_video">वीडियो सेव हो गया</string>
+    <string name="stories_saving_video">वीडियो सेव हो रहा है…</string>
     <string name="stories_message_sent">मैसेज भेज दिया गया</string>
+    <string name="stories_sending_message">मैसेज भेजा जा रहा है…</string>
     <string name="stories_moment_sent">मोमेंट भेज दिया गया</string>
     <string name="stories_reactions">रिएक्शन</string>
 

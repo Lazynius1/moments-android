@@ -1135,7 +1135,9 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="stories_replies_disabled_placeholder">Respostas não são permitidas</string>
     <string name="stories_saved_image">Imagem salva</string>
     <string name="stories_saved_video">Vídeo salvo</string>
+    <string name="stories_saving_video">Salvando vídeo…</string>
     <string name="stories_message_sent">Mensagem enviada</string>
+    <string name="stories_sending_message">Enviando mensagem…</string>
     <string name="stories_moment_sent">Momento enviado</string>
     <string name="stories_reactions">Reações</string>
 
@@ -1687,6 +1689,7 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="hidden_layers_audio_recording">Gravando...</string>
     <string name="hidden_layers_audio_tap_to_record">Toque para gravar</string>
     <string name="story_editor_saved_to_gallery">Story salva na sua galeria</string>
+    <string name="story_editor_saving_to_gallery">Salvando na galeria…</string>
     <string name="story_editor_discard_title">Descartar conteúdo multimídia?</string>
     <string name="story_editor_discard_message">Se você sair agora, perderá todas as alterações que fez.</string>
     <string name="story_editor_discard_confirm">Descartar</string>

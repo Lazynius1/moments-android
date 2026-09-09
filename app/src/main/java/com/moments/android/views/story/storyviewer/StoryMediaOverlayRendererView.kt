@@ -63,6 +63,7 @@ fun StoryMediaOverlayRendererView(
     reportsDeckInteractionExclusion: Boolean = true,
     allowsStickerHitTesting: Boolean = true,
     renderingMode: StoryOverlayRenderingMode = StoryOverlayRenderingMode.LIVE,
+    textMaxLayoutWidthDp: Float? = null,
     onPauseStory: () -> Unit = {},
     onResumeStory: () -> Unit = {},
     onMomentTap: (momentId: String, authorId: String) -> Unit = { _, _ -> },
@@ -127,6 +128,7 @@ fun StoryMediaOverlayRendererView(
                 replayToken = replayToken,
                 containerSize = container,
                 animates = renderingMode == StoryOverlayRenderingMode.LIVE,
+                maxLayoutWidthDp = textMaxLayoutWidthDp,
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(overlay.layerOrder.toFloat()),

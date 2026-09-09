@@ -1,14 +1,12 @@
 package com.moments.android.views.messaging.groups
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -45,29 +44,110 @@ import com.moments.android.services.messaging.OnlineStatusService
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.utilities.MomentsFormat
+import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.extensions.MomentsGlassButtonTint
 import com.moments.android.views.components.ModernFollowButton
 import com.moments.android.views.components.ModernFollowButtonStyle
+import com.moments.android.views.components.MomentsCircularProgressIndicator
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.core.PresenceDisplay
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
+import com.moments.android.views.profile.editor.sections.ProfileLibraryCropEntryView
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.Date
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.text.DateFormat
 
 @Composable private fun g(key: String) = stringResource(groupStringId(key))
 
 private const val GroupNameMaxLength = 60
+private const val GroupDescriptionMaxLength = 280
 private fun String.limitedGroupName(): String {
     val count = codePointCount(0, length)
     if (count <= GroupNameMaxLength) return this
     return substring(0, offsetByCodePoints(0, GroupNameMaxLength))
+}
+private fun String.limitedGroupDescription(): String {
+    val count = codePointCount(0, length)
+    if (count <= GroupDescriptionMaxLength) return this
+    return substring(0, offsetByCodePoints(0, GroupDescriptionMaxLength))
+}
+
+@Composable
+internal fun GroupMentionCandidateList(
+    query: String,
+    members: List<GroupMember>,
+    onSelect: (GroupMember) -> Unit,
+) {
+    val colors = rememberAdaptiveColors()
+    val matches = members.filter {
+        query.isBlank() || it.name.contains(query, ignoreCase = true)
+    }.take(10)
+    val panelHeight = (minOf(maxOf(matches.size, 1), 3) * 67).dp
+    val panelShape = RoundedCornerShape(24.dp)
+
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 6.dp)
+            .momentsChromeGlass(panelShape, interactive = false)
+            .border(1.dp, colors.primary.copy(alpha = 0.08f), panelShape)
+            .padding(vertical = 8.dp),
+    ) {
+        when {
+            matches.isEmpty() -> {
+                Box(Modifier.fillMaxWidth().height(88.dp), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.common_no_results), color = Color.Gray, fontSize = 15.sp)
+                }
+            }
+            else -> {
+                LazyColumn(Modifier.height(panelHeight)) {
+                    items(matches, key = { it.id }) { member ->
+                        GroupMentionSearchRow(member = member, onClick = { onSelect(member) })
+                        if (member.id != matches.last().id) {
+                            HorizontalDivider(color = Color.Gray.copy(alpha = 0.25f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GroupMentionSearchRow(member: GroupMember, onClick: () -> Unit) {
+    val colors = rememberAdaptiveColors()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncProfileImageView(member.id, Modifier.size(42.dp).clip(CircleShape))
+        Spacer(Modifier.width(12.dp))
+        Text(
+            member.name,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 16.sp,
+            color = colors.primary,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            Icons.Filled.Add,
+            contentDescription = null,
+            tint = colors.primary,
+            modifier = Modifier
+                .size(28.dp)
+                .momentsChromeGlass(CircleShape, interactive = true)
+                .padding(4.dp),
+        )
+    }
 }
 
 @Composable private fun GroupHeader(title: String, onBack: () -> Unit, actions: @Composable RowScope.() -> Unit = {}) {
@@ -89,10 +169,12 @@ private fun String.limitedGroupName(): String {
     local: Bitmap? = null,
     size: androidx.compose.ui.unit.Dp = 52.dp,
     camera: Boolean = false,
+    uploading: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
+    val cameraTint = if (isSystemInDarkTheme()) Color.White else Color.Black
     Box(
-        Modifier.size(size).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        Modifier.size(size).then(if (onClick != null && !uploading) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.BottomEnd,
     ) {
         Box(
@@ -100,17 +182,40 @@ private fun String.limitedGroupName(): String {
             contentAlignment = Alignment.Center,
         ) {
             when {
-                local != null -> Image(bitmap = local.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                local != null -> Image(
+                    bitmap = local.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    alpha = if (uploading) 0.42f else 1f,
+                )
                 image.isNotBlank() -> AsyncImage(image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 else -> Icon(Icons.Default.Groups, null, Modifier.size(size / 2))
+            }
+            if (uploading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.28f))
+                            .padding(12.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        MomentsCircularProgressIndicator(Modifier.size(size * 0.28f))
+                    }
+                }
             }
         }
         if (camera) {
             Icon(
                 Icons.Default.PhotoCamera,
                 g("photo"),
-                Modifier.size(size * 0.34f).clip(CircleShape).background(MaterialTheme.colorScheme.primary).padding(5.dp),
-                tint = MaterialTheme.colorScheme.onPrimary,
+                Modifier
+                    .size(size * 0.38f)
+                    .clip(CircleShape)
+                    .momentsChromeGlass(CircleShape, interactive = true)
+                    .padding(size * 0.08f),
+                tint = cameraTint,
             )
         }
     }
@@ -285,10 +390,7 @@ private fun GroupMemberLine(
     var loading by remember { mutableStateOf(true) }
     var skipContinue by remember { mutableStateOf<GroupSaveResult?>(null) }
     var photo by remember { mutableStateOf<Bitmap?>(null) }
-    val context = LocalContext.current
-    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        photo = uri?.let { context.contentResolver.openInputStream(it)?.use(BitmapFactory::decodeStream) }
-    }
+    var showPhotoCrop by remember { mutableStateOf(false) }
     val candidates = store.candidates.filter { person -> group?.members?.none { it.id == person.id } != false && group?.pendingNames?.containsKey(person.id) != true && (search.isBlank() || person.name.contains(search, true)) }
     val valid = (group != null || name.isNotBlank()) &&
         selected.size >= (if (group == null) 2 else 1) && selected.size + ((group?.members?.size ?: 1) + (group?.pendingNames?.size ?: 0)) <= 50
@@ -299,6 +401,18 @@ private fun GroupMemberLine(
     }
     MomentsTabBarHidden()
     LaunchedEffect(search) { loading = true; kotlinx.coroutines.delay(250); store.loadCandidates(search); loading = false }
+    if (showPhotoCrop) {
+        BackHandler { showPhotoCrop = false }
+        ProfileLibraryCropEntryView(
+            onImageCropped = { bitmap ->
+                photo = bitmap
+                showPhotoCrop = false
+            },
+            onDismiss = { showPhotoCrop = false },
+            modifier = Modifier.fillMaxSize(),
+        )
+        return
+    }
     GroupHeader(headerTitle, onBack) {
         TextButton(enabled = valid && !store.busy, onClick = { scope.launch {
             val result = store.saveMembers(name, selected.sorted(), group) ?: return@launch
@@ -316,9 +430,7 @@ private fun GroupMemberLine(
         item { OutlinedTextField(search, { search = it }, Modifier.fillMaxWidth().padding(horizontal = 20.dp), label = { Text(g("search")) }, singleLine = true) }
         if (group == null) item {
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                GroupChatAvatar(local = photo, size = 64.dp, camera = true, onClick = {
-                    photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                })
+                GroupChatAvatar(local = photo, size = 64.dp, camera = true, onClick = { showPhotoCrop = true })
                 OutlinedTextField(name, { name = it.limitedGroupName() }, Modifier.weight(1f).padding(start = 14.dp), label = { Text(g("name")) }, singleLine = true)
             }
         }
@@ -362,8 +474,13 @@ private fun GroupMemberLine(
         followEpoch++
     }
     val members = group?.members.orEmpty()
-    val you = remember(members, followEpoch, store.uid) { members.filter { it.id == store.uid } }
-    val rest = remember(members, followEpoch, store.uid) { members.filter { it.id != store.uid } }
+    var memberSearch by remember { mutableStateOf("") }
+    val query = memberSearch.trim()
+    val visibleMembers = remember(members, query) {
+        if (query.isEmpty()) members else members.filter { it.name.contains(query, ignoreCase = true) }
+    }
+    val you = remember(visibleMembers, followEpoch, store.uid) { visibleMembers.filter { it.id == store.uid } }
+    val rest = remember(visibleMembers, followEpoch, store.uid) { visibleMembers.filter { it.id != store.uid } }
     val following = remember(rest, followEpoch) {
         rest.filter { FollowStateStore.state(it.id)?.isFollowingOrMutual == true }.sortedBy { it.name.lowercase() }
     }
@@ -385,9 +502,41 @@ private fun GroupMemberLine(
                 autoSize = TextAutoSize.StepBased(minFontSize = 16.sp, maxFontSize = 22.sp),
             )
             Text(stringResource(R.string.groups_member_count, group.members.size))
+            if (group.groupDescription.isNotBlank()) {
+                Text(
+                    group.groupDescription,
+                    color = rememberAdaptiveColors().secondary,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
         } }
+        item {
+            OutlinedTextField(
+                memberSearch,
+                { memberSearch = it },
+                Modifier.fillMaxWidth(),
+                label = { Text(g("searchMembers")) },
+                singleLine = true,
+            )
+        }
         if (admin) {
             item { TextButton(onClick = onAdd, enabled = group.members.size < 50 && !store.busy) { Icon(Icons.Default.PersonAdd, null); Spacer(Modifier.width(8.dp)); Text(g("add")) } }
+        }
+        if (admin && group.pendingJoinNames.isNotEmpty()) {
+            item { Text(g("joinRequests"), style = MaterialTheme.typography.titleMedium) }
+            items(group.pendingJoinNames.keys.sorted(), key = { "join-$it" }) { id ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    GroupPersonRow(
+                        GroupMember(id, group.pendingJoinNames[id].orEmpty(), ""),
+                        onProfileTap = { onOpenProfile(id) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(enabled = !store.busy, onClick = { scope.launch { store.command("declineJoin", group, memberId = id) } }) { Text(g("decline")) }
+                    TextButton(enabled = !store.busy, onClick = { scope.launch { store.command("approveJoin", group, memberId = id) } }) { Text(g("approveJoin")) }
+                }
+            }
         }
         if (admin && group.pendingNames.isNotEmpty()) {
             item { Text(g("pendingInvitations"), style = MaterialTheme.typography.titleMedium) }
@@ -420,6 +569,9 @@ private fun GroupMemberLine(
             items(others, key = { it.id }) { member ->
                 GroupMemberLine(member, group, store, admin, { removing = it }, onOpenProfile)
             }
+        }
+        if (you.isEmpty() && following.isEmpty() && others.isEmpty() && query.isNotEmpty()) {
+            item { Text(g("noMembersFound"), color = rememberAdaptiveColors().secondary, modifier = Modifier.padding(top = 8.dp)) }
         }
     }
     removing?.let { member ->
@@ -460,14 +612,46 @@ fun GroupEditView(groupId: String, onBack: () -> Unit) {
     MomentsTabBarHidden()
     val group = store.active
     var name by remember { mutableStateOf("") }
-    val context = LocalContext.current
-    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        val bitmap = uri?.let { context.contentResolver.openInputStream(it)?.use(BitmapFactory::decodeStream) } ?: return@rememberLauncherForActivityResult
-        scope.launch { store.active?.let { store.setPhoto(bitmap, it) } }
-    }
+    var description by remember { mutableStateOf("") }
+    var showPhotoCrop by remember { mutableStateOf(false) }
+    var pendingPhoto by remember { mutableStateOf<Bitmap?>(null) }
+    var isPhotoUploading by remember { mutableStateOf(false) }
+    val canSave = name.isNotBlank() && !store.busy && !isPhotoUploading
+    val saveTint = if (isSystemInDarkTheme()) MomentsGlassButtonTint.canvasLight else MomentsGlassButtonTint.canvasDark
+    val saveLabel = if (isSystemInDarkTheme()) MomentsGlassButtonTint.canvasDark else MomentsGlassButtonTint.canvasLight
     DisposableEffect(groupId) { store.open(groupId); onDispose { store.stop() } }
-    LaunchedEffect(group?.name) {
-        if (name.isBlank()) name = group?.name.orEmpty()
+    LaunchedEffect(group?.id) {
+        if (name.isBlank() && group != null) {
+            name = group.name
+            description = group.groupDescription
+        }
+    }
+    LaunchedEffect(group?.image) {
+        pendingPhoto = null
+    }
+    if (showPhotoCrop) {
+        BackHandler { showPhotoCrop = false }
+        ProfileLibraryCropEntryView(
+            onImageCropped = { bitmap ->
+                showPhotoCrop = false
+                pendingPhoto = bitmap
+                isPhotoUploading = true
+                scope.launch {
+                    val current = store.active
+                    if (current == null) {
+                        isPhotoUploading = false
+                        pendingPhoto = null
+                        return@launch
+                    }
+                    store.setPhoto(bitmap, current)
+                    isPhotoUploading = false
+                    if (store.error != null) pendingPhoto = null
+                }
+            },
+            onDismiss = { showPhotoCrop = false },
+            modifier = Modifier.fillMaxSize(),
+        )
+        return
     }
     BackHandler(onBack = onBack)
     Column(Modifier.fillMaxSize().background(rememberAdaptiveColors().surfaceBackground).statusBarsPadding().navigationBarsPadding().imePadding()) {
@@ -478,21 +662,49 @@ fun GroupEditView(groupId: String, onBack: () -> Unit) {
             Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 GroupChatAvatar(
                     image = group.image,
+                    local = pendingPhoto,
                     size = 96.dp,
                     camera = true,
-                    onClick = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    uploading = isPhotoUploading,
+                    onClick = { showPhotoCrop = true },
                 )
                 OutlinedTextField(name, { name = it.limitedGroupName() }, Modifier.fillMaxWidth(), label = { Text(g("name")) }, enabled = !store.busy, singleLine = true)
-                TextButton(
-                    onClick = {
-                        scope.launch {
-                            val trimmed = name.trim()
-                            if (trimmed.isNotBlank() && trimmed != group.name) store.command("rename", group, name = trimmed)
-                            onBack()
+                OutlinedTextField(
+                    description,
+                    { description = it.limitedGroupDescription() },
+                    Modifier.fillMaxWidth(),
+                    label = { Text(g("descriptionPlaceholder")) },
+                    enabled = !store.busy,
+                    minLines = 3,
+                    maxLines = 6,
+                )
+                Text(
+                    g("save"),
+                    color = saveLabel,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .alpha(if (canSave) 1f else 0.5f)
+                        .clip(RoundedCornerShape(50))
+                        .momentsChromeGlass(
+                            RoundedCornerShape(50),
+                            interactive = canSave,
+                            tint = saveTint.copy(alpha = if (canSave) 0.92f else 0.35f),
+                        )
+                        .clickable(enabled = canSave) {
+                            scope.launch {
+                                val trimmed = name.trim()
+                                val trimmedDescription = description.trim()
+                                if (trimmed.isBlank()) return@launch
+                                if (trimmed != group.name || trimmedDescription != group.groupDescription) {
+                                    if (!store.command("rename", group, name = trimmed,
+                                            extra = mapOf("description" to trimmedDescription))) return@launch
+                                }
+                                onBack()
+                            }
                         }
-                    },
-                    enabled = name.isNotBlank() && !store.busy,
-                ) { Text(g("save")) }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                )
             }
         }
     }
@@ -559,6 +771,17 @@ fun GroupInviteLinkManageView(groupId: String, onBack: () -> Unit) {
                     }
                 }
                 HorizontalDivider()
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(g("link.approval"), modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = group?.linkRequiresApproval == true,
+                        onCheckedChange = { value ->
+                            val current = store.active ?: return@Switch
+                            scope.launch { store.command("setLinkApproval", current, extra = mapOf("requiresApproval" to value)) }
+                        },
+                        enabled = !store.busy && group != null,
+                    )
+                }
                 TextButton(enabled = !store.busy, onClick = { confirmRenew = true }) { Text(g("renewLink")) }
                 TextButton(enabled = !store.busy, onClick = { confirmDisable = true }) { Text(g("disableLink"), color = MaterialTheme.colorScheme.error) }
             } ?: run {
@@ -704,6 +927,7 @@ internal fun GroupJoinLinkDialog(link: GroupInviteLink, onDismiss: () -> Unit, o
     val store = remember(link.groupId, link.token) { GroupChatStore(scope) }
     var name by remember(link.groupId, link.token) { mutableStateOf<String?>(null) }
     var image by remember(link.groupId, link.token) { mutableStateOf("") }
+    var requested by remember(link.groupId, link.token) { mutableStateOf(false) }
     val colors = rememberAdaptiveColors()
     MomentsModalSheet(onDismissRequest = onDismiss, largeOnly = false) { _ ->
         com.moments.android.views.messaging.components.ChatRecoveryGateView(onCancel = onDismiss) {
@@ -729,7 +953,7 @@ internal fun GroupJoinLinkDialog(link: GroupInviteLink, onDismiss: () -> Unit, o
                     )
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        g("joinBody"),
+                        if (requested) g("join.requested") else g("joinBody"),
                         color = colors.secondary,
                         fontSize = 15.sp,
                         textAlign = TextAlign.Center,
@@ -741,8 +965,16 @@ internal fun GroupJoinLinkDialog(link: GroupInviteLink, onDismiss: () -> Unit, o
                 }
                 Spacer(Modifier.height(28.dp))
                 Button(
-                    onClick = { scope.launch { if (store.joinLink(link)) onJoined() } },
-                    enabled = !store.busy && name != null,
+                    onClick = {
+                        scope.launch {
+                            when (store.joinLink(link)) {
+                                true -> onJoined()
+                                false -> requested = true
+                                null -> Unit
+                            }
+                        }
+                    },
+                    enabled = !store.busy && name != null && !requested,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.buttonColors(
@@ -752,7 +984,7 @@ internal fun GroupJoinLinkDialog(link: GroupInviteLink, onDismiss: () -> Unit, o
                         disabledContentColor = colors.surfaceBackground,
                     ),
                 ) {
-                    Text(g("joinLink"), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    Text(if (requested) g("join.requested") else g("joinLink"), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             LaunchedEffect(link.groupId, link.token) {

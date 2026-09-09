@@ -1,5 +1,6 @@
 package com.moments.android.views.story
 
+import com.moments.android.views.story.storyviewer.LocalStoryExportTime
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.hardware.Sensor
@@ -426,6 +427,7 @@ fun InteractiveFrameSticker(
         context.getSharedPreferences("moments_story_stickers", Context.MODE_PRIVATE)
     }
     val persistenceKey = remember(storyId) { "frame_revealed_$storyId" }
+    val isExporting = LocalStoryExportTime.current != null
     val bitmap = remember(imageContent) { decodeStickerBitmap(imageContent) }
     val sensorManager = remember(context) {
         context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -434,7 +436,8 @@ fun InteractiveFrameSticker(
     val scope = rememberCoroutineScope()
     val listenerRef = remember(storyId) { AtomicReference<SensorEventListener?>(null) }
     var revealProgress by remember(storyId, isEditing) {
-        mutableFloatStateOf(if (isEditing) 1f else 0f)
+        mutableFloatStateOf(if (isEditing || (isExporting &&
+            (storyId == "editor-download" || prefs.getBoolean(persistenceKey, false)))) 1f else 0f)
     }
     var lastAcceleration by remember(storyId) { mutableStateOf<FloatArray?>(null) }
     var resumeJob by remember(storyId) { mutableStateOf<Job?>(null) }
@@ -481,6 +484,7 @@ fun InteractiveFrameSticker(
     }
 
     LaunchedEffect(accelerometer, isEditing, storyId) {
+        if (isExporting) return@LaunchedEffect
         if (!isEditing && accelerometer == null && revealProgress < 1f) {
             delay(1_500)
             // ≡ withAnimation(.linear(duration: 3.3)) { revealProgress = 1.0 }
@@ -493,7 +497,7 @@ fun InteractiveFrameSticker(
     }
 
     DisposableEffect(accelerometer, isEditing, storyId) {
-        if (isEditing || accelerometer == null || revealProgress >= 1f) {
+        if (isExporting || isEditing || accelerometer == null || revealProgress >= 1f) {
             onDispose { resumeJob?.cancel() }
         } else {
             val listener = object : SensorEventListener {

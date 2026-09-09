@@ -371,6 +371,7 @@ data class EnhancedMessage(
     /** Hora real de lectura por usuario; ausente cuando los acuses están desactivados. */
     var readAtBy: Map<String, Date>? = null,
     var starredBy: List<String>? = null,
+    var mentionedUserIds: List<String>? = null,
     var isForwarded: Boolean? = null,
     var isVanishModeMessage: Boolean = false,
     var vanishedFor: List<String> = emptyList(),
@@ -830,6 +831,7 @@ data class Conversation(
     val pinnedBy: String? = null,
     val isMuted: Boolean? = false,
     val mutedByUserIds: List<String>? = null,
+    val mutedUntil: Map<String, Date>? = null,
     val mutedBy: String? = null,
     val archivedByUserIds: List<String>? = null,
     val encryptionVersion: String? = null,
@@ -856,9 +858,9 @@ data class Conversation(
 ) {
     val isGroup: Boolean get() = com.moments.android.services.messaging.GroupChatScope.isGroup(id)
     fun allowsForwarding(senderId: String): Boolean = forwardingPreferences?.get(senderId) ?: true
-    fun isMuted(userId: String?): Boolean = when {
+    fun isMuted(userId: String?, now: Date = Date()): Boolean = when {
         userId.isNullOrBlank() -> isMuted == true
-        userId in mutedByUserIds.orEmpty() -> true
+        userId in mutedByUserIds.orEmpty() -> mutedUntil?.get(userId)?.after(now) ?: true
         isMuted == true && mutedBy == userId -> true
         else -> false
     }

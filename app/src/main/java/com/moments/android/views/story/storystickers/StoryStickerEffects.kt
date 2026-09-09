@@ -2,6 +2,10 @@ package com.moments.android.views.story.storystickers
 
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import com.moments.android.views.story.storyviewer.LocalStoryExportVideoFrames
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -236,6 +240,14 @@ fun StickerVideoPlayer(
     onDurationMs: ((Long) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val exportFrames = LocalStoryExportVideoFrames.current
+    if (exportFrames != null) {
+        exportFrames[url]?.let { bitmap ->
+            Image(bitmap.asImageBitmap(), contentDescription = null,
+                modifier = modifier, contentScale = ContentScale.Crop)
+        }
+        return
+    }
     val durationCallback by rememberUpdatedState(onDurationMs)
     val player = remember(url) {
         ExoPlayer.Builder(context.applicationContext).build().apply {

@@ -30,6 +30,10 @@ internal data class GroupConversation(
     val allMemberNames: Map<String, String>,
     val image: String = "",
     val memberJoinedAt: Map<String, Date> = emptyMap(),
+    val groupDescription: String = "",
+    val sendPermission: String = "everyone",
+    val linkRequiresApproval: Boolean = false,
+    val pendingJoinNames: Map<String, String> = emptyMap(),
 ) {
     fun joinedDate(memberId: String): Date? =
         memberJoinedAt[memberId] ?: createdAt.takeIf { memberId == createdBy || memberId == owner }
@@ -53,6 +57,10 @@ internal data class GroupConversation(
                 details.mapValues { (_, value) -> value["username"] as? String ?: "" },
                 data["groupImagePath"] as? String ?: "",
                 timestampMap(data["memberJoinedAt"]),
+                data["groupDescription"] as? String ?: "",
+                if (data["sendPermission"] as? String == "admins") "admins" else "everyone",
+                data["linkRequiresApproval"] as? Boolean ?: false,
+                data["pendingJoinNames"] as? Map<String, String> ?: emptyMap(),
             )
         }
 
@@ -183,11 +191,11 @@ internal class GroupChatStore(private val scope: CoroutineScope) {
             request("manageGroup", mapOf("action" to "setPhoto", "conversationId" to group.id, "revision" to group.revision, "imagePath" to path))
         } catch (_: Exception) { error = "photoError" } finally { busy = false }
     }
-    suspend fun command(action: String, group: GroupConversation, memberId: String = "", name: String = "", muted: Boolean = false): Boolean {
+    suspend fun command(action: String, group: GroupConversation, memberId: String = "", name: String = "", muted: Boolean = false, extra: Map<String, Any> = emptyMap()): Boolean {
         if (busy) return false
         busy = true
         return try {
-            request("manageGroup", mapOf("action" to action, "conversationId" to group.id, "revision" to group.revision, "memberId" to memberId, "name" to name, "muted" to muted)); true
+            request("manageGroup", mapOf("action" to action, "conversationId" to group.id, "revision" to group.revision, "memberId" to memberId, "name" to name, "muted" to muted) + extra); true
         } catch (_: Exception) { error = "manageError"; false } finally { busy = false }
     }
     suspend fun invitationLink(group: GroupConversation, renew: Boolean = false): String? {
@@ -223,8 +231,8 @@ internal class GroupChatStore(private val scope: CoroutineScope) {
         if (name.isBlank()) null else name to result.optString("image")
     } catch (_: Exception) { error = "linkError"; null }
 
-    suspend fun joinLink(link: GroupInviteLink): Boolean {
-        if (busy) return false
+    suspend fun joinLink(link: GroupInviteLink): Boolean? {
+        if (busy) return null
         busy = true
         return try {
             val result = request("manageGroup", mapOf("action" to "previewLink", "conversationId" to link.groupId, "token" to link.token))
@@ -232,9 +240,9 @@ internal class GroupChatStore(private val scope: CoroutineScope) {
             val key = linkKey(link, result)
             val envelope = EncryptionService.buildWrappedConversationKeys(listOf(userId), key, userId)[userId]
                 ?.filterKeys { it != "wrappedAt" } ?: error("Missing key")
-            request("manageGroup", mapOf("action" to "joinLink", "conversationId" to link.groupId, "token" to link.token, "wrappedKey" to envelope))
-            true
-        } catch (_: Exception) { error = "linkError"; false } finally { busy = false }
+            val joined = request("manageGroup", mapOf("action" to "joinLink", "conversationId" to link.groupId, "token" to link.token, "wrappedKey" to envelope))
+            if (joined.optBoolean("pending")) false else true
+        } catch (_: Exception) { error = "linkError"; null } finally { busy = false }
     }
     private suspend fun request(endpoint: String, body: Map<String, Any>): JSONObject {
         val user = auth.currentUser ?: error("Unauthenticated")

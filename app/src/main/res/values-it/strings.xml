@@ -1135,7 +1135,9 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="stories_replies_disabled_placeholder">Le risposte non sono consentite</string>
     <string name="stories_saved_image">Immagine salvata</string>
     <string name="stories_saved_video">Video salvato</string>
+    <string name="stories_saving_video">Salvataggio del video…</string>
     <string name="stories_message_sent">Messaggio inviato</string>
+    <string name="stories_sending_message">Invio del messaggio…</string>
     <string name="stories_moment_sent">Momento inviato</string>
     <string name="stories_reactions">Reazioni</string>
 
@@ -1687,6 +1689,7 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="hidden_layers_audio_recording">Registrazione...</string>
     <string name="hidden_layers_audio_tap_to_record">Tocca per registrare</string>
     <string name="story_editor_saved_to_gallery">Storia salvata nella tua galleria</string>
+    <string name="story_editor_saving_to_gallery">Salvataggio in galleria…</string>
     <string name="story_editor_discard_title">Vuoi scartare il contenuto multimediale?</string>
     <string name="story_editor_discard_message">Se esci ora, perderai tutte le modifiche che hai fatto.</string>
     <string name="story_editor_discard_confirm">Scarta</string>

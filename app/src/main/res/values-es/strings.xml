@@ -841,6 +841,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="creator_story_camera_permission">Necesitamos la cámara para grabar una historia</string>
     <string name="creator_story_text_mode">Aa</string>
     <string name="story_editor_saved_to_gallery">Historia guardada en tu galería</string>
+    <string name="story_editor_saving_to_gallery">Guardando en la galería…</string>
     <string name="story_editor_discard_title">¿Descartar contenido multimedia?</string>
     <string name="story_editor_discard_message">Si sales ahora, perderás los cambios que hayas realizado.</string>
     <string name="story_editor_discard_confirm">Descartar</string>
@@ -1733,7 +1734,9 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="stories_replies_disabled_placeholder">No se permiten respuestas</string>
     <string name="stories_saved_image">Imagen guardada</string>
     <string name="stories_saved_video">Vídeo guardado</string>
+    <string name="stories_saving_video">Guardando vídeo…</string>
     <string name="stories_message_sent">Mensaje enviado</string>
+    <string name="stories_sending_message">Enviando mensaje…</string>
     <string name="stories_moment_sent">Momento enviado</string>
     <string name="stories_reactions">Reacciones</string>
 

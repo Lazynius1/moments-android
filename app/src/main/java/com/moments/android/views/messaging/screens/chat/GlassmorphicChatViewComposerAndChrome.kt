@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -361,7 +362,7 @@ fun rememberChatComposerAndChromeController(
 }
 
 @Composable
-fun ChatComposerChrome(
+internal fun ChatComposerChrome(
     controller: ChatComposerAndChromeController,
     messageText: String,
     onMessageTextChange: (String) -> Unit,
@@ -393,6 +394,10 @@ fun ChatComposerChrome(
     onReplyAfterAcceptance: (String, String) -> Unit = { _, _ -> },
     /** ≡ iOS `isTextFieldFocused = false` tras enviar request. */
     onPendingRequestSent: () -> Unit = {},
+    isGroup: Boolean = false,
+    groupSendLocked: Boolean = false,
+    groupMentionMembers: List<com.moments.android.views.messaging.groups.GroupMember> = emptyList(),
+    currentUserId: String = "",
     viewModel: EnhancedChatViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -439,12 +444,25 @@ fun ChatComposerChrome(
     when {
         isOtherParticipantBlockedByCurrentUser -> BlockedByMeChatInputBar(onUnblock, safeModifier)
         isOtherParticipantUnavailable -> UnavailableChatInputBar(safeModifier)
+        groupSendLocked -> GroupSendLockedInputBar(safeModifier)
         context?.status == PendingChatContext.Status.OUTGOING_REQUEST_SENT && !controller.pendingChatCanType -> Box(safeModifier) {}
         context?.status == PendingChatContext.Status.OUTGOING_REQUEST_BLOCKED -> RequestsClosedInputBar(
             displayName = context.otherUsername.ifBlank { otherParticipantDisplayName },
             modifier = safeModifier,
         )
         else -> Column(safeModifier) {
+            if (isGroup) {
+                val token = com.moments.android.services.messaging.GroupChatScope.detectMentionToken(messageText)
+                if (token != null) {
+                    com.moments.android.views.messaging.groups.GroupMentionCandidateList(
+                        query = token.query,
+                        members = groupMentionMembers.filter { it.id != currentUserId },
+                        onSelect = { member ->
+                            onMessageTextChange(messageText.replaceRange(token.fullRange, "@${member.name} "))
+                        },
+                    )
+                }
+            }
             GlassmorphicInputBar(
                 text = messageText,
                 onTextChange = onMessageTextChange,
@@ -575,6 +593,13 @@ private fun ChatRequestSecondaryButton(textRes: Int, onClick: () -> Unit, modifi
 fun UnavailableChatInputBar(modifier: Modifier = Modifier) = ChatComposerInfoPill(
     icon = { Icon(Icons.Default.Info, null, modifier = Modifier.size(15.dp)) },
     text = stringResource(R.string.chat_input_unavailable),
+    modifier = modifier,
+)
+
+@Composable
+fun GroupSendLockedInputBar(modifier: Modifier = Modifier) = ChatComposerInfoPill(
+    icon = { Icon(Icons.Default.Lock, null, modifier = Modifier.size(15.dp)) },
+    text = stringResource(R.string.groups_send_locked),
     modifier = modifier,
 )
 
