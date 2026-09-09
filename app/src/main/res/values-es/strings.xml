@@ -722,7 +722,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="online_status_busy">Ocupado</string>
     <string name="online_status_offline">Desconectado</string>
     <string name="online_status_invisible">Invisible</string>
-    <string name="creator_caption_placeholder">Escribe una descripción...</string>
+    <string name="creator_caption_placeholder">Escribe un pie de foto...</string>
     <string name="creator_media_preview_hint">Mantén para ver</string>
     <string name="creator_tag_people">Etiquetar personas</string>
     <string name="creator_add_location">Añadir ubicación</string>

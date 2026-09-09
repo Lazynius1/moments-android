@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,6 +26,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -42,8 +44,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,6 +59,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -66,7 +67,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -295,6 +298,7 @@ fun CaptionAndDetailsView(
                         .padding(horizontal = 16.dp)
                         .padding(top = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(30.dp),
+                    verticalAlignment = Alignment.Top,
                 ) {
                     Box(
                         Modifier
@@ -326,28 +330,35 @@ fun CaptionAndDetailsView(
                             )
                         }
                     }
-                    TextField(
-                        value = captionText,
-                        onValueChange = { captionText = it },
-                        placeholder = {
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .heightIn(min = 120.dp)
+                            .padding(top = 4.dp),
+                    ) {
+                        if (captionText.isEmpty()) {
                             Text(
                                 stringResource(R.string.creator_caption_placeholder),
                                 color = secondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(top = 8.dp),
                             )
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(120.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedTextColor = primary,
-                            unfocusedTextColor = primary,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            cursorColor = primary,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                        ),
-                    )
+                        }
+                        BasicTextField(
+                            value = captionText,
+                            onValueChange = { captionText = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 120.dp)
+                                .padding(top = 8.dp),
+                            textStyle = TextStyle(
+                                color = primary,
+                                fontSize = 16.sp,
+                            ),
+                            cursorBrush = SolidColor(primary),
+                        )
+                    }
                 }
 
                 Column(Modifier.padding(top = 10.dp)) {

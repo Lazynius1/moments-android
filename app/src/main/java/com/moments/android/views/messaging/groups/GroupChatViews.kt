@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -867,130 +868,104 @@ private fun skippedNames(skipped: List<GroupSkippedInvite>, candidates: List<Gro
 }
 
 @Composable
-fun GroupInvitationRows(onAccepted: (com.moments.android.views.messaging.core.Conversation) -> Unit) {
-    val scope = rememberCoroutineScope()
-    val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-    var invitations by remember { mutableStateOf<List<com.google.firebase.firestore.DocumentSnapshot>>(emptyList()) }
-    var busy by remember { mutableStateOf(false) }
-    var failed by remember { mutableStateOf(false) }
-    DisposableEffect(uid) {
-        invitations = emptyList()
-        val listener = if (uid.isBlank()) null else com.google.firebase.firestore.FirebaseFirestore.getInstance()
-            .collection("groupInvitations").whereEqualTo("recipientId", uid).addSnapshotListener { snapshot, error ->
-                if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == uid) {
-                    if (error != null) failed = true else invitations = snapshot?.documents.orEmpty()
-                }
-            }
-        onDispose { listener?.remove() }
+internal fun GroupRequestsEntry(store: GroupRequestsStore, onOpen: () -> Unit) {
+    val colors = rememberAdaptiveColors()
+    Row(Modifier.padding(horizontal = 20.dp, vertical = 8.dp).fillMaxWidth()
+        .clip(RoundedCornerShape(14.dp)).background(colors.primary.copy(alpha = .05f))
+        .clickable(onClick = onOpen).padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Icon(Icons.Default.Groups, null)
+        Text(g("requestsTitle"), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        if (store.count > 0) Text(store.count.toString(),
+            Modifier.background(colors.primary, CircleShape).padding(horizontal = 8.dp, vertical = 4.dp),
+            color = colors.surfaceBackground, style = MaterialTheme.typography.labelMedium)
+        Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp), tint = colors.secondary)
     }
-    if (invitations.isNotEmpty()) Column(Modifier.fillMaxWidth().padding(16.dp)) {
-        Text(g("invitations"), style = MaterialTheme.typography.titleMedium)
-        invitations.forEach { invitation ->
-            val id = invitation.getString("groupId").orEmpty()
-            Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    GroupChatAvatar(image = invitation.getString("groupImagePath").orEmpty(), size = 56.dp)
-                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                        Text(invitation.getString("groupName").orEmpty(), fontWeight = FontWeight.SemiBold, maxLines = 1)
-                        Text(
-                            stringResource(R.string.groups_invited_you, invitation.getString("inviterName").orEmpty()),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = rememberAdaptiveColors().secondary,
-                            maxLines = 2,
-                        )
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf(false, true).forEach { accept ->
-                    TextButton(enabled = !busy, onClick = { scope.launch {
-                        busy = true
-                        try {
-                            com.moments.android.services.messaging.GroupChatAPI.request("manageGroup", mapOf("action" to if (accept) "acceptInvite" else "declineInvite", "conversationId" to id))
-                            if (accept) {
-                                val doc = com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("groupConversations").document(id).get().await()
-                                com.moments.android.views.messaging.services.ChatService.parseConversation(doc.id, doc.data.orEmpty(), uid)?.let(onAccepted)
-                            }
-                        } catch (_: Exception) { failed = true } finally { busy = false }
-                    } }) { Text(g(if (accept) "accept" else "decline")) }
-                }
-                }
-            }
-        }
-    }
-    if (failed) AlertDialog(onDismissRequest = { failed = false }, title = { Text(g("errorTitle")) }, text = { Text(g("manageError")) },
-        confirmButton = { TextButton(onClick = { failed = false }) { Text(g("ok")) } })
 }
 
 @Composable
-internal fun GroupJoinLinkDialog(link: GroupInviteLink, onDismiss: () -> Unit, onJoined: () -> Unit) {
+internal fun GroupRequestsView(store: GroupRequestsStore, onBack: () -> Unit, initialSentTab: Boolean = false,
+    onAccepted: (com.moments.android.views.messaging.core.Conversation) -> Unit) {
+    var sentTab by remember(initialSentTab) { mutableStateOf(initialSentTab) }
     val scope = rememberCoroutineScope()
-    val store = remember(link.groupId, link.token) { GroupChatStore(scope) }
-    var name by remember(link.groupId, link.token) { mutableStateOf<String?>(null) }
-    var image by remember(link.groupId, link.token) { mutableStateOf("") }
-    var requested by remember(link.groupId, link.token) { mutableStateOf(false) }
     val colors = rememberAdaptiveColors()
-    MomentsModalSheet(onDismissRequest = onDismiss, largeOnly = false) { _ ->
-        com.moments.android.views.messaging.components.ChatRecoveryGateView(onCancel = onDismiss) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Spacer(Modifier.height(20.dp))
-                GroupChatAvatar(image = image, size = 104.dp)
-                Spacer(Modifier.height(14.dp))
-                val groupName = name
-                if (groupName != null) {
-                    Text(
-                        groupName,
-                        color = colors.primary,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        if (requested) g("join.requested") else g("joinBody"),
-                        color = colors.secondary,
-                        fontSize = 15.sp,
-                        textAlign = TextAlign.Center,
-                    )
-                } else if (store.error == null) {
-                    CircularProgressIndicator(Modifier.padding(top = 12.dp), color = colors.primary)
-                } else {
-                    Text(g("linkError"), color = colors.secondary, fontSize = 15.sp, textAlign = TextAlign.Center)
-                }
-                Spacer(Modifier.height(28.dp))
-                Button(
-                    onClick = {
-                        scope.launch {
-                            when (store.joinLink(link)) {
-                                true -> onJoined()
-                                false -> requested = true
-                                null -> Unit
-                            }
-                        }
-                    },
-                    enabled = !store.busy && name != null && !requested,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.primary,
-                        contentColor = colors.surfaceBackground,
-                        disabledContainerColor = colors.primary.copy(alpha = 0.35f),
-                        disabledContentColor = colors.surfaceBackground,
-                    ),
-                ) {
-                    Text(if (requested) g("join.requested") else g("joinLink"), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+    val rows = if (sentTab) store.sent else store.received
+    val loading = if (sentTab) store.sentLoading else store.receivedLoading
+    val failed = if (sentTab) store.sentFailed else store.receivedFailed
+    BackHandler(onBack = onBack)
+    Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+        Row(Modifier.padding(horizontal = 20.dp, vertical = 12.dp).fillMaxWidth()
+            .background(colors.primary.copy(alpha = .06f), RoundedCornerShape(12.dp)).padding(4.dp)) {
+            listOf(false, true).forEach { sent ->
+                val selected = sentTab == sent
+                val label = g(if (sent) "requestsSent" else "requestsReceived")
+                val count = if (sent) store.sent.size else store.received.size
+                Box(Modifier.weight(1f).clip(RoundedCornerShape(9.dp))
+                    .background(if (selected) colors.surfaceBackground else androidx.compose.ui.graphics.Color.Transparent)
+                    .selectable(selected = selected, role = androidx.compose.ui.semantics.Role.Tab, onClick = { sentTab = sent })
+                    .padding(horizontal = 6.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
+                    Text("$label  $count", fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        style = MaterialTheme.typography.bodyMedium, color = if (selected) colors.primary else colors.secondary)
                 }
             }
-            LaunchedEffect(link.groupId, link.token) {
-                store.previewLink(link)?.let { name = it.first; image = it.second }
+        }
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp)) {
+            if (failed) item {
+                Column(Modifier.fillMaxWidth().padding(vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(g("requestsError"), color = colors.secondary)
+                    TextButton(onClick = store::retry) { Text(g("requestsRetry")) }
+                }
+            } else if (loading && rows.isEmpty()) item {
+                Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else if (rows.isEmpty()) item {
+                Text(g(if (sentTab) "requestsSentEmpty" else "requestsReceivedEmpty"),
+                    Modifier.fillMaxWidth().padding(vertical = 32.dp), textAlign = TextAlign.Center, color = colors.secondary)
+            }
+            items(rows, key = { it.id }) { row ->
+                GroupRequestRow(row, sentTab, store.busy,
+                    onAccept = { scope.launch { store.respond(row, true)?.let(onAccepted) } },
+                    onReject = { scope.launch { store.respond(row, false) } },
+                    onCancel = { scope.launch { store.cancel(row) } })
+                HorizontalDivider(Modifier.padding(start = 68.dp), color = colors.primary.copy(alpha = .1f))
+            }
+            item {
+                Text(g(if (sentTab) "requestsSentFooter" else "requestsReceivedFooter"),
+                    Modifier.fillMaxWidth().padding(top = 40.dp, bottom = 24.dp),
+                    style = MaterialTheme.typography.bodySmall, color = colors.secondary, textAlign = TextAlign.Center)
             }
         }
     }
-    GroupError(store)
+    if (store.actionFailed) AlertDialog(onDismissRequest = { store.actionFailed = false },
+        title = { Text(g("errorTitle")) }, text = { Text(g("manageError")) },
+        confirmButton = { TextButton(onClick = { store.actionFailed = false }) { Text(g("ok")) } })
+}
+
+@Composable
+private fun GroupRequestRow(row: GroupPendingRequest, sent: Boolean, busy: Boolean,
+    onAccept: () -> Unit, onReject: () -> Unit, onCancel: () -> Unit) {
+    val colors = rememberAdaptiveColors()
+    Row(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        GroupChatAvatar(image = row.image, size = 56.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(row.name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge, maxLines = 2)
+            Text(if (sent) g("requestsPending") else stringResource(R.string.groups_invited_you, row.inviter),
+                style = MaterialTheme.typography.bodyMedium, color = colors.secondary)
+            row.createdAt?.let { date ->
+                Text(android.text.format.DateUtils.getRelativeTimeSpanString(date.time, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString(),
+                    style = MaterialTheme.typography.bodySmall, color = colors.secondary.copy(alpha = .8f))
+            }
+            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (sent) {
+                    OutlinedButton(onClick = onCancel, enabled = !busy, shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.primary)) { Text(g("requestsCancel")) }
+                } else {
+                    OutlinedButton(onClick = onReject, enabled = !busy, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.primary)) { Text(g("decline")) }
+                    Button(onClick = onAccept, enabled = !busy, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = colors.surfaceBackground)) { Text(g("accept")) }
+                }
+            }
+        }
+    }
 }

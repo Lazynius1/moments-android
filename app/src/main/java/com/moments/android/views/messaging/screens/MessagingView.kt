@@ -38,8 +38,10 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.People
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,6 +63,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -83,6 +86,7 @@ import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
+import com.moments.android.extensions.ProfileChromeControlsCluster
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
 import com.moments.android.models.OnlineStatus
@@ -158,6 +162,8 @@ fun MessagingView(
     var isSearching by remember { mutableStateOf(false) }
     var isSearchFocused by remember { mutableStateOf(false) }
     var showingNewConversation by remember { mutableStateOf(false) }
+    var showingGroupRequests by remember { mutableStateOf(false) }
+    var groupRequestsStartSent by remember { mutableStateOf(false) }
     val groupLink by com.moments.android.views.messaging.groups.GroupLinkNavigation.pending.collectAsState()
     if (uid != null) groupLink?.let { link ->
         com.moments.android.views.messaging.groups.GroupJoinLinkDialog(link,
@@ -165,6 +171,11 @@ fun MessagingView(
             onJoined = {
                 com.moments.android.views.messaging.groups.GroupLinkNavigation.pending.value = null
                 GroupNavigation.pendingId.value = link.groupId
+            },
+            onViewRequests = {
+                com.moments.android.views.messaging.groups.GroupLinkNavigation.pending.value = null
+                groupRequestsStartSent = true
+                showingGroupRequests = true
             })
     }
     val groupTarget by GroupNavigation.pendingId.collectAsState()
@@ -176,6 +187,8 @@ fun MessagingView(
         }
         GroupNavigation.pendingId.value = null
     }
+    val groupRequests = remember { com.moments.android.views.messaging.groups.GroupRequestsStore(scope) }
+    DisposableEffect(groupRequests) { groupRequests.start(); onDispose { groupRequests.stop() } }
     var showingRequests by remember { mutableStateOf(false) }
     var showingArchived by remember { mutableStateOf(false) }
     var showingStatusSelector by remember { mutableStateOf(false) }
@@ -203,7 +216,7 @@ fun MessagingView(
     val suppressTabBar =
         (viewModel.selectedConversation != null && !adaptiveWindow.supportsTwoPanes) ||
             pendingChatContext != null ||
-            inboxStory != null
+            inboxStory != null || showingGroupRequests
     LaunchedEffect(suppressTabBar) {
         onSuppressTabBarChange(suppressTabBar)
     }
@@ -339,6 +352,25 @@ fun MessagingView(
             )
             return
         }
+        showingGroupRequests -> {
+            BackHandler { showingGroupRequests = false }
+            Column(Modifier.fillMaxSize().background(colors.surfaceBackground).statusBarsPadding()) {
+                MessagingDestinationHeader(
+                    title = stringResource(R.string.groups_requests_title),
+                    onBack = { showingGroupRequests = false },
+                )
+                com.moments.android.views.messaging.groups.GroupRequestsView(
+                    groupRequests,
+                    initialSentTab = groupRequestsStartSent,
+                    onBack = { showingGroupRequests = false },
+                    onAccepted = { conversation ->
+                        showingGroupRequests = false
+                        viewModel.openConversation(conversation)
+                    },
+                )
+            }
+            return
+        }
         showingRequests -> {
             BackHandler { showingRequests = false }
             Column(Modifier.fillMaxSize().background(colors.surfaceBackground).statusBarsPadding()) {
@@ -418,12 +450,13 @@ fun MessagingView(
                 onDismiss = onDismiss,
                 embeddedInTab = embeddedInTab,
                 onCompose = { showingNewConversation = true },
+                onGroupRequests = { groupRequestsStartSent = false; showingGroupRequests = true },
                 onRequests = { showingRequests = true },
                 onStatus = { showingStatusSelector = true },
+                groupRequestCount = groupRequests.received.size + groupRequests.sent.size,
                 pendingRequestCount = pendingRequestCount,
                 currentStatus = currentStatus,
             )
-            com.moments.android.views.messaging.groups.GroupInvitationRows(onAccepted = viewModel::openConversation)
             val showSearch =
                 viewModel.conversations.isNotEmpty() ||
                     viewModel.archivedConversations.isNotEmpty() ||
@@ -652,8 +685,10 @@ private fun MessagingToolbar(
     onDismiss: () -> Unit,
     embeddedInTab: Boolean = false,
     onCompose: () -> Unit,
+    onGroupRequests: () -> Unit,
     onRequests: () -> Unit,
     onStatus: () -> Unit,
+    groupRequestCount: Int,
     pendingRequestCount: Int,
     currentStatus: OnlineStatus,
 ) {
@@ -666,17 +701,24 @@ private fun MessagingToolbar(
             .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // ≡ iOS: tab → compose leading; overlay → chevron dismiss.
-        if (embeddedInTab) {
-            IconButton(onClick = onCompose) {
-                Icon(Icons.Filled.Create, stringResource(R.string.messaging_new_conversation), tint = colors.primary)
-            }
-        } else {
-            IconButton(onClick = onDismiss) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = colors.primary)
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            if (!embeddedInTab) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = colors.primary)
+                }
+            } else {
+                ProfileChromeControlsCluster {
+                    MessagingToolbarRequestButton(
+                        icon = Icons.Filled.Create,
+                        count = 0,
+                        onClick = onCompose,
+                        accessibilityLabel = stringResource(R.string.messaging_new_conversation),
+                        foregroundColor = colors.primary,
+                    )
+                }
             }
         }
-        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 stringResource(R.string.messaging_title),
                 fontWeight = FontWeight.SemiBold,
@@ -704,27 +746,59 @@ private fun MessagingToolbar(
                 Icon(Icons.Filled.KeyboardArrowDown, null, tint = colors.secondary, modifier = Modifier.size(10.dp))
             }
         }
-        if (!embeddedInTab) {
-            IconButton(onClick = onCompose) {
-                Icon(Icons.Filled.Create, stringResource(R.string.messaging_new_conversation), tint = colors.primary)
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+            ProfileChromeControlsCluster {
+                if (!embeddedInTab) {
+                    MessagingToolbarRequestButton(
+                        icon = Icons.Filled.Create,
+                        count = 0,
+                        onClick = onCompose,
+                        accessibilityLabel = stringResource(R.string.messaging_new_conversation),
+                        foregroundColor = colors.primary,
+                    )
+                }
+                MessagingToolbarRequestButton(
+                    icon = Icons.Outlined.People,
+                    count = groupRequestCount,
+                    onClick = onGroupRequests,
+                    accessibilityLabel = stringResource(R.string.groups_requests_title),
+                    foregroundColor = colors.primary,
+                )
+                MessagingToolbarRequestButton(
+                    icon = Icons.Outlined.ChatBubbleOutline,
+                    count = pendingRequestCount,
+                    onClick = onRequests,
+                    accessibilityLabel = stringResource(R.string.message_requests_title),
+                    foregroundColor = colors.primary,
+                )
             }
         }
-        Box {
-            IconButton(onClick = onRequests) {
-                Icon(Icons.Outlined.Forum, stringResource(R.string.message_requests_title), tint = colors.primary)
-            }
-            if (pendingRequestCount > 0) {
-                Box(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = (-4).dp, y = 4.dp)
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFFF3B30)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("$pendingRequestCount", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
+    }
+}
+
+@Composable
+private fun MessagingToolbarRequestButton(
+    icon: ImageVector,
+    count: Int,
+    onClick: () -> Unit,
+    accessibilityLabel: String,
+    foregroundColor: Color,
+) {
+    Box {
+        IconButton(onClick = onClick) {
+            Icon(icon, accessibilityLabel, tint = foregroundColor)
+        }
+        if (count > 0) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 4.dp, y = (-4).dp)
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFF3B30)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("$count", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

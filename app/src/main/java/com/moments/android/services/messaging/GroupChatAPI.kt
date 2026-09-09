@@ -12,6 +12,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Date
 
+class GroupChatAPIException(val serverCode: String) : Exception(serverCode)
+
 object GroupChatAPI {
     suspend fun request(endpoint: String, body: Map<String, Any?>): JSONObject {
         val user = FirebaseAuth.getInstance().currentUser ?: error("Unauthenticated")
@@ -24,8 +26,15 @@ object GroupChatAPI {
                 connection.setRequestProperty("Authorization", "Bearer $token"); connection.setRequestProperty("Content-Type", "application/json")
                 @Suppress("UNCHECKED_CAST") val json = JSONObject(jsonValue(body) as Map<String, Any?>)
                 connection.outputStream.use { it.write(json.toString().toByteArray(Charsets.UTF_8)) }
-                check(connection.responseCode == 200 && FirebaseAuth.getInstance().currentUser?.uid == user.uid)
-                JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                check(FirebaseAuth.getInstance().currentUser?.uid == user.uid)
+                val status = connection.responseCode
+                val payload = (if (status == 200) connection.inputStream else connection.errorStream)
+                    ?.bufferedReader()?.use { it.readText() }.orEmpty()
+                if (status != 200) {
+                    val code = runCatching { JSONObject(payload).optString("error", "failed") }.getOrDefault("failed")
+                    throw GroupChatAPIException(code)
+                }
+                JSONObject(payload)
             } finally { connection.disconnect() }
         }
     }

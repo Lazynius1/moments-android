@@ -11,6 +11,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.moments.android.services.messaging.CryptoHelpers
 import com.moments.android.services.messaging.EncryptionService
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -224,11 +225,11 @@ internal class GroupChatStore(private val scope: CoroutineScope) {
         CryptoHelpers.aesGcmOpen(android.util.Base64.decode(result.getString("encryptedKey"), android.util.Base64.NO_WRAP),
             link.secret, link.groupId.toByteArray(Charsets.UTF_8)).also { require(it.size == 32) }
 
-    suspend fun previewLink(link: GroupInviteLink): Pair<String, String>? = try {
+    suspend fun previewLink(link: GroupInviteLink): Triple<String, String, Boolean>? = try {
         val result = request("manageGroup", mapOf("action" to "previewLink", "conversationId" to link.groupId, "token" to link.token))
         linkKey(link, result)
         val name = result.optString("name")
-        if (name.isBlank()) null else name to result.optString("image")
+        if (name.isBlank()) null else Triple(name, result.optString("image"), result.optBoolean("requiresApproval"))
     } catch (_: Exception) { error = "linkError"; null }
 
     suspend fun joinLink(link: GroupInviteLink): Boolean? {
@@ -305,3 +306,107 @@ internal data class GroupInviteLink(val groupId: String, val token: String, val 
     }
 }
 internal object GroupLinkNavigation { val pending = MutableStateFlow<GroupInviteLink?>(null) }
+
+internal data class GroupPendingRequest(
+    val id: String, val groupId: String, val name: String, val image: String,
+    val inviter: String = "", val createdAt: Date? = null,
+)
+
+internal class GroupRequestsStore(private val scope: CoroutineScope) {
+    var received by mutableStateOf<List<GroupPendingRequest>>(emptyList()); private set
+    var sent by mutableStateOf<List<GroupPendingRequest>>(emptyList()); private set
+    var receivedLoading by mutableStateOf(true); private set
+    var sentLoading by mutableStateOf(true); private set
+    var receivedFailed by mutableStateOf(false); private set
+    var sentFailed by mutableStateOf(false); private set
+    var busy by mutableStateOf(false); private set
+    var actionFailed by mutableStateOf(false)
+    val count get() = received.size + sent.size
+    private val auth = FirebaseAuth.getInstance()
+    private var sessionId: String? = null
+    private var generation = 0
+    private var sentGeneration = 0
+    private var receivedListener: ListenerRegistration? = null
+    private var sentListener: ListenerRegistration? = null
+    private var authListener: FirebaseAuth.AuthStateListener? = null
+    fun start() {
+        if (authListener != null) return
+        listen(auth.currentUser?.uid)
+        authListener = FirebaseAuth.AuthStateListener {
+            if (sessionId != it.currentUser?.uid) listen(it.currentUser?.uid)
+        }.also(auth::addAuthStateListener)
+    }
+    fun stop() {
+        generation++; sentGeneration++
+        receivedListener?.remove(); sentListener?.remove()
+        authListener?.let(auth::removeAuthStateListener); authListener = null
+        sessionId = null; received = emptyList(); sent = emptyList()
+    }
+    fun retry() = listen(auth.currentUser?.uid)
+    private fun listen(uid: String?) {
+        receivedListener?.remove(); sentListener?.remove()
+        generation++; sentGeneration++
+        val version = generation
+        if (sessionId != uid) { received = emptyList(); sent = emptyList(); busy = false; actionFailed = false }
+        sessionId = uid
+        receivedLoading = true; sentLoading = true; receivedFailed = false; sentFailed = false
+        if (uid == null) { receivedLoading = false; sentLoading = false; return }
+        val db = FirebaseFirestore.getInstance()
+        receivedListener = db.collection("groupInvitations").whereEqualTo("recipientId", uid).addSnapshotListener { snapshot, failure ->
+            if (generation != version || sessionId != uid) return@addSnapshotListener
+            receivedLoading = false; receivedFailed = failure != null
+            if (snapshot != null && failure == null) received = snapshot.documents.map { doc ->
+                GroupPendingRequest(doc.id, doc.getString("groupId").orEmpty(), doc.getString("groupName").orEmpty(),
+                    doc.getString("groupImagePath").orEmpty(), doc.getString("inviterName").orEmpty(), doc.getTimestamp("createdAt")?.toDate())
+            }.sortedByDescending { it.createdAt?.time ?: 0 }
+        }
+        sentListener = db.collection("groupJoinRequests").whereEqualTo("recipientId", uid).addSnapshotListener { snapshot, failure ->
+            if (generation != version || sessionId != uid) return@addSnapshotListener
+            sentGeneration++
+            val requestVersion = sentGeneration
+            if (failure != null) { sentLoading = false; sentFailed = true; return@addSnapshotListener }
+            if (snapshot?.isEmpty == true) { sent = emptyList(); sentLoading = false; sentFailed = false; return@addSnapshotListener }
+            scope.launch {
+                try {
+                    val result = com.moments.android.services.messaging.GroupChatAPI.request("manageGroup", mapOf("action" to "listJoinRequests"))
+                    if (generation != version || sentGeneration != requestVersion || sessionId != uid) return@launch
+                    val rows = result.optJSONArray("requests")
+                    sent = (0 until (rows?.length() ?: 0)).mapNotNull { index ->
+                        val row = rows?.optJSONObject(index) ?: return@mapNotNull null
+                        val millis = row.optLong("createdAt")
+                        GroupPendingRequest(row.getString("id"), row.getString("groupId"), row.optString("name"), row.optString("image"),
+                            createdAt = millis.takeIf { it > 0 }?.let(::Date))
+                    }
+                    sentLoading = false; sentFailed = false
+                } catch (_: Exception) {
+                    if (generation == version && sentGeneration == requestVersion) { sentLoading = false; sentFailed = true }
+                }
+            }
+        }
+    }
+    suspend fun respond(row: GroupPendingRequest, accept: Boolean): com.moments.android.views.messaging.core.Conversation? {
+        val uid = sessionId ?: return null
+        if (busy || auth.currentUser?.uid != uid) return null
+        busy = true
+        return try {
+            com.moments.android.services.messaging.GroupChatAPI.request("manageGroup", mapOf("action" to if (accept) "acceptInvite" else "declineInvite", "conversationId" to row.groupId))
+            if (sessionId != uid) return null
+            received = received.filterNot { it.id == row.id }
+            if (!accept) null else {
+                val doc = FirebaseFirestore.getInstance().collection("groupConversations").document(row.groupId).get().await()
+                if (sessionId != uid) null else com.moments.android.views.messaging.services.ChatService.parseConversation(doc.id, doc.data.orEmpty(), uid)
+            }
+        } catch (_: Exception) { if (sessionId == uid) actionFailed = true; null }
+        finally { if (sessionId == uid) busy = false }
+    }
+    suspend fun cancel(row: GroupPendingRequest) {
+        val uid = sessionId ?: return
+        if (busy || auth.currentUser?.uid != uid) return
+        busy = true
+        try {
+            com.moments.android.services.messaging.GroupChatAPI.request("manageGroup", mapOf("action" to "cancelJoin", "conversationId" to row.groupId))
+            if (sessionId == uid) sent = sent.filterNot { it.id == row.id }
+        } catch (_: Exception) { if (sessionId == uid) actionFailed = true }
+        finally { if (sessionId == uid) busy = false }
+    }
+}

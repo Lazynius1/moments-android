@@ -839,7 +839,7 @@
     <string name="creator_crop_reset">초기화</string>
     <string name="creator_crop_rotate">회전</string>
     <string name="creator_share">공유</string>
-    <string name="creator_caption_placeholder">캡션을 입력하세요...</string>
+    <string name="creator_caption_placeholder">캡션을 작성하세요...</string>
     <string name="creator_media_preview_hint">길게 눌러 미리 보기</string>
     <string name="creator_tag_people">사람 태그하기</string>
     <string name="creator_add_location">위치 추가</string>

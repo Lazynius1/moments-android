@@ -99,10 +99,50 @@ internal fun groupStringId(key: String): Int = when (key) {
     "mute.week" -> R.string.groups_mute_week
     "mute.always" -> R.string.groups_mute_always
     "link.approval" -> R.string.groups_link_approval
+    "join.approvalBody" -> R.string.groups_join_approval_body
+    "join.requestLink" -> R.string.groups_join_request_link
     "join.requested" -> R.string.groups_join_requested
     "joinRequests" -> R.string.groups_join_requests
     "approveJoin" -> R.string.groups_approve_join
     "report" -> R.string.groups_report
     "report.subtitle" -> R.string.groups_report_subtitle
+    "requestsTitle" -> R.string.groups_requests_title
+    "requestsReceived" -> R.string.groups_requests_received
+    "requestsSent" -> R.string.groups_requests_sent
+    "requestsPending" -> R.string.groups_requests_pending
+    "requestsCancel" -> R.string.groups_requests_cancel
+    "requestsReceivedFooter" -> R.string.groups_requests_received_footer
+    "requestsSentFooter" -> R.string.groups_requests_sent_footer
+    "requestsReceivedEmpty" -> R.string.groups_requests_received_empty
+    "requestsSentEmpty" -> R.string.groups_requests_sent_empty
+    "requestsError" -> R.string.groups_requests_error
+    "requestsRetry" -> R.string.groups_requests_retry
+    "sheet.loadingTitle" -> R.string.groups_sheet_loading_title
+    "sheet.loadingBody" -> R.string.groups_sheet_loading_body
+    "sheet.directBody" -> R.string.groups_sheet_direct_body
+    "sheet.approvalBody" -> R.string.groups_sheet_approval_body
+    "sheet.requestAction" -> R.string.groups_sheet_request_action
+    "sheet.approvalFooter" -> R.string.groups_sheet_approval_footer
+    "sheet.sendingBody" -> R.string.groups_sheet_sending_body
+    "sheet.sendingAction" -> R.string.groups_sheet_sending_action
+    "sheet.joiningBody" -> R.string.groups_sheet_joining_body
+    "sheet.joiningAction" -> R.string.groups_sheet_joining_action
+    "sheet.sentTitle" -> R.string.groups_sheet_sent_title
+    "sheet.sentBody" -> R.string.groups_sheet_sent_body
+    "sheet.done" -> R.string.groups_sheet_done
+    "sheet.viewRequests" -> R.string.groups_sheet_view_requests
+    "sheet.pendingTitle" -> R.string.groups_sheet_pending_title
+    "sheet.pendingBody" -> R.string.groups_sheet_pending_body
+    "sheet.errorSendTitle" -> R.string.groups_sheet_error_send_title
+    "sheet.errorLoadTitle" -> R.string.groups_sheet_error_load_title
+    "sheet.errorJoinTitle" -> R.string.groups_sheet_error_join_title
+    "sheet.errorCancelTitle" -> R.string.groups_sheet_error_cancel_title
+    "sheet.errorBody" -> R.string.groups_sheet_error_body
+    "sheet.unavailableTitle" -> R.string.groups_sheet_unavailable_title
+    "sheet.unavailableBody" -> R.string.groups_sheet_unavailable_body
+    "sheet.fullTitle" -> R.string.groups_sheet_full_title
+    "sheet.fullBody" -> R.string.groups_sheet_full_body
+    "sheet.close" -> R.string.groups_sheet_close
+    "sheet.cancelling" -> R.string.groups_sheet_cancelling
     else -> R.string.groups_error
 }

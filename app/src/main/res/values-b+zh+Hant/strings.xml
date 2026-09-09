@@ -839,7 +839,7 @@
     <string name="creator_crop_reset">重設</string>
     <string name="creator_crop_rotate">旋轉</string>
     <string name="creator_share">分享</string>
-    <string name="creator_caption_placeholder">寫下說明文字⋯</string>
+    <string name="creator_caption_placeholder">撰寫說明文字…</string>
     <string name="creator_media_preview_hint">長按預覽</string>
     <string name="creator_tag_people">標註朋友</string>
     <string name="creator_add_location">新增地點</string>
