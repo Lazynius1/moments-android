@@ -1245,7 +1245,6 @@
     <string name="messaging_compose_title">Pesan baru</string>
     <string name="messaging_compose_placeholder">Tulis pesan…</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">Stiker</string>
     <string name="sticker_search_placeholder">Cari</string>
@@ -1467,10 +1466,9 @@
     <string name="conversation_settings_vanish">Pesan yang menghilang</string>
     <string name="conversation_settings_preferences">Preferensi chat</string>
     <string name="conversation_settings_privacy_and_security">Privasi dan keamanan</string>
+    <string name="conversation_settings_shared_media">Media yang dibagikan</string>
     <string name="conversation_settings_hide">Sembunyikan</string>
     <string name="conversation_settings_preferences_desc">Notifikasi, pratinjau, dan privasi</string>
-    <string name="conversation_settings_storage">Penyimpanan media</string>
-    <string name="conversation_settings_storage_desc">Foto dan video yang disimpan sementara di perangkat ini</string>
     <string name="conversation_settings_clear_media">Hapus media tersimpan sementara</string>
     <string name="conversation_settings_media_reload">Media akan diunduh lagi saat diperlukan.</string>
     <string name="conversation_settings_media">Media</string>
@@ -2279,8 +2277,6 @@
     <string name="notification_type_comment">Komentar</string>
     <string name="notification_type_story_reaction">Reaksi story</string>
     <string name="settings_section_data">DATA &amp; PENYIMPANAN</string>
-    <string name="settings_chat_storage">Penyimpanan chat</string>
-    <string name="settings_chat_storage_desc">Kelola foto dan video yang tersimpan di cache</string>
     <string name="settings_data_export">Unduh informasi Anda</string>
     <string name="settings_data_export_desc">Salinan data Moments Anda</string>
     <string name="settings_section_support">BANTUAN &amp; HUKUM</string>
@@ -2340,8 +2336,6 @@
     <string name="settings_sections_best_friends_subtitle">Kelola daftar Teman Dekat</string>
     <string name="settings_sections_download_data">Unduh Data Anda</string>
     <string name="settings_sections_download_data_subtitle">Minta salinan data Anda</string>
-    <string name="settings_sections_chat_storage">Penyimpanan Chat</string>
-    <string name="settings_sections_chat_storage_subtitle">Cache media dan preferensi unduhan</string>
     <string name="settings_sections_push_notifications">Notifikasi Push</string>
     <string name="settings_sections_push_notifications_subtitle">Postingan, cerita, komentar</string>
     <string name="settings_sections_email_notifications">Notifikasi Email</string>
@@ -2818,30 +2812,6 @@
     <string name="saved_moments_restricted_subtitle">Kamu tidak lagi memiliki akses</string>
     <string name="saved_moments_restricted_muted_title">Akun dibisukan</string>
     <string name="saved_moments_restricted_muted_subtitle">Kamu membisukan akun ini</string>
-
-    <string name="settings_chat_storage_title">Penyimpanan Chat</string>
-    <string name="settings_chat_storage_preferences_title">Preferensi</string>
-    <string name="settings_chat_storage_auto_download_title">Unduh media otomatis</string>
-    <string name="settings_chat_storage_auto_download_wifi">Wi‑Fi saja</string>
-    <string name="settings_chat_storage_auto_download_always">Selalu</string>
-    <string name="settings_chat_storage_auto_download_never">Jangan pernah</string>
-    <string name="settings_chat_storage_retention_title">Simpan media selama</string>
-    <string name="settings_chat_storage_retention_7days">7 hari</string>
-    <string name="settings_chat_storage_retention_30days">30 hari</string>
-    <string name="settings_chat_storage_retention_90days">90 hari</string>
-    <string name="settings_chat_storage_retention_forever">Selamanya</string>
-    <string name="settings_chat_storage_clear_media_action">Kosongkan media chat</string>
-    <string name="settings_chat_storage_clear_media_subtitle">Menghapus foto dan video, tetapi tetap menyimpan teks pesan di perangkat ini.</string>
-    <string name="settings_chat_storage_clear_media_confirm">Kosongkan media chat? Teks pesan akan tetap tersimpan di perangkat ini.</string>
-    <string name="settings_chat_storage_clear_media_done">Media chat dihapus. Media akan diunduh lagi saat Anda membuka percakapan.</string>
-    <string name="settings_chat_storage_clear_all_action">Hapus cache chat</string>
-    <string name="settings_chat_storage_clear_all_subtitle">Menghapus semua pesan dan media yang tersimpan di cache dari perangkat ini.</string>
-    <string name="settings_chat_storage_clear_all_confirm">Hapus semua data chat yang tersimpan di cache dari perangkat ini?</string>
-    <string name="settings_chat_storage_clear_all_done">Cache chat dihapus.</string>
-    <string name="settings_chat_storage_manage_title">Kelola penyimpanan</string>
-    <string name="settings_chat_storage_manage_subtitle">Percakapan yang paling banyak menggunakan ruang di perangkat ini.</string>
-    <string name="settings_chat_storage_summary_limit">dari %1$s · media akan dihapus otomatis saat penuh</string>
-    <string name="settings_chat_storage_manage_show_more">Lihat selengkapnya</string>
 
     <string name="content_visibility_title">Privasi konten</string>
     <string name="content_visibility_loading">Memuat konfigurasi...</string>

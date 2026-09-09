@@ -1245,7 +1245,6 @@
     <string name="messaging_compose_title">新しいメッセージ</string>
     <string name="messaging_compose_placeholder">メッセージ…</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">スタンプ</string>
     <string name="sticker_search_placeholder">検索</string>
@@ -1467,10 +1466,9 @@
     <string name="conversation_settings_vanish">消えるメッセージ</string>
     <string name="conversation_settings_preferences">チャットの設定</string>
     <string name="conversation_settings_privacy_and_security">プライバシーとセキュリティ</string>
+    <string name="conversation_settings_shared_media">共有メディア</string>
     <string name="conversation_settings_hide">非表示</string>
     <string name="conversation_settings_preferences_desc">通知、プレビュー、プライバシー</string>
-    <string name="conversation_settings_storage">メディアの保存</string>
-    <string name="conversation_settings_storage_desc">このデバイスにキャッシュされた写真と動画</string>
     <string name="conversation_settings_clear_media">キャッシュを削除</string>
     <string name="conversation_settings_media_reload">必要なときにメディアが再度ダウンロードされます。</string>
     <string name="conversation_settings_media">メディア</string>
@@ -2279,8 +2277,6 @@
     <string name="notification_type_comment">コメント</string>
     <string name="notification_type_story_reaction">ストーリーへのリアクション</string>
     <string name="settings_section_data">データとストレージ</string>
-    <string name="settings_chat_storage">チャットのストレージ</string>
-    <string name="settings_chat_storage_desc">キャッシュされた写真や動画を管理します</string>
     <string name="settings_data_export">あなたの情報をダウンロード</string>
     <string name="settings_data_export_desc">Momentsのデータのコピー</string>
     <string name="settings_section_support">サポートと法的情報</string>
@@ -2340,8 +2336,6 @@
     <string name="settings_sections_best_friends_subtitle">親しい友達リストを管理</string>
     <string name="settings_sections_download_data">データをダウンロード</string>
     <string name="settings_sections_download_data_subtitle">データのコピーをリクエスト</string>
-    <string name="settings_sections_chat_storage">チャットストレージ</string>
-    <string name="settings_sections_chat_storage_subtitle">メディアのキャッシュとダウンロード設定</string>
     <string name="settings_sections_push_notifications">プッシュ通知</string>
     <string name="settings_sections_push_notifications_subtitle">投稿、ストーリーズ、コメント</string>
     <string name="settings_sections_email_notifications">メール通知</string>
@@ -2818,30 +2812,6 @@
     <string name="saved_moments_restricted_subtitle">アクセスできなくなりました</string>
     <string name="saved_moments_restricted_muted_title">ミュート中のアカウント</string>
     <string name="saved_moments_restricted_muted_subtitle">このアカウントをミュートしています</string>
-
-    <string name="settings_chat_storage_title">チャットのストレージ</string>
-    <string name="settings_chat_storage_preferences_title">設定</string>
-    <string name="settings_chat_storage_auto_download_title">メディアの自動ダウンロード</string>
-    <string name="settings_chat_storage_auto_download_wifi">Wi‑Fiのみ</string>
-    <string name="settings_chat_storage_auto_download_always">常に</string>
-    <string name="settings_chat_storage_auto_download_never">しない</string>
-    <string name="settings_chat_storage_retention_title">メディアの保存期間</string>
-    <string name="settings_chat_storage_retention_7days">7日間</string>
-    <string name="settings_chat_storage_retention_30days">30日間</string>
-    <string name="settings_chat_storage_retention_90days">90日間</string>
-    <string name="settings_chat_storage_retention_forever">無期限</string>
-    <string name="settings_chat_storage_clear_media_action">チャットのメディアを削除</string>
-    <string name="settings_chat_storage_clear_media_subtitle">写真と動画を削除します。メッセージ本文はこの端末に残ります。</string>
-    <string name="settings_chat_storage_clear_media_confirm">チャットのメディアを削除しますか？メッセージ本文はこの端末に残ります。</string>
-    <string name="settings_chat_storage_clear_media_done">チャットのメディアを削除しました。会話を開くと再びダウンロードされます。</string>
-    <string name="settings_chat_storage_clear_all_action">チャットキャッシュを削除</string>
-    <string name="settings_chat_storage_clear_all_subtitle">この端末にキャッシュされたメッセージとメディアをすべて削除します。</string>
-    <string name="settings_chat_storage_clear_all_confirm">この端末のチャットキャッシュをすべて削除しますか？</string>
-    <string name="settings_chat_storage_clear_all_done">チャットキャッシュを削除しました。</string>
-    <string name="settings_chat_storage_manage_title">ストレージを管理</string>
-    <string name="settings_chat_storage_manage_subtitle">この端末のストレージを多く使用している会話。</string>
-    <string name="settings_chat_storage_summary_limit">%1$s中 · 上限に達するとメディアを自動的に削除</string>
-    <string name="settings_chat_storage_manage_show_more">もっと見る</string>
 
     <string name="content_visibility_title">コンテンツの公開範囲</string>
     <string name="content_visibility_loading">設定を読み込んでいます…</string>

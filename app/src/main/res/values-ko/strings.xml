@@ -1245,7 +1245,6 @@
     <string name="messaging_compose_title">새 메시지</string>
     <string name="messaging_compose_placeholder">메시지 입력…</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">스티커</string>
     <string name="sticker_search_placeholder">검색</string>
@@ -1467,10 +1466,9 @@
     <string name="conversation_settings_vanish">사라지는 메시지</string>
     <string name="conversation_settings_preferences">채팅 환경설정</string>
     <string name="conversation_settings_privacy_and_security">개인정보 보호 및 보안</string>
+    <string name="conversation_settings_shared_media">공유 미디어</string>
     <string name="conversation_settings_hide">숨기기</string>
     <string name="conversation_settings_preferences_desc">알림, 미리보기 및 개인정보 보호</string>
-    <string name="conversation_settings_storage">미디어 저장 공간</string>
-    <string name="conversation_settings_storage_desc">이 기기에 캐시된 사진 및 동영상</string>
     <string name="conversation_settings_clear_media">캐시된 미디어 삭제</string>
     <string name="conversation_settings_media_reload">필요할 때 미디어가 다시 다운로드돼요.</string>
     <string name="conversation_settings_media">미디어</string>
@@ -2279,8 +2277,6 @@
     <string name="notification_type_comment">댓글</string>
     <string name="notification_type_story_reaction">스토리 반응</string>
     <string name="settings_section_data">데이터 및 저장 공간</string>
-    <string name="settings_chat_storage">채팅 저장 공간</string>
-    <string name="settings_chat_storage_desc">캐시된 사진 및 동영상 관리</string>
     <string name="settings_data_export">내 정보 다운로드</string>
     <string name="settings_data_export_desc">Moments 데이터 사본</string>
     <string name="settings_section_support">지원 및 법률</string>
@@ -2340,8 +2336,6 @@
     <string name="settings_sections_best_friends_subtitle">친한 친구 목록 관리</string>
     <string name="settings_sections_download_data">내 데이터 다운로드</string>
     <string name="settings_sections_download_data_subtitle">데이터 사본 요청</string>
-    <string name="settings_sections_chat_storage">채팅 저장 공간</string>
-    <string name="settings_sections_chat_storage_subtitle">미디어 캐시 및 다운로드 설정</string>
     <string name="settings_sections_push_notifications">푸시 알림</string>
     <string name="settings_sections_push_notifications_subtitle">게시물, 스토리, 댓글</string>
     <string name="settings_sections_email_notifications">이메일 알림</string>
@@ -2818,30 +2812,6 @@
     <string name="saved_moments_restricted_subtitle">더 이상 이용할 수 없어요</string>
     <string name="saved_moments_restricted_muted_title">뮤트한 계정</string>
     <string name="saved_moments_restricted_muted_subtitle">이 계정을 뮤트했어요</string>
-
-    <string name="settings_chat_storage_title">채팅 저장 공간</string>
-    <string name="settings_chat_storage_preferences_title">환경설정</string>
-    <string name="settings_chat_storage_auto_download_title">미디어 자동 다운로드</string>
-    <string name="settings_chat_storage_auto_download_wifi">Wi‑Fi에서만</string>
-    <string name="settings_chat_storage_auto_download_always">항상</string>
-    <string name="settings_chat_storage_auto_download_never">안 함</string>
-    <string name="settings_chat_storage_retention_title">미디어 보관 기간</string>
-    <string name="settings_chat_storage_retention_7days">7일</string>
-    <string name="settings_chat_storage_retention_30days">30일</string>
-    <string name="settings_chat_storage_retention_90days">90일</string>
-    <string name="settings_chat_storage_retention_forever">항상 보관</string>
-    <string name="settings_chat_storage_clear_media_action">채팅 미디어 정리</string>
-    <string name="settings_chat_storage_clear_media_subtitle">사진과 동영상을 삭제하지만 메시지 텍스트는 이 기기에 보관해요.</string>
-    <string name="settings_chat_storage_clear_media_confirm">채팅 미디어를 정리할까요? 메시지 텍스트는 이 기기에 남아 있어요.</string>
-    <string name="settings_chat_storage_clear_media_done">채팅 미디어를 삭제했어요. 대화를 다시 열면 다시 다운로드돼요.</string>
-    <string name="settings_chat_storage_clear_all_action">채팅 캐시 삭제</string>
-    <string name="settings_chat_storage_clear_all_subtitle">이 기기에 캐시된 메시지와 미디어를 모두 삭제해요.</string>
-    <string name="settings_chat_storage_clear_all_confirm">이 기기의 캐시된 채팅 데이터를 모두 삭제할까요?</string>
-    <string name="settings_chat_storage_clear_all_done">채팅 캐시를 삭제했어요.</string>
-    <string name="settings_chat_storage_manage_title">저장 공간 관리</string>
-    <string name="settings_chat_storage_manage_subtitle">이 기기에서 가장 많은 공간을 사용하는 대화예요.</string>
-    <string name="settings_chat_storage_summary_limit">%1$s 중 · 저장 공간이 가득 차면 미디어가 자동으로 삭제돼요</string>
-    <string name="settings_chat_storage_manage_show_more">더 보기</string>
 
     <string name="content_visibility_title">콘텐츠 공개 범위</string>
     <string name="content_visibility_loading">설정을 불러오는 중...</string>

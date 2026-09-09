@@ -691,7 +691,6 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="edit_moment_tags_unavailable">Impossibile aprire l\'editor dei tag.</string>
     <string name="edit_moment_tags_pending">Selettore tag non ancora disponibile</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">Sticker</string>
     <string name="sticker_search_placeholder">Cerca</string>
@@ -1076,7 +1075,6 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="conversation_settings_privacy_and_security">Privacy e sicurezza</string>
     <string name="conversation_settings_hide">Nascondi</string>
     <string name="conversation_settings_preferences_desc">Notifiche, anteprime e privacy</string>
-    <string name="conversation_settings_storage_desc">Foto e video nella cache di questo dispositivo</string>
     <string name="conversation_settings_clear_media">Svuota cache media</string>
     <string name="conversation_settings_links">Link</string>
     <string name="conversation_settings_media_empty">Nessun media condiviso</string>
@@ -2162,8 +2160,6 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="settings_appeals">Ricorsi &amp; stato revisione</string>
     <string name="settings_best_friends_desc">Gestisci la tua lista esclusiva</string>
     <string name="settings_blocked_users">Account bloccati</string>
-    <string name="settings_chat_storage">Archiviazione chat</string>
-    <string name="settings_chat_storage_desc">Gestisci foto e video memorizzati nella cache</string>
     <string name="settings_connections_pending">Visibilità connessioni</string>
     <string name="settings_connections_pending_body">Porting di ConnectionVisibilityView (SettingsSections) in sospeso.</string>
     <string name="settings_data_export">Scarica le tue informazioni</string>

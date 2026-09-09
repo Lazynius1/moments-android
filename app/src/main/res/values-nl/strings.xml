@@ -1245,7 +1245,6 @@
     <string name="messaging_compose_title">Nieuw bericht</string>
     <string name="messaging_compose_placeholder">Bericht…</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">Stickers</string>
     <string name="sticker_search_placeholder">Zoeken</string>
@@ -1467,10 +1466,9 @@
     <string name="conversation_settings_vanish">Verdwijnende berichten</string>
     <string name="conversation_settings_preferences">Chatvoorkeuren</string>
     <string name="conversation_settings_privacy_and_security">Privacy en beveiliging</string>
+    <string name="conversation_settings_shared_media">Gedeelde media</string>
     <string name="conversation_settings_hide">Verbergen</string>
     <string name="conversation_settings_preferences_desc">Meldingen, voorvertoningen en privacy</string>
-    <string name="conversation_settings_storage">Mediaopslag</string>
-    <string name="conversation_settings_storage_desc">Gecachte foto\'s en video\'s op dit apparaat</string>
     <string name="conversation_settings_clear_media">Gecachte media wissen</string>
     <string name="conversation_settings_media_reload">Media wordt opnieuw gedownload wanneer dat nodig is.</string>
     <string name="conversation_settings_media">Media</string>
@@ -2279,8 +2277,6 @@
     <string name="notification_type_comment">Reactie</string>
     <string name="notification_type_story_reaction">Reactie op je story</string>
     <string name="settings_section_data">GEGEVENS &amp; OPSLAG</string>
-    <string name="settings_chat_storage">Chatopslag</string>
-    <string name="settings_chat_storage_desc">Beheer opgeslagen foto\'s en video\'s</string>
     <string name="settings_data_export">Je gegevens downloaden</string>
     <string name="settings_data_export_desc">Een kopie van je Moments-gegevens</string>
     <string name="settings_section_support">ONDERSTEUNING &amp; JURIDISCH</string>
@@ -2340,8 +2336,6 @@
     <string name="settings_sections_best_friends_subtitle">Lijst met beste vrienden beheren</string>
     <string name="settings_sections_download_data">Je gegevens downloaden</string>
     <string name="settings_sections_download_data_subtitle">Een kopie van je gegevens aanvragen</string>
-    <string name="settings_sections_chat_storage">Chatopslag</string>
-    <string name="settings_sections_chat_storage_subtitle">Mediacache en downloadvoorkeuren</string>
     <string name="settings_sections_push_notifications">Pushmeldingen</string>
     <string name="settings_sections_push_notifications_subtitle">Berichten, verhalen, reacties</string>
     <string name="settings_sections_email_notifications">E-mailmeldingen</string>
@@ -2818,30 +2812,6 @@
     <string name="saved_moments_restricted_subtitle">Je hebt geen toegang meer</string>
     <string name="saved_moments_restricted_muted_title">Gedempt account</string>
     <string name="saved_moments_restricted_muted_subtitle">Je hebt dit account gedempt</string>
-
-    <string name="settings_chat_storage_title">Chatopslag</string>
-    <string name="settings_chat_storage_preferences_title">Voorkeuren</string>
-    <string name="settings_chat_storage_auto_download_title">Media automatisch downloaden</string>
-    <string name="settings_chat_storage_auto_download_wifi">Alleen via wifi</string>
-    <string name="settings_chat_storage_auto_download_always">Altijd</string>
-    <string name="settings_chat_storage_auto_download_never">Nooit</string>
-    <string name="settings_chat_storage_retention_title">Media bewaren voor</string>
-    <string name="settings_chat_storage_retention_7days">7 dagen</string>
-    <string name="settings_chat_storage_retention_30days">30 dagen</string>
-    <string name="settings_chat_storage_retention_90days">90 dagen</string>
-    <string name="settings_chat_storage_retention_forever">Altijd</string>
-    <string name="settings_chat_storage_clear_media_action">Chatmedia vrijmaken</string>
-    <string name="settings_chat_storage_clear_media_subtitle">Verwijdert foto\'s en video\'s, maar bewaart de tekst van berichten lokaal.</string>
-    <string name="settings_chat_storage_clear_media_confirm">Chatmedia vrijmaken? De tekst van berichten blijft op dit apparaat staan.</string>
-    <string name="settings_chat_storage_clear_media_done">Chatmedia verwijderd. Deze wordt opnieuw gedownload wanneer je gesprekken opent.</string>
-    <string name="settings_chat_storage_clear_all_action">Chatcache wissen</string>
-    <string name="settings_chat_storage_clear_all_subtitle">Verwijdert alle gecachte berichten en media van dit apparaat.</string>
-    <string name="settings_chat_storage_clear_all_confirm">Alle gecachte chatgegevens op dit apparaat wissen?</string>
-    <string name="settings_chat_storage_clear_all_done">Chatcache gewist.</string>
-    <string name="settings_chat_storage_manage_title">Opslag beheren</string>
-    <string name="settings_chat_storage_manage_subtitle">Gesprekken die de meeste ruimte innemen op dit apparaat.</string>
-    <string name="settings_chat_storage_summary_limit">van %1$s · media wordt automatisch verwijderd wanneer de limiet is bereikt</string>
-    <string name="settings_chat_storage_manage_show_more">Meer weergeven</string>
 
     <string name="content_visibility_title">Privacy van content</string>
     <string name="content_visibility_loading">Configuratie wordt geladen...</string>

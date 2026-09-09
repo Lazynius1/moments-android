@@ -1245,7 +1245,6 @@
     <string name="messaging_compose_title">新訊息</string>
     <string name="messaging_compose_placeholder">傳送訊息…</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">貼圖</string>
     <string name="sticker_search_placeholder">搜尋</string>
@@ -1467,10 +1466,9 @@
     <string name="conversation_settings_vanish">限時訊息</string>
     <string name="conversation_settings_preferences">聊天偏好設定</string>
     <string name="conversation_settings_privacy_and_security">隱私權與安全性</string>
+    <string name="conversation_settings_shared_media">分享的媒體</string>
     <string name="conversation_settings_hide">隱藏</string>
     <string name="conversation_settings_preferences_desc">通知、預覽和隱私</string>
-    <string name="conversation_settings_storage">媒體儲存空間</string>
-    <string name="conversation_settings_storage_desc">這部裝置上的照片和影片快取</string>
     <string name="conversation_settings_clear_media">清除快取媒體</string>
     <string name="conversation_settings_media_reload">需要時會重新下載媒體。</string>
     <string name="conversation_settings_media">媒體</string>
@@ -2279,8 +2277,6 @@
     <string name="notification_type_comment">留言</string>
     <string name="notification_type_story_reaction">限時動態互動</string>
     <string name="settings_section_data">資料與儲存空間</string>
-    <string name="settings_chat_storage">聊天儲存空間</string>
-    <string name="settings_chat_storage_desc">管理快取的相片與影片</string>
     <string name="settings_data_export">下載你的資料</string>
     <string name="settings_data_export_desc">你的 Moments 資料副本</string>
     <string name="settings_section_support">支援與法律</string>
@@ -2340,8 +2336,6 @@
     <string name="settings_sections_best_friends_subtitle">管理摯友名單</string>
     <string name="settings_sections_download_data">下載你的資料</string>
     <string name="settings_sections_download_data_subtitle">申請一份你的資料副本</string>
-    <string name="settings_sections_chat_storage">聊天儲存空間</string>
-    <string name="settings_sections_chat_storage_subtitle">管理媒體快取和下載偏好設定</string>
     <string name="settings_sections_push_notifications">推播通知</string>
     <string name="settings_sections_push_notifications_subtitle">貼文、限時動態、留言</string>
     <string name="settings_sections_email_notifications">電子郵件通知</string>
@@ -2818,30 +2812,6 @@
     <string name="saved_moments_restricted_subtitle">你已無法存取</string>
     <string name="saved_moments_restricted_muted_title">已靜音的帳號</string>
     <string name="saved_moments_restricted_muted_subtitle">你已將此帳號靜音</string>
-
-    <string name="settings_chat_storage_title">聊天儲存空間</string>
-    <string name="settings_chat_storage_preferences_title">偏好設定</string>
-    <string name="settings_chat_storage_auto_download_title">自動下載媒體</string>
-    <string name="settings_chat_storage_auto_download_wifi">僅限 Wi‑Fi</string>
-    <string name="settings_chat_storage_auto_download_always">一律</string>
-    <string name="settings_chat_storage_auto_download_never">永不</string>
-    <string name="settings_chat_storage_retention_title">媒體保留時間</string>
-    <string name="settings_chat_storage_retention_7days">7 天</string>
-    <string name="settings_chat_storage_retention_30days">30 天</string>
-    <string name="settings_chat_storage_retention_90days">90 天</string>
-    <string name="settings_chat_storage_retention_forever">永遠保留</string>
-    <string name="settings_chat_storage_clear_media_action">釋放聊天媒體空間</string>
-    <string name="settings_chat_storage_clear_media_subtitle">移除照片和影片，但訊息文字仍會保留在本機。</string>
-    <string name="settings_chat_storage_clear_media_confirm">要釋放聊天媒體空間嗎？訊息文字會保留在這部裝置上。</string>
-    <string name="settings_chat_storage_clear_media_done">已移除聊天媒體。開啟對話時會再次下載。</string>
-    <string name="settings_chat_storage_clear_all_action">清除聊天快取</string>
-    <string name="settings_chat_storage_clear_all_subtitle">移除這部裝置上的所有聊天訊息和媒體快取。</string>
-    <string name="settings_chat_storage_clear_all_confirm">要清除這部裝置上的所有聊天快取資料嗎？</string>
-    <string name="settings_chat_storage_clear_all_done">已清除聊天快取。</string>
-    <string name="settings_chat_storage_manage_title">管理儲存空間</string>
-    <string name="settings_chat_storage_manage_subtitle">查看這部裝置上佔用最多空間的對話。</string>
-    <string name="settings_chat_storage_summary_limit">／%1$s · 空間滿時會自動清除媒體</string>
-    <string name="settings_chat_storage_manage_show_more">顯示更多</string>
 
     <string name="content_visibility_title">內容隱私權</string>
     <string name="content_visibility_loading">正在載入設定⋯</string>

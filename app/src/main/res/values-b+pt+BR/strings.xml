@@ -691,7 +691,6 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="edit_moment_tags_unavailable">Não foi possível abrir o editor de marcações.</string>
     <string name="edit_moment_tags_pending">Seletor de tags ainda não disponível</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">Stickers</string>
     <string name="sticker_search_placeholder">Buscar</string>
@@ -1076,7 +1075,6 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="conversation_settings_privacy_and_security">Privacidade e segurança</string>
     <string name="conversation_settings_hide">Ocultar</string>
     <string name="conversation_settings_preferences_desc">Notificações, prévias e privacidade</string>
-    <string name="conversation_settings_storage_desc">Fotos e vídeos em cache neste dispositivo</string>
     <string name="conversation_settings_clear_media">Limpar mídia em cache</string>
     <string name="conversation_settings_links">Links</string>
     <string name="conversation_settings_media_empty">Nenhuma mídia compartilhada</string>
@@ -2156,8 +2154,6 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="settings_appeals">Recursos &amp; status de revisão</string>
     <string name="settings_best_friends_desc">Gerencie sua lista exclusiva</string>
     <string name="settings_blocked_users">Contas bloqueadas</string>
-    <string name="settings_chat_storage">Armazenamento de chat</string>
-    <string name="settings_chat_storage_desc">Gerencie fotos e vídeos em cache</string>
     <string name="settings_connections_pending">Visibilidade de conexões</string>
     <string name="settings_connections_pending_body">Portabilidade pendente do ConnectionVisibilityView (SettingsSections).</string>
     <string name="settings_data_export">Baixar suas informações</string>

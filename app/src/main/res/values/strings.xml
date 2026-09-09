@@ -1268,7 +1268,6 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="messaging_compose_title">New message</string>
     <string name="messaging_compose_placeholder">Message…</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">Stickers</string>
     <string name="sticker_search_placeholder">Search</string>
@@ -1492,8 +1491,6 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="conversation_settings_privacy_and_security">Privacy and security</string>
     <string name="conversation_settings_hide">Hide</string>
     <string name="conversation_settings_preferences_desc">Notifications, previews and privacy</string>
-    <string name="conversation_settings_storage">Media storage</string>
-    <string name="conversation_settings_storage_desc">Cached photos and videos on this device</string>
     <string name="conversation_settings_clear_media">Clear cached media</string>
     <string name="conversation_settings_media_reload">Media will download again when needed.</string>
     <string name="conversation_settings_media">Media</string>
@@ -2302,8 +2299,6 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="notification_type_comment">Comment</string>
     <string name="notification_type_story_reaction">Story reaction</string>
     <string name="settings_section_data">DATA &amp; STORAGE</string>
-    <string name="settings_chat_storage">Chat storage</string>
-    <string name="settings_chat_storage_desc">Manage cached photos and videos</string>
     <string name="settings_data_export">Download your information</string>
     <string name="settings_data_export_desc">Copy of your Moments data</string>
     <string name="settings_section_support">SUPPORT &amp; LEGAL</string>
@@ -2363,8 +2358,6 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="settings_sections_best_friends_subtitle">Manage best friends list</string>
     <string name="settings_sections_download_data">Download Your Data</string>
     <string name="settings_sections_download_data_subtitle">Request a copy of your data</string>
-    <string name="settings_sections_chat_storage">Chat Storage</string>
-    <string name="settings_sections_chat_storage_subtitle">Media cache and download preferences</string>
     <string name="settings_sections_push_notifications">Push Notifications</string>
     <string name="settings_sections_push_notifications_subtitle">Posts, stories, comments</string>
     <string name="settings_sections_email_notifications">Email Notifications</string>
@@ -2841,30 +2834,6 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="saved_moments_restricted_subtitle">You no longer have access</string>
     <string name="saved_moments_restricted_muted_title">Muted account</string>
     <string name="saved_moments_restricted_muted_subtitle">You muted this account</string>
-
-    <string name="settings_chat_storage_title">Chat Storage</string>
-    <string name="settings_chat_storage_preferences_title">Preferences</string>
-    <string name="settings_chat_storage_auto_download_title">Auto-download media</string>
-    <string name="settings_chat_storage_auto_download_wifi">Wi‑Fi only</string>
-    <string name="settings_chat_storage_auto_download_always">Always</string>
-    <string name="settings_chat_storage_auto_download_never">Never</string>
-    <string name="settings_chat_storage_retention_title">Keep media for</string>
-    <string name="settings_chat_storage_retention_7days">7 days</string>
-    <string name="settings_chat_storage_retention_30days">30 days</string>
-    <string name="settings_chat_storage_retention_90days">90 days</string>
-    <string name="settings_chat_storage_retention_forever">Always</string>
-    <string name="settings_chat_storage_clear_media_action">Free chat media</string>
-    <string name="settings_chat_storage_clear_media_subtitle">Removes photos and videos but keeps message text locally.</string>
-    <string name="settings_chat_storage_clear_media_confirm">Free chat media? Message text will stay on this device.</string>
-    <string name="settings_chat_storage_clear_media_done">Chat media removed. It will download again when you open conversations.</string>
-    <string name="settings_chat_storage_clear_all_action">Clear chat cache</string>
-    <string name="settings_chat_storage_clear_all_subtitle">Removes all cached messages and media from this device.</string>
-    <string name="settings_chat_storage_clear_all_confirm">Clear all cached chat data on this device?</string>
-    <string name="settings_chat_storage_clear_all_done">Chat cache cleared.</string>
-    <string name="settings_chat_storage_manage_title">Manage storage</string>
-    <string name="settings_chat_storage_manage_subtitle">Conversations using the most space on this device.</string>
-    <string name="settings_chat_storage_summary_limit">of %1$s · media clears automatically when full</string>
-    <string name="settings_chat_storage_manage_show_more">Show more</string>
 
     <string name="content_visibility_title">Content Privacy</string>
     <string name="content_visibility_loading">Loading configuration...</string>

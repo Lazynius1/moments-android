@@ -691,7 +691,6 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="edit_moment_tags_unavailable">Não foi possível abrir o editor de etiquetas.</string>
     <string name="edit_moment_tags_pending">Seletor de etiquetas ainda não disponível</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">Adesivos</string>
     <string name="sticker_search_placeholder">Pesquisar</string>
@@ -1076,7 +1075,6 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="conversation_settings_privacy_and_security">Privacidade e segurança</string>
     <string name="conversation_settings_hide">Ocultar</string>
     <string name="conversation_settings_preferences_desc">Notificações, pré-visualizações e privacidade</string>
-    <string name="conversation_settings_storage_desc">Fotos e vídeos em cache neste dispositivo</string>
     <string name="conversation_settings_clear_media">Limpar multimédia em cache</string>
     <string name="conversation_settings_links">Hiperligações</string>
     <string name="conversation_settings_media_empty">Sem multimédia partilhada</string>
@@ -2155,8 +2153,6 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="settings_appeals">Recursos &amp; estado de revisão</string>
     <string name="settings_best_friends_desc">Gere a tua lista exclusiva</string>
     <string name="settings_blocked_users">Contas bloqueadas</string>
-    <string name="settings_chat_storage">Armazenamento do chat</string>
-    <string name="settings_chat_storage_desc">Gere as fotos e vídeos em cache</string>
     <string name="settings_connections_pending">Visibilidade de ligações</string>
     <string name="settings_connections_pending_body">Portabilidade pendente do ConnectionVisibilityView (SettingsSections).</string>
     <string name="settings_data_export">Transferir a tua informação</string>

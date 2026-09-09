@@ -2,7 +2,6 @@ package com.moments.android.views.messaging.screens
 
 import com.moments.android.services.messaging.messagingThread
 import com.moments.android.services.messaging.messagingMessages
-import android.text.format.Formatter
 import android.content.ContentValues
 import android.net.Uri
 import android.os.Build
@@ -41,10 +40,11 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -52,7 +52,6 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Timer
@@ -85,7 +84,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -187,8 +185,6 @@ class ConversationSettingsViewModel(
         private set
     var receivedMessagesCount by mutableIntStateOf(0)
         private set
-    var conversationMediaBytes by mutableLongStateOf(0)
-        private set
     var sharedMedia by mutableStateOf<List<SharedMedia>>(emptyList())
         private set
     var sharedGalleryMessages by mutableStateOf<List<EnhancedMessage>>(emptyList())
@@ -232,7 +228,6 @@ class ConversationSettingsViewModel(
         vanishModeActive = value.vanishModeActive == true
         vanishTimer = VanishMessageTimer.fromStored(value.vanishMessageTimer)
         notificationsEnabled = !value.isMuted(currentUserId)
-        conversationMediaBytes = value.id?.let(ChatCacheStore::bytes) ?: 0L
         conversationCreatedDate = MomentsFormat.smartDate(value.timestamp, MomentsFormat.DateContext.MEDIUM_DATE)
         value.id?.let { conversationId ->
             val prefsCtx = context ?: MomentsApplication.instance
@@ -328,13 +323,6 @@ class ConversationSettingsViewModel(
                 }
             }
         }
-    }
-
-    fun refreshMediaUsage() { conversationMediaBytes = conversation?.id?.let(ChatCacheStore::bytes) ?: 0L }
-
-    fun clearConversationMedia() {
-        conversation?.id?.let { ChatCacheStore.deleteConversation(it, emptyList()) }
-        refreshMediaUsage()
     }
 
     fun processMessages(messages: List<EnhancedMessage>) {
@@ -850,7 +838,6 @@ fun ConversationSettingsView(
     val model = remember(conversation.id) { ConversationSettingsViewModel() }
     MomentsTabBarHidden()
     var tab by remember { mutableStateOf(SharedContentTab.MEDIA) }
-    var clearMediaConfirm by remember { mutableStateOf(false) }
     var showStarred by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showPreferences by remember { mutableStateOf(false) }
@@ -1072,7 +1059,6 @@ fun ConversationSettingsView(
                         HapticManager.shared.lightImpact()
                         model.openSharedGallery(ClusterGalleryTab.MEDIA)
                     },
-                    onClearMedia = { clearMediaConfirm = true },
                 )
                 // ≡ iOS: settingsFooter debajo de vaciar media, antes de Media/Links
                 if (!conversation.isGroup) SettingsFooter(model, colors)
@@ -1204,13 +1190,6 @@ fun ConversationSettingsView(
         }
     }
 
-    if (clearMediaConfirm) AlertDialog(
-        onDismissRequest = { clearMediaConfirm = false },
-        title = { Text(stringResource(R.string.conversation_settings_clear_media)) },
-        text = { Text(stringResource(R.string.conversation_settings_media_reload)) },
-        confirmButton = { Text(stringResource(R.string.conversation_settings_clear_media), modifier = Modifier.clickable { model.clearConversationMedia(); clearMediaConfirm = false }.padding(16.dp)) },
-        dismissButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable { clearMediaConfirm = false }.padding(16.dp)) },
-    )
     if (showBlockConfirm) AlertDialog(
         onDismissRequest = { showBlockConfirm = false },
         title = { Text(stringResource(R.string.conversation_settings_block)) },
@@ -1529,9 +1508,7 @@ private fun SettingsRows(
     onVanish: () -> Unit,
     onPreferences: () -> Unit,
     onOpenGallery: () -> Unit,
-    onClearMedia: () -> Unit,
 ) {
-    val context = LocalContext.current
     Column(Modifier.padding(horizontal = 16.dp)) {
         SettingsRow(Icons.Default.Star, R.string.conversation_settings_starred, model.starredMessages.size.takeIf { it > 0 }?.toString() ?: stringResource(R.string.conversation_settings_starred_none), colors, onStarred)
         onInviteLink?.let { openLink ->
@@ -1559,15 +1536,12 @@ private fun SettingsRows(
             action = onPreferences,
         )
         SettingsRow(
-            Icons.Default.Folder,
-            R.string.conversation_settings_storage,
-            Formatter.formatFileSize(context, model.conversationMediaBytes),
+            Icons.Default.Image,
+            R.string.conversation_settings_shared_media,
+            null,
             colors,
             onOpenGallery,
         )
-        if (model.conversationMediaBytes > 0) {
-            SettingsRow(Icons.Default.Delete, R.string.conversation_settings_clear_media, null, colors, onClearMedia, destructive = true)
-        }
     }
 }
 

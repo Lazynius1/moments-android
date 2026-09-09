@@ -1245,7 +1245,6 @@
     <string name="messaging_compose_title">नया संदेश</string>
     <string name="messaging_compose_placeholder">संदेश लिखें…</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">स्टिकर्स</string>
     <string name="sticker_search_placeholder">खोजें</string>
@@ -1467,10 +1466,9 @@
     <string name="conversation_settings_vanish">गायब होने वाले मैसेज</string>
     <string name="conversation_settings_preferences">चैट की प्राथमिकताएँ</string>
     <string name="conversation_settings_privacy_and_security">गोपनीयता और सुरक्षा</string>
+    <string name="conversation_settings_shared_media">शेयर किया गया मीडिया</string>
     <string name="conversation_settings_hide">छिपाएँ</string>
     <string name="conversation_settings_preferences_desc">नोटिफ़िकेशन, प्रीव्यू और निजता</string>
-    <string name="conversation_settings_storage">मीडिया स्टोरेज</string>
-    <string name="conversation_settings_storage_desc">इस डिवाइस पर कैश की गई फ़ोटो और वीडियो</string>
     <string name="conversation_settings_clear_media">कैश किया गया मीडिया साफ़ करें</string>
     <string name="conversation_settings_media_reload">ज़रूरत पड़ने पर मीडिया फिर से डाउनलोड हो जाएगा।</string>
     <string name="conversation_settings_media">मीडिया</string>
@@ -2279,8 +2277,6 @@
     <string name="notification_type_comment">कमेंट</string>
     <string name="notification_type_story_reaction">स्टोरी पर रिएक्शन</string>
     <string name="settings_section_data">डेटा और स्टोरेज</string>
-    <string name="settings_chat_storage">चैट स्टोरेज</string>
-    <string name="settings_chat_storage_desc">कैश की गई फ़ोटो और वीडियो मैनेज करें</string>
     <string name="settings_data_export">अपनी जानकारी डाउनलोड करें</string>
     <string name="settings_data_export_desc">आपके Moments डेटा की कॉपी</string>
     <string name="settings_section_support">सपोर्ट और कानूनी जानकारी</string>
@@ -2340,8 +2336,6 @@
     <string name="settings_sections_best_friends_subtitle">करीबी दोस्तों की सूची मैनेज करें</string>
     <string name="settings_sections_download_data">अपना डेटा डाउनलोड करें</string>
     <string name="settings_sections_download_data_subtitle">अपने डेटा की कॉपी का अनुरोध करें</string>
-    <string name="settings_sections_chat_storage">चैट स्टोरेज</string>
-    <string name="settings_sections_chat_storage_subtitle">मीडिया कैश और डाउनलोड प्राथमिकताएं</string>
     <string name="settings_sections_push_notifications">पुश नोटिफ़िकेशन</string>
     <string name="settings_sections_push_notifications_subtitle">पोस्ट, स्टोरी और कमेंट</string>
     <string name="settings_sections_email_notifications">ईमेल नोटिफ़िकेशन</string>
@@ -2818,30 +2812,6 @@
     <string name="saved_moments_restricted_subtitle">अब आपके पास इसका ऐक्सेस नहीं है</string>
     <string name="saved_moments_restricted_muted_title">म्यूट किया गया अकाउंट</string>
     <string name="saved_moments_restricted_muted_subtitle">आपने इस अकाउंट को म्यूट किया है</string>
-
-    <string name="settings_chat_storage_title">चैट स्टोरेज</string>
-    <string name="settings_chat_storage_preferences_title">पसंद</string>
-    <string name="settings_chat_storage_auto_download_title">मीडिया अपने-आप डाउनलोड करें</string>
-    <string name="settings_chat_storage_auto_download_wifi">सिर्फ़ Wi‑Fi</string>
-    <string name="settings_chat_storage_auto_download_always">हमेशा</string>
-    <string name="settings_chat_storage_auto_download_never">कभी नहीं</string>
-    <string name="settings_chat_storage_retention_title">मीडिया रखें</string>
-    <string name="settings_chat_storage_retention_7days">7 दिन</string>
-    <string name="settings_chat_storage_retention_30days">30 दिन</string>
-    <string name="settings_chat_storage_retention_90days">90 दिन</string>
-    <string name="settings_chat_storage_retention_forever">हमेशा</string>
-    <string name="settings_chat_storage_clear_media_action">चैट मीडिया हटाएँ</string>
-    <string name="settings_chat_storage_clear_media_subtitle">फ़ोटो और वीडियो हट जाएँगे, लेकिन मैसेज का टेक्स्ट इस डिवाइस पर रहेगा।</string>
-    <string name="settings_chat_storage_clear_media_confirm">चैट मीडिया हटाएँ? मैसेज का टेक्स्ट इस डिवाइस पर रहेगा।</string>
-    <string name="settings_chat_storage_clear_media_done">चैट मीडिया हटा दिया गया। बातचीत खोलने पर यह फिर से डाउनलोड हो जाएगा।</string>
-    <string name="settings_chat_storage_clear_all_action">चैट कैश साफ़ करें</string>
-    <string name="settings_chat_storage_clear_all_subtitle">इस डिवाइस से कैश किए गए सभी मैसेज और मीडिया हट जाएँगे।</string>
-    <string name="settings_chat_storage_clear_all_confirm">इस डिवाइस से चैट का सारा कैश किया गया डेटा साफ़ करें?</string>
-    <string name="settings_chat_storage_clear_all_done">चैट कैश साफ़ कर दिया गया।</string>
-    <string name="settings_chat_storage_manage_title">स्टोरेज मैनेज करें</string>
-    <string name="settings_chat_storage_manage_subtitle">इस डिवाइस पर सबसे ज़्यादा जगह लेने वाली बातचीत।</string>
-    <string name="settings_chat_storage_summary_limit">%1$s में से · जगह भरने पर मीडिया अपने-आप हटेगा</string>
-    <string name="settings_chat_storage_manage_show_more">और दिखाएँ</string>
 
     <string name="content_visibility_title">कंटेंट की प्राइवेसी</string>
     <string name="content_visibility_loading">कॉन्फ़िगरेशन लोड हो रहा है...</string>

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -106,12 +105,6 @@ fun DataSection(onRoute: (SettingsRoute) -> Unit) {
             title = stringResource(R.string.settings_sections_download_data),
             subtitle = stringResource(R.string.settings_sections_download_data_subtitle),
             onClick = { onRoute(SettingsRoute.DATA_EXPORT) },
-        )
-        SettingsRow(
-            icon = Icons.AutoMirrored.Filled.Chat,
-            title = stringResource(R.string.settings_sections_chat_storage),
-            subtitle = stringResource(R.string.settings_sections_chat_storage_subtitle),
-            onClick = { onRoute(SettingsRoute.CHAT_STORAGE) },
         )
     }
 }

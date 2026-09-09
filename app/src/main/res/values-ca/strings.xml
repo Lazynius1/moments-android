@@ -691,7 +691,6 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="edit_moment_tags_unavailable">No hem pogut obrir l\'editor d\'etiquetes.</string>
     <string name="edit_moment_tags_pending">Selector d\'etiquetes encara no disponible</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">Adhesius</string>
     <string name="sticker_search_placeholder">Cercar</string>
@@ -843,8 +842,6 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="settings_notifications">Notificacions</string>
     <string name="settings_notifications_desc">Preferències d’avisos i hores de silenci</string>
     <string name="settings_section_data">DADES I EMMAGATZEMATGE</string>
-    <string name="settings_chat_storage">Emmagatzematge de xat</string>
-    <string name="settings_chat_storage_desc">Gestiona la memòria cau de fotos i vídeos</string>
     <string name="settings_data_export">Descarregar la teva informació</string>
     <string name="settings_data_export_desc">Còpia de les teves dades de Moments</string>
     <string name="settings_section_support">SUPORT I LEGAL</string>
@@ -1110,7 +1107,6 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="conversation_settings_privacy_and_security">Privacitat i seguretat</string>
     <string name="conversation_settings_hide">Amaga</string>
     <string name="conversation_settings_preferences_desc">Notificacions, vistes prèvies i privacitat</string>
-    <string name="conversation_settings_storage_desc">Fotos i vídeos en memòria cau en aquest dispositiu</string>
     <string name="conversation_settings_clear_media">Buida la memòria cau</string>
     <string name="conversation_settings_links">Enllaços</string>
     <string name="conversation_settings_media_empty">No hi ha contingut multimèdia compartit</string>

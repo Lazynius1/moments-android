@@ -105,7 +105,6 @@ enum class SettingsRoute {
     SAVED_MOMENTS,
     USER_ACTIVITY,
     DATA_EXPORT,
-    CHAT_STORAGE,
     MODERATION_REVIEWS,
     ARCHIVED_STORIES,
     NOTIFICATION_SETTINGS,
@@ -422,7 +421,6 @@ private fun SettingsDestinationHost(
         }
         SettingsRoute.USER_ACTIVITY -> UserActivityView(onNavigateBack = onDismiss)
         SettingsRoute.DATA_EXPORT -> DataExportView(onNavigateBack = onDismiss)
-        SettingsRoute.CHAT_STORAGE -> ChatStorageSettingsView(onNavigateBack = onDismiss)
         SettingsRoute.MODERATION_REVIEWS -> ModerationReviewStatusView(onBack = onDismiss)
         SettingsRoute.ARCHIVED_STORIES -> ArchivedStoriesView(onNavigateBack = onDismiss)
         SettingsRoute.NOTIFICATION_SETTINGS -> NotificationSettingsView(

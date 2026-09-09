@@ -1245,7 +1245,6 @@
     <string name="messaging_compose_title">Yeni mesaj</string>
     <string name="messaging_compose_placeholder">Mesaj…</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">Çıkartmalar</string>
     <string name="sticker_search_placeholder">Ara</string>
@@ -1467,10 +1466,9 @@
     <string name="conversation_settings_vanish">Kaybolan mesajlar</string>
     <string name="conversation_settings_preferences">Sohbet tercihleri</string>
     <string name="conversation_settings_privacy_and_security">Gizlilik ve güvenlik</string>
+    <string name="conversation_settings_shared_media">Paylaşılan medya</string>
     <string name="conversation_settings_hide">Gizle</string>
     <string name="conversation_settings_preferences_desc">Bildirimler, önizlemeler ve gizlilik</string>
-    <string name="conversation_settings_storage">Medya depolama</string>
-    <string name="conversation_settings_storage_desc">Bu cihazdaki önbelleğe alınmış fotoğraf ve videolar</string>
     <string name="conversation_settings_clear_media">Önbelleğe alınan medyayı temizle</string>
     <string name="conversation_settings_media_reload">Medya gerektiğinde yeniden indirilir.</string>
     <string name="conversation_settings_media">Medya</string>
@@ -2279,8 +2277,6 @@
     <string name="notification_type_comment">Yorum</string>
     <string name="notification_type_story_reaction">Hikâyeye verilen tepki</string>
     <string name="settings_section_data">VERİLER VE DEPOLAMA</string>
-    <string name="settings_chat_storage">Sohbet depolama alanı</string>
-    <string name="settings_chat_storage_desc">Önbelleğe alınan fotoğraf ve videoları yönet</string>
     <string name="settings_data_export">Bilgilerini indir</string>
     <string name="settings_data_export_desc">Moments verilerinin bir kopyası</string>
     <string name="settings_section_support">DESTEK VE YASAL</string>
@@ -2340,8 +2336,6 @@
     <string name="settings_sections_best_friends_subtitle">Yakın arkadaş listeni yönet</string>
     <string name="settings_sections_download_data">Verilerini İndir</string>
     <string name="settings_sections_download_data_subtitle">Verilerinin bir kopyasını iste</string>
-    <string name="settings_sections_chat_storage">Sohbet Depolama Alanı</string>
-    <string name="settings_sections_chat_storage_subtitle">Medya önbelleği ve indirme tercihleri</string>
     <string name="settings_sections_push_notifications">Anlık Bildirimler</string>
     <string name="settings_sections_push_notifications_subtitle">Gönderiler, hikâyeler, yorumlar</string>
     <string name="settings_sections_email_notifications">E-posta Bildirimleri</string>
@@ -2818,30 +2812,6 @@
     <string name="saved_moments_restricted_subtitle">Artık erişimin yok</string>
     <string name="saved_moments_restricted_muted_title">Sessize alınan hesap</string>
     <string name="saved_moments_restricted_muted_subtitle">Bu hesabı sessize aldın</string>
-
-    <string name="settings_chat_storage_title">Sohbet depolama alanı</string>
-    <string name="settings_chat_storage_preferences_title">Tercihler</string>
-    <string name="settings_chat_storage_auto_download_title">Medyayı otomatik indir</string>
-    <string name="settings_chat_storage_auto_download_wifi">Yalnızca Wi‑Fi</string>
-    <string name="settings_chat_storage_auto_download_always">Her zaman</string>
-    <string name="settings_chat_storage_auto_download_never">Asla</string>
-    <string name="settings_chat_storage_retention_title">Medyalar şu süreyle saklansın</string>
-    <string name="settings_chat_storage_retention_7days">7 gün</string>
-    <string name="settings_chat_storage_retention_30days">30 gün</string>
-    <string name="settings_chat_storage_retention_90days">90 gün</string>
-    <string name="settings_chat_storage_retention_forever">Her zaman</string>
-    <string name="settings_chat_storage_clear_media_action">Sohbet medyalarını temizle</string>
-    <string name="settings_chat_storage_clear_media_subtitle">Fotoğraf ve videoları kaldırır, mesaj metinlerini cihazında tutar.</string>
-    <string name="settings_chat_storage_clear_media_confirm">Sohbet medyaları temizlensin mi? Mesaj metinleri bu cihazda kalır.</string>
-    <string name="settings_chat_storage_clear_media_done">Sohbet medyaları kaldırıldı. Sohbetleri açtığında yeniden indirilir.</string>
-    <string name="settings_chat_storage_clear_all_action">Sohbet önbelleğini temizle</string>
-    <string name="settings_chat_storage_clear_all_subtitle">Bu cihazdaki tüm önbelleğe alınmış mesajları ve medyaları kaldırır.</string>
-    <string name="settings_chat_storage_clear_all_confirm">Bu cihazdaki tüm önbelleğe alınmış sohbet verileri temizlensin mi?</string>
-    <string name="settings_chat_storage_clear_all_done">Sohbet önbelleği temizlendi.</string>
-    <string name="settings_chat_storage_manage_title">Depolamayı yönet</string>
-    <string name="settings_chat_storage_manage_subtitle">Bu cihazda en fazla yer kaplayan sohbetler.</string>
-    <string name="settings_chat_storage_summary_limit">%1$s · alan dolduğunda medya otomatik temizlenir</string>
-    <string name="settings_chat_storage_manage_show_more">Daha fazlasını göster</string>
 
     <string name="content_visibility_title">İçerik gizliliği</string>
     <string name="content_visibility_loading">Yapılandırma yükleniyor...</string>

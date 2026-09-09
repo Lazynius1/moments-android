@@ -392,12 +392,6 @@
     <string name="conversation_settings_starred_messages">Mensajes destacados</string>
     <string name="conversation_settings_starred_messages_empty">Los mensajes que destaques en este chat aparecerán aquí</string>
     <string name="conversation_settings_starred_messages_none">Ninguno</string>
-    <string name="conversation_settings_storage">Almacenamiento</string>
-    <string name="conversation_settings_storage_clear_media">Vaciar media en caché</string>
-    <string name="conversation_settings_storage_clear_media_message">Las fotos y vídeos se volverán a descargar cuando los necesites.</string>
-    <string name="conversation_settings_storage_clear_media_title">¿Vaciar media en caché?</string>
-    <string name="conversation_settings_storage_media_usage">Media en este chat</string>
-    <string name="conversation_settings_storage_media_usage_desc">Fotos y vídeos en caché en este dispositivo</string>
     <string name="conversation_settings_title">Ajustes de conversación</string>
     <string name="conversation_settings_typing_indicator">Indicador de escritura</string>
     <string name="conversation_settings_typing_indicator_desc">Si lo desactivas, tampoco verás cuándo la otra persona está escribiendo.</string>
@@ -1160,10 +1154,6 @@
     <string name="settings_account_title">Tu Cuenta</string>
     <string name="settings_badges_explore">Explorar badges</string>
     <string name="settings_badges_manage">Gestionar badges</string>
-    <string name="settings_chat_storage_usage_media">Fotos y vídeos</string>
-    <string name="settings_chat_storage_usage_messages">Mensajes en caché</string>
-    <string name="settings_chat_storage_usage_messages_count">%1$d mensajes</string>
-    <string name="settings_chat_storage_usage_title">Uso</string>
     <string name="settings_connection_privacy">Privacidad del perfil</string>
     <string name="settings_danger_zone_title">Zona de riesgo</string>
     <string name="settings_error_not_authenticated">Usuario no autenticado</string>

@@ -320,11 +320,6 @@
     <string name="conversation_settings_starred_messages">Starred messages</string>
     <string name="conversation_settings_starred_messages_empty">Messages you star in this chat will appear here</string>
     <string name="conversation_settings_starred_messages_none">None</string>
-    <string name="conversation_settings_storage_clear_media">Clear cached media</string>
-    <string name="conversation_settings_storage_clear_media_message">Photos and videos will re-download when you need them.</string>
-    <string name="conversation_settings_storage_clear_media_title">Clear cached media?</string>
-    <string name="conversation_settings_storage_media_usage">Media in this chat</string>
-    <string name="conversation_settings_storage_media_usage_desc">Cached photos and videos on this device</string>
     <string name="conversation_settings_typing_indicator">Typing indicator</string>
     <string name="conversation_settings_typing_indicator_desc">If you turn this off, you also won\'t see when the other person is typing.</string>
     <string name="conversation_settings_understood">Understood</string>
@@ -981,10 +976,6 @@
     <string name="settings_account_title">Your Account</string>
     <string name="settings_badges_explore">Explore badges</string>
     <string name="settings_badges_manage">Manage badges</string>
-    <string name="settings_chat_storage_usage_media">Photos and videos</string>
-    <string name="settings_chat_storage_usage_messages">Cached messages</string>
-    <string name="settings_chat_storage_usage_messages_count">%1$d messages</string>
-    <string name="settings_chat_storage_usage_title">Usage</string>
     <string name="settings_connection_privacy">Profile Privacy</string>
     <string name="settings_danger_zone_title">Danger Zone</string>
     <string name="settings_error_not_authenticated">User not authenticated</string>

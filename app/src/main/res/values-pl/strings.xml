@@ -1245,7 +1245,6 @@
     <string name="messaging_compose_title">Nowa wiadomość</string>
     <string name="messaging_compose_placeholder">Napisz wiadomość…</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">Naklejki</string>
     <string name="sticker_search_placeholder">Szukaj</string>
@@ -1467,10 +1466,9 @@
     <string name="conversation_settings_vanish">Znikające wiadomości</string>
     <string name="conversation_settings_preferences">Preferencje czatu</string>
     <string name="conversation_settings_privacy_and_security">Prywatność i bezpieczeństwo</string>
+    <string name="conversation_settings_shared_media">Udostępnione multimedia</string>
     <string name="conversation_settings_hide">Ukryj</string>
     <string name="conversation_settings_preferences_desc">Powiadomienia, podglądy i prywatność</string>
-    <string name="conversation_settings_storage">Pamięć multimediów</string>
-    <string name="conversation_settings_storage_desc">Buforowane zdjęcia i filmy na tym urządzeniu</string>
     <string name="conversation_settings_clear_media">Wyczyść buforowane multimedia</string>
     <string name="conversation_settings_media_reload">Multimedia zostaną ponownie pobrane w razie potrzeby.</string>
     <string name="conversation_settings_media">Multimedia</string>
@@ -2279,8 +2277,6 @@
     <string name="notification_type_comment">Komentarz</string>
     <string name="notification_type_story_reaction">Reakcja na relację</string>
     <string name="settings_section_data">DANE I PAMIĘĆ</string>
-    <string name="settings_chat_storage">Pamięć czatów</string>
-    <string name="settings_chat_storage_desc">Zarządzaj zdjęciami i filmami w pamięci podręcznej</string>
     <string name="settings_data_export">Pobierz swoje dane</string>
     <string name="settings_data_export_desc">Kopia Twoich danych z Moments</string>
     <string name="settings_section_support">POMOC I INFORMACJE PRAWNE</string>
@@ -2340,8 +2336,6 @@
     <string name="settings_sections_best_friends_subtitle">Zarządzaj listą bliskich znajomych</string>
     <string name="settings_sections_download_data">Pobierz swoje dane</string>
     <string name="settings_sections_download_data_subtitle">Poproś o kopię swoich danych</string>
-    <string name="settings_sections_chat_storage">Pamięć czatów</string>
-    <string name="settings_sections_chat_storage_subtitle">Pamięć podręczna multimediów i ustawienia pobierania</string>
     <string name="settings_sections_push_notifications">Powiadomienia push</string>
     <string name="settings_sections_push_notifications_subtitle">Posty, relacje, komentarze</string>
     <string name="settings_sections_email_notifications">Powiadomienia e-mail</string>
@@ -2818,30 +2812,6 @@
     <string name="saved_moments_restricted_subtitle">Nie masz już do niego dostępu</string>
     <string name="saved_moments_restricted_muted_title">Wyciszone konto</string>
     <string name="saved_moments_restricted_muted_subtitle">Wyciszono to konto</string>
-
-    <string name="settings_chat_storage_title">Pamięć czatów</string>
-    <string name="settings_chat_storage_preferences_title">Preferencje</string>
-    <string name="settings_chat_storage_auto_download_title">Automatycznie pobieraj multimedia</string>
-    <string name="settings_chat_storage_auto_download_wifi">Tylko przez Wi‑Fi</string>
-    <string name="settings_chat_storage_auto_download_always">Zawsze</string>
-    <string name="settings_chat_storage_auto_download_never">Nigdy</string>
-    <string name="settings_chat_storage_retention_title">Przechowuj multimedia przez</string>
-    <string name="settings_chat_storage_retention_7days">7 dni</string>
-    <string name="settings_chat_storage_retention_30days">30 dni</string>
-    <string name="settings_chat_storage_retention_90days">90 dni</string>
-    <string name="settings_chat_storage_retention_forever">Bezterminowo</string>
-    <string name="settings_chat_storage_clear_media_action">Zwolnij miejsce na multimediach czatu</string>
-    <string name="settings_chat_storage_clear_media_subtitle">Usuwa zdjęcia i filmy, ale zachowuje lokalnie tekst wiadomości.</string>
-    <string name="settings_chat_storage_clear_media_confirm">Zwolnić miejsce zajmowane przez multimedia czatu? Tekst wiadomości pozostanie na tym urządzeniu.</string>
-    <string name="settings_chat_storage_clear_media_done">Usunięto multimedia czatu. Zostaną pobrane ponownie po otwarciu rozmów.</string>
-    <string name="settings_chat_storage_clear_all_action">Wyczyść pamięć podręczną czatu</string>
-    <string name="settings_chat_storage_clear_all_subtitle">Usuwa z tego urządzenia wszystkie zapisane w pamięci podręcznej wiadomości i multimedia.</string>
-    <string name="settings_chat_storage_clear_all_confirm">Wyczyścić wszystkie dane czatu zapisane w pamięci podręcznej na tym urządzeniu?</string>
-    <string name="settings_chat_storage_clear_all_done">Pamięć podręczna czatu została wyczyszczona.</string>
-    <string name="settings_chat_storage_manage_title">Zarządzaj miejscem</string>
-    <string name="settings_chat_storage_manage_subtitle">Rozmowy zajmujące najwięcej miejsca na tym urządzeniu.</string>
-    <string name="settings_chat_storage_summary_limit">z %1$s · multimedia są automatycznie usuwane po zapełnieniu</string>
-    <string name="settings_chat_storage_manage_show_more">Pokaż więcej</string>
 
     <string name="content_visibility_title">Prywatność treści</string>
     <string name="content_visibility_loading">Ładowanie ustawień...</string>

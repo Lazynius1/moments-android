@@ -705,7 +705,6 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="edit_moment_tags_unavailable">Impossible d\'ouvrir l\'éditeur d\'identifications.</string>
     <string name="edit_moment_tags_pending">Sélecteur de tags pas encore disponible</string>
 
-
     <!-- Story stickers (chunk 1 emoji) -->
     <string name="sticker_picker_title">Stickers</string>
     <string name="sticker_search_placeholder">Rechercher</string>
@@ -1090,7 +1089,6 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="conversation_settings_privacy_and_security">Confidentialité et sécurité</string>
     <string name="conversation_settings_hide">Masquer</string>
     <string name="conversation_settings_preferences_desc">Notifications, aperçus et confidentialité</string>
-    <string name="conversation_settings_storage_desc">Photos et vidéos en cache sur cet appareil</string>
     <string name="conversation_settings_clear_media">Vider le cache des médias</string>
     <string name="conversation_settings_links">Liens</string>
     <string name="conversation_settings_media_empty">Aucun média partagé</string>
@@ -2216,8 +2214,6 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="settings_appeals">Recours &amp; statut des révisions</string>
     <string name="settings_best_friends_desc">Gérez votre liste exclusive</string>
     <string name="settings_blocked_users">Comptes bloqués</string>
-    <string name="settings_chat_storage">Stockage du chat</string>
-    <string name="settings_chat_storage_desc">Gérez les photos et vidéos en cache</string>
     <string name="settings_connections_pending">Visibilité des connexions</string>
     <string name="settings_connections_pending_body">Portage en attente de ConnectionVisibilityView (SettingsSections).</string>
     <string name="settings_data_export">Télécharger vos informations</string>
