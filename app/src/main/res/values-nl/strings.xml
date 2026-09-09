@@ -1623,7 +1623,6 @@
     <string name="chat_location_stop_sharing">Stop met delen</string>
     <string name="chat_location_directions">Routebeschrijving</string>
     <string name="chat_location_open_maps">Openen in Maps</string>
-    <string name="chat_media_download">Downloaden</string>
     <string name="chat_deleted_audio">Audiobericht verwijderd</string>
     <string name="chat_deleted_image">Foto verwijderd</string>
     <string name="chat_deleted_video">Video verwijderd</string>
@@ -2897,4 +2896,8 @@
     <string name="nova_welcome_editorial_write_prompt">Help me iets te schrijven</string>
     <string name="nova_welcome_editorial_moments_title">Wat kan ik doen in Moments?</string>
     <string name="nova_welcome_editorial_moments_prompt">Waarmee kun je me helpen in Moments?</string>
+    <string name="notification_chat_summary_single">Nieuw bericht</string>
+    <string name="notification_chat_summary_multiple">%1$s nieuwe berichten</string>
+    <string name="notification_group_untitled">Groep</string>
+    <string name="notification_chat_self">Jij</string>
 </resources>

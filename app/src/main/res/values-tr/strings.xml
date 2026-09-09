@@ -1623,7 +1623,6 @@
     <string name="chat_location_stop_sharing">Paylaşımı durdur</string>
     <string name="chat_location_directions">Yol tarifi</string>
     <string name="chat_location_open_maps">Haritalar\'da aç</string>
-    <string name="chat_media_download">İndir</string>
     <string name="chat_deleted_audio">Sesli mesaj silindi</string>
     <string name="chat_deleted_image">Fotoğraf silindi</string>
     <string name="chat_deleted_video">Video silindi</string>
@@ -2897,4 +2896,8 @@
     <string name="nova_welcome_editorial_write_prompt">Bir şey yazmama yardım et</string>
     <string name="nova_welcome_editorial_moments_title">Moments’ta neler yapabilirim?</string>
     <string name="nova_welcome_editorial_moments_prompt">Moments’ta bana nasıl yardımcı olabilirsin?</string>
+    <string name="notification_chat_summary_single">Yeni mesaj</string>
+    <string name="notification_chat_summary_multiple">%1$s yeni mesaj</string>
+    <string name="notification_group_untitled">Grup</string>
+    <string name="notification_chat_self">Sen</string>
 </resources>

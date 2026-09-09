@@ -26,8 +26,10 @@ object InAppNotificationPreviewResolver {
             ChatPreviewPrivacy.isVanishModeMessage(userInfo ?: emptyMap()),
         )
 
+        val group = com.moments.android.views.messaging.groups.GroupDirectory.groups.value[conversationId]
+        val resolved = notification.copy(groupName = notification.groupName ?: group?.name, groupImage = notification.groupImage ?: group?.image)
         return when (notification.type) {
-            NotificationType.MESSAGE -> resolveMessagePreview(notification, conversationId, userInfo, previewEnabled)
+            NotificationType.MESSAGE -> resolveMessagePreview(resolved, conversationId, userInfo, previewEnabled)
             NotificationType.MESSAGE_REACTION -> resolveMessageReactionPreview(notification, conversationId, userInfo, previewEnabled)
             else -> stripUnsafeTextPreview(notification)
         }
@@ -91,8 +93,8 @@ object InAppNotificationPreviewResolver {
     }
 
     private suspend fun fetchAndDecryptMessage(messageId: String, conversationId: String): String? = runCatching {
-        val snapshot = db.collection("conversations").document(conversationId)
-            .collection("messages").document(messageId).get().await()
+        val snapshot = db.collection(if (com.moments.android.services.messaging.GroupChatScope.isGroup(conversationId)) "groupConversations" else "conversations").document(conversationId)
+            .collection(if (com.moments.android.services.messaging.GroupChatScope.isGroup(conversationId)) "groupMessages" else "messages").document(messageId).get().await()
         val cipher = snapshot.getString("content")?.trim().orEmpty()
         if (cipher.isEmpty()) return null
         if (ChatPreviewPrivacy.isVanishModeMessage(snapshot.data ?: emptyMap())) return null

@@ -39,6 +39,7 @@ object ChatPreviewPrivacy {
     fun setUserPreviewEnabled(context: Context, conversationId: String, enabled: Boolean) {
         if (conversationId.isBlank()) return
         prefs(context).edit().putBoolean(key(conversationId), enabled).apply()
+        if (!enabled) com.moments.android.notifications.services.NotificationShadePoster.clearConversation(context, conversationId)
     }
 
     /** ≡ shouldRevealPreview(for:isVanishModeMessage:) */
@@ -60,7 +61,7 @@ object ChatPreviewPrivacy {
     fun isVanishModeMessage(payload: Map<String, Any?>): Boolean {
         return when (val raw = payload["isVanishModeMessage"]) {
             is Boolean -> raw
-            is String -> raw == "1"
+            is String -> raw.trim().lowercase() in setOf("1", "true")
             else -> false
         }
     }

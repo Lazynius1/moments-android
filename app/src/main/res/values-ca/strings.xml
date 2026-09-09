@@ -2088,7 +2088,6 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="chat_intro_relationship_other_follows_since">%1$s et segueix des de %2$s</string>
     <string name="chat_link_open">Obre l\'enllaç</string>
     <string name="chat_link_preview_loading">Carregant la vista prèvia de l\'enllaç</string>
-    <string name="chat_media_download">Descarrega</string>
     <string name="chat_recovery_invalid_pin">Fes servir exactament 6 dígits</string>
     <string name="chat_scroll_badge_max">99+</string>
     <string name="chat_shared_moment">Ha compartit un Moment</string>
@@ -2329,4 +2328,8 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="settings_privacy_group_invites_everyone">Tothom</string>
     <string name="settings_privacy_group_invites_following">Persones que segueixes</string>
     <string name="settings_privacy_group_invites_nobody">Ningú</string>
+    <string name="notification_chat_summary_single">Missatge nou</string>
+    <string name="notification_chat_summary_multiple">%1$s missatges nous</string>
+    <string name="notification_group_untitled">Grup</string>
+    <string name="notification_chat_self">Tu</string>
 </resources>

@@ -491,6 +491,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="notification_mutual_connection_multiple_body">%1$s y %2$s más ahora son conexiones mutuas</string>
     <string name="banner_verb_echo_suggestion">¡está cerca de ti! Cread un Echo</string>    <string name="notification_action_reply">Responder</string>
     <string name="notification_action_placeholder">Mensaje</string>
+    <string name="notification_chat_self">Tú</string>
     <string name="chat_preview_text">Nuevo mensaje</string>
     <string name="chat_preview_photo">Foto</string>
     <string name="chat_preview_video">Vídeo</string>
@@ -2718,4 +2719,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="nova_welcome_editorial_write_prompt">Ayúdame a escribir algo</string>
     <string name="nova_welcome_editorial_moments_title">¿Qué puedo hacer en Moments?</string>
     <string name="nova_welcome_editorial_moments_prompt">¿En qué puedes ayudarme dentro de Moments?</string>
+    <string name="notification_chat_summary_single">Nuevo mensaje</string>
+    <string name="notification_chat_summary_multiple">%1$s mensajes nuevos</string>
+    <string name="notification_group_untitled">Grupo</string>
 </resources>

@@ -377,15 +377,15 @@ private fun parseFirestoreDate(value: Any?): Date? = when (value) {
 
 suspend fun ChatService.resolveEncryptedMediaForMessage(
     message: EnhancedMessage,
-    forceDownload: Boolean = false,
+
 ): CachedResolvedMedia? =
-    encryptedMediaResolver.resolveForMessage(message, forceDownload)
+    encryptedMediaResolver.resolveForMessage(message)
 
 suspend fun ChatService.resolveVideoThumbnail(
     message: EnhancedMessage,
-    forceDownload: Boolean = false,
+
 ): String? =
-    encryptedMediaResolver.resolveThumbnailURL(message, forceDownload)
+    encryptedMediaResolver.resolveThumbnailURL(message)
 
 fun ChatService.warmMessageURLsFromDiskCache(message: EnhancedMessage): CachedResolvedMedia =
     encryptedMediaResolver.warmMessageURLsFromDiskCache(message)

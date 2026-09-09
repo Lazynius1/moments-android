@@ -10,6 +10,7 @@ import com.moments.android.views.messaging.components.ChatListScrollCommand
 import com.moments.android.views.messaging.components.ChatMessageListController
 import com.moments.android.views.messaging.components.VanishPullResult
 import com.moments.android.views.messaging.core.EnhancedChatViewModel
+import com.moments.android.views.messaging.services.ChatKeyboardScrollCoordinator
 import com.moments.android.views.messaging.services.ChatScrollTarget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,10 +19,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Port de `GlassmorphicChatView+Scroll.swift`.
+/**
+ * Scroll del chat: pin/bottom, history, search jump, vanish pull.
  *
- * Paridad de comportamiento (pin/bottom, history, search jump, vanish pull).
- * Δ intencional: reintentos/invalidate de self-sizing UIKit no aplican a LazyList Compose.
+ * Teclado (Android/TG): no force-scroll a mitad del IME. El padding de la lista
+ * sigue la altura medida del composer (incluye inset); al acabar la transición
+ * se hace un settle. Durante IME se silencian snaps de composer.
  */
 enum class ListBottomSnapReason { KEYBOARD, COMPOSER_RESIZED, USER_REQUESTED, INCOMING_WHILE_PINNED }
 
@@ -47,6 +50,7 @@ class GlassmorphicChatScrollController(
     private val viewModel: EnhancedChatViewModel,
     private val listController: ChatMessageListController,
     private val callbacks: ChatScrollCallbacks = ChatScrollCallbacks(),
+    private val keyboardScrollCoordinator: ChatKeyboardScrollCoordinator? = null,
     private val reduceMotion: () -> Boolean = { false },
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -182,14 +186,27 @@ class GlassmorphicChatScrollController(
         }
         bottomSnapJob?.cancel()
         bottomSnapJob = scope.launch {
+            val imeDuration = keyboardScrollCoordinator?.animationDurationMillis ?: keyboardDurationMillis
             val wait = when (reason) {
-                ListBottomSnapReason.KEYBOARD -> keyboardDurationMillis + 16L
+                // Esperar a que termine la curva IME (≈ AdjustPan onTransitionEnd).
+                ListBottomSnapReason.KEYBOARD -> maxOf(imeDuration, 50L) + 32L
                 ListBottomSnapReason.COMPOSER_RESIZED -> 50L
                 ListBottomSnapReason.INCOMING_WHILE_PINNED, ListBottomSnapReason.USER_REQUESTED -> 0L
             }
             if (wait > 0) delay(wait)
+            if (keyboardScrollCoordinator?.isTransitioning == true &&
+                reason == ListBottomSnapReason.COMPOSER_RESIZED
+            ) {
+                return@launch
+            }
             if (callbacks.rowsReady() && isPinnedToBottom) {
-                val shouldAnimate = (animated ?: (reason == ListBottomSnapReason.KEYBOARD || reason == ListBottomSnapReason.COMPOSER_RESIZED)) && !reduceMotion()
+                // Teclado/composer: settle sin animación (el padding ya movió el ancla).
+                val shouldAnimate = when (reason) {
+                    ListBottomSnapReason.KEYBOARD, ListBottomSnapReason.COMPOSER_RESIZED ->
+                        (animated ?: false) && !reduceMotion()
+                    else ->
+                        (animated ?: true) && !reduceMotion()
+                }
                 listController.perform(ChatListScrollCommand.Bottom(shouldAnimate))
             }
         }
@@ -201,8 +218,25 @@ class GlassmorphicChatScrollController(
         // El primer tamaño real llega después del scroll inicial: si lo ignoramos,
         // la lista queda anclada con la estimación y el último mensaje bajo el composer.
         if (!hasCompletedInitialScroll || !isPinnedToBottom || (previous != null && kotlin.math.abs(height.value - previous.value) <= .5f)) return
+        // Durante IME el padding de la lista ya sigue la altura medida; un snap extra pelea.
+        if (keyboardScrollCoordinator?.isTransitioning == true) return
         composerSnapJob?.cancel()
-        composerSnapJob = scope.launch { delay(50L); scheduleListBottomSnap(ListBottomSnapReason.COMPOSER_RESIZED) }
+        composerSnapJob = scope.launch {
+            delay(50L)
+            if (keyboardScrollCoordinator?.isTransitioning == true) return@launch
+            scheduleListBottomSnap(ListBottomSnapReason.COMPOSER_RESIZED, animated = false)
+        }
+    }
+
+    /** IME height cambió — un solo settle al final (show y hide). */
+    fun handleKeyboardHeightChange(oldHeightPx: Float, newHeightPx: Float) {
+        if (!hasCompletedInitialScroll || !isPinnedToBottom) return
+        if (kotlin.math.abs(newHeightPx - oldHeightPx) <= 1f) return
+        scheduleListBottomSnap(
+            ListBottomSnapReason.KEYBOARD,
+            keyboardDurationMillis = keyboardScrollCoordinator?.animationDurationMillis ?: 250L,
+            animated = false,
+        )
     }
 
     fun handleLastMessageChange(oldMessageId: String?, lastMessageId: String?) {

@@ -16,12 +16,12 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.moments.android.MainActivity
 import com.moments.android.R
+import com.moments.android.views.shared.ChatPreviewPrivacy
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Port de Shared/ChatCommunicationIntentDonor.swift (+ ChatNotificationReply).
- *
- * iOS: INSendMessageIntent. Android: Shortcut dinámico + Person/LocusId + MessagingStyle.
+ * Contrato Android de conversaciones (People / MessagingStyle / shortcuts).
+ * No copia el stacking de iOS: un shade por conversación.
  */
 
 /** Paridad `ChatNotificationReply` (misma categoría/acción que iOS). */
@@ -32,11 +32,67 @@ object ChatNotificationReply {
     const val KEY_TEXT_REPLY = "key_text_reply"
 }
 
+object ChatNotificationThread {
+    fun conversationId(userInfo: Map<String, Any?>): String? {
+        val type = (userInfo["type"] as? String)?.lowercase()
+        val fromConversation = (userInfo["conversationId"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+        val fromGroup = (userInfo["groupId"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+        return if (type == "group_message") fromConversation ?: fromGroup else fromConversation
+    }
+
+    fun isChatMessage(type: String?) = type in setOf("message", "new_message", "group_message")
+
+    fun isGroupConversationId(id: String?): Boolean = GroupChatScope.isGroup(id)
+
+    fun isGroup(userInfo: Map<String, Any?>): Boolean {
+        val type = (userInfo["type"] as? String)?.lowercase()
+        val cid = conversationId(userInfo)
+        return type == "group_message" || (cid != null && isGroupConversationId(cid))
+    }
+
+    /** Título de grupo para Conversations API — sin esto Android pinta 1:1. */
+    fun resolvedGroupName(userInfo: Map<String, Any?>, fallbackTitle: String? = null): String? {
+        if (!isGroup(userInfo)) return null
+        val sender = (userInfo["senderUsername"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+        (userInfo["groupName"] as? String)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        val candidates = listOf(
+            userInfo["title"] as? String,
+            fallbackTitle,
+        )
+        for (raw in candidates) {
+            val name = raw?.trim()?.takeIf { it.isNotEmpty() } ?: continue
+            if (sender != null && name.equals(sender, ignoreCase = true)) continue
+            return name
+        }
+        return null
+    }
+
+    fun previewLabel(context: Context, messageType: String?): String = context.getString(when (messageType) {
+        "image" -> R.string.chat_preview_photo
+        "video" -> R.string.chat_preview_video
+        "audio" -> R.string.chat_preview_audio
+        "gif" -> R.string.chat_preview_gif
+        "sticker" -> R.string.chat_preview_sticker
+        "location" -> R.string.chat_preview_location
+        "file" -> R.string.chat_preview_file
+        "viewOnceImage" -> R.string.chat_preview_view_once_photo
+        "viewOnceVideo" -> R.string.chat_preview_view_once_video
+        "ephemeral" -> R.string.chat_preview_ephemeral
+        "moment", "sharedMoment" -> R.string.chat_preview_shared_moment
+        "sharedStory", "storyMention" -> R.string.chat_preview_shared_story
+        "sharedProfile" -> R.string.chat_preview_shared_profile
+        else -> R.string.notification_chat_summary_single
+    })
+
+    fun shadeKey(conversationId: String) = "conversation_$conversationId"
+}
+
 object ChatCommunicationIntentDonor {
     private const val SHORTCUT_PREFIX = "moments_chat_"
-    private const val SELF_NAME = "You"
     private const val MAX_SHADE_MESSAGES = 7
     private const val EXTRA_SHADE_MESSAGE_IDS = "moments.shade.message_ids"
+    private const val EXTRA_PREVIEW_VISIBLE = "moments.shade.preview_visible"
+    private const val EXTRA_MESSAGE_COUNT = "moments.shade.message_count"
 
     data class DonatedConversation(
         val conversationId: String,
@@ -49,7 +105,6 @@ object ChatCommunicationIntentDonor {
 
     private var appContext: Context? = null
     private val lastDonationByConversation = ConcurrentHashMap<String, DonatedConversation>()
-    private val shadeHistory = ConcurrentHashMap<String, MutableList<NotificationCompat.MessagingStyle.Message>>()
 
     fun initialize(context: Context) {
         if (appContext != null) return
@@ -81,20 +136,22 @@ object ChatCommunicationIntentDonor {
         channelId: String,
         contentIntent: PendingIntent,
         avatarBitmap: Bitmap? = null,
+        conversationAvatarBitmap: Bitmap? = null,
         mediaUri: Uri? = null,
         includeReply: Boolean = true,
         notificationId: Int,
     ): NotificationCompat.Builder {
         initialize(context)
-        val conversationId = userInfo["conversationId"] as? String
+        val conversationId = ChatNotificationThread.conversationId(userInfo)
         val type = (userInfo["type"] as? String)?.lowercase()
         val isConversation = !conversationId.isNullOrBlank() && type in setOf(
             "message",
             "new_message",
+            "group_message",
             "message_reaction",
             "chat_buzz",
         )
-        val isChatMessage = type == "message" || type == "new_message"
+        val isChatMessage = ChatNotificationThread.isChatMessage(type)
 
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_moments)
@@ -104,6 +161,9 @@ object ChatCommunicationIntentDonor {
 
         if (isConversation) {
             val convId = conversationId!!
+            val isGroup = ChatNotificationThread.isGroup(userInfo)
+            val groupTitle = ChatNotificationThread.resolvedGroupName(userInfo, fallbackTitle)
+                ?: context.getString(R.string.notification_group_untitled).takeIf { isGroup }
             val senderName = (userInfo["senderUsername"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
                 ?: fallbackTitle
             val person = Person.Builder()
@@ -112,33 +172,54 @@ object ChatCommunicationIntentDonor {
                 .setImportant(true)
                 .apply { avatarBitmap?.let { setIcon(IconCompat.createWithBitmap(it)) } }
                 .build()
-            val self = Person.Builder().setName(SELF_NAME).build()
-            val incoming = NotificationCompat.MessagingStyle.Message(body, System.currentTimeMillis(), person)
-            if (mediaUri != null) {
-                incoming.setData("image/jpeg", mediaUri)
-            }
-            val (style, shadeIds) = conversationStyle(
+            val self = Person.Builder()
+                .setName(context.getString(R.string.notification_chat_self))
+                .build()
+            val previewOn = ChatPreviewPrivacy.shouldRevealPreview(
+                convId,
+                ChatPreviewPrivacy.isVanishModeMessage(userInfo),
+            )
+            val safeBody = if (previewOn || !isChatMessage) body else context.getString(R.string.notification_chat_summary_single)
+            val incoming = NotificationCompat.MessagingStyle.Message(safeBody, System.currentTimeMillis(), person)
+            if (previewOn && mediaUri != null) incoming.setData("image/jpeg", mediaUri)
+            val (style, shadeIds, count) = conversationStyle(
                 context = context,
                 notificationId = notificationId,
-                conversationId = convId,
                 self = self,
                 incoming = incoming,
                 incomingMessageId = userInfo["messageId"] as? String,
+                previewOn = previewOn,
+                isGroup = isGroup,
+                groupTitle = groupTitle,
+                summarizeHidden = isChatMessage,
+                mention = if (userInfo["isMention"] == "1" || userInfo["isMention"] == true)
+                    context.getString(R.string.groups_notification_mention, senderName) else null,
             )
+            val conversationIcon = conversationAvatarBitmap ?: avatarBitmap
             donateIncomingMessage(
                 conversationId = convId,
                 messageId = userInfo["messageId"] as? String ?: convId,
                 senderId = userInfo["senderId"] as? String ?: "",
                 senderUsername = senderName,
                 senderProfileImageUrl = userInfo["senderProfileImage"] as? String,
-                messagePreview = body,
-                avatarBitmap = avatarBitmap,
+                messagePreview = safeBody,
+                avatarBitmap = conversationIcon,
+                senderAvatarBitmap = avatarBitmap,
+                conversationLabel = groupTitle,
+                isGroup = isGroup,
             )
-            builder.setStyle(style)
+            // Título explícito: OEMs (MIUI) a veces ignoran solo MessagingStyle.
+            builder.setContentTitle(if (isGroup) groupTitle ?: senderName else senderName)
+                .setContentText(body)
+                .setStyle(style)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setShortcutId(SHORTCUT_PREFIX + convId)
                 .addPerson(person)
+            conversationIcon?.let { builder.setLargeIcon(it) }
             builder.extras.putStringArrayList(EXTRA_SHADE_MESSAGE_IDS, ArrayList(shadeIds))
+            builder.extras.putBoolean(EXTRA_PREVIEW_VISIBLE, previewOn)
+            builder.extras.putInt(EXTRA_MESSAGE_COUNT, count)
+            if (!previewOn) builder.setContentText(style.messages.lastOrNull()?.text)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 builder.setLocusId(LocusIdCompat(convId))
             }
@@ -180,47 +261,50 @@ object ChatCommunicationIntentDonor {
      * Android shade: al expandir se ven los mensajes del hilo (MessagingStyle),
      * no solo el último. iOS no acumula; aquí sí. Fuente: notificación activa.
      */
+    private data class ConversationStyle(
+        val style: NotificationCompat.MessagingStyle,
+        val messageIds: List<String>,
+        val count: Int,
+    )
+
     private fun conversationStyle(
         context: Context,
         notificationId: Int,
-        conversationId: String,
         self: Person,
         incoming: NotificationCompat.MessagingStyle.Message,
         incomingMessageId: String?,
-    ): Pair<NotificationCompat.MessagingStyle, List<String>> {
+        previewOn: Boolean,
+        isGroup: Boolean,
+        groupTitle: String?,
+        summarizeHidden: Boolean,
+        mention: String?,
+    ): ConversationStyle {
         val existing = NotificationManagerCompat.from(context).activeNotifications
-            .firstOrNull { it.id == notificationId }
-        if (existing == null) shadeHistory.remove(conversationId)
-        val previousIds = existing?.notification?.extras
-            ?.getStringArrayList(EXTRA_SHADE_MESSAGE_IDS)
-            .orEmpty()
-        val recovered = existing?.notification?.let {
+            .firstOrNull { it.id == notificationId }?.notification
+        val previousIds = existing?.extras?.getStringArrayList(EXTRA_SHADE_MESSAGE_IDS).orEmpty()
+        val recovered = existing?.let {
             NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(it)
         }?.messages.orEmpty()
-        val fromMemory = shadeHistory[conversationId].orEmpty()
-        val priorMessages = when {
-            recovered.isNotEmpty() -> recovered
-            existing != null && fromMemory.isNotEmpty() -> fromMemory
-            else -> emptyList()
-        }
         val alreadyPosted = !incomingMessageId.isNullOrBlank() && incomingMessageId in previousIds
-        val mergedMessages = if (alreadyPosted) {
-            priorMessages.ifEmpty { listOf(incoming) }
+        val priorCount = existing?.extras?.getInt(EXTRA_MESSAGE_COUNT, recovered.size) ?: 0
+        val count = (priorCount + if (alreadyPosted) 0 else 1).coerceAtLeast(1)
+        val style = NotificationCompat.MessagingStyle(self).setGroupConversation(isGroup)
+        if (isGroup) style.conversationTitle = groupTitle ?: context.getString(R.string.notification_group_untitled)
+        val ids = (previousIds + listOfNotNull(incomingMessageId)).distinct().takeLast(100)
+
+        if (!previewOn) {
+            val summary = if (!summarizeHidden) incoming.text.toString()
+                else if (count > 1) context.getString(R.string.notification_chat_summary_multiple, count.toString())
+                else context.getString(R.string.notification_chat_summary_single)
+            val text = if (mention != null) "$summary\n$mention" else summary
+            style.addMessage(NotificationCompat.MessagingStyle.Message(text, incoming.timestamp, incoming.person))
         } else {
-            priorMessages + incoming
-        }.takeLast(MAX_SHADE_MESSAGES)
-        shadeHistory[conversationId] = mergedMessages.toMutableList()
-        val mergedIds = buildList {
-            if (alreadyPosted) addAll(previousIds.takeLast(MAX_SHADE_MESSAGES))
-            else {
-                addAll(previousIds)
-                incomingMessageId?.takeIf { it.isNotBlank() }?.let { add(it) }
-                while (size > MAX_SHADE_MESSAGES) removeAt(0)
-            }
+            // A previous hidden summary (or legacy notification) is never restored as chat history.
+            val previous = if (existing?.extras?.getBoolean(EXTRA_PREVIEW_VISIBLE) == true) recovered else emptyList()
+            val messages = if (alreadyPosted && previous.isNotEmpty()) previous else previous + incoming
+            messages.takeLast(MAX_SHADE_MESSAGES).forEach { style.addMessage(it) }
         }
-        val style = NotificationCompat.MessagingStyle(self).setGroupConversation(false)
-        mergedMessages.forEach { style.addMessage(it) }
-        return style to mergedIds
+        return ConversationStyle(style, ids, count)
     }
 
     fun donateIncomingMessage(
@@ -231,6 +315,9 @@ object ChatCommunicationIntentDonor {
         senderProfileImageUrl: String?,
         messagePreview: String?,
         avatarBitmap: Bitmap? = null,
+        conversationLabel: String? = null,
+        isGroup: Boolean = false,
+        senderAvatarBitmap: Bitmap? = avatarBitmap,
     ) {
         val ctx = appContext ?: return
         val donation = DonatedConversation(
@@ -247,7 +334,7 @@ object ChatCommunicationIntentDonor {
             .setKey(senderId)
             .setName(senderUsername)
             .setImportant(true)
-            .apply { avatarBitmap?.let { setIcon(IconCompat.createWithBitmap(it)) } }
+            .apply { senderAvatarBitmap?.let { setIcon(IconCompat.createWithBitmap(it)) } }
             .build()
 
         val intent = Intent(ctx, MainActivity::class.java).apply {
@@ -260,14 +347,20 @@ object ChatCommunicationIntentDonor {
         }
 
         val shortcutId = SHORTCUT_PREFIX + conversationId
+        val shortcutLabel = conversationLabel?.takeIf { it.isNotBlank() }
+            ?: if (isGroup) ctx.getString(R.string.notification_group_untitled) else senderUsername
         val shortcutBuilder = ShortcutInfoCompat.Builder(ctx, shortcutId)
-            .setShortLabel(senderUsername.take(24))
-            .setLongLabel(senderUsername)
+            .setShortLabel(shortcutLabel.take(24))
+            .setLongLabel(shortcutLabel)
             .setLocusId(LocusIdCompat(conversationId))
-            .setPerson(person)
             .setLongLived(true)
             .setCategories(setOf("android.shortcut.conversation"))
             .setIntent(intent)
+        if (isGroup) {
+            shortcutBuilder.setPersons(arrayOf(person))
+        } else {
+            shortcutBuilder.setPerson(person)
+        }
         avatarBitmap?.let { shortcutBuilder.setIcon(IconCompat.createWithBitmap(it)) }
         val shortcut = shortcutBuilder.build()
 
@@ -279,7 +372,6 @@ object ChatCommunicationIntentDonor {
     fun removeConversationShortcut(conversationId: String) {
         val ctx = appContext ?: return
         lastDonationByConversation.remove(conversationId)
-        shadeHistory.remove(conversationId)
         runCatching {
             ShortcutManagerCompat.removeDynamicShortcuts(ctx, listOf(SHORTCUT_PREFIX + conversationId))
         }

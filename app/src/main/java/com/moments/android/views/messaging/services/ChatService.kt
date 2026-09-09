@@ -192,6 +192,27 @@ object ChatService {
         ).getOrThrow()
     }
 
+    /** Media compartido del hilo (fotos/vídeos) para Conversation Settings. */
+    suspend fun fetchSharedGalleryMedia(
+        conversationId: String,
+        limit: Int = 400,
+    ): Result<List<EnhancedMessage>> = runCatching {
+        preloadEncryption(conversationId)
+        val snapshot = db.messagingThread(conversationId)
+            .messagingMessages
+            .whereIn("type", listOf(MessageType.IMAGE.raw, MessageType.VIDEO.raw))
+            .limit(limit.toLong())
+            .get()
+            .await()
+        handleMessagesSnapshot(
+            documents = snapshot.documents,
+            error = null,
+            conversationId = conversationId,
+            cutoffDate = null,
+            hydrateReactions = false,
+        ).getOrThrow()
+    }
+
     suspend fun fetchMessagesAfter(
         conversationId: String,
         after: MessageSyncCursor,

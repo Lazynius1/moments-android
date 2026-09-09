@@ -2073,7 +2073,6 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="chat_intro_relationship_other_follows_since">%1$s segue-te desde %2$s</string>
     <string name="chat_link_open">Abrir link</string>
     <string name="chat_link_preview_loading">A carregar pré-visualização do link</string>
-    <string name="chat_media_download">Transferir</string>
     <string name="chat_recovery_invalid_pin">Usa exatamente 6 dígitos</string>
     <string name="chat_scroll_badge_max">99+</string>
     <string name="chat_shared_moment">Partilhou um Moment</string>
@@ -2322,4 +2321,8 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="settings_privacy_group_invites_everyone">Todos</string>
     <string name="settings_privacy_group_invites_following">Pessoas que segues</string>
     <string name="settings_privacy_group_invites_nobody">Ninguém</string>
+    <string name="notification_chat_summary_single">Nova mensagem</string>
+    <string name="notification_chat_summary_multiple">%1$s novas mensagens</string>
+    <string name="notification_group_untitled">Grupo</string>
+    <string name="notification_chat_self">Tu</string>
 </resources>

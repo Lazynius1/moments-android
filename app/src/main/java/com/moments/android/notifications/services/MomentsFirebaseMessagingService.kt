@@ -8,6 +8,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.moments.android.R
+import com.moments.android.services.messaging.ChatNotificationThread
 import com.moments.android.services.messaging.MessageIngestService
 import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.messaging.SharedChatDecryptor
@@ -41,7 +42,7 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         super.onMessageReceived(message)
         val userInfo = message.data.mapValues { it.value as Any? }
         if (userInfo.isEmpty()) return
-        if (userInfo["type"] == "group_message" || userInfo["type"] == "group_invitation") {
+        if (userInfo["type"] == "group_invitation") {
             val isOpen = isAppInForeground() && userInfo["type"] == "group_message" && userInfo["groupId"] == com.moments.android.views.messaging.services.ChatSessionEngine.activeConversationId
             if (!isOpen) scope.launch { showSystemNotificationIfNeeded(message, userInfo) }
             NotificationBadgeService.setupListeners()
@@ -92,7 +93,7 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         // ≡ enqueueMessageIngestIfNeeded + mark delivered / badge
         val handledByServer = handleServerCounts(userInfo)
         val type = (userInfo["type"] as? String)?.lowercase()
-        val conversationId = userInfo["conversationId"] as? String
+        val conversationId = ChatNotificationThread.conversationId(userInfo)
         val messageId = userInfo["messageId"] as? String
         if (!conversationId.isNullOrBlank() && !messageId.isNullOrBlank()) {
             ChatService.markMessageAsDeliveredFromNotification(conversationId, messageId)
@@ -123,7 +124,7 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         val notifications = parseCount("unreadNotifications") ?: return false
         val echoes = parseCount("unreadEchoes") ?: 0
         val tags = parseCount("unreadTags") ?: 0
-        return NotificationBadgeService.applyServerCounts(messages, notifications, echoes, tags)
+        return NotificationBadgeService.applyServerCounts(messages, notifications, echoes, tags, parseCount("unreadGroupMessages"))
     }
 
     private suspend fun showSystemNotificationIfNeeded(message: RemoteMessage, userInfo: Map<String, Any?>) {
@@ -161,10 +162,53 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
             return ResolvedContent(getString(com.moments.android.R.string.groups_invitations), userInfo["groupName"] as? String ?: "")
         }
         if (type == "group_message") {
-            return ResolvedContent(
-                userInfo["groupName"] as? String ?: getString(R.string.groups_title),
-                getString(R.string.groups_notification, userInfo["senderUsername"] as? String ?: ""),
-            )
+            val conversationId = ChatNotificationThread.conversationId(userInfo)
+            val groupTitle = ChatNotificationThread.resolvedGroupName(userInfo)
+                ?: getString(R.string.notification_group_untitled)
+            val sender = userInfo["senderUsername"] as? String ?: ""
+            val isMention = userInfo["isMention"] == "1" || userInfo["isMention"] == true
+            val generic = if (isMention) {
+                getString(R.string.groups_notification_mention, sender)
+            } else {
+                ChatNotificationThread.previewLabel(this, userInfo["messageType"] as? String)
+            }
+            if (conversationId.isNullOrBlank() ||
+                (userInfo["messageType"] as? String) != "text" ||
+                !ChatPreviewPrivacy.shouldRevealPreview(
+                    conversationId,
+                    ChatPreviewPrivacy.isVanishModeMessage(userInfo),
+                )
+            ) {
+                return ResolvedContent(groupTitle, generic)
+            }
+            SharedChatDecryptor.decrypt(
+                (userInfo["encryptedContent"] as? String).orEmpty(),
+                conversationId,
+            )?.let { plain ->
+                val trimmed = ChatTextMarkup.plainText(plain, hidesSpoilers = true).trim()
+                if (trimmed.isNotEmpty()) {
+                    val body = if (trimmed.length > 200) trimmed.take(199) + "…" else trimmed
+                    return ResolvedContent(groupTitle, body)
+                }
+            }
+            val messageId = userInfo["messageId"] as? String
+            if (!messageId.isNullOrBlank()) {
+                val fetched = runCatching {
+                    val snapshot = FirebaseFirestore.getInstance()
+                        .collection("groupConversations").document(conversationId)
+                        .collection("groupMessages").document(messageId).get().await()
+                    if (ChatPreviewPrivacy.isVanishModeMessage(snapshot.data ?: emptyMap())) null
+                    else snapshot.getString("content")
+                }.getOrNull()
+                SharedChatDecryptor.decrypt(fetched.orEmpty(), conversationId)?.let { plain ->
+                    val trimmed = ChatTextMarkup.plainText(plain, hidesSpoilers = true).trim()
+                    if (trimmed.isNotEmpty()) {
+                        val body = if (trimmed.length > 200) trimmed.take(199) + "…" else trimmed
+                        return ResolvedContent(groupTitle, body)
+                    }
+                }
+            }
+            return ResolvedContent(groupTitle, generic)
         }
 
         if (type == "message_request_v2") {

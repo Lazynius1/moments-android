@@ -33,16 +33,19 @@ class ChatNotificationReplyReceiver : BroadcastReceiver() {
 
         val pendingResult = goAsync()
         scope.launch {
-            runCatching {
-                ChatService.sendTextMessage(
+            try {
+                val result = ChatService.sendTextMessage(
                     conversationId = conversationId,
                     senderId = senderId,
                     content = replyText,
                 )
+                if (result.isSuccess) {
+                    com.moments.android.notifications.services.NotificationShadePoster.clearConversation(context, conversationId)
+                }
+                NotificationBadgeService.setupListeners()
+            } finally {
+                pendingResult.finish()
             }
-            // ≡ NotificationBadgeService.shared.setupListeners() tras quick reply iOS
-            NotificationBadgeService.setupListeners()
-            pendingResult.finish()
         }
     }
 }

@@ -111,6 +111,9 @@ object ChatSessionEngine {
     fun activate(conversationId: String) {
         reconcileCurrentUser()
         activeConversationId = conversationId
+        com.moments.android.MomentsApplication.instance?.let {
+            com.moments.android.notifications.services.NotificationShadePoster.clearConversation(it, conversationId)
+        }
         val session = synchronized(lock) { sessions[conversationId] }
         if (session == null) {
             syncInAppFallbackListeners()

@@ -1,5 +1,6 @@
 package com.moments.android.services.messaging
 
+import com.moments.android.services.network.NetworkMonitor
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageType
@@ -13,7 +14,7 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Port de `ChatMediaPrefetcher.swift` — precarga proactiva de media de chat.
- * Reutiliza el resolver cifrado (`ChatMediaDownloadPolicy` + cuota); aquí solo se decide
+ * Reutiliza el resolver cifrado (la caché automática + cuota); aquí solo se decide
  * *qué* precargar y se acota la concurrencia (`maxConcurrent = 3`), como en iOS.
  */
 object ChatMediaPrefetcher {
@@ -24,18 +25,24 @@ object ChatMediaPrefetcher {
     private var activeCount = 0
     private const val MAX_CONCURRENT = 3
 
+    init {
+        scope.launch {
+            NetworkMonitor.isConnectedFlow.collect { connected ->
+                if (connected) pump()
+            }
+        }
+    }
+
     /**
-     * Encola la media descargable de estos mensajes. No-op si la política no permite
-     * descargar ahora (p. ej. wifi-only en celular). El trabajo corre en un scope propio
+     * Encola la media descargable cuando hay conexión. El trabajo corre en un scope propio
      * (equivalente al `Task {}` de iOS) para no bloquear al llamante.
      */
     fun prefetchIfNeeded(messages: List<EnhancedMessage>) {
-        if (!ChatMediaDownloadPolicy.shouldDownloadAutomatically()) return
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        if (FirebaseAuth.getInstance().currentUser == null) return
         scope.launch {
             mutex.withLock {
                 for (message in messages) {
-                    if (!shouldPrefetch(message, currentUserId)) continue
+                    if (!shouldPrefetch(message)) continue
                     if (!inFlight.add(message.id)) continue
                     pending.addLast(message)
                 }
@@ -44,12 +51,10 @@ object ChatMediaPrefetcher {
         }
     }
 
-    private fun shouldPrefetch(message: EnhancedMessage, currentUserId: String): Boolean {
+    private fun shouldPrefetch(message: EnhancedMessage): Boolean {
         if (message.isDeleted) return false
-        // Los mensajes propios ya se cachean localmente al enviarse.
-        if (message.senderId == currentUserId) return false
         // View-once y efímeros se abren deliberadamente: no se precachean en silencio.
-        if (message.type != MessageType.IMAGE && message.type != MessageType.VIDEO) return false
+        if (message.isVanishModeMessage == true || message.type !in setOf(MessageType.IMAGE, MessageType.VIDEO, MessageType.AUDIO, MessageType.FILE)) return false
         val path = message.mediaObjectPath
         if (path.isNullOrEmpty() || message.mediaEncryption == null) return false
         return true
@@ -59,13 +64,18 @@ object ChatMediaPrefetcher {
     private suspend fun pump() {
         while (true) {
             val message = mutex.withLock {
+                if (!NetworkMonitor.isConnected) return@withLock null
+                if (FirebaseAuth.getInstance().currentUser == null) {
+                    pending.clear()
+                    inFlight.clear()
+                    return@withLock null
+                }
                 if (activeCount >= MAX_CONCURRENT || pending.isEmpty()) return@withLock null
                 activeCount += 1
                 pending.removeFirst()
             } ?: break
             scope.launch {
                 // El resolver descarga, descifra, escribe a disco y aplica cuota.
-                // Devuelve null sin efecto si la política bloquea ese fichero concreto.
                 runCatching { ChatService.encryptedMediaResolver.resolveForMessage(message) }
                 finish(message.id)
             }

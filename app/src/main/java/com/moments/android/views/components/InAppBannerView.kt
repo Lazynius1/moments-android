@@ -316,6 +316,9 @@ private fun bannerTextLines(
     copy: NotificationBannerCopy,
     notification: MomentsNotification,
 ): BannerTextLines {
+    if (com.moments.android.services.messaging.GroupChatScope.isGroup(notification.conversationId)) {
+        return BannerTextLines(copy.title, copy.body)
+    }
     val name = notification.senderUsername
     if (isSystemTimeLimitBanner(notification)) {
         return BannerTextLines(copy.title, copy.body)
@@ -345,6 +348,8 @@ private fun BannerAvatar(
 ) {
     if (isSystem) {
         SystemBannerAvatar(notification = notification, isDark = isDark)
+    } else if (com.moments.android.services.messaging.GroupChatScope.isGroup(notification.conversationId)) {
+        com.moments.android.views.messaging.groups.GroupChatAvatar(image = notification.groupImage.orEmpty(), size = 34.dp)
     } else {
         AsyncProfileImageView(
             userId = notification.senderId,

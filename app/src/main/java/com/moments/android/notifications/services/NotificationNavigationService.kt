@@ -65,7 +65,7 @@ object NotificationNavigationService {
             return
         }
         if (type == "group_message") {
-            val id = userInfo["groupId"] as? String ?: return
+            val id = com.moments.android.services.messaging.ChatNotificationThread.conversationId(userInfo) ?: return
             if (id.isNotBlank()) {
                 com.moments.android.views.messaging.groups.GroupNavigation.pendingId.value = id
                 AppRouter.navigate(AppRouter.Destination.ShowMessages)

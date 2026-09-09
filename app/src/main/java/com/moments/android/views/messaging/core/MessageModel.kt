@@ -17,7 +17,6 @@ import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.content.BackendFeedService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.messaging.ChatCacheStore
-import com.moments.android.services.messaging.ChatMediaDownloadPolicy
 import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.messaging.VanishMessageTimer
 import com.moments.android.utilities.MomentsFormat
@@ -648,25 +647,6 @@ data class EnhancedMessage(
                 else -> false
             }
         }
-
-    val isMediaAwaitingManualDownload: Boolean
-        get() {
-            if (ChatMediaDownloadPolicy.shouldDownloadAutomatically()) return false
-            return if (type == MessageType.VIDEO) needsDownloadForPlayback else isMediaPendingResolution
-        }
-
-    val estimatedDownloadByteCount: Long?
-        get() {
-            fileSize?.takeIf { it > 0 }?.let { return it }
-            val main = mediaEncryption?.plaintextSize?.takeIf { it > 0 } ?: return null
-            return if (type == MessageType.VIDEO) {
-                val thumb = thumbnailEncryption?.plaintextSize?.takeIf { it > 0 } ?: 0L
-                main + thumb
-            } else main
-        }
-
-    val formattedDownloadSize: String?
-        get() = estimatedDownloadByteCount?.let { Formatter.formatFileSize(MomentsFormat.requireContext(), it) }
 
     val previewThumbnailURLForDisplay: String?
         get() {

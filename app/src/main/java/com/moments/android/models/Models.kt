@@ -1278,6 +1278,8 @@ data class MomentsNotification(
     val reminderVariant: String? = null,
     val isReactionPlural: Boolean? = null,
     val isHost: Boolean? = null,
+    val groupName: String? = null,
+    val groupImage: String? = null,
 ) {
     companion object {
         /**
@@ -1304,6 +1306,8 @@ data class MomentsNotification(
                 ?: (data["reactionCount"] as? String)?.toIntOrNull()
                 ?: (data["moderatedMediaCount"] as? String)?.toIntOrNull()
             return MomentsNotification(
+                groupName = data["groupName"] as? String,
+                groupImage = data["groupImage"] as? String,
                 id = id ?: data["id"] as? String,
                 type = type,
                 senderId = data["senderId"] as? String ?: "",

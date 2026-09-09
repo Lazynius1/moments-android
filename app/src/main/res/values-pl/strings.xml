@@ -1623,7 +1623,6 @@
     <string name="chat_location_stop_sharing">Przestań udostępniać</string>
     <string name="chat_location_directions">Wyznacz trasę</string>
     <string name="chat_location_open_maps">Otwórz w Mapach</string>
-    <string name="chat_media_download">Pobierz</string>
     <string name="chat_deleted_audio">Usunięto wiadomość głosową</string>
     <string name="chat_deleted_image">Usunięto zdjęcie</string>
     <string name="chat_deleted_video">Usunięto film</string>
@@ -2897,4 +2896,8 @@
     <string name="nova_welcome_editorial_write_prompt">Pomóż mi coś napisać</string>
     <string name="nova_welcome_editorial_moments_title">Co mogę robić w Moments?</string>
     <string name="nova_welcome_editorial_moments_prompt">W czym możesz mi pomóc w Moments?</string>
+    <string name="notification_chat_summary_single">Nowa wiadomość</string>
+    <string name="notification_chat_summary_multiple">Nowe wiadomości: %1$s</string>
+    <string name="notification_group_untitled">Grupa</string>
+    <string name="notification_chat_self">Ty</string>
 </resources>

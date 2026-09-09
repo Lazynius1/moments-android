@@ -2073,7 +2073,6 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="chat_intro_relationship_other_follows_since">%1$s ti segue da %2$s</string>
     <string name="chat_link_open">Apri link</string>
     <string name="chat_link_preview_loading">Caricamento anteprima link</string>
-    <string name="chat_media_download">Scarica</string>
     <string name="chat_recovery_invalid_pin">Usa esattamente 6 cifre</string>
     <string name="chat_scroll_badge_max">99+</string>
     <string name="chat_shared_moment">Ha condiviso un moment</string>
@@ -2330,4 +2329,8 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="settings_privacy_group_invites_everyone">Tutti</string>
     <string name="settings_privacy_group_invites_following">Persone che segui</string>
     <string name="settings_privacy_group_invites_nobody">Nessuno</string>
+    <string name="notification_chat_summary_single">Nuovo messaggio</string>
+    <string name="notification_chat_summary_multiple">%1$s nuovi messaggi</string>
+    <string name="notification_group_untitled">Gruppo</string>
+    <string name="notification_chat_self">Tu</string>
 </resources>

@@ -18,15 +18,19 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.graphics.drawable.toBitmap
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import com.moments.android.MainActivity
 import com.moments.android.R
 import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.messaging.ChatCommunicationIntentDonor
+import com.moments.android.services.messaging.ChatNotificationThread
 import com.moments.android.services.messaging.SharedChatDecryptor
 import com.moments.android.services.storage.StoragePathBuilder
 import com.moments.android.views.shared.ChatPreviewPrivacy
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -44,6 +48,8 @@ object NotificationShadePoster {
     const val CHANNEL_SOCIAL = "moments_social"
     const val CHANNEL_REMINDERS = "moments_reminders"
     const val CHANNEL_DEFAULT = MomentsFirebaseMessagingService.CHANNEL_ID
+
+    private val postMutex = Mutex()
 
     private const val FILE_PROVIDER_AUTHORITY_SUFFIX = ".notification.fileprovider"
     private const val MAX_ATTACHMENT_BYTES = 8L * 1024 * 1024
@@ -98,15 +104,22 @@ object NotificationShadePoster {
         userInfo: Map<String, Any?>,
         title: String,
         body: String,
-    ) {
+    ) = postMutex.withLock {
         ensureChannels(context)
         val type = (userInfo["type"] as? String)?.lowercase().orEmpty()
-        val bitmaps = resolveBitmaps(userInfo)
+        val bitmaps = resolveBitmaps(context, userInfo)
         val channelId = channelIdFor(userInfo, type)
         val threadId = (userInfo["threadId"] as? String)?.takeIf { it.isNotBlank() }
             ?: defaultThreadId(userInfo, type)
         val collapseKey = (userInfo["collapseKey"] as? String)?.takeIf { it.isNotBlank() }
             ?: defaultCollapseKey(userInfo, type, messageId)
+        val conversationId = ChatNotificationThread.conversationId(userInfo)
+        val shadeKey = if (isConversationShade(type) && !conversationId.isNullOrBlank()) {
+            ChatNotificationThread.shadeKey(conversationId) +
+                (if (ChatNotificationThread.isChatMessage(type)) "" else "_$type")
+        } else {
+            collapseKey
+        }
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -115,15 +128,16 @@ object NotificationShadePoster {
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
-            collapseKey.hashCode(),
+            shadeKey.hashCode(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
         val builder = if (isConversationShade(type)) {
-            val circularAvatar = bitmaps.avatar?.let { prepareAvatar(it) }
-            val mediaUri = if (isChatDm(type)) {
-                bitmaps.content?.let { cacheBitmapAsUri(context, it, messageId ?: collapseKey) }
+            val senderAvatar = bitmaps.avatar?.let { prepareAvatar(it) }
+            val conversationAvatar = bitmaps.conversation?.let { prepareAvatar(it) } ?: senderAvatar
+            val mediaUri = if (ChatNotificationThread.isChatMessage(type)) {
+                bitmaps.content?.let { cacheBitmapAsUri(context, it, messageId ?: shadeKey) }
                     ?.also { uri ->
                         runCatching {
                             context.grantUriPermission(
@@ -143,10 +157,11 @@ object NotificationShadePoster {
                 body = body,
                 channelId = channelId,
                 contentIntent = pendingIntent,
-                avatarBitmap = circularAvatar,
+                avatarBitmap = senderAvatar,
+                conversationAvatarBitmap = conversationAvatar,
                 mediaUri = mediaUri,
-                includeReply = isChatDm(type),
-                notificationId = collapseKey.hashCode(),
+                includeReply = ChatNotificationThread.isChatMessage(type),
+                notificationId = shadeKey.hashCode(),
             )
         } else {
             buildSocialNotification(
@@ -173,15 +188,19 @@ object NotificationShadePoster {
         }
 
         runCatching {
-            NotificationManagerCompat.from(context).notify(collapseKey.hashCode(), builder.build())
+            NotificationManagerCompat.from(context).notify(shadeKey.hashCode(), builder.build())
         }
     }
 
-    private fun isChatDm(type: String) = type == "message" || type == "new_message"
+    fun clearConversation(context: Context, conversationId: String) {
+        val manager = NotificationManagerCompat.from(context)
+        listOf("", "_message_reaction", "_chat_buzz").forEach { suffix ->
+            manager.cancel((ChatNotificationThread.shadeKey(conversationId) + suffix).hashCode())
+        }
+    }
 
-    /** DM + reacción/buzz del mismo hilo de conversación (≡ thread-id iOS). */
     private fun isConversationShade(type: String) =
-        type in setOf("message", "new_message", "message_reaction", "chat_buzz")
+        type in setOf("message", "new_message", "group_message", "message_reaction", "chat_buzz")
 
     private fun isQuotedSocial(type: String, userInfo: Map<String, Any?>): Boolean {
         if (type == "moment_comment") return true
@@ -195,7 +214,7 @@ object NotificationShadePoster {
             return fromPayload!!
         }
         return when (type) {
-            "message", "new_message", "message_reaction", "chat_buzz", "message_request_v2" ->
+            "message", "new_message", "group_message", "message_reaction", "chat_buzz", "message_request_v2" ->
                 CHANNEL_MESSAGES
             "gentle_reminder" -> CHANNEL_REMINDERS
             else -> CHANNEL_SOCIAL
@@ -203,17 +222,17 @@ object NotificationShadePoster {
     }
 
     private fun defaultThreadId(userInfo: Map<String, Any?>, type: String): String? {
-        val conversationId = userInfo["conversationId"] as? String
-        if (!conversationId.isNullOrBlank() && type in setOf("message", "new_message", "message_reaction", "chat_buzz")) {
-            return "conversation_$conversationId"
+        val conversationId = ChatNotificationThread.conversationId(userInfo)
+        if (!conversationId.isNullOrBlank() && isConversationShade(type)) {
+            return ChatNotificationThread.shadeKey(conversationId)
         }
         return null
     }
 
     private fun defaultCollapseKey(userInfo: Map<String, Any?>, type: String, messageId: String?): String {
-        val conversationId = userInfo["conversationId"] as? String
-        if (type == "message" || type == "new_message") {
-            return "msg_${conversationId.orEmpty()}".ifBlank { messageId ?: type }
+        val conversationId = ChatNotificationThread.conversationId(userInfo)
+        if (isConversationShade(type) && !conversationId.isNullOrBlank()) {
+            return ChatNotificationThread.shadeKey(conversationId)
         }
         return messageId ?: type
     }
@@ -251,16 +270,28 @@ object NotificationShadePoster {
         return builder
     }
 
-    private data class ShadeBitmaps(val avatar: Bitmap?, val content: Bitmap?)
+    private data class ShadeBitmaps(
+        val avatar: Bitmap?,
+        val content: Bitmap?,
+        /** Icono del hilo: foto de grupo si existe; si no, remitente. */
+        val conversation: Bitmap? = avatar,
+    )
 
-    private suspend fun resolveBitmaps(userInfo: Map<String, Any?>): ShadeBitmaps {
+    private suspend fun resolveBitmaps(context: Context, userInfo: Map<String, Any?>): ShadeBitmaps {
         val type = (userInfo["type"] as? String)?.lowercase()
-        val isChat = type == "new_message" || type == "message"
+        val isChat = ChatNotificationThread.isChatMessage(type)
+        val isGroup = ChatNotificationThread.isGroup(userInfo)
         val messageType = userInfo["messageType"] as? String
-        val avatar = resolveAvatarBitmap(userInfo)
+        val senderAvatar = resolveAvatarBitmap(userInfo)
+        val conversationAvatar = if (isGroup) {
+            resolveGroupAvatarBitmap(userInfo)
+                ?: ContextCompat.getDrawable(context, R.drawable.ic_notification_group)?.toBitmap(256, 256)
+        } else {
+            senderAvatar
+        }
 
         if (isChat && messageType != null && messageType !in viewOnceTypes) {
-            val conversationId = userInfo["conversationId"] as? String
+            val conversationId = ChatNotificationThread.conversationId(userInfo)
             val previewOn = conversationId != null && ChatPreviewPrivacy.shouldRevealPreview(
                 conversationId,
                 ChatPreviewPrivacy.isVanishModeMessage(userInfo),
@@ -270,7 +301,12 @@ object NotificationShadePoster {
                     "image", "video" -> {
                         val messageId = userInfo["messageId"] as? String
                         if (messageId.isNullOrBlank() || conversationId.isNullOrBlank()) null
-                        else resolveEncryptedMediaBitmap(conversationId, messageId, messageType == "image")
+                        else resolveEncryptedMediaBitmap(
+                            conversationId,
+                            messageId,
+                            messageType == "image",
+                            isGroup,
+                        )
                     }
                     "gif", "sticker" -> (userInfo["mediaUrl"] as? String)?.let { downloadPublicBitmap(it) }
                     else -> null
@@ -278,12 +314,19 @@ object NotificationShadePoster {
             } else {
                 null
             }
-            return ShadeBitmaps(avatar, content)
+            return ShadeBitmaps(senderAvatar, content, conversationAvatar)
         }
+
+        if (isChat) return ShadeBitmaps(senderAvatar, null, conversationAvatar)
 
         val mediaUrl = (userInfo["mediaUrl"] as? String)?.takeIf { it.isNotBlank() }
         val content = mediaUrl?.let { downloadPublicBitmap(it) }
-        return ShadeBitmaps(avatar, content)
+        return ShadeBitmaps(senderAvatar, content, conversationAvatar)
+    }
+
+    private suspend fun resolveGroupAvatarBitmap(userInfo: Map<String, Any?>): Bitmap? {
+        val fromPayload = (userInfo["groupImage"] as? String)?.takeIf { it.isNotBlank() } ?: return null
+        return downloadAvatar(fromPayload)
     }
 
     private suspend fun resolveAvatarBitmap(userInfo: Map<String, Any?>): Bitmap? {
@@ -327,10 +370,18 @@ object NotificationShadePoster {
         conversationId: String,
         messageId: String,
         allowFullMediaFallback: Boolean,
+        isGroup: Boolean = false,
     ): Bitmap? {
         val data = runCatching {
-            FirebaseFirestore.getInstance().collection("conversations").document(conversationId)
-                .collection("messages").document(messageId).get().await().data
+            val db = FirebaseFirestore.getInstance()
+            val snap = if (isGroup) {
+                db.collection("groupConversations").document(conversationId)
+                    .collection("groupMessages").document(messageId).get().await()
+            } else {
+                db.collection("conversations").document(conversationId)
+                    .collection("messages").document(messageId).get().await()
+            }
+            snap.data
         }.getOrNull() ?: return null
 
         val thumbPath = data["thumbnailObjectPath"] as? String

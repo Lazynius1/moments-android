@@ -1623,7 +1623,6 @@
     <string name="chat_location_stop_sharing">共有を停止</string>
     <string name="chat_location_directions">経路</string>
     <string name="chat_location_open_maps">マップで開く</string>
-    <string name="chat_media_download">ダウンロード</string>
     <string name="chat_deleted_audio">音声メッセージは削除されました</string>
     <string name="chat_deleted_image">写真は削除されました</string>
     <string name="chat_deleted_video">動画は削除されました</string>
@@ -2897,4 +2896,8 @@
     <string name="nova_welcome_editorial_write_prompt">何かを書くのを手伝って</string>
     <string name="nova_welcome_editorial_moments_title">Momentsでは何ができますか？</string>
     <string name="nova_welcome_editorial_moments_prompt">Momentsでどんなことを手伝えますか？</string>
+    <string name="notification_chat_summary_single">新しいメッセージ</string>
+    <string name="notification_chat_summary_multiple">新しいメッセージ%1$s件</string>
+    <string name="notification_group_untitled">グループ</string>
+    <string name="notification_chat_self">あなた</string>
 </resources>

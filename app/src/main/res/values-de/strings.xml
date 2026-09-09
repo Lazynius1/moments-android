@@ -2091,7 +2091,6 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="chat_intro_relationship_other_follows_since">%1$s folgt dir seit %2$s</string>
     <string name="chat_link_open">Link öffnen</string>
     <string name="chat_link_preview_loading">Linkvorschau wird geladen</string>
-    <string name="chat_media_download">Herunterladen</string>
     <string name="chat_recovery_invalid_pin">Verwende genau 6 Ziffern</string>
     <string name="chat_scroll_badge_max">99+</string>
     <string name="chat_shared_moment">Hat einen Moment geteilt</string>
@@ -2347,4 +2346,8 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="settings_privacy_group_invites_everyone">Alle</string>
     <string name="settings_privacy_group_invites_following">Personen, denen du folgst</string>
     <string name="settings_privacy_group_invites_nobody">Niemand</string>
+    <string name="notification_chat_summary_single">Neue Nachricht</string>
+    <string name="notification_chat_summary_multiple">%1$s neue Nachrichten</string>
+    <string name="notification_group_untitled">Gruppe</string>
+    <string name="notification_chat_self">Du</string>
 </resources>

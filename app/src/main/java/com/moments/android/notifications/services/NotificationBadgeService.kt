@@ -176,7 +176,9 @@ object NotificationBadgeService {
         unreadNotifications: Int,
         unreadEchoes: Int = 0,
         unreadTags: Int = 0,
+        unreadGroupMessages: Int? = null,
     ): Boolean {
+        if (unreadGroupMessages != null) groupMessageCount = unreadGroupMessages.coerceAtLeast(0)
         directMessageCount = unreadMessages.coerceAtLeast(0)
         _unreadMessagesCount.value = directMessageCount + groupMessageCount
         _unreadNotificationsCount.value = unreadNotifications.coerceAtLeast(0)

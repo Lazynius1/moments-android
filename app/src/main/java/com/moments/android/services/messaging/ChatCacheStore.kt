@@ -10,18 +10,12 @@ import java.io.File
 import java.util.Calendar
 import java.util.Date
 import java.util.UUID
-data class ChatStorageBreakdown(
-    val messageCount: Int,
-    val decryptedMediaBytes: Long,
-    val posterBytes: Long,
-) {
-    val totalMediaBytes: Long get() = decryptedMediaBytes + posterBytes
-}
-
 /**
  * Port de ChatCacheStore.swift — almacenamiento local de media descifrada de chat.
  */
 object ChatCacheStore {
+    private const val MAX_MEDIA_BYTES = 1_610_612_736L
+    private const val RETENTION_DAYS = 30
     private const val PREFS = "chat_cache_store"
     private const val DID_MIGRATE_KEY = "didMigrateChatMediaToAppGroup"
     private const val LEGACY_DECRYPTED = "chat_media_decrypted"
@@ -32,7 +26,6 @@ object ChatCacheStore {
     fun initialize(context: Context) {
         if (appContext == null) {
             appContext = context.applicationContext
-            ChatMediaDownloadPolicy.initialize(context)
         }
     }
 
@@ -172,32 +165,6 @@ object ChatCacheStore {
         return directoryBytes(decryptedDirectory()) + directoryBytes(postersDirectory())
     }
 
-    fun bytes(conversationId: String): Long {
-        val prefix = safeComponent(conversationId) + "_"
-        return filesIn(decryptedDirectory())
-            .filter { it.name.startsWith(prefix) }
-            .sumOf { it.length() }
-    }
-
-    fun bytesByConversation(conversationIds: List<String>): Map<String, Long> {
-        if (conversationIds.isEmpty()) return emptyMap()
-        val scanned = filesIn(decryptedDirectory()).map { it.name to it.length() }
-        if (scanned.isEmpty()) return emptyMap()
-        val result = mutableMapOf<String, Long>()
-        for (conversationId in conversationIds) {
-            val prefix = safeComponent(conversationId) + "_"
-            val total = scanned.sumOf { (name, size) -> if (name.startsWith(prefix)) size else 0L }
-            if (total > 0) result[conversationId] = total
-        }
-        return result
-    }
-
-    fun storageBreakdown(): ChatStorageBreakdown = ChatStorageBreakdown(
-        messageCount = LocalPersistenceService.cachedMessageCount(),
-        decryptedMediaBytes = directoryBytes(decryptedDirectory()),
-        posterBytes = directoryBytes(postersDirectory()),
-    )
-
     fun deleteMessageFiles(conversationId: String, messageId: String) {
         val msgPrefix = safeComponent(conversationId) + "_" + safeComponent(messageId) + "_"
         filesIn(decryptedDirectory()).filter { it.name.startsWith(msgPrefix) }.forEach { it.delete() }
@@ -218,7 +185,7 @@ object ChatCacheStore {
     private const val QUOTA_PROTECTION_DAYS = 7
 
     fun enforceQuota() {
-        val maxBytes = ChatMediaDownloadPolicy.maxMediaBytes
+        val maxBytes = MAX_MEDIA_BYTES
         var total = totalMediaBytes()
         if (total <= maxBytes) return
 
@@ -247,7 +214,7 @@ object ChatCacheStore {
     }
 
     fun enforceRetention() {
-        val retentionDays = ChatMediaDownloadPolicy.retentionDays
+        val retentionDays = RETENTION_DAYS
         if (retentionDays <= 0) return
         val cutoff = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -retentionDays) }.time
         val protectedKeys = LocalPersistenceService.cachedMessageKeys(cutoff)

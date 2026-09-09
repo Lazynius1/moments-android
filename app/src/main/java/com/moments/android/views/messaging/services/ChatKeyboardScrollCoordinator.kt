@@ -21,11 +21,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Port de `ChatKeyboardScrollCoordinator.swift`.
+ * Observa el IME (`WindowInsets.ime`) para sincronizar scroll del chat.
  *
- * iOS: NotificationCenter (`keyboardWillChangeFrame` / `keyboardWillHide`) + overlap vs UIWindow.
- * Android: `WindowInsets.ime` (Compose) alimenta el mismo estado publicado.
- * El scroll de la lista vive aparte (`LazyListState` en `ChatMessageListView`).
+ * En Telegram Android: `SizeNotifierFrameLayout` + `AdjustPanLayoutHelper`.
+ * Aquí el inset Compose alimenta el mismo ciclo (altura / transitioning / duración).
  */
 @Stable
 class ChatKeyboardScrollCoordinator {

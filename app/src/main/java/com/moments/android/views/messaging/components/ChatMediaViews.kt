@@ -68,68 +68,6 @@ private val mediaCorner = RoundedCornerShape(16.dp)
 /** ≡ iOS downsampling 208×272 en burbujas de chat. */
 val ChatMediaBubbleDownsample = DpSize(208.dp, 272.dp)
 
-/** Overlay centrado: flecha + tamaño (≡ iOS `ChatMediaDownloadOverlay`). */
-@Composable
-fun ChatMediaDownloadOverlay(sizeLabel: String?, modifier: Modifier = Modifier) {
-    Box(
-        modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.28f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Box(
-                Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Default.Download, null, tint = Color.White, modifier = Modifier.size(21.dp))
-            }
-            Text(
-                sizeLabel ?: stringResource(R.string.chat_media_download),
-                color = Color.White.copy(alpha = 0.92f),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-            )
-        }
-    }
-}
-
-/** Placeholder genérico sin miniatura en disco (≡ iOS `ChatMediaManualDownloadPlaceholder`). */
-@Composable
-fun ChatMediaManualDownloadPlaceholder(
-    sizeLabel: String?,
-    showsVideoBadge: Boolean = false,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier
-            .fillMaxSize()
-            .background(
-                Brush.linearGradient(
-                    listOf(Color(0xFF4A4A4C), Color(0xFF2C2C2E), Color(0xFF1C1C1E)),
-                ),
-            ),
-    ) {
-        // ≡ BlurView ultraThin ≈ velo oscuro sólido
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f)))
-        ChatMediaDownloadOverlay(sizeLabel)
-        if (showsVideoBadge) {
-            ChatVideoPlayBadge(
-                size = 14.dp,
-                padding = 6.dp,
-                modifier = Modifier.align(Alignment.BottomStart),
-            )
-        }
-    }
-}
-
 /** Overlay de progreso de descarga (≡ iOS `ChatMediaDownloadProgressOverlay`). */
 @Composable
 fun ChatMediaDownloadProgressOverlay(
@@ -158,10 +96,8 @@ fun GlassmorphicImageMessage(
     previewThumbnailUrl: String? = null,
     isSending: Boolean,
     isResolvingMedia: Boolean = false,
-    isAwaitingManualDownload: Boolean = false,
     isDownloadingMedia: Boolean = false,
     downloadProgress: Double? = null,
-    downloadSizeLabel: String? = null,
     progress: Double?,
     onTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -169,7 +105,7 @@ fun GlassmorphicImageMessage(
 ) {
     val a11yPhoto = stringResource(R.string.chat_a11y_photo)
     val a11yHint = stringResource(R.string.chat_a11y_open_media)
-    val blurredPreview = previewThumbnailUrl?.takeIf { isAwaitingManualDownload && it.isNotBlank() }
+    val blurredPreview = previewThumbnailUrl?.takeIf { it.isNotBlank() }
 
     Box(
         modifier
@@ -194,20 +130,7 @@ fun GlassmorphicImageMessage(
                     ChatMediaDownloadProgressOverlay(downloadProgress ?: 0.03)
                 }
             }
-            isAwaitingManualDownload -> {
-                if (!blurredPreview.isNullOrBlank()) {
-                    Box(Modifier.fillMaxSize()) {
-                        ChatKFImage(
-                            blurredPreview,
-                            Modifier.fillMaxSize().blur(22.dp),
-                            downsamplingSize,
-                        )
-                        ChatMediaDownloadOverlay(downloadSizeLabel)
-                    }
-                } else {
-                    ChatMediaManualDownloadPlaceholder(downloadSizeLabel, modifier = Modifier.fillMaxSize())
-                }
-            }
+
             isResolvingMedia -> ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
             !imageUrl.isNullOrBlank() -> ChatKFImage(imageUrl, Modifier.fillMaxSize(), downsamplingSize)
             else -> Box(
@@ -237,10 +160,8 @@ fun GlassmorphicVideoMessage(
     thumbnailUrl: String?,
     isSending: Boolean,
     isResolvingMedia: Boolean = false,
-    isAwaitingManualDownload: Boolean = false,
     isDownloadingMedia: Boolean = false,
     downloadProgress: Double? = null,
-    downloadSizeLabel: String? = null,
     progress: Double?,
     onTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -248,9 +169,8 @@ fun GlassmorphicVideoMessage(
 ) {
     val a11yVideo = stringResource(R.string.chat_a11y_video)
     val a11yHint = stringResource(R.string.chat_a11y_open_media)
-    val blurredPreview = thumbnailUrl?.takeIf { isAwaitingManualDownload && it.isNotBlank() }
-    val showPlayBadge = (!isAwaitingManualDownload && !isDownloadingMedia) ||
-        (isAwaitingManualDownload && !blurredPreview.isNullOrBlank())
+    val blurredPreview = thumbnailUrl?.takeIf { it.isNotBlank() }
+    val showPlayBadge = !isDownloadingMedia
 
     Box(
         modifier
@@ -275,24 +195,7 @@ fun GlassmorphicVideoMessage(
                     ChatMediaDownloadProgressOverlay(downloadProgress ?: 0.03)
                 }
             }
-            isAwaitingManualDownload -> {
-                if (!blurredPreview.isNullOrBlank()) {
-                    Box(Modifier.fillMaxSize()) {
-                        ChatKFImage(
-                            blurredPreview,
-                            Modifier.fillMaxSize().blur(22.dp),
-                            downsamplingSize,
-                        )
-                        ChatMediaDownloadOverlay(downloadSizeLabel)
-                    }
-                } else {
-                    ChatMediaManualDownloadPlaceholder(
-                        sizeLabel = downloadSizeLabel,
-                        showsVideoBadge = true,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
+
             isResolvingMedia -> ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
             !thumbnailUrl.isNullOrBlank() -> ChatKFImage(thumbnailUrl, Modifier.fillMaxSize(), downsamplingSize)
             else -> Box(Modifier.fillMaxSize().background(Color.White.copy(0.1f)))

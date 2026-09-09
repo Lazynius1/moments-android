@@ -54,6 +54,7 @@ import com.moments.android.utilities.HapticManager
 import com.moments.android.views.messaging.services.ChatBuzzProcessedStore
 import com.moments.android.views.messaging.services.ChatNavigationIntentStore
 import com.moments.android.views.messaging.services.ChatSessionEngine
+import com.moments.android.views.messaging.services.rememberChatKeyboardScrollCoordinator
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
@@ -211,6 +212,7 @@ fun GlassmorphicChatView(
     val searchResults by session.searchResults.collectAsState()
     val typingUsers by session.typingUsers.collectAsState()
     val listController = rememberChatMessageListController()
+    val keyboardScrollCoordinator = rememberChatKeyboardScrollCoordinator()
     val messagePresentation = rememberChatMessagePresentationState()
     messagePresentation.rowFrameProvider = { listController.frameInWindow(it) }
     val listPresentation = rememberChatMessageListPresentation()
@@ -386,10 +388,11 @@ fun GlassmorphicChatView(
         }.toSet()
     }
 
-    val scroll = remember(session, listController) {
+    val scroll = remember(session, listController, keyboardScrollCoordinator) {
         GlassmorphicChatScrollController(
             viewModel = session,
             listController = listController,
+            keyboardScrollCoordinator = keyboardScrollCoordinator,
             callbacks = ChatScrollCallbacks(
                 rowsReady = { session.chatRenderRows.isNotEmpty() },
                 resolveInitialTarget = {
@@ -419,6 +422,15 @@ fun GlassmorphicChatView(
         )
     }
     val search = remember(session, scroll) { GlassmorphicChatSearchController(session, scroll) }
+    // IME: un settle al cambiar altura (show/hide), sin pelear frame a frame.
+    var previousKeyboardHeightPx by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(keyboardScrollCoordinator.keyboardHeightPx, search.isSearchVisible) {
+        val newHeight = keyboardScrollCoordinator.keyboardHeightPx
+        val oldHeight = previousKeyboardHeightPx
+        previousKeyboardHeightPx = newHeight
+        if (search.isSearchVisible) return@LaunchedEffect
+        scroll.handleKeyboardHeightChange(oldHeight, newHeight)
+    }
     // Holder antes del lifecycle para que `onStoriesDisabled` limpie storyRoute (≡ iOS)
     val chatStoryRouteHolder = remember { mutableStateOf<ChatStoryRoute?>(null) }
     var chatStoryRoute by chatStoryRouteHolder
@@ -552,7 +564,7 @@ fun GlassmorphicChatView(
         }
         scope.launch {
             runCatching {
-                val resolved = ChatEncryptedMediaResolver.resolveForMessage(message, forceDownload = true)
+                val resolved = ChatEncryptedMediaResolver.resolveForMessage(message)
                     ?: error(context.getString(R.string.message_requests_media_unavailable))
                 val localUrl = resolved.mediaUrl
                     ?: error(context.getString(R.string.message_requests_media_unavailable))
@@ -662,6 +674,8 @@ fun GlassmorphicChatView(
     }
     DisposableEffect(session, lifecycle, search) {
         onDispose {
+            focusManager.clearFocus()
+            keyboardController?.hide()
             // ≡ onDisappearActions: drainAvailable → ABANDON_REPLAY
             val conversationId = session.conversationId
             if (conversationId.isNotBlank()) {
@@ -688,6 +702,7 @@ fun GlassmorphicChatView(
             }
             voice.resetVoiceRecordingInteraction()
             search.dispose()
+            scroll.dispose()
             lifecycle.dispose()
             session.deactivateChatSession()
         }

@@ -94,7 +94,7 @@ object NotificationPresentationCoordinator {
         val bucket = (notification.timestamp.time / DEDUP_WINDOW_MS).toInt()
         return when (notification.type) {
             NotificationType.MESSAGE ->
-                "message|${notification.conversationId.orEmpty()}|${notification.senderId}|$bucket"
+                "message|${notification.conversationId.orEmpty()}|${notification.messageId ?: "${notification.senderId}|$bucket"}"
             NotificationType.MESSAGE_REACTION ->
                 "messageReaction|${notification.conversationId.orEmpty()}|${notification.messageId.orEmpty()}|${notification.senderId}|$bucket"
             NotificationType.CHAT_BUZZ ->
@@ -148,6 +148,8 @@ object NotificationPresentationCoordinator {
         val senderId = firstString(userInfo, listOf("senderId", "userId", "followerId", "continuerId", "hostId"))
             ?: if (notificationType == NotificationType.GENTLE_REMINDER) "gentle_reminder" else ""
         return MomentsNotification(
+            groupName = com.moments.android.services.messaging.ChatNotificationThread.resolvedGroupName(userInfo),
+            groupImage = firstString(userInfo, listOf("groupImage", "groupImagePath")),
             id = firstString(userInfo, listOf("notificationId", "gcm.message_id"))
                 ?: UUID.randomUUID().toString(),
             type = notificationType,
@@ -169,7 +171,7 @@ object NotificationPresentationCoordinator {
                 listOf("reactionCount", "unreadInConvo", "moderatedMediaCount", "aggregateCount"),
             ),
             commentId = firstString(userInfo, listOf("commentId")),
-            conversationId = firstString(userInfo, listOf("conversationId", "targetId")),
+            conversationId = firstString(userInfo, listOf("conversationId", "groupId", "targetId")),
             echoId = firstString(userInfo, listOf("echoId")),
             moderationScope = firstString(userInfo, listOf("moderationScope")),
             chainId = firstString(userInfo, listOf("chainId")),
@@ -190,7 +192,7 @@ object NotificationPresentationCoordinator {
     fun notificationFromPush(userInfo: Map<String, Any?>): MomentsNotification? = mapPushPayload(userInfo)
 
     private fun mapPushType(rawType: String): NotificationType? = when (rawType) {
-        "new_message" -> NotificationType.MESSAGE
+        "new_message", "group_message" -> NotificationType.MESSAGE
         "message_reaction" -> NotificationType.MESSAGE_REACTION
         "chat_buzz" -> NotificationType.CHAT_BUZZ
         "gentle_reminder" -> NotificationType.GENTLE_REMINDER

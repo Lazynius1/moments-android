@@ -487,17 +487,7 @@ private fun MediaGridTileContent(message: EnhancedMessage, isDownloadingMedia: B
                     ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
                 }
             }
-            message.isMediaAwaitingManualDownload -> {
-                val preview = message.previewThumbnailURLForDisplay
-                if (!preview.isNullOrBlank()) {
-                    Box(Modifier.fillMaxSize()) {
-                        AsyncImage(preview, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(18.dp))
-                        ChatMediaDownloadOverlay(message.formattedDownloadSize)
-                    }
-                } else {
-                    ChatMediaManualDownloadPlaceholder(message.formattedDownloadSize, modifier = Modifier.fillMaxSize())
-                }
-            }
+
             message.isMediaPendingResolution -> ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
             !message.mediaUrl.isNullOrBlank() && message.localMediaFileIsReachable(message.mediaUrl!!) -> {
                 AsyncImage(message.mediaUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -513,21 +503,7 @@ private fun MediaGridTileContent(message: EnhancedMessage, isDownloadingMedia: B
                     ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
                 }
             }
-            message.isMediaAwaitingManualDownload -> {
-                val preview = message.previewThumbnailURLForDisplay
-                if (!preview.isNullOrBlank()) {
-                    Box(Modifier.fillMaxSize()) {
-                        AsyncImage(preview, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(18.dp))
-                        ChatMediaDownloadOverlay(message.formattedDownloadSize)
-                    }
-                } else {
-                    ChatMediaManualDownloadPlaceholder(
-                        sizeLabel = message.formattedDownloadSize,
-                        showsVideoBadge = true,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
+
             message.isMediaPendingResolution || message.needsVideoThumbnailForDisplay -> {
                 ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
             }

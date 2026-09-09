@@ -122,15 +122,17 @@ fun InAppMessageQuickReplyPanel(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            AsyncProfileImageView(
-                userId = notification.senderId,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape),
-            )
+            if (com.moments.android.services.messaging.GroupChatScope.isGroup(notification.conversationId)) {
+                com.moments.android.views.messaging.groups.GroupChatAvatar(image = notification.groupImage.orEmpty(), size = 40.dp)
+            } else {
+                AsyncProfileImageView(
+                    userId = notification.senderId,
+                    modifier = Modifier.size(40.dp).clip(CircleShape),
+                )
+            }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = notification.senderUsername,
+                    text = NotificationCopyResolver.resolve(notification).title,
                     color = primary,
                     fontWeight = FontWeight.Bold,
                     fontSize = titleSp,

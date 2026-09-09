@@ -46,7 +46,6 @@ import com.moments.android.views.messaging.services.warmMessageURLsFromDiskCache
 import com.moments.android.utilities.EmojiUsageStore
 import com.moments.android.MomentsApplication
 import com.moments.android.services.messaging.ChatCacheStore
-import com.moments.android.services.messaging.ChatMediaDownloadPolicy
 import com.moments.android.services.messaging.EncryptionService
 import com.moments.android.services.messaging.LocalFirstMessagingSettings
 import com.moments.android.services.messaging.MessagingEvents
@@ -919,11 +918,8 @@ open class EnhancedChatViewModel(
     private fun messageNeedsMediaHydration(message: EnhancedMessage): Boolean = message.isMediaPendingResolution
 
     fun hydrateMediaIfNeeded(message: EnhancedMessage) {
-        if (message.isMediaAwaitingManualDownload) {
-            hydrateThumbnailPreviewIfNeeded(message)
-            return
-        }
-        if (!ChatMediaDownloadPolicy.shouldDownloadAutomatically()) return
+
+        if (!NetworkMonitor.isConnected) return
         // Vídeos: solo miniatura. El .mp4 completo al abrir.
         if (message.type == MessageType.VIDEO) {
             hydrateVideoThumbnailIfNeeded(message)
@@ -941,7 +937,7 @@ open class EnhancedChatViewModel(
         if (message.id in hydratingMediaIds) return
         hydratingMediaIds += message.id
         setDownloadProgress(message.id, 0.03)
-        prepareMediaForViewing(message, forceDownload = false) {
+        prepareMediaForViewing(message) {
             hydratingMediaIds -= message.id
             clearDownloadProgress(message.id)
         }
@@ -994,14 +990,14 @@ open class EnhancedChatViewModel(
 
     fun hydrateVideoThumbnailIfNeeded(message: EnhancedMessage) {
         if (message.type != MessageType.VIDEO || !message.needsVideoThumbnailForDisplay) return
-        if (!ChatMediaDownloadPolicy.shouldDownloadAutomatically()) return
+        if (!NetworkMonitor.isConnected) return
 
         // Caso 1: miniatura cifrada en Storage.
         if (message.thumbnailObjectPath != null && message.thumbnailEncryption != null) {
             val thumbnailKey = "thumb_${message.id}"
             if (!hydratingMediaIds.add(thumbnailKey)) return
             scope.launch {
-                val resolvedThumb = chatService.resolveVideoThumbnail(message, forceDownload = false)
+                val resolvedThumb = chatService.resolveVideoThumbnail(message)
                 hydratingMediaIds -= thumbnailKey
                 if (resolvedThumb.isNullOrBlank()) return@launch
                 val updated = (_messages.value.firstOrNull { it.id == message.id } ?: message)
@@ -1024,7 +1020,7 @@ open class EnhancedChatViewModel(
         if (message.mediaObjectPath != null && message.mediaEncryption != null) {
             if (!hydratingMediaIds.add(message.id)) return
             setDownloadProgress(message.id, 0.03)
-            prepareMediaForViewing(message, forceDownload = false) { updated ->
+            prepareMediaForViewing(message) { updated ->
                 hydratingMediaIds -= message.id
                 clearDownloadProgress(message.id)
                 generateVideoPosterIfPossible(updated)
@@ -1060,7 +1056,7 @@ open class EnhancedChatViewModel(
         val previewKey = "thumb_preview_${message.id}"
         if (!hydratingMediaIds.add(previewKey)) return
         scope.launch {
-            val thumbnail = chatService.resolveVideoThumbnail(message, forceDownload = false)
+            val thumbnail = chatService.resolveVideoThumbnail(message)
             hydratingMediaIds -= previewKey
             if (thumbnail == null) return@launch
             val updated = (_messages.value.firstOrNull { it.id == message.id } ?: message)
@@ -1079,17 +1075,17 @@ open class EnhancedChatViewModel(
         }
         if (!downloadingMediaIds.add(message.id)) return
         setDownloadProgress(message.id, 0.03)
-        prepareMediaForViewing(message, forceDownload = true) { updated ->
+        prepareMediaForViewing(message) { updated ->
             downloadingMediaIds -= message.id
             clearDownloadProgress(message.id)
             completion(updated)
         }
     }
 
-    /** ≡ `prepareMediaForViewing(_:forceDownload:completion:)`. */
+    /** ≡ `prepareMediaForViewing(_:completion:)`. */
     fun prepareMediaForViewing(
         message: EnhancedMessage,
-        forceDownload: Boolean = true,
+
         completion: (EnhancedMessage) -> Unit,
     ) {
         if (message.hasLocalMediaReadyForViewer && !message.hasMissingLocalMedia) {
@@ -1112,7 +1108,7 @@ open class EnhancedChatViewModel(
         scope.launch {
             setDownloadProgress(message.id, 0.03)
             try {
-                val resolved = ChatEncryptedMediaResolver.resolveForMessage(message, forceDownload = forceDownload)
+                val resolved = ChatEncryptedMediaResolver.resolveForMessage(message)
                 if (resolved?.mediaUrl == null) {
                     completion(message)
                     return@launch
@@ -1137,7 +1133,7 @@ open class EnhancedChatViewModel(
     }
 
     fun prefetchUnresolvedMediaIfNeeded() {
-        if (!ChatMediaDownloadPolicy.shouldDownloadAutomatically()) return
+        if (!NetworkMonitor.isConnected) return
         for (message in _messages.value) {
             if (messageNeedsMediaHydration(message)) hydrateMediaIfNeeded(message)
         }
@@ -1938,8 +1934,8 @@ open class EnhancedChatViewModel(
             }
             if (next != current) appendOrReplaceMessage(next)
             if (next.type == MessageType.VIDEO) {
-                if (ChatMediaDownloadPolicy.shouldDownloadAutomatically()) hydrateVideoThumbnailIfNeeded(next)
-            } else if (ChatMediaDownloadPolicy.shouldDownloadAutomatically()) {
+                if (NetworkMonitor.isConnected) hydrateVideoThumbnailIfNeeded(next)
+            } else if (NetworkMonitor.isConnected) {
                 hydrateMediaIfNeeded(next)
             }
         }

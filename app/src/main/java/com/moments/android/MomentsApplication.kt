@@ -18,7 +18,6 @@ import com.moments.android.services.incognito.IncognitoModeService
 import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.messaging.ChatCommunicationIntentDonor
 import com.moments.android.services.messaging.EncryptionService
-import com.moments.android.services.messaging.ChatMediaDownloadPolicy
 import com.moments.android.services.messaging.LocalFirstMessagingSettings
 import com.moments.android.views.messaging.services.LiveLocationSharingService
 import com.moments.android.services.messaging.MessageIngestQueue
@@ -99,7 +98,6 @@ class MomentsApplication : Application(), ImageLoaderFactory {
         LocalFirstMessagingSettings.initialize(this)
         MessageIngestQueue.initialize(this)
         MessageSyncCursorStore.initialize(this)
-        ChatMediaDownloadPolicy.initialize(this)
         ChatCacheStore.initialize(this)
         com.moments.android.views.messaging.services.ChatBuzzProcessedStore.initialize(this)
         com.moments.android.views.messaging.services.ChatDraftStore.initialize(this)

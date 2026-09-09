@@ -2094,7 +2094,6 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="chat_intro_relationship_other_follows_since">%1$s vous suit depuis %2$s</string>
     <string name="chat_link_open">Ouvrir le lien</string>
     <string name="chat_link_preview_loading">Chargement de l\'aperçu du lien</string>
-    <string name="chat_media_download">Télécharger</string>
     <string name="chat_preview_image">Image</string>
     <string name="chat_recovery_invalid_pin">Utilisez exactement 6 chiffres</string>
     <string name="chat_scroll_badge_max">99+</string>
@@ -2388,4 +2387,8 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="settings_privacy_group_invites_everyone">Tout le monde</string>
     <string name="settings_privacy_group_invites_following">Personnes que vous suivez</string>
     <string name="settings_privacy_group_invites_nobody">Personne</string>
+    <string name="notification_chat_summary_single">Nouveau message</string>
+    <string name="notification_chat_summary_multiple">%1$s nouveaux messages</string>
+    <string name="notification_group_untitled">Groupe</string>
+    <string name="notification_chat_self">Vous</string>
 </resources>

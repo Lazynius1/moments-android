@@ -70,6 +70,7 @@ import com.moments.android.views.messaging.components.GlassmorphicClusterRow
 import com.moments.android.views.messaging.components.GlassmorphicInputBar
 import com.moments.android.views.messaging.components.GlassmorphicMessageRow
 import com.moments.android.views.messaging.components.ChatBubbleAnchorMetrics
+import com.moments.android.views.messaging.components.ChatComposerChromeMetrics
 import com.moments.android.views.messaging.components.ChatTimestampRevealState
 import com.moments.android.views.messaging.components.chatInputBackground
 import com.moments.android.views.messaging.components.clusterAggregateStatus
@@ -414,8 +415,9 @@ internal fun ChatComposerChrome(
     }
     val usePinnedKeyboardPadding = voiceGestureState.preserveKeyboardElevation &&
         voiceGestureState.pinnedKeyboardBottomPx > 0
-    // Pequeño gap sobre el IME: imePadding() queda corto en el host legacy.
-    val keyboardGap = 8.dp
+    // Gap fijo (TG: mismo término en la fórmula con/sin teclado). imePadding()
+    // a veces queda corto en el host legacy → medimos IME y sumamos panelInset.
+    val panelGap = ChatComposerChromeMetrics.panelBottomGap(keyboardVisible)
     val composerPanelBackground = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()).chatInputBackground
     // Una única superficie opaca cubre compositor + zona de nav/gesture.
     // Como SizeNotifierFrameLayout en Telegram: durante todo el gesto de voz se usa
@@ -427,18 +429,18 @@ internal fun ChatComposerChrome(
             if (keepComposerElevated) {
                 when {
                     usePinnedKeyboardPadding ->
-                        Modifier.padding(bottom = pinnedKeyboardBottom + keyboardGap)
+                        Modifier.padding(bottom = pinnedKeyboardBottom + panelGap)
                     keyboardVisible && measuredKeyboardBottom > 0.dp ->
-                        Modifier.padding(bottom = measuredKeyboardBottom + keyboardGap)
+                        Modifier.padding(bottom = measuredKeyboardBottom + panelGap)
                     else ->
                         Modifier
                             .imePadding()
-                            .padding(bottom = keyboardGap)
+                            .padding(bottom = panelGap)
                 }
             } else {
                 Modifier
                     .navigationBarsPadding()
-                    .padding(bottom = 10.dp)
+                    .padding(bottom = panelGap)
             },
         )
     when {

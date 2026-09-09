@@ -84,9 +84,9 @@ object MessageIngestService {
         if (!LocalFirstMessagingSettings.isEnabled) return false
 
         val type = (userInfo["type"] as? String)?.trim()?.lowercase()
-        if (type != "message" && type != "new_message") return false
+        if (!ChatNotificationThread.isChatMessage(type)) return false
 
-        val conversationId = userInfo["conversationId"] as? String ?: return false
+        val conversationId = ChatNotificationThread.conversationId(userInfo) ?: return false
         val messageId = userInfo["messageId"] as? String ?: return false
 
         return ingest(conversationId, messageId, MessageIngestSource.PUSH)
@@ -178,16 +178,6 @@ object MessageIngestService {
             scope.launch { MessageCatchUpService.sync(conv) }
 
             rememberIngestedKey(key)
-
-            ChatCommunicationNotificationService.donateFromPush(
-                mapOf(
-                    "type" to "new_message",
-                    "conversationId" to conv,
-                    "messageId" to msg,
-                    "senderId" to message.senderId,
-                ),
-                message.content,
-            )
 
             MessagingEvents.emitMessagesIngested(
                 MessagesIngestedEvent(conv, listOf(msg), source.raw),

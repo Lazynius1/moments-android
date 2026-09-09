@@ -549,12 +549,10 @@ private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Bool
             thumbnailUrl = message.thumbnailUrl,
             isSending = message.status == MessageStatus.SENDING,
             isResolvingMedia = (message.isMediaPendingResolution || message.needsVideoThumbnailForDisplay) &&
-                !message.isMediaAwaitingManualDownload &&
+
                 !downloading,
-            isAwaitingManualDownload = message.isMediaAwaitingManualDownload && !downloading,
             isDownloadingMedia = downloading,
             downloadProgress = downloadProgress,
-            downloadSizeLabel = message.formattedDownloadSize,
             progress = progress,
             modifier = mediaModifier,
         )
@@ -564,12 +562,10 @@ private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Bool
             previewThumbnailUrl = message.previewThumbnailURLForDisplay ?: message.thumbnailUrl,
             isSending = message.status == MessageStatus.SENDING,
             isResolvingMedia = message.isMediaPendingResolution &&
-                !message.isMediaAwaitingManualDownload &&
+
                 !downloading,
-            isAwaitingManualDownload = message.isMediaAwaitingManualDownload && !downloading,
             isDownloadingMedia = downloading,
             downloadProgress = downloadProgress,
-            downloadSizeLabel = message.formattedDownloadSize,
             progress = progress,
             modifier = mediaModifier,
         )

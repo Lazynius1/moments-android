@@ -492,6 +492,7 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="notification_mutual_connection_multiple_body">%1$s and %2$s others are now mutual connections</string>
     <string name="banner_verb_echo_suggestion">is near you! Create an Echo</string>    <string name="notification_action_reply">Reply</string>
     <string name="notification_action_placeholder">Message</string>
+    <string name="notification_chat_self">You</string>
     <string name="chat_preview_text">New message</string>
     <string name="chat_preview_photo">Photo</string>
     <string name="chat_preview_video">Video</string>
@@ -1645,7 +1646,6 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="chat_location_stop_sharing">Stop sharing</string>
     <string name="chat_location_directions">Directions</string>
     <string name="chat_location_open_maps">Open in Maps</string>
-    <string name="chat_media_download">Download</string>
     <string name="chat_deleted_audio">Audio message deleted</string>
     <string name="chat_deleted_image">Photo deleted</string>
     <string name="chat_deleted_video">Video deleted</string>
@@ -2919,4 +2919,7 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="nova_welcome_editorial_write_prompt">Help me write something</string>
     <string name="nova_welcome_editorial_moments_title">What can I do in Moments?</string>
     <string name="nova_welcome_editorial_moments_prompt">What can you help me do in Moments?</string>
+    <string name="notification_chat_summary_single">New message</string>
+    <string name="notification_chat_summary_multiple">%1$s new messages</string>
+    <string name="notification_group_untitled">Group</string>
 </resources>

@@ -3,15 +3,14 @@ package com.moments.android.services.messaging
 import com.moments.android.views.messaging.core.ChatTextMarkup
 
 /**
- * Port de ChatCommunicationNotificationService.swift — solo `donateFromPush`.
- * La donación real / shortcuts viven en [ChatCommunicationIntentDonor].
+ * Donación de shortcut de conversación al recibir un push (People API).
  */
 object ChatCommunicationNotificationService {
 
     fun donateFromPush(userInfo: Map<String, Any?>, previewBody: String?) {
         val type = (userInfo["type"] as? String)?.lowercase() ?: return
-        if (type != "message" && type != "new_message") return
-        val conversationId = userInfo["conversationId"] as? String ?: return
+        if (!ChatNotificationThread.isChatMessage(type)) return
+        val conversationId = ChatNotificationThread.conversationId(userInfo) ?: return
         val messageId = userInfo["messageId"] as? String ?: return
         val senderId = userInfo["senderId"] as? String ?: return
         val senderUsername = (userInfo["senderUsername"] as? String)?.takeIf { it.isNotBlank() } ?: "Moments"
@@ -21,6 +20,7 @@ object ChatCommunicationNotificationService {
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
 
+        val isGroup = ChatNotificationThread.isGroup(userInfo)
         ChatCommunicationIntentDonor.donateIncomingMessage(
             conversationId = conversationId,
             messageId = messageId,
@@ -28,6 +28,8 @@ object ChatCommunicationNotificationService {
             senderUsername = senderUsername,
             senderProfileImageUrl = avatarUrl,
             messagePreview = preview,
+            conversationLabel = ChatNotificationThread.resolvedGroupName(userInfo),
+            isGroup = isGroup,
         )
     }
 }

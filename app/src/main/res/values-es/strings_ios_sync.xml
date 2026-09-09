@@ -240,7 +240,6 @@
     <string name="chat_location_no_results">Sin resultados</string>
     <string name="chat_location_open_in_maps">Abrir en Mapas</string>
     <string name="chat_location_share_live">Compartir ubicación en vivo</string>
-    <string name="chat_media_download">Descargar</string>
     <string name="chat_menu_details">Ajustes de la conversacion</string>
     <string name="chat_message_deleted">Este mensaje fue eliminado</string>
     <string name="chat_message_expired">Mensaje expirado</string>

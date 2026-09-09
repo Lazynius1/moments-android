@@ -1623,7 +1623,6 @@
     <string name="chat_location_stop_sharing">停止分享</string>
     <string name="chat_location_directions">路線</string>
     <string name="chat_location_open_maps">在地圖中開啟</string>
-    <string name="chat_media_download">下載</string>
     <string name="chat_deleted_audio">語音訊息已刪除</string>
     <string name="chat_deleted_image">照片已刪除</string>
     <string name="chat_deleted_video">影片已刪除</string>
@@ -2897,4 +2896,8 @@
     <string name="nova_welcome_editorial_write_prompt">幫我寫點東西</string>
     <string name="nova_welcome_editorial_moments_title">我可以在 Moments 中做什麼？</string>
     <string name="nova_welcome_editorial_moments_prompt">你能在 Moments 中幫我做什麼？</string>
+    <string name="notification_chat_summary_single">新訊息</string>
+    <string name="notification_chat_summary_multiple">%1$s 則新訊息</string>
+    <string name="notification_group_untitled">群組</string>
+    <string name="notification_chat_self">你</string>
 </resources>

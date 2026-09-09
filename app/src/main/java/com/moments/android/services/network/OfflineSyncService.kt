@@ -1,5 +1,6 @@
 package com.moments.android.services.network
 
+import com.moments.android.services.network.NetworkMonitor
 import android.graphics.BitmapFactory
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore

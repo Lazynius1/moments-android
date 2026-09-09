@@ -7,7 +7,6 @@ import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.EncryptedChatMediaMetadata
 import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.messaging.ChatMediaChunkedCipher
-import com.moments.android.services.messaging.ChatMediaDownloadPolicy
 import com.moments.android.services.messaging.EncryptionService
 import com.moments.android.services.storage.StoragePathBuilder
 import java.io.File
@@ -78,9 +77,9 @@ object ChatEncryptedMediaResolver {
         return CachedResolvedMedia(warmed.first, warmed.second)
     }
 
-    suspend fun resolveThumbnailURL(message: EnhancedMessage, forceDownload: Boolean = false): String? {
-        message.thumbnailUrl?.takeIf { it.isNotEmpty() }?.let { return it }
-        resolvedThumbnailCache[message.id]?.let { return it }
+    suspend fun resolveThumbnailURL(message: EnhancedMessage): String? {
+        message.thumbnailUrl?.takeIf { cachedMediaFileExists(it) }?.let { return it }
+        resolvedThumbnailCache[message.id]?.takeIf { cachedMediaFileExists(it) }?.let { return it }
         val thumbObjectPath = message.thumbnailObjectPath?.takeIf { it.isNotEmpty() } ?: return null
         val thumbEncryption = message.thumbnailEncryption ?: return null
         val resolved = resolveEncryptedMediaURL(
@@ -88,7 +87,7 @@ object ChatEncryptedMediaResolver {
             metadata = thumbEncryption,
             conversationId = message.conversationId,
             messageId = message.id,
-            forceDownload = forceDownload,
+
         )
         if (resolved != null) resolvedThumbnailCache[message.id] = resolved
         return resolved
@@ -96,7 +95,7 @@ object ChatEncryptedMediaResolver {
 
     suspend fun resolveForMessage(
         message: EnhancedMessage,
-        forceDownload: Boolean = false,
+
     ): CachedResolvedMedia? {
         val mediaObjectPath = message.mediaObjectPath?.takeIf { it.isNotEmpty() } ?: return null
         val mediaEncryption = message.mediaEncryption ?: return null
@@ -107,7 +106,7 @@ object ChatEncryptedMediaResolver {
             mediaEncryption = mediaEncryption,
             thumbnailObjectPath = message.thumbnailObjectPath,
             thumbnailEncryption = message.thumbnailEncryption,
-            forceDownload = forceDownload,
+
         )
     }
 
@@ -118,25 +117,13 @@ object ChatEncryptedMediaResolver {
         mediaEncryption: EncryptedChatMediaMetadata,
         thumbnailObjectPath: String?,
         thumbnailEncryption: EncryptedChatMediaMetadata?,
-        forceDownload: Boolean = false,
-    ): CachedResolvedMedia {
-        outgoingPreviews[messageId]?.let { return it }
-        resolvedMediaCache[messageId]?.let { cached ->
-            if (cachedMediaFileExists(cached.mediaUrl)) return cached
-            resolvedMediaCache.remove(messageId)
-        }
 
-        val diskMain = ChatCacheStore.decryptedMediaFile(
-            conversationId,
-            messageId,
-            mediaEncryption.purpose,
-            mediaEncryption.fileExtension,
-        )
-        if (diskMain.exists()) {
-            ChatCacheStore.touchAccessDate(diskMain)
-            val resolved = CachedResolvedMedia(Uri.fromFile(diskMain).toString(), null)
-            resolvedMediaCache[messageId] = resolved
-            return resolved
+    ): CachedResolvedMedia {
+        outgoingPreviews[messageId]?.takeIf { cachedMediaFileExists(it.mediaUrl) }?.let { return it }
+        resolvedMediaCache[messageId]?.let { cached ->
+            if (cachedMediaFileExists(cached.mediaUrl) &&
+                (thumbnailObjectPath == null || cachedMediaFileExists(cached.thumbnailUrl))) return cached
+            resolvedMediaCache.remove(messageId)
         }
 
         if (messageId in activeUploadMessageIds) {
@@ -150,7 +137,7 @@ object ChatEncryptedMediaResolver {
             mediaEncryption = mediaEncryption,
             thumbnailObjectPath = thumbnailObjectPath,
             thumbnailEncryption = thumbnailEncryption,
-            forceDownload = forceDownload,
+
         )
         if (resolved.mediaUrl != null || resolved.thumbnailUrl != null) {
             resolvedMediaCache[messageId] = resolved
@@ -165,7 +152,7 @@ object ChatEncryptedMediaResolver {
         mediaEncryption: EncryptedChatMediaMetadata,
         thumbnailObjectPath: String?,
         thumbnailEncryption: EncryptedChatMediaMetadata?,
-        forceDownload: Boolean,
+
     ): CachedResolvedMedia = coroutineScope {
         // ≡ async let mainURL / thumbURL (paralelo).
         val mainDeferred = async {
@@ -174,7 +161,7 @@ object ChatEncryptedMediaResolver {
                 metadata = mediaEncryption,
                 conversationId = conversationId,
                 messageId = messageId,
-                forceDownload = forceDownload,
+
             )
         }
         val thumbDeferred = async {
@@ -183,7 +170,7 @@ object ChatEncryptedMediaResolver {
                 metadata = thumbnailEncryption,
                 conversationId = conversationId,
                 messageId = messageId,
-                forceDownload = forceDownload,
+
             )
         }
         CachedResolvedMedia(mainDeferred.await(), thumbDeferred.await())
@@ -194,10 +181,10 @@ object ChatEncryptedMediaResolver {
         metadata: EncryptedChatMediaMetadata?,
         conversationId: String,
         messageId: String,
-        forceDownload: Boolean,
+
     ): String? {
         if (objectPath == null || metadata == null) return null
-        return resolveEncryptedMediaURL(objectPath, metadata, conversationId, messageId, forceDownload)
+        return resolveEncryptedMediaURL(objectPath, metadata, conversationId, messageId)
     }
 
     private suspend fun resolveEncryptedMediaURL(
@@ -205,7 +192,7 @@ object ChatEncryptedMediaResolver {
         metadata: EncryptedChatMediaMetadata,
         conversationId: String,
         messageId: String,
-        forceDownload: Boolean,
+
     ): String? {
         val cacheFile = ChatCacheStore.decryptedMediaFile(
             conversationId,
@@ -217,14 +204,6 @@ object ChatEncryptedMediaResolver {
             ChatCacheStore.touchAccessDate(cacheFile)
             return Uri.fromFile(cacheFile).toString()
         }
-
-        val shouldDownload = when (metadata.purpose) {
-            ChatMediaPurpose.THUMBNAIL ->
-                ChatMediaDownloadPolicy.shouldDownloadThumbnailPreview(forceDownload)
-            ChatMediaPurpose.PRIMARY ->
-                ChatMediaDownloadPolicy.shouldDownloadAutomatically(forceDownload)
-        }
-        if (!shouldDownload) return null
 
         return runCatching {
             val maxSize = max(metadata.plaintextSize + 256L * 1024L, 8L * 1024L * 1024L)

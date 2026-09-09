@@ -28,6 +28,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -36,7 +37,7 @@ import com.moments.android.views.messaging.core.MessageItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
-
+import kotlin.math.abs
 /**
  * Lista de chat Compose: `LazyColumn(reverseLayout = true)` + filas newest-first
  * en el adapter.
@@ -623,6 +624,32 @@ fun ChatMessageListView(
 
     LaunchedEffect(isVanishGestureEnabled) {
         if (!isVanishGestureEnabled) vanishPull.reset()
+    }
+
+    // TG ChatListViewPaddingsAnimator / AdjustPan: al cambiar el padding inferior
+    // (composer+IME), si estás al fondo reafirma index 0 sin animar. Sin pan
+    // de ventana completo, no compensamos mid-lista (evita scrollBy con signo dudoso).
+    val density = LocalDensity.current
+    val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().roundToPx() }
+    var previousBottomPaddingPx by remember { mutableIntStateOf(-1) }
+    LaunchedEffect(bottomPaddingPx, displayRows.isNotEmpty()) {
+        val previous = previousBottomPaddingPx
+        previousBottomPaddingPx = bottomPaddingPx
+        if (previous < 0 || displayRows.isEmpty()) return@LaunchedEffect
+        val delta = bottomPaddingPx - previous
+        if (delta == 0) return@LaunchedEffect
+        if (controller.scrollNavigationTargetRowId != null) return@LaunchedEffect
+        if (controller.isProgrammaticScroll) return@LaunchedEffect
+        val pinned = controller.isAtBottom || controller.isStrictlyAtBottom
+        if (!pinned) return@LaunchedEffect
+        if (state.firstVisibleItemIndex != 0 || abs(state.firstVisibleItemScrollOffset) > 2) {
+            controller.isProgrammaticScroll = true
+            try {
+                state.scrollToItem(0, 0)
+            } finally {
+                controller.isProgrammaticScroll = false
+            }
+        }
     }
 
     // No keyear por displayRows: cancelaba el delay y dejaba armed=false para siempre.

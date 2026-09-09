@@ -1623,7 +1623,6 @@
     <string name="chat_location_stop_sharing">Berhenti berbagi</string>
     <string name="chat_location_directions">Petunjuk arah</string>
     <string name="chat_location_open_maps">Buka di Maps</string>
-    <string name="chat_media_download">Unduh</string>
     <string name="chat_deleted_audio">Pesan audio dihapus</string>
     <string name="chat_deleted_image">Foto dihapus</string>
     <string name="chat_deleted_video">Video dihapus</string>
@@ -2897,4 +2896,8 @@
     <string name="nova_welcome_editorial_write_prompt">Bantu aku menulis sesuatu</string>
     <string name="nova_welcome_editorial_moments_title">Apa yang bisa kulakukan di Moments?</string>
     <string name="nova_welcome_editorial_moments_prompt">Apa yang bisa kamu bantu aku lakukan di Moments?</string>
+    <string name="notification_chat_summary_single">Pesan baru</string>
+    <string name="notification_chat_summary_multiple">%1$s pesan baru</string>
+    <string name="notification_group_untitled">Grup</string>
+    <string name="notification_chat_self">Anda</string>
 </resources>

@@ -83,7 +83,12 @@ import kotlin.math.PI
 
 /** Port de `Views/Messaging/Components/ChatChromeViews.swift`. */
 object ChatComposerChromeMetrics {
-    val panelHomeGap = 16.dp
+    /**
+     * Gap fijo bajo el panel (nav/home o IME).
+     * Como el padding estable de TG (`dp(9+7)` en la fórmula de list padding):
+     * no cambiar entre teclado abierto/cerrado — evita saltos al medir el composer.
+     */
+    val panelInset = 8.dp
     val messageListGap = 11.dp
     val fadeExtendAbovePanel = 20.dp
     val fadeEdgeSize = 60.dp
@@ -91,12 +96,14 @@ object ChatComposerChromeMetrics {
     val estimatedComposerChromeHeight = 68.dp
 
     fun listBottomInset(composerChromeHeight: Dp): Dp =
-        // Δ iOS `max(height, estimated)+gap`: en Android el composer medido manda;
+        // El composer medido manda (incluye IME vía padding del panel);
         // forzar el mínimo estimado deja ~80dp de hueco en pantallas compactas.
         composerChromeHeight + messageListGap
 
     fun floatingControlBottomInset(composerChromeHeight: Dp): Dp =
         maxOf(composerChromeHeight, estimatedComposerChromeHeight) + 20.dp
+
+    fun panelBottomGap(@Suppress("UNUSED_PARAMETER") keyboardVisible: Boolean): Dp = panelInset
 }
 
 /** Spring Compose ≈ iOS `MotionPolicy.Spring.press` (response 0.28, damping 0.72). */

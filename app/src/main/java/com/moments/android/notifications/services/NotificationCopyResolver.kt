@@ -7,6 +7,7 @@ import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.core.ChatTextMarkup
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
+import com.moments.android.services.messaging.ChatNotificationThread
 
 data class NotificationBannerCopy(
     val title: String,
@@ -56,14 +57,21 @@ object NotificationCopyResolver {
 
     private fun messageCopy(ctx: Context, notification: MomentsNotification): NotificationBannerCopy {
         val unreadCount = notification.reactionCount ?: 0
-        if (unreadCount > 1) {
-            return NotificationBannerCopy(
-                notification.senderUsername,
-                ctx.getString(R.string.notification_message_multiple, unreadCount.toString()),
-            )
+        val isGroup = ChatNotificationThread.isGroupConversationId(notification.conversationId)
+        if (isGroup) {
+            val title = notification.groupName?.takeIf { it.isNotBlank() } ?: ctx.getString(R.string.notification_group_untitled)
+            sanitizedPreviewLine(notification.reaction, notification.messageType)?.let {
+                return NotificationBannerCopy(title, "${notification.senderUsername}: $it")
+            }
+            val body = if (unreadCount > 1) ctx.getString(R.string.notification_chat_summary_multiple, unreadCount.toString())
+                else ctx.getString(R.string.groups_notification, notification.senderUsername)
+            return NotificationBannerCopy(title, body)
         }
         sanitizedPreviewLine(notification.reaction, notification.messageType)?.let {
             return NotificationBannerCopy(notification.senderUsername, it)
+        }
+        if (unreadCount > 1) {
+            return NotificationBannerCopy(notification.senderUsername, ctx.getString(R.string.notification_message_multiple, unreadCount.toString()))
         }
         return NotificationBannerCopy(
             notification.senderUsername,

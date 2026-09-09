@@ -1623,7 +1623,6 @@
     <string name="chat_location_stop_sharing">शेयर करना बंद करें</string>
     <string name="chat_location_directions">दिशा-निर्देश</string>
     <string name="chat_location_open_maps">मैप्स में खोलें</string>
-    <string name="chat_media_download">डाउनलोड करें</string>
     <string name="chat_deleted_audio">ऑडियो संदेश हटा दिया गया</string>
     <string name="chat_deleted_image">फ़ोटो हटा दी गई</string>
     <string name="chat_deleted_video">वीडियो हटा दिया गया</string>
@@ -2897,4 +2896,8 @@
     <string name="nova_welcome_editorial_write_prompt">कुछ लिखने में मेरी मदद करें</string>
     <string name="nova_welcome_editorial_moments_title">Moments में क्या-क्या किया जा सकता है?</string>
     <string name="nova_welcome_editorial_moments_prompt">Moments में आप मेरी किस तरह मदद कर सकते हैं?</string>
+    <string name="notification_chat_summary_single">नया संदेश</string>
+    <string name="notification_chat_summary_multiple">%1$s नए संदेश</string>
+    <string name="notification_group_untitled">समूह</string>
+    <string name="notification_chat_self">आप</string>
 </resources>

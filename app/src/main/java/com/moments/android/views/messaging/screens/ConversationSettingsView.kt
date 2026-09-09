@@ -1,5 +1,6 @@
 package com.moments.android.views.messaging.screens
 
+import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.messaging.messagingThread
 import com.moments.android.services.messaging.messagingMessages
 import android.content.ContentValues
@@ -122,7 +123,6 @@ import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.core.PresenceDisplay
 import kotlin.math.roundToInt
 import com.moments.android.services.messaging.ChatCacheStore
-import com.moments.android.services.messaging.ChatMediaDownloadPolicy
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.messaging.VanishMessageTimer
 import com.moments.android.services.firestore.FirestoreService
@@ -248,7 +248,12 @@ class ConversationSettingsViewModel(
             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                 MessageCatchUpService.sync(conversationId)
                 val refreshed = LocalPersistenceService.loadMessagesFast(conversationId)
-                withContext(Dispatchers.Main) { processMessages(refreshed) }
+                val remoteMedia = ChatService.fetchSharedGalleryMedia(conversationId).getOrDefault(emptyList())
+                val merged = mergeMessages(refreshed, remoteMedia)
+                withContext(Dispatchers.Main) {
+                    if (merged.isNotEmpty()) processMessages(merged)
+                    hydrateGalleryThumbnails()
+                }
             }
             loadPrivacySettings(prefsCtx)
         }
@@ -331,8 +336,72 @@ class ConversationSettingsViewModel(
         sentMessagesCount = active.count { it.senderId == currentUserId }
         receivedMessagesCount = active.size - sentMessagesCount
         sharedGalleryMessages = messages.filter(::isSharedGalleryEligible).sortedByDescending { it.timestamp }
+        // Incluir siempre, aunque aún no haya URL local (E2E sin descifrar).
         sharedMedia = sharedGalleryMessages.filter(::isSharedMedia).mapNotNull(::makeSharedMedia)
         starredMessages = active.filter { currentUserId in it.starredBy.orEmpty() }.sortedByDescending { it.timestamp }
+    }
+
+    /** Une local + remoto por id; gana la copia con más campos de media resueltos. */
+    private fun mergeMessages(local: List<EnhancedMessage>, remote: List<EnhancedMessage>): List<EnhancedMessage> {
+        val byId = LinkedHashMap<String, EnhancedMessage>()
+        for (message in local) byId[message.id] = message
+        for (message in remote) {
+            val existing = byId[message.id]
+            byId[message.id] = if (existing != null) preferRicherMedia(existing, message) else message
+        }
+        return byId.values.toList()
+    }
+
+    private fun preferRicherMedia(a: EnhancedMessage, b: EnhancedMessage): EnhancedMessage {
+        fun score(m: EnhancedMessage): Int =
+            (if (!m.mediaUrl.isNullOrBlank()) 2 else 0) +
+                (if (!m.thumbnailUrl.isNullOrBlank()) 1 else 0) +
+                (if (!m.mediaObjectPath.isNullOrBlank()) 1 else 0)
+        return if (score(b) > score(a)) b else a
+    }
+
+    /** Miniaturas del grid de Media (listar + resolver thumbs E2E). */
+    fun hydrateGalleryThumbnails() {
+        for (message in sharedGalleryMessages) {
+            if (!isSharedMedia(message)) continue
+            val (cachedMedia, cachedThumb) = ChatCacheStore.localURLsIfPresent(message)
+            val hasThumb = !cachedThumb.isNullOrBlank() || !message.thumbnailUrl.isNullOrBlank()
+            val hasMedia = !cachedMedia.isNullOrBlank() || !message.mediaUrl.isNullOrBlank()
+            if (hasThumb || (message.type == MessageType.IMAGE && hasMedia)) continue
+            forceHydrateGalleryThumbnail(message)
+        }
+    }
+
+    private fun forceHydrateGalleryThumbnail(message: EnhancedMessage) {
+        if (message.type == MessageType.VIDEO &&
+            message.thumbnailObjectPath != null &&
+            message.thumbnailEncryption != null
+        ) {
+            val thumbnailKey = "thumb_${message.id}"
+            if (thumbnailKey in hydratingMediaIds) return
+            hydratingMediaIds += thumbnailKey
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                val resolvedThumb = ChatService.resolveVideoThumbnail(message)
+                withContext(Dispatchers.Main) {
+                    hydratingMediaIds -= thumbnailKey
+                    if (resolvedThumb.isNullOrBlank()) return@withContext
+                    val updated = (sharedGalleryMessages.firstOrNull { it.id == message.id } ?: message)
+                        .copy(thumbnailUrl = resolvedThumb)
+                    updateGalleryMessage(updated)
+                }
+            }
+            return
+        }
+        if (message.mediaObjectPath == null || message.mediaEncryption == null) {
+            refreshMediaMetadataIfNeeded(message)
+            return
+        }
+        if (message.id in hydratingMediaIds) return
+        hydratingMediaIds += message.id
+        prepareMediaForViewing(message) { updated ->
+            hydratingMediaIds -= message.id
+            if (updated.type == MessageType.VIDEO) generateVideoPosterIfPossible(updated)
+        }
     }
 
     fun sharedLinks(): List<EnhancedMessage> = sharedGalleryMessages.filter {
@@ -550,7 +619,7 @@ class ConversationSettingsViewModel(
         if (message.id in downloadingMediaIds) return
         downloadingMediaIds += message.id
         setDownloadProgress(message.id, 0.03)
-        prepareMediaForViewing(message, forceDownload = true) { updated ->
+        prepareMediaForViewing(message) { updated ->
             downloadingMediaIds -= message.id
             clearDownloadProgress(message.id)
             makeSharedMedia(updated)?.let(onResolved)
@@ -559,11 +628,8 @@ class ConversationSettingsViewModel(
 
     /** ≡ iOS `hydrateMediaIfNeeded(for:)`. */
     fun hydrateMediaIfNeeded(message: EnhancedMessage) {
-        if (message.isMediaAwaitingManualDownload) {
-            hydrateThumbnailPreviewIfNeeded(message)
-            return
-        }
-        if (!ChatMediaDownloadPolicy.shouldDownloadAutomatically()) return
+
+        if (!NetworkMonitor.isConnected) return
         if (message.type == MessageType.VIDEO) {
             hydrateVideoThumbnailIfNeeded(message)
             return
@@ -580,7 +646,7 @@ class ConversationSettingsViewModel(
         if (message.id in hydratingMediaIds) return
         hydratingMediaIds += message.id
         setDownloadProgress(message.id, 0.03)
-        prepareMediaForViewing(message, forceDownload = false) {
+        prepareMediaForViewing(message) {
             hydratingMediaIds -= message.id
             clearDownloadProgress(message.id)
         }
@@ -646,14 +712,14 @@ class ConversationSettingsViewModel(
     /** ≡ iOS `hydrateVideoThumbnailIfNeeded`. */
     private fun hydrateVideoThumbnailIfNeeded(message: EnhancedMessage) {
         if (message.type != MessageType.VIDEO || !message.needsVideoThumbnailForDisplay) return
-        if (!ChatMediaDownloadPolicy.shouldDownloadAutomatically()) return
+        if (!NetworkMonitor.isConnected) return
 
         if (message.thumbnailObjectPath != null && message.thumbnailEncryption != null) {
             val thumbnailKey = "thumb_${message.id}"
             if (thumbnailKey in hydratingMediaIds) return
             hydratingMediaIds += thumbnailKey
             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                val resolvedThumb = ChatService.resolveVideoThumbnail(message, forceDownload = false)
+                val resolvedThumb = ChatService.resolveVideoThumbnail(message)
                 withContext(Dispatchers.Main) {
                     hydratingMediaIds -= thumbnailKey
                     if (resolvedThumb.isNullOrBlank()) return@withContext
@@ -674,7 +740,7 @@ class ConversationSettingsViewModel(
             if (message.id in hydratingMediaIds) return
             hydratingMediaIds += message.id
             setDownloadProgress(message.id, 0.03)
-            prepareMediaForViewing(message, forceDownload = false) { updated ->
+            prepareMediaForViewing(message) { updated ->
                 hydratingMediaIds -= message.id
                 clearDownloadProgress(message.id)
                 generateVideoPosterIfPossible(updated)
@@ -693,7 +759,7 @@ class ConversationSettingsViewModel(
         if (previewKey in hydratingMediaIds) return
         hydratingMediaIds += previewKey
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-            val thumbnail = ChatService.resolveVideoThumbnail(message, forceDownload = false)
+            val thumbnail = ChatService.resolveVideoThumbnail(message)
             withContext(Dispatchers.Main) {
                 hydratingMediaIds -= previewKey
                 if (thumbnail == null) return@withContext
@@ -726,7 +792,7 @@ class ConversationSettingsViewModel(
     /** ≡ iOS `prepareMediaForViewing`. */
     private fun prepareMediaForViewing(
         message: EnhancedMessage,
-        forceDownload: Boolean,
+
         completion: (EnhancedMessage) -> Unit,
     ) {
         if (message.hasLocalMediaReadyForViewer && !message.hasMissingLocalMedia) {
@@ -739,7 +805,7 @@ class ConversationSettingsViewModel(
         }
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
             try {
-                val resolved = ChatEncryptedMediaResolver.resolveForMessage(message, forceDownload = forceDownload)
+                val resolved = ChatEncryptedMediaResolver.resolveForMessage(message)
                 withContext(Dispatchers.Main) {
                     if (resolved?.mediaUrl == null) {
                         completion(message)
@@ -800,19 +866,27 @@ class ConversationSettingsViewModel(
     private fun isSharedGalleryEligible(message: EnhancedMessage): Boolean =
         !message.isDeleted && (isSharedMedia(message) || (message.type == MessageType.TEXT && LINK.containsMatchIn(message.content.orEmpty())))
 
-    private fun isSharedMedia(message: EnhancedMessage): Boolean =
-        message.type in setOf(MessageType.IMAGE, MessageType.VIDEO) &&
-            !message.isViewOnce && !message.isVanishModeMessage && message.storyReplyData == null &&
-            (!message.mediaUrl.isNullOrBlank() || (!message.mediaObjectPath.isNullOrBlank() && message.mediaEncryption != null))
+    private fun isSharedMedia(message: EnhancedMessage): Boolean {
+        if (message.type !in setOf(MessageType.IMAGE, MessageType.VIDEO)) return false
+        if (message.isViewOnce || message.isVanishModeMessage || message.storyReplyData != null) return false
+        if (!message.mediaUrl.isNullOrBlank()) return true
+        if (!message.mediaObjectPath.isNullOrBlank() && message.mediaEncryption != null) return true
+        if (!message.thumbnailUrl.isNullOrBlank()) return true
+        if (!message.thumbnailObjectPath.isNullOrBlank() && message.thumbnailEncryption != null) return true
+        return false
+    }
 
     private fun makeSharedMedia(message: EnhancedMessage): SharedMedia? {
+        if (!isSharedMedia(message)) return null
+        // Si el archivo descifrado ya vive en disco, usar esa ruta. Si no, igual listamos la celda.
         val (cachedMedia, cachedThumbnail) = ChatCacheStore.localURLsIfPresent(message)
-        val original = cachedMedia ?: message.mediaUrl ?: cachedThumbnail ?: message.thumbnailUrl ?: return null
+        val mediaUrl = cachedMedia ?: message.mediaUrl.orEmpty()
+        val thumb = cachedThumbnail ?: message.thumbnailUrl ?: mediaUrl
         return SharedMedia(
             id = message.id,
             type = if (message.type == MessageType.VIDEO) SharedMedia.Type.VIDEO else SharedMedia.Type.IMAGE,
-            thumbnailUrl = cachedThumbnail ?: message.thumbnailUrl ?: original,
-            originalUrl = original,
+            thumbnailUrl = thumb,
+            originalUrl = mediaUrl.ifEmpty { thumb },
             senderId = message.senderId,
             timestamp = message.timestamp,
             sourceMessage = message,
@@ -2129,8 +2203,37 @@ fun ChatInfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: St
 @Composable
 fun SharedMediaThumbnail(media: SharedMedia, fillsGrid: Boolean = false, onTap: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(if (fillsGrid) 0.dp else 16.dp)
-    Box(modifier.clip(shape).clickable(onClick = onTap)) {
-        AsyncImage(media.thumbnailUrl, null, Modifier.fillMaxWidth().height(if (fillsGrid) 118.dp else 100.dp), contentScale = ContentScale.Crop)
-        if (media.type == SharedMedia.Type.VIDEO) Icon(Icons.Default.PlayArrow, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).size(18.dp))
+    val dark = isSystemInDarkTheme()
+    val placeholder = if (dark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.06f)
+    // Para vídeos no usamos la URL del vídeo como imagen (no renderiza portada).
+    val thumb = when {
+        media.type == SharedMedia.Type.VIDEO ->
+            media.thumbnailUrl.takeIf { it.isNotBlank() && it != media.originalUrl }
+        else -> media.thumbnailUrl.takeIf { it.isNotBlank() }
+    }
+    Box(
+        modifier
+            .clip(shape)
+            .background(placeholder)
+            .clickable(onClick = onTap),
+    ) {
+        if (!thumb.isNullOrBlank()) {
+            AsyncImage(
+                thumb,
+                null,
+                Modifier.fillMaxWidth().height(if (fillsGrid) 118.dp else 100.dp),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Spacer(Modifier.fillMaxWidth().height(if (fillsGrid) 118.dp else 100.dp))
+        }
+        if (media.type == SharedMedia.Type.VIDEO) {
+            Icon(
+                Icons.Default.PlayArrow,
+                null,
+                tint = androidx.compose.ui.graphics.Color.White,
+                modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).size(18.dp),
+            )
+        }
     }
 }

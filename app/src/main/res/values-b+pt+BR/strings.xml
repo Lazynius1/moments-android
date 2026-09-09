@@ -2071,7 +2071,6 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="chat_intro_relationship_other_follows_since">%1$s segue você desde %2$s</string>
     <string name="chat_link_open">Abrir link</string>
     <string name="chat_link_preview_loading">Carregando pré-visualização do link</string>
-    <string name="chat_media_download">Baixar</string>
     <string name="chat_recovery_invalid_pin">Use exatamente 6 dígitos</string>
     <string name="chat_scroll_badge_max">99+</string>
     <string name="chat_shared_moment">Compartilhou um Moment</string>
@@ -2325,4 +2324,8 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="settings_privacy_group_invites_everyone">Todos</string>
     <string name="settings_privacy_group_invites_following">Pessoas que você segue</string>
     <string name="settings_privacy_group_invites_nobody">Ninguém</string>
+    <string name="notification_chat_summary_single">Nova mensagem</string>
+    <string name="notification_chat_summary_multiple">%1$s novas mensagens</string>
+    <string name="notification_group_untitled">Grupo</string>
+    <string name="notification_chat_self">Você</string>
 </resources>
