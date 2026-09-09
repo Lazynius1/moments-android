@@ -140,6 +140,9 @@
     <string name="groups_sheet_unavailable_body">Esta ligação já não está ativa. Pede uma nova a um admin do grupo.</string>
     <string name="groups_sheet_full_title">O grupo está cheio</string>
     <string name="groups_sheet_full_body">Este grupo atingiu o limite de membros. Tenta novamente mais tarde.</string>
+    <string name="groups_sheet_already_title">Já estás neste grupo</string>
+    <string name="groups_sheet_already_body">Podes abrir o chat nas tuas conversas.</string>
+    <string name="groups_sheet_open_chat">Ir para o chat</string>
     <string name="groups_sheet_close">Fechar</string>
     <string name="groups_sheet_cancelling">A cancelar…</string>
 </resources>

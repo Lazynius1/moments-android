@@ -142,6 +142,9 @@ internal fun groupStringId(key: String): Int = when (key) {
     "sheet.unavailableBody" -> R.string.groups_sheet_unavailable_body
     "sheet.fullTitle" -> R.string.groups_sheet_full_title
     "sheet.fullBody" -> R.string.groups_sheet_full_body
+    "sheet.alreadyTitle" -> R.string.groups_sheet_already_title
+    "sheet.alreadyBody" -> R.string.groups_sheet_already_body
+    "sheet.openChat" -> R.string.groups_sheet_open_chat
     "sheet.close" -> R.string.groups_sheet_close
     "sheet.cancelling" -> R.string.groups_sheet_cancelling
     else -> R.string.groups_error

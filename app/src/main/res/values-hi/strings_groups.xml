@@ -140,6 +140,9 @@
     <string name="groups_sheet_unavailable_body">यह लिंक अब सक्रिय नहीं है। समूह के एडमिन से नया लिंक माँगें।</string>
     <string name="groups_sheet_full_title">समूह भर गया है</string>
     <string name="groups_sheet_full_body">इस समूह में सदस्यों की सीमा पूरी हो गई है। बाद में फिर कोशिश करें।</string>
+    <string name="groups_sheet_already_title">आप पहले से इस समूह में हैं</string>
+    <string name="groups_sheet_already_body">आप अपनी बातचीत से चैट खोल सकते हैं।</string>
+    <string name="groups_sheet_open_chat">चैट खोलें</string>
     <string name="groups_sheet_close">बंद करें</string>
     <string name="groups_sheet_cancelling">रद्द कर रहे हैं…</string>
 </resources>

@@ -140,6 +140,9 @@
     <string name="groups_sheet_unavailable_body">このリンクは無効です。グループの管理者に新しいリンクを依頼してください。</string>
     <string name="groups_sheet_full_title">グループは満員です</string>
     <string name="groups_sheet_full_body">このグループはメンバー数の上限に達しています。後でもう一度お試しください。</string>
+    <string name="groups_sheet_already_title">すでにこのグループに参加しています</string>
+    <string name="groups_sheet_already_body">会話一覧からチャットを開けます。</string>
+    <string name="groups_sheet_open_chat">チャットを開く</string>
     <string name="groups_sheet_close">閉じる</string>
     <string name="groups_sheet_cancelling">取り消し中…</string>
 </resources>

@@ -140,6 +140,9 @@
     <string name="groups_sheet_unavailable_body">Deze link is niet meer actief. Vraag een groepsbeheerder om een nieuwe.</string>
     <string name="groups_sheet_full_title">Groep is vol</string>
     <string name="groups_sheet_full_body">Deze groep heeft het maximale aantal leden bereikt. Probeer het later opnieuw.</string>
+    <string name="groups_sheet_already_title">Je zit al in deze groep</string>
+    <string name="groups_sheet_already_body">Je kunt de chat openen vanuit je gesprekken.</string>
+    <string name="groups_sheet_open_chat">Naar de chat</string>
     <string name="groups_sheet_close">Sluiten</string>
     <string name="groups_sheet_cancelling">Annuleren…</string>
 </resources>

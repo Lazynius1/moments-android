@@ -140,6 +140,9 @@
     <string name="groups_sheet_unavailable_body">Bu bağlantı artık etkin değil. Bir grup yöneticisinden yeni bağlantı iste.</string>
     <string name="groups_sheet_full_title">Grup dolu</string>
     <string name="groups_sheet_full_body">Bu grup üye sınırına ulaştı. Daha sonra tekrar dene.</string>
+    <string name="groups_sheet_already_title">Zaten bu gruptasın</string>
+    <string name="groups_sheet_already_body">Sohbeti konuşmalarından açabilirsin.</string>
+    <string name="groups_sheet_open_chat">Sohbete git</string>
     <string name="groups_sheet_close">Kapat</string>
     <string name="groups_sheet_cancelling">İptal ediliyor…</string>
 </resources>

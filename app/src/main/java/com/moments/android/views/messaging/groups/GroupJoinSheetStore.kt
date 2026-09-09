@@ -14,7 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-internal enum class GroupJoinSheetPhase { LOADING, DIRECT, APPROVAL, SENDING, SENT, PENDING, ERROR, UNAVAILABLE, FULL }
+internal enum class GroupJoinSheetPhase { LOADING, DIRECT, APPROVAL, SENDING, SENT, PENDING, ALREADY_MEMBER, ERROR, UNAVAILABLE, FULL }
 
 internal class GroupJoinSheetStore(private val scope: CoroutineScope) {
     var phase by mutableStateOf(GroupJoinSheetPhase.LOADING); private set
@@ -99,7 +99,7 @@ internal class GroupJoinSheetStore(private val scope: CoroutineScope) {
         try {
             val result = GroupChatAPI.request("manageGroup", mapOf("action" to "cancelJoin", "conversationId" to link.groupId))
             if (!valid(version)) return
-            if (result.optBoolean("isMember")) { joined = true; return }
+            if (result.optBoolean("isMember")) { phase = GroupJoinSheetPhase.ALREADY_MEMBER; return }
             busy = false
             load(link)
         } catch (error: Exception) { if (valid(version)) present(error) }
@@ -121,7 +121,7 @@ internal class GroupJoinSheetStore(private val scope: CoroutineScope) {
         name = data.optString("name"); image = data.optString("image"); requiresApproval = data.optBoolean("requiresApproval")
     }
     private fun applyResolvedStatus(data: JSONObject): Boolean {
-        if (data.optBoolean("isMember")) { joined = true; return true }
+        if (data.optBoolean("isMember")) { phase = GroupJoinSheetPhase.ALREADY_MEMBER; return true }
         if (data.optBoolean("pending")) {
             phase = GroupJoinSheetPhase.PENDING
             link?.let { watchPending(it, generation) }

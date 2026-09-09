@@ -140,6 +140,9 @@
     <string name="groups_sheet_unavailable_body">Aquest enllaç ja no està actiu. Demana’n un de nou a un admin del grup.</string>
     <string name="groups_sheet_full_title">El grup és ple</string>
     <string name="groups_sheet_full_body">Aquest grup ha arribat al límit de membres. Torna-ho a provar més endavant.</string>
+    <string name="groups_sheet_already_title">Ja ets en aquest grup</string>
+    <string name="groups_sheet_already_body">Pots obrir el xat des de les teves converses.</string>
+    <string name="groups_sheet_open_chat">Vés al xat</string>
     <string name="groups_sheet_close">Tancar</string>
     <string name="groups_sheet_cancelling">Cancel·lant…</string>
 </resources>

@@ -29,6 +29,10 @@ enum class AttachmentIcon(@DrawableRes val drawableRes: Int) {
     HIDDEN_LAYER(R.drawable.attachment_hidden_layer_icon),
     BUZZ(R.drawable.attachment_buzz_icon),
     MUTUALS(R.drawable.audience_mutuals_icon),
+    COMPOSE(R.drawable.attachment_compose_icon),
+    GROUPS(R.drawable.attachment_groups_icon),
+    WAITING(R.drawable.attachment_waiting_icon),
+    MESSAGE_REQUESTS(R.drawable.attachment_message_requests_icon),
 }
 
 object AttachmentIconMetrics {

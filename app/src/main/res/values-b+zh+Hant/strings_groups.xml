@@ -140,6 +140,9 @@
     <string name="groups_sheet_unavailable_body">此連結已失效。請向群組管理員索取新連結。</string>
     <string name="groups_sheet_full_title">群組已滿</string>
     <string name="groups_sheet_full_body">此群組已達成員人數上限。請稍後再試。</string>
+    <string name="groups_sheet_already_title">你已在此群組中</string>
+    <string name="groups_sheet_already_body">你可以從對話列表開啟聊天。</string>
+    <string name="groups_sheet_open_chat">開啟聊天</string>
     <string name="groups_sheet_close">關閉</string>
     <string name="groups_sheet_cancelling">取消中…</string>
 </resources>

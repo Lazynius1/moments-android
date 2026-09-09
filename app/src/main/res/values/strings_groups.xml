@@ -140,6 +140,9 @@
     <string name="groups_sheet_unavailable_body">This link is no longer active. Ask a group admin for a new one.</string>
     <string name="groups_sheet_full_title">Group is full</string>
     <string name="groups_sheet_full_body">This group has reached its member limit. Try again later.</string>
+    <string name="groups_sheet_already_title">You\'re already in this group</string>
+    <string name="groups_sheet_already_body">You can open the chat from your conversations.</string>
+    <string name="groups_sheet_open_chat">Open chat</string>
     <string name="groups_sheet_close">Close</string>
     <string name="groups_sheet_cancelling">Cancelling…</string>
 </resources>

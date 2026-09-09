@@ -1,19 +1,26 @@
 package com.moments.android.views.messaging.groups
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
@@ -30,6 +37,8 @@ import com.airbnb.lottie.compose.rememberLottieComposition
 import com.moments.android.R
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.messaging.components.AttachmentIcon
+import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.messaging.components.ChatRecoveryGateView
 import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.launch
@@ -49,27 +58,45 @@ internal fun GroupJoinLinkDialog(link: GroupInviteLink, onDismiss: () -> Unit, o
         onDispose { lifecycle.removeObserver(observer); store.stop() }
     }
     LaunchedEffect(store.joined) { if (store.joined) onJoined() }
-    MomentsModalSheet(onDismissRequest = onDismiss, largeOnly = false) { _ ->
+    GroupJoinMediumSheet(onDismiss = onDismiss) {
         ChatRecoveryGateView(onCancel = onDismiss) {
-            Box(Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).navigationBarsPadding()
-                    .padding(horizontal = 24.dp).padding(top = 36.dp, bottom = 28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                    GroupJoinSheetHeader(store.phase, store.name, store.image, store.requiresApproval, store.errorTitle, store.errorBody)
+            GroupJoinSheetLayout(
+                header = { GroupJoinSheetHeader(store.phase, store.name, store.image, store.requiresApproval, store.errorTitle, store.errorBody) },
+                actions = {
                     GroupJoinSheetActions(store.phase, store.busy, store.requiresApproval,
                         onSubmit = { scope.launch { store.submit() } },
                         onRetry = { scope.launch { store.retry() } },
                         onCancel = { scope.launch { store.cancel() } },
-                        onClose = onDismiss, onRequests = onViewRequests)
-                }
-                val colors = rememberAdaptiveColors()
-                IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp)) {
-                    Icon(Icons.Default.Close, sheetCopy("sheet.close"), Modifier.size(32.dp)
-                        .background(colors.primary.copy(alpha = .06f), CircleShape).padding(8.dp), tint = colors.primary)
-                }
-            }
+                        onClose = onDismiss, onOpenChat = onJoined, onRequests = onViewRequests)
+                })
             LaunchedEffect(link.groupId, link.token) { store.load(link) }
         }
+    }
+}
+
+/** One content-sized anchor matching iOS `.medium` (~half the window, grabber included). */
+@Composable
+private fun GroupJoinMediumSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    val density = LocalDensity.current
+    val windowHeight = with(density) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val bodyHeight = (windowHeight / 2 - 24.dp).coerceAtLeast(340.dp)
+    MomentsModalSheet(onDismissRequest = onDismiss, largeOnly = true) { _ ->
+        Box(Modifier.fillMaxWidth().height(bodyHeight)) { content() }
+    }
+}
+
+@Composable
+private fun GroupJoinSheetLayout(header: @Composable () -> Unit, actions: @Composable () -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(top = 8.dp, bottom = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) { header() }
+        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 4.dp, bottom = 12.dp)) { actions() }
     }
 }
 
@@ -81,6 +108,7 @@ private fun GroupJoinSheetHeader(phase: GroupJoinSheetPhase, name: String, image
         GroupJoinSheetPhase.LOADING -> sheetCopy("sheet.loadingTitle")
         GroupJoinSheetPhase.SENT -> sheetCopy("sheet.sentTitle")
         GroupJoinSheetPhase.PENDING -> sheetCopy("sheet.pendingTitle")
+        GroupJoinSheetPhase.ALREADY_MEMBER -> sheetCopy("sheet.alreadyTitle")
         GroupJoinSheetPhase.ERROR -> sheetCopy(errorTitle)
         GroupJoinSheetPhase.UNAVAILABLE -> sheetCopy("sheet.unavailableTitle")
         GroupJoinSheetPhase.FULL -> sheetCopy("sheet.fullTitle")
@@ -93,19 +121,47 @@ private fun GroupJoinSheetHeader(phase: GroupJoinSheetPhase, name: String, image
         GroupJoinSheetPhase.SENDING -> if (requiresApproval) "sheet.sendingBody" else "sheet.joiningBody"
         GroupJoinSheetPhase.SENT -> "sheet.sentBody"
         GroupJoinSheetPhase.PENDING -> "sheet.pendingBody"
+        GroupJoinSheetPhase.ALREADY_MEMBER -> "sheet.alreadyBody"
         GroupJoinSheetPhase.ERROR -> errorBody
         GroupJoinSheetPhase.UNAVAILABLE -> "sheet.unavailableBody"
         GroupJoinSheetPhase.FULL -> "sheet.fullBody"
     }
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.height(112.dp).fillMaxWidth().clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.height(112.dp).fillMaxWidth().clipToBounds().clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
             when (phase) {
                 GroupJoinSheetPhase.LOADING -> CircularProgressIndicator(Modifier.size(36.dp), color = colors.secondary)
                 GroupJoinSheetPhase.SENT -> GroupRequestSentAnimation()
-                GroupJoinSheetPhase.PENDING -> Box {
-                    GroupChatAvatar(image, size = 104.dp)
-                    Icon(Icons.Default.Schedule, null, Modifier.align(Alignment.BottomEnd).size(32.dp)
-                        .background(colors.surfaceBackground, CircleShape).padding(4.dp), tint = colors.secondary)
+                GroupJoinSheetPhase.PENDING -> Box(Modifier.size(104.dp)) {
+                    // ≡ MutualAwareAvatar: Clear en offscreen; waiting = solo el glifo (sin círculo de badge).
+                    Box(
+                        Modifier
+                            .matchParentSize()
+                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                            .drawWithContent {
+                                drawContent()
+                                val cutR = 16.5.dp.toPx()
+                                val nudge = 1.5.dp.toPx()
+                                val cx = if (layoutDirection == LayoutDirection.Rtl) {
+                                    cutR - nudge
+                                } else {
+                                    size.width - cutR + nudge
+                                }
+                                drawCircle(
+                                    color = Color.Black,
+                                    radius = cutR,
+                                    center = Offset(cx, size.height - cutR + nudge),
+                                    blendMode = BlendMode.Clear,
+                                )
+                            },
+                    ) {
+                        GroupChatAvatar(image, size = 104.dp)
+                    }
+                    AttachmentIconView(
+                        icon = AttachmentIcon.WAITING,
+                        size = 30.dp,
+                        tintColor = colors.secondary,
+                        modifier = Modifier.align(Alignment.BottomEnd),
+                    )
                 }
                 GroupJoinSheetPhase.ERROR, GroupJoinSheetPhase.UNAVAILABLE, GroupJoinSheetPhase.FULL ->
                     Icon(when (phase) {
@@ -116,8 +172,8 @@ private fun GroupJoinSheetHeader(phase: GroupJoinSheetPhase, name: String, image
                 else -> GroupChatAvatar(image, size = 104.dp)
             }
         }
-        Text(title, color = colors.primary, fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-        if (phase == GroupJoinSheetPhase.SENT || phase == GroupJoinSheetPhase.PENDING) {
+        Text(title, color = colors.primary, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        if (phase == GroupJoinSheetPhase.SENT || phase == GroupJoinSheetPhase.PENDING || phase == GroupJoinSheetPhase.ALREADY_MEMBER) {
             Text(name, style = MaterialTheme.typography.bodyMedium, color = colors.secondary, textAlign = TextAlign.Center)
         }
         Text(sheetCopy(bodyKey), style = MaterialTheme.typography.bodyMedium, color = colors.secondary, textAlign = TextAlign.Center)
@@ -126,7 +182,7 @@ private fun GroupJoinSheetHeader(phase: GroupJoinSheetPhase, name: String, image
 
 @Composable
 private fun GroupJoinSheetActions(phase: GroupJoinSheetPhase, busy: Boolean, requiresApproval: Boolean,
-    onSubmit: () -> Unit, onRetry: () -> Unit, onCancel: () -> Unit, onClose: () -> Unit, onRequests: () -> Unit) {
+    onSubmit: () -> Unit, onRetry: () -> Unit, onCancel: () -> Unit, onClose: () -> Unit, onOpenChat: () -> Unit, onRequests: () -> Unit) {
     val colors = rememberAdaptiveColors()
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when (phase) {
@@ -153,6 +209,10 @@ private fun GroupJoinSheetActions(phase: GroupJoinSheetPhase, busy: Boolean, req
                 TextButton(onClick = onClose, colors = ButtonDefaults.textButtonColors(contentColor = colors.primary)) { Text(sheetCopy("sheet.close")) }
             }
             GroupJoinSheetPhase.UNAVAILABLE, GroupJoinSheetPhase.FULL -> GroupJoinPrimaryButton(sheetCopy("sheet.done"), onClick = onClose)
+            GroupJoinSheetPhase.ALREADY_MEMBER -> {
+                GroupJoinPrimaryButton(sheetCopy("sheet.openChat"), onClick = onOpenChat)
+                TextButton(onClick = onClose, colors = ButtonDefaults.textButtonColors(contentColor = colors.primary)) { Text(sheetCopy("sheet.done")) }
+            }
         }
     }
 }
@@ -165,7 +225,7 @@ private fun GroupJoinPrimaryButton(title: String, loading: Boolean = false, enab
         colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = colors.surfaceBackground,
             disabledContainerColor = colors.primary.copy(alpha = .35f), disabledContentColor = colors.surfaceBackground)) {
         if (loading) { CircularProgressIndicator(Modifier.size(18.dp), color = colors.surfaceBackground, strokeWidth = 2.dp); Spacer(Modifier.width(10.dp)) }
-        Text(title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+        Text(title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, color = colors.surfaceBackground)
     }
 }
 

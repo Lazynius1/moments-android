@@ -140,6 +140,9 @@
     <string name="groups_sheet_unavailable_body">Tautan ini tidak lagi aktif. Minta tautan baru dari admin grup.</string>
     <string name="groups_sheet_full_title">Grup penuh</string>
     <string name="groups_sheet_full_body">Grup ini telah mencapai batas anggota. Coba lagi nanti.</string>
+    <string name="groups_sheet_already_title">Kamu sudah di grup ini</string>
+    <string name="groups_sheet_already_body">Kamu bisa membuka chat dari percakapanmu.</string>
+    <string name="groups_sheet_open_chat">Buka chat</string>
     <string name="groups_sheet_close">Tutup</string>
     <string name="groups_sheet_cancelling">Membatalkan…</string>
 </resources>

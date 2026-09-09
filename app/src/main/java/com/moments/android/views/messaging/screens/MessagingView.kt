@@ -38,10 +38,8 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Groups
-import androidx.compose.material.icons.outlined.People
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,7 +61,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -73,6 +70,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -99,6 +98,9 @@ import com.moments.android.utilities.momentsEmptyStateAppear
 import com.moments.android.views.components.MomentRefreshOverlayHost
 import com.moments.android.views.components.momentRefresh
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.messaging.components.AttachmentIcon
+import com.moments.android.views.messaging.components.AttachmentIconPreset
+import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.messaging.components.ChatRecoveryGateView
 import com.moments.android.views.messaging.components.ConversationContextMenuInsets
 import com.moments.android.views.messaging.components.ConversationContextMenuOverlay
@@ -709,7 +711,7 @@ private fun MessagingToolbar(
             } else {
                 ProfileChromeControlsCluster {
                     MessagingToolbarRequestButton(
-                        icon = Icons.Filled.Create,
+                        icon = AttachmentIcon.COMPOSE,
                         count = 0,
                         onClick = onCompose,
                         accessibilityLabel = stringResource(R.string.messaging_new_conversation),
@@ -750,7 +752,7 @@ private fun MessagingToolbar(
             ProfileChromeControlsCluster {
                 if (!embeddedInTab) {
                     MessagingToolbarRequestButton(
-                        icon = Icons.Filled.Create,
+                        icon = AttachmentIcon.COMPOSE,
                         count = 0,
                         onClick = onCompose,
                         accessibilityLabel = stringResource(R.string.messaging_new_conversation),
@@ -758,14 +760,14 @@ private fun MessagingToolbar(
                     )
                 }
                 MessagingToolbarRequestButton(
-                    icon = Icons.Outlined.People,
+                    icon = AttachmentIcon.GROUPS,
                     count = groupRequestCount,
                     onClick = onGroupRequests,
                     accessibilityLabel = stringResource(R.string.groups_requests_title),
                     foregroundColor = colors.primary,
                 )
                 MessagingToolbarRequestButton(
-                    icon = Icons.Outlined.ChatBubbleOutline,
+                    icon = AttachmentIcon.MESSAGE_REQUESTS,
                     count = pendingRequestCount,
                     onClick = onRequests,
                     accessibilityLabel = stringResource(R.string.message_requests_title),
@@ -778,15 +780,22 @@ private fun MessagingToolbar(
 
 @Composable
 private fun MessagingToolbarRequestButton(
-    icon: ImageVector,
+    icon: AttachmentIcon,
     count: Int,
     onClick: () -> Unit,
     accessibilityLabel: String,
     foregroundColor: Color,
 ) {
     Box {
-        IconButton(onClick = onClick) {
-            Icon(icon, accessibilityLabel, tint = foregroundColor)
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier.semantics { contentDescription = accessibilityLabel },
+        ) {
+            AttachmentIconView(
+                icon = icon,
+                preset = AttachmentIconPreset.SETTINGS_ROW,
+                tintColor = foregroundColor,
+            )
         }
         if (count > 0) {
             Box(
