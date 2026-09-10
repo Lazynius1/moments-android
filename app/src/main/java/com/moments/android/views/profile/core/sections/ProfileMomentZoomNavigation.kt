@@ -23,7 +23,6 @@ import com.moments.android.views.explore.ExploreMomentDetailView
 import com.moments.android.views.explore.toExploreFeedMoment
 import com.moments.android.views.feed.maps.LocationMomentDetailView
 import com.moments.android.views.profile.momentsview.ModernMomentDetailView
-import com.moments.android.views.profile.momentsview.ModernSavedMomentsDetailView
 import com.moments.android.views.shared.MomentsMotion
 import com.moments.android.views.shared.MomentsZoomSourceCorner
 import com.moments.android.views.shared.momentdetail.SingleMomentDetailView
@@ -192,32 +191,20 @@ fun ProfileMomentZoomDetailDestination(
         zoomSourceID = destination.zoomSourceID,
         modifier = modifier,
     ) {
-        when (destination.feedKind) {
-            ProfileMomentZoomFeedKind.SAVED_MOMENTS -> {
-                ModernSavedMomentsDetailView(
-                    moments = moments,
-                    initialIndex = destination.initialIndex,
-                    onDismiss = onDismiss,
-                    onRemoveMoment = onRemoveSavedMoment,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            else -> {
-                val selected = MomentZoomOpener.resolvedProfileMoment(destination, moments)
-                if (selected == null) {
-                    MomentZoomSingleFallbackView(Modifier.fillMaxSize())
-                } else {
-                    ModernMomentDetailView(
-                        moments = moments.ifEmpty { listOf(selected) },
-                        onDismiss = onDismiss,
-                        initialIndex = destination.initialIndex,
-                        initialMomentId = destination.initialMomentId ?: selected.id,
-                        restrictPlaybackToInitialIndex = destination.restrictPlaybackToInitialIndex,
-                        openCommentsOnAppear = destination.openCommentsOnAppear,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
+        // Misma superficie que el resto del perfil/feed (no el detalle viejo de guardados).
+        val selected = MomentZoomOpener.resolvedProfileMoment(destination, moments)
+        if (selected == null) {
+            MomentZoomSingleFallbackView(Modifier.fillMaxSize())
+        } else {
+            ModernMomentDetailView(
+                moments = moments.ifEmpty { listOf(selected) },
+                onDismiss = onDismiss,
+                initialIndex = destination.initialIndex,
+                initialMomentId = destination.initialMomentId ?: selected.id,
+                restrictPlaybackToInitialIndex = destination.restrictPlaybackToInitialIndex,
+                openCommentsOnAppear = destination.openCommentsOnAppear,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
@@ -238,7 +225,9 @@ fun MomentZoomDetailDestination(
     ) {
         val contentMod = Modifier.fillMaxSize()
         when (val presentation = destination.presentation) {
-            MomentZoomPresentationKind.Carousel -> {
+            MomentZoomPresentationKind.Carousel,
+            MomentZoomPresentationKind.Saved,
+            -> {
                 ModernMomentDetailView(
                     moments = moments,
                     onDismiss = {
@@ -248,15 +237,6 @@ fun MomentZoomDetailDestination(
                     initialIndex = destination.initialIndex,
                     initialMomentId = destination.initialMomentId,
                     restrictPlaybackToInitialIndex = destination.restrictPlaybackToInitialIndex,
-                    modifier = contentMod,
-                )
-            }
-            MomentZoomPresentationKind.Saved -> {
-                ModernSavedMomentsDetailView(
-                    moments = moments,
-                    initialIndex = destination.initialIndex,
-                    onDismiss = onDismiss,
-                    onRemoveMoment = onRemoveSavedMoment,
                     modifier = contentMod,
                 )
             }

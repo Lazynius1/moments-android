@@ -77,6 +77,7 @@ fun UserModernPublicProfileView(
     onOpenSocial: (SocialConnectionTab) -> Unit,
     onOpenMoment: (moments: List<com.moments.android.models.Moment>, index: Int) -> Unit,
     onMomentLongPress: (moment: com.moments.android.models.Moment, index: Int) -> Unit,
+    onPreviewStory: ((Rect) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
@@ -134,6 +135,7 @@ fun UserModernPublicProfileView(
                 onOpenMessage = onOpenMessage,
                 onAvatarBoundsChange = onAvatarBoundsChange,
                 hideAvatarForFlip = hideAvatarForFlip,
+                onPreviewStory = onPreviewStory,
                 modifier = Modifier
                     .padding(top = ProfileHeaderCollapseMetrics.headerTopPadding)
                     .padding(bottom = 4.dp),

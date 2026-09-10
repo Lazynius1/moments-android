@@ -100,6 +100,9 @@ import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.OfflineBannerOverlay
 import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import com.moments.android.views.story.StoriesView
+import com.moments.android.views.feed.stories.FeedStoryRingPreviewOverlay
+import com.moments.android.views.feed.stories.FeedStoryRingPreviewPlacement
+import com.moments.android.views.feed.stories.FeedStoryRingPreviewSelection
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -330,6 +333,9 @@ fun UserProfileView(
     var showingRelationshipSheet by remember { mutableStateOf(false) }
     var showingUnfollowConfirmation by remember { mutableStateOf(false) }
     var showingStories by remember { mutableStateOf(false) }
+    var storyStartStoryId by remember { mutableStateOf<String?>(null) }
+    var storyStartElapsed by remember { mutableStateOf(0.0) }
+    var storyRingPreviewSelection by remember { mutableStateOf<FeedStoryRingPreviewSelection?>(null) }
     var showProfileImageFullscreen by remember { mutableStateOf(false) }
     var showingQrCode by remember { mutableStateOf(false) }
     var qrAvatarBounds by remember { mutableStateOf(Rect.Zero) }
@@ -482,7 +488,11 @@ fun UserProfileView(
                             safeAreaBottom = safeAreaBottom,
                             onFollowAction = handleFollowAction,
                             onDismiss = onDismiss,
-                            onOpenStories = { showingStories = true },
+                            onOpenStories = {
+                                storyStartStoryId = null
+                                storyStartElapsed = 0.0
+                                showingStories = true
+                            },
                             onOpenMessage = openMessageFlow,
                             onShowProfileImageFullscreen = { showProfileImageFullscreen = true },
                             onShowQrCode = {
@@ -501,6 +511,13 @@ fun UserProfileView(
                             onMomentLongPress = { moment, index ->
                                 heroCoordinator.openMenu(moment, index, ProfileGridHeroMenuKind.VISITOR)
                             },
+                            onPreviewStory = { frame ->
+                                storyRingPreviewSelection = FeedStoryRingPreviewSelection(
+                                    userId = userId,
+                                    anchorFrame = frame,
+                                    placement = FeedStoryRingPreviewPlacement.TrailingBelowAvatar,
+                                )
+                            },
                         )
                     }
                 }
@@ -509,6 +526,23 @@ fun UserProfileView(
                     coordinator = heroCoordinator,
                     moments = zoomMoments,
                     zoomFeedKind = zoomFeedKind,
+                )
+
+                FeedStoryRingPreviewOverlay(
+                    selection = storyRingPreviewSelection,
+                    onSelectionChange = { storyRingPreviewSelection = it },
+                    onOpenStory = { previewUserId, storyId, elapsed ->
+                        storyStartStoryId = storyId
+                        storyStartElapsed = elapsed
+                        showingStories = true
+                    },
+                    onOpenProfile = { storyRingPreviewSelection = null },
+                    onMuted = {
+                        viewModel.loadRelationshipManagementState()
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(50f),
                 )
 
                 OfflineBannerOverlay(Modifier.align(Alignment.TopCenter))
@@ -681,7 +715,13 @@ fun UserProfileView(
         ) {
             StoriesView(
                 startWithUserId = userId,
-                onDismiss = { showingStories = false },
+                startStoryId = storyStartStoryId,
+                startElapsed = storyStartElapsed,
+                onDismiss = {
+                    showingStories = false
+                    storyStartStoryId = null
+                    storyStartElapsed = 0.0
+                },
             )
         }
     }

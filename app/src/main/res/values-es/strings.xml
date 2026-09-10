@@ -2379,6 +2379,12 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="saved_moments_share">Compartir</string>
     <string name="saved_moments_select">Seleccionar</string>
     <string name="saved_moments_search_placeholder">Buscar por usuario, texto o lugar</string>
+    <string name="saved_moments_filters_button">Filtros</string>
+    <string name="saved_moments_filters_title">Filtros</string>
+    <string name="saved_moments_filters_sort">Ordenar</string>
+    <string name="saved_moments_filters_contains">Contiene</string>
+    <string name="saved_moments_filters_apply">Aplicar</string>
+    <string name="saved_moments_filters_reset">Restablecer</string>
     <string name="saved_moments_empty_filtered_title">No hay resultados con estos filtros</string>
     <string name="saved_moments_empty_filtered_description">Prueba quitando filtros o limpiando la busqueda.</string>
     <string name="saved_moments_clear_filters">Limpiar filtros</string>

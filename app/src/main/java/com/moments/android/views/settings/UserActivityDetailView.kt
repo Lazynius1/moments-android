@@ -38,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.AlertDialog
@@ -75,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.moments.android.R
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.Moment
 import com.moments.android.models.Story
 import com.moments.android.services.performance.VideoMoment
@@ -584,6 +586,7 @@ fun ActivityInteractionDetailView(
                                 selectedAuthorId = selectedAuthorId,
                                 authorUsernameMap = authorUsernameMap,
                                 onOpenAuthorSheet = { showAuthorSheet = true },
+                                onClearAuthor = { selectedAuthorId = null },
                                 ink = ink,
                                 inkMuted = inkMuted,
                             )
@@ -1372,35 +1375,174 @@ private fun FiltersHeader(
     selectedAuthorId: String?,
     authorUsernameMap: Map<String, String>,
     onOpenAuthorSheet: () -> Unit,
+    onClearAuthor: () -> Unit,
     ink: Color,
     inkMuted: Color,
 ) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    val isDark = isSystemInDarkTheme()
+    val stroke = Color.White.copy(alpha = if (isDark) 0.06f else 0.16f)
+    var menuExpanded by remember { mutableStateOf(false) }
+    var lastSegment by remember {
+        mutableStateOf(
+            if (dateFilter == ReactionsDateFilter.CUSTOM) ReactionsDateFilter.ALL else dateFilter,
+        )
+    }
+    val segmentOptions = ReactionsDateFilter.entries.filter { it != ReactionsDateFilter.CUSTOM }
+    val hasSecondary =
+        sort != ReactionsSortOption.NEWEST ||
+            dateFilter == ReactionsDateFilter.CUSTOM ||
+            selectedAuthorId != null
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp, bottom = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        FilterChipMenu(
-            label = stringResource(R.string.user_activity_filters_sort),
-            value = stringResource(sort.titleRes),
-            options = ReactionsSortOption.entries.map { it to stringResource(it.titleRes) },
-            selected = sort,
-            onSelect = onSort,
-            ink = ink,
-            inkMuted = inkMuted,
-        )
-        FilterChipMenu(
-            label = stringResource(R.string.user_activity_filters_date),
-            value = stringResource(dateFilter.titleRes),
-            options = ReactionsDateFilter.entries.map { it to stringResource(it.titleRes) },
-            selected = dateFilter,
-            onSelect = onDateFilter,
-            ink = ink,
-            inkMuted = inkMuted,
-        )
-        if (showAuthor) {
-            val authorLabel = selectedAuthorId?.let { authorUsernameMap[it] }
-                ?: stringResource(R.string.user_activity_filters_author)
-            FilterChip(label = authorLabel, onClick = onOpenAuthorSheet, ink = ink, inkMuted = inkMuted)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(50))
+                    .border(1.dp, stroke, RoundedCornerShape(50))
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                segmentOptions.forEach { option ->
+                    val isSelected = dateFilter != ReactionsDateFilter.CUSTOM && dateFilter == option
+                    Text(
+                        text = stringResource(option.titleRes),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(50))
+                            .then(
+                                if (isSelected) {
+                                    Modifier.background(
+                                        if (isDark) Color.White.copy(alpha = 0.14f) else Color.White,
+                                    )
+                                } else Modifier,
+                            )
+                            .clickable {
+                                lastSegment = option
+                                onDateFilter(option)
+                            }
+                            .padding(vertical = 9.dp),
+                        textAlign = TextAlign.Center,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ink,
+                        maxLines = 1,
+                    )
+                }
+            }
+            Box {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .then(
+                            if (hasSecondary) {
+                                Modifier.momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                            } else {
+                                Modifier.border(1.dp, stroke, RoundedCornerShape(50))
+                            },
+                        )
+                        .clickable { menuExpanded = true }
+                        .padding(horizontal = 11.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.FilterList,
+                        contentDescription = stringResource(R.string.saved_moments_filters_button),
+                        tint = ink,
+                        modifier = Modifier.size(13.dp),
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                ) {
+                    Text(
+                        text = stringResource(R.string.user_activity_filters_sort),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = inkMuted,
+                    )
+                    ReactionsSortOption.entries.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(option.titleRes)) },
+                            onClick = {
+                                onSort(option)
+                                menuExpanded = false
+                            },
+                            trailingIcon = {
+                                if (sort == option) {
+                                    Icon(Icons.Default.CheckCircle, null, Modifier.size(16.dp))
+                                }
+                            },
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.user_activity_filters_date),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = inkMuted,
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(ReactionsDateFilter.CUSTOM.titleRes)) },
+                        onClick = {
+                            onDateFilter(ReactionsDateFilter.CUSTOM)
+                            menuExpanded = false
+                        },
+                        trailingIcon = {
+                            if (dateFilter == ReactionsDateFilter.CUSTOM) {
+                                Icon(Icons.Default.CheckCircle, null, Modifier.size(16.dp))
+                            }
+                        },
+                    )
+                    if (showAuthor) {
+                        val authorLabel = selectedAuthorId?.let { authorUsernameMap[it] }
+                            ?: stringResource(R.string.user_activity_filters_author)
+                        DropdownMenuItem(
+                            text = { Text(authorLabel) },
+                            onClick = {
+                                onOpenAuthorSheet()
+                                menuExpanded = false
+                            },
+                            trailingIcon = {
+                                if (selectedAuthorId != null) {
+                                    Icon(Icons.Default.CheckCircle, null, Modifier.size(16.dp))
+                                }
+                            },
+                        )
+                    }
+                    if (hasSecondary) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(R.string.saved_moments_filters_reset),
+                                    color = Color(0xFFFF3B30),
+                                )
+                            },
+                            onClick = {
+                                onSort(ReactionsSortOption.NEWEST)
+                                if (dateFilter == ReactionsDateFilter.CUSTOM) {
+                                    onDateFilter(lastSegment)
+                                }
+                                onClearAuthor()
+                                menuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
         }
     }
 }

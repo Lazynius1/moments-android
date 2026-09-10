@@ -13,6 +13,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,18 +21,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -44,7 +41,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -55,7 +51,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,6 +65,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -89,12 +85,18 @@ import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.messaging.components.ChatVideoPlayBadge
 import com.moments.android.views.messaging.components.momentsScrollEdgeChrome
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import com.moments.android.views.settings.SettingsProfileColors
 import com.moments.android.views.settings.SettingsSearchField
+import com.moments.android.views.settings.SettingsToolbarBackButton
 import com.moments.android.views.profile.core.sections.MomentCarouselIndicatorIcon
 import com.moments.android.views.profile.core.sections.MomentZoomDestination
 import com.moments.android.views.profile.core.sections.MomentZoomDetailDestination
-import com.moments.android.views.shared.MomentsContainerTransformOverlay
-import com.moments.android.views.shared.MomentsSharedTransitionLayout
 import com.moments.android.views.profile.core.sections.MomentZoomOpener
 import com.moments.android.views.profile.core.sections.MomentZoomPresentationKind
 import com.moments.android.views.profile.core.sections.ProfileMomentZoomNavigation
@@ -102,9 +104,10 @@ import com.moments.android.views.profile.core.sections.momentZoomNavigationSurfa
 import com.moments.android.views.profile.core.sections.profileGridNavigationChrome
 import com.moments.android.views.profile.core.sections.profileMomentZoomSource
 import com.moments.android.views.profile.core.sections.profileThumbnailUrl
-import com.moments.android.views.settings.SettingsProfileColors
-import com.moments.android.views.settings.SettingsToolbarBackButton
+import com.moments.android.views.shared.MomentsContainerTransformOverlay
+import com.moments.android.views.shared.MomentsSharedTransitionLayout
 import com.moments.android.views.shared.ScreenshotProtectedView
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -126,7 +129,8 @@ private data class IdentifiedSavedMoment(
 
 /**
  * Port de `SavedMomentsView.swift` (struct principal + `SavedMomentGridCard`).
- * Detalle (`ModernSavedMomentsDetailView`+) se abre vía [MomentZoomDetailDestination].
+ * Detalle se abre vía [MomentZoomDetailDestination] con [MomentZoomPresentationKind.Carousel]
+ * (= `ModernMomentDetailView`, misma superficie que el feed/perfil).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -142,18 +146,24 @@ fun SavedMomentsView(
     val viewModel = remember { SavedMomentsViewModel() }
 
     var searchText by remember { mutableStateOf("") }
+    var isSearchExpanded by remember { mutableStateOf(false) }
     var mediaFilter by remember { mutableStateOf(SavedMediaFilter.ALL) }
     var collectionFilter by remember { mutableStateOf(SavedCollectionFilter.ALL) }
     var sortMode by remember { mutableStateOf(SavedSortMode.NEWEST) }
+    var filtersMenuExpanded by remember { mutableStateOf(false) }
 
     var isSelectionMode by remember { mutableStateOf(false) }
     var selectedMomentIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showRemoveSelectionAlert by remember { mutableStateOf(false) }
     var restrictedMomentToRemove by remember { mutableStateOf<Moment?>(null) }
     var showingRestrictedRemoveAlert by remember { mutableStateOf(false) }
-    var sortMenuExpanded by remember { mutableStateOf(false) }
     var zoomDestination by remember { mutableStateOf<MomentZoomDestination?>(null) }
-    var isRefreshing by remember { mutableStateOf(false) }
+
+    val hasSecondaryFiltersActive =
+        collectionFilter != SavedCollectionFilter.ALL || sortMode != SavedSortMode.NEWEST
+
+    // ≡ iOS SavedMomentsView `.momentsFloatingTabBarHidden`
+    MomentsTabBarHidden()
 
     BackHandler {
         if (isSelectionMode) {
@@ -232,7 +242,7 @@ fun SavedMomentsView(
             moment = moment,
             moments = accessible,
             initialIndex = resolvedIndex,
-            presentation = MomentZoomPresentationKind.Saved,
+            presentation = MomentZoomPresentationKind.Carousel,
             setDestination = { zoomDestination = it },
             zoomIDPrefix = "saved",
         )
@@ -343,105 +353,88 @@ fun SavedMomentsView(
                         SavedMomentsEmpty(textColor, secondaryColor)
                     }
                     else -> {
-                        PullToRefreshBox(
-                            isRefreshing = isRefreshing,
+                        SavedMomentsToolbarFilterScroll(
                             onRefresh = {
-                                scope.launch {
-                                    isRefreshing = true
-                                    suspendCancellableCoroutine { cont ->
-                                        viewModel.loadSavedMoments {
-                                            cont.resume(Unit)
-                                        }
+                                suspendCancellableCoroutine { cont ->
+                                    viewModel.loadSavedMoments {
+                                        cont.resume(Unit)
                                     }
-                                    isRefreshing = false
                                 }
                             },
-                            modifier = Modifier.fillMaxSize(),
-                        ) {
-                            Column(
-                                Modifier.fillMaxSize().padding(top = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(14.dp),
-                            ) {
-                                SavedMomentsSearchBar(
-                                    searchText = searchText,
-                                    onSearchTextChange = { searchText = it },
-                                    textColor = textColor,
-                                    secondaryColor = secondaryColor,
-                                )
-                                SavedMomentsFilterPanel(
-                                    mediaFilter = mediaFilter,
-                                    onMediaFilterChange = { mediaFilter = it },
-                                    collectionFilter = collectionFilter,
-                                    onCollectionFilterChange = { collectionFilter = it },
-                                    sortMode = sortMode,
-                                    onSortModeChange = { sortMode = it },
-                                    sortMenuExpanded = sortMenuExpanded,
-                                    onSortMenuExpandedChange = { sortMenuExpanded = it },
-                                    textColor = textColor,
-                                    isDark = isDark,
-                                )
+                            chrome = {
+                                Column(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 4.dp, bottom = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    SavedMomentsChromeRow(
+                                        mediaFilter = mediaFilter,
+                                        onMediaFilterChange = { mediaFilter = it },
+                                        isSearchActive = isSearchExpanded || searchText.isNotEmpty(),
+                                        onSearchToggle = { isSearchExpanded = !isSearchExpanded },
+                                        hasSecondaryFilters = hasSecondaryFiltersActive,
+                                        filtersMenuExpanded = filtersMenuExpanded,
+                                        onFiltersMenuExpandedChange = { filtersMenuExpanded = it },
+                                        sortMode = sortMode,
+                                        onSortModeChange = { sortMode = it },
+                                        collectionFilter = collectionFilter,
+                                        onCollectionFilterChange = { collectionFilter = it },
+                                        onResetFilters = {
+                                            sortMode = SavedSortMode.NEWEST
+                                            collectionFilter = SavedCollectionFilter.ALL
+                                        },
+                                        textColor = textColor,
+                                        isDark = isDark,
+                                    )
+                                    if (isSearchExpanded || searchText.isNotEmpty()) {
+                                        SavedMomentsSearchBar(
+                                            searchText = searchText,
+                                            onSearchTextChange = { searchText = it },
+                                        )
+                                    }
+                                    if (hasSecondaryFiltersActive) {
+                                        SavedMomentsActiveFilterChips(
+                                            sortMode = sortMode,
+                                            collectionFilter = collectionFilter,
+                                            onClearSort = { sortMode = SavedSortMode.NEWEST },
+                                            onClearCollection = {
+                                                collectionFilter = SavedCollectionFilter.ALL
+                                            },
+                                            textColor = textColor,
+                                        )
+                                    }
+                                }
+                            },
+                            content = {
                                 if (filteredMoments.isEmpty()) {
                                     SavedMomentsFilteredEmpty(
                                         textColor = textColor,
                                         secondaryColor = secondaryColor,
                                         onClear = {
                                             searchText = ""
+                                            isSearchExpanded = false
                                             mediaFilter = SavedMediaFilter.ALL
                                             collectionFilter = SavedCollectionFilter.ALL
+                                            sortMode = SavedSortMode.NEWEST
                                         },
                                     )
                                 } else {
-                                    LazyVerticalGrid(
-                                        columns = GridCells.Fixed(3),
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .profileGridNavigationChrome()
-                                            .padding(horizontal = 10.dp),
-                                        contentPadding = PaddingValues(
-                                            bottom = if (isSelectionMode) 90.dp else 20.dp,
-                                        ),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                                    ) {
-                                        itemsIndexed(
-                                            identifiedFilteredMoments,
-                                            key = { _, item -> item.id },
-                                        ) { _, identified ->
-                                            val moment = identified.moment
-                                            val momentId = identified.id
-                                            val isRestricted =
-                                                !(viewModel.visibilityByMomentId[momentId] ?: true)
-                                            val isMutedRestriction =
-                                                isRestricted && viewModel.isMomentFromMutedUser(moment)
-                                            ScreenshotProtectedView(
-                                                isProtected = !isRestricted &&
-                                                    (moment.audience?.lowercase() ?: "") != "everyone",
-                                            ) {
-                                                SavedMomentGridCard(
-                                                    moment = moment,
-                                                    isRestricted = isRestricted,
-                                                    isMutedRestriction = isMutedRestriction,
-                                                    isSelectionMode = isSelectionMode,
-                                                    isSelected = momentId in selectedMomentIds,
-                                                    zoomSourceID = ProfileMomentZoomNavigation.sourceID(
-                                                        moment,
-                                                        identified.index,
-                                                        "saved-manager",
-                                                    ),
-                                                    onTap = {
-                                                        handleTap(moment, filteredMoments)
-                                                    },
-                                                    onLongPress = {
-                                                        if (!isSelectionMode) isSelectionMode = true
-                                                        toggleSelection(moment)
-                                                    },
-                                                )
-                                            }
-                                        }
-                                    }
+                                    SavedMomentsScrollGrid(
+                                        items = identifiedFilteredMoments,
+                                        isSelectionMode = isSelectionMode,
+                                        selectedMomentIds = selectedMomentIds,
+                                        visibilityByMomentId = viewModel.visibilityByMomentId,
+                                        isMuted = { viewModel.isMomentFromMutedUser(it) },
+                                        onTap = { handleTap(it, filteredMoments) },
+                                        onLongPress = { moment ->
+                                            if (!isSelectionMode) isSelectionMode = true
+                                            toggleSelection(moment)
+                                        },
+                                    )
                                 }
-                            }
-                        }
+                            },
+                        )
                     }
                 }
 
@@ -551,6 +544,7 @@ fun SavedMomentsView(
 }
 
 @Composable
+/** ≡ header de `SharedActivityDetailView` / `DetailTopBar`: título a la izquierda, Seleccionar en cápsula. */
 private fun SavedMomentsToolbar(
     title: String,
     isSelectionMode: Boolean,
@@ -558,47 +552,338 @@ private fun SavedMomentsToolbar(
     onNavigateBack: () -> Unit,
     onToggleSelection: () -> Unit,
 ) {
-    val actionSlotWidth = 96.dp
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .padding(top = 4.dp),
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier.width(actionSlotWidth),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            SettingsToolbarBackButton(onNavigateBack = onNavigateBack)
-        }
+        SettingsToolbarBackButton(onNavigateBack = onNavigateBack)
         Text(
             text = title,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.SemiBold,
             color = textColor,
-            textAlign = TextAlign.Center,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 17.sp,
             maxLines = 1,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 4.dp),
         )
-        Box(
-            Modifier
-                .width(actionSlotWidth)
-                .widthIn(min = 48.dp)
-                .clickable(onClick = onToggleSelection),
-            contentAlignment = Alignment.Center,
+        TextButton(
+            onClick = onToggleSelection,
+            // Material3 TextButton default = CircleShape → óvalo al pulsar; cápsula como el chrome de actividad.
+            shape = RoundedCornerShape(50),
         ) {
             Text(
                 text = stringResource(
                     if (isSelectionMode) R.string.saved_moments_cancel
                     else R.string.saved_moments_select,
                 ),
-                fontSize = 14.sp,
+                color = if (isSelectionMode) Color.Red else textColor,
                 fontWeight = FontWeight.SemiBold,
-                color = if (isSelectionMode) Color(0xFFFF3B30) else textColor,
+                fontSize = 14.sp,
                 maxLines = 1,
             )
         }
+    }
+}
+
+/**
+ * Port de Guardados con chrome tipo toolbar (`safeAreaBar`):
+ * barra fija arriba; el grid scrollea por debajo (sin bloque duro inline).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SavedMomentsToolbarFilterScroll(
+    onRefresh: suspend () -> Unit,
+    chrome: @Composable () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+    var chromeHeightPx by remember { mutableIntStateOf(0) }
+    var refreshing by remember { mutableStateOf(false) }
+    val chromeHeight = with(density) { chromeHeightPx.toDp() }
+    val isDark = isSystemInDarkTheme()
+    val canvas = ProfileMomentZoomNavigation.canvasBackground(isDark)
+
+    Box(Modifier.fillMaxSize()) {
+        PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = {
+                scope.launch {
+                    refreshing = true
+                    onRefresh()
+                    refreshing = false
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState),
+            ) {
+                Spacer(Modifier.height(chromeHeight))
+                content()
+            }
+        }
+
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .onGloballyPositioned { chromeHeightPx = it.size.height },
+        ) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0f to canvas.copy(alpha = 0.9f),
+                                0.65f to canvas.copy(alpha = 0.45f),
+                                1f to Color.Transparent,
+                            ),
+                        ),
+                    ),
+            )
+            chrome()
+        }
+    }
+}
+
+@Composable
+private fun SavedMomentsScrollGrid(
+    items: List<IdentifiedSavedMoment>,
+    isSelectionMode: Boolean,
+    selectedMomentIds: Set<String>,
+    visibilityByMomentId: Map<String, Boolean>,
+    isMuted: (Moment) -> Boolean,
+    onTap: (Moment) -> Unit,
+    onLongPress: (Moment) -> Unit,
+) {
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .profileGridNavigationChrome()
+            .padding(horizontal = 10.dp)
+            .padding(bottom = if (isSelectionMode) 90.dp else 20.dp),
+    ) {
+        val side = (maxWidth - 8.dp) / 3
+        Column(
+            Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            items.chunked(3).forEach { row ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    row.forEach { identified ->
+                        val moment = identified.moment
+                        val momentId = identified.id
+                        val isRestricted = !(visibilityByMomentId[momentId] ?: true)
+                        val isMutedRestriction = isRestricted && isMuted(moment)
+                        Box(Modifier.width(side)) {
+                            ScreenshotProtectedView(
+                                isProtected = !isRestricted &&
+                                    (moment.audience?.lowercase() ?: "") != "everyone",
+                            ) {
+                                SavedMomentGridCard(
+                                    moment = moment,
+                                    isRestricted = isRestricted,
+                                    isMutedRestriction = isMutedRestriction,
+                                    isSelectionMode = isSelectionMode,
+                                    isSelected = momentId in selectedMomentIds,
+                                    zoomSourceID = ProfileMomentZoomNavigation.sourceID(
+                                        moment,
+                                        identified.index,
+                                        "saved-manager",
+                                    ),
+                                    onTap = { onTap(moment) },
+                                    onLongPress = { onLongPress(moment) },
+                                )
+                            }
+                        }
+                    }
+                    repeat(3 - row.size) {
+                        Spacer(Modifier.width(side).aspectRatio(1f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SavedMomentsChromeRow(
+    mediaFilter: SavedMediaFilter,
+    onMediaFilterChange: (SavedMediaFilter) -> Unit,
+    isSearchActive: Boolean,
+    onSearchToggle: () -> Unit,
+    hasSecondaryFilters: Boolean,
+    filtersMenuExpanded: Boolean,
+    onFiltersMenuExpandedChange: (Boolean) -> Unit,
+    sortMode: SavedSortMode,
+    onSortModeChange: (SavedSortMode) -> Unit,
+    collectionFilter: SavedCollectionFilter,
+    onCollectionFilterChange: (SavedCollectionFilter) -> Unit,
+    onResetFilters: () -> Unit,
+    textColor: Color,
+    isDark: Boolean,
+) {
+    val stroke = Color.White.copy(alpha = if (isDark) 0.06f else 0.16f)
+    Row(
+        Modifier.padding(horizontal = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(50))
+                .border(1.dp, stroke, RoundedCornerShape(50))
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            SavedMediaFilter.entries.forEach { filter ->
+                val selected = mediaFilter == filter
+                Text(
+                    text = stringResource(filter.titleRes),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(50))
+                        .then(
+                            if (selected) {
+                                Modifier.background(
+                                    if (isDark) Color.White.copy(alpha = 0.14f) else Color.White,
+                                )
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .clickable { onMediaFilterChange(filter) }
+                        .padding(vertical = 9.dp),
+                    textAlign = TextAlign.Center,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = textColor,
+                    maxLines = 1,
+                )
+            }
+        }
+        SavedMomentsChromeIconButton(
+            icon = Icons.Default.Search,
+            isActive = isSearchActive,
+            textColor = textColor,
+            isDark = isDark,
+            onClick = onSearchToggle,
+        )
+        Box {
+            SavedMomentsChromeIconButton(
+                icon = Icons.Default.FilterList,
+                isActive = hasSecondaryFilters,
+                textColor = textColor,
+                isDark = isDark,
+                onClick = { onFiltersMenuExpandedChange(true) },
+                contentDescription = stringResource(R.string.saved_moments_filters_button),
+            )
+            DropdownMenu(
+                expanded = filtersMenuExpanded,
+                onDismissRequest = { onFiltersMenuExpandedChange(false) },
+            ) {
+                Text(
+                    text = stringResource(R.string.saved_moments_filters_sort),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = textColor.copy(alpha = 0.55f),
+                )
+                SavedSortMode.entries.forEach { mode ->
+                    DropdownMenuItem(
+                        text = { Text(stringResource(mode.titleRes)) },
+                        onClick = {
+                            onSortModeChange(mode)
+                            onFiltersMenuExpandedChange(false)
+                        },
+                        trailingIcon = {
+                            if (sortMode == mode) {
+                                Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
+                            }
+                        },
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.saved_moments_filters_contains),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = textColor.copy(alpha = 0.55f),
+                )
+                SavedCollectionFilter.entries
+                    .filter { it != SavedCollectionFilter.ALL }
+                    .forEach { filter ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(filter.titleRes)) },
+                            onClick = {
+                                onCollectionFilterChange(
+                                    if (collectionFilter == filter) SavedCollectionFilter.ALL else filter,
+                                )
+                                onFiltersMenuExpandedChange(false)
+                            },
+                            trailingIcon = {
+                                if (collectionFilter == filter) {
+                                    Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
+                                }
+                            },
+                        )
+                    }
+                if (hasSecondaryFilters) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(R.string.saved_moments_filters_reset),
+                                color = Color(0xFFFF3B30),
+                            )
+                        },
+                        onClick = {
+                            onResetFilters()
+                            onFiltersMenuExpandedChange(false)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SavedMomentsChromeIconButton(
+    icon: ImageVector,
+    isActive: Boolean,
+    textColor: Color,
+    isDark: Boolean,
+    onClick: () -> Unit,
+    contentDescription: String? = null,
+) {
+    val stroke = Color.White.copy(alpha = if (isDark) 0.06f else 0.16f)
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .then(
+                if (isActive) {
+                    Modifier.momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                } else {
+                    Modifier.border(1.dp, stroke, RoundedCornerShape(50))
+                },
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 11.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = contentDescription, tint = textColor, modifier = Modifier.size(13.dp))
     }
 }
 
@@ -606,8 +891,6 @@ private fun SavedMomentsToolbar(
 private fun SavedMomentsSearchBar(
     searchText: String,
     onSearchTextChange: (String) -> Unit,
-    textColor: Color,
-    secondaryColor: Color,
 ) {
     SettingsSearchField(
         value = searchText,
@@ -618,113 +901,54 @@ private fun SavedMomentsSearchBar(
 }
 
 @Composable
-private fun SavedMomentsFilterPanel(
-    mediaFilter: SavedMediaFilter,
-    onMediaFilterChange: (SavedMediaFilter) -> Unit,
-    collectionFilter: SavedCollectionFilter,
-    onCollectionFilterChange: (SavedCollectionFilter) -> Unit,
+private fun SavedMomentsActiveFilterChips(
     sortMode: SavedSortMode,
-    onSortModeChange: (SavedSortMode) -> Unit,
-    sortMenuExpanded: Boolean,
-    onSortMenuExpandedChange: (Boolean) -> Unit,
+    collectionFilter: SavedCollectionFilter,
+    onClearSort: () -> Unit,
+    onClearCollection: () -> Unit,
     textColor: Color,
-    isDark: Boolean,
 ) {
-    val stroke = Color.White.copy(alpha = if (isDark) 0.06f else 0.16f)
-    Column(
-        Modifier.padding(horizontal = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SavedMediaFilter.entries.forEach { filter ->
-                    val selected = mediaFilter == filter
-                    Text(
-                        text = stringResource(filter.titleRes),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(50))
-                            .then(
-                                if (selected) {
-                                    Modifier.momentsChromeGlass(RoundedCornerShape(50), interactive = true)
-                                } else {
-                                    Modifier
-                                        .background(Color.Transparent)
-                                        .border(1.dp, stroke, RoundedCornerShape(50))
-                                },
-                            )
-                            .clickable { onMediaFilterChange(filter) }
-                            .padding(vertical = 10.dp),
-                        textAlign = TextAlign.Center,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = textColor,
-                    )
-                }
-            }
-            Box {
-                Row(
-                    Modifier
-                        .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
-                        .clickable { onSortMenuExpandedChange(true) }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Icon(Icons.Default.SwapVert, null, tint = textColor, modifier = Modifier.size(13.dp))
-                    Text(
-                        stringResource(sortMode.titleRes),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = textColor,
-                        maxLines = 1,
-                    )
-                }
-                DropdownMenu(
-                    expanded = sortMenuExpanded,
-                    onDismissRequest = { onSortMenuExpandedChange(false) },
-                ) {
-                    SavedSortMode.entries.forEach { mode ->
-                        DropdownMenuItem(
-                            text = { Text(stringResource(mode.titleRes)) },
-                            onClick = {
-                                onSortModeChange(mode)
-                                onSortMenuExpandedChange(false)
-                            },
-                        )
-                    }
-                }
-            }
-        }
-
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(SavedCollectionFilter.entries) { filter ->
-                val selected = collectionFilter == filter
-                Text(
-                    text = stringResource(filter.titleRes),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .then(
-                            if (selected) {
-                                Modifier.momentsChromeGlass(RoundedCornerShape(50), interactive = true)
-                            } else {
-                                Modifier.border(1.dp, stroke, RoundedCornerShape(50))
-                            },
-                        )
-                        .clickable { onCollectionFilterChange(filter) }
-                        .padding(horizontal = 12.dp, vertical = 9.dp),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = textColor,
+        if (sortMode != SavedSortMode.NEWEST) {
+            item {
+                SavedMomentsActiveChip(
+                    title = stringResource(sortMode.titleRes),
+                    textColor = textColor,
+                    onClear = onClearSort,
                 )
             }
         }
+        if (collectionFilter != SavedCollectionFilter.ALL) {
+            item {
+                SavedMomentsActiveChip(
+                    title = stringResource(collectionFilter.titleRes),
+                    textColor = textColor,
+                    onClear = onClearCollection,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SavedMomentsActiveChip(
+    title: String,
+    textColor: Color,
+    onClear: () -> Unit,
+) {
+    Row(
+        Modifier
+            .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+            .clickable(onClick = onClear)
+            .padding(horizontal = 11.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = textColor)
+        Icon(Icons.Default.Close, null, tint = textColor, modifier = Modifier.size(10.dp))
     }
 }
 

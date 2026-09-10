@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
@@ -43,6 +44,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -55,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AccountHistoryEventType
 import com.moments.android.models.AccountHistoryItem
 import com.moments.android.services.firestore.FirestoreService
@@ -239,68 +242,150 @@ private fun AccountHistoryFilterHeader(
     isDark: Boolean,
     primary: Color,
 ) {
+    val stroke = Color.White.copy(alpha = if (isDark) 0.06f else 0.16f)
+    var menuExpanded by remember { mutableStateOf(false) }
+    var lastSegment by remember {
+        mutableStateOf(
+            if (dateFilter == ReactionsDateFilter.CUSTOM) ReactionsDateFilter.ALL else dateFilter,
+        )
+    }
+    val segmentOptions = ReactionsDateFilter.entries.filter { it != ReactionsDateFilter.CUSTOM }
+    val hasSecondary =
+        !sortDescending || dateFilter == ReactionsDateFilter.CUSTOM || selectedType != null
+
     Row(
         Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
+            .padding(horizontal = 14.dp)
             .padding(top = 8.dp, bottom = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        HistoryChipMenu(
-            titleRes = R.string.user_activity_filters_sort,
-            value = stringResource(
-                if (sortDescending) R.string.user_activity_account_history_filter_newest
-                else R.string.user_activity_account_history_filter_oldest,
-            ),
-            isDark = isDark,
-            primary = primary,
-        ) { dismiss ->
-            HistoryMenuItem(
-                label = stringResource(R.string.user_activity_account_history_filter_newest),
-                selected = sortDescending,
-                onClick = { onSort(true); dismiss() },
-            )
-            HistoryMenuItem(
-                label = stringResource(R.string.user_activity_account_history_filter_oldest),
-                selected = !sortDescending,
-                onClick = { onSort(false); dismiss() },
-            )
-        }
-
-        HistoryChipMenu(
-            titleRes = R.string.user_activity_filters_date,
-            value = stringResource(dateFilter.titleRes),
-            isDark = isDark,
-            primary = primary,
-        ) { dismiss ->
-            ReactionsDateFilter.entries.forEach { option ->
-                HistoryMenuItem(
-                    label = stringResource(option.titleRes),
-                    selected = dateFilter == option,
-                    onClick = { onDateFilter(option); dismiss() },
+        Row(
+            Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(50))
+                .border(1.dp, stroke, RoundedCornerShape(50))
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            segmentOptions.forEach { option ->
+                val isSelected = dateFilter != ReactionsDateFilter.CUSTOM && dateFilter == option
+                Text(
+                    text = stringResource(option.titleRes),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(50))
+                        .then(
+                            if (isSelected) {
+                                Modifier.background(
+                                    if (isDark) Color.White.copy(alpha = 0.14f) else Color.White,
+                                )
+                            } else Modifier,
+                        )
+                        .clickable {
+                            lastSegment = option
+                            onDateFilter(option)
+                        }
+                        .padding(vertical = 9.dp),
+                    textAlign = TextAlign.Center,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = primary,
+                    maxLines = 1,
                 )
             }
         }
-
-        HistoryChipMenu(
-            titleRes = R.string.user_activity_filters_type,
-            value = selectedType?.let { stringResource(it.labelRes) }
-                ?: stringResource(R.string.user_activity_account_history_filter_all),
-            isDark = isDark,
-            primary = primary,
-        ) { dismiss ->
-            HistoryMenuItem(
-                label = stringResource(R.string.user_activity_account_history_filter_all),
-                selected = selectedType == null,
-                onClick = { onType(null); dismiss() },
-            )
-            AccountHistoryEventType.entries.forEach { type ->
-                HistoryMenuItem(
-                    label = stringResource(type.labelRes),
-                    selected = selectedType == type,
-                    onClick = { onType(type); dismiss() },
+        Box {
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(50))
+                    .then(
+                        if (hasSecondary) {
+                            Modifier.momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                        } else {
+                            Modifier.border(1.dp, stroke, RoundedCornerShape(50))
+                        },
+                    )
+                    .clickable { menuExpanded = true }
+                    .padding(horizontal = 11.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.FilterList,
+                    contentDescription = stringResource(R.string.saved_moments_filters_button),
+                    tint = primary,
+                    modifier = Modifier.size(13.dp),
                 )
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+            ) {
+                Text(
+                    text = stringResource(R.string.user_activity_filters_sort),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = primary.copy(alpha = 0.55f),
+                )
+                HistoryMenuItem(
+                    label = stringResource(R.string.user_activity_account_history_filter_newest),
+                    selected = sortDescending,
+                    onClick = { onSort(true); menuExpanded = false },
+                )
+                HistoryMenuItem(
+                    label = stringResource(R.string.user_activity_account_history_filter_oldest),
+                    selected = !sortDescending,
+                    onClick = { onSort(false); menuExpanded = false },
+                )
+                Text(
+                    text = stringResource(R.string.user_activity_filters_type),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = primary.copy(alpha = 0.55f),
+                )
+                HistoryMenuItem(
+                    label = stringResource(R.string.user_activity_account_history_filter_all),
+                    selected = selectedType == null,
+                    onClick = { onType(null); menuExpanded = false },
+                )
+                AccountHistoryEventType.entries.forEach { type ->
+                    HistoryMenuItem(
+                        label = stringResource(type.labelRes),
+                        selected = selectedType == type,
+                        onClick = { onType(type); menuExpanded = false },
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.user_activity_filters_date),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = primary.copy(alpha = 0.55f),
+                )
+                HistoryMenuItem(
+                    label = stringResource(ReactionsDateFilter.CUSTOM.titleRes),
+                    selected = dateFilter == ReactionsDateFilter.CUSTOM,
+                    onClick = { onDateFilter(ReactionsDateFilter.CUSTOM); menuExpanded = false },
+                )
+                if (hasSecondary) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(R.string.saved_moments_filters_reset),
+                                color = Color(0xFFFF3B30),
+                            )
+                        },
+                        onClick = {
+                            onSort(true)
+                            if (dateFilter == ReactionsDateFilter.CUSTOM) onDateFilter(lastSegment)
+                            onType(null)
+                            menuExpanded = false
+                        },
+                    )
+                }
             }
         }
     }

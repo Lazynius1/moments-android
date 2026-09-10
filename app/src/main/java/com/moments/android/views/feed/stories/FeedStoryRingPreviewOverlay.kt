@@ -95,10 +95,19 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+/** ≡ iOS `FeedStoryRingPreviewPlacement`. */
+enum class FeedStoryRingPreviewPlacement {
+    /** Anillo del feed: debajo del avatar, centrado. */
+    BelowAnchor,
+    /** Perfil ajeno: a la derecha de la foto, un poco más abajo. */
+    TrailingBelowAvatar,
+}
+
 /** ≡ iOS `FeedStoryRingPreviewSelection`. */
 data class FeedStoryRingPreviewSelection(
     val userId: String,
     val anchorFrame: Rect,
+    val placement: FeedStoryRingPreviewPlacement = FeedStoryRingPreviewPlacement.BelowAnchor,
 )
 
 private const val PhotoPreviewDurationMs = 4_000L
@@ -401,6 +410,7 @@ fun FeedStoryRingPreviewOverlay(
                 shape = menuCardShape,
                 primaryTextColor = primaryTextColor,
                 isDark = isDark,
+                showViewProfile = selection.placement != FeedStoryRingPreviewPlacement.TrailingBelowAvatar,
                 onViewProfile = { dismissOverlay { onOpenProfile(selection.userId) } },
                 onMute = { showMuteConfirmation = true },
             )
@@ -595,6 +605,7 @@ private fun ActionsMenu(
     shape: RoundedCornerShape,
     primaryTextColor: Color,
     isDark: Boolean,
+    showViewProfile: Boolean = true,
     onViewProfile: () -> Unit,
     onMute: () -> Unit,
 ) {
@@ -612,17 +623,19 @@ private fun ActionsMenu(
                 spotColor = Color.Black.copy(alpha = if (isDark) 0.24f else 0.12f),
             ),
     ) {
-        MenuRow(
-            title = stringResource(R.string.user_activity_event_action_view_profile),
-            icon = { Icon(Icons.Outlined.AccountCircle, contentDescription = null, modifier = Modifier.size(24.dp)) },
-            isDestructive = false,
-            primaryTextColor = primaryTextColor,
-            onClick = onViewProfile,
-        )
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 14.dp),
-            color = primaryTextColor.copy(alpha = 0.35f),
-        )
+        if (showViewProfile) {
+            MenuRow(
+                title = stringResource(R.string.user_activity_event_action_view_profile),
+                icon = { Icon(Icons.Outlined.AccountCircle, contentDescription = null, modifier = Modifier.size(24.dp)) },
+                isDestructive = false,
+                primaryTextColor = primaryTextColor,
+                onClick = onViewProfile,
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 14.dp),
+                color = primaryTextColor.copy(alpha = 0.35f),
+            )
+        }
         MenuRow(
             title = stringResource(R.string.story_context_menu_mute),
             icon = { Icon(Icons.Filled.NotificationsOff, contentDescription = null, modifier = Modifier.size(24.dp)) },
@@ -683,7 +696,8 @@ private fun previewLayout(
     val horizontalInset = 16.dp
     val ringGap = 10.dp
     val previewWidthPx = with(density) { previewWidthDp.toPx() }
-    val menuHeight = with(density) { menuRowHeight.toPx() } * 2f + with(density) { 12.dp.toPx() }
+    val menuRows = if (selection.placement == FeedStoryRingPreviewPlacement.TrailingBelowAvatar) 1 else 2
+    val menuHeight = with(density) { menuRowHeight.toPx() } * menuRows + with(density) { 12.dp.toPx() }
     val stackGapPx = with(density) { stackGap.toPx() }
     val insetPx = with(density) { horizontalInset.toPx() }
     val ringGapPx = with(density) { ringGap.toPx() }
@@ -695,7 +709,18 @@ private fun previewLayout(
         selection.anchorFrame.right - overlayGlobal.left,
         selection.anchorFrame.bottom - overlayGlobal.top,
     )
-    val previewTop = max(anchor.bottom + ringGapPx, with(density) { 8.dp.toPx() })
+    val previewTop = when (selection.placement) {
+        FeedStoryRingPreviewPlacement.BelowAnchor ->
+            max(anchor.bottom + ringGapPx, with(density) { 8.dp.toPx() })
+        FeedStoryRingPreviewPlacement.TrailingBelowAvatar ->
+            max(anchor.top + with(density) { 36.dp.toPx() }, with(density) { 8.dp.toPx() })
+    }
+    val preferredOriginX = when (selection.placement) {
+        FeedStoryRingPreviewPlacement.BelowAnchor ->
+            anchor.center.x - previewWidthPx / 2f
+        FeedStoryRingPreviewPlacement.TrailingBelowAvatar ->
+            anchor.right + with(density) { 12.dp.toPx() }
+    }
     val maxHeight = max(
         with(density) { 220.dp.toPx() },
         overlayHeight - previewTop - stackGapPx - menuHeight - with(density) { 16.dp.toPx() },
@@ -709,6 +734,11 @@ private fun previewLayout(
     }
     val minX = insetPx
     val maxX = max(minX, overlayWidth - insetPx - width)
-    val originX = min(max(anchor.center.x - width / 2f, minX), maxX)
-    return PreviewLayout(width, height, originX, previewTop)
+    val originX = min(max(preferredOriginX, minX), maxX)
+    val stackHeight = height + stackGapPx + menuHeight
+    val clampedTop = min(
+        previewTop,
+        max(with(density) { 8.dp.toPx() }, overlayHeight - stackHeight - with(density) { 16.dp.toPx() }),
+    )
+    return PreviewLayout(width, height, originX, clampedTop)
 }

@@ -230,6 +230,7 @@ fun UserModernProfileHeader(
     onOpenMessage: () -> Unit,
     onAvatarBoundsChange: (Rect) -> Unit = {},
     hideAvatarForFlip: Boolean = false,
+    onPreviewStory: ((Rect) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
@@ -251,6 +252,7 @@ fun UserModernProfileHeader(
                     storyRingRefreshTrigger = storyRingRefreshTrigger,
                     onOpenStories = onOpenStories,
                     onShowProfileImageFullscreen = onShowProfileImageFullscreen,
+                    onPreviewStory = onPreviewStory,
                     modifier = Modifier
                         .alpha(if (hideAvatarForFlip) 0f else 1f)
                         .onGloballyPositioned { onAvatarBoundsChange(it.boundsInRoot()) },

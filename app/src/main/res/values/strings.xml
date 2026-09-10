@@ -2823,6 +2823,12 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="saved_moments_share">Share</string>
     <string name="saved_moments_select">Select</string>
     <string name="saved_moments_search_placeholder">Search by user, text, or location</string>
+    <string name="saved_moments_filters_button">Filters</string>
+    <string name="saved_moments_filters_title">Filters</string>
+    <string name="saved_moments_filters_sort">Sort</string>
+    <string name="saved_moments_filters_contains">Contains</string>
+    <string name="saved_moments_filters_apply">Apply</string>
+    <string name="saved_moments_filters_reset">Reset</string>
     <string name="saved_moments_empty_filtered_title">No results for these filters</string>
     <string name="saved_moments_empty_filtered_description">Try removing filters or clearing search.</string>
     <string name="saved_moments_clear_filters">Clear filters</string>
