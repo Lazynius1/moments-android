@@ -213,6 +213,9 @@ fun GlassmorphicChatMessageList(
         callbacks.onAtBottomChanged(listController.isAtBottom)
     }
     val vanishModeActive by viewModel.vanishModeActive.collectAsState()
+    val canLoadMore by viewModel.canLoadMore.collectAsState()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+    val isRestoringHistory by viewModel.isLoadingOlderHistory.collectAsState()
     val listBottomInset = composerChromeHeight + composerGap
     CompositionLocalProvider(
         LocalChatSearchHighlightTerm provides searchHighlightTerm,
@@ -223,6 +226,8 @@ fun GlassmorphicChatMessageList(
                 transaction = transaction,
                 controller = listController,
                 onReachedTop = callbacks.loadOlderHistory,
+                canLoadOlderHistory = presentation.hasCompletedInitialScroll && canLoadMore
+                    && !isLoadingMore && !isRestoringHistory,
                 onContentExtentChanged = { exceeds ->
                     presentation.scrollContentExceedsViewport = exceeds
                     callbacks.onContentExtentChanged(exceeds)

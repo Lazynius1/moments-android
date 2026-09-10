@@ -78,6 +78,7 @@ import com.moments.android.views.messaging.core.MessageStatus
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.ScreenshotProtectionMode
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import kotlin.math.abs
 import java.net.URI
 
@@ -590,6 +591,8 @@ fun ClusterGalleryView(
     detail: (@Composable (message: EnhancedMessage, onDismissDetail: () -> Unit) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    // ≡ iOS `.momentsFloatingTabBarHidden` en galería + detalle media.
+    MomentsTabBarHidden()
     var tab by remember { mutableStateOf(initialTab) }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<String>>(emptySet()) }

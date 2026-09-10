@@ -82,6 +82,7 @@ import com.moments.android.views.shared.MomentsVideoPlaybackTimeline
 import com.moments.android.views.shared.MomentsVideoPlayer
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.ScreenshotProtectionMode
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import com.moments.android.views.story.StoryRingAvatarView
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -108,6 +109,8 @@ fun ConversationFullScreenMediaView(
     onSendReply: (SharedMedia, String, (Result<Unit>) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // ≡ iOS FullScreenMediaView `.momentsFloatingTabBarHidden`.
+    MomentsTabBarHidden()
     val colors = rememberAdaptiveColors()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()

@@ -147,6 +147,7 @@ open class EnhancedChatViewModel(
     private var activeSearchToken = 0
     private var isMaterializingConversation = false
     private val pendingMaterializationCallbacks = mutableListOf<(String?) -> Unit>()
+    private var historyRestorationJob: Job? = null
     private var didLoadCache = false
     var messagesById: Map<String, EnhancedMessage> = emptyMap(); private set
     var messageIndexById: Map<String, Int> = emptyMap(); private set
@@ -1218,7 +1219,8 @@ open class EnhancedChatViewModel(
      */
     fun loadMoreMessages() = scope.launch {
         val oldest = _messages.value.firstOrNull() ?: return@launch
-        if (_isLoadingMore.value || !_canLoadMore.value || conversationId.isBlank()) return@launch
+        if (_isLoadingMore.value || _isLoadingOlderHistory.value || !_canLoadMore.value || conversationId.isBlank()) return@launch
+        historyRestorationJob?.cancel()
         _isLoadingMore.value = true
         _isLoadingOlderHistory.value = true
         _historyLoadNotice.value = HistoryLoadNotice.HIDDEN
@@ -1302,7 +1304,8 @@ open class EnhancedChatViewModel(
 
     /** Si `onPrependFinished` no llega (kind mal clasificado / race con listener), desbloquea load more. */
     private fun scheduleHistoryScrollRestorationFallback() {
-        scope.launch {
+        historyRestorationJob?.cancel()
+        historyRestorationJob = scope.launch {
             delay(900)
             if (_isLoadingOlderHistory.value) endHistoryScrollRestoration()
         }
@@ -1334,6 +1337,8 @@ open class EnhancedChatViewModel(
 
     /** La vista llama esto cuando el scroll quedó re-anclado tras prepend. */
     fun endHistoryScrollRestoration() {
+        historyRestorationJob?.cancel()
+        historyRestorationJob = null
         _isLoadingOlderHistory.value = false
     }
 

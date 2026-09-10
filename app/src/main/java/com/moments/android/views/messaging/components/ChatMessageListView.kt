@@ -2,6 +2,7 @@ package com.moments.android.views.messaging.components
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,9 +15,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -34,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.moments.android.views.messaging.core.ChatRenderRow
 import com.moments.android.views.messaging.core.MessageItem
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -63,6 +68,10 @@ private data class HistoryLoadViewport(
     val lastIndex: Int,
     val rowCount: Int,
     val scrolling: Boolean,
+    val canLoadHistory: Boolean,
+    val loadArmed: Boolean,
+    val programmaticScroll: Boolean,
+    val measuredRowCount: Int,
 )
 
 data class ChatListRow(
@@ -70,6 +79,7 @@ data class ChatListRow(
     val messageIds: Set<String> = emptySet(),
     val visualSignature: Int = 0,
     val payload: Any? = null,
+    val refreshGeneration: Int = 0,
 )
 
 enum class ChatListUpdateKind { INITIAL, PREPEND_HISTORY, APPEND_MESSAGES, RECONFIGURE_ROWS, REPLACE_ALL, JUMP }
@@ -137,8 +147,6 @@ class ChatMessageListController {
         private set
     var scrollNavigationTargetRowId by mutableStateOf<String?>(null)
 
-    /** Tras prepend, no disparar carga de historial hasta gesto de usuario. */
-    internal var suppressHistoryLoadUntilNextUserScroll by mutableStateOf(false)
     internal var pendingScroll by mutableStateOf<PendingScrollRequest?>(null)
     internal var allowForceScrollDuringNavigation by mutableStateOf(false)
     internal var isProgrammaticScroll by mutableStateOf(false)
@@ -146,6 +154,7 @@ class ChatMessageListController {
     private var messageIdToRowId: Map<String, String> = emptyMap()
     private var orderedRowIds: List<String> = emptyList()
     private val rowFramesInWindow = mutableMapOf<String, Rect>()
+    internal val rowRefreshGenerations = mutableStateMapOf<String, Int>()
 
     fun enqueue(value: ChatListScrollIntent) {
         nextIntent = value
@@ -187,9 +196,11 @@ class ChatMessageListController {
     }
 
     fun reconfigure(messageIds: List<String>) {
-        if (messageIds.any { messageIdToRowId.containsKey(it) || orderedRowIds.contains(it) }) {
-            reconfigureGeneration++
-        }
+        messageIds.mapNotNull { messageIdToRowId[it] ?: it.takeIf(orderedRowIds::contains) }
+            .distinct()
+            .forEach { rowId ->
+                rowRefreshGenerations[rowId] = (rowRefreshGenerations[rowId] ?: 0) + 1
+            }
     }
 
     fun resolvedRowId(forMessageId: String): String =
@@ -225,6 +236,9 @@ class ChatMessageListController {
 
     internal fun syncRows(chronoRows: List<ChatListRow>) {
         orderedRowIds = chronoRows.map { it.id }
+        val retainedIds = orderedRowIds.toSet()
+        rowRefreshGenerations.keys.retainAll(retainedIds)
+        rowFramesInWindow.keys.retainAll(retainedIds)
         messageIdToRowId = buildMap {
             chronoRows.forEach { row ->
                 row.messageIds.forEach { put(it, row.id) }
@@ -238,7 +252,6 @@ class ChatMessageListController {
     }
 
     internal fun onUserScrollBegan() {
-        suppressHistoryLoadUntilNextUserScroll = false
         if (scrollNavigationTargetRowId != null) {
             scrollNavigationTargetRowId = null
         }
@@ -255,8 +268,8 @@ class ChatMessageListController {
         val layoutInfo = state.layoutInfo
         val visible = layoutInfo.visibleItemsInfo
         firstVisibleRowIndex = visible.firstOrNull()?.index
-        topVisibleRowId = visible.maxByOrNull { it.index }?.index?.let(displayRows::getOrNull)?.id
-        bottomVisibleRowId = visible.minByOrNull { it.index }?.index?.let(displayRows::getOrNull)?.id
+        topVisibleRowId = visible.maxByOrNull { it.index }?.key as? String
+        bottomVisibleRowId = visible.minByOrNull { it.index }?.key as? String
         contentOffsetY = state.firstVisibleItemScrollOffset
         val nearestBottom = visible.minOfOrNull { it.index } ?: Int.MAX_VALUE
         val offsetNearBottom = nearestBottom == 0 && state.firstVisibleItemScrollOffset <= 8
@@ -365,6 +378,7 @@ fun ChatMessageListView(
     transaction: ChatListUpdateTransaction,
     controller: ChatMessageListController,
     onReachedTop: () -> Unit,
+    canLoadOlderHistory: Boolean = true,
     onContentExtentChanged: (Boolean) -> Unit = {},
     onPrependFinished: () -> Unit = {},
     onPrefetchRows: (List<ChatListRow>) -> Unit = {},
@@ -394,6 +408,8 @@ fun ChatMessageListView(
     var displayIndexByMessageId by remember { mutableStateOf(emptyMap<String, Int>()) }
     var hasLoadedInitial by remember { mutableStateOf(false) }
     var historyLoadArmed by remember { mutableStateOf(true) }
+    val historyLoadScope = rememberCoroutineScope()
+    val canLoadOlderHistoryUpdated = rememberUpdatedState(canLoadOlderHistory)
     val displayRowsUpdated = rememberUpdatedState(displayRows)
     val onReachedTopUpdated = rememberUpdatedState(onReachedTop)
     val onContentExtentChangedUpdated = rememberUpdatedState(onContentExtentChanged)
@@ -478,7 +494,7 @@ fun ChatMessageListView(
         val detectedChanged = newIds.filter { id ->
             val old = oldById[id] ?: return@filter false
             val neu = newById[id] ?: return@filter false
-            old.visualSignature != neu.visualSignature
+            old.visualSignature != neu.visualSignature || old.payload != neu.payload
         }.toSet()
         val changed = detectedChanged + transaction.changedRowIds.filter { newById.containsKey(it) }
 
@@ -490,7 +506,11 @@ fun ChatMessageListView(
         val wasAtBottom = controller.isAtBottom
         val oldFirst = state.firstVisibleItemIndex
         val oldOffset = state.firstVisibleItemScrollOffset
-        val previousAnchorId = displayRows.getOrNull(oldFirst)?.id
+        // Read the measured key: indices can still belong to the previous layout.
+        val previousAnchorId = state.layoutInfo.visibleItemsInfo
+            .firstOrNull { it.index == oldFirst }?.key as? String
+            ?: displayRows.getOrNull(oldFirst)?.id
+        val previousAnchor = oldById[previousAnchorId]
 
         val normalized = normalizeTransactionKind(
             requested = transaction.kind,
@@ -500,28 +520,25 @@ fun ChatMessageListView(
             changedRowIds = changed,
         )
 
+        // Stable LazyColumn keys preserve the visible item and its pixel offset,
+        // including during a fling. Only remap when a single photo became an album.
+        val replacementAnchor = if (previousAnchorId != null && previousAnchorId !in newById) {
+            transaction.rows.indexOfFirst { row ->
+                previousAnchor?.messageIds?.any(row.messageIds::contains) == true
+            }.takeIf { it >= 0 }?.let { transaction.rows.lastIndex - it }
+        } else null
         rebuildIndices(transaction.rows)
+        if (normalized != ChatListUpdateKind.JUMP && replacementAnchor != null) {
+            state.requestScrollToItem(replacementAnchor, oldOffset)
+        }
 
         if (normalized == ChatListUpdateKind.PREPEND_HISTORY) {
-            // Suppress solo durante el scrollToItem programático.
-            controller.suppressHistoryLoadUntilNextUserScroll = true
-            val anchorId = previousAnchorId ?: transaction.anchorRowId
-            if (anchorId != null && displayIndexById.containsKey(anchorId)) {
-                val target = displayIndexById.getValue(anchorId)
-                controller.isProgrammaticScroll = true
-                try {
-                    state.scrollToItem(target, oldOffset)
-                } finally {
-                    controller.isProgrammaticScroll = false
-                }
-            }
-            controller.suppressHistoryLoadUntilNextUserScroll = false
-            onPrependFinished()
-            // Si tras insertar sigues cerca del tope, encadena otra página.
-            val topish = state.layoutInfo.visibleItemsInfo.maxOfOrNull { it.index } ?: 0
-            val distanceFromOldest = (displayRows.lastIndex - topish).coerceAtLeast(0)
-            if (displayRows.isNotEmpty() && distanceFromOldest <= LOAD_OLDER_IDLE_THRESHOLD) {
-                onReachedTop()
+            // A frame lets the new item provider reach measure before another page
+            // is requested. No scrollToItem: it would cancel the user's fling.
+            try {
+                withFrameNanos { }
+            } finally {
+                onPrependFinished()
             }
             applyScrollCommand(transaction.scrollCommand)
             resolvePendingScrollIfPossible()
@@ -543,25 +560,11 @@ fun ChatMessageListView(
                     }
                 }
             }
-            wasAtBottom &&
+            wasAtBottom && !state.isScrollInProgress &&
                 controller.scrollNavigationTargetRowId == null &&
                 normalized == ChatListUpdateKind.APPEND_MESSAGES &&
                 displayRows.isNotEmpty() -> {
                 state.goTo(0, animated = false)
-            }
-            normalized == ChatListUpdateKind.RECONFIGURE_ROWS &&
-                !wasAtBottom &&
-                controller.scrollNavigationTargetRowId == null &&
-                previousAnchorId != null &&
-                displayIndexById.containsKey(previousAnchorId) -> {
-                // Mantener ancla al reconfigurar (status/reactions) sin saltar al fondo.
-                val target = displayIndexById.getValue(previousAnchorId)
-                controller.isProgrammaticScroll = true
-                try {
-                    state.scrollToItem(target, oldOffset)
-                } finally {
-                    controller.isProgrammaticScroll = false
-                }
             }
         }
 
@@ -569,14 +572,14 @@ fun ChatMessageListView(
         resolvePendingScrollIfPossible()
     }
 
-    LaunchedEffect(controller.command, displayIndexById, displayRows, controller.reconfigureGeneration) {
+    LaunchedEffect(controller.command) {
         val command = controller.command
         if (command is ChatListScrollCommand.None) return@LaunchedEffect
         applyScrollCommand(command)
         controller.consumeCommand()
     }
 
-    LaunchedEffect(controller.nextIntent, displayIndexById, displayRows) {
+    LaunchedEffect(controller.nextIntent) {
         val intent = controller.nextIntent ?: return@LaunchedEffect
         when (intent) {
             is ChatListScrollIntent.Bottom -> {
@@ -605,17 +608,12 @@ fun ChatMessageListView(
         controller.consumeIntent()
     }
 
-    // Gesto de usuario: liberar suppress + nav target.
-    // NO terminar vanish aquí: al enganchar el pull, isScrollInProgress pasa a false
-    // (la lista ya no scrollea) y eso mataba el gesto a los pocos px → shake.
+    // DragInteraction distinguishes touch input even when it interrupts a
+    // programmatic scroll. isScrollInProgress also includes animations/flings.
     LaunchedEffect(state) {
-        snapshotFlow { state.isScrollInProgress }
-            .distinctUntilChanged()
-            .collect { scrolling ->
-                if (scrolling && !controller.isProgrammaticScroll) {
-                    controller.onUserScrollBegan()
-                }
-            }
+        state.interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) controller.onUserScrollBegan()
+        }
     }
 
     LaunchedEffect(controller.vanishPullResetSignal) {
@@ -652,7 +650,8 @@ fun ChatMessageListView(
         }
     }
 
-    // No keyear por displayRows: cancelaba el delay y dejaba armed=false para siempre.
+    // Observe readiness as well as the viewport, so another page can start
+    // after the previous one settles without requiring a new touch gesture.
     LaunchedEffect(state) {
         snapshotFlow {
             val rows = displayRowsUpdated.value
@@ -664,6 +663,10 @@ fun ChatMessageListView(
                 lastIndex = rows.lastIndex,
                 rowCount = rows.size,
                 scrolling = state.isScrollInProgress && !controller.isProgrammaticScroll,
+                canLoadHistory = canLoadOlderHistoryUpdated.value,
+                loadArmed = historyLoadArmed,
+                programmaticScroll = controller.isProgrammaticScroll,
+                measuredRowCount = state.layoutInfo.totalItemsCount,
             )
         }
             .distinctUntilChanged()
@@ -683,23 +686,33 @@ fun ChatMessageListView(
                 val distanceFromOldest = (vp.lastIndex - vp.topish).coerceAtLeast(0)
                 val checkLoadCount =
                     if (vp.scrolling) LOAD_OLDER_SCROLL_THRESHOLD else LOAD_OLDER_IDLE_THRESHOLD
-                val shouldLoad = vp.rowCount > 0 && distanceFromOldest <= checkLoadCount
-                if (shouldLoad) {
-                    if (historyLoadArmed && !controller.suppressHistoryLoadUntilNextUserScroll) {
-                        historyLoadArmed = false
-                        try {
-                            onReachedTopUpdated.value()
-                            delay(350)
-                        } finally {
-                            historyLoadArmed = true
-                        }
+                val shouldLoad = vp.rowCount > 0 && vp.measuredRowCount == vp.rowCount
+                    && distanceFromOldest <= checkLoadCount
+                if (shouldLoad && vp.canLoadHistory && vp.loadArmed &&
+                    canLoadOlderHistoryUpdated.value && !vp.programmaticScroll
+                ) {
+                    historyLoadArmed = false
+                    onReachedTopUpdated.value()
+                    // Do not block viewport reporting or media prefetch during debounce.
+                    historyLoadScope.launch {
+                        delay(350)
+                        historyLoadArmed = true
                     }
                 }
+            }
+    }
 
-                val first = state.firstVisibleItemIndex
-                val from = (first - 5).coerceAtLeast(0)
-                val to = (first + 40).coerceAtMost(rows.size)
-                if (from < to) onPrefetchRowsUpdated.value(rows.subList(from, to))
+    LaunchedEffect(state) {
+        snapshotFlow {
+            val rows = displayRowsUpdated.value
+            val first = state.firstVisibleItemIndex
+            val from = (first - 5).coerceAtLeast(0)
+            val to = (first + 40).coerceAtMost(rows.size)
+            if (from < to) rows.subList(from, to) else emptyList()
+        }
+            .distinctUntilChanged()
+            .collect { rows ->
+                if (rows.isNotEmpty()) onPrefetchRowsUpdated.value(rows)
             }
     }
 
@@ -754,7 +767,8 @@ fun ChatMessageListView(
         ) {
             itemsIndexed(
                 items = displayRows,
-                key = { _, row -> "${row.id}|${row.visualSignature}|$reconfigureGen" },
+                key = { _, row -> row.id },
+                contentType = { _, row -> (row.payload as? ChatRenderRow)?.javaClass },
             ) { _, row ->
                 // En la fila seleccionada el lift/scale debe ganar a vecinos
                 // (zIndex solo vale entre siblings).
@@ -765,7 +779,9 @@ fun ChatMessageListView(
                             controller.reportRowFrame(row.id, coords.boundsInWindow())
                         },
                 ) {
-                    rowContent(row)
+                    rowContent(row.copy(
+                        refreshGeneration = reconfigureGen + (controller.rowRefreshGenerations[row.id] ?: 0),
+                    ))
                 }
             }
         }
