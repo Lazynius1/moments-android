@@ -21,9 +21,11 @@ import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.models.ProfileUpdatePayload
 import com.moments.android.models.ReactionPayload
 import com.moments.android.models.ReportActionPayload
+import com.moments.android.models.encode
 import com.moments.android.models.SavePayload
 import com.moments.android.models.cache.CachedAction
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.firestore.checkIfSaved
 import com.moments.android.services.firestore.addComment
 import com.moments.android.services.firestore.deleteComment
 import com.moments.android.services.firestore.toggleSaveMoment
@@ -122,10 +124,14 @@ object OfflineSyncService {
                     handleExhaustedAction(action)
                     continue
                 }
-                if (!ignoreBackoff && !isReadyForAttempt(action)) continue
+                if (!ignoreBackoff && !isReadyForAttempt(action)) {
+                    if (action.type == CachedAction.ActionType.REACTION.raw) break
+                    continue
+                }
 
                 LocalPersistenceService.markActionAttempt(action.id)
                 executeAction(action)
+                if (action.type == CachedAction.ActionType.REACTION.raw && LocalPersistenceService.hasPendingAction(action.id)) break
             }
         } finally {
             syncMutex.unlock()
@@ -175,8 +181,12 @@ object OfflineSyncService {
             CachedAction.ActionType.REACTION.raw -> {
                 decodeReactionPayload(action.payloadData)?.let { payload ->
                     runCatching {
+                        val desired = payload.desiredActive ?: (db.collection("users").document(payload.authorId)
+                            .collection("moments").document(payload.momentId).collection("reactions").document(payload.userId)
+                            .get(com.google.firebase.firestore.Source.SERVER).await().getString("reactionType") != payload.reaction)
+                        LocalPersistenceService.updateActionPayload(action.id, payload.copy(desiredActive = desired).encode())
                         firestoreService.addReaction(
-                            payload.momentId, payload.reaction, payload.userId, payload.authorId,
+                            payload.momentId, payload.reaction, payload.userId, payload.authorId, desiredActive = desired,
                         )
                     }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
                 } ?: LocalPersistenceService.deleteAction(action.id)
@@ -271,8 +281,19 @@ object OfflineSyncService {
 
             CachedAction.ActionType.SAVE.raw -> {
                 decodeSavePayload(action.payloadData)?.let { payload ->
+                    val desiredSaved = payload.desiredSaved ?: run {
+                        val currentlySaved = runCatching {
+                            firestoreService.checkIfSaved(payload.userId, payload.momentId)
+                        }.getOrNull()
+                        if (currentlySaved == null) {
+                            return@let
+                        }
+                        !currentlySaved
+                    }
+                    val resolved = payload.copy(desiredSaved = desiredSaved)
+                    LocalPersistenceService.updateActionPayload(action.id, resolved.encode())
                     runCatching {
-                        firestoreService.toggleSaveMoment(payload.userId, payload.momentId, payload.authorId)
+                        firestoreService.toggleSaveMoment(resolved.userId, resolved.momentId, resolved.authorId, desiredSaved)
                     }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
                 } ?: LocalPersistenceService.deleteAction(action.id)
             }
@@ -385,6 +406,7 @@ object OfflineSyncService {
                             .collection("moments").document(payload.momentId)
                             .delete().awaitTask()
                     }.isSuccess
+                    if (!deleted) return@let
                     // 2. Storage fire & forget (no bloquea la cola si falla) — igual que iOS.
                     payload.imagePath?.takeIf { it.isNotEmpty() }?.let { path ->
                         runCatching { StorageService.deleteMedia(path) }
@@ -417,13 +439,22 @@ object OfflineSyncService {
             }
         }
 
-        optimizeToggleGroup(actions, CachedAction.ActionType.REACTION.raw) { action ->
-            decodeReactionPayload(action.payloadData)?.let { "${it.momentId}_${it.userId}_${it.reaction}" } ?: "unknown"
-        }.let { actionsToDelete.addAll(it) }
+        // Reaction actions retain their order, including resolved retries.
 
-        optimizeToggleGroup(actions, CachedAction.ActionType.SAVE.raw) { action ->
-            decodeSavePayload(action.payloadData)?.let { "${it.momentId}_${it.userId}" } ?: "unknown"
-        }.let { actionsToDelete.addAll(it) }
+        // Save payloads carry an absolute desired state. Only compact groups
+        // whose records all have that field; legacy null payloads are toggles
+        // and must retain ordering/parity for safe migration.
+        actions.filter { it.type == CachedAction.ActionType.SAVE.raw }
+            .groupBy { action ->
+                decodeSavePayload(action.payloadData)?.let { "${it.momentId}_${it.userId}" } ?: "unknown_${action.id}"
+            }
+            .values
+            .filter { group ->
+                group.size > 1 && group.all { decodeSavePayload(it.payloadData)?.desiredSaved != null }
+            }
+            .forEach { group ->
+                group.sortedBy { it.createdAt }.dropLast(1).forEach { actionsToDelete.add(it.id) }
+            }
 
         actions.filter { it.type == CachedAction.ActionType.FOLLOW.raw }
             .groupBy { action ->
@@ -485,7 +516,7 @@ object OfflineSyncService {
 
     private fun decodeReactionPayload(data: ByteArray): ReactionPayload? = runCatching {
         val o = JSONObject(String(data))
-        ReactionPayload(o.getString("momentId"), o.getString("reaction"), o.getString("authorId"), o.getString("userId"))
+        ReactionPayload(o.getString("momentId"), o.getString("reaction"), o.getString("authorId"), o.getString("userId"), if (o.has("desiredActive")) o.getBoolean("desiredActive") else null)
     }.getOrNull()
 
     private fun decodeCommentPayload(data: ByteArray): CommentPayload? = runCatching {
@@ -518,7 +549,12 @@ object OfflineSyncService {
 
     private fun decodeSavePayload(data: ByteArray): SavePayload? = runCatching {
         val o = JSONObject(String(data))
-        SavePayload(o.getString("userId"), o.getString("momentId"), o.optString("authorId").takeIf { it.isNotBlank() })
+        SavePayload(
+            o.getString("userId"),
+            o.getString("momentId"),
+            o.optString("authorId").takeIf { it.isNotBlank() },
+            if (o.has("desiredSaved")) o.getBoolean("desiredSaved") else null,
+        )
     }.getOrNull()
 
     private fun decodeBlockPayload(data: ByteArray): BlockActionPayload? = runCatching {

@@ -227,7 +227,7 @@ class SavedMomentsViewModel : ViewModel() {
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                firestoreService.toggleSaveMoment(userId, momentId)
+                firestoreService.toggleSaveMoment(userId, momentId, desiredSaved = false)
                 withContext(Dispatchers.Main) {
                     moments = moments.filter { it.id != momentId }
                     savedMomentIds = savedMomentIds.filter { it != momentId }

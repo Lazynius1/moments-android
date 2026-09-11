@@ -681,9 +681,9 @@ class FirestoreService(
         }
     }
 
-    suspend fun addReaction(momentId: String, reaction: String, userId: String, authorId: String) {
-        LocalPersistenceService.toggleMomentReactionLocally(momentId, reaction, userId)
-        if (shouldQueueFirestoreOutbox()) {
+    suspend fun addReaction(momentId: String, reaction: String, userId: String, authorId: String, desiredActive: Boolean? = null) {
+        if (desiredActive == null) LocalPersistenceService.toggleMomentReactionLocally(momentId, reaction, userId)
+        if (desiredActive == null && shouldQueueFirestoreOutbox()) {
             val payload = ReactionPayload(momentId, reaction, authorId, userId)
             LocalPersistenceService.saveAction(
                 CachedAction(
@@ -698,6 +698,18 @@ class FirestoreService(
             .collection("moments").document(momentId)
             .collection("reactions").document(userId)
         val snap = reactionRef.get().await()
+        if (desiredActive != null) {
+            if (desiredActive) {
+                if (snap.getString("reactionType") == reaction) return
+                reactionRef.set(mapOf("userId" to userId, "reactionType" to reaction, "timestamp" to FieldValue.serverTimestamp())).await()
+            } else {
+                reactionRef.delete().await()
+                if (userId != authorId) {
+                    NotificationService.removeNotification(NotificationType.REACTION, userId, authorId, momentId = momentId, reaction = reaction)
+                }
+            }
+            return
+        }
         if (snap.exists()) {
             val existingReaction = snap.data?.get("reactionType") as? String
             if (existingReaction == reaction) {

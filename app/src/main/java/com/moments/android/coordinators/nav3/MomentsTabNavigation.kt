@@ -127,8 +127,8 @@ class MomentsTabNavigator(val state: MomentsTabNavigationState) {
         if (uid.isNotEmpty()) {
             pushOnFeed(MomentsNavKey.Story(storyId = sid, authorId = uid))
         } else if (sid.isNotEmpty()) {
-            // Sin autor: abre el deck genérico (StoriesView resuelve).
-            pushOnFeed(MomentsNavKey.ShowStories)
+            // Preserve the requested story while the viewer resolves the loaded reels.
+            pushOnFeed(MomentsNavKey.Story(storyId = sid, authorId = ""))
         }
     }
 

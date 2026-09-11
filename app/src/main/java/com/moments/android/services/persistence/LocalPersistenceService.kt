@@ -203,6 +203,12 @@ object LocalPersistenceService {
         saveAllActions(actions)
     }
 
+    fun updateActionPayload(id: String, payloadData: ByteArray) {
+        saveAllActions(loadAllActions().map { action ->
+            if (action.id == id) action.copy(payloadData = payloadData) else action
+        })
+    }
+
     fun updateCachedMessageStatus(conversationId: String, messageId: String, status: MessageStatus) {
         MessagePersistenceStore.updateMessageStatus(conversationId, messageId, status.raw)
     }

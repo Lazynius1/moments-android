@@ -1,6 +1,10 @@
 package com.moments.android.coordinators
 
 import android.net.Uri
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,6 +17,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +33,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import com.moments.android.coordinators.nav3.MomentsDeepLinkParser
 import com.moments.android.coordinators.nav3.MomentsNavKey
 import com.moments.android.coordinators.nav3.MomentsTabNavHost
@@ -71,13 +77,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.auth.FirebaseAuth
@@ -373,7 +386,7 @@ fun TabBarScreen(
                             onSelectTab = ::selectTab,
                             onOpenCreator = { selectTab(AppTab.toIndex(AppTab.CREATE)) },
                             showFeedBadge = hasNewFeedContent,
-                            showMessagesBadge = unreadMessagesCount > 0,
+                            unreadMessagesCount = unreadMessagesCount,
                             showProfileBadge = hasUnreadNotifications,
                         )
                     }
@@ -423,7 +436,7 @@ fun TabBarScreen(
                         selected = selectedTab == 1,
                         onClick = { selectTab(1) },
                         icon = {
-                            RailIcon(showBadge = unreadMessagesCount > 0) {
+                            RailIcon(unreadMessagesCount = unreadMessagesCount) {
                                 MessagesTabGlyph(
                                     size = 26.dp,
                                     color = LocalContentColor.current,
@@ -509,11 +522,27 @@ fun TabBarScreen(
 }
 
 @Composable
-private fun RailIcon(showBadge: Boolean, content: @Composable () -> Unit) {
+private fun RailIcon(
+    showBadge: Boolean = false,
+    unreadMessagesCount: Int = 0,
+    content: @Composable () -> Unit,
+) {
     Box {
         content()
-        if (showBadge) {
-            RedNavigationBadge(Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-2).dp))
+        when {
+            unreadMessagesCount > 0 -> {
+                CollapsingMessagesUnreadBadge(
+                    count = unreadMessagesCount,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(x = 5.dp, y = 3.dp),
+                )
+            }
+            showBadge -> {
+                RedNavigationBadge(
+                    Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-2).dp),
+                )
+            }
         }
     }
 }
@@ -549,6 +578,99 @@ private fun RedNavigationBadge(modifier: Modifier = Modifier) {
 }
 
 /**
+ * ≡ iOS `CollapsingMessagesUnreadBadge`: una cápsula que crece (conteo) y
+ * encoge al puntito; el texto hace fade.
+ *
+ * 1–9 expandido = cuadrado fijo (círculo). 10+ = píldora.
+ * Padding solo en el Text de la píldora (nunca en el Box con tamaño fijo).
+ */
+@Composable
+private fun CollapsingMessagesUnreadBadge(
+    count: Int,
+    modifier: Modifier = Modifier,
+) {
+    if (count <= 0) return
+    var expanded by remember(count) { mutableStateOf(true) }
+    LaunchedEffect(count) {
+        expanded = true
+        delay(3_000)
+        expanded = false
+    }
+    val label = if (count >= 10) "10+" else count.toString()
+    val isPill = count >= 10
+    val spring = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+    val dpSpring = spring<androidx.compose.ui.unit.Dp>(
+        dampingRatio = Spring.DampingRatioMediumBouncy,
+        stiffness = Spring.StiffnessMediumLow,
+    )
+    val expandedSize = 20.dp
+    val compactSize = 8.dp
+    val height by animateDpAsState(
+        targetValue = if (expanded) expandedSize else compactSize,
+        animationSpec = dpSpring,
+        label = "messagesBadgeHeight",
+    )
+    val safeHeight = height.coerceAtLeast(0.dp)
+    val textAlpha by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = spring,
+        label = "messagesBadgeText",
+    )
+    val textScale by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0.01f,
+        animationSpec = spring,
+        label = "messagesBadgeScale",
+    )
+
+    Box(
+        modifier
+            .height(safeHeight)
+            .then(
+                when {
+                    !expanded -> Modifier.width(safeHeight)
+                    // Círculo perfecto: W == H, sin padding que ensanche.
+                    !isPill -> Modifier.width(safeHeight)
+                    else -> Modifier
+                        .defaultMinSize(minWidth = safeHeight)
+                        .wrapContentWidth()
+                },
+            )
+            .clip(RoundedCornerShape(percent = 50))
+            .background(Color(0xFFFF3B30)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = Color.White,
+            style = TextStyle(
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                // Sin font padding de plataforma → centrado vertical real.
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                lineHeight = 11.sp,
+                lineHeightStyle = LineHeightStyle(
+                    alignment = LineHeightStyle.Alignment.Center,
+                    trim = LineHeightStyle.Trim.Both,
+                ),
+            ),
+            maxLines = 1,
+            modifier = Modifier
+                .then(
+                    if (expanded && isPill) Modifier.padding(horizontal = 5.dp)
+                    else Modifier,
+                )
+                .graphicsLayer {
+                    alpha = textAlpha
+                    scaleX = textScale
+                    scaleY = textScale
+                    transformOrigin = TransformOrigin.Center
+                },
+        )
+    }
+}
+
+/**
  * Tab bar docked (full-width, sin labels).
  * Edge-to-edge: [Surface] pinta bajo la gesture/nav bar; iconos en [navigationBarsPadding].
  * TODO(adaptive): NavigationSuiteScaffold / rail en tablet — skill `adaptive` + Nav3.
@@ -559,7 +681,7 @@ private fun MomentsCustomTabBar(
     onSelectTab: (Int) -> Unit,
     onOpenCreator: () -> Unit,
     showFeedBadge: Boolean,
-    showMessagesBadge: Boolean,
+    unreadMessagesCount: Int,
     showProfileBadge: Boolean,
 ) {
     val isDark = isSystemInDarkTheme()
@@ -567,6 +689,7 @@ private fun MomentsCustomTabBar(
     val inactiveColor = activeColor.copy(alpha = 0.55f)
     val chromeFill = MaterialTheme.colorScheme.background
     val hairline = Color.Black.copy(alpha = if (isDark) 0.28f else 0.10f)
+    val showMessagesBadge = unreadMessagesCount > 0
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -608,7 +731,8 @@ private fun MomentsCustomTabBar(
                     inactiveColor = inactiveColor,
                     isMessages = true,
                     showBadge = showMessagesBadge,
-                    // Fill + puntito cuando hay no leídos (outline si no).
+                    unreadMessagesCount = unreadMessagesCount,
+                    // Fill + badge cuando hay no leídos (outline si no).
                     messagesFilled = showMessagesBadge,
                     onClick = { onSelectTab(1) },
                 )
@@ -656,6 +780,7 @@ private fun RowScope.TabBarItem(
     isMessages: Boolean = false,
     messagesFilled: Boolean = false,
     showBadge: Boolean = false,
+    unreadMessagesCount: Int = 0,
     onClick: () -> Unit,
 ) {
     Box(
@@ -685,7 +810,14 @@ private fun RowScope.TabBarItem(
                     modifier = Modifier.size(26.dp),
                 )
             }
-            if (showBadge) {
+            if (isMessages && unreadMessagesCount > 0) {
+                CollapsingMessagesUnreadBadge(
+                    count = unreadMessagesCount,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(x = 5.dp, y = 3.dp),
+                )
+            } else if (showBadge) {
                 Box(
                     Modifier
                         // Mensajes: abajo-trailing (lejos de la punta). Home: top-trailing.

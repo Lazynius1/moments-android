@@ -189,9 +189,9 @@ suspend fun FirestoreService.checkIfSaved(userId: String, momentId: String): Boo
     return snap.exists()
 }
 
-suspend fun FirestoreService.toggleSaveMoment(userId: String, momentId: String, authorId: String? = null) {
+suspend fun FirestoreService.toggleSaveMoment(userId: String, momentId: String, authorId: String? = null, desiredSaved: Boolean) {
     if (shouldQueueFirestoreOutbox()) {
-        val payload = SavePayload(userId, momentId, authorId)
+        val payload = SavePayload(userId, momentId, authorId, desiredSaved)
         LocalPersistenceService.saveAction(
             CachedAction(
                 id = UUID.randomUUID().toString(),
@@ -199,25 +199,26 @@ suspend fun FirestoreService.toggleSaveMoment(userId: String, momentId: String, 
                 payloadData = payload.encode(),
             ),
         )
+        _savedMomentIds.update { ids -> if (desiredSaved) (ids + momentId).distinct() else ids.filterNot { it == momentId } }
         return
     }
     val savedMomentRef = db.collection("users").document(userId)
         .collection("savedMoments").document(momentId)
     db.runTransaction { transaction ->
         val snapshot = transaction.get(savedMomentRef)
-        if (snapshot.exists()) {
-            transaction.delete(savedMomentRef)
-            _savedMomentIds.update { it.filterNot { id -> id == momentId } }
-        } else {
+        if (desiredSaved) {
+            if (snapshot.exists()) return@runTransaction null
             transaction.set(savedMomentRef, buildMap<String, Any> {
                 put("momentId", momentId)
                 put("timestamp", Timestamp(Date()))
                 authorId?.takeIf { it.isNotBlank() }?.let { put("authorId", it) }
             })
-            _savedMomentIds.update { it + momentId }
+        } else if (snapshot.exists()) {
+            transaction.delete(savedMomentRef)
         }
         null
     }.await()
+    _savedMomentIds.update { ids -> if (desiredSaved) (ids + momentId).distinct() else ids.filterNot { it == momentId } }
 }
 
 /** Paridad `createMoment` iOS: `addDocument` (ID auto) y **sin** `mapVisibility`. */

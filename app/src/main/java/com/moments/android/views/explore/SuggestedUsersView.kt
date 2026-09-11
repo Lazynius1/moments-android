@@ -64,6 +64,7 @@ import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.views.components.VerifiedBadge
 import com.moments.android.views.feed.core.FeedProfileSheetRoute
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import kotlinx.coroutines.launch
 
 /**
@@ -84,6 +85,9 @@ fun SuggestedUsersView(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     var selectedProfileRoute by remember { mutableStateOf<FeedProfileSheetRoute?>(null) }
+
+    // ≡ iOS SuggestedUsersView `.momentsFloatingTabBarHidden`
+    MomentsTabBarHidden()
 
     LaunchedEffect(Unit) {
         viewModel.loadInitialUsers()

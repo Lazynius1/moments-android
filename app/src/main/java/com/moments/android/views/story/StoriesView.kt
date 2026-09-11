@@ -165,8 +165,9 @@ fun StoriesView(
     var isInChainMode by remember { mutableStateOf(explicitStories != null) }
     var hostChainStories by remember { mutableStateOf(explicitStories.orEmpty()) }
 
-    val lockedRingNavigationUserIds = remember(ringNavigationUserIds) {
-        ringNavigationUserIds.filter { it.isNotEmpty() }
+    val lockedRingNavigationUserIds = remember(ringNavigationUserIds, startAtUserId) {
+        val ids = ringNavigationUserIds.filter { it.isNotEmpty() }.distinct()
+        if (!startAtUserId.isNullOrBlank() && startAtUserId !in ids) listOf(startAtUserId) + ids else ids
     }
 
     // ≡ isMultiUserRingMode: startWithUserId == nil || empty
@@ -598,6 +599,15 @@ fun StoriesView(
         val newUserIds = resolvedNavigationUserIds(storiesMap)
         val previousActiveUserId = hostUserIds.getOrNull(userIndex)
 
+        if (!hasResolvedInitialViewerPosition && initialTargetUserId.isEmpty() && handoffStoryId.isNotEmpty()) {
+            val owner = newUserIds.firstOrNull { owner -> storiesMap[owner]?.any { it.id == handoffStoryId } == true }
+            if (owner == null) {
+                // Author reels arrive separately; wait for the requested story.
+                hostIsLoading = true
+                return@LaunchedEffect
+            }
+            initialTargetUserId = owner
+        }
         if (initialTargetUserId.isNotEmpty()) {
             val targetUserId = initialTargetUserId
             val targetIndex = newUserIds.indexOf(targetUserId)

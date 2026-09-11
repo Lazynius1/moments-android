@@ -200,7 +200,8 @@ fun MomentsTabNavHost(
             }
             is MomentsNavKey.Story -> NavEntry(key, metadata = fullScreenDialog) {
                 StoriesView(
-                    startAtUserId = key.authorId,
+                    startAtUserId = key.authorId?.takeIf { it.isNotBlank() },
+                    startStoryId = key.storyId.takeIf { it.isNotBlank() },
                     onDismiss = { navigator.navigateUp() },
                 )
             }

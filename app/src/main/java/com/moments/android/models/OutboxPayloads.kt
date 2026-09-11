@@ -15,12 +15,14 @@ data class ReactionPayload(
     val reaction: String,
     val authorId: String,
     val userId: String,
+    val desiredActive: Boolean? = null,
 )
 
 data class SavePayload(
     val userId: String,
     val momentId: String,
     val authorId: String? = null,
+    val desiredSaved: Boolean? = null,
 )
 
 data class CommentPayload(
@@ -119,6 +121,7 @@ data class ProfileUpdatePayload(
 fun ReactionPayload.encode(): ByteArray = JSONObject().apply {
     put("momentId", momentId)
     put("reaction", reaction)
+    desiredActive?.let { put("desiredActive", it) }
     put("authorId", authorId)
     put("userId", userId)
 }.toString().toByteArray()
@@ -127,6 +130,7 @@ fun SavePayload.encode(): ByteArray = JSONObject().apply {
     put("userId", userId)
     put("momentId", momentId)
     authorId?.let { put("authorId", it) }
+    desiredSaved?.let { put("desiredSaved", it) }
 }.toString().toByteArray()
 
 fun CommentPayload.encode(): ByteArray = JSONObject().apply {
