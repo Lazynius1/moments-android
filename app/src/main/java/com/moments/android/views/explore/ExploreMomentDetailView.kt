@@ -122,6 +122,7 @@ fun ExploreMomentDetailView(
     }
 
     var currentIndex by remember { mutableStateOf(resolvedInitialIndex) }
+    var hasPositionedInitially by remember { mutableStateOf(false) }
     var trackedMomentViewIds by remember { mutableStateOf(setOf<String>()) }
 
     var dragOffsetPx by remember { mutableFloatStateOf(0f) }
@@ -233,16 +234,19 @@ fun ExploreMomentDetailView(
     }
 
     LaunchedEffect(resolvedInitialIndex, feedMoments.size) {
-        currentIndex = resolvedInitialIndex
-        if (feedMoments.isNotEmpty()) {
+        if (!hasPositionedInitially && feedMoments.isNotEmpty()) {
+            hasPositionedInitially = true
+            currentIndex = resolvedInitialIndex
             listState.scrollToItem(resolvedInitialIndex)
             trackMomentViewIfNeeded(feedMoments.getOrNull(resolvedInitialIndex))
             VideoMomentsIndex.rebuild(domainMoments)
-            FirebaseAuth.getInstance().currentUser?.uid?.let { uid ->
-                runCatching { firestore.loadSavedMoments(uid) }
-            }
-            delay(150)
             activateVideoForIndex(resolvedInitialIndex)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        FirebaseAuth.getInstance().currentUser?.uid?.let { uid ->
+            runCatching { firestore.loadSavedMoments(uid) }
         }
     }
 

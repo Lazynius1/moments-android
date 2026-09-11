@@ -7,6 +7,12 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import com.moments.android.services.performance.MotionPolicy
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -40,6 +46,26 @@ fun rememberStoryTextMotionFrame(
     textLength: Int = 10,
 ): StoryTextMotionFrame {
     val motion = motionRaw.lowercase()
+    if (motion == "none" || MotionPolicy.reduceMotion) return StoryTextMotionFrame()
+    if (motion == "typewriter" || motion == "shimmer") {
+        var progress by remember(replayToken, textLength) { mutableFloatStateOf(0f) }
+        LaunchedEffect(replayToken, textLength) {
+            val count = textLength.coerceAtLeast(1)
+            while (true) {
+                for (index in 1..count) {
+                    progress = index.toFloat() / count
+                    delay(90)
+                }
+                delay(2_200)
+                for (index in count - 1 downTo 0) {
+                    progress = index.toFloat() / count
+                    delay(55)
+                }
+                delay(450)
+            }
+        }
+        return StoryTextMotionFrame(typewriterProgress = progress)
+    }
     val transition = rememberInfiniteTransition(label = "storyTextMotion_$replayToken")
 
     // MARK: pop — 1.2s, values/keyTimes de applyPop

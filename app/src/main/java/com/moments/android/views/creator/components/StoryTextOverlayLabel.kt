@@ -28,6 +28,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
+import android.icu.text.BreakIterator
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -75,23 +81,56 @@ fun StoryTextOverlayLabel(
     replayToken: Int = 0,
 ) {
     val fontFamily = rememberStoryFontFamily(configuration.style)
+    val characterEnds = remember(configuration.displayText) {
+        val iterator = BreakIterator.getCharacterInstance().apply { setText(configuration.displayText) }
+        buildList { var end = iterator.next(); while (end != BreakIterator.DONE) { add(end); end = iterator.next() } }
+    }
     val motion = rememberStoryTextMotionFrame(
         motionRaw = motionRaw,
         replayToken = replayToken,
-        textLength = configuration.displayText.length,
+        textLength = characterEnds.size,
     )
-    val display = storyTextForMotion(configuration.displayText, motionRaw, motion)
-    val configForDraw = configuration.copy(
-        text = display,
-        appliesDisplayTransform = false,
+    val attrs = StoryTextAttributesBuilder.coreAttributes(configuration)
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val hasPlate = attrs.background != null && configuration.visualTreatment in listOf(StoryTextVisualTreatment.PLAIN, StoryTextVisualTreatment.BOXED_CAPTION)
+    val padH = if (hasPlate) maxOf(14f, configuration.fontSize * 0.36f) else 0f
+    val padV = if (hasPlate) maxOf(10f, configuration.fontSize * 0.24f) else 0f
+    val layout = measurer.measure(
+        text = AnnotatedString(configuration.displayText),
+        style = TextStyle(fontFamily = fontFamily, fontWeight = FontWeight.Normal, fontSize = configuration.fontSize.sp,
+            letterSpacing = attrs.letterSpacing.sp, textAlign = attrs.textAlign),
+        constraints = Constraints(maxWidth = with(density) { (maxWidth - (padH * 2).dp).roundToPx().coerceAtLeast(1) }),
     )
     Box(
-        modifier
-            .widthIn(max = maxWidth)
-            .storyTextMotion(motion)
-            .wrapContentSize(align = alignmentFor(configuration.textAlign)),
+        modifier.widthIn(max = maxWidth).storyTextMotion(motion)
+            .wrapContentSize(align = alignmentFor(configuration.textAlign))
+            .drawWithContent {
+                if (motionRaw.lowercase() !in listOf("typewriter", "shimmer") || motion.typewriterProgress >= 1f) {
+                    drawContent()
+                } else {
+                    val count = (characterEnds.size * motion.typewriterProgress).toInt().coerceIn(0, characterEnds.size)
+                    if (count > 0) {
+                        val end = characterEnds[count - 1]
+                        val path = Path()
+                        for (line in 0..layout.getLineForOffset(end - 1)) {
+                            val start = layout.getLineStart(line)
+                            val lineEnd = minOf(end, layout.getLineEnd(line))
+                            if (lineEnd > start) {
+                                val bounds = layout.getPathForRange(start, lineEnd).getBounds()
+                                path.addRect(androidx.compose.ui.geometry.Rect(
+                                    bounds.left, bounds.top,
+                                    bounds.right + padH.dp.toPx() * 2,
+                                    bounds.bottom + padV.dp.toPx() * 2,
+                                ))
+                            }
+                        }
+                        clipPath(path) { this@drawWithContent.drawContent() }
+                    }
+                }
+            },
     ) {
-        StoryTextOverlayContainer(configuration = configForDraw, fontFamily = fontFamily)
+        StoryTextOverlayContainer(configuration = configuration, fontFamily = fontFamily)
     }
 }
 
@@ -114,7 +153,6 @@ fun StoryTextEditorInput(
 ) {
     val fontFamily = rememberStoryFontFamily(configuration.style)
     val attrs = StoryTextAttributesBuilder.typingAttributes(configuration)
-    val motion = rememberStoryTextMotionFrame(motionRaw, replayToken, text.length.coerceAtLeast(1))
     val focusRequester = remember { FocusRequester() }
     val caret = when (configuration.textBackgroundFillRaw.lowercase()) {
         "solid", "semitransparent" -> StoryTextAttributesBuilder.contrastColor(configuration.textColor)
@@ -126,15 +164,15 @@ fun StoryTextEditorInput(
         modifier
             .widthIn(min = 80.dp, max = maxWidth)
             .heightIn(min = 140.dp, max = 280.dp)
-            .storyTextMotion(motion)
             .wrapContentSize(Alignment.Center),
         contentAlignment = Alignment.Center,
     ) {
         if (text.isNotEmpty()) {
-            StoryTextOverlayContainer(
-                configuration = effectConfig,
-                fontFamily = fontFamily,
-            )
+            if (isFocused) {
+                StoryTextOverlayContainer(configuration = effectConfig, fontFamily = fontFamily)
+            } else {
+                StoryTextOverlayLabel(configuration = effectConfig, maxWidth = maxWidth, motionRaw = motionRaw, replayToken = replayToken)
+            }
         }
         BasicTextField(
             value = text,
@@ -142,7 +180,7 @@ fun StoryTextEditorInput(
             textStyle = LocalTextStyle.current.copy(
                 color = Color.Transparent,
                 fontSize = configuration.fontSize.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Normal,
                 // ≡ iOS `NSKernAttributeName` en puntos (preset.letterSpacing), no em.
                 letterSpacing = attrs.letterSpacing.sp,
                 textAlign = attrs.textAlign,
@@ -160,7 +198,7 @@ fun StoryTextEditorInput(
                             text = placeholder.ifEmpty { "Aa" },
                             color = configuration.textColor.copy(alpha = 0.45f),
                             fontSize = configuration.fontSize.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Normal,
                             textAlign = attrs.textAlign,
                             fontFamily = fontFamily,
                         )
@@ -189,7 +227,7 @@ fun StoryTextOverlayContainer(
     val baseStyle = TextStyle(
         color = attrs.foreground,
         fontSize = configuration.fontSize.sp,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Normal,
         // ≡ iOS kern en puntos (`preset.letterSpacing`).
         letterSpacing = attrs.letterSpacing.sp,
         textAlign = attrs.textAlign,
@@ -236,7 +274,7 @@ fun StoryTextOverlayContainer(
                     if (bg != null) {
                         Modifier
                             .background(bg, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .padding(horizontal = maxOf(14f, configuration.fontSize * 0.36f).dp, vertical = maxOf(10f, configuration.fontSize * 0.24f).dp)
                     } else {
                         Modifier
                     },
@@ -503,7 +541,7 @@ private fun MarkerHighlightText(configuration: StoryTextRenderConfiguration, bas
         style = baseStyle.copy(color = contrast, shadow = null),
         modifier = Modifier
             .background(configuration.textColor.copy(alpha = 0.92f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = maxOf(10f, configuration.fontSize * 0.24f).dp),
     )
 }
 
@@ -552,7 +590,7 @@ private fun BoxedCaptionText(
                 if (fill != null) {
                     Modifier
                         .background(fill, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .padding(horizontal = maxOf(14f, configuration.fontSize * 0.36f).dp, vertical = maxOf(10f, configuration.fontSize * 0.24f).dp)
                 } else {
                     Modifier
                 },

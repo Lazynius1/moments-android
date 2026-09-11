@@ -172,7 +172,6 @@ fun ExploreView(
             .fillMaxSize()
             .momentRefresh {
                 if (searchText.isBlank()) viewModel.refreshAllContent() else viewModel.retrySearch()
-                delay(900)
             },
     ) {
         Column(Modifier.fillMaxSize()) {

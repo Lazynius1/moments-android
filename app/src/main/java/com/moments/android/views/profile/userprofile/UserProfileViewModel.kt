@@ -137,7 +137,7 @@ class UserProfileViewModel(
         isProfileUnavailable = false
 
         viewModelScope.launch {
-            loadViewerContext(current)
+            launch { loadViewerContext(current) }
 
             // Restaurar la última decisión de privacidad conocida (no caer en "privado" sin red).
             cachedCanViewContent(current)?.let { canViewContent = it }
@@ -227,7 +227,6 @@ class UserProfileViewModel(
         if (isRefreshing || isLoading) return
         isRefreshing = true
         viewModelScope.launch {
-            delay(500) // deja a Firestore procesar cambios recientes
             performRefresh(current)
         }
     }

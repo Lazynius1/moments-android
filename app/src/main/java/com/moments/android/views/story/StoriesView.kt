@@ -218,22 +218,11 @@ fun StoriesView(
         }
         val viewerId = FirebaseAuth.getInstance().currentUser?.uid ?: return 0
         if (stories.isEmpty()) return 0
-        return coroutineScope {
-            val flags = stories.mapIndexed { index, story ->
-                async {
-                    val storyId = story.id ?: return@async index to true
-                    // ≡ iOS: document nil / error → no contado como visto
-                    val viewed = runCatching {
-                        firestore.db.collection("users").document(authorId)
-                            .collection("stories").document(storyId)
-                            .collection("viewers").document(viewerId)
-                            .get().await().exists()
-                    }.getOrDefault(false)
-                    index to viewed
-                }
-            }.awaitAll()
-            flags.filter { !it.second }.minByOrNull { it.first }?.first ?: 0
-        }
+        val lastSeen = com.moments.android.services.persistence.StorySeenStateService.lastSeenDate(viewerId, authorId)
+        return stories.indexOfFirst { story ->
+            val locallyViewed = viewModel.storyViewers[story.id]?.any { it.userId == viewerId } == true
+            !locallyViewed && (lastSeen == null || story.timestamp.after(lastSeen))
+        }.takeIf { it >= 0 } ?: 0
     }
 
     fun prefetchNeighborStories(around: Int) {

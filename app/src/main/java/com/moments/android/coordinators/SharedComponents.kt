@@ -419,10 +419,11 @@ fun ActionSubCardView(
             onClick = {
                 val momentId = moment.id ?: return@IconButton
                 val userId = currentUserId ?: return@IconButton
-                scope.launch(Dispatchers.IO) {
-                    val desiredSaved = !isSaved
+                val desiredSaved = !isSaved
+                isSaved = desiredSaved
+                scope.launch {
                     runCatching { firestoreService.toggleSaveMoment(userId, momentId, moment.authorId, desiredSaved) }
-                        .onSuccess { isSaved = desiredSaved }
+                        .onFailure { if (isSaved == desiredSaved) isSaved = !desiredSaved }
                 }
             },
         ) {
