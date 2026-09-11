@@ -1,5 +1,7 @@
 package com.moments.android.views.feed.core
 
+import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.cancel
 import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,7 +50,9 @@ import java.util.concurrent.ConcurrentHashMap
  * Port de `FeedViewModel.swift` — caches duales following/forYou, paginación
  * backend, pause/resume, shutdown, privacy filter + listeners de visibilidad.
  */
-class FeedViewModel {
+class FeedViewModel : ViewModel() {
+    var hasLoadedInitialFeed = false
+        private set
     var moments by mutableStateOf<List<FeedMoment>>(emptyList())
     var isLoading by mutableStateOf(false)
     var isLoadingMore by mutableStateOf(false)
@@ -189,6 +193,8 @@ class FeedViewModel {
     /** Port 1:1 de `fetchMoments(userId:feedType:)`. */
     fun fetchMoments(scope: CoroutineScope, userId: String, feedType: FeedType? = null) {
         feedGeneration++
+        val generation = feedGeneration
+        hasLoadedInitialFeed = false
         isLoadingMore = false
         val targetFeedType = feedType ?: currentFeedType
 
@@ -228,6 +234,9 @@ class FeedViewModel {
                 FeedType.Following -> fetchFollowingMoments(userId)
                 FeedType.ForYou -> fetchForYouMoments(userId)
             }
+        }
+        activeJob?.invokeOnCompletion { cause ->
+            if (cause == null && generation == feedGeneration) hasLoadedInitialFeed = true
         }
     }
 
@@ -793,7 +802,18 @@ class FeedViewModel {
         syncMomentListeners(latestVisibilitySnapshot)
     }
 
+    override fun onCleared() {
+        shutdown()
+        listenerScope.cancel()
+        ioScope.cancel()
+        super.onCleared()
+    }
+
     fun shutdown() {
+        feedGeneration++
+        isLoading = false
+        isLoadingMore = false
+        isRefreshing = false
         activeJob?.cancel()
         activeJob = null
         listenerSyncJob?.cancel()

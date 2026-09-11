@@ -19,8 +19,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -220,15 +223,18 @@ fun FeedListSection(
                 } else {
                     listState.scrollToItem(0)
                 }
-                onRefresh()
             }
         }
     }
 
+    var previousFeedType by rememberSaveable { mutableStateOf(selectedFeedType) }
     LaunchedEffect(selectedFeedType) {
-        ForYouPreferences.clearVisibility()
-        onHeaderHiddenChangeLatest(false)
-        listState.scrollToItem(0)
+        if (previousFeedType != selectedFeedType) {
+            previousFeedType = selectedFeedType
+            ForYouPreferences.clearVisibility()
+            onHeaderHiddenChangeLatest(false)
+            listState.scrollToItem(0)
+        }
     }
 
     fun prefetchUpcoming(fromIndex: Int) {

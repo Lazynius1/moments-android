@@ -39,6 +39,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -103,8 +105,8 @@ fun ExploreView(
     val scope = rememberCoroutineScope()
     val view = LocalView.current
     val layoutDirection = LocalLayoutDirection.current
-    val viewModel = remember { ExploreViewModel() }
-    var searchText by remember { mutableStateOf(initialSearchQuery.orEmpty()) }
+    val viewModel: ExploreViewModel = viewModel()
+    var searchText by rememberSaveable { mutableStateOf(initialSearchQuery.orEmpty()) }
     var isSearchFocused by remember { mutableStateOf(false) }
     var showPrivateProfileAlert by remember { mutableStateOf(false) }
     var showSuggestedUsers by remember { mutableStateOf(false) }
@@ -139,24 +141,14 @@ fun ExploreView(
         )
     }
 
-    LaunchedEffect(Unit) {
-        val q = initialSearchQuery?.trim().orEmpty()
-        if (q.isNotEmpty()) {
-            searchText = q
-            if (viewModel.moments.isNotEmpty()) {
-                viewModel.smartSearch(q)
-            } else {
-                delay(500)
-                viewModel.smartSearch(q)
-            }
-        }
-        if (viewModel.moments.isEmpty()) {
+    LaunchedEffect(viewModel) {
+        if (viewModel.moments.isEmpty() && !viewModel.isLoading) {
             viewModel.fetchMomentsByInterests()
         }
     }
 
     LaunchedEffect(searchText) {
-        viewModel.smartSearch(searchText)
+        viewModel.searchIfChanged(searchText)
     }
 
     MomentsSharedTransitionLayout(
@@ -273,7 +265,6 @@ fun ExploreView(
                                                 }
                                             }
                                         },
-                                        modifier = Modifier.padding(bottom = 80.dp),
                                     )
                                 }
                                 ExplorePagingFooter(viewModel.isLoadingMoreExplore, viewModel.explorePageFailed,

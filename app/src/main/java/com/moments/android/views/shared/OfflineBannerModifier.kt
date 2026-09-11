@@ -1,11 +1,16 @@
 package com.moments.android.views.shared
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SignalWifiOff
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -52,20 +56,22 @@ import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.legacyPoppinsSize
+import com.moments.android.views.feed.rememberAdaptiveColors
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Port de `OfflineBannerModifier.swift` / `CollapsibleOfflineBanner`.
+ * Overlay del banner offline.
  *
- * Tipografía: [legacyPoppinsSize] devuelve **px** → usar `.toSp()` con [LocalDensity]
- * (nunca `.sp` directo; eso infla el texto ~density× y pisa “Modo”/“offline”).
+ * Android (esta sesión): más arriba, compacto a la **izquierda**, expand hacia la derecha.
+ * iOS se actualizará aparte (liquid glass / animación distinta en iOS 26).
  */
 @Composable
 fun OfflineBannerOverlay(
     modifier: Modifier = Modifier,
-    topInsetBelowSafeArea: Dp = 92.dp,
+    /** A la altura del FeedTypeSelector (bajo el aro / header ~88). */
+    topInsetBelowSafeArea: Dp = 118.dp,
 ) {
     Box(
         modifier
@@ -73,13 +79,12 @@ fun OfflineBannerOverlay(
             .statusBarsPadding()
             .padding(top = topInsetBelowSafeArea)
             .zIndex(9_999f),
-        contentAlignment = Alignment.TopCenter,
+        contentAlignment = Alignment.TopStart,
     ) {
         CollapsibleOfflineBanner()
     }
 }
 
-/** ≡ `CollapsibleOfflineBanner` en OfflineBannerModifier.swift. */
 @Composable
 fun CollapsibleOfflineBanner(modifier: Modifier = Modifier) {
     val connected by NetworkMonitor.isConnectedFlow.collectAsState()
@@ -108,6 +113,7 @@ fun CollapsibleOfflineBanner(modifier: Modifier = Modifier) {
     }
 
     fun expandFromCompact() {
+        HapticManager.shared.lightImpact()
         cancelCollapse()
         isExpanded = true
         scheduleCollapse()
@@ -137,102 +143,154 @@ fun CollapsibleOfflineBanner(modifier: Modifier = Modifier) {
 
     if (connected) return
 
+    val colors = rememberAdaptiveColors()
+    val primary = colors.primary
+    val secondary = colors.secondary
     val capsule = RoundedCornerShape(percent = 50)
-    val glow = Color.Red.copy(alpha = 0.22f)
-    val titleSp = with(density) { legacyPoppinsSize(context, 15).toSp() }
+    // Glow más suave → menos “alarma” en el chrome.
+    val glow = Color.Red.copy(alpha = 0.12f)
+    val titleSp = with(density) { legacyPoppinsSize(context, 14).toSp() }
     val bodySp = with(density) { legacyPoppinsSize(context, 11).toSp() }
+    val expandHint = stringResource(R.string.offline_banner_expand_hint)
+    val springSpec = spring<Float>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMediumLow,
+    )
 
     Box(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.TopCenter,
+            .padding(start = 12.dp, end = 16.dp),
+        contentAlignment = Alignment.TopStart,
     ) {
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = fadeIn() + scaleIn(initialScale = 0.92f),
-            exit = fadeOut() + scaleOut(targetScale = 0.92f),
-        ) {
-            // ≡ iOS: icon | texto (flex) | Reintentar (ancho intrínseco, nunca truncado).
-            // Padding vertical 8 (antes 10) → cápsula menos “gorda”.
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .shadow(18.dp, capsule, clip = false, ambientColor = glow, spotColor = glow)
-                    .momentsChromeGlass(capsule, interactive = false)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(
-                    Icons.Filled.SignalWifiOff,
-                    contentDescription = null,
-                    tint = LocalContentColor.current,
-                    modifier = Modifier.size(18.dp),
-                )
-                Column(
-                    Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(1.dp),
+        // Un solo contenedor anclado a la izquierda: compacto ↔ expandido hacia la derecha.
+        AnimatedContent(
+            targetState = isExpanded,
+            transitionSpec = {
+                if (targetState) {
+                    (
+                        fadeIn(springSpec) +
+                            expandHorizontally(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                                expandFrom = Alignment.Start,
+                            )
+                        ) togetherWith (
+                        fadeOut(springSpec) +
+                            shrinkHorizontally(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                                shrinkTowards = Alignment.Start,
+                            )
+                        )
+                } else {
+                    (
+                        fadeIn(springSpec) +
+                            expandHorizontally(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                                expandFrom = Alignment.Start,
+                            )
+                        ) togetherWith (
+                        fadeOut(springSpec) +
+                            shrinkHorizontally(
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                                shrinkTowards = Alignment.Start,
+                            )
+                        )
+                }.using(SizeTransform(clip = false))
+            },
+            label = "offlineBannerMorph",
+        ) { expanded ->
+            if (expanded) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .shadow(10.dp, capsule, clip = false, ambientColor = glow, spotColor = glow)
+                        .momentsChromeGlass(capsule, interactive = false)
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    Icon(
+                        Icons.Filled.SignalWifiOff,
+                        contentDescription = null,
+                        tint = primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Column(
+                        Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(1.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.network_offline_title),
+                            color = primary,
+                            fontSize = titleSp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            stringResource(R.string.offline_banner_message),
+                            color = secondary,
+                            fontSize = bodySp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     Text(
-                        stringResource(R.string.network_offline_title),
-                        color = LocalContentColor.current,
-                        fontSize = titleSp,
+                        stringResource(R.string.network_offline_retry),
+                        color = primary,
+                        fontSize = bodySp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        stringResource(R.string.offline_banner_message),
-                        color = LocalContentColor.current.copy(alpha = 0.72f),
-                        fontSize = bodySp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = bodySp * 1.25f,
+                        softWrap = false,
+                        modifier = Modifier
+                            .wrapContentWidth(unbounded = false)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = ::retrySync,
+                            )
+                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                            .semantics {
+                                contentDescription = context.getString(R.string.network_offline_retry)
+                            },
                     )
                 }
-                Text(
-                    stringResource(R.string.network_offline_retry),
-                    color = LocalContentColor.current,
-                    fontSize = bodySp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    softWrap = false,
-                    modifier = Modifier
-                        .wrapContentWidth(unbounded = false)
-                        .clickable(onClick = ::retrySync)
-                        .padding(horizontal = 4.dp, vertical = 4.dp)
+            } else {
+                Box(
+                    Modifier
+                        .shadow(8.dp, CircleShape, clip = false, ambientColor = glow, spotColor = glow)
+                        .size(36.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = ::expandFromCompact,
+                        )
                         .semantics {
-                            contentDescription = context.getString(R.string.network_offline_retry)
+                            contentDescription =
+                                context.getString(R.string.network_offline_title) + ". " + expandHint
                         },
-                )
-            }
-        }
-
-        AnimatedVisibility(
-            visible = !isExpanded,
-            enter = fadeIn() + scaleIn(initialScale = 0.92f),
-            exit = fadeOut(),
-        ) {
-            val expandHint = stringResource(R.string.offline_banner_expand_hint)
-            Box(
-                Modifier
-                    .shadow(14.dp, CircleShape, clip = false, ambientColor = glow, spotColor = glow)
-                    .size(44.dp)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(onClick = ::expandFromCompact)
-                    .semantics {
-                        contentDescription =
-                            context.getString(R.string.network_offline_title) + ". " + expandHint
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.SignalWifiOff,
-                    contentDescription = null,
-                    tint = LocalContentColor.current,
-                    modifier = Modifier.size(16.dp),
-                )
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Filled.SignalWifiOff,
+                        contentDescription = null,
+                        tint = primary.copy(alpha = 0.88f),
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
             }
         }
     }

@@ -47,7 +47,6 @@ import com.moments.android.views.login.DeactivatedScreen
 import com.moments.android.views.login.LoginScreen
 import com.moments.android.views.login.SplashScreen
 import com.moments.android.views.login.SuspendedScreen
-import com.moments.android.views.login.resolveAccountState
 import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.messaging.services.LiveLocationSharingService
 import com.moments.android.views.misc.WhatsNewView
@@ -95,8 +94,12 @@ fun MomentsApp(
     // aviso para no rebotar al login en ese hueco.
     var manuallyAuthenticated by launchState.manuallyAuthenticated
     val signedIn = hasProfileSession || manuallyAuthenticated
-    var accountState by launchState.accountState
-    var validatedAccountUid by launchState.validatedAccountUid
+    // ≡ iOS LoginView: suspended / deactivated salen de AuthService, sin get() extra a Firestore.
+    val authState by AuthService.authState.collectAsState()
+    val isAccountDeactivated by AuthService.isAccountDeactivated.collectAsState()
+    val deactivatedUser by AuthService.deactivatedUserData.collectAsState()
+    val isVerifyingAccount by AuthService.isVerifyingAccount.collectAsState()
+    val isRegistering by AuthService.isRegistering.collectAsState()
 
     val incognitoActive by IncognitoModeService.isActive.collectAsState()
 
@@ -120,36 +123,26 @@ fun MomentsApp(
         onDispose { FirebaseAuth.getInstance().removeAuthStateListener(listener) }
     }
 
-    val signedInUid = FirebaseAuth.getInstance().currentUser?.uid
-    LaunchedEffect(signedIn, signedInUid) {
-        if (!signedIn) {
-            accountState = AccountState.Loading
-            validatedAccountUid = null
-        } else if (signedInUid != null && validatedAccountUid != signedInUid) {
-            accountState = AccountState.Loading
-            accountState = resolveAccountState(signedInUid)
-            validatedAccountUid = signedInUid
-        }
-    }
-
     // ≡ onAppear: post-launch init (una vez) + restore live location
     LaunchedEffect(Unit) {
         if (!didPostLaunchInit) {
             didPostLaunchInit = true
             delay(200)
-            OfflineSyncService.enableAutomaticSync()
-            BackgroundMomentUploadService.cleanupStaleUploadActivities()
-            // BackgroundStoryUploadService.cleanupStaleUploadActivities — Live Activity N/A
-            LocalPersistenceService.cleanupOldData()
-            ChatCacheStore.runMaintenance()
-            if (FirebaseAuth.getInstance().currentUser != null) {
-                MessageIngestService.drainPendingQueue()
-                MessageCatchUpService.syncRecent(LocalPersistenceService.loadConversations())
+            runCatching {
+                OfflineSyncService.enableAutomaticSync()
+                BackgroundMomentUploadService.cleanupStaleUploadActivities()
+                // BackgroundStoryUploadService.cleanupStaleUploadActivities — Live Activity N/A
+                LocalPersistenceService.cleanupOldData()
+                ChatCacheStore.runMaintenance()
+                if (FirebaseAuth.getInstance().currentUser != null) {
+                    MessageIngestService.drainPendingQueue()
+                    MessageCatchUpService.syncRecent(LocalPersistenceService.loadConversations())
+                }
+                AffinityTracker.applyTimeDecayIfNeeded()
+                AffinityTracker.cleanupVeryLowAffinities()
             }
-            AffinityTracker.applyTimeDecayIfNeeded()
-            AffinityTracker.cleanupVeryLowAffinities()
         }
-        LiveLocationSharingService.restoreIfNeeded()
+        runCatching { LiveLocationSharingService.restoreIfNeeded() }
     }
 
     // ≡ UIApplication.didBecomeActiveNotification
@@ -172,18 +165,26 @@ fun MomentsApp(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    val suspendedState = authState as? AuthService.AuthState.Suspended
+    val deactivatedUiState = remember(deactivatedUser) {
+        AccountState.Deactivated(
+            username = deactivatedUser?.username,
+            email = deactivatedUser?.email,
+            profileImagePath = deactivatedUser?.profileImagePath,
+        )
+    }
+
     Box(Modifier.fillMaxSize()) {
-        // Contenido principal (bajo el splash, como iOS ZStack)
+        // Contenido principal (bajo el splash, como iOS ZStack / LoginView gate)
         when {
-            !signedIn -> LoginScreen(onAuthenticated = { manuallyAuthenticated = true })
-            accountState is AccountState.Loading -> AccountLoading()
-            accountState is AccountState.Deactivated -> DeactivatedScreen(accountState as AccountState.Deactivated) {
-                scope.launch {
-                    val uid = FirebaseAuth.getInstance().currentUser?.uid
-                    accountState = if (uid != null) resolveAccountState(uid) else AccountState.Active
-                }
+            suspendedState != null -> SuspendedScreen(
+                AccountState.Suspended(suspendedState.reason, suspendedState.expiresAt?.time),
+            )
+            isAccountDeactivated -> DeactivatedScreen(deactivatedUiState) {
+                // reactivateAccount ya hidrata AuthService; no hace falta otro get() a Firestore.
             }
-            accountState is AccountState.Suspended -> SuspendedScreen(accountState as AccountState.Suspended)
+            isVerifyingAccount && !isRegistering && !signedIn -> AccountLoading()
+            !signedIn -> LoginScreen(onAuthenticated = { manuallyAuthenticated = true })
             else -> TabBarScreen(
                 deepLinkUri = deepLinkUri,
                 deepLinkFromNewTask = deepLinkFromNewTask,
@@ -287,8 +288,6 @@ internal class MomentsAppLaunchState : ViewModel() {
     val showWhatsNew = mutableStateOf(false)
     val didPostLaunchInit = mutableStateOf(false)
     val manuallyAuthenticated = mutableStateOf(false)
-    val accountState = mutableStateOf<AccountState>(AccountState.Loading)
-    val validatedAccountUid = mutableStateOf<String?>(null)
 }
 
 private const val PREFS_NAME = "moments_app"

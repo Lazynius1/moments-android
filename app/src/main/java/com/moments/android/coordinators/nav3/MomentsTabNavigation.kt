@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
@@ -43,6 +44,7 @@ class MomentsTabNavigationState(
         val decoratedEntries = backStacks.mapValues { (_, stack) ->
             val decorators = listOf(
                 rememberSaveableStateHolderNavEntryDecorator<NavKey>(),
+                rememberViewModelStoreNavEntryDecorator<NavKey>(),
             )
             rememberDecoratedNavEntries(
                 backStack = stack,

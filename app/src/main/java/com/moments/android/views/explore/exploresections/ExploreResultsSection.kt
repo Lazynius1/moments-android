@@ -35,12 +35,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -131,14 +139,31 @@ fun ExploreResultsSection(
 
 @Composable
 fun ExplorePagingFooter(isLoading: Boolean, failed: Boolean, hasMore: Boolean, onLoadMore: () -> Unit, onRetry: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val view = LocalView.current
+    var footerVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(footerVisible, hasMore, isLoading, failed) {
+        if (footerVisible && hasMore && !isLoading && !failed) onLoadMore()
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            // Separación media del grid: menos que el bloque viejo de "Cargar más", sin pegarlo.
+            .padding(top = 20.dp, bottom = 72.dp)
+            .onGloballyPositioned { coords ->
+                val bounds = coords.boundsInWindow()
+                val buffer = 160f
+                footerVisible = bounds.top < view.height + buffer && bounds.bottom > -buffer
+            },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         when {
-            isLoading -> CircularProgressIndicator(Modifier.size(24.dp), color = SearchAccent)
+            isLoading || (hasMore && !failed) ->
+                CircularProgressIndicator(Modifier.size(20.dp), color = SearchAccent, strokeWidth = 2.dp)
             failed -> {
                 Text(stringResource(R.string.explore_global_error))
                 TextButton(onClick = onRetry) { Text(stringResource(R.string.explore_global_retry)) }
             }
-            hasMore -> TextButton(onClick = onLoadMore) { Text(stringResource(R.string.explore_global_more)) }
         }
     }
 }

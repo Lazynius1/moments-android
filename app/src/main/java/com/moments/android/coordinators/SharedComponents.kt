@@ -420,7 +420,7 @@ fun ActionSubCardView(
                 val momentId = moment.id ?: return@IconButton
                 val userId = currentUserId ?: return@IconButton
                 scope.launch(Dispatchers.IO) {
-                    runCatching { firestoreService.toggleSaveMoment(userId, momentId) }
+                    runCatching { firestoreService.toggleSaveMoment(userId, momentId, moment.authorId) }
                         .onSuccess { isSaved = !isSaved }
                 }
             },

@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -107,10 +108,8 @@ fun FeedView(
     val isDark = isSystemInDarkTheme()
 
     // MARK: - Services (equivalente @StateObject / @ObservedObject iOS)
-    val viewModel = remember {
-        FeedViewModel().also { it.attachContext(context) }
-    }
-    val messagingViewModel = remember { MessagingViewModel() }
+    val viewModel: FeedViewModel = viewModel { FeedViewModel().also { it.attachContext(context) } }
+    val messagingViewModel: MessagingViewModel = viewModel()
     val notificationsViewModel = remember { NotificationsViewModel() }
     val storyRingCoordinator = remember { FeedStoryRingCoordinator(appContext = context.applicationContext) }
     val firestoreService = remember { FirestoreService() }
@@ -171,7 +170,6 @@ fun FeedView(
     var showStoryChain by remember { mutableStateOf(false) }
     var selectedChainId by remember { mutableStateOf("") }
     var selectedChainTitle by remember { mutableStateOf("") }
-    var hasLoadedInitialData by remember { mutableStateOf(false) }
     var hasUnreadMessages by remember { mutableStateOf(false) }
 
     var selectedStoryRoute by remember { mutableStateOf<StoryUserPresentationRoute?>(null) }
@@ -276,10 +274,11 @@ fun FeedView(
         if (videoUrls.isNotEmpty()) VideoPreloader.preloadAssets(videoUrls)
     }
 
-    fun loadInitialData() {
+    fun loadInitialData(force: Boolean = false) {
         val userId = viewModel.viewerId ?: return
-        if (hasLoadedInitialData) {
+        if (!force && viewModel.hasLoadedInitialFeed) {
             viewModel.fetchUserData(scope, userId)
+            storyRingCoordinator.loadStoryUsers(scope, userId)
             return
         }
         storyRingCoordinator.clearCacheIfNeeded()
@@ -291,16 +290,14 @@ fun FeedView(
             viewModel.fetchUserData(scope, userId)
             storyRingCoordinator.loadStoryUsers(scope, userId)
             prefetchImages()
-            hasLoadedInitialData = true
             delay(400)
             messagingViewModel.fetchConversations(userId)
         }
     }
 
     fun forceRefresh() {
-        hasLoadedInitialData = false
         storyRingCoordinator.resetCache()
-        loadInitialData()
+        loadInitialData(force = true)
     }
 
     suspend fun refreshFeed(userId: String) {

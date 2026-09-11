@@ -45,6 +45,9 @@ import com.moments.android.notifications.services.NotificationBadgeService
 import com.moments.android.notifications.services.NotificationService
 import com.moments.android.services.security.MomentsAppCheckProviderFactory
 import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreSettings
+import com.google.firebase.firestore.PersistentCacheSettings
 import com.mapbox.common.MapboxOptions
 import com.moments.android.views.feed.maps.FeedMaps
 import coil.ImageLoader
@@ -66,6 +69,9 @@ class MomentsApplication : Application(), ImageLoaderFactory {
         @Volatile
         var instance: MomentsApplication? = null
             private set
+
+        /** ≡ iOS `PersistentCacheSettings(sizeBytes: 100 * 1024 * 1024)`. */
+        private const val FIRESTORE_CACHE_BYTES = 100L * 1024 * 1024
     }
 
     override fun newImageLoader(): ImageLoader = MomentsImageLoader.create(this)
@@ -79,6 +85,8 @@ class MomentsApplication : Application(), ImageLoaderFactory {
         }
         // iOS: AppCheck.setAppCheckProviderFactory antes de FirebaseApp.configure().
         FirebaseAppCheck.getInstance().installAppCheckProviderFactory(MomentsAppCheckProviderFactory)
+        // ≡ iOS MomentsApp.init PersistentCacheSettings — antes de Auth/Firestore.
+        configureFirestorePersistence()
         NetworkMonitor.initialize(this)
         TimeSpentManager.initialize(this)
         VideoCompressionService.initialize(this)
@@ -157,5 +165,19 @@ class MomentsApplication : Application(), ImageLoaderFactory {
     override fun onLowMemory() {
         super.onLowMemory()
         imageLoader.memoryCache?.clear()
+    }
+
+    /** Port de `PersistentCacheSettings` en `MomentsApp.init` (iOS). */
+    private fun configureFirestorePersistence() {
+        runCatching {
+            val settings = FirebaseFirestoreSettings.Builder()
+                .setLocalCacheSettings(
+                    PersistentCacheSettings.newBuilder()
+                        .setSizeBytes(FIRESTORE_CACHE_BYTES)
+                        .build(),
+                )
+                .build()
+            FirebaseFirestore.getInstance().firestoreSettings = settings
+        }
     }
 }

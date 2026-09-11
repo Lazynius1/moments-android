@@ -109,12 +109,14 @@ fun StoryRingAvatarView(
 
     // iOS: onAppear / onChange(userId) → resolveSnapshot() sin force
     LaunchedEffect(userId, viewerId, allowOwnStories) {
-        snapshot = resolveSnapshot(
-            userId = userId,
-            viewerId = viewerId,
-            allowOwnStories = allowOwnStories,
-            forceRefresh = false,
-        )
+        snapshot = runCatching {
+            resolveSnapshot(
+                userId = userId,
+                viewerId = viewerId,
+                allowOwnStories = allowOwnStories,
+                forceRefresh = false,
+            )
+        }.getOrDefault(StoryRingSnapshot.Empty)
     }
     // iOS: onChange(refreshTrigger) → resolveSnapshot(forceRefresh: true)
     var skipFirstRefreshTrigger by remember { mutableStateOf(true) }
@@ -123,12 +125,14 @@ fun StoryRingAvatarView(
             skipFirstRefreshTrigger = false
             return@LaunchedEffect
         }
-        snapshot = resolveSnapshot(
-            userId = userId,
-            viewerId = viewerId,
-            allowOwnStories = allowOwnStories,
-            forceRefresh = true,
-        )
+        snapshot = runCatching {
+            resolveSnapshot(
+                userId = userId,
+                viewerId = viewerId,
+                allowOwnStories = allowOwnStories,
+                forceRefresh = true,
+            )
+        }.getOrDefault(StoryRingSnapshot.Empty)
     }
 
     LaunchedEffect(snapshot.hasStory) {
@@ -246,33 +250,41 @@ fun GroupStoryRingAvatarView(
             nestedStoryViewedStatus = emptyList()
             return@LaunchedEffect
         }
-        val collected = coroutineScope {
-            authors.map { authorId ->
-                async {
-                    authorId to StoryRingResolverService.resolve(
-                        viewerId = viewerId,
-                        authorId = authorId,
-                        useCache = true,
-                    )
-                }
-            }.awaitAll().toMap()
+        runCatching {
+            val collected = coroutineScope {
+                authors.map { authorId ->
+                    async {
+                        authorId to StoryRingResolverService.resolve(
+                            viewerId = viewerId,
+                            authorId = authorId,
+                            useCache = true,
+                        )
+                    }
+                }.awaitAll().toMap()
+            }
+            val withStories = authors.mapNotNull { id ->
+                val snap = collected[id] ?: return@mapNotNull null
+                if (snap.hasStory) id to snap else null
+            }
+            storyAuthorIds = withStories.map { it.first }
+            startAuthorId = withStories.firstOrNull { it.second.hasUnseenStory }?.first
+                ?: withStories.firstOrNull()?.first
+            nestedStoryAudiences = withStories.map { it.second.storyAudiences }
+            nestedStoryViewedStatus = withStories.map { it.second.storyViewedStatus }
+            snapshot = StoryRingSnapshot(
+                hasStory = withStories.isNotEmpty(),
+                hasUnseenStory = withStories.any { it.second.hasUnseenStory },
+                storyCount = withStories.size,
+                storyViewedStatus = withStories.map { !it.second.hasUnseenStory },
+                storyAudiences = withStories.map { it.second.groupRingAudience },
+            )
+        }.onFailure {
+            snapshot = StoryRingSnapshot.Empty
+            storyAuthorIds = emptyList()
+            startAuthorId = null
+            nestedStoryAudiences = emptyList()
+            nestedStoryViewedStatus = emptyList()
         }
-        val withStories = authors.mapNotNull { id ->
-            val snap = collected[id] ?: return@mapNotNull null
-            if (snap.hasStory) id to snap else null
-        }
-        storyAuthorIds = withStories.map { it.first }
-        startAuthorId = withStories.firstOrNull { it.second.hasUnseenStory }?.first
-            ?: withStories.firstOrNull()?.first
-        nestedStoryAudiences = withStories.map { it.second.storyAudiences }
-        nestedStoryViewedStatus = withStories.map { it.second.storyViewedStatus }
-        snapshot = StoryRingSnapshot(
-            hasStory = withStories.isNotEmpty(),
-            hasUnseenStory = withStories.any { it.second.hasUnseenStory },
-            storyCount = withStories.size,
-            storyViewedStatus = withStories.map { !it.second.hasUnseenStory },
-            storyAudiences = withStories.map { it.second.groupRingAudience },
-        )
     }
 
     val interaction = remember { MutableInteractionSource() }

@@ -38,6 +38,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -302,15 +304,15 @@ fun ProfileView(
     /** ≡ iOS `.toolbar(.hidden, for: .tabBar)` en Settings / edit / moment zoom. */
     onSuppressTabBarChange: (Boolean) -> Unit = {},
 ) {
-    val viewModel = remember { ProfileViewModel() }
-    val storyViewModel = remember { StoryViewModel() }
+    val viewModel: ProfileViewModel = viewModel()
+    val storyViewModel: StoryViewModel = viewModel()
     // ≡ iOS `@StateObject private var savedMomentsViewModel = SavedMomentsViewModel()`
-    val savedMomentsViewModel = remember { SavedMomentsViewModel() }
+    val savedMomentsViewModel: SavedMomentsViewModel = viewModel()
     val heroCoordinator = remember { ProfileGridHeroTransitionCoordinator() }
     val scope = rememberCoroutineScope()
     val firestore = remember { FirestoreService() }
 
-    var profileTab by remember { mutableStateOf(ProfileTabType.MOMENTS) }
+    var profileTab by rememberSaveable { mutableStateOf(ProfileTabType.MOMENTS) }
     var uid by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser?.uid) }
     val unauthenticatedMessage = stringResource(R.string.messaging_error_not_authenticated)
 
@@ -388,7 +390,7 @@ fun ProfileView(
             viewModel.errorMessage = unauthenticatedMessage
             return@LaunchedEffect
         }
-        viewModel.fetchProfile(currentUid)
+        if (viewModel.userProfile?.id != currentUid) viewModel.fetchProfile(currentUid)
         // ≡ iOS: fetchStories(includeConnections: false) + checkActiveStories
         storyViewModel.fetchStories(forUserId = currentUid, includeConnections = false)
     }

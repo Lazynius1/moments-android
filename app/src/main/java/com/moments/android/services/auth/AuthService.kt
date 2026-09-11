@@ -58,6 +58,7 @@ import com.moments.android.services.firestore.createUser
 import com.moments.android.services.firestore.fetchAvailableInterests
 import com.moments.android.services.firestore.verifyUserCreation
 import com.moments.android.services.firestore.changeUsername
+import com.moments.android.utilities.AppLog
 
 /**
  * Port de AuthService.swift — email + Google Sign-In.
@@ -223,7 +224,11 @@ object AuthService {
         authListenerAttached = true
         auth.addAuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
-            scope.launch { handleAuthStateChange(user) }
+            // ≡ iOS completions nunca tiran; un fallo Firestore offline no debe tumbar el proceso.
+            scope.launch {
+                runCatching { handleAuthStateChange(user) }
+                    .onFailure { AppLog.error("AuthService handleAuthStateChange failed: ${it.message}") }
+            }
         }
     }
 
@@ -1196,9 +1201,12 @@ object AuthService {
     }
 
     suspend fun checkUserSuspension(userId: String): Triple<Boolean, String?, Date?> {
+        // ≡ iOS: offline → completion(false); getDocument error → data nil → false.
+        // Nunca lanzar: NetworkMonitor puede decir "conectado" y Firestore estar offline.
         if (!NetworkMonitor.isConnected) return Triple(false, null, null)
-        val snap = db.collection("users").document(userId).get().await()
-        val data = snap.data ?: return Triple(false, null, null)
+        val data = runCatching {
+            db.collection("users").document(userId).get().await().data
+        }.getOrNull() ?: return Triple(false, null, null)
         val isSuspended = data["isSuspended"] as? Boolean ?: false
         if (!isSuspended) return Triple(false, null, null)
 
@@ -1206,13 +1214,15 @@ object AuthService {
         if (suspendedUntil != null) {
             val expiration = suspendedUntil.toDate()
             if (Date().after(expiration)) {
-                db.collection("users").document(userId).update(
-                    mapOf(
-                        "isSuspended" to false,
-                        "suspendedUntil" to FieldValue.delete(),
-                        "suspensionReason" to FieldValue.delete(),
-                    ),
-                ).await()
+                runCatching {
+                    db.collection("users").document(userId).update(
+                        mapOf(
+                            "isSuspended" to false,
+                            "suspendedUntil" to FieldValue.delete(),
+                            "suspensionReason" to FieldValue.delete(),
+                        ),
+                    ).await()
+                }
                 return Triple(false, null, null)
             }
             return Triple(true, data["suspensionReason"] as? String, expiration)

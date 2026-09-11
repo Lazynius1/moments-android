@@ -272,7 +272,7 @@ object OfflineSyncService {
             CachedAction.ActionType.SAVE.raw -> {
                 decodeSavePayload(action.payloadData)?.let { payload ->
                     runCatching {
-                        firestoreService.toggleSaveMoment(payload.userId, payload.momentId)
+                        firestoreService.toggleSaveMoment(payload.userId, payload.momentId, payload.authorId)
                     }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
                 } ?: LocalPersistenceService.deleteAction(action.id)
             }
@@ -518,7 +518,7 @@ object OfflineSyncService {
 
     private fun decodeSavePayload(data: ByteArray): SavePayload? = runCatching {
         val o = JSONObject(String(data))
-        SavePayload(o.getString("userId"), o.getString("momentId"))
+        SavePayload(o.getString("userId"), o.getString("momentId"), o.optString("authorId").takeIf { it.isNotBlank() })
     }.getOrNull()
 
     private fun decodeBlockPayload(data: ByteArray): BlockActionPayload? = runCatching {

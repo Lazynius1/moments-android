@@ -12,6 +12,7 @@ import kotlinx.coroutines.tasks.await
 import java.util.concurrent.ConcurrentHashMap
 import com.moments.android.models.Story
 import com.moments.android.services.firestore.fetchMutuals
+import com.moments.android.services.firestore.getOfflineAware
 
 // MARK: - Privacy settings
 
@@ -262,8 +263,10 @@ object PrivacyService {
     suspend fun resolveFollowButtonState(viewerId: String, targetUserId: String): FollowButtonState {
         if (viewerId == targetUserId) return FollowButtonState.OWN_PROFILE
 
-        val viewerSnapshot = db.collection("users").document(viewerId).get().await()
-        val targetSnapshot = db.collection("users").document(targetUserId).get().await()
+        val viewerSnapshot = db.collection("users").document(viewerId).getOfflineAware()
+            ?: error("Relationship user document not found")
+        val targetSnapshot = db.collection("users").document(targetUserId).getOfflineAware()
+            ?: error("Relationship user document not found")
         check(viewerSnapshot.exists() && targetSnapshot.exists()) { "Relationship user document not found" }
 
         val viewerBlocked = (viewerSnapshot.get("blockedUsers") as? List<*>)
@@ -276,21 +279,23 @@ object PrivacyService {
 
         val following = db.collection("users").document(viewerId)
             .collection("following").document(targetUserId)
-            .get().await().exists()
+            .getOfflineAware()?.exists() == true
         if (following) {
             val mutual = db.collection("users").document(viewerId)
                 .collection("mutuals").document(targetUserId)
-                .get().await().exists()
+                .getOfflineAware()?.exists() == true
             return if (mutual) FollowButtonState.MUTUALS else FollowButtonState.FOLLOWING
         }
 
-        val pending = db.collection("users").document(viewerId).collection("sentFollowRequests")
-            .whereEqualTo("recipientId", targetUserId)
-            .whereEqualTo("status", FollowRequestStatus.PENDING.raw)
-            .limit(1)
-            .get().await()
-            .documents
-            .isNotEmpty()
+        val pending = runCatching {
+            db.collection("users").document(viewerId).collection("sentFollowRequests")
+                .whereEqualTo("recipientId", targetUserId)
+                .whereEqualTo("status", FollowRequestStatus.PENDING.raw)
+                .limit(1)
+                .getOfflineAware()
+                ?.documents
+                ?.isNotEmpty() == true
+        }.getOrDefault(false)
         if (pending) return FollowButtonState.REQUEST_PENDING_CANCELLABLE
 
         return if (targetSnapshot.getBoolean("isPrivate") == true) {

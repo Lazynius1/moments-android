@@ -189,9 +189,9 @@ suspend fun FirestoreService.checkIfSaved(userId: String, momentId: String): Boo
     return snap.exists()
 }
 
-suspend fun FirestoreService.toggleSaveMoment(userId: String, momentId: String) {
+suspend fun FirestoreService.toggleSaveMoment(userId: String, momentId: String, authorId: String? = null) {
     if (shouldQueueFirestoreOutbox()) {
-        val payload = SavePayload(userId, momentId)
+        val payload = SavePayload(userId, momentId, authorId)
         LocalPersistenceService.saveAction(
             CachedAction(
                 id = UUID.randomUUID().toString(),
@@ -209,7 +209,11 @@ suspend fun FirestoreService.toggleSaveMoment(userId: String, momentId: String) 
             transaction.delete(savedMomentRef)
             _savedMomentIds.update { it.filterNot { id -> id == momentId } }
         } else {
-            transaction.set(savedMomentRef, mapOf("momentId" to momentId, "timestamp" to Timestamp(Date())))
+            transaction.set(savedMomentRef, buildMap<String, Any> {
+                put("momentId", momentId)
+                put("timestamp", Timestamp(Date()))
+                authorId?.takeIf { it.isNotBlank() }?.let { put("authorId", it) }
+            })
             _savedMomentIds.update { it + momentId }
         }
         null

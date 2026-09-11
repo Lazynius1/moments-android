@@ -121,9 +121,9 @@ class ExploreViewModel(
             return
         }
         currentUserId = userId
-        loadExplorePage(reset = true)
         isLoading = true
         errorMessage = null
+        loadExplorePage(reset = true)
 
         val cached = LocalPersistenceService.loadExploreMoments()
         if (cached.isNotEmpty() && moments.isEmpty()) {
@@ -147,12 +147,7 @@ class ExploreViewModel(
     }
 
     fun refreshContent() {
-        moments = emptyList()
-        filteredMoments = emptyList()
-        suggestedUsers = emptyList()
-        searchedUsers = emptyList()
-        followedUserIds = emptySet()
-        pendingRequests = emptySet()
+        // Keep the current page visible until its replacement succeeds.
         fetchMomentsByInterests()
     }
 
@@ -172,8 +167,7 @@ class ExploreViewModel(
     }
 
     fun refreshAllContent() {
-        clearData()
-        fetchMomentsByInterests()
+        refreshContent()
     }
 
     fun debugVisibleContent() {
@@ -187,6 +181,10 @@ class ExploreViewModel(
     fun setSearchFilter(filter: String) {
         searchFilter = filter
         smartSearch(activeSearchQuery)
+    }
+
+    fun searchIfChanged(query: String) {
+        if (query.trim() != activeSearchQuery) smartSearch(query)
     }
 
     fun smartSearch(query: String) {

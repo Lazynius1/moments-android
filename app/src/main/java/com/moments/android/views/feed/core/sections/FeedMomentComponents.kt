@@ -650,7 +650,7 @@ fun ModernPostCardView(
         isSaved = !isSaved
         isSaveLoading = true
         scope.launch {
-            val error = runCatching { firestore.toggleSaveMoment(uid, moment.id) }.exceptionOrNull()
+            val error = runCatching { firestore.toggleSaveMoment(uid, moment.id, moment.authorId) }.exceptionOrNull()
             isSaveLoading = false
             if (error != null) isSaved = !isSaved
         }

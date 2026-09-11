@@ -20,6 +20,7 @@ data class ReactionPayload(
 data class SavePayload(
     val userId: String,
     val momentId: String,
+    val authorId: String? = null,
 )
 
 data class CommentPayload(
@@ -125,6 +126,7 @@ fun ReactionPayload.encode(): ByteArray = JSONObject().apply {
 fun SavePayload.encode(): ByteArray = JSONObject().apply {
     put("userId", userId)
     put("momentId", momentId)
+    authorId?.let { put("authorId", it) }
 }.toString().toByteArray()
 
 fun CommentPayload.encode(): ByteArray = JSONObject().apply {

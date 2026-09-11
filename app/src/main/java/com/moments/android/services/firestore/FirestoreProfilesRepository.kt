@@ -18,8 +18,15 @@ import java.util.Date
 
 suspend fun FirestoreService.fetchUser(userId: String): AppUser {
     require(userId.isNotEmpty()) { "El userId está vacío" }
-    val source = if (NetworkMonitor.isConnected) Source.DEFAULT else Source.CACHE
-    val snap = db.collection("users").document(userId).get(source).await()
+    // ≡ iOS Source.default vs .cache según red; si Firestore dice offline con monitor online → cache.
+    val snap = if (NetworkMonitor.isConnected) {
+        runCatching { db.collection("users").document(userId).get(Source.DEFAULT).await() }
+            .getOrElse {
+                db.collection("users").document(userId).get(Source.CACHE).await()
+            }
+    } else {
+        db.collection("users").document(userId).get(Source.CACHE).await()
+    }
     if (!snap.exists()) error("User not found: $userId")
     @Suppress("UNCHECKED_CAST")
     val data = snap.data as Map<String, Any?>

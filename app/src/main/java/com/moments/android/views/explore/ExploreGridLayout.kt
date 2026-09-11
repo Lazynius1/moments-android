@@ -27,9 +27,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +41,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -142,6 +147,28 @@ object ExploreMomentsGridMetrics {
         }
 }
 
+/**
+ * Returns the coarse row range that can intersect the window viewport.
+ * The grid origin and viewport bounds must be expressed in the same window space.
+ */
+fun exploreVisibleRowRange(
+    gridTopInWindowPx: Float,
+    gridHeightPx: Float,
+    windowTopPx: Float,
+    windowBottomPx: Float,
+    rowStepPx: Float,
+    rowCount: Int,
+    bufferRows: Int,
+): IntRange {
+    if (rowCount <= 0 || rowStepPx <= 0f || gridHeightPx <= 0f) return 0..0
+    val visibleTop = (windowTopPx - gridTopInWindowPx).coerceIn(0f, gridHeightPx)
+    val visibleBottom = (windowBottomPx - gridTopInWindowPx).coerceIn(0f, gridHeightPx)
+    val buffer = bufferRows.coerceAtLeast(0)
+    val first = ((visibleTop / rowStepPx).toInt() - buffer).coerceAtLeast(0)
+    val last = ((visibleBottom / rowStepPx).toInt() + buffer).coerceAtMost(rowCount)
+    return first..last
+}
+
 data class ExploreBentoPlacement(
     val index: Int,
     val kind: ExploreBentoTileKind,
@@ -216,48 +243,98 @@ fun ExploreMomentsBentoGrid(
     val descriptors = remember(moments) { ExploreBentoTileAssigner.assign(moments) }
     val kinds = descriptors.map { it.layoutKind }
     val placements = remember(kinds) { ExploreBentoLayoutPlanner.plan(kinds) }
-    val rows = ExploreBentoLayoutPlanner.heightUnits(kinds)
+    val rows = remember(placements) { placements.maxOfOrNull { (it.y + it.kind.rowSpan).roundToInt() } ?: 0 }
+    val configuration = LocalConfiguration.current
+    val view = LocalView.current
 
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val gap = ExploreMomentsGridMetrics.spacing
         val unit = ExploreMomentsGridMetrics.columnWidth(maxWidth)
         val height = if (rows == 0) 0.dp else unit * rows + gap * (rows - 1)
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val stepPx = with(density) { (unit + gap).toPx() }
+        val initialViewportRows = remember(rows, stepPx) {
+            val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+            val bufferRows = if (stepPx > 0f) (screenHeightPx / stepPx).toInt() + 1 else 0
+            0..minOf(rows, bufferRows * 2)
+        }
+        var visibleRows by remember(stepPx) { mutableStateOf(initialViewportRows) }
+        val viewportBufferRows = remember(stepPx) {
+            if (stepPx > 0f) {
+                with(density) { 720.dp.toPx() }.div(stepPx).toInt().coerceAtLeast(1)
+            } else {
+                1
+            }
+        }
 
-        Box(Modifier.fillMaxWidth().height(height)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(height)
+                // The grid is hosted by Explore's clipped verticalScroll Column. Its
+                // own bounds remain the full measured height, so use window coordinates
+                // only to derive a coarse row range and avoid per-pixel recomposition.
+                .onGloballyPositioned { coordinates ->
+                    if (stepPx <= 0f || rows == 0) return@onGloballyPositioned
+                    // positionInWindow() retains the unclipped content origin while
+                    // the parent verticalScroll moves it. rootView.height gives the
+                    // viewport in the same window coordinate space, including split
+                    // screen and display cutout configurations.
+                    val gridTop = coordinates.positionInWindow().y
+                    val gridHeight = coordinates.size.height.toFloat()
+                    val nextRows = exploreVisibleRowRange(
+                        gridTopInWindowPx = gridTop,
+                        gridHeightPx = gridHeight,
+                        windowTopPx = 0f,
+                        windowBottomPx = view.rootView.height.toFloat(),
+                        rowStepPx = stepPx,
+                        rowCount = rows,
+                        bufferRows = viewportBufferRows,
+                    )
+                    if (nextRows != visibleRows) visibleRows = nextRows
+                },
+        ) {
             placements.forEach { placement ->
+                if (placement.y >= visibleRows.last + 1 ||
+                    placement.y + placement.kind.rowSpan <= visibleRows.first
+                ) {
+                    return@forEach
+                }
                 val moment = moments.getOrNull(placement.index) ?: return@forEach
                 val descriptor = descriptors.getOrNull(placement.index)
                     ?: ExploreGridTileDescriptor.standard(moment)
                 val tileW = ExploreMomentsGridMetrics.tileWidth(placement.kind, unit)
                 val tileH = ExploreMomentsGridMetrics.tileHeight(placement.kind, unit)
-                Box(
-                    Modifier
-                        .offset(
-                            x = (unit + gap) * placement.startColumn,
-                            y = (unit + gap) * placement.y.toInt(),
-                        )
-                        .width(tileW)
-                        .height(tileH)
-                        // ≡ iOS ProfileMomentZoomSourceModifier(cornerRadius: 0)
-                        .profileMomentZoomSource(
-                            sourceID = ProfileMomentZoomNavigation.sourceID(
-                                moment,
-                                placement.index,
-                                zoomIDPrefix,
+                key("${zoomIDPrefix}:${moment.authorId}:${moment.id ?: placement.index}") {
+                    Box(
+                        Modifier
+                            .offset(
+                                x = (unit + gap) * placement.startColumn,
+                                y = (unit + gap) * placement.y.toInt(),
+                            )
+                            .width(tileW)
+                            .height(tileH)
+                            // ≡ iOS ProfileMomentZoomSourceModifier(cornerRadius: 0)
+                            .profileMomentZoomSource(
+                                sourceID = ProfileMomentZoomNavigation.sourceID(
+                                    moment,
+                                    placement.index,
+                                    zoomIDPrefix,
+                                ),
+                                cornerRadius = 0.dp,
                             ),
-                            cornerRadius = 0.dp,
-                        ),
-                ) {
-                    ScreenshotProtectedView(
-                        isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
-                        fillsContainer = true,
                     ) {
-                        ExploreMomentThumbnail(
-                            moment = moment,
-                            descriptor = descriptor,
-                            onTap = { onMomentTap(moment, placement.index, moments) },
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        ScreenshotProtectedView(
+                            isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
+                            fillsContainer = true,
+                        ) {
+                            ExploreMomentThumbnail(
+                                moment = moment,
+                                descriptor = descriptor,
+                                onTap = { onMomentTap(moment, placement.index, moments) },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
             }

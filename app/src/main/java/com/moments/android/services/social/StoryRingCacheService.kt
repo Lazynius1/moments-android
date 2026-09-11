@@ -4,6 +4,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.moments.android.models.Story
+import com.moments.android.services.firestore.getOfflineAware
 import com.moments.android.services.persistence.StorySeenStateService
 import com.moments.android.services.privacy.PrivacyService
 import kotlinx.coroutines.async
@@ -147,22 +148,21 @@ object StoryRingResolverService {
         privacyService: PrivacyService,
         db: FirebaseFirestore,
     ): StoryRingSnapshot {
+        // ≡ iOS getDocuments { snapshot, _ in … } — error → vacío, nunca crash.
         val documents = runCatching {
             // iOS: expirationDate > now, order by timestamp ascending.
             db.collection("users").document(authorId).collection("stories")
                 .whereGreaterThan("expirationDate", Timestamp.now())
                 .orderBy("timestamp", Query.Direction.ASCENDING)
-                .get()
-                .await()
-                .documents
+                .getOfflineAware()
+                ?.documents
         }.recoverCatching {
             // Fallback sin índice: filtrar/ordenar en cliente.
             db.collection("users").document(authorId).collection("stories")
                 .whereGreaterThan("expirationDate", Timestamp.now())
-                .get()
-                .await()
-                .documents
-                .sortedBy { (it.get("timestamp") as? Timestamp)?.toDate()?.time ?: 0L }
+                .getOfflineAware()
+                ?.documents
+                ?.sortedBy { (it.get("timestamp") as? Timestamp)?.toDate()?.time ?: 0L }
         }.getOrNull() ?: return cacheAndReturn(viewerId, authorId, emptySnapshot)
 
         if (documents.isEmpty()) {
@@ -197,7 +197,7 @@ object StoryRingResolverService {
         stories.map { story ->
             async {
                 val canView = withTimeoutOrNull(viewerLookupTimeoutMs) {
-                    privacyService.canUserViewStoryEnhanced(story, viewerId)
+                    runCatching { privacyService.canUserViewStoryEnhanced(story, viewerId) }.getOrDefault(false)
                 } ?: return@async
 
                 if (!canView) return@async
@@ -213,12 +213,12 @@ object StoryRingResolverService {
 
                 val storyId = story.id
                 val wasViewed = if (!storyId.isNullOrEmpty()) {
+                    // ≡ iOS getDocument { viewerDoc, _ in } — offline no tumba el aro del tab.
                     val viewerDoc = db.collection("users").document(story.authorId)
                         .collection("stories").document(storyId)
                         .collection("viewers").document(viewerId)
-                        .get()
-                        .await()
-                    val viewed = viewerDoc.exists()
+                        .getOfflineAware()
+                    val viewed = viewerDoc?.exists() == true
                     if (viewed && supportsShortcut) {
                         StorySeenStateService.markSeen(
                             viewerId = viewerId,

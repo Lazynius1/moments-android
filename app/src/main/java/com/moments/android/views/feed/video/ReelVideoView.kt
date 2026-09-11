@@ -363,7 +363,7 @@ fun ReelVideoView(
         isSaved = !isSaved
         isSaveLoading = true
         scope.launch {
-            val error = runCatching { firestore.toggleSaveMoment(userId, momentId) }.exceptionOrNull()
+            val error = runCatching { firestore.toggleSaveMoment(userId, momentId, video.moment.authorId) }.exceptionOrNull()
             isSaveLoading = false
             if (error != null) isSaved = !isSaved
         }

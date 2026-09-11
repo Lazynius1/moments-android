@@ -15,7 +15,10 @@ import com.moments.android.services.firestore.toggleSaveMoment
 import com.moments.android.services.privacy.PrivacyService
 import java.util.Calendar
 import java.util.UUID
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -27,7 +30,7 @@ import kotlinx.coroutines.withContext
 /**
  * Mirror 1:1 de `SavedMomentsViewModel.swift` (384 líneas en iOS).
  */
-class SavedMomentsViewModel {
+class SavedMomentsViewModel : ViewModel() {
     var moments by mutableStateOf<List<Moment>>(emptyList())
         private set
 
@@ -47,8 +50,11 @@ class SavedMomentsViewModel {
 
     private val firestoreService = FirestoreService()
     private val privacyService = PrivacyService
-    private val scope = CoroutineScope(Dispatchers.IO)
     private var visibilityValidationToken: String = UUID.randomUUID().toString()
+
+    private var loadJob: Job? = null
+    private var loadGeneration = 0
+    private var dataOwnerId: String? = null
 
     fun loadSavedMoments(completion: (Throwable?) -> Unit = {}) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: run {
@@ -58,14 +64,25 @@ class SavedMomentsViewModel {
             return
         }
 
+        loadJob?.cancel()
+        val generation = ++loadGeneration
+        if (dataOwnerId != userId) {
+            moments = emptyList()
+            savedMomentIds = emptyList()
+            visibilityByMomentId.clear()
+            mutedUserIds = emptySet()
+            dataOwnerId = userId
+        }
         isLoading = true
         error = null
 
-        scope.launch {
+        loadJob = viewModelScope.launch(Dispatchers.IO) {
             launch {
                 runCatching { firestoreService.fetchMutedUserIds(userId) }
                     .onSuccess { muted ->
-                        withContext(Dispatchers.Main) { mutedUserIds = muted }
+                        withContext(Dispatchers.Main) {
+                            if (loadGeneration == generation && dataOwnerId == userId) mutedUserIds = muted
+                        }
                     }
             }
 
@@ -76,6 +93,7 @@ class SavedMomentsViewModel {
                     .get()
                     .await()
 
+                if (generation != loadGeneration || FirebaseAuth.getInstance().currentUser?.uid != userId) return@launch
                 val momentIds = snapshot.documents.map { it.id }
                 withContext(Dispatchers.Main) {
                     savedMomentIds = momentIds
@@ -91,10 +109,18 @@ class SavedMomentsViewModel {
                     return@launch
                 }
 
-                fetchSavedMomentsDirectly(momentIds)
-                completion(null)
+                val cachedAuthors = moments.associate { it.id to it.authorId }
+                val authors = snapshot.documents.mapNotNull { document ->
+                    (document.getString("authorId") ?: cachedAuthors[document.id])
+                        ?.takeIf { it.isNotBlank() }?.let { document.id to it }
+                }.toMap()
+                val loadError = fetchSavedMomentsDirectly(momentIds, authors, userId, generation)
+                withContext(Dispatchers.Main) { completion(loadError) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
+                    if (generation != loadGeneration || FirebaseAuth.getInstance().currentUser?.uid != userId) return@withContext
                     error = e
                     isLoading = false
                 }
@@ -103,36 +129,57 @@ class SavedMomentsViewModel {
         }
     }
 
-    /** Buscar momentos guardados directamente sin filtros de privacidad (paridad iOS). */
-    private suspend fun fetchSavedMomentsDirectly(momentIds: List<String>) {
-        val userIds = fetchActiveUsers()
-        val foundMoments = coroutineScope {
-            userIds.map { authorId ->
-                async {
-                    fetchMomentsFromUser(authorId).filter { moment ->
-                        val momentId = moment.id ?: return@filter false
-                        momentIds.contains(momentId)
+    /** Exact document paths for new bookmarks; bounded compatibility lookup for old ones. */
+    private suspend fun fetchSavedMomentsDirectly(momentIds: List<String>, authorsById: Map<String, String>, viewerId: String, generation: Int): Throwable? {
+        val foundMoments = mutableListOf<Moment>()
+        var firstError: Throwable? = null
+        for (batch in authorsById.entries.chunked(6)) {
+            val results = coroutineScope {
+                batch.map { (id, author) ->
+                    async {
+                        try {
+                            val document = firestoreService.db.collection("users").document(author)
+                                .collection("moments").document(id).get().await()
+                            Result.success(if (!document.exists()) null else document.data?.let { Moment.from(document.id, it) }
+                                ?.takeUnless { it.isArchived == true })
+                        } catch (e: CancellationException) { throw e }
+                        catch (e: Exception) { Result.failure<Moment?>(e) }
                     }
+                }.awaitAll()
+            }
+            results.forEach { result ->
+                result.onSuccess { it?.let(foundMoments::add) }
+                    .onFailure { firstError = firstError ?: it }
+            }
+        }
+        val legacyIds = momentIds.toSet() - authorsById.keys
+        if (legacyIds.isNotEmpty()) {
+            for (batch in fetchActiveUsers().chunked(6)) {
+                foundMoments += coroutineScope {
+                    batch.map { author -> async { fetchMomentsFromUser(author).filter { it.id in legacyIds } } }
+                        .awaitAll().flatten()
                 }
-            }.awaitAll().flatten()
+            }
         }
-
-        val foundMomentIds = foundMoments.mapNotNull { it.id }.toSet()
-        val notFoundMomentIds = momentIds.filter { it !in foundMomentIds }
-        if (notFoundMomentIds.isNotEmpty()) {
-            cleanupMissingMoments(notFoundMomentIds)
-        }
-
+        // Unknown is not deleted: network failures, permissions and the legacy lookup
+        // cannot prove that a saved publication no longer exists.
+        firstError?.let { if (foundMoments.isEmpty()) throw it }
+        if (generation != loadGeneration || FirebaseAuth.getInstance().currentUser?.uid != viewerId) return null
         val sortedMoments = foundMoments.sortedByDescending { it.timestamp }
         withContext(Dispatchers.Main) {
+            if (generation != loadGeneration || FirebaseAuth.getInstance().currentUser?.uid != viewerId) return@withContext
             moments = sortedMoments
+            error = firstError
             isLoading = false
         }
         validateVisibilityForLoadedMoments(sortedMoments)
+        return firstError
     }
 
     private suspend fun fetchMomentsFromUser(userId: String): List<Moment> =
-        runCatching { firestoreService.fetchMoments(userId) }.getOrDefault(emptyList())
+        try { firestoreService.fetchMoments(userId) }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { emptyList() }
 
     private suspend fun fetchActiveUsers(): List<String> {
         val calendar = Calendar.getInstance()
@@ -147,6 +194,8 @@ class SavedMomentsViewModel {
                 .await()
             val userIds = snapshot.documents.map { it.id }
             if (userIds.isEmpty()) fetchAllUsers() else userIds
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             fetchAllUsers()
         }
@@ -160,28 +209,11 @@ class SavedMomentsViewModel {
                 .await()
                 .documents
                 .map { it.id }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             emptyList()
         }
-
-    private suspend fun cleanupMissingMoments(missingIds: List<String>) {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        coroutineScope {
-            missingIds.map { momentId ->
-                async {
-                    runCatching {
-                        firestoreService.db.collection("users").document(userId)
-                            .collection("savedMoments").document(momentId)
-                            .delete()
-                            .await()
-                    }
-                }
-            }.awaitAll()
-        }
-        withContext(Dispatchers.Main) {
-            savedMomentIds = savedMomentIds.filterNot { missingIds.contains(it) }
-        }
-    }
 
     fun isMomentSaved(momentId: String): Boolean = savedMomentIds.contains(momentId)
 
@@ -193,7 +225,7 @@ class SavedMomentsViewModel {
             return
         }
 
-        scope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 firestoreService.toggleSaveMoment(userId, momentId)
                 withContext(Dispatchers.Main) {
@@ -229,7 +261,7 @@ class SavedMomentsViewModel {
             return
         }
 
-        scope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val canView = privacyService.canUserViewMomentEnhanced(moment, viewerId)
             withContext(Dispatchers.Main) {
                 visibilityByMomentId[momentId] = canView
@@ -240,7 +272,7 @@ class SavedMomentsViewModel {
 
     fun debugSavedMoments() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        scope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             runCatching {
                 firestoreService.db.collection("users").document(userId)
                     .collection("savedMoments")
@@ -251,9 +283,6 @@ class SavedMomentsViewModel {
     }
 
     fun forceRefresh() {
-        moments = emptyList()
-        savedMomentIds = emptyList()
-        visibilityByMomentId.clear()
         loadSavedMoments()
     }
 
@@ -262,7 +291,7 @@ class SavedMomentsViewModel {
         val token = UUID.randomUUID().toString()
         visibilityValidationToken = token
 
-        scope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val result = coroutineScope {
                 moments.mapNotNull { moment ->
                     val momentId = moment.id ?: return@mapNotNull null

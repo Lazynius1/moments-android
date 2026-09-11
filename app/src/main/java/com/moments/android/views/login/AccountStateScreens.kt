@@ -71,6 +71,7 @@ import com.moments.android.R
 import com.moments.android.reportes.AppealFormView
 import com.moments.android.reportes.AppealStatusView
 import com.moments.android.services.auth.AuthService
+import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.Surface
@@ -88,9 +89,29 @@ sealed interface AccountState {
 }
 
 suspend fun resolveAccountState(uid: String): AccountState {
+    // ≡ iOS LoginView: el estado vive en AuthService; no hace falta un get() extra al abrir.
+    when (val state = AuthService.authState.value) {
+        is AuthService.AuthState.Suspended ->
+            return AccountState.Suspended(state.reason, state.expiresAt?.time)
+        AuthService.AuthState.Deactivated -> {
+            val user = AuthService.deactivatedUserData.value
+            return AccountState.Deactivated(
+                username = user?.username,
+                email = user?.email,
+                profileImagePath = user?.profileImagePath,
+            )
+        }
+        AuthService.AuthState.Authenticated -> return AccountState.Active
+        else -> Unit
+    }
+
+    // Offline: no llamar al servidor (Firestore tira "client is offline").
+    if (!NetworkMonitor.isConnected) return AccountState.Active
+
     val firestore = FirebaseFirestore.getInstance()
-    val data = runCatching { firestore.collection("users").document(uid).get().await().data }.getOrNull()
-        ?: return AccountState.Active
+    val data = runCatching {
+        firestore.collection("users").document(uid).get().await().data
+    }.getOrNull() ?: return AccountState.Active
 
     val isSuspended = data["isSuspended"] as? Boolean ?: false
     if (isSuspended) {

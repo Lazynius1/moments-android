@@ -53,6 +53,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -153,7 +154,7 @@ fun MessagingView(
 ) {
     val colors = rememberAdaptiveColors()
     val context = LocalContext.current
-    val viewModel = messagingViewModel ?: remember { MessagingViewModel() }
+    val viewModel = messagingViewModel ?: viewModel<MessagingViewModel>()
     val requestService = remember { MessageRequestService() }
     val onlineStatusService = remember { OnlineStatusService.shared }
     val scope = rememberCoroutineScope()

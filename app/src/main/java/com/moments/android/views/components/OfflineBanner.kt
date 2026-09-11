@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SignalWifiOff
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,12 +45,14 @@ import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.utilities.legacyPoppinsSize
+import com.moments.android.views.feed.rememberAdaptiveColors
 import kotlinx.coroutines.delay
 
 /** Port de `OfflineBanner` (OfflineBanner.swift). */
 @Composable
 fun OfflineBanner(onRetry: () -> Unit, modifier: Modifier = Modifier) {
     val connected by NetworkMonitor.isConnectedFlow.collectAsState()
+    val colors = rememberAdaptiveColors()
     var visible by remember { mutableStateOf(true) }
     LaunchedEffect(connected) {
         if (!connected) visible = true
@@ -72,7 +73,8 @@ fun OfflineBanner(onRetry: () -> Unit, modifier: Modifier = Modifier) {
             NetworkStatusPill(
                 title = stringResource(R.string.network_offline_title),
                 icon = Icons.Filled.SignalWifiOff,
-                iconTint = LocalContentColor.current,
+                iconTint = colors.primary,
+                textColor = colors.primary,
                 glowColor = Color.Red.copy(alpha = 0.2f),
                 shadowColor = Color.Red.copy(alpha = 0.35f),
                 onClick = onRetry,
@@ -87,7 +89,7 @@ fun OfflineBanner(onRetry: () -> Unit, modifier: Modifier = Modifier) {
             Icon(
                 Icons.Filled.SignalWifiOff,
                 contentDescription = null,
-                tint = LocalContentColor.current.copy(alpha = 0.6f),
+                tint = colors.primary.copy(alpha = 0.6f),
                 modifier = Modifier
                     .padding(top = 4.dp)
                     .size(30.dp)
@@ -105,6 +107,7 @@ fun OfflineBanner(onRetry: () -> Unit, modifier: Modifier = Modifier) {
 fun SlowConnectionBanner(modifier: Modifier = Modifier) {
     val connected by NetworkMonitor.isConnectedFlow.collectAsState()
     val isSlow = connected && NetworkMonitor.isSlowConnection
+    val colors = rememberAdaptiveColors()
     var visible by remember { mutableStateOf(true) }
     LaunchedEffect(isSlow) {
         if (isSlow) visible = true
@@ -126,13 +129,14 @@ fun SlowConnectionBanner(modifier: Modifier = Modifier) {
             title = stringResource(R.string.network_slow_title),
             icon = Icons.Filled.Speed,
             iconTint = Color(0xFFFFCC00),
+            textColor = colors.primary,
             glowColor = Color(0xFFFF9500).copy(alpha = 0.2f),
             shadowColor = Color(0xFFFF9500).copy(alpha = 0.35f),
             trailing = {
                 Icon(
                     Icons.Filled.Close,
                     contentDescription = null,
-                    tint = LocalContentColor.current.copy(alpha = 0.7f),
+                    tint = colors.primary.copy(alpha = 0.7f),
                     modifier = Modifier
                         .size(30.dp)
                         .clickable { visible = false }
@@ -151,6 +155,7 @@ private fun NetworkStatusPill(
     title: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     iconTint: Color,
+    textColor: Color,
     glowColor: Color,
     shadowColor: Color,
     modifier: Modifier = Modifier,
@@ -193,7 +198,7 @@ private fun NetworkStatusPill(
         }
         Text(
             text = title,
-            color = LocalContentColor.current,
+            color = textColor,
             fontSize = fontSize,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(end = if (trailing == null) 12.dp else 0.dp),
