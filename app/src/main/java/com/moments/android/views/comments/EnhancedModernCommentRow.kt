@@ -185,11 +185,7 @@ fun EnhancedModernCommentRow(
                             .padding(start = indentationWidth - 10.dp)
                             .width(2.dp)
                             .fillMaxHeight()
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color(0xFF007AFF).copy(0.3f), Color(0xFFAF52DE).copy(0.3f)),
-                                ),
-                            )
+                            .background((if (isDark) Color.White else Color.Black).copy(alpha = if (isDark) 0.18f else 0.12f))
                             .align(Alignment.CenterStart),
                     )
                     Box(
@@ -197,7 +193,7 @@ fun EnhancedModernCommentRow(
                             .padding(start = indentationWidth - 11.dp)
                             .offset(y = (-4).dp)
                             .size(4.dp)
-                            .background(Color(0xFFAF52DE).copy(0.5f), CircleShape)
+                            .background((if (isDark) Color.White else Color.Black).copy(alpha = if (isDark) 0.28f else 0.22f), CircleShape)
                             .align(Alignment.TopStart),
                     )
                 }

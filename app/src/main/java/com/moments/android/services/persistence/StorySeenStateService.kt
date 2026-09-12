@@ -1,16 +1,16 @@
 package com.moments.android.services.persistence
 
 import android.content.Context
-import android.content.SharedPreferences
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import com.moments.android.services.network.NetworkMonitor
+import com.moments.android.services.persistence.room.MomentsRoomStore
+import com.moments.android.services.persistence.room.StorySeenEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
@@ -22,11 +22,9 @@ import kotlin.coroutines.resume
  */
 object StorySeenStateService {
 
-    private const val STORAGE_KEY = "story_last_seen_by_author_v1"
     private const val MAX_AGE_MS = 6L * 60 * 60 * 1000
     private const val REMOTE_CACHE_TTL_MS = 60_000L
 
-    private var prefs: SharedPreferences? = null
     private var loaded = false
     private val lastSeenMap = mutableMapOf<String, Double>()
     private val remoteCache = ConcurrentHashMap<String, Pair<Date?, Long>>()
@@ -34,31 +32,37 @@ object StorySeenStateService {
     private val lock = Any()
 
     fun initialize(context: Context) {
-        if (prefs != null) return
-        prefs = context.applicationContext.getSharedPreferences("moments_story_seen", Context.MODE_PRIVATE)
+        if (loaded) return
+        MomentsRoomStore.initialize(context)
+        synchronized(lock) { ensureLoaded() }
     }
 
     private fun compositeKey(viewerId: String, authorId: String) = "$viewerId|$authorId"
 
     private fun ensureLoaded() {
         if (loaded) return
-        // ≡ iOS UserDefaults dictionary(forKey:) — un JSON bajo STORAGE_KEY (no float prefs).
-        val raw = prefs?.getString(STORAGE_KEY, null)
-        if (!raw.isNullOrEmpty()) {
-            runCatching {
-                val json = JSONObject(raw)
-                for (key in json.keys()) {
-                    lastSeenMap[key] = json.getDouble(key)
-                }
-            }
+        val persisted = kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+            MomentsRoomStore.dao().allStorySeen()
+        }
+        persisted.forEach { entry ->
+            lastSeenMap[compositeKey(entry.viewerId, entry.authorId)] = entry.lastSeenAt / 1000.0
         }
         loaded = true
     }
 
     private fun persistLocked() {
-        val json = JSONObject()
-        for ((k, v) in lastSeenMap) json.put(k, v)
-        prefs?.edit()?.putString(STORAGE_KEY, json.toString())?.apply()
+        val rows = lastSeenMap.mapNotNull { (key, timestamp) ->
+            val separator = key.indexOf('|')
+            if (separator <= 0 || separator >= key.lastIndex) null
+            else StorySeenEntity(
+                viewerId = key.substring(0, separator),
+                authorId = key.substring(separator + 1),
+                lastSeenAt = (timestamp * 1000).toLong(),
+            )
+        }
+        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+            MomentsRoomStore.dao().replaceStorySeen(rows)
+        }
     }
 
     private fun localLastSeenDateLocked(viewerId: String, authorId: String): Date? {

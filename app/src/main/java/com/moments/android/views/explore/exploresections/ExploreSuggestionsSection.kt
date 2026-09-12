@@ -256,6 +256,7 @@ fun ExploreLoadingStateView(modifier: Modifier = Modifier) {
 
     Column(
         modifier
+            .fillMaxSize()
             .fillMaxWidth()
             .padding(top = 80.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

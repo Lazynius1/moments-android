@@ -193,7 +193,9 @@
     <string name="privacy_messages_title">6. मैसेज और बातचीत</string>
     <string name="privacy_messages_body">मैसेज पहुँचाने के लिए हम बातचीत, मैसेज रिक्वेस्ट, प्रतिभागियों, टाइमस्टैम्प, पढ़े जाने की रसीद, मीडिया फ़ाइलें, अस्थायी मैसेज और शेयर किया गया कंटेंट प्रोसेस करते हैं।\n\nमैसेज और संवेदनशील डेटा की सुरक्षा के लिए हम एन्क्रिप्शन और अन्य सुरक्षा उपायों का इस्तेमाल करते हैं। फिर भी, कुछ मेटाडेटा, मीडिया फ़ाइल URL या सेवा पहुँचाने के लिए ज़रूरी जानकारी अलग से स्टोर और प्रोसेस की जा सकती है।\n\nअगर आप बातचीत में लाइव लोकेशन शेयर करना चुनते हैं, तो शेयरिंग सेशन खत्म या एक्सपायर होने तक हम उस लोकेशन को प्रोसेस करते हैं।</string>
     <string name="privacy_permissions_title">7. डिवाइस की अनुमतियाँ</string>
-    <string name="privacy_permissions_body">हम किसी खास सुविधा के लिए ज़रूरत पड़ने पर ही अनुमति माँगते हैं: फ़ोटो या वीडियो बनाने के लिए कैमरा, कंटेंट अपलोड या सेव करने के लिए फ़ोटो लाइब्रेरी, ऑडियो के लिए माइक्रोफ़ोन और पोस्ट में टैग लगाने, मैप व आसपास का कंटेंट दिखाने तथा Nova के वैकल्पिक संदर्भ के लिए लोकेशन।\n\nआप अपने डिवाइस की सेटिंग में इन अनुमतियों को बदल सकते हैं। इन्हें बंद करने पर कुछ सुविधाएँ उपलब्ध नहीं रहेंगी।</string>
+    <string name="privacy_permissions_body">हम किसी खास सुविधा के लिए ज़रूरत पड़ने पर ही अनुमति माँगते हैं: फ़ोटो या वीडियो बनाने के लिए कैमरा, कंटेंट अपलोड या सेव करने के लिए फ़ोटो लाइब्रेरी, ऑडियो के लिए माइक्रोफ़ोन और पोस्ट में टैग लगाने, मैप दिखाने व चैट में शेयर करने के लिए लोकेशन, साथ ही Nova का वैकल्पिक संदर्भ।
+
+आप अपने डिवाइस की सेटिंग में इन अनुमतियों को बदल सकते हैं। इन्हें बंद करने पर कुछ सुविधाएँ उपलब्ध नहीं रहेंगी।</string>
     <string name="privacy_ads_title">8. विज्ञापन और सहमति</string>
     <string name="privacy_ads_body">Moments Google AdMob के ज़रिए विज्ञापन दिखा सकता है। आपके क्षेत्र और सेटिंग के आधार पर, हम Google के User Messaging Platform (UMP) के ज़रिए आपकी सहमति माँग सकते हैं।\n\nअगर आप सहमत होते हैं, तो आपके विज्ञापन ID और अनुमत संकेतों के आधार पर विज्ञापन पर्सनलाइज़ किए जा सकते हैं। अगर आप सहमत नहीं होते, तो हम गैर-पर्सनलाइज़्ड या सीमित विज्ञापन दिखा सकते हैं।</string>
     <string name="privacy_moderation_title">9. सुरक्षा, रिपोर्ट और मॉडरेशन</string>
@@ -1842,11 +1844,11 @@
     <string name="permission_camera_denied_open_settings">सेटिंग्स खोलें</string>
     <string name="permission_phone_time">9:41</string>
     <string name="permission_location_primer_title">लोकेशन चालू करें</string>
-    <string name="permission_location_primer_subtitle">अपनी पोस्ट में लोकेशन जोड़ने और आस-पास का काम का कंटेंट देखने के लिए लोकेशन की अनुमति दें।</string>
+    <string name="permission_location_primer_subtitle">अपनी पोस्ट में लोकेशन टैग करने और चैट में शेयर करने के लिए लोकेशन की अनुमति दें।</string>
     <string name="permission_location_primer_allow">लोकेशन का ऐक्सेस दें</string>
     <string name="permission_location_primer_not_now">अभी नहीं</string>
     <string name="permission_location_denied_title">लोकेशन का ऐक्सेस बंद है</string>
-    <string name="permission_location_denied_subtitle">अपनी पोस्ट में लोकेशन जोड़ने और आस-पास का काम का कंटेंट देखने के लिए सेटिंग्स में जाकर लोकेशन चालू करें।</string>
+    <string name="permission_location_denied_subtitle">अपनी पोस्ट में लोकेशन टैग करने और चैट में शेयर करने के लिए सेटिंग्स में लोकेशन चालू करें।</string>
     <string name="permission_location_denied_open_settings">सेटिंग्स खोलें</string>
     <string name="permission_location_always_primer_title">लाइव लोकेशन शेयर करें</string>
     <string name="permission_location_always_primer_subtitle">हमेशा की अनुमति दें, ताकि Moments बैकग्राउंड में होने पर भी आपके दोस्त आपकी लाइव लोकेशन देख सकें।</string>

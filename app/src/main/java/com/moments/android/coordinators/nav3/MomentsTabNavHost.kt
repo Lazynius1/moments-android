@@ -112,6 +112,7 @@ fun MomentsTabNavHost(
             }
             MomentsTabNavKey.Explore -> NavEntry(key) {
                 ExploreView(
+                    isTabActive = navigationState.selectedTabIndex == MomentsTabNavKey.Explore.tabIndex,
                     contentPadding = PaddingValues(bottom = padding.calculateBottomPadding()),
                 )
             }

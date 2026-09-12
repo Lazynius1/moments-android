@@ -193,7 +193,9 @@
     <string name="privacy_messages_title">6. Berichten en communicatie</string>
     <string name="privacy_messages_body">We verwerken gesprekken, berichtverzoeken, deelnemers, tijdstempels, leesbevestigingen, mediabestanden, tijdelijke berichten en gedeelde content om berichten te kunnen bezorgen.\n\nWe gebruiken versleuteling en beveiligingsmaatregelen om berichten en gevoelige gegevens te beschermen. Sommige metadata, URL\'s van mediabestanden of informatie die nodig is om de dienst te leveren, kunnen echter afzonderlijk worden opgeslagen en verwerkt.\n\nAls je ervoor kiest om je live locatie in een gesprek te delen, verwerken we die locatie totdat de deelsessie eindigt of verloopt.</string>
     <string name="privacy_permissions_title">7. Toestemmingen op je apparaat</string>
-    <string name="privacy_permissions_body">We vragen alleen om toestemmingen wanneer die nodig zijn voor een specifieke functie: de camera om foto\'s of video\'s te maken, je fotobibliotheek om content te uploaden of op te slaan, je microfoon voor audio en je locatie om berichten te taggen, kaarten en content in de buurt te tonen en optionele context aan Nova te geven.\n\nJe kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je ze uitschakelt, zijn sommige functies mogelijk niet meer beschikbaar.</string>
+    <string name="privacy_permissions_body">We vragen alleen om toestemmingen wanneer die nodig zijn voor een specifieke functie: de camera om foto\'s of video\'s te maken, je fotobibliotheek om content te uploaden of op te slaan, je microfoon voor audio en je locatie om berichten te taggen, kaarten te tonen en die in chats te delen, plus optionele context voor Nova.
+
+Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je ze uitschakelt, zijn sommige functies mogelijk niet meer beschikbaar.</string>
     <string name="privacy_ads_title">8. Advertenties en toestemming</string>
     <string name="privacy_ads_body">Moments kan advertenties tonen via Google AdMob. Afhankelijk van je regio en instellingen kunnen we via Google\'s User Messaging Platform (UMP) om toestemming vragen.\n\nAls je toestemming geeft, kunnen advertenties worden gepersonaliseerd met je advertentie-ID en toegestane signalen. Als je geen toestemming geeft, kunnen we niet-gepersonaliseerde of beperkte advertenties tonen.</string>
     <string name="privacy_moderation_title">9. Veiligheid, meldingen en moderatie</string>
@@ -1842,11 +1844,11 @@
     <string name="permission_camera_denied_open_settings">Instellingen openen</string>
     <string name="permission_phone_time">9:41</string>
     <string name="permission_location_primer_title">Zet locatie aan</string>
-    <string name="permission_location_primer_subtitle">Geef toegang tot je locatie om je berichten te taggen en relevante content in de buurt te laten zien.</string>
+    <string name="permission_location_primer_subtitle">Geef toegang tot je locatie om je berichten te taggen en die in chats te delen.</string>
     <string name="permission_location_primer_allow">Locatietoegang toestaan</string>
     <string name="permission_location_primer_not_now">Niet nu</string>
     <string name="permission_location_denied_title">Locatietoegang staat uit</string>
-    <string name="permission_location_denied_subtitle">Zet locatie aan in Instellingen om je berichten te taggen en relevante content in de buurt te blijven zien.</string>
+    <string name="permission_location_denied_subtitle">Schakel je locatie in via Instellingen om je berichten te taggen en die in chats te delen.</string>
     <string name="permission_location_denied_open_settings">Instellingen openen</string>
     <string name="permission_location_always_primer_title">Deel je live locatie</string>
     <string name="permission_location_always_primer_subtitle">Kies \'Altijd toestaan\', zodat vrienden je live locatie kunnen zien wanneer Moments op de achtergrond actief is.</string>

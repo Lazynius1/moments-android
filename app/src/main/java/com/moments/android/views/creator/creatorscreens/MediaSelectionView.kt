@@ -116,46 +116,51 @@ fun MediaSelectionView(
 
     fun usePickerUris(uris: List<Uri>) {
         if (uris.isEmpty()) return
-        val media = uris.take(10).map { uri ->
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
-            }
-            val isVideo = context.contentResolver.getType(uri)?.startsWith("video/") == true
-            val duration = if (isVideo) {
-                runCatching {
-                    MediaMetadataRetriever().let { retriever ->
-                        try {
-                            retriever.setDataSource(context, uri)
-                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                                ?.toDoubleOrNull()?.div(1000.0)
-                        } finally {
-                            retriever.release()
-                        }
+        scope.launch {
+            val media = withContext(Dispatchers.IO) {
+                uris.take(10).map { uri ->
+                    runCatching {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                        )
                     }
-                }.getOrNull()
-            } else null
-            CreatorMedia(
-                id = uri.toString(),
-                uri = uri,
-                isVideo = isVideo,
-                durationSeconds = duration,
-                aspectRatio = detectAspectRatio(context, uri, isVideo),
-                recommendedAspectRatio = detectAspectRatio(context, uri, isVideo),
+                    val isVideo = context.contentResolver.getType(uri)?.startsWith("video/") == true
+                    val duration = if (isVideo) {
+                        runCatching {
+                            MediaMetadataRetriever().let { retriever ->
+                                try {
+                                    retriever.setDataSource(context, uri)
+                                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                        ?.toDoubleOrNull()?.div(1000.0)
+                                } finally {
+                                    retriever.release()
+                                }
+                            }
+                        }.getOrNull()
+                    } else null
+                    val aspectRatio = detectAspectRatio(context, uri, isVideo)
+                    CreatorMedia(
+                        id = uri.toString(),
+                        uri = uri,
+                        isVideo = isVideo,
+                        durationSeconds = duration,
+                        aspectRatio = aspectRatio,
+                        recommendedAspectRatio = aspectRatio,
+                    )
+                }
+            }
+            onSelectedMediaItemsChange(media)
+            val hasImages = media.any { !it.isVideo }
+            val hasVideos = media.any { it.isVideo }
+            onCurrentFlowChange(
+                when {
+                    hasVideos && !hasImages -> CreatorFlow.VIDEO_EDITING
+                    hasImages && !hasVideos -> CreatorFlow.MEDIA_EDITING
+                    else -> CreatorFlow.CAPTION_AND_DETAILS
+                },
             )
         }
-        onSelectedMediaItemsChange(media)
-        val hasImages = media.any { !it.isVideo }
-        val hasVideos = media.any { it.isVideo }
-        onCurrentFlowChange(
-            when {
-                hasVideos && !hasImages -> CreatorFlow.VIDEO_EDITING
-                hasImages && !hasVideos -> CreatorFlow.MEDIA_EDITING
-                else -> CreatorFlow.CAPTION_AND_DETAILS
-            },
-        )
     }
 
     val systemPicker = rememberLauncherForActivityResult(

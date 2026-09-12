@@ -193,7 +193,9 @@
     <string name="privacy_messages_title">6. Wiadomości i komunikacja</string>
     <string name="privacy_messages_body">Przetwarzamy rozmowy, zaproszenia do wiadomości, uczestników, znaczniki czasu, potwierdzenia odczytu, pliki multimedialne, wiadomości znikające i udostępnione treści, aby dostarczać funkcje komunikacyjne.\n\nStosujemy szyfrowanie i zabezpieczenia chroniące wiadomości oraz poufne dane. Niektóre metadane, adresy URL plików multimedialnych lub informacje potrzebne do świadczenia usługi mogą być jednak przechowywane i przetwarzane oddzielnie.\n\nJeśli zdecydujesz się udostępniać lokalizację na żywo w rozmowie, będziemy ją przetwarzać do zakończenia lub wygaśnięcia sesji udostępniania.</string>
     <string name="privacy_permissions_title">7. Uprawnienia urządzenia</string>
-    <string name="privacy_permissions_body">Prosimy o uprawnienia tylko wtedy, gdy są potrzebne do konkretnej funkcji: aparat do tworzenia zdjęć lub filmów, biblioteka zdjęć do przesyłania lub zapisywania treści, mikrofon do obsługi dźwięku oraz lokalizacja do oznaczania postów, wyświetlania map, treści w pobliżu i opcjonalnego kontekstu dla Nova.\n\nMożesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączysz, niektóre funkcje mogą przestać być dostępne.</string>
+    <string name="privacy_permissions_body">Prosimy o uprawnienia tylko wtedy, gdy są potrzebne do konkretnej funkcji: aparat do tworzenia zdjęć lub filmów, biblioteka zdjęć do przesyłania lub zapisywania treści, mikrofon do obsługi dźwięku oraz lokalizacja do oznaczania postów, wyświetlania map i udostępniania jej na czatach, a także opcjonalnego kontekstu dla Nova.
+
+Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączysz, niektóre funkcje mogą przestać być dostępne.</string>
     <string name="privacy_ads_title">8. Reklamy i zgoda</string>
     <string name="privacy_ads_body">Moments może wyświetlać reklamy za pośrednictwem Google AdMob. W zależności od regionu i ustawień możemy poprosić o zgodę za pośrednictwem Google User Messaging Platform (UMP).\n\nJeśli wyrazisz zgodę, reklamy mogą być personalizowane na podstawie Twojego identyfikatora reklamowego i dozwolonych sygnałów. Jeśli nie wyrazisz zgody, możemy wyświetlać reklamy niespersonalizowane lub ograniczone.</string>
     <string name="privacy_moderation_title">9. Bezpieczeństwo, zgłoszenia i moderacja</string>
@@ -1842,11 +1844,11 @@
     <string name="permission_camera_denied_open_settings">Otwórz Ustawienia</string>
     <string name="permission_phone_time">9:41</string>
     <string name="permission_location_primer_title">Włącz lokalizację</string>
-    <string name="permission_location_primer_subtitle">Zezwól na dostęp do lokalizacji, aby oznaczać nią posty i wyświetlać trafne treści w pobliżu.</string>
+    <string name="permission_location_primer_subtitle">Zezwól na dostęp do lokalizacji, aby oznaczać nią swoje posty i udostępniać ją na czatach.</string>
     <string name="permission_location_primer_allow">Zezwól na dostęp do lokalizacji</string>
     <string name="permission_location_primer_not_now">Nie teraz</string>
     <string name="permission_location_denied_title">Dostęp do lokalizacji jest wyłączony</string>
-    <string name="permission_location_denied_subtitle">Włącz lokalizację w Ustawieniach, aby oznaczać nią posty i wyświetlać trafne treści w pobliżu.</string>
+    <string name="permission_location_denied_subtitle">Włącz lokalizację w Ustawieniach, aby oznaczać nią swoje posty i udostępniać ją na czatach.</string>
     <string name="permission_location_denied_open_settings">Otwórz Ustawienia</string>
     <string name="permission_location_always_primer_title">Udostępnij lokalizację na żywo</string>
     <string name="permission_location_always_primer_subtitle">Wybierz opcję „Zawsze”, aby znajomi mogli widzieć Twoją lokalizację na żywo, nawet gdy Moments działa w tle.</string>

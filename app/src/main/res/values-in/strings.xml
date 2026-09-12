@@ -193,7 +193,9 @@
     <string name="privacy_messages_title">6. Pesan dan komunikasi</string>
     <string name="privacy_messages_body">Kami memproses percakapan, permintaan pesan, peserta, stempel waktu, tanda sudah dibaca, file media, pesan sementara, dan konten yang dibagikan untuk menyediakan layanan pesan.\n\nKami menerapkan enkripsi dan langkah-langkah keamanan untuk melindungi pesan serta data sensitif. Namun, beberapa metadata, URL file media, atau informasi yang diperlukan untuk menyediakan layanan dapat disimpan dan diproses secara terpisah.\n\nJika Anda memilih untuk membagikan lokasi secara langsung dalam percakapan, kami memproses lokasi tersebut hingga sesi berbagi berakhir atau kedaluwarsa.</string>
     <string name="privacy_permissions_title">7. Izin perangkat</string>
-    <string name="privacy_permissions_body">Kami hanya meminta izin saat diperlukan untuk fitur tertentu: kamera untuk membuat foto atau video, galeri foto untuk mengunggah atau menyimpan konten, mikrofon untuk audio, dan lokasi untuk menandai postingan, menampilkan peta, konten di sekitar, serta konteks Nova opsional.\n\nAnda dapat mengubah izin ini di pengaturan perangkat. Jika menonaktifkannya, beberapa fitur mungkin tidak lagi tersedia.</string>
+    <string name="privacy_permissions_body">Kami hanya meminta izin saat diperlukan untuk fitur tertentu: kamera untuk membuat foto atau video, perpustakaan foto untuk mengunggah atau menyimpan konten, mikrofon untuk audio, dan lokasi untuk menandai postingan, menampilkan peta, serta membagikannya di chat, plus konteks Nova opsional.
+
+Anda dapat mengubah izin ini di pengaturan perangkat. Jika izin dinonaktifkan, beberapa fitur mungkin tidak tersedia.</string>
     <string name="privacy_ads_title">8. Iklan dan persetujuan</string>
     <string name="privacy_ads_body">Moments dapat menampilkan iklan melalui Google AdMob. Tergantung wilayah dan pengaturan Anda, kami dapat meminta persetujuan melalui Google User Messaging Platform (UMP).\n\nJika Anda menyetujuinya, iklan dapat dipersonalisasi menggunakan ID iklan dan sinyal yang diizinkan. Jika tidak menyetujuinya, kami dapat menampilkan iklan nonpersonal atau terbatas.</string>
     <string name="privacy_moderation_title">9. Keamanan, laporan, dan moderasi</string>
@@ -1842,11 +1844,11 @@
     <string name="permission_camera_denied_open_settings">Buka Pengaturan</string>
     <string name="permission_phone_time">9:41</string>
     <string name="permission_location_primer_title">Aktifkan lokasi</string>
-    <string name="permission_location_primer_subtitle">Izinkan akses lokasi untuk menandai postingan dan menampilkan konten relevan di sekitar Anda.</string>
+    <string name="permission_location_primer_subtitle">Izinkan akses lokasi untuk menandai postinganmu dan membagikannya di chat.</string>
     <string name="permission_location_primer_allow">Izinkan akses lokasi</string>
     <string name="permission_location_primer_not_now">Nanti saja</string>
     <string name="permission_location_denied_title">Akses lokasi nonaktif</string>
-    <string name="permission_location_denied_subtitle">Aktifkan lokasi di Pengaturan untuk menandai postingan dan menampilkan konten relevan di sekitar Anda.</string>
+    <string name="permission_location_denied_subtitle">Aktifkan lokasi di Pengaturan untuk menandai postinganmu dan membagikannya di chat.</string>
     <string name="permission_location_denied_open_settings">Buka Pengaturan</string>
     <string name="permission_location_always_primer_title">Bagikan lokasi secara langsung</string>
     <string name="permission_location_always_primer_subtitle">Izinkan akses Selalu agar teman dapat melihat lokasi Anda secara langsung, meskipun Moments berjalan di latar belakang.</string>

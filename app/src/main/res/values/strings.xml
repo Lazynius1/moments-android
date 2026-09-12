@@ -210,7 +210,7 @@ We apply encryption and security measures to protect messages and sensitive data
 
 If you choose to share live location in a conversation, we process that location until the sharing session ends or expires.</string>
     <string name="privacy_permissions_title">7. Device permissions</string>
-    <string name="privacy_permissions_body">We request permissions only when needed for a specific feature: camera to create photos or videos, photo library to upload or save content, microphone for audio, and location to tag posts, show maps, nearby content, and optional Nova context.
+    <string name="privacy_permissions_body">We request permissions only when needed for a specific feature: camera to create photos or videos, photo library to upload or save content, microphone for audio, and location to tag posts, show maps and share it in chats, plus optional Nova context.
 
 You can change these permissions in your device settings. If you turn them off, some features may no longer be available.</string>
     <string name="privacy_ads_title">8. Advertising and consent</string>
@@ -1865,11 +1865,11 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="permission_camera_denied_open_settings">Open Settings</string>
     <string name="permission_phone_time">9:41</string>
     <string name="permission_location_primer_title">Turn on location</string>
-    <string name="permission_location_primer_subtitle">Allow location to tag your posts and show nearby relevant content.</string>
+    <string name="permission_location_primer_subtitle">Allow location to tag your posts and share it in chats.</string>
     <string name="permission_location_primer_allow">Allow location access</string>
     <string name="permission_location_primer_not_now">Not now</string>
     <string name="permission_location_denied_title">Location access is off</string>
-    <string name="permission_location_denied_subtitle">Turn on location in Settings to tag your posts and show nearby relevant content.</string>
+    <string name="permission_location_denied_subtitle">Turn on location in Settings to tag your posts and share it in chats.</string>
     <string name="permission_location_denied_open_settings">Open Settings</string>
     <string name="permission_location_always_primer_title">Share live location</string>
     <string name="permission_location_always_primer_subtitle">Allow Always so friends can see your live location even when Moments is in the background.</string>

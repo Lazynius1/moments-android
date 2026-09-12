@@ -27,6 +27,9 @@ mapboxMaps = "11.27.0"
 windowManager = "1.5.1"
 workManager = "2.11.2"
 lottie = "6.6.6"
+room3 = "3.0.3"
+sqlite = "2.7.1"
+ksp = "2.3.10"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -83,9 +86,14 @@ lottie-compose = { module = "com.airbnb.android:lottie-compose", version.ref = "
 mapbox-maps = { module = "com.mapbox.maps:android-ndk27", version.ref = "mapboxMaps" }
 mapbox-maps-compose = { module = "com.mapbox.extension:maps-compose-ndk27", version.ref = "mapboxMaps" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+androidx-room3-runtime = { module = "androidx.room3:room3-runtime", version.ref = "room3" }
+androidx-room3-compiler = { module = "androidx.room3:room3-compiler", version.ref = "room3" }
+androidx-sqlite-framework = { module = "androidx.sqlite:sqlite-framework", version.ref = "sqlite" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+androidx-room3 = { id = "androidx.room3", version.ref = "room3" }

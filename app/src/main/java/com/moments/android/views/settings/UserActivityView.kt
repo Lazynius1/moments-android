@@ -21,18 +21,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,25 +43,14 @@ import com.moments.android.views.settings.sections.SettingsSubsectionGroup
 import com.moments.android.views.story.ArchiveDisplayMode
 import com.moments.android.views.story.ArchiveDisplayModeActions
 import com.moments.android.views.story.ArchivedStoriesView
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * Port 1:1 de `UserActivityView.swift` (266 líneas).
  * 5 secciones + destinos (incl. ArchivedActivityView / RecentlyDeletedActivityView).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserActivityView(onNavigateBack: () -> Unit = {}) {
-    val summaryVM = remember { ActivitySummaryViewModel() }
-    val scope = rememberCoroutineScope()
-    var isRefreshing by remember { mutableStateOf(false) }
     var route by remember { mutableStateOf<ActivityRoute?>(null) }
-
-    LaunchedEffect(Unit) {
-        summaryVM.load()
-        summaryVM.autoRefresh()
-    }
 
     val sections = listOf(
         R.string.user_activity_section_interactions to listOf(
@@ -99,23 +84,11 @@ fun UserActivityView(onNavigateBack: () -> Unit = {}) {
         title = stringResource(R.string.user_activity_title),
         onNavigateBack = onNavigateBack,
     ) {
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = {
-                scope.launch {
-                    isRefreshing = true
-                    summaryVM.load()
-                    delay(400)
-                    isRefreshing = false
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(22.dp),
-            ) {
                 item {
                     Column(
                         modifier = Modifier.padding(horizontal = 16.dp),
@@ -141,13 +114,11 @@ fun UserActivityView(onNavigateBack: () -> Unit = {}) {
                             ActivitySection(
                                 title = stringResource(titleRes),
                                 categories = categories,
-                                summaries = summaryVM.summaries,
                                 onOpen = { route = routeFor(it) },
                             )
                         }
                     }
                 }
-            }
         }
     }
 
@@ -187,7 +158,6 @@ fun UserActivityView(onNavigateBack: () -> Unit = {}) {
 private fun ActivitySection(
     title: String,
     categories: List<ActivityInteractionCategory>,
-    summaries: Map<ActivityInteractionCategory, ActivityCategorySummary>,
     onOpen: (ActivityInteractionCategory) -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
@@ -196,7 +166,6 @@ private fun ActivitySection(
             Box(Modifier.clickable { onOpen(category) }) {
                 ActivityInteractionCategoryRow(
                     category = category,
-                    summary = summaries[category],
                 )
             }
             if (index < categories.lastIndex) {

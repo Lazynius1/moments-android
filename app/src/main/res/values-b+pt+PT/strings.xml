@@ -209,9 +209,9 @@ Aplicamos criptografia e medidas de segurança para proteger mensagens e dados s
 
 Se optares por partilhar localização em tempo real numa conversa, tratamos essa localização até a sessão de partilha terminar ou expirar.</string>
     <string name="privacy_permissions_title">7. Permissões do dispositivo</string>
-    <string name="privacy_permissions_body">Solicitamos permissões apenas quando necessárias para um recurso específico: câmara para criar fotos ou vídeos, galeria para enviar ou guardar conteúdos, microfone para áudio e localização para marcar posts, mostrar mapas, conteúdos próximos e contexto opcional da Nova.
+    <string name="privacy_permissions_body">Solicitamos permissões apenas quando necessárias para um recurso específico: câmara para criar fotos ou vídeos, galeria para enviar ou guardar conteúdos, microfone para áudio e localização para marcar publicações, mostrar mapas e partilhá-la nos chats, além de contexto opcional da Nova.
 
-Podes alterar estas permissões nas definições do teu dispositivo. Se as desativares, algumas funcionalidades podem deixar de estar disponíveis.</string>
+Podes alterar estas permissões nas definições do dispositivo. Se as desativares, alguns recursos podem deixar de estar disponíveis.</string>
     <string name="privacy_ads_title">8. Publicidade e consentimento</string>
     <string name="privacy_ads_body">O Moments pode mostrar anúncios através do Google AdMob. Dependendo da tua região e das tuas definições, podemos solicitar consentimento via User Messaging Platform (UMP) do Google.
 
@@ -1229,10 +1229,10 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="permission_camera_denied_title">O acesso à câmara está desativado</string>
     <string name="permission_camera_denied_subtitle">Ativa a câmara nas Definições para continuares a captar fotografias e vídeos para as tuas histórias, momentos e perfil.</string>
     <string name="permission_location_primer_title">Ativa a localização</string>
-    <string name="permission_location_primer_subtitle">Permite o acesso à localização para etiquetar as tuas publicações e mostrar conteúdo relevante nas proximidades.</string>
+    <string name="permission_location_primer_subtitle">Permite o acesso à localização para etiquetar as tuas publicações e partilhá-la nos chats.</string>
     <string name="permission_location_primer_allow">Permitir acesso à localização</string>
     <string name="permission_location_denied_title">O acesso à localização está desativado</string>
-    <string name="permission_location_denied_subtitle">Ativa a localização nas Definições para etiquetar as tuas publicações e mostrar conteúdo nas proximidades.</string>
+    <string name="permission_location_denied_subtitle">Ativa a localização nas Definições para etiquetar as tuas publicações e partilhá-la nos chats.</string>
     <string name="permission_location_always_primer_subtitle">Permite Sempre para que os amigos vejam a tua localização em direto mesmo com o Moments em segundo plano.</string>
     <string name="permission_location_always_primer_allow">Permitir Sempre</string>
     <string name="permission_location_always_denied_title">A localização em segundo plano está desativada</string>

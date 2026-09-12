@@ -7,6 +7,8 @@ import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.core.decodeMessages
 import com.moments.android.views.messaging.core.encodeMessages
 import com.moments.android.services.messaging.ChatCacheStore
+import com.moments.android.services.persistence.room.MessageEntity
+import com.moments.android.services.persistence.room.MomentsRoomStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -24,20 +26,11 @@ import kotlin.concurrent.write
  * y aquí se apoyan en el mismo almacén JSON por conversación.
  */
 object MessagePersistenceStore {
-    private const val DIR = "message_cache"
     private const val MAX_MESSAGES_PER_CONVERSATION = 2_000
     private val lock = ReentrantReadWriteLock()
 
-    @Volatile private var cacheDir: File? = null
-
     fun initialize(context: Context) {
-        if (cacheDir != null) return
-        cacheDir = File(context.applicationContext.filesDir, DIR).apply { mkdirs() }
-    }
-
-    private fun conversationFile(conversationId: String): File {
-        val safe = conversationId.replace("/", "_")
-        return File(cacheDir ?: error("MessagePersistenceStore.initialize required"), "$safe.json")
+        MomentsRoomStore.initialize(context)
     }
 
     suspend fun save(
@@ -78,11 +71,8 @@ object MessagePersistenceStore {
     ): ByteArray = withContext(Dispatchers.IO) {
         if (limit <= 0) return@withContext ByteArray(0)
         lock.read {
-            var cached = loadMessagesUnsafe(conversationId)
-                .sortedWith(compareByDescending<EnhancedMessage> { it.timestamp }.thenByDescending { it.id })
-                .take(limit)
-            if (cutoffDate != null) {
-                cached = cached.filter { it.timestamp > cutoffDate }
+            val cached = blockingRoom {
+                recentMessagesIn(conversationId, cutoffDate?.time, limit).mapNotNull(::decodeMessageEntity)
             }
             encodeMessages(cached.reversed())
         }
@@ -96,12 +86,15 @@ object MessagePersistenceStore {
     ): ByteArray = withContext(Dispatchers.IO) {
         if (limit <= 0) return@withContext ByteArray(0)
         lock.read {
-            val filtered = loadMessagesUnsafe(conversationId).filter { msg ->
-                (cutoffDate == null || msg.timestamp > cutoffDate) &&
-                    (msg.timestamp < cursor.timestamp ||
-                        (msg.timestamp == cursor.timestamp && msg.id < cursor.messageId))
-            }.sortedWith(compareByDescending<EnhancedMessage> { it.timestamp }.thenByDescending { it.id })
-                .take(limit)
+            val filtered = blockingRoom {
+                messagesBefore(
+                    conversationId,
+                    cursor.timestamp.time,
+                    cursor.messageId,
+                    cutoffDate?.time,
+                    limit,
+                ).mapNotNull(::decodeMessageEntity)
+            }
             encodeMessages(filtered.reversed())
         }
     }
@@ -114,12 +107,15 @@ object MessagePersistenceStore {
     ): ByteArray = withContext(Dispatchers.IO) {
         if (limit <= 0) return@withContext ByteArray(0)
         lock.read {
-            val filtered = loadMessagesUnsafe(conversationId).filter { msg ->
-                (cutoffDate == null || msg.timestamp > cutoffDate) &&
-                    (msg.timestamp > cursor.timestamp ||
-                        (msg.timestamp == cursor.timestamp && msg.id >= cursor.messageId))
-            }.sortedWith(compareBy<EnhancedMessage> { it.timestamp }.thenBy { it.id })
-                .take(limit)
+            val filtered = blockingRoom {
+                messagesAfter(
+                    conversationId,
+                    cursor.timestamp.time,
+                    cursor.messageId,
+                    cutoffDate?.time,
+                    limit,
+                ).mapNotNull(::decodeMessageEntity)
+            }
             encodeMessages(filtered)
         }
     }
@@ -136,37 +132,31 @@ object MessagePersistenceStore {
     suspend fun containsMessage(conversationId: String, messageId: String): Boolean =
         withContext(Dispatchers.IO) {
             lock.read {
-                loadMessagesUnsafe(conversationId).any { it.id == messageId }
+                blockingRoom { containsMessage(conversationId, messageId) }
             }
         }
 
     suspend fun lastCursor(conversationId: String): MessageSyncCursor? = withContext(Dispatchers.IO) {
         lock.read {
-            loadMessagesUnsafe(conversationId)
-                .maxWithOrNull(compareBy<EnhancedMessage> { it.timestamp }.thenBy { it.id })
-                ?.let { MessageSyncCursor(it.timestamp, it.id) }
+            blockingRoom { latestMessageIn(conversationId) }
+                ?.let { MessageSyncCursor(Date(it.timestamp), it.id) }
         }
     }
 
     fun cachedMessageCount(): Int = lock.read {
-        cacheDir?.listFiles()?.sumOf { file ->
-            runCatching { loadMessagesFromFile(file).size }.getOrDefault(0)
-        } ?: 0
+        blockingRoom { allMessages().size }
     }
 
     fun cachedMessageKeys(since: Date): Set<String> = lock.read {
-        val result = mutableSetOf<String>()
-        cacheDir?.listFiles()?.forEach { file ->
-            val convId = file.nameWithoutExtension.replace("_", "/") // best-effort
-            loadMessagesFromFile(file).forEach { msg ->
-                if (msg.timestamp >= since) result.add("${msg.conversationId}:${msg.id}")
-            }
+        blockingRoom {
+            allMessages()
+                .filter { it.timestamp >= since.time }
+                .mapTo(mutableSetOf()) { "${it.conversationId}:${it.id}" }
         }
-        result
     }
 
     fun clearAll() = lock.write {
-        cacheDir?.listFiles()?.forEach { it.delete() }
+        blockingRoom { deleteAllMessages() }
     }
 
     fun updateMessageStatus(conversationId: String, messageId: String, status: String) = lock.write {
@@ -193,7 +183,7 @@ object MessagePersistenceStore {
 
     fun deleteConversation(conversationId: String) = lock.write {
         val messageIds = loadMessagesUnsafe(conversationId).map { it.id }
-        conversationFile(conversationId).takeIf { it.exists() }?.delete()
+        blockingRoom { deleteMessagesIn(conversationId) }
         messageIds.forEach { ChatCacheStore.deleteMessageFiles(conversationId, it) }
     }
 
@@ -220,11 +210,7 @@ object MessagePersistenceStore {
     fun removeCachedMessage(conversationId: String, messageId: String) = lock.write {
         ChatCacheStore.deleteMessageFiles(conversationId, messageId)
         val kept = loadMessagesUnsafe(conversationId).filter { it.id != messageId }
-        if (kept.isEmpty()) {
-            conversationFile(conversationId).takeIf { it.exists() }?.delete()
-        } else {
-            writeMessagesUnsafe(conversationId, kept)
-        }
+        writeMessagesUnsafe(conversationId, kept)
     }
 
     fun unreadMessageCount(
@@ -232,11 +218,7 @@ object MessagePersistenceStore {
         currentUserId: String,
         lastReadAt: Date? = null,
     ): Int = lock.read {
-        loadMessagesUnsafe(conversationId).count { message ->
-            message.senderId != currentUserId &&
-                !message.isRead &&
-                (lastReadAt == null || message.timestamp.after(lastReadAt))
-        }
+        blockingRoom { unreadCount(conversationId, currentUserId, lastReadAt?.time) }
     }
 
     fun updateMessageVanishExpiresAt(conversationId: String, messageId: String, expiresAt: Date) = lock.write {
@@ -254,16 +236,14 @@ object MessagePersistenceStore {
     }
 
     fun toggleMessageReactionLocally(messageId: String, emoji: String, userId: String): Boolean = lock.write {
-        val dir = cacheDir ?: return@write false
-        for (file in dir.listFiles().orEmpty()) {
-            val messages = loadMessagesFromFile(file)
+        for (conversationId in allConversationIdsUnsafe()) {
+            val messages = loadMessagesUnsafe(conversationId)
             val index = messages.indexOfFirst { it.id == messageId }
             if (index < 0) continue
             val message = messages[index]
             val updatedReactions = applyMessageReactionMutation(message.reactions, emoji, userId)
             val updated = messages.toMutableList()
             updated[index] = message.copy(reactions = updatedReactions)
-            val conversationId = message.conversationId
             writeMessagesUnsafe(conversationId, updated)
             return@write true
         }
@@ -300,9 +280,8 @@ object MessagePersistenceStore {
         val normalizedQuery = SearchNormalization.normalizeForSearch(trimmedQuery)
         if (normalizedQuery.isEmpty()) return@read emptyList()
         val matches = mutableListOf<EnhancedMessage>()
-        val dir = cacheDir ?: return@read emptyList()
-        for (file in dir.listFiles().orEmpty()) {
-            for (message in loadMessagesFromFile(file)) {
+        for (conversationId in allConversationIdsUnsafe()) {
+            for (message in loadMessagesUnsafe(conversationId)) {
                 if (message.type != MessageType.TEXT || message.isDeleted || message.isVanishModeMessage) continue
                 val content = message.content ?: continue
                 if (!SearchNormalization.containsNormalized(content, normalizedQuery)) continue
@@ -314,10 +293,7 @@ object MessagePersistenceStore {
     }
 
     fun allConversationIds(): Set<String> = lock.read {
-        cacheDir?.listFiles()?.map { file ->
-            val messages = loadMessagesFromFile(file)
-            messages.firstOrNull()?.conversationId ?: file.nameWithoutExtension.replace("_", "/")
-        }?.toSet().orEmpty()
+        blockingRoom { conversationIdsWithMessages().toSet() }
     }
 
     fun cleanupOldChats(
@@ -326,34 +302,31 @@ object MessagePersistenceStore {
         recentWindow: Int,
         staleWindow: Int,
     ) = lock.write {
-        val dir = cacheDir ?: return@write
         for (conversationId in allConversationIdsUnsafe()) {
-            val messages = loadMessagesUnsafe(conversationId)
-            if (messages.isEmpty()) continue
-            val latestTimestamp = messages.maxOfOrNull { it.timestamp }
-            val isStale = latestTimestamp?.before(staleThresholdDate) ?: true
+            val latestTimestamp = blockingRoom { latestMessageTimestampIn(conversationId) }
+            val isStale = latestTimestamp?.let { it < staleThresholdDate.time } ?: true
             val keepCount = if (isStale) staleWindow else recentWindow
-            val protectedIds = messages
-                .sortedWith(compareByDescending<EnhancedMessage> { it.timestamp }.thenByDescending { it.id })
-                .take(keepCount)
-                .map { it.id }
-                .toSet()
-            val kept = messages.filter { msg ->
-                msg.timestamp.after(cutoffDate) || msg.id in protectedIds
+            val removedIds = blockingRoom {
+                staleMessageIdsOutsideRecentWindow(
+                    conversationId = conversationId,
+                    cutoff = cutoffDate.time,
+                    keepCount = keepCount,
+                )
             }
-            val keptIds = kept.map { it.id }.toSet()
-            val removed = messages.filter { it.id !in keptIds }
-            writeMessagesUnsafe(conversationId, kept)
-            removed.forEach { ChatCacheStore.deleteMessageFiles(conversationId, it.id) }
+            if (removedIds.isEmpty()) continue
+            blockingRoom {
+                deleteStaleMessagesOutsideRecentWindow(
+                    conversationId = conversationId,
+                    cutoff = cutoffDate.time,
+                    keepCount = keepCount,
+                )
+            }
+            removedIds.forEach { ChatCacheStore.deleteMessageFiles(conversationId, it) }
         }
-        dir.listFiles()?.filter { it.length() == 0L }?.forEach { it.delete() }
     }
 
     private fun allConversationIdsUnsafe(): Set<String> {
-        val dir = cacheDir ?: return emptySet()
-        return dir.listFiles()?.mapNotNull { file ->
-            loadMessagesFromFile(file).firstOrNull()?.conversationId
-        }?.toSet().orEmpty()
+        return blockingRoom { conversationIdsWithMessages().toSet() }
     }
 
     private fun applyMessageReactionMutation(
@@ -458,21 +431,37 @@ object MessagePersistenceStore {
     }
 
     private fun loadMessagesUnsafe(conversationId: String): List<EnhancedMessage> =
-        loadMessagesFromFile(conversationFile(conversationId))
-
-    private fun loadMessagesFromFile(file: File): List<EnhancedMessage> {
-        if (!file.exists()) return emptyList()
-        return runCatching {
-            val arr = JSONArray(file.readText())
-            (0 until arr.length()).map { index ->
-                val obj = arr.getJSONObject(index)
-                EnhancedMessage.fromJson(obj).copy(reactions = parseReactionsFromJson(obj))
-            }
-        }.getOrDefault(emptyList())
-    }
+        blockingRoom {
+            messagesIn(conversationId).mapNotNull(::decodeMessageEntity)
+        }
 
     private fun writeMessagesUnsafe(conversationId: String, messages: List<EnhancedMessage>) {
-        val arr = JSONArray().apply { messages.forEach { put(it.toJson()) } }
-        conversationFile(conversationId).writeText(arr.toString())
+        blockingRoom {
+            replaceMessagesIn(
+                conversationId,
+                messages.map {
+                    MessageEntity(
+                        conversationId = conversationId,
+                        id = it.id,
+                        timestamp = it.timestamp.time,
+                        senderId = it.senderId,
+                        type = it.type.raw,
+                        content = it.content,
+                        isRead = it.isRead,
+                        isDeleted = it.isDeleted,
+                        isVanishModeMessage = it.isVanishModeMessage,
+                        payload = it.toJson().toString(),
+                    )
+                },
+            )
+        }
     }
+
+    private fun decodeMessageEntity(entity: MessageEntity): EnhancedMessage? = runCatching {
+        val obj = JSONObject(entity.payload)
+        EnhancedMessage.fromJson(obj).copy(reactions = parseReactionsFromJson(obj))
+    }.getOrNull()
+
+    private fun <T> blockingRoom(block: suspend com.moments.android.services.persistence.room.MomentsDao.() -> T): T =
+        kotlinx.coroutines.runBlocking(Dispatchers.IO) { MomentsRoomStore.dao().block() }
 }

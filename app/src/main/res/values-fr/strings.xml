@@ -215,9 +215,9 @@ Nous appliquons des mesures de chiffrement et de sécurité pour protéger les m
 
 Si vous choisissez de partager votre localisation en direct dans une conversation, nous traitons cette localisation jusqu\'à la fin ou l\'expiration de la session de partage.</string>
     <string name="privacy_permissions_title">7. Autorisations de l\'appareil</string>
-    <string name="privacy_permissions_body">Nous demandons des autorisations uniquement lorsqu\'elles sont nécessaires à une fonctionnalité précise : l\'appareil photo pour créer des photos ou des vidéos, la photothèque pour importer ou enregistrer du contenu, le microphone pour l\'audio, et la localisation pour identifier des publications, afficher des cartes, du contenu à proximité et un contexte optionnel pour Nova.
+    <string name="privacy_permissions_body">Nous demandons des autorisations uniquement lorsqu\'elles sont nécessaires à une fonctionnalité précise : l\'appareil photo pour créer des photos ou des vidéos, la photothèque pour importer ou enregistrer du contenu, le microphone pour l\'audio, et la localisation pour identifier des publications, afficher des cartes et la partager dans les chats, plus un contexte optionnel pour Nova.
 
-Vous pouvez modifier ces autorisations dans les réglages de votre appareil. Si vous les désactivez, certaines fonctionnalités peuvent ne plus être disponibles.</string>
+Vous pouvez modifier ces autorisations dans les réglages de l\'appareil. Si vous les désactivez, certaines fonctionnalités peuvent ne plus être disponibles.</string>
     <string name="privacy_ads_title">8. Publicité et consentement</string>
     <string name="privacy_ads_body">Moments peut afficher des publicités via Google AdMob. Selon votre région et vos paramètres, nous pouvons demander votre consentement via la User Messaging Platform (UMP) de Google.
 
@@ -1244,10 +1244,10 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="permission_camera_denied_title">L’accès à l’appareil photo est désactivé</string>
     <string name="permission_camera_denied_subtitle">Activez l’appareil photo dans Réglages pour continuer à capturer des photos et des vidéos pour vos stories, vos moments et votre profil.</string>
     <string name="permission_location_primer_title">Activez la localisation</string>
-    <string name="permission_location_primer_subtitle">Autorisez la localisation pour taguer vos publications et afficher du contenu pertinent à proximité.</string>
+    <string name="permission_location_primer_subtitle">Autorisez la localisation pour taguer vos publications et la partager dans les chats.</string>
     <string name="permission_location_primer_allow">Autoriser la localisation</string>
     <string name="permission_location_denied_title">L’accès à la localisation est désactivé</string>
-    <string name="permission_location_denied_subtitle">Activez la localisation dans Réglages pour taguer vos publications et afficher du contenu à proximité.</string>
+    <string name="permission_location_denied_subtitle">Activez la localisation dans Réglages pour taguer vos publications et la partager dans les chats.</string>
     <string name="permission_location_always_primer_subtitle">Autorisez Toujours pour que vos amis voient votre position en direct même lorsque Moments est en arrière-plan.</string>
     <string name="permission_location_always_primer_allow">Autoriser Toujours</string>
     <string name="permission_location_always_denied_title">La localisation en arrière-plan est désactivée</string>

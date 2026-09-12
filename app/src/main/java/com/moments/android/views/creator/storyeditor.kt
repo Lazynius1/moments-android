@@ -603,7 +603,7 @@ fun StoryEditingView(
             textOverlays.map {
                 if (it.id != id) it
                 else it.copy(
-                    text = trimmed,
+                    text = editorBuffer,
                     styleRaw = editorStyle.raw,
                     colorHex = editorColorHex,
                     alignmentRaw = editorTextAlignmentRaw,

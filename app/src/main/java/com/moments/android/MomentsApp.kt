@@ -55,8 +55,10 @@ import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.MomentsTheme
 import com.moments.android.views.shared.Surface
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Port de `MomentsApp.swift` (cuerpo Compose / Scene).
@@ -132,8 +134,10 @@ fun MomentsApp(
                 OfflineSyncService.enableAutomaticSync()
                 BackgroundMomentUploadService.cleanupStaleUploadActivities()
                 // BackgroundStoryUploadService.cleanupStaleUploadActivities — Live Activity N/A
-                LocalPersistenceService.cleanupOldData()
-                ChatCacheStore.runMaintenance()
+                withContext(Dispatchers.IO) {
+                    LocalPersistenceService.cleanupOldData()
+                    ChatCacheStore.runMaintenance()
+                }
                 if (FirebaseAuth.getInstance().currentUser != null) {
                     MessageIngestService.drainPendingQueue()
                     MessageCatchUpService.syncRecent(LocalPersistenceService.loadConversations())

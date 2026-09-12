@@ -193,7 +193,9 @@
     <string name="privacy_messages_title">6. 메시지 및 커뮤니케이션</string>
     <string name="privacy_messages_body">메시지 기능을 제공하기 위해 대화, 메시지 요청, 참여자, 타임스탬프, 읽음 확인, 미디어 파일, 사라지는 메시지, 공유 콘텐츠를 처리해요.\n\n메시지와 민감한 데이터를 보호하기 위해 암호화 및 보안 조치를 적용해요. 다만 일부 메타데이터, 미디어 파일 URL 또는 서비스 제공에 필요한 정보는 별도로 저장되고 처리될 수 있어요.\n\n대화에서 실시간 위치를 공유하기로 선택하면 공유 세션이 종료되거나 만료될 때까지 해당 위치를 처리해요.</string>
     <string name="privacy_permissions_title">7. 기기 권한</string>
-    <string name="privacy_permissions_body">특정 기능에 필요한 경우에만 권한을 요청해요. 사진이나 동영상을 만들 때는 카메라, 콘텐츠를 업로드하거나 저장할 때는 사진 보관함, 오디오를 사용할 때는 마이크, 게시물에 태그를 추가하거나 지도와 주변 콘텐츠 및 선택적 Nova 컨텍스트를 표시할 때는 위치 권한이 필요해요.\n\n기기 설정에서 이러한 권한을 변경할 수 있어요. 권한을 끄면 일부 기능을 사용하지 못할 수 있어요.</string>
+    <string name="privacy_permissions_body">특정 기능에 필요한 경우에만 권한을 요청해요. 사진이나 동영상을 만들 때는 카메라, 콘텐츠를 업로드하거나 저장할 때는 사진 보관함, 오디오를 사용할 때는 마이크, 게시물에 위치를 표시하거나 지도를 보고 채팅에서 공유할 때와 선택적 Nova 정보에는 위치 권한이 필요해요.
+
+기기 설정에서 이러한 권한을 변경할 수 있어요. 권한을 끄면 일부 기능을 사용하지 못할 수 있어요.</string>
     <string name="privacy_ads_title">8. 광고 및 동의</string>
     <string name="privacy_ads_body">Moments는 Google AdMob을 통해 광고를 표시할 수 있어요. 지역과 설정에 따라 Google의 User Messaging Platform (UMP)을 통해 동의를 요청할 수 있어요.\n\n동의하면 광고 ID와 허용된 신호를 사용해 맞춤형 광고를 표시할 수 있어요. 동의하지 않으면 맞춤 설정되지 않은 광고나 제한적인 광고가 표시될 수 있어요.</string>
     <string name="privacy_moderation_title">9. 안전, 신고 및 검토</string>
@@ -1842,11 +1844,11 @@
     <string name="permission_camera_denied_open_settings">설정 열기</string>
     <string name="permission_phone_time">9:41</string>
     <string name="permission_location_primer_title">위치 켜기</string>
-    <string name="permission_location_primer_subtitle">게시물에 위치를 태그하고 주변의 관련 콘텐츠를 확인할 수 있도록 위치 사용을 허용해 주세요.</string>
+    <string name="permission_location_primer_subtitle">게시물에 위치를 태그하고 채팅에서 공유하려면 위치 접근을 허용해 주세요.</string>
     <string name="permission_location_primer_allow">위치 사용 허용</string>
     <string name="permission_location_primer_not_now">나중에</string>
     <string name="permission_location_denied_title">위치 사용이 꺼져 있어요</string>
-    <string name="permission_location_denied_subtitle">게시물에 위치를 태그하고 주변의 관련 콘텐츠를 확인하려면 설정에서 위치를 켜 주세요.</string>
+    <string name="permission_location_denied_subtitle">게시물에 위치를 태그하고 채팅에서 공유하려면 설정에서 위치를 켜 주세요.</string>
     <string name="permission_location_denied_open_settings">설정 열기</string>
     <string name="permission_location_always_primer_title">실시간 위치 공유</string>
     <string name="permission_location_always_primer_subtitle">Moments가 백그라운드에서 실행 중일 때도 친구들이 실시간 위치를 볼 수 있도록 ‘항상 허용’을 선택해 주세요.</string>

@@ -193,7 +193,9 @@
     <string name="privacy_messages_title">6. 訊息與通訊</string>
     <string name="privacy_messages_body">為了提供訊息功能，我們會處理對話、訊息邀請、參與者、時間戳記、已讀回條、媒體檔案、限時訊息及分享的內容。\n\n我們會採用加密和安全措施，保護訊息及敏感資料。不過，部分中繼資料、媒體檔案 URL 或提供服務所需的資訊，可能會另外儲存和處理。\n\n如果你選擇在對話中分享即時位置，我們會處理該位置資訊，直到分享工作階段結束或到期。</string>
     <string name="privacy_permissions_title">7. 裝置權限</string>
-    <string name="privacy_permissions_body">只有在特定功能需要時，我們才會要求權限：使用相機建立照片或影片、使用照片圖庫上傳或儲存內容、使用麥克風錄製音訊，以及使用位置資訊標記貼文、顯示地圖和附近內容，或提供 Nova 選用的情境資訊。\n\n你可以在裝置設定中變更這些權限。如果關閉權限，部分功能可能會無法使用。</string>
+    <string name="privacy_permissions_body">只有在特定功能需要時，我們才會要求權限：使用相機建立照片或影片、使用照片圖庫上傳或儲存內容、使用麥克風錄製音訊，以及使用位置資訊標記貼文、顯示地圖並在聊天中分享，或提供 Nova 選用的情境資訊。
+
+你可以在裝置設定中變更這些權限。如果關閉權限，部分功能可能會無法使用。</string>
     <string name="privacy_ads_title">8. 廣告與同意</string>
     <string name="privacy_ads_body">Moments 可能會透過 Google AdMob 顯示廣告。視你的地區和設定而定，我們可能會透過 Google 的 User Messaging Platform (UMP) 徵求你的同意。\n\n如果你同意，廣告可能會根據你的廣告 ID 和獲准使用的訊號進行個人化。如果你不同意，我們可能會顯示非個人化或受限廣告。</string>
     <string name="privacy_moderation_title">9. 安全、檢舉與內容審核</string>
@@ -1842,11 +1844,11 @@
     <string name="permission_camera_denied_open_settings">開啟設定</string>
     <string name="permission_phone_time">9:41</string>
     <string name="permission_location_primer_title">開啟定位服務</string>
-    <string name="permission_location_primer_subtitle">允許定位服務標註你的貼文，並顯示附近的相關內容。</string>
+    <string name="permission_location_primer_subtitle">允許使用定位功能，為貼文標註位置並在聊天中分享。</string>
     <string name="permission_location_primer_allow">允許使用定位服務</string>
     <string name="permission_location_primer_not_now">現在不要</string>
     <string name="permission_location_denied_title">定位服務已關閉</string>
-    <string name="permission_location_denied_subtitle">請在「設定」中開啟定位服務，標註你的貼文並顯示附近的相關內容。</string>
+    <string name="permission_location_denied_subtitle">請前往「設定」開啟定位功能，為貼文標註位置並在聊天中分享。</string>
     <string name="permission_location_denied_open_settings">開啟設定</string>
     <string name="permission_location_always_primer_title">分享即時位置</string>
     <string name="permission_location_always_primer_subtitle">允許「永遠」，讓朋友即使在 Moments 於背景執行時，也能查看你的即時位置。</string>

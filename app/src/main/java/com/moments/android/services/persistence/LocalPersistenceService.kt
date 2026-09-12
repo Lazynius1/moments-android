@@ -31,6 +31,15 @@ import com.moments.android.views.messaging.core.encodeMessages
 import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.network.OfflineSyncService
+import com.moments.android.services.persistence.room.ConnectionEntity
+import com.moments.android.services.persistence.room.ConversationEntity
+import com.moments.android.services.persistence.room.MomentEntity
+import com.moments.android.services.persistence.room.MomentsRoomStore
+import com.moments.android.services.persistence.room.NotificationEntity
+import com.moments.android.services.persistence.room.PendingActionEntity
+import com.moments.android.services.persistence.room.SearchEntity
+import com.moments.android.services.persistence.room.StoryEntity
+import com.moments.android.services.persistence.room.UserEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -44,20 +53,16 @@ import java.util.Date
 import java.util.UUID
 
 /**
- * Persistencia local (SharedPreferences + filesDir JSON).
+ * Persistencia local con Room.
  * Port de LocalPersistenceService.swift — StorySeenStateService en archivo aparte (mismo Swift).
  * Topes: feed 100, explore 50, users 200, conversations 50, notifs 100, searches 20, msgs/chat 2000.
- * Δ líneas ≈ SwiftData/App Group/boilerplate OO vs JSON.
+ * Los payloads complejos conservan su codificación JSON dentro de BLOBs o
+ * texto de Room; las claves de acceso viven en columnas indexadas.
  */
 object LocalPersistenceService {
 
     private const val PREFS = "moments_local_persistence"
-    private const val KEY_CURRENT_USER_ID = "currentUserId"
-    private const val KEY_USER_PREFIX = "user_"
-    private const val KEY_PENDING_ACTIONS = "pending_actions"
-    private const val KEY_CONVERSATION_PREVIEWS = "conversation_previews"
-    private const val KEY_CONNECTIONS_PREFIX = "connections_"
-    private const val KEY_SEARCH_HISTORY = "search_history"
+    private const val KEY_ROOM_CACHE_CUTOVER = "room_cache_cutover_v1"
 
     private const val MAX_CONVERSATIONS = 50
     private const val MAX_NOTIFICATIONS = 100
@@ -82,66 +87,71 @@ object LocalPersistenceService {
     fun initialize(context: Context) {
         if (appContext == null) {
             appContext = context.applicationContext
+            clearLegacyCacheForRoomCutover(context.applicationContext)
+            MomentsRoomStore.initialize(context)
             MessagePersistenceStore.initialize(context)
             StorySeenStateService.initialize(context)
         }
     }
 
-    private fun prefs() =
-        (appContext ?: error("LocalPersistenceService.initialize required"))
-            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-
-    private fun cacheDir(): File {
-        val ctx = appContext ?: error("LocalPersistenceService.initialize required")
-        return File(ctx.filesDir, "local_cache").also { it.mkdirs() }
+    /**
+     * Android aún no tenía usuarios a los que migrar una caché activa. Hacemos
+     * el corte una sola vez: el contenido remoto se hidrata de nuevo y no se
+     * conservan acciones que solo existieran en la instalación anterior.
+     */
+    private fun clearLegacyCacheForRoomCutover(context: Context) {
+        val legacyPrefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (legacyPrefs.getBoolean(KEY_ROOM_CACHE_CUTOVER, false)) return
+        File(context.filesDir, "local_cache").deleteRecursively()
+        File(context.filesDir, "message_cache").deleteRecursively()
+        legacyPrefs.edit().clear().putBoolean(KEY_ROOM_CACHE_CUTOVER, true).commit()
+        context.getSharedPreferences("moments_story_seen", Context.MODE_PRIVATE).edit().clear().commit()
     }
-
-    private fun momentsFile(section: String): File =
-        File(File(cacheDir(), "moments"), "$section.json").apply { parentFile?.mkdirs() }
-
-    private fun storiesFile(): File = File(cacheDir(), "stories.json")
-
-    private fun conversationsFile(): File = File(cacheDir(), "conversations.json")
-
-    private fun notificationsFile(): File = File(cacheDir(), "notifications.json")
 
     // MARK: - Current user
 
     fun saveCurrentUser(user: AppUser) = saveUser(user, section = "currentUser")
 
     fun loadCurrentUser(): AppUser? {
-        prefs().getString(KEY_CURRENT_USER_ID, null)?.let { return loadUser(it) }
-        // ≡ iOS: FetchDescriptor por cacheSection == "currentUser"
-        prefs().all.keys.filter { it.startsWith(KEY_USER_PREFIX) }.forEach { key ->
-            val raw = prefs().getString(key, null) ?: return@forEach
-            val cached = CachedUser.decodeFromPrefsJson(raw) ?: return@forEach
-            if (cached.cacheSection == "currentUser") return cached.toAppUser()
+        return runBlockingIo {
+            MomentsRoomStore.dao().currentUser()?.payload
+                ?.let(CachedUser::decodeFromPrefsJson)
+                ?.toAppUser()
         }
-        return null
     }
 
     fun clearCurrentUser() {
-        val id = prefs().getString(KEY_CURRENT_USER_ID, null)
-        val editor = prefs().edit().remove(KEY_CURRENT_USER_ID)
-        if (id != null) editor.remove(KEY_USER_PREFIX + id)
-        editor.apply()
+        runBlockingIo {
+            MomentsRoomStore.dao().currentUser()?.let { current ->
+                MomentsRoomStore.dao().deleteUser(current.userId, current.cacheSection)
+            }
+        }
     }
 
     // MARK: - Users
 
     fun saveUser(user: AppUser, section: String = "profile") {
-        val editor = prefs().edit()
-            .putString(KEY_USER_PREFIX + user.id, encodeUser(user, section))
-        if (section == "currentUser") {
-            editor.putString(KEY_CURRENT_USER_ID, user.id)
+        val cached = CachedUser.from(user, section)
+        runBlockingIo {
+            MomentsRoomStore.dao().upsertUsers(
+                listOf(
+                    UserEntity(
+                        userId = cached.userId,
+                        cacheSection = cached.cacheSection,
+                        lastSyncedAt = cached.lastSyncedAt.time,
+                        payload = cached.encodeToPrefsJson(),
+                    ),
+                ),
+            )
         }
-        editor.apply()
         trimCachedUsers()
     }
 
     fun loadUser(userId: String): AppUser? {
-        val raw = prefs().getString(KEY_USER_PREFIX + userId, null) ?: return null
-        return decodeUser(raw)
+        return runBlockingIo {
+            MomentsRoomStore.dao().usersById(userId)
+                .firstNotNullOfOrNull { it.payload.let(CachedUser::decodeFromPrefsJson)?.toAppUser() }
+        }
     }
 
     // MARK: - Outbox / CachedAction
@@ -287,33 +297,20 @@ object LocalPersistenceService {
     }
 
     private fun loadConnectionRecords(userId: String): List<CachedConnection> {
-        val raw = prefs().getString(KEY_CONNECTIONS_PREFIX + userId, null) ?: return emptyList()
-        return runCatching {
-            val arr = JSONArray(raw)
-            (0 until arr.length()).map { i ->
-                val obj = arr.getJSONObject(i)
-                CachedConnection(
-                    userId = obj.getString("userId"),
-                    targetId = obj.getString("targetId"),
-                    type = obj.getString("type"),
-                    timestamp = Date(obj.optLong("timestamp", System.currentTimeMillis())),
-                )
+        return runBlockingIo {
+            MomentsRoomStore.dao().connectionsFor(userId).map {
+                CachedConnection(it.userId, it.targetId, it.type, Date(it.timestamp))
             }
-        }.getOrDefault(emptyList())
+        }
     }
 
     private fun saveConnectionRecords(userId: String, connections: List<CachedConnection>) {
-        val arr = JSONArray().apply {
-            connections.forEach { conn ->
-                put(JSONObject().apply {
-                    put("userId", conn.userId)
-                    put("targetId", conn.targetId)
-                    put("type", conn.type)
-                    put("timestamp", conn.timestamp.time)
-                })
-            }
+        runBlockingIo {
+            MomentsRoomStore.dao().replaceConnectionsFor(
+                userId,
+                connections.map { ConnectionEntity(it.userId, it.targetId, it.type, it.timestamp.time) },
+            )
         }
-        prefs().edit().putString(KEY_CONNECTIONS_PREFIX + userId, arr.toString()).apply()
     }
 
     // MARK: - Moments cache
@@ -359,17 +356,28 @@ object LocalPersistenceService {
             .mapNotNull { it.toMoment() }
 
     private fun loadCachedMoments(section: String): List<CachedMoment> {
-        val file = momentsFile(section)
-        if (!file.exists()) return emptyList()
-        return runCatching {
-            val arr = JSONArray(file.readText())
-            (0 until arr.length()).mapNotNull { decodeCachedMoment(arr.getJSONObject(it)) }
-        }.getOrDefault(emptyList())
+        return runBlockingIo {
+            MomentsRoomStore.dao().momentsIn(section).mapNotNull { entity ->
+                runCatching { decodeCachedMoment(JSONObject(entity.payload)) }.getOrNull()
+            }
+        }
     }
 
     private fun writeCachedMoments(section: String, moments: List<CachedMoment>) {
-        val arr = JSONArray().apply { moments.forEach { put(encodeCachedMoment(it)) } }
-        momentsFile(section).writeText(arr.toString())
+        runBlockingIo {
+            MomentsRoomStore.dao().replaceMomentsIn(
+                section,
+                moments.map {
+                    MomentEntity(
+                        momentId = it.momentId,
+                        feedSection = it.feedSection,
+                        timestamp = it.timestamp.time,
+                        lastSyncedAt = it.lastSyncedAt.time,
+                        payload = encodeCachedMoment(it).toString(),
+                    )
+                },
+            )
+        }
     }
 
     // MARK: - Stories cache
@@ -385,38 +393,49 @@ object LocalPersistenceService {
     }
 
     fun deleteStory(storyId: String) {
-        writeAllCachedStories(loadAllCachedStories().filter { it.id != storyId })
+        runBlockingIo { MomentsRoomStore.dao().deleteStory(storyId) }
     }
 
     fun deleteStories(userId: String) {
-        writeAllCachedStories(loadAllCachedStories().filter { it.authorId != userId })
+        runBlockingIo { MomentsRoomStore.dao().deleteStoriesByAuthor(userId) }
     }
 
     fun loadStories(userId: String): List<Story> {
         val now = Date()
-        return loadAllCachedStories()
-            .filter { it.authorId == userId && it.expirationDate.after(now) }
+        return runBlockingIo { MomentsRoomStore.dao().storiesByAuthor(userId) }
+            .mapNotNull { entity -> runCatching { decodeCachedStory(JSONObject(entity.payload)) }.getOrNull() }
+            .filter { it.expirationDate.after(now) }
             .sortedBy { it.timestamp.time }
             .map { it.toStory() }
     }
 
     fun cleanupOldStories() {
-        val now = Date()
-        writeAllCachedStories(loadAllCachedStories().filter { it.expirationDate.after(now) })
+        runBlockingIo { MomentsRoomStore.dao().deleteExpiredStories(Date().time) }
     }
 
     private fun loadAllCachedStories(): List<CachedStory> {
-        val file = storiesFile()
-        if (!file.exists()) return emptyList()
-        return runCatching {
-            val arr = JSONArray(file.readText())
-            (0 until arr.length()).mapNotNull { decodeCachedStory(arr.getJSONObject(it)) }
-        }.getOrDefault(emptyList())
+        return runBlockingIo {
+            MomentsRoomStore.dao().allStories().mapNotNull { entity ->
+                runCatching { decodeCachedStory(JSONObject(entity.payload)) }.getOrNull()
+            }
+        }
     }
 
     private fun writeAllCachedStories(stories: List<CachedStory>) {
-        val arr = JSONArray().apply { stories.forEach { put(encodeCachedStory(it)) } }
-        storiesFile().writeText(arr.toString())
+        runBlockingIo {
+            MomentsRoomStore.dao().replaceStories(
+                stories.map {
+                    StoryEntity(
+                        id = it.id,
+                        authorId = it.authorId,
+                        timestamp = it.timestamp.time,
+                        expirationDate = it.expirationDate.time,
+                        cachedAt = it.cachedAt.time,
+                        payload = encodeCachedStory(it).toString(),
+                    )
+                },
+            )
+        }
     }
 
     // MARK: - Optimistic local updates
@@ -450,13 +469,7 @@ object LocalPersistenceService {
     }
 
     fun deleteMoment(momentId: String) {
-        val momentsDir = File(cacheDir(), "moments")
-        if (!momentsDir.exists()) return
-        momentsDir.listFiles()?.forEach { file ->
-            val section = file.nameWithoutExtension
-            val updated = loadCachedMoments(section).filter { it.momentId != momentId }
-            writeCachedMoments(section, updated)
-        }
+        runBlockingIo { MomentsRoomStore.dao().deleteMoment(momentId) }
     }
 
     suspend fun deleteMoment(
@@ -613,23 +626,15 @@ object LocalPersistenceService {
     }
 
     fun loadRecentSearches(): List<CachedSearch> {
-        val raw = prefs().getString(KEY_SEARCH_HISTORY, null) ?: return emptyList()
-        return runCatching {
-            val arr = JSONArray(raw)
-            (0 until arr.length()).map { i ->
-                val obj = arr.getJSONObject(i)
-                CachedSearch(
-                    query = obj.getString("query"),
-                    type = obj.getString("type"),
-                    targetId = obj.stringOrNull("targetId"),
-                    timestamp = Date(obj.getLong("timestamp")),
-                )
+        return runBlockingIo {
+            MomentsRoomStore.dao().allSearches().map {
+                CachedSearch(it.query, it.type, it.targetId, Date(it.timestamp))
             }
-        }.getOrDefault(emptyList())
+        }
     }
 
     fun clearSearchHistory() {
-        prefs().edit().remove(KEY_SEARCH_HISTORY).apply()
+        runBlockingIo { MomentsRoomStore.dao().deleteAllSearches() }
     }
 
     // MARK: - Messaging cache (delegated)
@@ -890,13 +895,6 @@ object LocalPersistenceService {
         MessagePersistenceStore.deleteConversation(conversationId)
         val remaining = loadCachedConversations().filter { it.id != conversationId }
         writeCachedConversations(remaining)
-        prefs().edit().apply {
-            val previews = loadConversationPreviews().toMutableMap()
-            previews.remove(conversationId)
-            val obj = JSONObject()
-            previews.forEach { (k, v) -> obj.put(k, v) }
-            putString(KEY_CONVERSATION_PREVIEWS, obj.toString())
-        }.apply()
     }
 
     fun saveNotifications(notifications: List<MomentsNotification>, sync: Boolean = false) {
@@ -989,19 +987,11 @@ object LocalPersistenceService {
                 compareByDescending<CachedConversation> { it.isPinned }.thenByDescending { it.timestamp },
             ).take(MAX_CONVERSATIONS),
         )
-        val previews = loadConversationPreviews().toMutableMap()
-        previews[message.conversationId] = JSONObject().apply {
-            put("lastMessage", previewText)
-            put("timestamp", message.timestamp.time)
-            put("senderId", message.senderId)
-        }
-        saveConversationPreviews(previews)
     }
 
     fun clearAllChatCache() {
         MessagePersistenceStore.clearAll()
         writeCachedConversations(emptyList())
-        prefs().edit().remove(KEY_CONVERSATION_PREVIEWS).apply()
         ChatCacheStore.clearAllMedia()
     }
 
@@ -1032,22 +1022,14 @@ object LocalPersistenceService {
         cleanupOldStories()
         cleanupOldChats()
         val cutoff = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -MAX_DATA_AGE_DAYS) }.time
-        val momentsDir = File(cacheDir(), "moments")
-        if (momentsDir.exists()) {
-            momentsDir.listFiles()?.forEach { file ->
-                val section = file.nameWithoutExtension
-                val fresh = loadCachedMoments(section).filter { it.lastSyncedAt.after(cutoff) }
-                writeCachedMoments(section, fresh)
-            }
-        }
+        runBlockingIo { MomentsRoomStore.dao().deleteMomentsBefore(cutoff.time) }
         trimCachedUsersByAge(cutoff)
         trimCachedUsers()
     }
 
     fun clearAll() {
-        prefs().edit().clear().apply()
-        cacheDir().deleteRecursively()
-        MessagePersistenceStore.clearAll()
+        runBlockingIo { MomentsRoomStore.dao().clearAllCache() }
+        ChatCacheStore.clearAllMedia()
     }
 
     fun getCacheStats(): String {
@@ -1062,10 +1044,10 @@ object LocalPersistenceService {
     // MARK: - Internals
 
     private fun updateMomentsAcrossSections(momentId: String, transform: (CachedMoment) -> CachedMoment) {
-        val momentsDir = File(cacheDir(), "moments")
-        if (!momentsDir.exists()) return
-        momentsDir.listFiles()?.forEach { file ->
-            val section = file.nameWithoutExtension
+        val affected = runBlockingIo {
+            MomentsRoomStore.dao().allMoments().filter { it.momentId == momentId }.map { it.feedSection }
+        }
+        affected.forEach { section ->
             val updated = loadCachedMoments(section).map { cached ->
                 if (cached.momentId == momentId) transform(cached) else cached
             }
@@ -1075,17 +1057,12 @@ object LocalPersistenceService {
 
     /** ≡ iOS trimCachedUsersToLimit — excluye cacheSection == currentUser. */
     private fun trimCachedUsers() {
-        val entries = prefs().all.keys.filter { it.startsWith(KEY_USER_PREFIX) }.mapNotNull { key ->
-            val raw = prefs().getString(key, null) ?: return@mapNotNull null
-            val cached = CachedUser.decodeFromPrefsJson(raw) ?: return@mapNotNull null
-            if (cached.cacheSection == "currentUser") return@mapNotNull null
-            Triple(key, cached.userId, cached.lastSyncedAt)
-        }
+        val entries = runBlockingIo { MomentsRoomStore.dao().cachedNonCurrentUsers() }
         if (entries.size <= MAX_CACHED_USERS) return
-        val toRemove = entries.sortedBy { it.third.time }.take(entries.size - MAX_CACHED_USERS)
-        val editor = prefs().edit()
-        toRemove.forEach { (key, _, _) -> editor.remove(key) }
-        editor.apply()
+        val toRemove = entries.sortedBy { it.lastSyncedAt }.take(entries.size - MAX_CACHED_USERS)
+        runBlockingIo {
+            toRemove.forEach { MomentsRoomStore.dao().deleteUser(it.userId, it.cacheSection) }
+        }
     }
 
     /** ≡ iOS updateCachedConversation — no retrocede lastMessage/timestamp. */
@@ -1122,97 +1099,95 @@ object LocalPersistenceService {
     }
 
     private fun saveSearchHistory(searches: List<CachedSearch>) {
-        val arr = JSONArray().apply {
-            searches.forEach { search ->
-                put(JSONObject().apply {
-                    put("query", search.query)
-                    put("type", search.type)
-                    search.targetId?.let { put("targetId", it) }
-                    put("timestamp", search.timestamp.time)
-                })
-            }
+        runBlockingIo {
+            MomentsRoomStore.dao().replaceSearches(
+                searches.map { SearchEntity(it.id, it.query, it.type, it.targetId, it.timestamp.time) },
+            )
         }
-        prefs().edit().putString(KEY_SEARCH_HISTORY, arr.toString()).apply()
     }
 
     private fun loadAllActions(): List<CachedAction> {
-        val raw = prefs().getString(KEY_PENDING_ACTIONS, null) ?: return emptyList()
-        return runCatching {
-            val arr = JSONArray(raw)
-            (0 until arr.length()).map { i ->
-                val obj = arr.getJSONObject(i)
+        return runBlockingIo {
+            MomentsRoomStore.dao().allActions().map {
                 CachedAction(
-                    id = obj.getString("id"),
-                    type = obj.getString("type"),
-                    status = obj.getString("status"),
-                    payloadData = Base64.getDecoder().decode(obj.getString("payloadData")),
-                    createdAt = Date(obj.getLong("createdAt")),
-                    retryCount = obj.optInt("retryCount"),
-                    lastError = obj.optString("lastError").takeIf { obj.has("lastError") && !obj.isNull("lastError") },
-                    lastAttemptAt = obj.optLong("lastAttemptAt").takeIf { obj.has("lastAttemptAt") }?.let { Date(it) },
+                    id = it.id,
+                    type = it.type,
+                    status = it.status,
+                    payloadData = it.payload,
+                    createdAt = Date(it.createdAt),
+                    retryCount = it.retryCount,
+                    lastError = it.lastError,
+                    lastAttemptAt = it.lastAttemptAt?.let(::Date),
                 )
             }
-        }.getOrDefault(emptyList())
+        }
     }
 
     private fun saveAllActions(actions: List<CachedAction>) {
-        val arr = JSONArray().apply {
-            actions.forEach { action ->
-                put(JSONObject().apply {
-                    put("id", action.id)
-                    put("type", action.type)
-                    put("status", action.status)
-                    put("payloadData", Base64.getEncoder().encodeToString(action.payloadData))
-                    put("createdAt", action.createdAt.time)
-                    put("retryCount", action.retryCount)
-                    action.lastError?.let { put("lastError", it) }
-                    action.lastAttemptAt?.let { put("lastAttemptAt", it.time) }
-                })
-            }
+        runBlockingIo {
+            MomentsRoomStore.dao().replaceActions(
+                actions.map {
+                    PendingActionEntity(
+                        id = it.id,
+                        type = it.type,
+                        status = it.status,
+                        payload = it.payloadData,
+                        createdAt = it.createdAt.time,
+                        retryCount = it.retryCount,
+                        lastError = it.lastError,
+                        lastAttemptAt = it.lastAttemptAt?.time,
+                    )
+                },
+            )
         }
-        prefs().edit().putString(KEY_PENDING_ACTIONS, arr.toString()).apply()
-    }
-
-    private fun loadConversationPreviews(): Map<String, JSONObject> {
-        val raw = prefs().getString(KEY_CONVERSATION_PREVIEWS, null) ?: return emptyMap()
-        return runCatching {
-            val obj = JSONObject(raw)
-            obj.keys().asSequence().associateWith { obj.getJSONObject(it) }
-        }.getOrDefault(emptyMap())
-    }
-
-    private fun saveConversationPreviews(previews: Map<String, JSONObject>) {
-        val obj = JSONObject()
-        previews.forEach { (k, v) -> obj.put(k, v) }
-        prefs().edit().putString(KEY_CONVERSATION_PREVIEWS, obj.toString()).apply()
     }
 
     private fun loadCachedConversations(): List<CachedConversation> {
-        val file = conversationsFile()
-        if (!file.exists()) return emptyList()
-        return runCatching {
-            val arr = JSONArray(file.readText())
-            (0 until arr.length()).mapNotNull { decodeCachedConversation(arr.getJSONObject(it)) }
-        }.getOrDefault(emptyList())
+        return runBlockingIo {
+            MomentsRoomStore.dao().allConversations().mapNotNull { entity ->
+                runCatching { decodeCachedConversation(JSONObject(entity.payload)) }.getOrNull()
+            }
+        }
     }
 
     private fun writeCachedConversations(conversations: List<CachedConversation>) {
-        val arr = JSONArray().apply { conversations.forEach { put(encodeCachedConversation(it)) } }
-        conversationsFile().writeText(arr.toString())
+        runBlockingIo {
+            MomentsRoomStore.dao().replaceConversations(
+                conversations.map {
+                    ConversationEntity(
+                        id = it.id,
+                        isPinned = it.isPinned,
+                        timestamp = it.timestamp.time,
+                        lastSyncedAt = it.lastSyncedAt.time,
+                        payload = encodeCachedConversation(it).toString(),
+                    )
+                },
+            )
+        }
     }
 
     private fun loadCachedNotifications(): List<CachedNotification> {
-        val file = notificationsFile()
-        if (!file.exists()) return emptyList()
-        return runCatching {
-            val arr = JSONArray(file.readText())
-            (0 until arr.length()).mapNotNull { decodeCachedNotification(arr.getJSONObject(it)) }
-        }.getOrDefault(emptyList())
+        return runBlockingIo {
+            MomentsRoomStore.dao().allNotifications().mapNotNull { entity ->
+                runCatching { decodeCachedNotification(JSONObject(entity.payload)) }.getOrNull()
+            }
+        }
     }
 
     private fun writeCachedNotifications(notifications: List<CachedNotification>) {
-        val arr = JSONArray().apply { notifications.forEach { put(encodeCachedNotification(it)) } }
-        notificationsFile().writeText(arr.toString())
+        runBlockingIo {
+            MomentsRoomStore.dao().replaceNotifications(
+                notifications.map {
+                    NotificationEntity(
+                        id = it.id,
+                        timestamp = it.timestamp.time,
+                        isPending = it.isPending,
+                        lastSyncedAt = it.lastSyncedAt.time,
+                        payload = encodeCachedNotification(it).toString(),
+                    )
+                },
+            )
+        }
     }
 
     private data class DiskWarmResult(val mediaUrl: String?, val thumbnailUrl: String?, val changed: Boolean)
@@ -1238,17 +1213,7 @@ object LocalPersistenceService {
     }
 
     private fun trimCachedUsersByAge(cutoff: Date) {
-        val editor = prefs().edit()
-        prefs().all.keys.filter { it.startsWith(KEY_USER_PREFIX) }.forEach { key ->
-            val raw = prefs().getString(key, null) ?: return@forEach
-            val cached = CachedUser.decodeFromPrefsJson(raw) ?: return@forEach
-            // ≡ iOS: no borrar cacheSection == currentUser
-            if (cached.cacheSection == "currentUser") return@forEach
-            if (cached.lastSyncedAt.before(cutoff)) {
-                editor.remove(key)
-            }
-        }
-        editor.apply()
+        runBlockingIo { MomentsRoomStore.dao().deleteUsersBefore(cutoff.time) }
     }
 
     private fun messagePreview(message: EnhancedMessage): String {

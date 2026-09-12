@@ -47,11 +47,6 @@ data class ThumbInfo(
     val canView: Boolean,
 )
 
-data class ActivityCategorySummary(
-    val count: Int,
-    val thumbnails: List<ThumbInfo>,
-)
-
 /** Port 1:1 de `ActivityInteractionDetailViewModel` (`UserActivityDetailViewModel.swift`, 1224 líneas). */
 class ActivityInteractionDetailViewModel(
     private val category: ActivityInteractionCategory,

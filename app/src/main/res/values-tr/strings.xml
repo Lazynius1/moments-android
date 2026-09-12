@@ -193,7 +193,9 @@
     <string name="privacy_messages_title">6. Mesajlar ve iletişim</string>
     <string name="privacy_messages_body">Mesajlaşmayı sunabilmek için konuşmaları, mesaj isteklerini, katılımcıları, zaman damgalarını, okundu bilgilerini, medya dosyalarını, geçici mesajları ve paylaşılan içerikleri işleriz.\n\nMesajları ve hassas verileri korumak için şifreleme ve güvenlik önlemleri uygularız. Ancak bazı üst veriler, medya dosyası URL\'leri veya hizmeti sunmak için gereken bilgiler ayrı olarak saklanabilir ve işlenebilir.\n\nBir konuşmada canlı konumunu paylaşmayı seçersen bu konumu paylaşım oturumu sona erene veya süresi dolana kadar işleriz.</string>
     <string name="privacy_permissions_title">7. Cihaz izinleri</string>
-    <string name="privacy_permissions_body">İzinleri yalnızca belirli bir özellik için gerektiğinde isteriz: fotoğraf veya video oluşturmak için kamera, içerik yüklemek veya kaydetmek için fotoğraf arşivi, ses için mikrofon ve gönderilere etiket eklemek, haritaları ve yakındaki içerikleri göstermek ve isteğe bağlı Nova bağlamı için konum.\n\nBu izinleri cihazının ayarlarından değiştirebilirsin. İzinleri kapatırsan bazı özellikler kullanılamayabilir.</string>
+    <string name="privacy_permissions_body">İzinleri yalnızca belirli bir özellik için gerektiğinde isteriz: fotoğraf veya video çekmek için kamera, içerik yüklemek veya kaydetmek için fotoğraf arşivi, ses için mikrofon ve gönderilere konum eklemek, haritaları göstermek ve sohbetlerde paylaşmak ile isteğe bağlı Nova bağlamı için konum.
+
+Bu izinleri cihazının ayarlarından değiştirebilirsin. İzinleri kapatırsan bazı özellikler kullanılamayabilir.</string>
     <string name="privacy_ads_title">8. Reklamlar ve onay</string>
     <string name="privacy_ads_body">Moments, Google AdMob üzerinden reklam gösterebilir. Bölgenize ve ayarlarına bağlı olarak Google\'ın User Messaging Platform (UMP) hizmeti üzerinden onayını isteyebiliriz.\n\nOnay verirsen reklamlar, reklam kimliğin ve izin verdiğin sinyaller kullanılarak kişiselleştirilebilir. Onay vermezsen kişiselleştirilmemiş veya sınırlı reklamlar gösterebiliriz.</string>
     <string name="privacy_moderation_title">9. Güvenlik, bildirimler ve moderasyon</string>
@@ -1842,11 +1844,11 @@
     <string name="permission_camera_denied_open_settings">Ayarlar\'ı aç</string>
     <string name="permission_phone_time">9:41</string>
     <string name="permission_location_primer_title">Konumunu aç</string>
-    <string name="permission_location_primer_subtitle">Gönderilerine konum eklemek ve yakındaki ilgili içerikleri göstermek için konum erişimine izin ver.</string>
+    <string name="permission_location_primer_subtitle">Gönderilerini konumla etiketlemek ve sohbetlerde paylaşmak için konumuna erişime izin ver.</string>
     <string name="permission_location_primer_allow">Konum erişimine izin ver</string>
     <string name="permission_location_primer_not_now">Şimdi değil</string>
     <string name="permission_location_denied_title">Konum erişimi kapalı</string>
-    <string name="permission_location_denied_subtitle">Gönderilerine konum eklemek ve yakındaki ilgili içerikleri göstermek için Ayarlar\'dan konum erişimini aç.</string>
+    <string name="permission_location_denied_subtitle">Gönderilerini konumla etiketlemek ve sohbetlerde paylaşmak için Ayarlar\'dan konumunu aç.</string>
     <string name="permission_location_denied_open_settings">Ayarlar\'ı aç</string>
     <string name="permission_location_always_primer_title">Canlı konumunu paylaş</string>
     <string name="permission_location_always_primer_subtitle">Moments arka plandayken bile arkadaşlarının canlı konumunu görebilmesi için “Her Zaman” seçeneğine izin ver.</string>

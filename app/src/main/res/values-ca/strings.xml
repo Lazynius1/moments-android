@@ -209,9 +209,9 @@ Apliquem xifratge i mesures de seguretat per protegir missatges i dades sensible
 
 Si decideixes compartir ubicació en viu en una conversa, tractem aquesta ubicació fins que la sessió de compartició acabi o expiri.</string>
     <string name="privacy_permissions_title">7. Permisos del dispositiu</string>
-    <string name="privacy_permissions_body">Demanem permisos només quan són necessaris per a una funció concreta: càmera per crear fotos o vídeos, galeria per pujar o desar contingut, micròfon per a àudio, i ubicació per etiquetar publicacions, mapes, contingut proper i context opcional de Nova.
+    <string name="privacy_permissions_body">Demanem permisos només quan són necessaris per a una funció concreta: càmera per crear fotos o vídeos, galeria per pujar o desar contingut, micròfon per a àudio, ubicació per etiquetar publicacions, mapes i compartir-la als xats, més context opcional de Nova.
 
-Pots canviar aquests permisos des dels ajustos del teu dispositiu. Si els desactives, algunes funcions poden deixar d\'estar disponibles.</string>
+Pots canviar aquests permisos des dels ajustos del dispositiu. Si els desactives, algunes funcions poden deixar d’estar disponibles.</string>
     <string name="privacy_ads_title">8. Publicitat i consentiment</string>
     <string name="privacy_ads_body">Moments pot mostrar anuncis mitjançant Google AdMob. Segons la teva regió i ajustos, podem demanar consentiment mitjançant la plataforma de missatges per a l\'usuari de Google (UMP).
 
@@ -1261,10 +1261,10 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="permission_camera_denied_title">L’accés a la càmera està desactivat</string>
     <string name="permission_camera_denied_subtitle">Activa la càmera als Ajustos per continuar capturant fotos i vídeos per a les teves històries, moments i perfil.</string>
     <string name="permission_location_primer_title">Activa la ubicació</string>
-    <string name="permission_location_primer_subtitle">Permet usar la teva ubicació per etiquetar les teves publicacions i mostrar contingut proper.</string>
+    <string name="permission_location_primer_subtitle">Permet usar la teva ubicació per etiquetar les teves publicacions i compartir-la als xats.</string>
     <string name="permission_location_primer_allow">Permetre l\'accés a la ubicació</string>
     <string name="permission_location_denied_title">L\'accés a la ubicació està desactivat</string>
-    <string name="permission_location_denied_subtitle">Activa la ubicació als Ajustos per etiquetar les teves publicacions i mostrar contingut proper.</string>
+    <string name="permission_location_denied_subtitle">Activa la ubicació als Ajustos per etiquetar les teves publicacions i compartir-la als xats.</string>
     <string name="permission_location_always_primer_subtitle">Permet Sempre perquè els amics vegin la teva ubicació en viu encara que Moments estigui en segon pla.</string>
     <string name="permission_location_always_primer_allow">Permetre Sempre</string>
     <string name="permission_location_always_denied_title">La ubicació en segon pla està desactivada</string>

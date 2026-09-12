@@ -193,7 +193,9 @@
     <string name="privacy_messages_title">6. メッセージとコミュニケーション</string>
     <string name="privacy_messages_body">メッセージを配信するため、会話、メッセージリクエスト、参加者、タイムスタンプ、既読情報、メディアファイル、消えるメッセージ、共有コンテンツを処理します。\n\nメッセージや機密データを保護するため、暗号化やセキュリティ対策を実施しています。ただし、一部のメタデータ、メディアファイルのURL、サービスの提供に必要な情報は、別途保存・処理される場合があります。\n\n会話でライブ位置情報を共有することを選択した場合、共有セッションが終了または期限切れになるまで、その位置情報を処理します。</string>
     <string name="privacy_permissions_title">7. デバイスの権限</string>
-    <string name="privacy_permissions_body">特定の機能に必要な場合のみ、権限をリクエストします。写真や動画の作成にはカメラ、コンテンツのアップロードや保存には写真ライブラリ、音声にはマイク、投稿へのタグ付け、地図や近くのコンテンツの表示、任意のNovaコンテキストの利用には位置情報を使用します。\n\nこれらの権限はデバイスの設定から変更できます。オフにすると、一部の機能を利用できなくなる場合があります。</string>
+    <string name="privacy_permissions_body">特定の機能に必要な場合のみ、権限をリクエストします。写真や動画の作成にはカメラ、コンテンツのアップロードや保存には写真ライブラリ、音声にはマイク、投稿への位置情報の追加、地図の表示、チャットでの共有、任意のNovaコンテキストには位置情報を使用します。
+
+これらの権限はデバイスの設定から変更できます。オフにすると、一部の機能を利用できなくなる場合があります。</string>
     <string name="privacy_ads_title">8. 広告と同意</string>
     <string name="privacy_ads_body">MomentsではGoogle AdMobを通じて広告を表示する場合があります。地域や設定に応じて、GoogleのUser Messaging Platform（UMP）を通じて同意を求めることがあります。\n\n同意した場合、広告IDや許可されたシグナルを使って広告がパーソナライズされることがあります。同意しない場合は、パーソナライズされていない広告、または制限付きの広告が表示されることがあります。</string>
     <string name="privacy_moderation_title">9. 安全対策、報告、モデレーション</string>
@@ -1842,11 +1844,11 @@
     <string name="permission_camera_denied_open_settings">設定を開く</string>
     <string name="permission_phone_time">9:41</string>
     <string name="permission_location_primer_title">位置情報をオンにする</string>
-    <string name="permission_location_primer_subtitle">投稿に位置情報を追加したり、近くの関連コンテンツを表示したりするため、位置情報へのアクセスを許可してください。</string>
+    <string name="permission_location_primer_subtitle">投稿に位置情報を付けたり、チャットで共有したりできるよう、位置情報へのアクセスを許可してください。</string>
     <string name="permission_location_primer_allow">位置情報を許可</string>
     <string name="permission_location_primer_not_now">今はしない</string>
     <string name="permission_location_denied_title">位置情報へのアクセスがオフです</string>
-    <string name="permission_location_denied_subtitle">投稿に位置情報を追加したり、近くの関連コンテンツを表示したりするには、「設定」で位置情報をオンにしてください。</string>
+    <string name="permission_location_denied_subtitle">投稿に位置情報を付けたり、チャットで共有したりするには、「設定」で位置情報をオンにしてください。</string>
     <string name="permission_location_denied_open_settings">設定を開く</string>
     <string name="permission_location_always_primer_title">ライブ位置情報を共有する</string>
     <string name="permission_location_always_primer_subtitle">Momentsがバックグラウンドで動作しているときも友達があなたのライブ位置情報を確認できるよう、「常に許可」を選択してください。</string>

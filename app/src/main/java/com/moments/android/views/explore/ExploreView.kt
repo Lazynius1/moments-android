@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -97,6 +98,7 @@ import kotlinx.coroutines.launch
 fun ExploreView(
     initialSearchQuery: String? = null,
     isDismissable: Boolean = false,
+    isTabActive: Boolean = true,
     onDismiss: () -> Unit = {},
     contentPadding: PaddingValues = PaddingValues(0.dp),
     modifier: Modifier = Modifier,
@@ -105,6 +107,7 @@ fun ExploreView(
     val scope = rememberCoroutineScope()
     val view = LocalView.current
     val layoutDirection = LocalLayoutDirection.current
+    val focusManager = LocalFocusManager.current
     val viewModel: ExploreViewModel = viewModel()
     var searchText by rememberSaveable { mutableStateOf(initialSearchQuery.orEmpty()) }
     var isSearchFocused by remember { mutableStateOf(false) }
@@ -114,9 +117,22 @@ fun ExploreView(
     var selectedProfileRoute by remember { mutableStateOf<FeedProfileSheetRoute?>(null) }
     var zoomDestination by remember { mutableStateOf<MomentZoomDestination?>(null) }
 
+    fun preserveSearchSessionForNavigation() {
+        if (searchText.isBlank()) return
+        isSearchFocused = false
+        focusManager.clearFocus()
+    }
+
+    fun clearSearchSession() {
+        isSearchFocused = false
+        focusManager.clearFocus()
+        searchText = ""
+    }
+
     fun openProfile(userId: String) {
         val trimmed = userId.trim()
         if (trimmed.isEmpty()) return
+        preserveSearchSessionForNavigation()
         selectedProfileRoute = FeedProfileSheetRoute(trimmed)
         // iOS: checkCanViewContent con resultado ignorado (solo prefetch/cache)
         scope.launch { viewModel.canViewContent(trimmed) }
@@ -129,6 +145,7 @@ fun ExploreView(
         presentation: MomentZoomPresentationKind,
         zoomIDPrefix: String,
     ) {
+        preserveSearchSessionForNavigation()
         val resolvedIndex = sourceMoments.indexOfFirst { it.id == moment.id }
             .takeIf { it >= 0 } ?: index
         MomentZoomOpener.open(
@@ -149,6 +166,10 @@ fun ExploreView(
 
     LaunchedEffect(searchText) {
         viewModel.searchIfChanged(searchText)
+    }
+
+    LaunchedEffect(isTabActive) {
+        if (!isTabActive) clearSearchSession()
     }
 
     MomentsSharedTransitionLayout(
@@ -179,6 +200,7 @@ fun ExploreView(
                 isDismissable = isDismissable,
                 onDismiss = {
                     HapticManager.shared.lightImpact(view)
+                    clearSearchSession()
                     onDismiss()
                 },
                 onOpenMap = {

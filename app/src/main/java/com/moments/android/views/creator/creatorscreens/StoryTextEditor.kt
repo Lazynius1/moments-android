@@ -321,9 +321,7 @@ fun StoryTextEditor(
 
         StoryTextEditorInput(
             text = text,
-            onTextChange = { raw ->
-                onTextChange(if (forcesAllCaps || selectedStyle.usesAllCaps) raw.uppercase() else raw)
-            },
+            onTextChange = onTextChange,
             isFocused = isTextFieldFocused,
             onFocusedChange = { isTextFieldFocused = it },
             configuration = configuration,

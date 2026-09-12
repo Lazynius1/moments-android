@@ -59,7 +59,6 @@ import com.moments.android.views.story.StoryRingAvatarView
 @Composable
 fun ActivityInteractionCategoryRow(
     category: ActivityInteractionCategory,
-    summary: ActivityCategorySummary?,
     modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
@@ -110,20 +109,6 @@ fun ActivityInteractionCategoryRow(
                     color = primary,
                 )
 
-                val count = summary?.count ?: 0
-                if (count > 0) {
-                    // ≡ Capsule + accentColor
-                    Text(
-                        text = "$count",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(category.accentColor)
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
-                }
             }
 
             Text(

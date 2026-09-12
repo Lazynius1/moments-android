@@ -209,9 +209,9 @@ Aplicamos cifrado y medidas de seguridad para proteger mensajes y datos sensible
 
 Si decides compartir ubicación en vivo en una conversación, tratamos esa ubicación hasta que la sesión de compartición termine o expire.</string>
     <string name="privacy_permissions_title">7. Permisos del dispositivo</string>
-    <string name="privacy_permissions_body">Pedimos permisos solo cuando son necesarios para una función concreta: cámara para crear fotos o vídeos, galería para subir o guardar contenido, micrófono para audio, ubicación para etiquetar publicaciones, mapas, contenido cercano y contexto opcional de Nova.
+    <string name="privacy_permissions_body">Pedimos permisos solo cuando son necesarios para una función concreta: cámara para crear fotos o vídeos, galería para subir o guardar contenido, micrófono para audio, ubicación para etiquetar publicaciones, mapas y compartirla en chats, más contexto opcional de Nova.
 
-Puedes cambiar estos permisos desde los ajustes de tu dispositivo. Si los desactivas, algunas funciones pueden dejar de estar disponibles.</string>
+Puedes cambiar estos permisos desde los ajustes del dispositivo. Si los desactivas, algunas funciones pueden dejar de estar disponibles.</string>
     <string name="privacy_ads_title">8. Publicidad y consentimiento</string>
     <string name="privacy_ads_body">Moments puede mostrar anuncios mediante Google AdMob. Según tu región y ajustes, podemos pedir consentimiento mediante la plataforma de mensajes para el usuario de Google (UMP).
 
@@ -1841,10 +1841,10 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="permission_camera_denied_title">La cámara está desactivada</string>
     <string name="permission_camera_denied_subtitle">Activa la cámara en Ajustes para seguir capturando fotos y vídeos para tus historias, momentos y perfil.</string>
     <string name="permission_location_primer_title">Activa la ubicación</string>
-    <string name="permission_location_primer_subtitle">Permite usar tu ubicación para etiquetar tus publicaciones y mostrar contenido cercano.</string>
+    <string name="permission_location_primer_subtitle">Permite usar tu ubicación para etiquetar tus publicaciones y compartirla en los chats.</string>
     <string name="permission_location_primer_allow">Permitir la ubicación</string>
     <string name="permission_location_denied_title">La ubicación está desactivada</string>
-    <string name="permission_location_denied_subtitle">Activa la ubicación en Ajustes para etiquetar tus publicaciones y mostrar contenido cercano.</string>
+    <string name="permission_location_denied_subtitle">Activa la ubicación en Ajustes para etiquetar tus publicaciones y compartirla en los chats.</string>
     <string name="permission_location_always_primer_subtitle">Permite Siempre para que tus amigos vean tu ubicación en vivo aunque Moments esté en segundo plano.</string>
     <string name="permission_location_always_primer_allow">Permitir Siempre</string>
     <string name="permission_location_always_denied_title">La ubicación en segundo plano está desactivada</string>

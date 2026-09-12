@@ -209,7 +209,7 @@ Applichiamo crittografia e misure di sicurezza per proteggere messaggi e dati se
 
 Se scegli di condividere la posizione in tempo reale in una conversazione, trattiamo quella posizione fino al termine o alla scadenza della sessione di condivisione.</string>
     <string name="privacy_permissions_title">7. Permessi del dispositivo</string>
-    <string name="privacy_permissions_body">Richiediamo i permessi solo quando servono per una funzione specifica: fotocamera per creare foto o video, libreria foto per caricare o salvare contenuti, microfono per l\'audio e posizione per taggare i post, mostrare mappe, contenuti vicini e contesto opzionale per Nova.
+    <string name="privacy_permissions_body">Richiediamo i permessi solo quando servono per una funzione specifica: fotocamera per creare foto o video, libreria foto per caricare o salvare contenuti, microfono per l\'audio e posizione per taggare i post, mostrare mappe e condividerla nelle chat, più contesto opzionale per Nova.
 
 Puoi modificare questi permessi nelle impostazioni del dispositivo. Se li disattivi, alcune funzioni potrebbero non essere più disponibili.</string>
     <string name="privacy_ads_title">8. Pubblicità e consenso</string>
@@ -1229,10 +1229,10 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="permission_camera_denied_title">L’accesso alla fotocamera è disattivato</string>
     <string name="permission_camera_denied_subtitle">Attiva la fotocamera nelle Impostazioni per continuare a catturare foto e video per le tue storie, i tuoi momenti e il tuo profilo.</string>
     <string name="permission_location_primer_title">Attiva la posizione</string>
-    <string name="permission_location_primer_subtitle">Consenti l’accesso alla posizione per taggare i tuoi post e mostrare contenuti rilevanti nelle vicinanze.</string>
+    <string name="permission_location_primer_subtitle">Consenti l’accesso alla posizione per taggare i tuoi post e condividerla nelle chat.</string>
     <string name="permission_location_primer_allow">Consenti accesso alla posizione</string>
     <string name="permission_location_denied_title">L’accesso alla posizione è disattivato</string>
-    <string name="permission_location_denied_subtitle">Attiva la posizione nelle Impostazioni per taggare i tuoi post e mostrare contenuti nelle vicinanze.</string>
+    <string name="permission_location_denied_subtitle">Attiva la posizione nelle Impostazioni per taggare i tuoi post e condividerla nelle chat.</string>
     <string name="permission_location_always_primer_subtitle">Consenti Sempre così gli amici possono vedere la tua posizione live anche quando Moments è in background.</string>
     <string name="permission_location_always_primer_allow">Consenti Sempre</string>
     <string name="permission_location_always_denied_title">La posizione in background è disattivata</string>

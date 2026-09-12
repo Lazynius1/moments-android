@@ -158,7 +158,7 @@ fun StoryTextEditorInput(
         "solid", "semitransparent" -> StoryTextAttributesBuilder.contrastColor(configuration.textColor)
         else -> configuration.textColor
     }
-    val effectConfig = configuration.copy(text = text.ifEmpty { " " })
+    val effectConfig = configuration.copy(text = text.ifEmpty { " " }, appliesDisplayTransform = !isFocused)
 
     Box(
         modifier

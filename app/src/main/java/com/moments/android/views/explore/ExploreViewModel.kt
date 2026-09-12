@@ -109,6 +109,8 @@ class ExploreViewModel(
     override fun onCleared() {
         FollowStateStore.removeListener(followListener)
         searchJob?.cancel()
+        contentSearchJob?.cancel()
+        exploreJob?.cancel()
         super.onCleared()
     }
 
@@ -432,10 +434,22 @@ class ExploreViewModel(
 
     // MARK: - Private loaders
 
-    private suspend fun loadConnectionsFirst(userId: String) {
-        val following = runCatching { firestore.fetchFollowing(userId) }.getOrDefault(emptyList())
-        val followers = runCatching { firestore.fetchFollowers(userId) }.getOrDefault(emptyList())
-        val notifications = NotificationService.fetchNotificationsOnce(userId).getOrDefault(emptyList())
+    private suspend fun loadConnectionsFirst(userId: String) = coroutineScope {
+        // Estas tres lecturas no dependen entre sí. Igual que en iOS, lanzarlas
+        // juntas reduce el tiempo hasta que Explore puede filtrar sugerencias.
+        val followingRequest = async {
+            runCatching { firestore.fetchFollowing(userId) }.getOrDefault(emptyList())
+        }
+        val followersRequest = async {
+            runCatching { firestore.fetchFollowers(userId) }.getOrDefault(emptyList())
+        }
+        val notificationsRequest = async {
+            NotificationService.fetchNotificationsOnce(userId).getOrDefault(emptyList())
+        }
+
+        val following = followingRequest.await()
+        val followers = followersRequest.await()
+        val notifications = notificationsRequest.await()
 
         val loadedFollowedIds = following.map { it.id }.toSet()
         followedUserIds = loadedFollowedIds

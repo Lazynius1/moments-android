@@ -165,6 +165,8 @@ fun ModernCommentsView(
 
     var commentsListener by remember { mutableStateOf<ListenerRegistration?>(null) }
     var muteSettingsListener by remember { mutableStateOf<ListenerRegistration?>(null) }
+    var commentsListenerRefreshId by remember { mutableStateOf(0) }
+    var loadedMomentId by remember { mutableStateOf<String?>(null) }
 
     val filterResult = remember(comments, mutedUserIds, mutedWordsNormalized, currentUid) {
         applyCommentMuteFilters(comments, currentUid, mutedUserIds, mutedWordsNormalized)
@@ -227,6 +229,7 @@ fun ModernCommentsView(
                 val mutedWords = ((muteSettings["mutedWords"] as? List<*>)?.filterIsInstance<String>() ?: emptyList())
                     .map { normalizeMutedText(it) }
                     .filter { it.isNotEmpty() }
+                if (FirebaseAuth.getInstance().currentUser?.uid != uid) return@addSnapshotListener
                 mutedUserIds = mutedUsers
                 mutedWordsNormalized = mutedWords
             }
@@ -238,6 +241,7 @@ fun ModernCommentsView(
             isLoading = false
             return
         }
+        val listenerRefreshId = commentsListenerRefreshId
         isLoading = true
         commentsListener?.remove()
         commentsListener = firestore.db
@@ -246,6 +250,9 @@ fun ModernCommentsView(
             .collection("comments")
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
+                if (commentsListenerRefreshId != listenerRefreshId || moment.id != momentId) {
+                    return@addSnapshotListener
+                }
                 if (error != null) {
                     isLoading = false
                     return@addSnapshotListener
@@ -288,15 +295,26 @@ fun ModernCommentsView(
         HapticManager.shared.selection()
     }
 
-    fun initializeCommentsView() {
-        scope.launch {
-            isLoading = true
+    fun stopCommentObservers() {
+        commentsListener?.remove()
+        commentsListener = null
+        muteSettingsListener?.remove()
+        muteSettingsListener = null
+    }
+
+    fun initializeCommentsView(clearExistingComments: Boolean) {
+        stopCommentObservers()
+        if (clearExistingComments) {
             comments = emptyList()
-            commentsListener?.remove()
-            delay(100)
-            setupMuteSettingsListener()
-            setupCommentsListener()
         }
+
+        if (moment.disableComments) {
+            isLoading = false
+            return
+        }
+
+        setupMuteSettingsListener()
+        setupCommentsListener()
     }
 
     fun addComment(content: String, parentCommentId: String?, mentions: List<CommentMentionEntity>) {
@@ -415,8 +433,9 @@ fun ModernCommentsView(
 
     var skipNextResumeInit by remember(moment.id) { mutableStateOf(true) }
 
-    LaunchedEffect(moment.id) {
-        initializeCommentsView()
+    LaunchedEffect(moment.id, commentsListenerRefreshId) {
+        initializeCommentsView(clearExistingComments = loadedMomentId != moment.id)
+        loadedMomentId = moment.id
         skipNextResumeInit = true
     }
 
@@ -428,7 +447,7 @@ fun ModernCommentsView(
                 if (skipNextResumeInit) {
                     skipNextResumeInit = false
                 } else {
-                    initializeCommentsView()
+                    commentsListenerRefreshId += 1
                 }
             }
         }
@@ -438,19 +457,17 @@ fun ModernCommentsView(
 
     DisposableEffect(Unit) {
         onDispose {
-            commentsListener?.remove()
-            muteSettingsListener?.remove()
+            stopCommentObservers()
             isLoading = false
             comments = emptyList()
-            commentsListener = null
-            muteSettingsListener = null
         }
     }
 
-    LaunchedEffect(isLoading) {
+    LaunchedEffect(moment.id, commentsListenerRefreshId, isLoading) {
         if (isLoading) {
+            val timeoutRefreshId = commentsListenerRefreshId
             delay(5_000)
-            if (isLoading) isLoading = false
+            if (isLoading && commentsListenerRefreshId == timeoutRefreshId) isLoading = false
         }
     }
 
@@ -460,7 +477,6 @@ fun ModernCommentsView(
             CommentsHeader(
                 authorId = moment.authorId,
                 fallbackUsername = moment.username,
-                count = null,
                 isLoading = false,
                 showSortMenu = showSortMenu,
                 onShowSortMenuChange = { showSortMenu = it },
@@ -495,7 +511,6 @@ fun ModernCommentsView(
             CommentsHeader(
                 authorId = moment.authorId,
                 fallbackUsername = moment.username,
-                count = if (!isLoading && filteredComments.isNotEmpty()) filteredComments.size else null,
                 isLoading = isLoading,
                 showSortMenu = showSortMenu,
                 onShowSortMenuChange = { showSortMenu = it },
@@ -716,7 +731,6 @@ fun ModernCommentsView(
 private fun CommentsHeader(
     authorId: String,
     fallbackUsername: String,
-    count: Int?,
     isLoading: Boolean,
     showSortMenu: Boolean,
     onShowSortMenuChange: (Boolean) -> Unit,
@@ -738,25 +752,11 @@ private fun CommentsHeader(
                     fontSize = 16.sp,
                     color = colors.primary,
                 )
-                when {
-                    isLoading -> MomentsCircularProgressIndicator(
+                if (isLoading) {
+                    MomentsCircularProgressIndicator(
                         modifier = Modifier.size(14.dp),
                         strokeWidth = 2.dp,
                     )
-                    count != null -> {
-                        Text(
-                            "$count",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier
-                                .background(
-                                    Brush.horizontalGradient(listOf(Color(0xFF007AFF), Color(0xFFAF52DE))),
-                                    RoundedCornerShape(50),
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
-                    }
                 }
             }
             Row(

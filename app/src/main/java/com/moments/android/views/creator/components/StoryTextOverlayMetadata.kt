@@ -91,7 +91,7 @@ data class StoryTextOverlayDraft(
         val effect = StoryTextEffect.fromStoredRaw(visualEffectRaw)
         return StoryTextOverlayMetadata(
             id = id,
-            text = trimmed,
+            text = text,
             normalizedPosition = Point(
                 normalizedX.coerceIn(0.0, 1.0),
                 normalizedY.coerceIn(0.0, 1.0),
@@ -185,7 +185,7 @@ fun buildStoryTextOverlayMetadata(
     val safeHeight = contentSize.height.coerceAtLeast(1f)
     return StoryTextOverlayMetadata(
         id = id,
-        text = trimmed,
+        text = text,
         normalizedPosition = Point(
             (editorPosition.x / safeWidth).toDouble().coerceIn(0.0, 1.0),
             (editorPosition.y / safeHeight).toDouble().coerceIn(0.0, 1.0),
