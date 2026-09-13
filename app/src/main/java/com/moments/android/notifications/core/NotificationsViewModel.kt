@@ -136,9 +136,9 @@ class NotificationsViewModel(
     }
 
     fun checkIfFollowing(currentUserId: String, targetUserId: String, onResult: (Boolean) -> Unit) {
-        val cached = LocalPersistenceService.isFollowing(targetUserId)
-        onResult(cached)
         scope.launch {
+            val cached = LocalPersistenceService.isFollowingAsync(targetUserId)
+            onResult(cached)
             val network = firestoreService.isFollowing(currentUserId, targetUserId)
             if (network != cached) onResult(network)
         }

@@ -120,7 +120,7 @@ class StoryViewModel(
         }
         viewModelScope.launch {
             if (userId == viewerId) {
-                val cached = LocalPersistenceService.loadStories(userId)
+                val cached = LocalPersistenceService.loadStoriesAsync(userId)
                 if (cached.isNotEmpty()) {
                     stories = stories + (userId to cached)
                     hasActiveStory = true
@@ -140,12 +140,12 @@ class StoryViewModel(
             }
             if (userStories.isEmpty()) {
                 stories = stories - userId
-                LocalPersistenceService.deleteStories(userId)
+                LocalPersistenceService.deleteStoriesAsync(userId)
                 return@launch
             }
             stories = mapOf(userId to userStories)
-            LocalPersistenceService.deleteStories(userId)
-            LocalPersistenceService.saveStories(userStories)
+            LocalPersistenceService.deleteStoriesAsync(userId)
+            LocalPersistenceService.saveStoriesAsync(userStories)
             for (story in userStories) {
                 val storyId = story.id ?: continue
                 fetchReactions(userId, storyId)
@@ -161,15 +161,12 @@ class StoryViewModel(
         if (!stories[authorId].isNullOrEmpty()) return
         if (authorReelJobs.containsKey(authorId)) return
 
-        if (authorId == viewerId) {
-            val cached = LocalPersistenceService.loadStories(authorId)
-            if (cached.isNotEmpty()) {
-                stories = stories + (authorId to cached)
-            }
-        }
-
         authorReelJobs[authorId] = viewModelScope.launch {
             try {
+                if (authorId == viewerId) {
+                    val cached = LocalPersistenceService.loadStoriesAsync(authorId)
+                    if (cached.isNotEmpty()) stories = stories + (authorId to cached)
+                }
                 val bundle = StoryTrayService.fetchAuthorStoryBundle(authorId)
                 if (bundle != null) {
                     val visible = bundle.stories.mapNotNull { StoryRepository.decodeBackendStory(it) }
@@ -190,11 +187,11 @@ class StoryViewModel(
         loadAuthorReelIfNeeded(authorId = userId, viewerId = viewerId)
     }
 
-    private fun applyLoadedStories(userStories: List<Story>, userId: String, viewerId: String) {
+    private suspend fun applyLoadedStories(userStories: List<Story>, userId: String, viewerId: String) {
         stories = stories + (userId to userStories)
         if (userId == viewerId) {
-            LocalPersistenceService.deleteStories(userId)
-            LocalPersistenceService.saveStories(userStories)
+            LocalPersistenceService.deleteStoriesAsync(userId)
+            LocalPersistenceService.saveStoriesAsync(userStories)
         }
         for (story in userStories) {
             val storyId = story.id ?: continue
@@ -303,8 +300,8 @@ class StoryViewModel(
             ringOrderedStoryUserIds = if (finalSortedIds.isEmpty()) lastFetchRingUserIds else finalSortedIds
         } else {
             // Affinity sorting ≡ AffinityTracker + bestFriends/mutuals
-            val bestFriends = LocalPersistenceService.loadUser(viewerId)?.bestFriends?.toSet().orEmpty()
-            val mutuals = LocalPersistenceService.loadConnections(viewerId).third.map { it.id }.toSet()
+            val bestFriends = LocalPersistenceService.loadUserAsync(viewerId)?.bestFriends?.toSet().orEmpty()
+            val mutuals = LocalPersistenceService.loadConnectionsAsync(viewerId).third.map { it.id }.toSet()
             val storyUserIds = filteredStories.keys.toList()
             val affinityScores = runCatching { AffinityTracker.getScores(storyUserIds) }.getOrDefault(emptyMap())
             finalSortedIds = filteredStories.keys.map { userId ->
@@ -322,11 +319,11 @@ class StoryViewModel(
         sortedStoryUserIds = finalSortedIds
 
         if (isFirstFetch) {
-            LocalPersistenceService.saveStories(filteredStories.values.flatten(), sync = true)
+            LocalPersistenceService.saveStoriesAsync(filteredStories.values.flatten(), sync = true)
             isFirstFetch = false
         } else {
             for ((_, uStories) in filteredStories) {
-                LocalPersistenceService.saveStories(uStories)
+                LocalPersistenceService.saveStoriesAsync(uStories)
             }
         }
         prefetchImages()
@@ -584,7 +581,7 @@ class StoryViewModel(
                 storyRepository.softDeleteStory(userId, storyId)
                 val userStories = stories[userId].orEmpty().filterNot { it.id == storyId }
                 stories = stories + (userId to userStories)
-                LocalPersistenceService.deleteStory(storyId)
+                LocalPersistenceService.deleteStoryAsync(storyId)
                 firestore.rebuildStorySummary(userId)
                 checkActiveStories(userId)
             }.exceptionOrNull()

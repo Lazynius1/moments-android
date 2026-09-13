@@ -110,7 +110,7 @@ suspend fun ChatService.updateChatNotice(
         .collection("messages").document(messageId)
         .update("content", noticeKey)
         .await()
-    LocalPersistenceService.updateMessageNoticeContent(conversationId, messageId, noticeKey)
+    LocalPersistenceService.updateMessageNoticeContentAsync(conversationId, messageId, noticeKey)
 }
 
 suspend fun ChatService.stampVanishExpiry(
@@ -122,7 +122,7 @@ suspend fun ChatService.stampVanishExpiry(
         .collection("messages").document(messageId)
         .update("vanishExpiresAt", Timestamp(expiresAt))
         .await()
-    LocalPersistenceService.updateMessageVanishExpiresAt(conversationId, messageId, expiresAt)
+    LocalPersistenceService.updateMessageVanishExpiresAtAsync(conversationId, messageId, expiresAt)
 }
 
 suspend fun ChatService.markVanishMessagesVanishedForMe(
@@ -139,10 +139,10 @@ suspend fun ChatService.markVanishMessagesVanishedForMe(
     batch.commit().await()
 }
 
-fun ChatService.purgeVanishMessagesLocally(conversationId: String, messageIds: Collection<String>) {
+suspend fun ChatService.purgeVanishMessagesLocally(conversationId: String, messageIds: Collection<String>) {
     if (messageIds.isEmpty()) return
     for (messageId in messageIds) {
-        LocalPersistenceService.removeCachedMessage(conversationId, messageId)
+        LocalPersistenceService.removeCachedMessageAsync(conversationId, messageId)
         ChatCacheStore.deleteMessageFiles(conversationId, messageId)
     }
 }

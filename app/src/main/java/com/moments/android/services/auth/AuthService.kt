@@ -300,7 +300,7 @@ object AuthService {
             return
         }
 
-        val cachedUser = LocalPersistenceService.loadUser(user.uid)
+        val cachedUser = LocalPersistenceService.loadUserAsync(user.uid)
         val cachedStatus = loadCachedAccountStatus(user.uid)
         if (cachedUser != null) {
             if (cachedStatus?.decision == CachedAccountDecision.SUSPENDED &&
@@ -349,7 +349,7 @@ object AuthService {
             OnboardingDraftStore.clear()
             check.user?.let {
                 saveCachedAccountStatus(user.uid, CachedAccountDecision.ALLOWED)
-                LocalPersistenceService.saveCurrentUser(it)
+                LocalPersistenceService.saveCurrentUserAsync(it)
             }
             hydrateAuthenticatedSession(user, check.user)
         } else if (check.user != null) {
@@ -535,7 +535,7 @@ object AuthService {
 
         if (check.isActive && check.user != null) {
             saveCachedAccountStatus(user.uid, CachedAccountDecision.ALLOWED)
-            LocalPersistenceService.saveCurrentUser(check.user)
+            LocalPersistenceService.saveCurrentUserAsync(check.user)
             hydrateAuthenticatedSession(user, check.user)
             LoginActivityService.recordSuccessfulLogin(user.uid, "google")
             authMutex.withLock { transitionLock = false }
@@ -980,7 +980,7 @@ object AuthService {
         }
 
         if (!NetworkMonitor.isConnected) {
-            val cachedUser = LocalPersistenceService.loadUser(userId)
+            val cachedUser = LocalPersistenceService.loadUserAsync(userId)
             val cachedStatus = loadCachedAccountStatus(userId)
             return when {
                 cachedStatus?.decision == CachedAccountDecision.SUSPENDED &&
@@ -999,7 +999,7 @@ object AuthService {
 
         if (result != null) return result
 
-        val cachedUser = LocalPersistenceService.loadUser(userId)
+        val cachedUser = LocalPersistenceService.loadUserAsync(userId)
         val cachedStatus = loadCachedAccountStatus(userId)
         return when {
             cachedStatus?.decision == CachedAccountDecision.SUSPENDED &&
@@ -1062,7 +1062,7 @@ object AuthService {
                     AccountCheck(false, null, false)
                 }
                 else -> {
-                    val cachedUser = LocalPersistenceService.loadUser(userId)
+                    val cachedUser = LocalPersistenceService.loadUserAsync(userId)
                     val cachedStatus = loadCachedAccountStatus(userId)
                     when {
                         cachedStatus?.decision == CachedAccountDecision.SUSPENDED &&
@@ -1236,7 +1236,7 @@ object AuthService {
         OnboardingDraftStore.clear()
         if (userData != null) {
             saveCachedAccountStatus(user.uid, CachedAccountDecision.ALLOWED)
-            LocalPersistenceService.saveCurrentUser(userData)
+            scope.launch { LocalPersistenceService.saveCurrentUserAsync(userData) }
         }
         _isLoggedIn.value = true
         _currentUser.value = userData
@@ -1509,7 +1509,7 @@ object AuthService {
     private fun finishAccountDeletionLocally() {
         auth.currentUser?.uid?.let { ForYouPreferences.clearAccountData(it) }
         runCatching { auth.signOut() }
-        LocalPersistenceService.clearCurrentUser()
+        scope.launch { LocalPersistenceService.clearCurrentUserAsync() }
         OnboardingDraftStore.clear()
         forceLogout(signOut = false)
         _currentFirebaseUser.value = null
@@ -1578,7 +1578,7 @@ object AuthService {
             MessageCatchUpService.resetOnSignOut()
             ChatSessionEngine.resetOnSignOut()
             runCatching { auth.signOut() }
-            LocalPersistenceService.clearCurrentUser()
+            LocalPersistenceService.clearCurrentUserAsync()
             OnboardingDraftStore.clear()
             _isLoggedIn.value = false
             _currentUser.value = null
@@ -1629,7 +1629,7 @@ object AuthService {
             runCatching {
                 val user = firestoreService.fetchUser(userId)
                 _currentUser.value = user
-                LocalPersistenceService.saveCurrentUser(user)
+                LocalPersistenceService.saveCurrentUserAsync(user)
             }
         }
     }

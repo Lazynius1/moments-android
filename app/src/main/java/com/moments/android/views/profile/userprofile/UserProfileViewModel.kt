@@ -35,7 +35,9 @@ import com.moments.android.views.profile.core.UserListViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.tasks.await
 import java.io.IOException
 import java.util.Date
@@ -142,8 +144,15 @@ class UserProfileViewModel(
             // Restaurar la última decisión de privacidad conocida (no caer en "privado" sin red).
             cachedCanViewContent(current)?.let { canViewContent = it }
 
-            // Caché local: perfil y moments (evita el flash a estado vacío sin red).
-            LocalPersistenceService.loadUser(userId)?.let { cached ->
+            // Caché local: perfil y moments (evita el flash a estado vacío sin bloquear la UI).
+            val cached = withContext(Dispatchers.IO) {
+                Triple(
+                    LocalPersistenceService.loadUserAsync(userId),
+                    LocalPersistenceService.loadProfileMomentsAsync(userId, current),
+                    LocalPersistenceService.loadConnectionsAsync(userId),
+                )
+            }
+            cached.first?.let { cached ->
                 if (cached.isActive) {
                     userProfile = cached
                     isLoading = false
@@ -154,12 +163,12 @@ class UserProfileViewModel(
                     isLoading = false
                 }
             }
-            val cachedMoments = LocalPersistenceService.loadProfileMoments(userId, current)
+            val cachedMoments = cached.second
             if (cachedMoments.isNotEmpty() && moments.isEmpty()) {
                 moments = cachedMoments.take(momentsFetchLimit)
             }
 
-            val (cachedFollowers, cachedFollowing, cachedMutuals) = LocalPersistenceService.loadConnections(userId)
+            val (cachedFollowers, cachedFollowing, cachedMutuals) = cached.third
             if (cachedFollowers.isNotEmpty() || cachedFollowing.isNotEmpty() || cachedMutuals.isNotEmpty()) {
                 categorizeConnectionsWithPrivacy(cachedFollowing, cachedFollowers, cachedMutuals)
             }
@@ -321,8 +330,8 @@ class UserProfileViewModel(
         fetchMoments()
         isLoading = false
 
-        LocalPersistenceService.saveFollowers(userId, filteredFollowers)
-        LocalPersistenceService.saveFollowing(userId, filteredFollowing)
+        LocalPersistenceService.saveFollowersAsync(userId, filteredFollowers)
+        LocalPersistenceService.saveFollowingAsync(userId, filteredFollowing)
     }
 
     // MARK: - Contexto del viewer
@@ -413,7 +422,7 @@ class UserProfileViewModel(
             moments = backend.moments
             isLoadingMoments = false
             if (momentsFetchLimit >= 50) {
-                LocalPersistenceService.saveProfileMoments(backend.moments, userId, current, sync = true)
+                LocalPersistenceService.saveProfileMomentsAsync(backend.moments, userId, current, sync = true)
             }
             return
         }
@@ -423,7 +432,7 @@ class UserProfileViewModel(
                 moments = filtered.take(momentsFetchLimit)
                 isLoadingMoments = false
                 if (momentsFetchLimit >= 50) {
-                    LocalPersistenceService.saveProfileMoments(filtered, userId, current, sync = true)
+                    LocalPersistenceService.saveProfileMomentsAsync(filtered, userId, current, sync = true)
                 }
             }
             .onFailure { isLoadingMoments = false }

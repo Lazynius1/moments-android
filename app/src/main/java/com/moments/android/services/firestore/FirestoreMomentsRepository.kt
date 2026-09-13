@@ -192,7 +192,7 @@ suspend fun FirestoreService.checkIfSaved(userId: String, momentId: String): Boo
 suspend fun FirestoreService.toggleSaveMoment(userId: String, momentId: String, authorId: String? = null, desiredSaved: Boolean) {
     if (shouldQueueFirestoreOutbox()) {
         val payload = SavePayload(userId, momentId, authorId, desiredSaved)
-        LocalPersistenceService.saveAction(
+        LocalPersistenceService.saveActionAsync(
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.SAVE.raw,

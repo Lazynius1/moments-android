@@ -1287,12 +1287,12 @@ class FeedViewModel : ViewModel() {
                 .apply()
             // Paridad iOS: también persiste en LocalPersistenceService (offline dual).
             runCatching {
-                LocalPersistenceService.saveFeedMoments(snapshot.map { it.toIndexMoment() })
+                LocalPersistenceService.saveFeedMomentsAsync(snapshot.map { it.toIndexMoment() })
             }
         }
     }
 
-    private fun loadFeedFromCache(type: FeedType): List<FeedMoment> {
+    private suspend fun loadFeedFromCache(type: FeedType): List<FeedMoment> {
         val ctx = appContext ?: return emptyList()
         val raw = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(cacheKey(type), null)
@@ -1370,7 +1370,7 @@ class FeedViewModel : ViewModel() {
         // Paridad iOS: fallback LocalPersistence solo para following.
         if (type != FeedType.Following) return emptyList()
         return runCatching {
-            LocalPersistenceService.loadFeedMoments()
+            LocalPersistenceService.loadFeedMomentsAsync()
                 .map { it.toFeedMoment() }
                 .filter { it.isArchived != true }
         }.getOrDefault(emptyList())

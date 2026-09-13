@@ -81,6 +81,7 @@
     <string name="groups_typing_one">%1$s टाइप कर रहे हैं…</string>
     <string name="groups_typing_two">%1$s और %2$s टाइप कर रहे हैं…</string>
     <string name="groups_typing_several">कई लोग टाइप कर रहे हैं…</string>
+    <string name="groups_typing_more">%1$s और %2$d अन्य टाइप कर रहे हैं…</string>
     <string name="groups_search_members">सदस्य खोजें</string>
     <string name="groups_no_members_found">कोई सदस्य नहीं मिला।</string>
     <string name="groups_mention_placeholder">किसी सदस्य का उल्लेख करें</string>

@@ -215,7 +215,7 @@ suspend fun FirestoreService.fetchMutuals(userId: String): List<AppUser> {
         (doc.data?.get("userId") as? String) ?: doc.id
     }
     val users = fetchUsersByIdsClean(userIds)
-    LocalPersistenceService.saveMutuals(userId, users)
+    LocalPersistenceService.saveMutualsAsync(userId, users)
     return users
 }
 

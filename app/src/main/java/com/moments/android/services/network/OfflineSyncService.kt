@@ -112,7 +112,7 @@ object OfflineSyncService {
 
         if (!syncMutex.tryLock()) return
         try {
-            var pendingActions = LocalPersistenceService.loadPendingActions()
+            var pendingActions = LocalPersistenceService.loadPendingActionsAsync()
             if (pendingActions.isEmpty()) return
 
             pendingActions = optimizePendingActions(pendingActions)
@@ -129,9 +129,9 @@ object OfflineSyncService {
                     continue
                 }
 
-                LocalPersistenceService.markActionAttempt(action.id)
+                LocalPersistenceService.markActionAttemptAsync(action.id)
                 executeAction(action)
-                if (action.type == CachedAction.ActionType.REACTION.raw && LocalPersistenceService.hasPendingAction(action.id)) break
+                if (action.type == CachedAction.ActionType.REACTION.raw && LocalPersistenceService.hasPendingActionAsync(action.id)) break
             }
         } finally {
             syncMutex.unlock()
@@ -161,16 +161,16 @@ object OfflineSyncService {
                 }
             }
         }
-        LocalPersistenceService.deleteAction(action.id)
+        LocalPersistenceService.deleteActionAsync(action.id)
     }
 
-    private fun markQueuedMessageFailed(conversationId: String, messageId: String) {
-        LocalPersistenceService.updateCachedMessageStatus(conversationId, messageId, MessageStatus.FAILED)
+    private suspend fun markQueuedMessageFailed(conversationId: String, messageId: String) {
+        LocalPersistenceService.updateCachedMessageStatusAsync(conversationId, messageId, MessageStatus.FAILED)
         ChatService.updateLocalMessageStatus(conversationId, messageId, MessageStatus.FAILED)
     }
 
     private suspend fun executeAction(action: CachedAction) {
-        LocalPersistenceService.updateActionStatus(action.id, CachedAction.ActionStatus.EXECUTING)
+        LocalPersistenceService.updateActionStatusAsync(action.id, CachedAction.ActionStatus.EXECUTING)
         when (action.type) {
             CachedAction.ActionType.MOMENT_UPLOAD.raw ->
                 BackgroundMomentUploadService.resumeUpload(action)
@@ -184,12 +184,12 @@ object OfflineSyncService {
                         val desired = payload.desiredActive ?: (db.collection("users").document(payload.authorId)
                             .collection("moments").document(payload.momentId).collection("reactions").document(payload.userId)
                             .get(com.google.firebase.firestore.Source.SERVER).await().getString("reactionType") != payload.reaction)
-                        LocalPersistenceService.updateActionPayload(action.id, payload.copy(desiredActive = desired).encode())
+                        LocalPersistenceService.updateActionPayloadAsync(action.id, payload.copy(desiredActive = desired).encode())
                         firestoreService.addReaction(
                             payload.momentId, payload.reaction, payload.userId, payload.authorId, desiredActive = desired,
                         )
-                    }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                    }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.COMMENT.raw -> {
@@ -204,8 +204,8 @@ object OfflineSyncService {
                             commentId = payload.commentId,
                             mentions = payload.mentions,
                         )
-                    }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                    }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.MESSAGE.raw -> {
@@ -213,10 +213,10 @@ object OfflineSyncService {
                     ChatService.sendMessage(payload.message, payload.useServerTimestamp)
                         .onSuccess { sent ->
                             if (sent.status != MessageStatus.PENDING) {
-                                LocalPersistenceService.deleteAction(action.id)
+                                LocalPersistenceService.deleteActionAsync(action.id)
                             }
                         }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.MEDIA_MESSAGE.raw -> {
@@ -233,7 +233,7 @@ object OfflineSyncService {
                     if (mediaData == null) {
                         // Sin bytes no hay reenvío posible: marcar fallido y retirar.
                         markQueuedMessageFailed(payload.conversationId, payload.messageId)
-                        LocalPersistenceService.deleteAction(action.id)
+                        LocalPersistenceService.deleteActionAsync(action.id)
                     } else {
                         val result = if (type == MessageType.AUDIO) {
                             ChatService.sendAudioMessage(
@@ -250,11 +250,11 @@ object OfflineSyncService {
                         }
                         result.onSuccess { sent ->
                             if (sent.status != MessageStatus.PENDING) {
-                                LocalPersistenceService.deleteAction(action.id)
+                                LocalPersistenceService.deleteActionAsync(action.id)
                             }
                         }
                     }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.DELETE_COMMENT.raw -> {
@@ -263,8 +263,8 @@ object OfflineSyncService {
                         firestoreService.deleteComment(
                             payload.momentId, payload.commentId, payload.userId, payload.authorId,
                         )
-                    }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                    }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.FOLLOW.raw -> {
@@ -275,8 +275,8 @@ object OfflineSyncService {
                         } else {
                             firestoreService.unfollowUser(payload.followerId, payload.followedId)
                         }
-                    }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                    }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.SAVE.raw -> {
@@ -291,11 +291,11 @@ object OfflineSyncService {
                         !currentlySaved
                     }
                     val resolved = payload.copy(desiredSaved = desiredSaved)
-                    LocalPersistenceService.updateActionPayload(action.id, resolved.encode())
+                    LocalPersistenceService.updateActionPayloadAsync(action.id, resolved.encode())
                     runCatching {
                         firestoreService.toggleSaveMoment(resolved.userId, resolved.momentId, resolved.authorId, desiredSaved)
-                    }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                    }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.BLOCK.raw -> {
@@ -306,8 +306,8 @@ object OfflineSyncService {
                         } else {
                             firestoreService.unblockUser(payload.currentUserId, payload.targetUserId)
                         }
-                    }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                    }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.UPDATE_PROFILE.raw -> {
@@ -315,12 +315,12 @@ object OfflineSyncService {
                     if (payload.isImageUpdate && payload.profileImageLocalPath != null) {
                         val bitmap = BitmapFactory.decodeFile(payload.profileImageLocalPath)
                         if (bitmap == null) {
-                            LocalPersistenceService.deleteAction(action.id)
+                            LocalPersistenceService.deleteActionAsync(action.id)
                         } else {
                             runCatching {
                                 val url = StorageService.uploadProfileImage(payload.userId, bitmap)
                                 firestoreService.updateProfilePicture(payload.userId, url)
-                            }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
+                            }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
                         }
                     } else {
                         runCatching {
@@ -335,9 +335,9 @@ object OfflineSyncService {
                                 db.collection("users").document(payload.userId)
                                     .update("interests", interests).awaitTask()
                             }
-                        }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
+                        }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
                     }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.ACCEPT_FOLLOW_REQUEST.raw -> {
@@ -346,13 +346,13 @@ object OfflineSyncService {
                         firestoreService.acceptFollowRequest(
                             payload.notificationId, payload.recipientId, payload.senderId,
                         )
-                    }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
+                    }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
                         .onFailure { err ->
                             if (err.message?.contains("Solicitud no encontrada") == true) {
-                                LocalPersistenceService.deleteAction(action.id)
+                                LocalPersistenceService.deleteActionAsync(action.id)
                             }
                         }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.REJECT_FOLLOW_REQUEST.raw -> {
@@ -361,8 +361,8 @@ object OfflineSyncService {
                         firestoreService.rejectFollowRequest(
                             payload.notificationId, payload.recipientId, payload.senderId,
                         )
-                    }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                    }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.REPORT_CONTENT.raw -> {
@@ -384,8 +384,8 @@ object OfflineSyncService {
                             "moderatorNotes" to "",
                         )
                         db.collection("reports").add(reportData).awaitTask()
-                    }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                    }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.MARK_AS_READ.raw -> {
@@ -394,8 +394,8 @@ object OfflineSyncService {
                         db.collection("users").document(payload.userId)
                             .collection("notifications").document(payload.notificationId)
                             .update("isPending", false).awaitTask()
-                    }.onSuccess { LocalPersistenceService.deleteAction(action.id) }
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                    }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
 
             CachedAction.ActionType.DELETE_MOMENT.raw -> {
@@ -414,13 +414,13 @@ object OfflineSyncService {
                     payload.videoUrl?.takeIf { it.isNotEmpty() }?.let { path ->
                         runCatching { StorageService.deleteMedia(path) }
                     }
-                    if (deleted) LocalPersistenceService.deleteAction(action.id)
-                } ?: LocalPersistenceService.deleteAction(action.id)
+                    if (deleted) LocalPersistenceService.deleteActionAsync(action.id)
+                } ?: LocalPersistenceService.deleteActionAsync(action.id)
             }
         }
         // Si no se borró, vuelve a pendiente (iOS: updateActionStatus .pending al final).
-        if (LocalPersistenceService.hasPendingAction(action.id)) {
-            LocalPersistenceService.updateActionStatus(action.id, CachedAction.ActionStatus.PENDING)
+        if (LocalPersistenceService.hasPendingActionAsync(action.id)) {
+            LocalPersistenceService.updateActionStatusAsync(action.id, CachedAction.ActionStatus.PENDING)
         }
     }
 
@@ -466,7 +466,7 @@ object OfflineSyncService {
                 group.sortedBy { it.createdAt }.dropLast(1).forEach { actionsToDelete.add(it.id) }
             }
 
-        actionsToDelete.forEach { LocalPersistenceService.deleteAction(it) }
+        actionsToDelete.forEach { LocalPersistenceService.deleteActionAsync(it) }
         return actions.filter { it.id !in actionsToDelete }
     }
 

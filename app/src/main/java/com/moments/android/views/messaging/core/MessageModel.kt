@@ -855,10 +855,14 @@ data class Conversation(
     fun messageHistoryCutoff(userId: String): MessageHistoryCutoff? =
         MessageHistoryCutoff.combining(lastDeletedAt?.get(userId), memberJoinedAt?.get(userId))
     fun unreadCount(currentUserId: String): Int {
+        if (currentUserId.isBlank()) return 0
         if (readStatus[currentUserId] != false) return 0
         val conversationId = id ?: return 1
-        val count = com.moments.android.services.persistence.LocalPersistenceService.unreadMessageCount(conversationId, currentUserId, lastReadAt?.get(currentUserId))
-        return count.takeIf { it > 0 } ?: 1
+        return com.moments.android.services.persistence.UnreadMessageCountStore.countFor(
+            conversationId = conversationId,
+            currentUserId = currentUserId,
+            lastReadAt = lastReadAt?.get(currentUserId),
+        )
     }
     /** Stub iOS: siempre true (bloqueos no filtrados aquí). */
     val isActive: Boolean get() = true

@@ -81,6 +81,7 @@
     <string name="groups_typing_one">%1$s yazıyor…</string>
     <string name="groups_typing_two">%1$s ve %2$s yazıyor…</string>
     <string name="groups_typing_several">Birden fazla kişi yazıyor…</string>
+    <string name="groups_typing_more">%1$s ve %2$d kişi daha yazıyor…</string>
     <string name="groups_search_members">Üye ara</string>
     <string name="groups_no_members_found">Üye bulunamadı.</string>
     <string name="groups_mention_placeholder">Bir üyeden bahset</string>

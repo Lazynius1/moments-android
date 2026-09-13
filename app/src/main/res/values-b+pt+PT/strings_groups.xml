@@ -81,6 +81,7 @@
     <string name="groups_typing_one">%1$s está a escrever…</string>
     <string name="groups_typing_two">%1$s e %2$s estão a escrever…</string>
     <string name="groups_typing_several">Várias pessoas estão a escrever…</string>
+    <string name="groups_typing_more">%1$s e mais %2$d estão a escrever…</string>
     <string name="groups_search_members">Pesquisar membros</string>
     <string name="groups_no_members_found">Nenhum membro encontrado.</string>
     <string name="groups_mention_placeholder">Mencionar um membro</string>

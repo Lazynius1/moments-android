@@ -3,6 +3,7 @@ package com.moments.android.views.messaging.components
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.InfiniteRepeatableSpec
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -23,11 +24,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -60,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -80,14 +84,11 @@ import java.util.Calendar
 import java.util.Date
 import kotlinx.coroutines.delay
 import kotlin.math.PI
+import kotlin.math.sin
 
 /** Port de `Views/Messaging/Components/ChatChromeViews.swift`. */
 object ChatComposerChromeMetrics {
-    /**
-     * Gap fijo bajo el panel (nav/home o IME).
-     * Como el padding estable de TG (`dp(9+7)` en la fórmula de list padding):
-     * no cambiar entre teclado abierto/cerrado — evita saltos al medir el composer.
-     */
+    /** Gap fijo bajo el panel (nav/home o IME); estable con teclado abierto/cerrado. */
     val panelInset = 8.dp
     val messageListGap = 11.dp
     val fadeExtendAbovePanel = 20.dp
@@ -502,59 +503,62 @@ fun GlassmorphicTypingIndicator(
     reduceMotion: Boolean = MotionPolicy.reduceMotion,
 ) {
     val colors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme())
-    // ≡ reduceMotion: puntos estáticos 0.85, sin pulso infinito
+    val shape = chatBubbleShape(
+        side = ChatBubbleSide.LEADING,
+        position = ChatMessageGroupPosition.SINGLE,
+    )
+    val density = LocalDensity.current
+    val lineHeight = with(density) { ChatMessageFont.bubbleLineHeightSp().sp.toDp() }
+    val bubbleModifier = modifier
+        .clip(shape)
+        .background(colors.messageBubbleBackground)
+        .border(0.5.dp, colors.messageBubbleStroke, shape)
+        .padding(
+            horizontal = ChatTextBubbleMetrics.horizontalPadding,
+            vertical = ChatTextBubbleMetrics.verticalPadding,
+        )
+
     if (reduceMotion) {
         Row(
-            modifier = modifier
-                .clip(RoundedCornerShape(20.dp))
-                .glassmorphicChat()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = bubbleModifier.heightIn(min = lineHeight),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             repeat(3) {
                 Box(
                     Modifier
-                        .size(8.dp)
+                        .size(6.5.dp)
                         .clip(CircleShape)
-                        .graphicsLayer {
-                            scaleX = 0.85f
-                            scaleY = 0.85f
-                            alpha = 0.85f
-                        }
+                        .graphicsLayer { alpha = 0.55f }
                         .background(colors.typingIndicatorColor),
                 )
             }
         }
         return
     }
+
     val transition = rememberInfiniteTransition(label = "chatTyping")
     Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .glassmorphicChat()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+        modifier = bubbleModifier.heightIn(min = lineHeight),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         repeat(3) { index ->
-            // ≡ iOS animationAmounts 0→1, easeInOut 0.6s, delay index*0.2, autoreverses
             val amount by transition.animateFloat(
                 initialValue = 0f,
                 targetValue = 1f,
                 animationSpec = infiniteRepeatable(
-                    tween(600, delayMillis = index * 200, easing = FastOutSlowInEasing),
+                    tween(550, delayMillis = index * 180, easing = FastOutSlowInEasing),
                     RepeatMode.Reverse,
                 ),
                 label = "typing$index",
             )
             Box(
                 Modifier
-                    .size(8.dp)
+                    .size(6.5.dp)
+                    .offset(y = (1.5f - amount * 5f).dp)
                     .clip(CircleShape)
-                    .graphicsLayer {
-                        scaleX = amount
-                        scaleY = amount
-                        alpha = amount
-                    }
+                    .graphicsLayer { alpha = 0.85f }
                     .background(colors.typingIndicatorColor),
             )
         }

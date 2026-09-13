@@ -38,7 +38,7 @@ suspend fun ChatService.buildMessagesFromSnapshotUsingLocalCache(
     conversationId: String,
     cutoffDate: Date?,
 ): List<EnhancedMessage> {
-    val cached = LocalPersistenceService.loadMessagesFast(conversationId)
+    val cached = LocalPersistenceService.loadMessagesFastAsync(conversationId)
     val cachedById = cached.associateBy(EnhancedMessage::id)
     val hasLocalCache = cached.isNotEmpty()
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid

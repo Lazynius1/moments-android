@@ -265,7 +265,7 @@ class FirestoreService(
             (doc.data?.get("userId") as? String) ?: doc.id
         }
         val users = fetchUsersByIdsClean(userIds)
-        LocalPersistenceService.saveFollowing(userId, users)
+        LocalPersistenceService.saveFollowingAsync(userId, users)
         return users
     }
 
@@ -279,7 +279,7 @@ class FirestoreService(
             (doc.data?.get("userId") as? String) ?: doc.id
         }
         val users = fetchUsersByIdsClean(userIds)
-        LocalPersistenceService.saveFollowers(userId, users)
+        LocalPersistenceService.saveFollowersAsync(userId, users)
         return users
     }
 
@@ -379,7 +379,7 @@ class FirestoreService(
     }
 
     suspend fun followUser(currentUserId: String, targetUserId: String) {
-        LocalPersistenceService.toggleFollowLocally(currentUserId, targetUserId, isFollow = true)
+        LocalPersistenceService.toggleFollowLocallyAsync(currentUserId, targetUserId, isFollow = true)
         require(currentUserId != targetUserId) { "Cannot follow yourself" }
         if (shouldQueueFirestoreOutbox()) {
             val payload = FollowActionPayload(
@@ -388,7 +388,7 @@ class FirestoreService(
                 followedUsername = "",
                 isFollow = true,
             )
-            LocalPersistenceService.saveAction(
+            LocalPersistenceService.saveActionAsync(
                 CachedAction(
                     id = "follow_${currentUserId}_$targetUserId",
                     type = CachedAction.ActionType.FOLLOW.raw,
@@ -544,7 +544,7 @@ class FirestoreService(
     }
 
     suspend fun unfollowUser(currentUserId: String, targetUserId: String) {
-        LocalPersistenceService.toggleFollowLocally(currentUserId, targetUserId, isFollow = false)
+        LocalPersistenceService.toggleFollowLocallyAsync(currentUserId, targetUserId, isFollow = false)
         require(currentUserId != targetUserId) { "Cannot unfollow yourself" }
         if (shouldQueueFirestoreOutbox()) {
             val payload = FollowActionPayload(
@@ -553,7 +553,7 @@ class FirestoreService(
                 followedUsername = "",
                 isFollow = false,
             )
-            LocalPersistenceService.saveAction(
+            LocalPersistenceService.saveActionAsync(
                 CachedAction(
                     id = "unfollow_${currentUserId}_$targetUserId",
                     type = CachedAction.ActionType.FOLLOW.raw,
@@ -682,10 +682,10 @@ class FirestoreService(
     }
 
     suspend fun addReaction(momentId: String, reaction: String, userId: String, authorId: String, desiredActive: Boolean? = null) {
-        if (desiredActive == null) LocalPersistenceService.toggleMomentReactionLocally(momentId, reaction, userId)
+        if (desiredActive == null) LocalPersistenceService.toggleMomentReactionLocallyAsync(momentId, reaction, userId)
         if (desiredActive == null && shouldQueueFirestoreOutbox()) {
             val payload = ReactionPayload(momentId, reaction, authorId, userId)
-            LocalPersistenceService.saveAction(
+            LocalPersistenceService.saveActionAsync(
                 CachedAction(
                     id = UUID.randomUUID().toString(),
                     type = CachedAction.ActionType.REACTION.raw,

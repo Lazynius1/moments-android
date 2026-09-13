@@ -80,8 +80,8 @@ fun SearchHistoryActivityView(
     var followerUserIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var isRefreshing by remember { mutableStateOf(false) }
 
-    fun loadSearches() {
-        searches = LocalPersistenceService.loadRecentSearches()
+    suspend fun loadSearches() {
+        searches = LocalPersistenceService.loadRecentSearchesAsync()
     }
 
     fun loadConnections() {
@@ -142,8 +142,8 @@ fun SearchHistoryActivityView(
                     color = SearchAccentBlue,
                     modifier = Modifier
                         .clickable {
-                            LocalPersistenceService.clearSearchHistory()
                             searches = emptyList()
+                            scope.launch { LocalPersistenceService.clearSearchHistoryAsync() }
                         }
                         .padding(end = 8.dp),
                 )
@@ -208,8 +208,8 @@ fun SearchHistoryActivityView(
                             textColor = textColor,
                             isDark = isDark,
                             onDelete = {
-                                LocalPersistenceService.deleteSearch(search.id)
                                 searches = searches.filterNot { it.id == search.id }
+                                scope.launch { LocalPersistenceService.deleteSearchAsync(search.id) }
                             },
                         )
                         if (index < searches.lastIndex) {

@@ -166,10 +166,14 @@ fun GlassmorphicConversationRow(
 
     val showsUnavailablePreview = isUnavailable && !isBlockedByCurrentUser
     val cleanDraft = draftText.trim()
-    val showsDraftPreview = !showsUnavailablePreview && cleanDraft.isNotEmpty()
     val isUnread = uid.isNotBlank() && conversation.readStatus[uid] == false
     val isOwnLast = conversation.isOwnLastMessage(uid)
     val unreadCount = conversation.unreadCount(uid)
+    // ≡ iOS: el borrador no tapa mensajes recibidos ni no leídos.
+    val showsDraftPreview = !showsUnavailablePreview &&
+        cleanDraft.isNotEmpty() &&
+        !isUnread &&
+        (isOwnLast || conversation.lastMessageSenderId == null)
 
     val resolvedPreview = when {
         showsUnavailablePreview -> stringResource(R.string.messaging_profile_unavailable_preview)

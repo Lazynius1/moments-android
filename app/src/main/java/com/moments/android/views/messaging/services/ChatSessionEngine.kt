@@ -34,6 +34,7 @@ object ChatSessionEngine {
     private const val MAX_CACHED_SESSIONS = 10
 
     @Volatile private var ownerUserId: String? = null
+    @Volatile private var fallbackConversationIds: List<String> = emptyList()
 
     @Volatile
     var activeConversationId: String? = null
@@ -172,22 +173,20 @@ object ChatSessionEngine {
     fun notificationConversationIdsForFallback(): List<String> {
         val ids = linkedSetOf<String>()
         activeConversationId?.let { ids.add(it) }
-
-        val userId = currentUserId
-        val cachedConversations = LocalPersistenceService.loadConversations()
-        cachedConversations
-            .filter { !(it.readStatus[userId] ?: true) }
-            .mapNotNull { it.id }
-            .forEach { ids.add(it) }
-
-        if (ids.isEmpty()) {
-            cachedConversations.take(5).mapNotNull { it.id }.forEach { ids.add(it) }
-        }
+        fallbackConversationIds.forEach { ids.add(it) }
         return ids.take(5)
     }
 
     private fun syncInAppFallbackListeners() {
-        InAppNotificationService.syncFallbackListeners(notificationConversationIdsForFallback())
+        scope.launch {
+            val cachedConversations = LocalPersistenceService.loadConversationsAsync()
+            val userId = currentUserId
+            fallbackConversationIds = cachedConversations
+                .filter { !(it.readStatus[userId] ?: true) }
+                .mapNotNull { it.id }
+                .ifEmpty { cachedConversations.take(5).mapNotNull { it.id } }
+            InAppNotificationService.syncFallbackListeners(notificationConversationIdsForFallback())
+        }
     }
 
     /** Debe llamarse con [lock] tomado. Expulsa las sesiones más antiguas por fecha. */

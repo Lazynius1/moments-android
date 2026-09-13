@@ -81,6 +81,7 @@
     <string name="groups_typing_one">%1$s sedang mengetik…</string>
     <string name="groups_typing_two">%1$s dan %2$s sedang mengetik…</string>
     <string name="groups_typing_several">Beberapa orang sedang mengetik…</string>
+    <string name="groups_typing_more">%1$s dan %2$d lainnya sedang mengetik…</string>
     <string name="groups_search_members">Cari anggota</string>
     <string name="groups_no_members_found">Tidak ada anggota ditemukan.</string>
     <string name="groups_mention_placeholder">Sebut anggota</string>

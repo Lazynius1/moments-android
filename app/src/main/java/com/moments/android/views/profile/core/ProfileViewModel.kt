@@ -41,7 +41,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.io.FileOutputStream
@@ -88,25 +90,29 @@ class ProfileViewModel(
         isLoading = true
         errorMessage = null
 
-        // ≡ SwiftData: pintar caché sin esperar a Firestore.
-        LocalPersistenceService.loadUser(userId)?.let {
-            userProfile = it
-            profileImagePath = it.profileImagePath
-            isLoading = false
-        }
-        LocalPersistenceService.loadConnections(userId).let { (cachedFollowers, cachedFollowing, cachedMutuals) ->
-            if (cachedFollowing.isNotEmpty() || cachedFollowers.isNotEmpty() || cachedMutuals.isNotEmpty()) {
-                applyConnectionSnapshots(userId, cachedFollowing, cachedFollowers, cachedMutuals)
-            }
-        }
-        // iOS: solo aplica caché de moments si la lista en memoria está vacía.
-        if (moments.isEmpty()) {
-            LocalPersistenceService.loadProfileMoments(userId).takeIf { it.isNotEmpty() }?.let {
-                moments = sortProfileMoments(it)
-            }
-        }
-
         viewModelScope.launch {
+            // ≡ SwiftData: pintar caché sin hacer esperar a la UI a Room.
+            val cached = withContext(Dispatchers.IO) {
+                Triple(
+                    LocalPersistenceService.loadUserAsync(userId),
+                    LocalPersistenceService.loadConnectionsAsync(userId),
+                    LocalPersistenceService.loadProfileMomentsAsync(userId),
+                )
+            }
+            cached.first?.let {
+                userProfile = it
+                profileImagePath = it.profileImagePath
+                isLoading = false
+            }
+            cached.second.let { (cachedFollowers, cachedFollowing, cachedMutuals) ->
+                if (cachedFollowing.isNotEmpty() || cachedFollowers.isNotEmpty() || cachedMutuals.isNotEmpty()) {
+                    applyConnectionSnapshots(userId, cachedFollowing, cachedFollowers, cachedMutuals)
+                }
+            }
+            if (moments.isEmpty() && cached.third.isNotEmpty()) {
+                moments = sortProfileMoments(cached.third)
+            }
+
             // Moments independientes del doc de perfil (como iOS `fetchMoments`).
             val momentsJob = async { runCatching { firestoreService.fetchMoments(userId) } }
             val profileResult = runCatching { firestoreService.fetchUser(userId) }
@@ -128,7 +134,7 @@ class ProfileViewModel(
 
             momentsJob.await().onSuccess { fetched ->
                 moments = sortProfileMoments(fetched)
-                LocalPersistenceService.saveProfileMoments(moments, userId, sync = true)
+                LocalPersistenceService.saveProfileMomentsAsync(moments, userId, sync = true)
             }.onFailure { error ->
                 if (!isNetworkError(error) && moments.isEmpty()) {
                     errorMessage = error.message
@@ -177,7 +183,7 @@ class ProfileViewModel(
         }
     }
 
-    private fun applyConnectionSnapshots(
+    private suspend fun applyConnectionSnapshots(
         userId: String,
         followingUsers: List<AppUser>,
         followerUsers: List<AppUser>,
@@ -187,9 +193,9 @@ class ProfileViewModel(
         followers = followerUsers
         mutuals = mutualUsers
         isLoading = false
-        LocalPersistenceService.saveFollowing(userId, followingUsers)
-        LocalPersistenceService.saveFollowers(userId, followerUsers)
-        LocalPersistenceService.saveMutuals(userId, mutualUsers)
+        LocalPersistenceService.saveFollowingAsync(userId, followingUsers)
+        LocalPersistenceService.saveFollowersAsync(userId, followerUsers)
+        LocalPersistenceService.saveMutualsAsync(userId, mutualUsers)
     }
 
     fun refreshVisits() {
@@ -280,7 +286,7 @@ class ProfileViewModel(
                 runCatching { firestoreService.fetchMoments(userId) }
                     .onSuccess {
                         moments = sortProfileMoments(it)
-                        LocalPersistenceService.saveProfileMoments(moments, userId, sync = true)
+                        LocalPersistenceService.saveProfileMomentsAsync(moments, userId, sync = true)
                     }
                     .onFailure { if (!isNetworkError(it)) hasErrors = true }
             }
@@ -415,7 +421,7 @@ class ProfileViewModel(
             runCatching {
                 firestoreService.deleteMoment(moment.authorId, momentId)
                 moments = moments.filterNot { it.id == momentId }
-                LocalPersistenceService.deleteMoment(momentId)
+                LocalPersistenceService.deleteMomentAsync(momentId)
             }.onFailure { errorMessage = it.message }
         }
     }
@@ -498,8 +504,8 @@ class ProfileViewModel(
                     .delete().await()
                 followers = followers.filterNot { it.id == userId }
                 mutuals = mutuals.filterNot { it.id == userId }
-                LocalPersistenceService.saveFollowers(currentId, followers)
-                LocalPersistenceService.saveMutuals(currentId, mutuals)
+                LocalPersistenceService.saveFollowersAsync(currentId, followers)
+                LocalPersistenceService.saveMutualsAsync(currentId, mutuals)
             }.onFailure { errorMessage = it.message }
         }
     }
@@ -598,8 +604,8 @@ class ProfileViewModel(
         pendingProfileNote = trimmed
         val updated = userProfile?.copy(profileNote = trimmed.ifEmpty { null }) ?: return
         userProfile = updated
-        LocalPersistenceService.saveUser(updated)
         viewModelScope.launch {
+            LocalPersistenceService.saveUserAsync(updated)
             runCatching {
                 firestoreService.updateProfileNote(id, trimmed)
             }.onSuccess {
@@ -621,7 +627,7 @@ class ProfileViewModel(
         }
         userProfile = merged
         profileImagePath = merged.profileImagePath
-        LocalPersistenceService.saveUser(merged)
+        viewModelScope.launch { LocalPersistenceService.saveUserAsync(merged) }
     }
 
     fun saveGridPreview(moment: Moment, settings: MomentGridPreviewSettings) {
@@ -638,7 +644,11 @@ class ProfileViewModel(
     }
 
     private fun persistMoments() {
-        userProfile?.id?.let { LocalPersistenceService.saveProfileMoments(moments, it, sync = true) }
+        userProfile?.id?.let { userId ->
+            viewModelScope.launch {
+                LocalPersistenceService.saveProfileMomentsAsync(moments, userId, sync = true)
+            }
+        }
     }
 
     private fun sortProfileMoments(values: List<Moment>): List<Moment> =

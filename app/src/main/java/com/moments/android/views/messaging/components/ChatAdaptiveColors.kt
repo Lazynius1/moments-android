@@ -42,7 +42,7 @@ val AdaptiveColors.dateHeaderColor: Color
     get() = if (isDark) Color.White.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.7f)
 
 val AdaptiveColors.typingIndicatorColor: Color
-    get() = if (isDark) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.6f)
+    get() = if (isDark) Color.White.copy(alpha = 0.82f) else Color.Black.copy(alpha = 0.42f)
 
 val AdaptiveColors.replyBarBackground: Color
     get() = if (isDark) Color(0xFFFAF9F6).copy(alpha = 0.1f) else Color(0xFF0B1215).copy(alpha = 0.05f)

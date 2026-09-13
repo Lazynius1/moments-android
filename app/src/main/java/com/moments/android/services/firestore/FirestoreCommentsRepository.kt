@@ -69,19 +69,19 @@ suspend fun FirestoreService.addComment(
             commentId = resolvedCommentId,
             mentions = sanitizedMentions,
         )
-        LocalPersistenceService.saveAction(
+        LocalPersistenceService.saveActionAsync(
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.COMMENT.raw,
                 payloadData = payload.encode(),
             ),
         )
-        LocalPersistenceService.updateCommentCountLocally(momentId, increment = 1)
+        LocalPersistenceService.updateCommentCountLocallyAsync(momentId, increment = 1)
         return
     }
 
     val user = fetchUser(authorId)
-    LocalPersistenceService.updateCommentCountLocally(momentId, increment = 1)
+    LocalPersistenceService.updateCommentCountLocallyAsync(momentId, increment = 1)
 
     val now = Date()
     val commentData = buildMap<String, Any> {
@@ -221,10 +221,10 @@ suspend fun FirestoreService.updateComment(
 }
 
 suspend fun FirestoreService.deleteComment(momentId: String, commentId: String, userId: String, authorId: String) {
-    LocalPersistenceService.updateCommentCountLocally(momentId, increment = -1)
+    LocalPersistenceService.updateCommentCountLocallyAsync(momentId, increment = -1)
     if (shouldQueueFirestoreOutbox()) {
         val payload = DeleteCommentPayload(momentId, commentId, userId, authorId)
-        LocalPersistenceService.saveAction(
+        LocalPersistenceService.saveActionAsync(
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.DELETE_COMMENT.raw,

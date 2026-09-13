@@ -81,6 +81,7 @@
     <string name="groups_typing_one">%1$sさんが入力中…</string>
     <string name="groups_typing_two">%1$sさんと%2$sさんが入力中…</string>
     <string name="groups_typing_several">複数の人が入力中…</string>
+    <string name="groups_typing_more">%1$sとその他%2$d人が入力中…</string>
     <string name="groups_search_members">メンバーを検索</string>
     <string name="groups_no_members_found">メンバーが見つかりません。</string>
     <string name="groups_mention_placeholder">メンバーをメンション</string>

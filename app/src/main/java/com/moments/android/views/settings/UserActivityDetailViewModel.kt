@@ -26,8 +26,10 @@ import com.moments.android.services.network.CloudFunctionsClient
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.story.StoryRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Date
@@ -462,7 +464,9 @@ class ActivityInteractionDetailViewModel(
         val viewerId = currentUserId
 
         viewModelScope.launch {
-            val cached = LocalPersistenceService.loadProfileMoments(userId, viewerId)
+            val cached = withContext(Dispatchers.IO) {
+                LocalPersistenceService.loadProfileMomentsAsync(userId, viewerId)
+            }
                 .filter { moment ->
                     val isArchived = moment.isArchived ?: false
                     !isArchived && moment.isReelCandidate == wantReels
@@ -474,7 +478,7 @@ class ActivityInteractionDetailViewModel(
 
             runCatching { firestoreService.fetchMoments(userId) }
                 .onSuccess { fetched ->
-                    LocalPersistenceService.saveProfileMoments(fetched, userId, viewerId, sync = true)
+                    LocalPersistenceService.saveProfileMomentsAsync(fetched, userId, viewerId, sync = true)
                     moments = fetched.filter { moment ->
                         val isArchived = moment.isArchived ?: false
                         !isArchived && moment.isReelCandidate == wantReels

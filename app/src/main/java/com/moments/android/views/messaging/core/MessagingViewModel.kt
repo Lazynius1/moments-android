@@ -98,14 +98,16 @@ class MessagingViewModel(
 
     fun fetchConversations(userId: String) {
         if (conversations.isEmpty()) {
-            val cached = sortConversationsForInbox(LocalPersistenceService.loadConversations())
-            if (cached.isNotEmpty()) {
-                val active = reconcilingOptimisticReadState(cached.filterNot { it.isArchived(userId) }, userId)
-                val archived = reconcilingOptimisticReadState(cached.filter { it.isArchived(userId) }, userId)
-                conversations = active
-                archivedConversations = archived
-                hasUnreadMessages = (active + archived).any { it.isUnreadFor(userId) }
-                isLoading = false
+            viewModelScope.launch {
+                val cached = sortConversationsForInbox(LocalPersistenceService.loadConversationsAsync())
+                if (cached.isNotEmpty() && conversations.isEmpty()) {
+                    val active = reconcilingOptimisticReadState(cached.filterNot { it.isArchived(userId) }, userId)
+                    val archived = reconcilingOptimisticReadState(cached.filter { it.isArchived(userId) }, userId)
+                    conversations = active
+                    archivedConversations = archived
+                    hasUnreadMessages = (active + archived).any { it.isUnreadFor(userId) }
+                    isLoading = false
+                }
             }
         }
 
@@ -126,8 +128,11 @@ class MessagingViewModel(
                 errorMessage = null
                 isLoading = false
 
-                LocalPersistenceService.saveConversations(active + archived, sync = isFirstFetch)
+                val shouldReplaceCache = isFirstFetch
                 isFirstFetch = false
+                viewModelScope.launch {
+                    LocalPersistenceService.saveConversationsAsync(active + archived, sync = shouldReplaceCache)
+                }
 
                 // Como iOS: calentar las sesiones de las conversaciones más recientes para que
                 // abrirlas sea inmediato (caché de ChatSessionEngine).
@@ -300,7 +305,9 @@ class MessagingViewModel(
             archivedConversations = updateList(archivedConversations)
         }
         filteredConversations = updateList(filteredConversations)
-        LocalPersistenceService.saveConversations(conversations + archivedConversations, sync = true)
+        viewModelScope.launch {
+            LocalPersistenceService.saveConversationsAsync(conversations + archivedConversations, sync = true)
+        }
     }
 
     private fun updatingConversation(
@@ -366,14 +373,14 @@ class MessagingViewModel(
             username.contains(lowered) || lastMessage.contains(lowered) || draft.contains(lowered)
         }
 
-        searchedMessages = globalMessageResults(trimmed)
-
         val existingUserIds = (conversations + archivedConversations).map { it.otherParticipantId }.toSet()
         searchJob = viewModelScope.launch {
             delay(250) // debounce, como el DispatchWorkItem de iOS
+            val localMessages = globalMessageResults(trimmed)
             val users = runCatching { firestoreService.searchUsersUncapped(trimmed) }.getOrDefault(emptyList())
             if (activeSearchQuery != trimmed) return@launch
             isSearchingContent = false
+            searchedMessages = localMessages
             searchedUsers = users.filter { it.id != currentUserId && it.id !in existingUserIds }
         }
     }
@@ -391,8 +398,8 @@ class MessagingViewModel(
      * Búsqueda global sobre el caché local (100% local, como iOS: con E2E, escanear en remoto
      * obligaría a descargar y descifrar todo el historial).
      */
-    private fun globalMessageResults(query: String): List<GlobalMessageSearchResult> {
-        val matches = LocalPersistenceService.searchMessagesGlobally(query)
+    private suspend fun globalMessageResults(query: String): List<GlobalMessageSearchResult> {
+        val matches = LocalPersistenceService.searchMessagesGloballyAsync(query)
         if (matches.isEmpty()) return emptyList()
         val byId = (conversations + archivedConversations).mapNotNull { conv ->
             conv.id?.let { it to conv }
@@ -579,10 +586,9 @@ class MessagingViewModel(
         hasUnreadMessages = (conversations + archivedConversations).any { it.isUnreadFor(userId) }
         ChatSessionEngine.invalidateSession(conversationId)
         MomentsApplication.instance?.let { ChatScrollStateStore.clear(it, conversationId) }
-        LocalPersistenceService.saveConversations(conversations + archivedConversations, sync = true)
-        LocalPersistenceService.deleteConversationCache(conversationId)
-
         viewModelScope.launch {
+            LocalPersistenceService.saveConversationsAsync(conversations + archivedConversations, sync = true)
+            LocalPersistenceService.deleteConversationCacheAsync(conversationId)
             (if (conversation.isGroup) runCatching {
                 com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("groupConversations").document(conversationId)
                     .update(mapOf("deletedFor" to com.google.firebase.firestore.FieldValue.arrayUnion(userId), "lastDeletedAt.$userId" to com.google.firebase.firestore.FieldValue.serverTimestamp())).await()
@@ -612,7 +618,9 @@ class MessagingViewModel(
         conversations = patch(conversations)
         archivedConversations = patch(archivedConversations)
         filteredConversations = patch(filteredConversations)
-        LocalPersistenceService.saveConversations(conversations + archivedConversations, sync = false)
+        viewModelScope.launch {
+            LocalPersistenceService.saveConversationsAsync(conversations + archivedConversations, sync = false)
+        }
     }
 
     /** Port de `applyLocalConversationState` para fijar: actualiza local y reordena la bandeja. */
@@ -629,7 +637,9 @@ class MessagingViewModel(
         conversations = patch(conversations)
         archivedConversations = patch(archivedConversations)
         filteredConversations = patch(filteredConversations)
-        LocalPersistenceService.saveConversations(conversations + archivedConversations, sync = true)
+        viewModelScope.launch {
+            LocalPersistenceService.saveConversationsAsync(conversations + archivedConversations, sync = true)
+        }
 
         viewModelScope.launch {
             val result = if (pinned) ChatService.unpinConversation(conversationId, userId)
@@ -651,7 +661,9 @@ class MessagingViewModel(
         conversations = patch(conversations)
         archivedConversations = patch(archivedConversations)
         filteredConversations = patch(filteredConversations)
-        LocalPersistenceService.saveConversations(conversations + archivedConversations, sync = true)
+        viewModelScope.launch {
+            LocalPersistenceService.saveConversationsAsync(conversations + archivedConversations, sync = true)
+        }
 
         viewModelScope.launch {
             val result = if (muted) ChatService.unmuteConversation(conversationId, userId)
@@ -682,7 +694,9 @@ class MessagingViewModel(
                 listOf(updated) + conversations.filterNot { it.id == conversationId },
             )
         }
-        LocalPersistenceService.saveConversations(conversations + archivedConversations, sync = true)
+        viewModelScope.launch {
+            LocalPersistenceService.saveConversationsAsync(conversations + archivedConversations, sync = true)
+        }
 
         viewModelScope.launch {
             val result = if (archived) ChatService.archiveConversation(conversationId, userId)

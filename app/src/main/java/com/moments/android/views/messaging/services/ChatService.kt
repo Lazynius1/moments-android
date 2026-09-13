@@ -622,7 +622,7 @@ object ChatService {
             // Late ack: si el set acabó bien, retirar cola (mismo doc id, reenvío idempotente).
             scope.launch {
                 writeJob.await().onSuccess {
-                    LocalPersistenceService.deleteAction(messageId)
+                    LocalPersistenceService.deleteActionAsync(messageId)
                     updateLocalMessageStatus(conversationId, messageId, MessageStatus.SENT)
                 }
             }
@@ -637,14 +637,14 @@ object ChatService {
             return Result.failure(error)
         }
 
-        LocalPersistenceService.deleteAction(messageId)
+        LocalPersistenceService.deleteActionAsync(messageId)
         updateConversation(
             conversationId = conversationId,
             lastMessage = neutralConversationPreview(message.type),
             senderId = message.senderId,
             messageType = message.type,
         )
-        LocalPersistenceService.upsertConversationPreview(message)
+        LocalPersistenceService.upsertConversationPreviewAsync(message)
         updateMessageStatus(conversationId, messageId, MessageStatus.SENT)
         return Result.success(message.copy(status = MessageStatus.SENT))
     }
@@ -722,13 +722,13 @@ object ChatService {
     }
 
     /** ≡ cola offline de `sendMessage` / media en ChatService.swift. */
-    private fun queueOfflineMessage(message: EnhancedMessage, useServerTimestamp: Boolean) {
+    private suspend fun queueOfflineMessage(message: EnhancedMessage, useServerTimestamp: Boolean) {
         val pending = message.copy(status = MessageStatus.PENDING)
         val payloadJson = JSONObject().apply {
             put("message", pending.toJson())
             put("useServerTimestamp", useServerTimestamp)
         }
-        LocalPersistenceService.saveAction(
+        LocalPersistenceService.saveActionAsync(
             CachedAction(
                 id = message.id,
                 type = CachedAction.ActionType.MESSAGE.raw,
@@ -1109,6 +1109,7 @@ object ChatService {
      * Mirrors iOS' `markMessagesAsRead`: all reads are recorded in `readBy`,
      * while externally visible read status remains subject to user and chat
      * privacy settings. Incognito must leave no server-side read trace.
+     * Errors are swallowed like iOS' completion handler (e.g. pending `dmr_` threads).
      */
     suspend fun markMessagesAsRead(
         conversationId: String,
@@ -1118,43 +1119,47 @@ object ChatService {
     ) {
         if (IncognitoModeService.isActiveSnapshot || messageIds.isEmpty()) return
 
-        val userSettings = db.collection("users").document(readerId).get().await().data
-        val globalEnabled = userSettings?.get("showReadReceipts") as? Boolean ?: true
-        val conversationRef = db.messagingThread(conversationId)
-        val conversation = conversationRef.get().await().data
-        @Suppress("UNCHECKED_CAST")
-        val preferences = conversation?.get("readReceiptPreferences") as? Map<String, Boolean> ?: emptyMap()
-        val finalEnabled = ChatReadReceiptPolicy.isEnabled(globalEnabled, preferences[readerId])
+        runCatching {
+            val userSettings = db.collection("users").document(readerId).get().await().data
+            val globalEnabled = userSettings?.get("showReadReceipts") as? Boolean ?: true
+            val conversationRef = db.messagingThread(conversationId)
+            val conversation = conversationRef.get().await().data
+            @Suppress("UNCHECKED_CAST")
+            val preferences = conversation?.get("readReceiptPreferences") as? Map<String, Boolean> ?: emptyMap()
+            val finalEnabled = ChatReadReceiptPolicy.isEnabled(globalEnabled, preferences[readerId])
 
-        val batch = db.batch()
-        messageIds.distinct().forEach { messageId ->
-            val update = mutableMapOf<String, Any>("readBy" to FieldValue.arrayUnion(readerId))
-            if (finalEnabled) {
-                update["isRead"] = true
-                update["status"] = MessageStatus.READ.raw
-                update["readAtBy.$readerId"] = FieldValue.serverTimestamp()
+            val batch = db.batch()
+            messageIds.distinct().forEach { messageId ->
+                val update = mutableMapOf<String, Any>("readBy" to FieldValue.arrayUnion(readerId))
+                if (finalEnabled) {
+                    update["isRead"] = true
+                    update["status"] = MessageStatus.READ.raw
+                    update["readAtBy.$readerId"] = FieldValue.serverTimestamp()
+                }
+                batch.update(conversationRef.messagingMessages.document(messageId), update)
             }
-            batch.update(conversationRef.messagingMessages.document(messageId), update)
+            val conversationUpdate = mutableMapOf<String, Any>(
+                "readStatus.$readerId" to true,
+                "lastReadAt.$readerId" to FieldValue.serverTimestamp(),
+            )
+            if (marksLastMessageSeen && finalEnabled) {
+                conversationUpdate["lastMessageSeenAt.$readerId"] = FieldValue.serverTimestamp()
+            }
+            batch.update(conversationRef, conversationUpdate)
+            batch.commit().await()
         }
-        val conversationUpdate = mutableMapOf<String, Any>(
-            "readStatus.$readerId" to true,
-            "lastReadAt.$readerId" to FieldValue.serverTimestamp(),
-        )
-        if (marksLastMessageSeen && finalEnabled) {
-            conversationUpdate["lastMessageSeenAt.$readerId"] = FieldValue.serverTimestamp()
-        }
-        batch.update(conversationRef, conversationUpdate)
-        batch.commit().await()
     }
 
     /** ≡ `markConversationAsRead` — iOS no corta por incógnito aquí (sí en `markMessagesAsRead`). */
     suspend fun markConversationAsRead(conversationId: String, userId: String) {
-        db.messagingThread(conversationId).update(
-            mapOf(
-                "readStatus.$userId" to true,
-                "lastReadAt.$userId" to FieldValue.serverTimestamp(),
-            ),
-        ).await()
+        runCatching {
+            db.messagingThread(conversationId).update(
+                mapOf(
+                    "readStatus.$userId" to true,
+                    "lastReadAt.$userId" to FieldValue.serverTimestamp(),
+                ),
+            ).await()
+        }
     }
 
     suspend fun markConversationAsUnread(conversationId: String, userId: String): Result<Unit> = runCatching {
@@ -1444,7 +1449,7 @@ object ChatService {
         ).getOrThrow()
     }
 
-    private fun queueOfflineMediaMessage(
+    private suspend fun queueOfflineMediaMessage(
         conversationId: String,
         senderId: String,
         type: MessageType,
@@ -1480,7 +1485,7 @@ object ChatService {
             vanishExpiresAt = vanishExpiresAt,
             replyTo = replyTo,
         )
-        LocalPersistenceService.saveAction(
+        LocalPersistenceService.saveActionAsync(
             CachedAction(
                 id = messageId,
                 type = CachedAction.ActionType.MEDIA_MESSAGE.raw,
@@ -1561,7 +1566,7 @@ object ChatService {
         emoji: String,
         userId: String,
     ): Result<Unit> = runCatching {
-        LocalPersistenceService.toggleMessageReactionLocally(messageId, emoji, userId)
+        LocalPersistenceService.toggleMessageReactionLocallyAsync(messageId, emoji, userId)
         val reactionRef = db.messagingThread(conversationId)
             .messagingMessages.document(messageId)
             .collection(com.moments.android.services.messaging.GroupChatScope.reactions(conversationId)).document(userId)
@@ -1606,7 +1611,7 @@ object ChatService {
                 ),
             )
             .await()
-        LocalPersistenceService.markMessageDeletedForEveryone(conversationId, messageId)
+        LocalPersistenceService.markMessageDeletedForEveryoneAsync(conversationId, messageId)
     }
 
     suspend fun deleteMessageForEveryone(conversationId: String, messageId: String): Result<Unit> =
@@ -1642,7 +1647,7 @@ object ChatService {
                 "drawingData" to FieldValue.delete(),
             ),
         ).await()
-        LocalPersistenceService.markMessageDeletedForEveryone(conversationId, messageId)
+        LocalPersistenceService.markMessageDeletedForEveryoneAsync(conversationId, messageId)
         if (mediaResources.isNotEmpty()) {
             deleteMediaFiles(mediaResources)
         }
@@ -1851,7 +1856,7 @@ object ChatService {
         val merged = (directInbox + groupInbox).sortedByDescending { it.timestamp }
         archivedConversationIds = merged.filter { it.isArchived(userId) }.mapNotNull { it.id }.toSet()
         lastPublishedInbox = merged
-        LocalPersistenceService.saveConversations(merged, sync = true)
+        scope.launch { LocalPersistenceService.saveConversationsAsync(merged, sync = true) }
         inboxOnUpdate?.invoke(Result.success(merged))
     }
 
@@ -1887,7 +1892,7 @@ object ChatService {
         }
     }
 
-    private fun resolvedConversationTimestamp(
+    private suspend fun resolvedConversationTimestamp(
         conversation: Conversation,
         latestMessageTimestamp: Date?,
     ): Date {
@@ -1897,7 +1902,7 @@ object ChatService {
         }
         val conversationId = conversation.id
         if (conversationId != null) {
-            val localTimestamp = LocalPersistenceService.lastMessageTimestamp(conversationId)
+            val localTimestamp = LocalPersistenceService.lastMessageTimestampAsync(conversationId)
             if (localTimestamp != null && localTimestamp.after(best)) {
                 best = localTimestamp
             }

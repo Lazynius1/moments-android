@@ -81,6 +81,7 @@
     <string name="groups_typing_one">%1$s正在輸入…</string>
     <string name="groups_typing_two">%1$s和%2$s正在輸入…</string>
     <string name="groups_typing_several">多人正在輸入…</string>
+    <string name="groups_typing_more">%1$s 和其他 %2$d 人正在輸入…</string>
     <string name="groups_search_members">搜尋成員</string>
     <string name="groups_no_members_found">找不到成員。</string>
     <string name="groups_mention_placeholder">提及成員</string>

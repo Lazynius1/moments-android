@@ -8,7 +8,12 @@ import com.google.firebase.firestore.Source
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.persistence.room.MomentsRoomStore
 import com.moments.android.services.persistence.room.StorySeenEntity
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.util.Date
@@ -30,48 +35,51 @@ object StorySeenStateService {
     private val remoteCache = ConcurrentHashMap<String, Pair<Date?, Long>>()
     private val inFlight = ConcurrentHashMap<String, MutableList<(Date?) -> Unit>>()
     private val lock = Any()
+    private val persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val persistenceMutex = Mutex()
 
     fun initialize(context: Context) {
         if (loaded) return
         MomentsRoomStore.initialize(context)
-        synchronized(lock) { ensureLoaded() }
+        loaded = true
+        persistenceScope.launch {
+            val persisted = MomentsRoomStore.dao().allStorySeen()
+            synchronized(lock) {
+                persisted.forEach { entry ->
+                    val key = compositeKey(entry.viewerId, entry.authorId)
+                    lastSeenMap[key] = maxOf(lastSeenMap[key] ?: 0.0, entry.lastSeenAt / 1000.0)
+                }
+            }
+        }
     }
 
     private fun compositeKey(viewerId: String, authorId: String) = "$viewerId|$authorId"
 
-    private fun ensureLoaded() {
-        if (loaded) return
-        val persisted = kotlinx.coroutines.runBlocking(Dispatchers.IO) {
-            MomentsRoomStore.dao().allStorySeen()
-        }
-        persisted.forEach { entry ->
-            lastSeenMap[compositeKey(entry.viewerId, entry.authorId)] = entry.lastSeenAt / 1000.0
-        }
-        loaded = true
-    }
-
-    private fun persistLocked() {
-        val rows = lastSeenMap.mapNotNull { (key, timestamp) ->
-            val separator = key.indexOf('|')
-            if (separator <= 0 || separator >= key.lastIndex) null
-            else StorySeenEntity(
-                viewerId = key.substring(0, separator),
-                authorId = key.substring(separator + 1),
-                lastSeenAt = (timestamp * 1000).toLong(),
-            )
-        }
-        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
-            MomentsRoomStore.dao().replaceStorySeen(rows)
+    private fun schedulePersist() {
+        persistenceScope.launch {
+            persistenceMutex.withLock {
+                val rows = synchronized(lock) {
+                    lastSeenMap.mapNotNull { (key, timestamp) ->
+                        val separator = key.indexOf('|')
+                        if (separator <= 0 || separator >= key.lastIndex) null
+                        else StorySeenEntity(
+                            viewerId = key.substring(0, separator),
+                            authorId = key.substring(separator + 1),
+                            lastSeenAt = (timestamp * 1000).toLong(),
+                        )
+                    }
+                }
+                MomentsRoomStore.dao().replaceStorySeen(rows)
+            }
         }
     }
 
     private fun localLastSeenDateLocked(viewerId: String, authorId: String): Date? {
-        ensureLoaded()
         val key = compositeKey(viewerId, authorId)
         val timestamp = lastSeenMap[key] ?: return null
         if (System.currentTimeMillis() / 1000.0 - timestamp > MAX_AGE_MS / 1000.0) {
             lastSeenMap.remove(key)
-            persistLocked()
+            schedulePersist()
             return null
         }
         return Date((timestamp * 1000).toLong())
@@ -99,7 +107,6 @@ object StorySeenStateService {
     fun fetchEffectiveLastSeen(viewerId: String, authorId: String, completion: (Date?) -> Unit) {
         val key = compositeKey(viewerId, authorId)
         synchronized(lock) {
-            ensureLoaded()
             val localDate = localLastSeenDateLocked(viewerId, authorId)
             val cached = remoteCache[key]
             if (cached != null && cached.second > System.currentTimeMillis()) {
@@ -136,7 +143,7 @@ object StorySeenStateService {
                         val remoteValue = remoteDate.time / 1000.0
                         if (remoteValue > currentValue) {
                             lastSeenMap[key] = remoteValue
-                            persistLocked()
+                            schedulePersist()
                         }
                     }
                     remoteCache[key] = remoteDate to (System.currentTimeMillis() + REMOTE_CACHE_TTL_MS)
@@ -153,13 +160,12 @@ object StorySeenStateService {
         var shouldSync = false
         var timestampToSync = timestamp
         synchronized(lock) {
-            ensureLoaded()
             val newValue = timestamp.time / 1000.0
             val currentValue = lastSeenMap[key] ?: 0.0
             val effectiveValue = maxOf(newValue, currentValue)
             if (effectiveValue > currentValue) {
                 lastSeenMap[key] = effectiveValue
-                persistLocked()
+                schedulePersist()
             }
             timestampToSync = Date((effectiveValue * 1000).toLong())
             remoteCache[key] = timestampToSync to (System.currentTimeMillis() + REMOTE_CACHE_TTL_MS)
@@ -174,11 +180,10 @@ object StorySeenStateService {
 
     fun invalidate(viewerId: String, authorId: String) {
         synchronized(lock) {
-            ensureLoaded()
             val key = compositeKey(viewerId, authorId)
             lastSeenMap.remove(key)
             remoteCache.remove(key)
-            persistLocked()
+            schedulePersist()
         }
     }
 

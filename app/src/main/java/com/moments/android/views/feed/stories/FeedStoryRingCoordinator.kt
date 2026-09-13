@@ -222,15 +222,15 @@ class FeedStoryRingCoordinator(
         )
 
     /** Port de `loadCachedStoryUsers` — skeleton desde LocalPersistence. */
-    private fun loadCachedStoryUsers(userId: String): List<FeedStoryUserState> {
-        val (_, following, _) = LocalPersistenceService.loadConnections(userId)
+    private suspend fun loadCachedStoryUsers(userId: String): List<FeedStoryUserState> {
+        val (_, following, _) = LocalPersistenceService.loadConnectionsAsync(userId)
         val candidateIds = listOf(userId) + following.map { it.id }
         val entries = mutableListOf<FeedStoryUserState>()
         for (candidateId in candidateIds) {
-            val stories = LocalPersistenceService.loadStories(candidateId)
+            val stories = LocalPersistenceService.loadStoriesAsync(candidateId)
             val hasStory = stories.isNotEmpty()
             if (candidateId != userId && !hasStory) continue
-            val username = LocalPersistenceService.loadUser(candidateId)?.username ?: "moments"
+            val username = LocalPersistenceService.loadUserAsync(candidateId)?.username ?: "moments"
             entries += FeedStoryUserState(
                 userId = candidateId,
                 username = username,
@@ -270,11 +270,11 @@ class FeedStoryRingCoordinator(
         if (allowInstantCache && cacheAgeSec < 20 && cachedStories.isNotEmpty()) {
             val cachedEntries = mutableListOf<FeedStoryUserState>()
             val ownHas = cachedStories[userId] == true
-            val ownStories = if (ownHas) LocalPersistenceService.loadStories(userId) else emptyList()
+            val ownStories = if (ownHas) LocalPersistenceService.loadStoriesAsync(userId) else emptyList()
             val ownCount = if (ownStories.isEmpty()) (if (ownHas) 1 else 0) else ownStories.size
             cachedEntries += FeedStoryUserState(
                 userId = userId,
-                username = LocalPersistenceService.loadUser(userId)?.username ?: "moments",
+                username = LocalPersistenceService.loadUserAsync(userId)?.username ?: "moments",
                 hasStory = ownHas,
                 hasUnseenStory = false,
                 storyCount = ownCount,
@@ -288,11 +288,11 @@ class FeedStoryRingCoordinator(
             for (followingId in followingIds) {
                 if (cachedStories[followingId] != true) continue
                 val hasUnseen = cachedUnseenStories[followingId] ?: true
-                val cached = LocalPersistenceService.loadStories(followingId)
+                val cached = LocalPersistenceService.loadStoriesAsync(followingId)
                 val count = if (cached.isEmpty()) 1 else cached.size
                 cachedEntries += FeedStoryUserState(
                     userId = followingId,
-                    username = LocalPersistenceService.loadUser(followingId)?.username ?: "moments",
+                    username = LocalPersistenceService.loadUserAsync(followingId)?.username ?: "moments",
                     hasStory = true,
                     hasUnseenStory = hasUnseen,
                     storyCount = count,
@@ -398,7 +398,7 @@ class FeedStoryRingCoordinator(
     }
 
     /** Port de `buildSortedStoryUsers` — unseen primero, luego afinidad + BF/mutuals. */
-    private fun buildSortedStoryUsers(
+    private suspend fun buildSortedStoryUsers(
         entries: List<FeedStoryUserState>,
         currentUserId: String,
     ): List<FeedStoryUserState> {
@@ -411,8 +411,8 @@ class FeedStoryRingCoordinator(
             AffinityTracker.getScores(sortedOthers.map { it.userId })
         }.getOrDefault(emptyMap())
 
-        val bestFriends = LocalPersistenceService.loadUser(currentUserId)?.bestFriends?.toSet().orEmpty()
-        val mutuals = LocalPersistenceService.loadConnections(currentUserId).third.map { it.id }.toSet()
+        val bestFriends = LocalPersistenceService.loadUserAsync(currentUserId)?.bestFriends?.toSet().orEmpty()
+        val mutuals = LocalPersistenceService.loadConnectionsAsync(currentUserId).third.map { it.id }.toSet()
 
         sortedOthers.sortWith { user1, user2 ->
             when {
@@ -459,7 +459,7 @@ class FeedStoryRingCoordinator(
 
     private suspend fun fetchUsernames(ids: List<String>): Map<String, String> = withContext(Dispatchers.IO) {
         ids.distinct().associateWith { id ->
-            LocalPersistenceService.loadUser(id)?.username?.takeIf { it.isNotBlank() }
+            LocalPersistenceService.loadUserAsync(id)?.username?.takeIf { it.isNotBlank() }
                 ?: runCatching {
                     FirebaseFirestore.getInstance().collection("users").document(id).get().await()
                         .getString("username")

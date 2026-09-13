@@ -81,6 +81,7 @@
     <string name="groups_typing_one">%1$s schreibt…</string>
     <string name="groups_typing_two">%1$s und %2$s schreiben…</string>
     <string name="groups_typing_several">Mehrere Personen schreiben…</string>
+    <string name="groups_typing_more">%1$s und %2$d weitere schreiben…</string>
     <string name="groups_search_members">Mitglieder suchen</string>
     <string name="groups_no_members_found">Keine Mitglieder gefunden.</string>
     <string name="groups_mention_placeholder">Mitglied erwähnen</string>

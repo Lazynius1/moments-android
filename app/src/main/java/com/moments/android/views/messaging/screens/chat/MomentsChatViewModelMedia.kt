@@ -265,6 +265,8 @@ fun MomentsChatViewModel.stopLiveLocation(messageId: String) {
         val updated = message.copy(liveLocationStoppedAt = stoppedAt)
         appendOrReplaceMessage(updated)
         // Persistir stop optimista: si no, local-first puede reutilizar cache sin stoppedAt.
-        LocalPersistenceService.saveMessages(listOf(updated), conversationId, sync = false)
+        chatMediaScope.launch {
+            LocalPersistenceService.saveMessagesAsync(listOf(updated), conversationId, sync = false)
+        }
     }
 }

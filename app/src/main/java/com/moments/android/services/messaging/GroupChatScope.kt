@@ -28,7 +28,11 @@ object GroupChatScope {
             0 -> context.getString(com.moments.android.R.string.chat_typing)
             1 -> context.getString(com.moments.android.R.string.groups_typing_one, resolved[0])
             2 -> context.getString(com.moments.android.R.string.groups_typing_two, resolved[0], resolved[1])
-            else -> context.getString(com.moments.android.R.string.groups_typing_several)
+            else -> context.getString(
+                com.moments.android.R.string.groups_typing_more,
+                resolved[0],
+                resolved.size - 1,
+            )
         }
     }
 

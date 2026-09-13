@@ -337,7 +337,7 @@ fun ReelVideoView(
         scope.launch {
             runCatching {
                 firestore.deleteMoment(userId = video.moment.authorId, momentId = momentId)
-                LocalPersistenceService.deleteMoment(momentId)
+                LocalPersistenceService.deleteMomentAsync(momentId)
                 onClose()
             }
         }

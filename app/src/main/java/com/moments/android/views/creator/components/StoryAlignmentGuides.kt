@@ -21,10 +21,12 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.moments.android.models.AppUser
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -410,8 +412,10 @@ fun StoryAlignmentGuidesOverlay(
 private fun StoryAlignmentHeaderChromePreview(
     modifier: Modifier = Modifier,
 ) {
-    val user = remember {
-        FirebaseAuth.getInstance().currentUser?.uid?.let(LocalPersistenceService::loadUser)
+    var user by remember { mutableStateOf<AppUser?>(null) }
+    LaunchedEffect(Unit) {
+        user = LocalPersistenceService.loadCurrentUserAsync()
+            ?: FirebaseAuth.getInstance().currentUser?.uid?.let { LocalPersistenceService.loadUserAsync(it) }
     }
     val username = user?.username.orEmpty()
     val profileImagePath = user?.profileImagePath

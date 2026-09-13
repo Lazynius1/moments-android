@@ -675,7 +675,7 @@ open class EnhancedChatViewModel(
             if (droppedVanishIds.isNotEmpty()) {
                 optimisticallyHiddenVanishIds += droppedVanishIds
                 for (id in droppedVanishIds) outgoingTempMessages.remove(id)
-                chatService.purgeVanishMessagesLocally(conversationId, droppedVanishIds)
+                scope.launch { chatService.purgeVanishMessagesLocally(conversationId, droppedVanishIds) }
             }
             val droppedVanishIdSet = droppedVanishIds.toSet()
             val promotable = messagesRespectingDeletionCutoff(droppedMessages)
@@ -742,12 +742,12 @@ open class EnhancedChatViewModel(
             val oldEnabledId = conversation.vanishSettingsNoticeMessageId
             if (!oldEnabledId.isNullOrBlank() && oldEnabledId != enabledNoticeId) {
                 removeMessageFromLocalStores(oldEnabledId)
-                LocalPersistenceService.removeCachedMessage(conversationId, oldEnabledId)
+                scope.launch { LocalPersistenceService.removeCachedMessageAsync(conversationId, oldEnabledId) }
             }
             val oldDisabledId = conversation.vanishDisabledNoticeMessageId
             if (!oldDisabledId.isNullOrBlank() && oldDisabledId != disabledNoticeId) {
                 removeMessageFromLocalStores(oldDisabledId)
-                LocalPersistenceService.removeCachedMessage(conversationId, oldDisabledId)
+                scope.launch { LocalPersistenceService.removeCachedMessageAsync(conversationId, oldDisabledId) }
             }
             conversation.vanishSettingsNoticeMessageId = enabledNoticeId
             conversation.vanishDisabledNoticeMessageId = disabledNoticeId
@@ -1363,7 +1363,7 @@ open class EnhancedChatViewModel(
         if (conversation.readStatus[currentUserId] == true) {
             val hasUnreadIncoming = recent.any { it.senderId != currentUserId && !it.isRead }
             if (!hasUnreadIncoming) {
-                LocalPersistenceService.markConversationReadLocally(conversationId, currentUserId)
+                LocalPersistenceService.markConversationReadLocallyAsync(conversationId, currentUserId)
                 recent = recent.map { message ->
                     if (message.senderId != currentUserId && !message.isRead) message.copy(isRead = true) else message
                 }
@@ -1379,11 +1379,11 @@ open class EnhancedChatViewModel(
                     if (message.status == MessageStatus.SENDING &&
                         now - message.timestamp.time > 60_000L
                     ) {
-                        val queued = LocalPersistenceService.hasPendingAction(message.id)
+                        val queued = LocalPersistenceService.hasPendingActionAsync(message.id)
                         updated = message.copy(
                             status = if (queued) MessageStatus.PENDING else MessageStatus.FAILED,
                         )
-                        LocalPersistenceService.updateCachedMessageStatus(
+                        LocalPersistenceService.updateCachedMessageStatusAsync(
                             conversationId,
                             message.id,
                             updated.status,
@@ -1770,8 +1770,10 @@ open class EnhancedChatViewModel(
         if (conversationId.isBlank()) return
         hiddenForMeMessageIds += message.id
         commitMessagesPresentation(_messages.value.filterNot { it.id == message.id })
-        LocalPersistenceService.removeCachedMessage(conversationId, message.id)
-        scope.launch { chatService.deleteMessageForMe(conversationId, message.id, currentUserId).onFailure { _error.value = it.message } }
+        scope.launch {
+            LocalPersistenceService.removeCachedMessageAsync(conversationId, message.id)
+            chatService.deleteMessageForMe(conversationId, message.id, currentUserId).onFailure { _error.value = it.message }
+        }
     }
 
     fun applyDeletedForMeLocally(message: EnhancedMessage) {
@@ -1781,7 +1783,7 @@ open class EnhancedChatViewModel(
         clearUploadProgress(message.id); clearDownloadProgress(message.id)
         historicalMessages.removeAll { it.id == message.id }
         realTimeMessages.removeAll { it.id == message.id }
-        LocalPersistenceService.removeCachedMessage(conversationId, message.id)
+        scope.launch { LocalPersistenceService.removeCachedMessageAsync(conversationId, message.id) }
         rebuildMessagesList()
     }
 
@@ -1978,10 +1980,12 @@ open class EnhancedChatViewModel(
         markList(historicalMessages)
 
         if (conversationId.isNotBlank()) {
-            if (markedIds.isNotEmpty()) {
-                LocalPersistenceService.markMessagesAsRead(conversationId, markedIds)
+            scope.launch {
+                if (markedIds.isNotEmpty()) {
+                    LocalPersistenceService.markMessagesAsReadAsync(conversationId, markedIds)
+                }
+                LocalPersistenceService.markConversationReadLocallyAsync(conversationId, currentUserId)
             }
-            LocalPersistenceService.markConversationReadLocally(conversationId, currentUserId)
             ChatDraftEvents.emit(ChatDraftEvent.MarkedReadLocally(conversationId))
         }
 
@@ -2025,7 +2029,7 @@ open class EnhancedChatViewModel(
                     .joinToString(" ")
                     .contains(trimmed, ignoreCase = true)
             }.map { it.id }
-            val localIds = LocalPersistenceService.searchMessageIds(conversationId, trimmed, 100)
+            val localIds = LocalPersistenceService.searchMessageIdsAsync(conversationId, trimmed, 100)
             var merged = mergeSearchResultIds(localIds + inMemoryMatches)
             _searchResults.value = merged
             if (merged.size >= 100) {
@@ -2045,7 +2049,7 @@ open class EnhancedChatViewModel(
             if (token != activeSearchToken) return@launch
             _isSearchingHistory.value = false
             if (remote.isNotEmpty()) {
-                LocalPersistenceService.appendMessages(remote, conversationId)
+                LocalPersistenceService.appendMessagesAsync(remote, conversationId)
                 merged = mergeSearchResultIds(merged + remote.map { it.id })
                 _searchResults.value = merged
             }
@@ -2177,8 +2181,10 @@ open class EnhancedChatViewModel(
 
         if (eligibleIds.isEmpty()) return
         optimisticallyHiddenVanishIds += eligibleIds
-        LocalPersistenceService.markVanishMessagesDismissed(conversationId, eligibleIds, currentUserId)
-        scope.launch { chatService.markVanishMessagesVanishedForMe(conversationId, eligibleIds, currentUserId) }
+        scope.launch {
+            LocalPersistenceService.markVanishMessagesDismissedAsync(conversationId, eligibleIds, currentUserId)
+            chatService.markVanishMessagesVanishedForMe(conversationId, eligibleIds, currentUserId)
+        }
         rebuildMessagesList()
     }
 
@@ -2241,7 +2247,7 @@ open class EnhancedChatViewModel(
     private suspend fun removeVanishEnabledNoticeIfNeeded() {
         val noticeId = resolveVanishEnabledNoticeMessageId() ?: return
         removeMessageFromLocalStores(noticeId)
-        LocalPersistenceService.removeCachedMessage(conversationId, noticeId)
+        LocalPersistenceService.removeCachedMessageAsync(conversationId, noticeId)
         conversation.vanishSettingsNoticeMessageId = null
         chatService.clearVanishSettingsNoticeMessageId(conversationId)
         chatService.deleteMessage(conversationId, noticeId)
@@ -2315,7 +2321,7 @@ open class EnhancedChatViewModel(
     private suspend fun removeVanishDisabledNoticeIfNeeded() {
         val noticeId = resolveVanishDisabledNoticeMessageId() ?: return
         removeMessageFromLocalStores(noticeId)
-        LocalPersistenceService.removeCachedMessage(conversationId, noticeId)
+        LocalPersistenceService.removeCachedMessageAsync(conversationId, noticeId)
         conversation.vanishDisabledNoticeMessageId = null
         chatService.clearVanishDisabledNoticeMessageId(conversationId)
         chatService.deleteMessage(conversationId, noticeId)
@@ -2331,7 +2337,7 @@ open class EnhancedChatViewModel(
         patch(historicalMessages)
         rebuildMessagesList()
         if (conversationId.isNotBlank()) {
-            LocalPersistenceService.updateMessageNoticeContent(conversationId, messageId, noticeKey)
+            scope.launch { LocalPersistenceService.updateMessageNoticeContentAsync(conversationId, messageId, noticeKey) }
         }
     }
 
@@ -2381,7 +2387,7 @@ open class EnhancedChatViewModel(
             .map { it.id }
         if (ids.isEmpty()) return
         optimisticallyHiddenVanishIds += ids
-        chatService.purgeVanishMessagesLocally(conversationId, ids)
+        scope.launch { chatService.purgeVanishMessagesLocally(conversationId, ids) }
         rebuildMessagesList()
     }
 

@@ -29,7 +29,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Port de `ExploreViewModel.swift` (919 líneas).
@@ -127,14 +129,15 @@ class ExploreViewModel(
         errorMessage = null
         loadExplorePage(reset = true)
 
-        val cached = LocalPersistenceService.loadExploreMoments()
-        if (cached.isNotEmpty() && moments.isEmpty()) {
-            moments = cached
-            if (activeSearchQuery.isEmpty()) filteredMoments = cached
-            isLoading = false
-        }
-
         viewModelScope.launch {
+            val cached = withContext(Dispatchers.IO) {
+                LocalPersistenceService.loadExploreMomentsAsync()
+            }
+            if (cached.isNotEmpty() && moments.isEmpty()) {
+                moments = cached
+                if (activeSearchQuery.isEmpty()) filteredMoments = cached
+                isLoading = false
+            }
             try {
                 val profile = firestore.fetchUserProfile(userId)
                 currentUserInterests = profile.interests
@@ -281,14 +284,16 @@ class ExploreViewModel(
             if (activeSearchQuery.isEmpty()) filteredMoments = moments
             exploreCursor = page.nextCursor
             hasMoreExplore = page.nextCursor != null
-            LocalPersistenceService.saveExploreMoments(moments.take(120), sync = true)
+            LocalPersistenceService.saveExploreMomentsAsync(moments.take(120), sync = true)
         }
     }
 
     // MARK: - Historial
 
     fun loadRecentSearches() {
-        recentSearches = LocalPersistenceService.loadRecentSearches()
+        viewModelScope.launch {
+            recentSearches = LocalPersistenceService.loadRecentSearchesAsync()
+        }
     }
 
     fun saveSearchRecord(query: String, type: String, targetId: String? = null) {
@@ -315,18 +320,24 @@ class ExploreViewModel(
             }
         }
 
-        LocalPersistenceService.saveSearch(finalQuery, finalType, targetId)
-        loadRecentSearches()
+        viewModelScope.launch {
+            LocalPersistenceService.saveSearchAsync(finalQuery, finalType, targetId)
+            recentSearches = LocalPersistenceService.loadRecentSearchesAsync()
+        }
     }
 
     fun deleteSearch(search: CachedSearch) {
-        LocalPersistenceService.deleteSearch(search.id)
-        loadRecentSearches()
+        viewModelScope.launch {
+            LocalPersistenceService.deleteSearchAsync(search.id)
+            recentSearches = LocalPersistenceService.loadRecentSearchesAsync()
+        }
     }
 
     fun clearAllSearches() {
-        LocalPersistenceService.clearSearchHistory()
         recentSearches = emptyList()
+        viewModelScope.launch {
+            LocalPersistenceService.clearSearchHistoryAsync()
+        }
     }
 
     // MARK: - Social / follow

@@ -10,14 +10,13 @@ import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.persistence.room.MessageEntity
 import com.moments.android.services.persistence.room.MomentsRoomStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.Date
-import java.util.concurrent.locks.ReentrantReadWriteLock
-import kotlin.concurrent.read
-import kotlin.concurrent.write
 
 /**
  * Port de MessagePersistenceStore.swift (@ModelActor).
@@ -27,7 +26,7 @@ import kotlin.concurrent.write
  */
 object MessagePersistenceStore {
     private const val MAX_MESSAGES_PER_CONVERSATION = 2_000
-    private val lock = ReentrantReadWriteLock()
+    private val lock = Mutex()
 
     fun initialize(context: Context) {
         MomentsRoomStore.initialize(context)
@@ -38,9 +37,9 @@ object MessagePersistenceStore {
         conversationId: String,
         sync: Boolean,
     ) = withContext(Dispatchers.IO) {
-        lock.write {
+        lockedIo {
             val messages = decodeMessages(encodedMessages)
-            if (messages.isEmpty() && !sync) return@withContext
+            if (messages.isEmpty() && !sync) return@lockedIo
 
             val existing = if (sync) emptyList() else loadMessagesUnsafe(conversationId)
             val merged = mergeMessages(existing, messages, sync)
@@ -56,7 +55,7 @@ object MessagePersistenceStore {
 
         val oldest = messages.minOf { it.timestamp }
         val remoteIds = messages.map { it.id }.toSet()
-        lock.write {
+        lockedIo {
             val kept = loadMessagesUnsafe(conversationId).filter { msg ->
                 msg.timestamp < oldest || msg.id in remoteIds
             }
@@ -70,8 +69,8 @@ object MessagePersistenceStore {
         cutoffDate: Date?,
     ): ByteArray = withContext(Dispatchers.IO) {
         if (limit <= 0) return@withContext ByteArray(0)
-        lock.read {
-            val cached = blockingRoom {
+        lockedIo {
+            val cached = room {
                 recentMessagesIn(conversationId, cutoffDate?.time, limit).mapNotNull(::decodeMessageEntity)
             }
             encodeMessages(cached.reversed())
@@ -85,8 +84,8 @@ object MessagePersistenceStore {
         limit: Int,
     ): ByteArray = withContext(Dispatchers.IO) {
         if (limit <= 0) return@withContext ByteArray(0)
-        lock.read {
-            val filtered = blockingRoom {
+        lockedIo {
+            val filtered = room {
                 messagesBefore(
                     conversationId,
                     cursor.timestamp.time,
@@ -106,8 +105,8 @@ object MessagePersistenceStore {
         limit: Int,
     ): ByteArray = withContext(Dispatchers.IO) {
         if (limit <= 0) return@withContext ByteArray(0)
-        lock.read {
-            val filtered = blockingRoom {
+        lockedIo {
+            val filtered = room {
                 messagesAfter(
                     conversationId,
                     cursor.timestamp.time,
@@ -121,7 +120,7 @@ object MessagePersistenceStore {
     }
 
     suspend fun allMessages(conversationId: String): ByteArray = withContext(Dispatchers.IO) {
-        lock.read {
+        lockedIo {
             encodeMessages(
                 loadMessagesUnsafe(conversationId)
                     .sortedWith(compareBy<EnhancedMessage> { it.timestamp }.thenBy { it.id }),
@@ -131,63 +130,65 @@ object MessagePersistenceStore {
 
     suspend fun containsMessage(conversationId: String, messageId: String): Boolean =
         withContext(Dispatchers.IO) {
-            lock.read {
-                blockingRoom { containsMessage(conversationId, messageId) }
+            lockedIo {
+                room { containsMessage(conversationId, messageId) }
             }
         }
 
     suspend fun lastCursor(conversationId: String): MessageSyncCursor? = withContext(Dispatchers.IO) {
-        lock.read {
-            blockingRoom { latestMessageIn(conversationId) }
+        lockedIo {
+            room { latestMessageIn(conversationId) }
                 ?.let { MessageSyncCursor(Date(it.timestamp), it.id) }
         }
     }
 
-    fun cachedMessageCount(): Int = lock.read {
-        blockingRoom { allMessages().size }
+    suspend fun cachedMessageCount(): Int = lockedIo {
+        room { allMessages().size }
     }
 
-    fun cachedMessageKeys(since: Date): Set<String> = lock.read {
-        blockingRoom {
+    suspend fun cachedMessageKeys(since: Date): Set<String> = lockedIo {
+        room {
             allMessages()
                 .filter { it.timestamp >= since.time }
                 .mapTo(mutableSetOf()) { "${it.conversationId}:${it.id}" }
         }
     }
 
-    fun clearAll() = lock.write {
-        blockingRoom { deleteAllMessages() }
+    suspend fun clearAll() = lockedIo {
+        room { deleteAllMessages() }
+        UnreadMessageCountStore.invalidateAll()
     }
 
-    fun updateMessageStatus(conversationId: String, messageId: String, status: String) = lock.write {
+    suspend fun updateMessageStatus(conversationId: String, messageId: String, status: String) = lockedIo {
         val messages = loadMessagesUnsafe(conversationId).map { msg ->
             if (msg.id == messageId) msg.copy(status = com.moments.android.views.messaging.core.MessageStatus.from(status)) else msg
         }
         writeMessagesUnsafe(conversationId, messages)
     }
 
-    fun markMessagesAsRead(conversationId: String, messageIds: Set<String>) = lock.write {
-        if (messageIds.isEmpty()) return@write
+    suspend fun markMessagesAsRead(conversationId: String, messageIds: Set<String>) = lockedIo {
+        if (messageIds.isEmpty()) return@lockedIo
         val messages = loadMessagesUnsafe(conversationId).map { msg ->
             if (msg.id in messageIds && !msg.isRead) msg.copy(isRead = true) else msg
         }
         writeMessagesUnsafe(conversationId, messages)
     }
 
-    fun markAllIncomingAsRead(conversationId: String, currentUserId: String) = lock.write {
+    suspend fun markAllIncomingAsRead(conversationId: String, currentUserId: String) = lockedIo {
         val messages = loadMessagesUnsafe(conversationId).map { msg ->
             if (msg.senderId != currentUserId && !msg.isRead) msg.copy(isRead = true) else msg
         }
         writeMessagesUnsafe(conversationId, messages)
     }
 
-    fun deleteConversation(conversationId: String) = lock.write {
+    suspend fun deleteConversation(conversationId: String) = lockedIo {
         val messageIds = loadMessagesUnsafe(conversationId).map { it.id }
-        blockingRoom { deleteMessagesIn(conversationId) }
+        room { deleteMessagesIn(conversationId) }
         messageIds.forEach { ChatCacheStore.deleteMessageFiles(conversationId, it) }
+        UnreadMessageCountStore.invalidate(conversationId)
     }
 
-    fun markMessageDeletedForEveryone(conversationId: String, messageId: String) = lock.write {
+    suspend fun markMessageDeletedForEveryone(conversationId: String, messageId: String) = lockedIo {
         val messages = loadMessagesUnsafe(conversationId).map { msg ->
             if (msg.id != messageId) msg
             else msg.copy(
@@ -207,35 +208,35 @@ object MessagePersistenceStore {
         ChatCacheStore.deleteMessageFiles(conversationId, messageId)
     }
 
-    fun removeCachedMessage(conversationId: String, messageId: String) = lock.write {
+    suspend fun removeCachedMessage(conversationId: String, messageId: String) = lockedIo {
         ChatCacheStore.deleteMessageFiles(conversationId, messageId)
         val kept = loadMessagesUnsafe(conversationId).filter { it.id != messageId }
         writeMessagesUnsafe(conversationId, kept)
     }
 
-    fun unreadMessageCount(
+    suspend fun unreadMessageCount(
         conversationId: String,
         currentUserId: String,
         lastReadAt: Date? = null,
-    ): Int = lock.read {
-        blockingRoom { unreadCount(conversationId, currentUserId, lastReadAt?.time) }
+    ): Int = lockedIo {
+        room { unreadCount(conversationId, currentUserId, lastReadAt?.time) }
     }
 
-    fun updateMessageVanishExpiresAt(conversationId: String, messageId: String, expiresAt: Date) = lock.write {
+    suspend fun updateMessageVanishExpiresAt(conversationId: String, messageId: String, expiresAt: Date) = lockedIo {
         val messages = loadMessagesUnsafe(conversationId).map { msg ->
             if (msg.id == messageId) msg.copy(vanishExpiresAt = expiresAt) else msg
         }
         writeMessagesUnsafe(conversationId, messages)
     }
 
-    fun updateMessageNoticeContent(conversationId: String, messageId: String, content: String) = lock.write {
+    suspend fun updateMessageNoticeContent(conversationId: String, messageId: String, content: String) = lockedIo {
         val messages = loadMessagesUnsafe(conversationId).map { msg ->
             if (msg.id == messageId) msg.copy(content = content) else msg
         }
         writeMessagesUnsafe(conversationId, messages)
     }
 
-    fun toggleMessageReactionLocally(messageId: String, emoji: String, userId: String): Boolean = lock.write {
+    suspend fun toggleMessageReactionLocally(messageId: String, emoji: String, userId: String): Boolean = lockedIo {
         for (conversationId in allConversationIdsUnsafe()) {
             val messages = loadMessagesUnsafe(conversationId)
             val index = messages.indexOfFirst { it.id == messageId }
@@ -245,13 +246,13 @@ object MessagePersistenceStore {
             val updated = messages.toMutableList()
             updated[index] = message.copy(reactions = updatedReactions)
             writeMessagesUnsafe(conversationId, updated)
-            return@write true
+            return@lockedIo true
         }
         false
     }
 
-    fun markVanishMessagesDismissed(conversationId: String, messageIds: Set<String>, userId: String) = lock.write {
-        if (messageIds.isEmpty()) return@write
+    suspend fun markVanishMessagesDismissed(conversationId: String, messageIds: Set<String>, userId: String) = lockedIo {
+        if (messageIds.isEmpty()) return@lockedIo
         val messages = loadMessagesUnsafe(conversationId).map { msg ->
             if (msg.id !in messageIds || !msg.isVanishModeMessage || userId in msg.vanishedFor) msg
             else msg.copy(vanishedFor = msg.vanishedFor + userId)
@@ -259,10 +260,10 @@ object MessagePersistenceStore {
         writeMessagesUnsafe(conversationId, messages)
     }
 
-    fun searchMessageIds(conversationId: String, query: String, limit: Int = 100): List<String> = lock.read {
-        if (limit <= 0) return@read emptyList()
+    suspend fun searchMessageIds(conversationId: String, query: String, limit: Int = 100): List<String> = lockedIo {
+        if (limit <= 0) return@lockedIo emptyList()
         val normalizedQuery = SearchNormalization.normalizeForSearch(query)
-        if (normalizedQuery.isEmpty()) return@read emptyList()
+        if (normalizedQuery.isEmpty()) return@lockedIo emptyList()
         val matches = mutableListOf<String>()
         for (message in loadMessagesUnsafe(conversationId).sortedBy { it.timestamp }) {
             if (message.type != MessageType.TEXT) continue
@@ -273,12 +274,12 @@ object MessagePersistenceStore {
         matches
     }
 
-    fun searchMessagesGlobally(query: String, limit: Int = 50): List<EnhancedMessage> = lock.read {
-        if (limit <= 0) return@read emptyList()
+    suspend fun searchMessagesGlobally(query: String, limit: Int = 50): List<EnhancedMessage> = lockedIo {
+        if (limit <= 0) return@lockedIo emptyList()
         val trimmedQuery = query.trim()
-        if (trimmedQuery.isEmpty()) return@read emptyList()
+        if (trimmedQuery.isEmpty()) return@lockedIo emptyList()
         val normalizedQuery = SearchNormalization.normalizeForSearch(trimmedQuery)
-        if (normalizedQuery.isEmpty()) return@read emptyList()
+        if (normalizedQuery.isEmpty()) return@lockedIo emptyList()
         val matches = mutableListOf<EnhancedMessage>()
         for (conversationId in allConversationIdsUnsafe()) {
             for (message in loadMessagesUnsafe(conversationId)) {
@@ -292,21 +293,21 @@ object MessagePersistenceStore {
             .take(limit)
     }
 
-    fun allConversationIds(): Set<String> = lock.read {
-        blockingRoom { conversationIdsWithMessages().toSet() }
+    suspend fun allConversationIds(): Set<String> = lockedIo {
+        room { conversationIdsWithMessages().toSet() }
     }
 
-    fun cleanupOldChats(
+    suspend fun cleanupOldChats(
         cutoffDate: Date,
         staleThresholdDate: Date,
         recentWindow: Int,
         staleWindow: Int,
-    ) = lock.write {
+    ) = lockedIo {
         for (conversationId in allConversationIdsUnsafe()) {
-            val latestTimestamp = blockingRoom { latestMessageTimestampIn(conversationId) }
+            val latestTimestamp = room { latestMessageTimestampIn(conversationId) }
             val isStale = latestTimestamp?.let { it < staleThresholdDate.time } ?: true
             val keepCount = if (isStale) staleWindow else recentWindow
-            val removedIds = blockingRoom {
+            val removedIds = room {
                 staleMessageIdsOutsideRecentWindow(
                     conversationId = conversationId,
                     cutoff = cutoffDate.time,
@@ -314,7 +315,7 @@ object MessagePersistenceStore {
                 )
             }
             if (removedIds.isEmpty()) continue
-            blockingRoom {
+            room {
                 deleteStaleMessagesOutsideRecentWindow(
                     conversationId = conversationId,
                     cutoff = cutoffDate.time,
@@ -322,11 +323,12 @@ object MessagePersistenceStore {
                 )
             }
             removedIds.forEach { ChatCacheStore.deleteMessageFiles(conversationId, it) }
+            UnreadMessageCountStore.invalidate(conversationId)
         }
     }
 
-    private fun allConversationIdsUnsafe(): Set<String> {
-        return blockingRoom { conversationIdsWithMessages().toSet() }
+    private suspend fun allConversationIdsUnsafe(): Set<String> {
+        return room { conversationIdsWithMessages().toSet() }
     }
 
     private fun applyMessageReactionMutation(
@@ -421,7 +423,7 @@ object MessagePersistenceStore {
         return File(path).exists()
     }
 
-    private fun trimMessagesUnsafe(conversationId: String, messages: List<EnhancedMessage>) {
+    private suspend fun trimMessagesUnsafe(conversationId: String, messages: List<EnhancedMessage>) {
         val sorted = messages.sortedWith(compareByDescending<EnhancedMessage> { it.timestamp }.thenByDescending { it.id })
         if (sorted.size <= MAX_MESSAGES_PER_CONVERSATION) return
         val overflow = sorted.drop(MAX_MESSAGES_PER_CONVERSATION)
@@ -430,13 +432,13 @@ object MessagePersistenceStore {
         overflow.forEach { ChatCacheStore.deleteMessageFiles(conversationId, it.id) }
     }
 
-    private fun loadMessagesUnsafe(conversationId: String): List<EnhancedMessage> =
-        blockingRoom {
+    private suspend fun loadMessagesUnsafe(conversationId: String): List<EnhancedMessage> =
+        room {
             messagesIn(conversationId).mapNotNull(::decodeMessageEntity)
         }
 
-    private fun writeMessagesUnsafe(conversationId: String, messages: List<EnhancedMessage>) {
-        blockingRoom {
+    private suspend fun writeMessagesUnsafe(conversationId: String, messages: List<EnhancedMessage>) {
+        room {
             replaceMessagesIn(
                 conversationId,
                 messages.map {
@@ -455,6 +457,7 @@ object MessagePersistenceStore {
                 },
             )
         }
+        UnreadMessageCountStore.invalidate(conversationId)
     }
 
     private fun decodeMessageEntity(entity: MessageEntity): EnhancedMessage? = runCatching {
@@ -462,6 +465,11 @@ object MessagePersistenceStore {
         EnhancedMessage.fromJson(obj).copy(reactions = parseReactionsFromJson(obj))
     }.getOrNull()
 
-    private fun <T> blockingRoom(block: suspend com.moments.android.services.persistence.room.MomentsDao.() -> T): T =
-        kotlinx.coroutines.runBlocking(Dispatchers.IO) { MomentsRoomStore.dao().block() }
+    private suspend fun <T> lockedIo(block: suspend () -> T): T = withContext(Dispatchers.IO) {
+        lock.withLock { block() }
+    }
+
+    private suspend fun <T> room(
+        block: suspend com.moments.android.services.persistence.room.MomentsDao.() -> T,
+    ): T = MomentsRoomStore.dao().block()
 }

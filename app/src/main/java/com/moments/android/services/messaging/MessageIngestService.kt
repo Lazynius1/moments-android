@@ -31,7 +31,7 @@ object MessageIngestService {
         recentlyIngestedKeys.clear()
         MessageIngestQueue.clear()
         MessageSyncCursorStore.clearAll()
-        LocalPersistenceService.clearAllChatCache()
+        scope.launch { LocalPersistenceService.clearAllChatCacheAsync() }
     }
 
     /**
@@ -51,7 +51,7 @@ object MessageIngestService {
         inFlightKeys.clear()
         recentlyIngestedKeys.clear()
         MessageSyncCursorStore.clearAll()
-        LocalPersistenceService.clearAllChatCache()
+        scope.launch { LocalPersistenceService.clearAllChatCacheAsync() }
         ChatSessionEngine.invalidateAll()
     }
 
@@ -113,7 +113,7 @@ object MessageIngestService {
                 latestCursor
             }
             MessageSyncCursorStore.updateCursor(conversationId, next)
-            sorted.lastOrNull()?.let { LocalPersistenceService.upsertConversationPreview(it) }
+            sorted.lastOrNull()?.let { LocalPersistenceService.upsertConversationPreviewAsync(it) }
         }
 
         for (message in sorted) {
@@ -165,7 +165,7 @@ object MessageIngestService {
             val message = ChatService.fetchMessage(conv, msg).getOrNull() ?: return false
 
             LocalPersistenceService.saveMessagesInBackground(listOf(message), conv, sync = false)
-            LocalPersistenceService.upsertConversationPreview(message)
+            LocalPersistenceService.upsertConversationPreviewAsync(message)
             ChatMediaPrefetcher.prefetchIfNeeded(listOf(message))
 
             FirebaseAuth.getInstance().currentUser?.uid?.let { currentUserId ->

@@ -83,6 +83,7 @@ internal fun groupStringId(key: String): Int = when (key) {
     "typing.one" -> R.string.groups_typing_one
     "typing.two" -> R.string.groups_typing_two
     "typing.several" -> R.string.groups_typing_several
+    "typing.more" -> R.string.groups_typing_more
     "searchMembers" -> R.string.groups_search_members
     "noMembersFound" -> R.string.groups_no_members_found
     "mention.placeholder" -> R.string.groups_mention_placeholder

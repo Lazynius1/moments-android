@@ -135,12 +135,15 @@ fun MomentsApp(
                 BackgroundMomentUploadService.cleanupStaleUploadActivities()
                 // BackgroundStoryUploadService.cleanupStaleUploadActivities — Live Activity N/A
                 withContext(Dispatchers.IO) {
-                    LocalPersistenceService.cleanupOldData()
+                    LocalPersistenceService.cleanupOldDataAsync()
                     ChatCacheStore.runMaintenance()
                 }
                 if (FirebaseAuth.getInstance().currentUser != null) {
+                    val cachedConversations = withContext(Dispatchers.IO) {
+                        LocalPersistenceService.loadConversationsAsync()
+                    }
                     MessageIngestService.drainPendingQueue()
-                    MessageCatchUpService.syncRecent(LocalPersistenceService.loadConversations())
+                    MessageCatchUpService.syncRecent(cachedConversations)
                 }
                 AffinityTracker.applyTimeDecayIfNeeded()
                 AffinityTracker.cleanupVeryLowAffinities()
@@ -162,7 +165,10 @@ fun MomentsApp(
             scope.launch {
                 ChatCacheStore.runMaintenance()
                 MessageIngestService.drainPendingQueue()
-                MessageCatchUpService.syncRecent(LocalPersistenceService.loadConversations())
+                val cachedConversations = withContext(Dispatchers.IO) {
+                    LocalPersistenceService.loadConversationsAsync()
+                }
+                MessageCatchUpService.syncRecent(cachedConversations)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

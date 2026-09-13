@@ -227,13 +227,17 @@ private fun ChatToolbarSubtitle(
     adaptiveColors: AdaptiveColors,
 ) {
     when {
-        isGroup -> Text(
-            groupTypingSubtitle ?: stringResource(R.string.groups_member_count, memberCount),
-            color = adaptiveColors.secondary,
-            fontSize = 11.sp,
-            maxLines = 1,
-            textAlign = TextAlign.Center,
-        )
+        isGroup -> {
+            if (!groupTypingSubtitle.isNullOrBlank()) {
+                Text(
+                    groupTypingSubtitle,
+                    color = adaptiveColors.secondary,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
         isBlockedByMe -> Text(
             stringResource(R.string.chat_blocked_by_me_subtitle),
             color = adaptiveColors.secondary,

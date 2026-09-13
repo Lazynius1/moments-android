@@ -244,10 +244,13 @@ class ConversationSettingsViewModel(
                 typingIndicatorEnabled = boolPref("chat_typing_indicator_enabled_$conversationId", "typing_$conversationId", true)
                 buzzEnabled = boolPref("chat_buzz_enabled_$conversationId", "buzz_$conversationId", true)
             }
-            processMessages(LocalPersistenceService.loadMessagesFast(conversationId))
             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                val cached = LocalPersistenceService.loadMessagesFastAsync(conversationId)
+                withContext(Dispatchers.Main) {
+                    if (cached.isNotEmpty()) processMessages(cached)
+                }
                 MessageCatchUpService.sync(conversationId)
-                val refreshed = LocalPersistenceService.loadMessagesFast(conversationId)
+                val refreshed = LocalPersistenceService.loadMessagesFastAsync(conversationId)
                 val remoteMedia = ChatService.fetchSharedGalleryMedia(conversationId).getOrDefault(emptyList())
                 val merged = mergeMessages(refreshed, remoteMedia)
                 withContext(Dispatchers.Main) {
@@ -848,7 +851,7 @@ class ConversationSettingsViewModel(
                         "deletedFor" to FieldValue.arrayUnion(currentUserId), "lastDeletedAt.$currentUserId" to FieldValue.serverTimestamp()
                     )).await()
                 }.onSuccess {
-                    LocalPersistenceService.deleteConversationCache(groupId)
+                    LocalPersistenceService.deleteConversationCacheAsync(groupId)
                     withContext(Dispatchers.Main) { onCleared() }
                 }
             }
@@ -858,7 +861,7 @@ class ConversationSettingsViewModel(
         if (currentUserId.isBlank()) return
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             ChatService.deleteConversationsBetweenUsers(currentUserId, targetUserId)
-            conversation?.id?.let(LocalPersistenceService::deleteConversationCache)
+            conversation?.id?.let { LocalPersistenceService.deleteConversationCacheAsync(it) }
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onCleared() }
         }
     }

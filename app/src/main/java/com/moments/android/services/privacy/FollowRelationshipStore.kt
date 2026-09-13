@@ -134,20 +134,7 @@ object FollowStateStore {
         }
         if (result != null) return result
 
-        val (isFollowing, isMutual) = LocalPersistenceService.cachedFollowRelationship(viewerId, targetUserId)
-        val snapshotState = when {
-            isMutual -> FollowButtonState.MUTUALS
-            isFollowing -> FollowButtonState.FOLLOWING
-            else -> null
-        } ?: return null
-        return write(
-            snapshotState,
-            EntrySource.LOCAL_SNAPSHOT,
-            viewerId,
-            targetUserId,
-            expectedRevision = null,
-            syncPersistentSnapshot = false,
-        )
+        return null
     }
 
     fun observe(viewerId: String, targetUserId: String): Flow<FollowButtonState?> {
@@ -172,7 +159,24 @@ object FollowStateStore {
             return FollowButtonState.OWN_PROFILE
         }
 
-        state(viewerId, targetUserId)
+        if (state(viewerId, targetUserId) == null) {
+            val (isFollowing, isMutual) = LocalPersistenceService.cachedFollowRelationshipAsync(viewerId, targetUserId)
+            val snapshotState = when {
+                isMutual -> FollowButtonState.MUTUALS
+                isFollowing -> FollowButtonState.FOLLOWING
+                else -> null
+            }
+            if (snapshotState != null) {
+                write(
+                    snapshotState,
+                    EntrySource.LOCAL_SNAPSHOT,
+                    viewerId,
+                    targetUserId,
+                    expectedRevision = null,
+                    syncPersistentSnapshot = false,
+                )
+            }
+        }
         val key = relationshipKey(viewerId, targetUserId)
         val now = System.currentTimeMillis()
         synchronized(lock) {
@@ -252,12 +256,14 @@ object FollowStateStore {
 
         if (!didWrite) return effectiveState
         if (syncPersistentSnapshot && state != FollowButtonState.OWN_PROFILE) {
-            LocalPersistenceService.updateCachedFollowRelationship(
-                viewerId = viewerId,
-                targetUserId = targetUserId,
-                isFollowing = state == FollowButtonState.FOLLOWING || state == FollowButtonState.MUTUALS,
-                isMutual = state == FollowButtonState.MUTUALS,
-            )
+            storeScope.launch {
+                LocalPersistenceService.updateCachedFollowRelationshipAsync(
+                    viewerId = viewerId,
+                    targetUserId = targetUserId,
+                    isFollowing = state == FollowButtonState.FOLLOWING || state == FollowButtonState.MUTUALS,
+                    isMutual = state == FollowButtonState.MUTUALS,
+                )
+            }
         }
         if (previousState != state && FirebaseAuth.getInstance().currentUser?.uid == viewerId) {
             val listenerSnapshot = synchronized(listeners) { listeners.toList() }

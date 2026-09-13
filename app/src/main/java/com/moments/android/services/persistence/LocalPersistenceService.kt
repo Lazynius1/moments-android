@@ -44,6 +44,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -80,7 +83,13 @@ object LocalPersistenceService {
 
     @Volatile private var appContext: Context? = null
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val connectionsLock = Any()
+    private val actionsMutex = Mutex()
+    private val connectionsMutex = Mutex()
+    private val conversationsMutex = Mutex()
+    private val notificationsMutex = Mutex()
+    private val searchesMutex = Mutex()
+    private val storiesMutex = Mutex()
+    private val momentsMutex = Mutex()
 
     class ActionPersistenceException(message: String) : Exception(message)
 
@@ -110,367 +119,352 @@ object LocalPersistenceService {
 
     // MARK: - Current user
 
-    fun saveCurrentUser(user: AppUser) = saveUser(user, section = "currentUser")
-
-    fun loadCurrentUser(): AppUser? {
-        return runBlockingIo {
-            MomentsRoomStore.dao().currentUser()?.payload
-                ?.let(CachedUser::decodeFromPrefsJson)
-                ?.toAppUser()
-        }
-    }
-
-    fun clearCurrentUser() {
-        runBlockingIo {
-            MomentsRoomStore.dao().currentUser()?.let { current ->
-                MomentsRoomStore.dao().deleteUser(current.userId, current.cacheSection)
-            }
-        }
+    suspend fun loadCurrentUserAsync(): AppUser? = withContext(Dispatchers.IO) {
+        MomentsRoomStore.dao().currentUser()?.payload
+            ?.let(CachedUser::decodeFromPrefsJson)
+            ?.toAppUser()
     }
 
     // MARK: - Users
 
-    fun saveUser(user: AppUser, section: String = "profile") {
-        val cached = CachedUser.from(user, section)
-        runBlockingIo {
-            MomentsRoomStore.dao().upsertUsers(
-                listOf(
-                    UserEntity(
-                        userId = cached.userId,
-                        cacheSection = cached.cacheSection,
-                        lastSyncedAt = cached.lastSyncedAt.time,
-                        payload = cached.encodeToPrefsJson(),
-                    ),
-                ),
-            )
-        }
-        trimCachedUsers()
+    suspend fun loadUserAsync(userId: String): AppUser? = withContext(Dispatchers.IO) {
+        MomentsRoomStore.dao().usersById(userId)
+            .firstNotNullOfOrNull { it.payload.let(CachedUser::decodeFromPrefsJson)?.toAppUser() }
     }
 
-    fun loadUser(userId: String): AppUser? {
-        return runBlockingIo {
-            MomentsRoomStore.dao().usersById(userId)
-                .firstNotNullOfOrNull { it.payload.let(CachedUser::decodeFromPrefsJson)?.toAppUser() }
+    suspend fun saveCurrentUserAsync(user: AppUser) = saveUserAsync(user, section = "currentUser")
+
+    suspend fun saveUserAsync(user: AppUser, section: String = "profile") = withContext(Dispatchers.IO) {
+        val cached = CachedUser.from(user, section)
+        MomentsRoomStore.dao().upsertUsers(
+            listOf(UserEntity(cached.userId, cached.cacheSection, cached.lastSyncedAt.time, cached.encodeToPrefsJson())),
+        )
+        val entries = MomentsRoomStore.dao().cachedNonCurrentUsers()
+        if (entries.size > MAX_CACHED_USERS) {
+            entries.sortedBy { it.lastSyncedAt }
+                .take(entries.size - MAX_CACHED_USERS)
+                .forEach { MomentsRoomStore.dao().deleteUser(it.userId, it.cacheSection) }
         }
+    }
+
+    suspend fun clearCurrentUserAsync() = withContext(Dispatchers.IO) {
+        MomentsRoomStore.dao().currentUser()?.let { MomentsRoomStore.dao().deleteUser(it.userId, it.cacheSection) }
     }
 
     // MARK: - Outbox / CachedAction
 
-    fun saveActionOrThrow(action: CachedAction) {
+    suspend fun saveActionOrThrowAsync(action: CachedAction) = withContext(Dispatchers.IO) {
         if (appContext == null) throw ActionPersistenceException("Local persistence store is unavailable.")
-        val actions = loadAllActions().toMutableList()
-        // ≡ iOS insert (SwiftData); evitar duplicados por id en JSON prefs.
-        if (actions.any { it.id == action.id }) return
-        actions += action
-        saveAllActions(actions)
+        actionsMutex.withLock {
+            val actions = loadActionsFromRoom()
+            if (actions.none { it.id == action.id }) writeActionsToRoom(actions + action)
+        }
     }
 
-    fun saveAction(action: CachedAction) {
-        runCatching { saveActionOrThrow(action) }.onFailure { return }
+    suspend fun saveActionAsync(action: CachedAction) {
+        runCatching { saveActionOrThrowAsync(action) }.onFailure { return }
         val isUpload = action.type == CachedAction.ActionType.MOMENT_UPLOAD.raw ||
             action.type == CachedAction.ActionType.STORY_UPLOAD.raw
         if (NetworkMonitor.isConnected && !isUpload) {
-            // iOS: `syncPendingActions()` (requireAutomaticSync = true por defecto).
             ioScope.launch { OfflineSyncService.syncPendingActions() }
         }
     }
 
-    fun loadPendingActions(): List<CachedAction> {
-        return loadAllActions().filter {
+    suspend fun loadPendingActionsAsync(): List<CachedAction> = withContext(Dispatchers.IO) {
+        loadActionsFromRoom().filter {
             it.status == CachedAction.ActionStatus.PENDING.raw ||
                 it.status == CachedAction.ActionStatus.EXECUTING.raw
         }.sortedBy { it.createdAt }
     }
 
-    /** Cualquier estado (PENDING / EXECUTING / FAILED) — cancel/retry outbox. */
-    fun loadAction(id: String): CachedAction? = loadAllActions().find { it.id == id }
-
-    fun deleteAction(id: String) {
-        saveAllActions(loadAllActions().filter { it.id != id })
+    suspend fun loadActionAsync(id: String): CachedAction? = withContext(Dispatchers.IO) {
+        loadActionsFromRoom().find { it.id == id }
     }
 
-    fun hasPendingAction(id: String): Boolean = loadAllActions().any { it.id == id }
+    suspend fun hasPendingActionAsync(id: String): Boolean = withContext(Dispatchers.IO) {
+        loadActionsFromRoom().any { it.id == id }
+    }
 
-    fun markActionAttempt(id: String) {
-        val actions = loadAllActions().map { action ->
-            if (action.id == id) action.copy(
-                retryCount = action.retryCount + 1,
-                lastAttemptAt = Date(),
-            ) else action
+    suspend fun deleteActionAsync(id: String) = mutateActionsAsync { actions -> actions.filter { it.id != id } }
+
+    suspend fun markActionAttemptAsync(id: String) = mutateActionsAsync { actions ->
+        actions.map { action ->
+            if (action.id == id) action.copy(retryCount = action.retryCount + 1, lastAttemptAt = Date()) else action
         }
-        saveAllActions(actions)
     }
 
-    fun updateActionStatus(id: String, status: CachedAction.ActionStatus, error: String? = null) {
-        val actions = loadAllActions().map { action ->
-            if (action.id != id) action
-            else action.copy(
+    suspend fun updateActionStatusAsync(
+        id: String,
+        status: CachedAction.ActionStatus,
+        error: String? = null,
+    ) = mutateActionsAsync { actions ->
+        actions.map { action ->
+            if (action.id != id) action else action.copy(
                 status = status.raw,
                 lastError = error,
                 retryCount = if (status == CachedAction.ActionStatus.FAILED) action.retryCount + 1 else action.retryCount,
             )
         }
-        saveAllActions(actions)
     }
 
-    fun updateActionPayload(id: String, payloadData: ByteArray) {
-        saveAllActions(loadAllActions().map { action ->
-            if (action.id == id) action.copy(payloadData = payloadData) else action
+    suspend fun updateActionPayloadAsync(id: String, payloadData: ByteArray) = mutateActionsAsync { actions ->
+        actions.map { if (it.id == id) it.copy(payloadData = payloadData) else it }
+    }
+
+    private suspend fun mutateActionsAsync(transform: (List<CachedAction>) -> List<CachedAction>) =
+        withContext(Dispatchers.IO) {
+            actionsMutex.withLock { writeActionsToRoom(transform(loadActionsFromRoom())) }
+        }
+
+    private suspend fun loadActionsFromRoom(): List<CachedAction> = MomentsRoomStore.dao().allActions().map {
+        CachedAction(
+            id = it.id,
+            type = it.type,
+            status = it.status,
+            payloadData = it.payload,
+            createdAt = Date(it.createdAt),
+            retryCount = it.retryCount,
+            lastError = it.lastError,
+            lastAttemptAt = it.lastAttemptAt?.let(::Date),
+        )
+    }
+
+    private suspend fun writeActionsToRoom(actions: List<CachedAction>) {
+        MomentsRoomStore.dao().replaceActions(actions.map {
+            PendingActionEntity(
+                id = it.id,
+                type = it.type,
+                status = it.status,
+                payload = it.payloadData,
+                createdAt = it.createdAt.time,
+                retryCount = it.retryCount,
+                lastError = it.lastError,
+                lastAttemptAt = it.lastAttemptAt?.time,
+            )
         })
     }
 
-    fun updateCachedMessageStatus(conversationId: String, messageId: String, status: MessageStatus) {
+    suspend fun updateCachedMessageStatusAsync(conversationId: String, messageId: String, status: MessageStatus) {
         MessagePersistenceStore.updateMessageStatus(conversationId, messageId, status.raw)
     }
 
     // MARK: - Connections (followers / following / mutuals)
 
-    fun saveFollowers(userId: String, followers: List<AppUser>) =
-        saveConnectionList(userId, followers, "follower")
-
-    fun saveFollowing(userId: String, following: List<AppUser>) =
-        saveConnectionList(userId, following, "following")
-
-    fun saveMutuals(userId: String, mutuals: List<AppUser>) =
-        saveConnectionList(userId, mutuals, "mutual")
-
-    fun loadConnections(userId: String): Triple<List<AppUser>, List<AppUser>, List<AppUser>> {
-        val connections = loadConnectionRecords(userId)
-        var followers = mutableListOf<AppUser>()
-        var following = mutableListOf<AppUser>()
-        var mutuals = mutableListOf<AppUser>()
-        for (conn in connections) {
-            val user = loadUser(conn.targetId) ?: continue
-            when (conn.type) {
-                "follower" -> followers += user
-                "mutual" -> mutuals += user
-                else -> following += user
+    suspend fun loadConnectionsAsync(userId: String): Triple<List<AppUser>, List<AppUser>, List<AppUser>> =
+        withContext(Dispatchers.IO) {
+            val records = MomentsRoomStore.dao().connectionsFor(userId)
+            val usersById = records.map { it.targetId }.distinct().associateWith { targetId ->
+                MomentsRoomStore.dao().usersById(targetId)
+                    .firstNotNullOfOrNull { it.payload.let(CachedUser::decodeFromPrefsJson)?.toAppUser() }
             }
-        }
-        return Triple(followers, following, mutuals)
-    }
-
-    fun isFollowing(targetUserId: String): Boolean {
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return false
-        return synchronized(connectionsLock) {
-            loadConnectionRecords(currentUserId).any {
-                it.targetId == targetUserId && it.type == "following"
+            val followers = mutableListOf<AppUser>()
+            val following = mutableListOf<AppUser>()
+            val mutuals = mutableListOf<AppUser>()
+            records.forEach { record ->
+                val user = usersById[record.targetId] ?: return@forEach
+                when (record.type) {
+                    "follower" -> followers += user
+                    "mutual" -> mutuals += user
+                    else -> following += user
+                }
             }
+            Triple(followers, following, mutuals)
+        }
+
+    suspend fun saveFollowersAsync(userId: String, followers: List<AppUser>) =
+        saveConnectionListAsync(userId, followers, "follower")
+
+    suspend fun saveFollowingAsync(userId: String, following: List<AppUser>) =
+        saveConnectionListAsync(userId, following, "following")
+
+    suspend fun saveMutualsAsync(userId: String, mutuals: List<AppUser>) =
+        saveConnectionListAsync(userId, mutuals, "mutual")
+
+    suspend fun isFollowingAsync(targetUserId: String): Boolean = withContext(Dispatchers.IO) {
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return@withContext false
+        MomentsRoomStore.dao().connectionsFor(currentUserId).any {
+            it.targetId == targetUserId && it.type == "following"
         }
     }
 
-    /** Snapshot positivo para arranque/offline; ausencia no equivale a un estado remoto negativo. */
-    fun cachedFollowRelationship(viewerId: String, targetUserId: String): Pair<Boolean, Boolean> {
-        return synchronized(connectionsLock) {
-            val matching = loadConnectionRecords(viewerId).filter { it.targetId == targetUserId }
-            Pair(
-                matching.any { it.type == "following" },
-                matching.any { it.type == "mutual" },
-            )
-        }
+    suspend fun cachedFollowRelationshipAsync(
+        viewerId: String,
+        targetUserId: String,
+    ): Pair<Boolean, Boolean> = withContext(Dispatchers.IO) {
+        val matching = MomentsRoomStore.dao().connectionsFor(viewerId).filter { it.targetId == targetUserId }
+        Pair(
+            matching.any { it.type == "following" },
+            matching.any { it.type == "mutual" },
+        )
     }
 
-    fun updateCachedFollowRelationship(
+    suspend fun updateCachedFollowRelationshipAsync(
         viewerId: String,
         targetUserId: String,
         isFollowing: Boolean,
         isMutual: Boolean,
-    ) {
-        synchronized(connectionsLock) {
-            val connections = loadConnectionRecords(viewerId).toMutableList()
+    ) = withContext(Dispatchers.IO) {
+        connectionsMutex.withLock {
+            val connections = MomentsRoomStore.dao().connectionsFor(viewerId).toMutableList()
             connections.removeAll {
                 it.targetId == targetUserId && (it.type == "following" || it.type == "mutual")
             }
-            if (isFollowing) connections += CachedConnection(viewerId, targetUserId, "following")
-            if (isMutual) connections += CachedConnection(viewerId, targetUserId, "mutual")
-            saveConnectionRecords(viewerId, connections)
+            val now = Date().time
+            if (isFollowing) connections += ConnectionEntity(viewerId, targetUserId, "following", now)
+            if (isMutual) connections += ConnectionEntity(viewerId, targetUserId, "mutual", now)
+            MomentsRoomStore.dao().replaceConnectionsFor(viewerId, connections)
         }
     }
 
-    private fun saveConnectionList(userId: String, users: List<AppUser>, type: String) {
-        synchronized(connectionsLock) {
-            val remaining = loadConnectionRecords(userId).filter { it.type != type }
-            val updated = remaining + users.map { CachedConnection(userId, it.id, type) }
-            saveConnectionRecords(userId, updated)
+    suspend fun toggleFollowLocallyAsync(
+        currentUserId: String,
+        targetUserId: String,
+        isFollow: Boolean,
+    ) = withContext(Dispatchers.IO) {
+        connectionsMutex.withLock {
+            val connections = MomentsRoomStore.dao().connectionsFor(currentUserId).toMutableList()
+            connections.removeAll { it.targetId == targetUserId && it.type == "following" }
+            if (isFollow) {
+                connections += ConnectionEntity(currentUserId, targetUserId, "following", Date().time)
+            }
+            MomentsRoomStore.dao().replaceConnectionsFor(currentUserId, connections)
         }
-        users.forEach { saveUser(it) }
     }
 
-    private fun loadConnectionRecords(userId: String): List<CachedConnection> {
-        return runBlockingIo {
-            MomentsRoomStore.dao().connectionsFor(userId).map {
-                CachedConnection(it.userId, it.targetId, it.type, Date(it.timestamp))
+    private suspend fun saveConnectionListAsync(userId: String, users: List<AppUser>, type: String) =
+        withContext(Dispatchers.IO) {
+            connectionsMutex.withLock {
+                val existing = MomentsRoomStore.dao().connectionsFor(userId)
+                val updated = existing.filter { it.type != type } + users.map {
+                    ConnectionEntity(userId, it.id, type, Date().time)
+                }
+                MomentsRoomStore.dao().replaceConnectionsFor(userId, updated)
+                if (users.isNotEmpty()) {
+                    MomentsRoomStore.dao().upsertUsers(users.map {
+                        val cached = CachedUser.from(it, "profile")
+                        UserEntity(cached.userId, cached.cacheSection, cached.lastSyncedAt.time, cached.encodeToPrefsJson())
+                    })
+                }
             }
         }
-    }
-
-    private fun saveConnectionRecords(userId: String, connections: List<CachedConnection>) {
-        runBlockingIo {
-            MomentsRoomStore.dao().replaceConnectionsFor(
-                userId,
-                connections.map { ConnectionEntity(it.userId, it.targetId, it.type, it.timestamp.time) },
-            )
-        }
-    }
 
     // MARK: - Moments cache
 
-    fun saveFeedMoments(moments: List<Moment>, sync: Boolean = false) =
-        saveMoments(moments, section = "feed", sync = sync, maxCount = MAX_FEED_MOMENTS)
+    suspend fun loadFeedMomentsAsync(): List<Moment> = loadMomentsAsync("feed", MAX_FEED_MOMENTS)
 
-    fun saveExploreMoments(moments: List<Moment>, sync: Boolean = false) =
-        saveMoments(moments, section = "explore", sync = sync, maxCount = MAX_EXPLORE_MOMENTS)
+    suspend fun loadExploreMomentsAsync(): List<Moment> = loadMomentsAsync("explore", MAX_EXPLORE_MOMENTS)
 
-    fun saveProfileMoments(
+    suspend fun loadProfileMomentsAsync(userId: String, viewerId: String? = null): List<Moment> =
+        loadMomentsAsync(profileMomentsSection(userId, viewerId), maxCount = 50)
+
+    suspend fun saveFeedMomentsAsync(moments: List<Moment>, sync: Boolean = false) =
+        saveMomentsAsync(moments, "feed", sync, MAX_FEED_MOMENTS)
+
+    suspend fun saveExploreMomentsAsync(moments: List<Moment>, sync: Boolean = false) =
+        saveMomentsAsync(moments, "explore", sync, MAX_EXPLORE_MOMENTS)
+
+    suspend fun saveProfileMomentsAsync(
         moments: List<Moment>,
         userId: String,
         viewerId: String? = null,
         sync: Boolean = true,
-    ) = saveMoments(moments, section = profileMomentsSection(userId, viewerId), sync = sync, maxCount = 50)
-
-    fun loadFeedMoments(): List<Moment> = loadMoments("feed", MAX_FEED_MOMENTS)
-
-    fun loadExploreMoments(): List<Moment> = loadMoments("explore", MAX_EXPLORE_MOMENTS)
-
-    fun loadProfileMoments(userId: String, viewerId: String? = null): List<Moment> =
-        loadMoments(profileMomentsSection(userId, viewerId), maxCount = 50)
+    ) = saveMomentsAsync(moments, profileMomentsSection(userId, viewerId), sync, 50)
 
     private fun profileMomentsSection(userId: String, viewerId: String?): String =
         if (!viewerId.isNullOrEmpty()) "profile_${viewerId}_$userId" else "profile_$userId"
 
-    private fun saveMoments(moments: List<Moment>, section: String, sync: Boolean, maxCount: Int) {
-        val existing = if (sync) emptyList() else loadCachedMoments(section)
-        val existingMap = existing.associateBy { it.momentId }.toMutableMap()
-        moments.forEach { moment ->
-            val id = moment.id ?: return@forEach
-            existingMap[id] = CachedMoment.from(moment, section)
+    private suspend fun loadMomentsAsync(section: String, maxCount: Int): List<Moment> =
+        withContext(Dispatchers.IO) {
+            MomentsRoomStore.dao().momentsIn(section)
+                .mapNotNull { entity ->
+                    runCatching { decodeCachedMoment(JSONObject(entity.payload)) }.getOrNull()
+                }
+                .sortedByDescending { it.timestamp.time }
+                .take(maxCount)
+                .mapNotNull { it.toMoment() }
         }
-        val merged = existingMap.values.sortedByDescending { it.timestamp.time }.take(maxCount)
-        writeCachedMoments(section, merged)
-    }
 
-    private fun loadMoments(section: String, maxCount: Int): List<Moment> =
-        loadCachedMoments(section)
-            .sortedByDescending { it.timestamp.time }
-            .take(maxCount)
-            .mapNotNull { it.toMoment() }
-
-    private fun loadCachedMoments(section: String): List<CachedMoment> {
-        return runBlockingIo {
-            MomentsRoomStore.dao().momentsIn(section).mapNotNull { entity ->
+    private suspend fun saveMomentsAsync(
+        moments: List<Moment>,
+        section: String,
+        sync: Boolean,
+        maxCount: Int,
+    ) = withContext(Dispatchers.IO) {
+        momentsMutex.withLock {
+            val existing = if (sync) emptyList() else MomentsRoomStore.dao().momentsIn(section).mapNotNull { entity ->
                 runCatching { decodeCachedMoment(JSONObject(entity.payload)) }.getOrNull()
             }
-        }
-    }
-
-    private fun writeCachedMoments(section: String, moments: List<CachedMoment>) {
-        runBlockingIo {
-            MomentsRoomStore.dao().replaceMomentsIn(
-                section,
-                moments.map {
-                    MomentEntity(
-                        momentId = it.momentId,
-                        feedSection = it.feedSection,
-                        timestamp = it.timestamp.time,
-                        lastSyncedAt = it.lastSyncedAt.time,
-                        payload = encodeCachedMoment(it).toString(),
-                    )
-                },
-            )
+            val merged = existing.associateBy { it.momentId }.toMutableMap()
+            moments.forEach { moment ->
+                val id = moment.id ?: return@forEach
+                merged[id] = CachedMoment.from(moment, section)
+            }
+            val rows = merged.values.sortedByDescending { it.timestamp.time }.take(maxCount).map {
+                MomentEntity(it.momentId, it.feedSection, it.timestamp.time, it.lastSyncedAt.time, encodeCachedMoment(it).toString())
+            }
+            MomentsRoomStore.dao().replaceMomentsIn(section, rows)
         }
     }
 
     // MARK: - Stories cache
 
-    fun saveStories(stories: List<Story>, sync: Boolean = false) {
-        val existing = if (sync) emptyList() else loadAllCachedStories()
-        val map = existing.associateBy { it.id }.toMutableMap()
-        stories.forEach { story ->
-            val id = story.id ?: return@forEach
-            CachedStory.fromStory(story)?.let { map[id] = it }
-        }
-        writeAllCachedStories(map.values.toList())
-    }
-
-    fun deleteStory(storyId: String) {
-        runBlockingIo { MomentsRoomStore.dao().deleteStory(storyId) }
-    }
-
-    fun deleteStories(userId: String) {
-        runBlockingIo { MomentsRoomStore.dao().deleteStoriesByAuthor(userId) }
-    }
-
-    fun loadStories(userId: String): List<Story> {
+    suspend fun loadStoriesAsync(userId: String): List<Story> = withContext(Dispatchers.IO) {
         val now = Date()
-        return runBlockingIo { MomentsRoomStore.dao().storiesByAuthor(userId) }
+        MomentsRoomStore.dao().storiesByAuthor(userId)
             .mapNotNull { entity -> runCatching { decodeCachedStory(JSONObject(entity.payload)) }.getOrNull() }
             .filter { it.expirationDate.after(now) }
             .sortedBy { it.timestamp.time }
             .map { it.toStory() }
     }
 
-    fun cleanupOldStories() {
-        runBlockingIo { MomentsRoomStore.dao().deleteExpiredStories(Date().time) }
-    }
-
-    private fun loadAllCachedStories(): List<CachedStory> {
-        return runBlockingIo {
-            MomentsRoomStore.dao().allStories().mapNotNull { entity ->
+    suspend fun saveStoriesAsync(stories: List<Story>, sync: Boolean = false) = withContext(Dispatchers.IO) {
+        storiesMutex.withLock {
+            val existing = if (sync) emptyList() else MomentsRoomStore.dao().allStories().mapNotNull { entity ->
                 runCatching { decodeCachedStory(JSONObject(entity.payload)) }.getOrNull()
             }
+            val merged = existing.associateBy { it.id }.toMutableMap()
+            stories.forEach { story ->
+                val id = story.id ?: return@forEach
+                CachedStory.fromStory(story)?.let { merged[id] = it }
+            }
+            MomentsRoomStore.dao().replaceStories(merged.values.map {
+                StoryEntity(it.id, it.authorId, it.timestamp.time, it.expirationDate.time, it.cachedAt.time, encodeCachedStory(it).toString())
+            })
         }
     }
 
-    private fun writeAllCachedStories(stories: List<CachedStory>) {
-        runBlockingIo {
-            MomentsRoomStore.dao().replaceStories(
-                stories.map {
-                    StoryEntity(
-                        id = it.id,
-                        authorId = it.authorId,
-                        timestamp = it.timestamp.time,
-                        expirationDate = it.expirationDate.time,
-                        cachedAt = it.cachedAt.time,
-                        payload = encodeCachedStory(it).toString(),
-                    )
-                },
-            )
-        }
+    suspend fun deleteStoryAsync(storyId: String) = withContext(Dispatchers.IO) {
+        storiesMutex.withLock { MomentsRoomStore.dao().deleteStory(storyId) }
+    }
+
+    suspend fun deleteStoriesAsync(userId: String) = withContext(Dispatchers.IO) {
+        storiesMutex.withLock { MomentsRoomStore.dao().deleteStoriesByAuthor(userId) }
+    }
+
+    suspend fun cleanupOldStoriesAsync() = withContext(Dispatchers.IO) {
+        storiesMutex.withLock { MomentsRoomStore.dao().deleteExpiredStories(Date().time) }
     }
 
     // MARK: - Optimistic local updates
 
-    fun toggleMomentReactionLocally(momentId: String, reaction: String, userId: String) {
-        updateMomentsAcrossSections(momentId) { cached ->
+    suspend fun deleteMomentAsync(momentId: String) = withContext(Dispatchers.IO) {
+        momentsMutex.withLock { MomentsRoomStore.dao().deleteMoment(momentId) }
+    }
+
+    suspend fun toggleMomentReactionLocallyAsync(momentId: String, reaction: String, userId: String) =
+        updateMomentsAcrossSectionsAsync(momentId) { cached ->
             val reactions = CachedMoment.decodeReactions(cached.reactionsData).toMutableMap()
             val users = reactions.getOrPut(reaction) { mutableListOf() }.toMutableList()
             if (users.contains(userId)) users.remove(userId) else users.add(userId)
             if (users.isEmpty()) reactions.remove(reaction) else reactions[reaction] = users
             cached.copy(reactionsData = CachedMoment.encodeReactions(reactions), lastSyncedAt = Date())
         }
-    }
 
-    fun updateCommentCountLocally(momentId: String, increment: Int) {
-        updateMomentsAcrossSections(momentId) { cached ->
+    suspend fun updateCommentCountLocallyAsync(momentId: String, increment: Int) =
+        updateMomentsAcrossSectionsAsync(momentId) { cached ->
             val current = cached.commentCount ?: 0
             cached.copy(commentCount = maxOf(0, current + increment), lastSyncedAt = Date())
         }
-    }
-
-    fun toggleFollowLocally(currentUserId: String, targetUserId: String, isFollow: Boolean) {
-        synchronized(connectionsLock) {
-            val connections = loadConnectionRecords(currentUserId).toMutableList()
-            connections.removeAll { it.targetId == targetUserId && it.type == "following" }
-            if (isFollow) {
-                connections += CachedConnection(currentUserId, targetUserId, "following")
-            }
-            saveConnectionRecords(currentUserId, connections)
-        }
-    }
-
-    fun deleteMoment(momentId: String) {
-        runBlockingIo { MomentsRoomStore.dao().deleteMoment(momentId) }
-    }
 
     suspend fun deleteMoment(
         momentId: String,
@@ -478,14 +472,14 @@ object LocalPersistenceService {
         imagePath: String?,
         videoUrl: String?,
     ) {
-        deleteMoment(momentId)
+        deleteMomentAsync(momentId)
         val payload = DeleteMomentPayload(
             momentId = momentId,
             userId = userId,
             imagePath = imagePath,
             videoUrl = videoUrl,
         )
-        saveAction(
+        saveActionAsync(
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.DELETE_MOMENT.raw,
@@ -507,11 +501,11 @@ object LocalPersistenceService {
     ) {
         var actualOldBio = oldBio
         var actualOldWebsite = oldWebsite
-        val existing = loadUser(userId)
+        val existing = loadUserAsync(userId)
         if (existing != null) {
             if (actualOldBio == null) actualOldBio = existing.bio
             if (actualOldWebsite == null) actualOldWebsite = existing.websiteUrl
-            saveUser(
+            saveUserAsync(
                 existing.copy(
                     bio = bio ?: existing.bio,
                     websiteUrl = website ?: existing.websiteUrl,
@@ -530,7 +524,7 @@ object LocalPersistenceService {
             profileImageLocalPath = profileImageLocalPath,
             isImageUpdate = profileImageLocalPath != null,
         )
-        saveAction(
+        saveActionAsync(
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.UPDATE_PROFILE.raw,
@@ -540,14 +534,14 @@ object LocalPersistenceService {
     }
 
     suspend fun acceptFollowRequest(notificationId: String, senderId: String, recipientId: String) {
-        markNotificationPending(notificationId, pending = false)
+        markNotificationPendingAsync(notificationId, pending = false)
         val payload = FollowRequestActionPayload(
             notificationId = notificationId,
             senderId = senderId,
             recipientId = recipientId,
             isAccept = true,
         )
-        saveAction(
+        saveActionAsync(
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.ACCEPT_FOLLOW_REQUEST.raw,
@@ -557,14 +551,14 @@ object LocalPersistenceService {
     }
 
     suspend fun rejectFollowRequest(notificationId: String, senderId: String, recipientId: String) {
-        deleteNotifications(listOf(notificationId))
+        deleteNotificationsAsync(listOf(notificationId))
         val payload = FollowRequestActionPayload(
             notificationId = notificationId,
             senderId = senderId,
             recipientId = recipientId,
             isAccept = false,
         )
-        saveAction(
+        saveActionAsync(
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.REJECT_FOLLOW_REQUEST.raw,
@@ -591,7 +585,7 @@ object LocalPersistenceService {
             description = description,
             priority = priority,
         )
-        saveAction(
+        saveActionAsync(
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.REPORT_CONTENT.raw,
@@ -601,9 +595,9 @@ object LocalPersistenceService {
     }
 
     suspend fun markNotificationAsRead(notificationId: String, userId: String) {
-        markNotificationPending(notificationId, pending = false)
+        markNotificationPendingAsync(notificationId, pending = false)
         val payload = MarkAsReadPayload(notificationId = notificationId, userId = userId)
-        saveAction(
+        saveActionAsync(
             CachedAction(
                 id = UUID.randomUUID().toString(),
                 type = CachedAction.ActionType.MARK_AS_READ.raw,
@@ -614,166 +608,169 @@ object LocalPersistenceService {
 
     // MARK: - Search history
 
-    fun saveSearch(query: String, type: String, targetId: String? = null) {
-        val search = CachedSearch(query, type, targetId)
-        val list = loadRecentSearches().filter { it.id != search.id }.toMutableList()
-        list.add(0, search)
-        saveSearchHistory(list.take(MAX_SEARCHES))
-    }
-
-    fun deleteSearch(id: String) {
-        saveSearchHistory(loadRecentSearches().filter { it.id != id })
-    }
-
-    fun loadRecentSearches(): List<CachedSearch> {
-        return runBlockingIo {
-            MomentsRoomStore.dao().allSearches().map {
-                CachedSearch(it.query, it.type, it.targetId, Date(it.timestamp))
-            }
+    suspend fun loadRecentSearchesAsync(): List<CachedSearch> = withContext(Dispatchers.IO) {
+        MomentsRoomStore.dao().allSearches().map {
+            CachedSearch(it.query, it.type, it.targetId, Date(it.timestamp))
         }
     }
 
-    fun clearSearchHistory() {
-        runBlockingIo { MomentsRoomStore.dao().deleteAllSearches() }
+    suspend fun saveSearchAsync(query: String, type: String, targetId: String? = null) =
+        withContext(Dispatchers.IO) {
+            searchesMutex.withLock {
+                val search = CachedSearch(query, type, targetId)
+                val list = MomentsRoomStore.dao().allSearches().map {
+                    CachedSearch(it.query, it.type, it.targetId, Date(it.timestamp))
+                }.filter { it.id != search.id }.toMutableList()
+                list.add(0, search)
+                MomentsRoomStore.dao().replaceSearches(
+                    list.take(MAX_SEARCHES).map { SearchEntity(it.id, it.query, it.type, it.targetId, it.timestamp.time) },
+                )
+            }
+        }
+
+    suspend fun deleteSearchAsync(id: String) = withContext(Dispatchers.IO) {
+        searchesMutex.withLock {
+            val remaining = MomentsRoomStore.dao().allSearches().filter { entity ->
+                CachedSearch(entity.query, entity.type, entity.targetId, Date(entity.timestamp)).id != id
+            }
+            MomentsRoomStore.dao().replaceSearches(remaining)
+        }
+    }
+
+    suspend fun clearSearchHistoryAsync() = withContext(Dispatchers.IO) {
+        searchesMutex.withLock { MomentsRoomStore.dao().deleteAllSearches() }
     }
 
     // MARK: - Messaging cache (delegated)
-
-    fun saveConversations(conversations: List<Conversation>, sync: Boolean = false) {
-        val existing = if (sync) emptyList() else loadCachedConversations()
-        val map = existing.associateBy { it.id }.toMutableMap()
-        conversations.forEach { conv ->
-            val id = conv.id ?: return@forEach
-            val incoming = CachedConversation.from(conv)
-            val prev = map[id]
-            map[id] = if (prev != null) mergeCachedConversation(prev, incoming) else incoming
-        }
-        writeCachedConversations(
-            map.values.sortedWith(
-                compareByDescending<CachedConversation> { it.isPinned }.thenByDescending { it.timestamp },
-            ).take(MAX_CONVERSATIONS),
-        )
-    }
-
-    fun loadConversations(): List<Conversation> =
-        loadCachedConversations()
+    suspend fun loadConversationsAsync(): List<Conversation> = withContext(Dispatchers.IO) {
+        MomentsRoomStore.dao().allConversations()
+            .mapNotNull { entity ->
+                runCatching { decodeCachedConversation(JSONObject(entity.payload)) }.getOrNull()
+            }
             .sortedWith(compareByDescending<CachedConversation> { it.isPinned }.thenByDescending { it.timestamp })
             .map { it.toConversation() }
-
-    /** Helper Android (iOS: ChatService.isConversationArchived). Lee snapshot LPS. */
-    fun isConversationArchived(conversationId: String, userId: String): Boolean {
-        val conversation = loadCachedConversations().firstOrNull { it.id == conversationId } ?: return false
-        return conversation.toConversation().isArchived(userId)
     }
 
-    fun saveMessages(messages: List<EnhancedMessage>, conversationId: String, sync: Boolean = false) {
+    suspend fun saveConversationsAsync(conversations: List<Conversation>, sync: Boolean = false) =
+        withContext(Dispatchers.IO) {
+            conversationsMutex.withLock {
+                val existing = if (sync) emptyList() else MomentsRoomStore.dao().allConversations().mapNotNull { entity ->
+                    runCatching { decodeCachedConversation(JSONObject(entity.payload)) }.getOrNull()
+                }
+                val merged = existing.associateBy { it.id }.toMutableMap()
+                conversations.forEach { conversation ->
+                    val id = conversation.id ?: return@forEach
+                    val incoming = CachedConversation.from(conversation)
+                    merged[id] = merged[id]?.let { mergeCachedConversation(it, incoming) } ?: incoming
+                }
+                MomentsRoomStore.dao().replaceConversations(
+                    merged.values.sortedWith(
+                        compareByDescending<CachedConversation> { it.isPinned }.thenByDescending { it.timestamp },
+                    ).take(MAX_CONVERSATIONS).map {
+                        ConversationEntity(it.id, it.isPinned, it.timestamp.time, it.lastSyncedAt.time, encodeCachedConversation(it).toString())
+                    },
+                )
+            }
+        }
+
+    suspend fun saveMessagesAsync(messages: List<EnhancedMessage>, conversationId: String, sync: Boolean = false) {
         if (messages.isEmpty() && !sync) return
         val warmed = warmDiskMediaURLs(messages)
-        kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
-            MessagePersistenceStore.save(encodeMessages(warmed), conversationId, sync)
-        }
+        MessagePersistenceStore.save(encodeMessages(warmed), conversationId, sync)
     }
 
-    fun appendMessages(messages: List<EnhancedMessage>, conversationId: String) {
+    suspend fun appendMessagesAsync(messages: List<EnhancedMessage>, conversationId: String) {
         if (messages.isEmpty()) return
-        saveMessages(messages, conversationId, sync = false)
+        saveMessagesAsync(messages, conversationId, sync = false)
     }
 
-    fun reconcileMessages(messages: List<EnhancedMessage>, conversationId: String) {
+    suspend fun reconcileMessagesAsync(messages: List<EnhancedMessage>, conversationId: String) {
         if (messages.isEmpty()) return
         val warmed = warmDiskMediaURLs(messages)
-        runBlockingIo {
-            MessagePersistenceStore.reconcile(encodeMessages(warmed), conversationId)
-        }
+        MessagePersistenceStore.reconcile(encodeMessages(warmed), conversationId)
     }
 
-    fun messageExists(conversationId: String, messageId: String): Boolean =
-        runBlockingIo { MessagePersistenceStore.containsMessage(conversationId, messageId) }
+    suspend fun messageExistsAsync(conversationId: String, messageId: String): Boolean =
+        MessagePersistenceStore.containsMessage(conversationId, messageId)
 
-    fun lastMessageSyncCursor(conversationId: String): MessageSyncCursor? =
-        runBlockingIo { MessagePersistenceStore.lastCursor(conversationId) }
+    suspend fun lastMessageSyncCursorAsync(conversationId: String): MessageSyncCursor? =
+        MessagePersistenceStore.lastCursor(conversationId)
 
-    fun lastMessageTimestamp(conversationId: String): Date? =
-        lastMessageSyncCursor(conversationId)?.timestamp
+    suspend fun lastMessageTimestampAsync(conversationId: String): Date? =
+        lastMessageSyncCursorAsync(conversationId)?.timestamp
 
-    fun loadMessagesFast(conversationId: String): List<EnhancedMessage> =
-        runBlockingIo { MessagePersistenceStore.allMessages(conversationId) }
+    suspend fun loadMessagesFastAsync(conversationId: String): List<EnhancedMessage> =
+        MessagePersistenceStore.allMessages(conversationId)
             .let { decodeMessages(it) }
             .sortedWith(compareBy<EnhancedMessage> { it.timestamp }.thenBy { it.id })
 
-    fun loadRecentMessagesFast(
+    suspend fun loadRecentMessagesFastAsync(
         conversationId: String,
         limit: Int,
         cutoffDate: Date? = null,
     ): List<EnhancedMessage> {
         if (limit <= 0) return emptyList()
-        return runBlockingIo {
-            MessagePersistenceStore.recentMessages(conversationId, limit, cutoffDate)
-        }.let { encoded ->
+        return MessagePersistenceStore.recentMessages(conversationId, limit, cutoffDate).let { encoded ->
             if (encoded.isEmpty()) emptyList() else decodeMessages(encoded)
         }
     }
 
-    fun loadMessagesBefore(
+    suspend fun loadMessagesBeforeAsync(
         conversationId: String,
         cursor: MessageSyncCursor,
         cutoffDate: Date? = null,
         limit: Int,
     ): List<EnhancedMessage> {
         if (limit <= 0) return emptyList()
-        return runBlockingIo {
-            MessagePersistenceStore.messagesBefore(conversationId, cursor, cutoffDate, limit)
-        }.let { encoded ->
+        return MessagePersistenceStore.messagesBefore(conversationId, cursor, cutoffDate, limit).let { encoded ->
             if (encoded.isEmpty()) emptyList() else decodeMessages(encoded)
         }
     }
 
-    fun loadMessagesAfter(
+    suspend fun loadMessagesAfterAsync(
         conversationId: String,
         cursor: MessageSyncCursor,
         cutoffDate: Date? = null,
         limit: Int,
     ): List<EnhancedMessage> {
         if (limit <= 0) return emptyList()
-        return runBlockingIo {
-            MessagePersistenceStore.messagesAfter(conversationId, cursor, cutoffDate, limit)
-        }.let { encoded ->
+        return MessagePersistenceStore.messagesAfter(conversationId, cursor, cutoffDate, limit).let { encoded ->
             if (encoded.isEmpty()) emptyList() else decodeMessages(encoded)
         }
     }
 
-    fun searchMessageIds(conversationId: String, query: String, limit: Int = 100): List<String> =
+    suspend fun searchMessageIdsAsync(conversationId: String, query: String, limit: Int = 100): List<String> =
         MessagePersistenceStore.searchMessageIds(conversationId, query, limit)
 
-    fun searchMessagesGlobally(query: String, limit: Int = 50): List<EnhancedMessage> =
+    suspend fun searchMessagesGloballyAsync(query: String, limit: Int = 50): List<EnhancedMessage> =
         MessagePersistenceStore.searchMessagesGlobally(query, limit)
 
-    fun markMessageDeletedForEveryone(conversationId: String, messageId: String) {
+    suspend fun markMessageDeletedForEveryoneAsync(conversationId: String, messageId: String) {
         MessagePersistenceStore.markMessageDeletedForEveryone(conversationId, messageId)
     }
 
-    fun removeCachedMessage(conversationId: String, messageId: String) {
+    suspend fun removeCachedMessageAsync(conversationId: String, messageId: String) {
         MessagePersistenceStore.removeCachedMessage(conversationId, messageId)
     }
 
-    fun markVanishMessagesDismissed(conversationId: String, messageIds: List<String>, userId: String) {
+    suspend fun markVanishMessagesDismissedAsync(conversationId: String, messageIds: List<String>, userId: String) {
         if (messageIds.isEmpty()) return
         MessagePersistenceStore.markVanishMessagesDismissed(conversationId, messageIds.toSet(), userId)
     }
 
-    fun updateMessageVanishExpiresAt(conversationId: String, messageId: String, expiresAt: Date) {
+    suspend fun updateMessageVanishExpiresAtAsync(conversationId: String, messageId: String, expiresAt: Date) {
         MessagePersistenceStore.updateMessageVanishExpiresAt(conversationId, messageId, expiresAt)
     }
 
-    fun updateMessageNoticeContent(conversationId: String, messageId: String, content: String) {
+    suspend fun updateMessageNoticeContentAsync(conversationId: String, messageId: String, content: String) {
         MessagePersistenceStore.updateMessageNoticeContent(conversationId, messageId, content)
     }
 
-    fun toggleMessageReactionLocally(messageId: String, emoji: String, userId: String) {
+    suspend fun toggleMessageReactionLocallyAsync(messageId: String, emoji: String, userId: String) {
         MessagePersistenceStore.toggleMessageReactionLocally(messageId, emoji, userId)
     }
 
-    fun unreadMessageCount(
+    suspend fun unreadMessageCountAsync(
         conversationId: String,
         currentUserId: String,
         lastReadAt: Date? = null,
@@ -794,7 +791,7 @@ object LocalPersistenceService {
         onUpdated: (List<EnhancedMessage>) -> Unit,
     ) {
         ioScope.launch {
-            val loaded = loadMessagesFast(conversationId)
+            val loaded = loadMessagesFastAsync(conversationId)
             if (loaded.isEmpty()) return@launch
             val relinked = mutableListOf<EnhancedMessage>()
             val results = loaded.map { msg ->
@@ -810,7 +807,7 @@ object LocalPersistenceService {
                 }
             }
             if (relinked.isNotEmpty()) {
-                saveMessages(relinked, conversationId, sync = false)
+                saveMessagesAsync(relinked, conversationId, sync = false)
             }
             onUpdated(results)
         }
@@ -822,8 +819,8 @@ object LocalPersistenceService {
         return decodeMessages(encoded)
     }
 
-    fun loadMessages(conversationId: String): List<EnhancedMessage> {
-        val results = loadMessagesFast(conversationId)
+    suspend fun loadMessagesAsync(conversationId: String): List<EnhancedMessage> {
+        val results = loadMessagesFastAsync(conversationId)
         if (results.isEmpty()) return emptyList()
         var relinked = false
         val warmed = results.map { msg ->
@@ -833,7 +830,7 @@ object LocalPersistenceService {
                 msg.copy(mediaUrl = warm.mediaUrl ?: msg.mediaUrl, thumbnailUrl = warm.thumbnailUrl ?: msg.thumbnailUrl)
             } else msg
         }
-        if (relinked) saveMessages(warmed, conversationId, sync = false)
+        if (relinked) saveMessagesAsync(warmed, conversationId, sync = false)
         return warmed
     }
 
@@ -869,51 +866,69 @@ object LocalPersistenceService {
         return decodeMessages(encoded)
     }
 
-    fun markMessagesAsRead(conversationId: String, messageIds: List<String>) {
+    suspend fun markMessagesAsReadAsync(conversationId: String, messageIds: List<String>) {
         if (messageIds.isEmpty()) return
         MessagePersistenceStore.markMessagesAsRead(conversationId, messageIds.toSet())
     }
 
-    fun markConversationReadLocally(conversationId: String, currentUserId: String) {
-        val conversations = loadCachedConversations().toMutableList()
+    suspend fun markConversationReadLocallyAsync(conversationId: String, currentUserId: String) {
+        val conversations = loadConversationsAsync().toMutableList()
         val index = conversations.indexOfFirst { it.id == conversationId }
         if (index >= 0) {
             val cached = conversations[index]
-            val readStatus = CachedConversation.decodeStringBoolMap(cached.readStatusData).toMutableMap()
+            val readStatus = cached.readStatus.toMutableMap()
             if (readStatus[currentUserId] != true) {
                 readStatus[currentUserId] = true
-                conversations[index] = cached.copy(readStatusData = CachedConversation.encodeStringBoolMap(readStatus))
-                writeCachedConversations(conversations)
+                conversations[index] = cached.copy(readStatus = readStatus)
+                saveConversationsAsync(conversations, sync = true)
             }
         }
         MessagePersistenceStore.markAllIncomingAsRead(conversationId, currentUserId)
     }
 
-    fun deleteConversationCache(conversationId: String) {
-        val messageIds = loadMessages(conversationId).map { it.id }
+    suspend fun deleteConversationCacheAsync(conversationId: String) {
+        val messageIds = loadMessagesAsync(conversationId).map { it.id }
         ChatCacheStore.deleteConversation(conversationId, messageIds)
         MessagePersistenceStore.deleteConversation(conversationId)
-        val remaining = loadCachedConversations().filter { it.id != conversationId }
-        writeCachedConversations(remaining)
+        val remaining = loadConversationsAsync().filter { it.id != conversationId }
+        saveConversationsAsync(remaining, sync = true)
     }
 
-    fun saveNotifications(notifications: List<MomentsNotification>, sync: Boolean = false) {
-        val existing = if (sync) emptyList() else loadCachedNotifications()
-        val map = existing.associateBy { it.id }.toMutableMap()
-        notifications.forEach { notification ->
-            val id = notification.id ?: return@forEach
-            map[id] = CachedNotification.from(notification)
+    suspend fun loadNotificationsAsync(): List<MomentsNotification> = withContext(Dispatchers.IO) {
+        MomentsRoomStore.dao().allNotifications()
+            .mapNotNull { entity ->
+                runCatching { decodeCachedNotification(JSONObject(entity.payload)) }.getOrNull()
+            }
+            .sortedByDescending { it.timestamp }
+            .map { it.toNotification() }
+    }
+
+    suspend fun saveNotificationsAsync(notifications: List<MomentsNotification>, sync: Boolean = false) =
+        withContext(Dispatchers.IO) {
+            notificationsMutex.withLock {
+                val existing = if (sync) emptyList() else MomentsRoomStore.dao().allNotifications().mapNotNull { entity ->
+                    runCatching { decodeCachedNotification(JSONObject(entity.payload)) }.getOrNull()
+                }
+                val merged = existing.associateBy { it.id }.toMutableMap()
+                notifications.forEach { notification ->
+                    val id = notification.id ?: return@forEach
+                    merged[id] = CachedNotification.from(notification)
+                }
+                MomentsRoomStore.dao().replaceNotifications(
+                    merged.values.sortedByDescending { it.timestamp }.take(MAX_NOTIFICATIONS).map {
+                        NotificationEntity(it.id, it.timestamp.time, it.isPending, it.lastSyncedAt.time, encodeCachedNotification(it).toString())
+                    },
+                )
+            }
         }
-        writeCachedNotifications(map.values.sortedByDescending { it.timestamp }.take(MAX_NOTIFICATIONS))
-    }
 
-    fun loadNotifications(): List<MomentsNotification> =
-        loadCachedNotifications().sortedByDescending { it.timestamp }.map { it.toNotification() }
-
-    fun deleteNotifications(ids: List<String>) {
-        if (ids.isEmpty()) return
-        val idSet = ids.toSet()
-        writeCachedNotifications(loadCachedNotifications().filter { it.id !in idSet })
+    suspend fun deleteNotificationsAsync(ids: List<String>) = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext
+        notificationsMutex.withLock {
+            val idSet = ids.toSet()
+            val remaining = MomentsRoomStore.dao().allNotifications().filter { it.id !in idSet }
+            MomentsRoomStore.dao().replaceNotifications(remaining)
+        }
     }
 
     suspend fun saveMessagesInBackground(
@@ -943,15 +958,15 @@ object LocalPersistenceService {
     suspend fun lastMessageSyncCursorInBackground(conversationId: String): MessageSyncCursor? =
         MessagePersistenceStore.lastCursor(conversationId)
 
-    fun upsertConversationPreview(message: EnhancedMessage) {
+    suspend fun upsertConversationPreviewAsync(message: EnhancedMessage) {
         val ctx = appContext
         val previewText = if (ctx != null) message.preview(ctx) else messagePreview(message)
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-        val conversations = loadCachedConversations().toMutableList()
+        val conversations = loadConversationsAsync().toMutableList()
         val index = conversations.indexOfFirst { it.id == message.conversationId }
         if (index >= 0) {
             val cached = conversations[index]
-            val readStatus = CachedConversation.decodeStringBoolMap(cached.readStatusData).toMutableMap()
+            val readStatus = cached.readStatus.toMutableMap()
             if (currentUserId.isNotEmpty() && message.senderId != currentUserId) {
                 readStatus[currentUserId] = false
             }
@@ -959,49 +974,48 @@ object LocalPersistenceService {
                 lastMessage = previewText,
                 timestamp = message.timestamp,
                 lastMessageSenderId = message.senderId,
-                lastSyncedAt = Date(),
-                readStatusData = CachedConversation.encodeStringBoolMap(readStatus),
-                lastMessageSeenAtData = if (message.senderId == currentUserId) null else cached.lastMessageSeenAtData,
-                lastMessageReactionData = if (message.senderId == currentUserId) null else cached.lastMessageReactionData,
+                readStatus = readStatus,
+                lastMessageSeenAt = if (message.senderId == currentUserId) null else cached.lastMessageSeenAt,
+                lastMessageReaction = if (message.senderId == currentUserId) null else cached.lastMessageReaction,
             )
         } else {
             val readStatus = mutableMapOf<String, Boolean>()
             if (currentUserId.isNotEmpty()) {
                 readStatus[currentUserId] = message.senderId == currentUserId
             }
-            conversations += CachedConversation(
+            conversations += Conversation(
                 id = message.conversationId,
                 participants = emptyList(),
                 lastMessage = previewText,
                 timestamp = message.timestamp,
-                readStatusData = CachedConversation.encodeStringBoolMap(readStatus),
+                readStatus = readStatus,
                 otherParticipantId = if (message.senderId == currentUserId) "" else message.senderId,
                 otherParticipantUsername = null,
                 otherParticipantProfileImagePath = null,
                 lastMessageSenderId = message.senderId,
-                lastSyncedAt = Date(),
             )
         }
-        writeCachedConversations(
+        saveConversationsAsync(
             conversations.sortedWith(
-                compareByDescending<CachedConversation> { it.isPinned }.thenByDescending { it.timestamp },
+                compareByDescending<Conversation> { it.isPinned == true }.thenByDescending { it.timestamp },
             ).take(MAX_CONVERSATIONS),
+            sync = true,
         )
     }
 
-    fun clearAllChatCache() {
+    suspend fun clearAllChatCacheAsync() {
         MessagePersistenceStore.clearAll()
-        writeCachedConversations(emptyList())
+        saveConversationsAsync(emptyList(), sync = true)
         ChatCacheStore.clearAllMedia()
     }
 
-    fun cachedMessageCount(): Int = MessagePersistenceStore.cachedMessageCount()
+    suspend fun cachedMessageCountAsync(): Int = MessagePersistenceStore.cachedMessageCount()
 
-    fun cachedMessageKeys(since: Date): Set<String> = MessagePersistenceStore.cachedMessageKeys(since)
+    suspend fun cachedMessageKeysAsync(since: Date): Set<String> = MessagePersistenceStore.cachedMessageKeys(since)
 
     // MARK: - Cleanup
 
-    fun cleanupOldChats() {
+    suspend fun cleanupOldChatsAsync() {
         val cutoff = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -MAX_DATA_AGE_DAYS) }.time
         val staleThreshold = Calendar.getInstance().apply {
             add(Calendar.DAY_OF_YEAR, -STALE_CHAT_THRESHOLD_DAYS)
@@ -1013,56 +1027,57 @@ object LocalPersistenceService {
             staleWindow = STALE_CHAT_WINDOW_SIZE,
         )
         val chatCutoff = cutoff
-        val remaining = loadCachedConversations().filter { it.isPinned || !it.timestamp.before(chatCutoff) }
-        writeCachedConversations(remaining)
+        val remaining = loadConversationsAsync().filter { it.isPinned == true || !it.timestamp.before(chatCutoff) }
+        saveConversationsAsync(remaining, sync = true)
         ChatCacheStore.enforceRetention()
     }
 
-    fun cleanupOldData() {
-        cleanupOldStories()
-        cleanupOldChats()
+    suspend fun cleanupOldDataAsync() {
+        cleanupOldStoriesAsync()
+        cleanupOldChatsAsync()
         val cutoff = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -MAX_DATA_AGE_DAYS) }.time
-        runBlockingIo { MomentsRoomStore.dao().deleteMomentsBefore(cutoff.time) }
-        trimCachedUsersByAge(cutoff)
-        trimCachedUsers()
-    }
-
-    fun clearAll() {
-        runBlockingIo { MomentsRoomStore.dao().clearAllCache() }
-        ChatCacheStore.clearAllMedia()
-    }
-
-    fun getCacheStats(): String {
-        val feed = loadCachedMoments("feed").size
-        val explore = loadCachedMoments("explore").size
-        val stories = loadAllCachedStories().size
-        val actions = loadPendingActions().size
-        val messages = cachedMessageCount()
-        return "feed=$feed explore=$explore stories=$stories actions=$actions messages=$messages"
+        withContext(Dispatchers.IO) { MomentsRoomStore.dao().deleteMomentsBefore(cutoff.time) }
+        trimCachedUsersByAgeAsync(cutoff)
+        trimCachedUsersAsync()
     }
 
     // MARK: - Internals
-
-    private fun updateMomentsAcrossSections(momentId: String, transform: (CachedMoment) -> CachedMoment) {
-        val affected = runBlockingIo {
-            MomentsRoomStore.dao().allMoments().filter { it.momentId == momentId }.map { it.feedSection }
-        }
-        affected.forEach { section ->
-            val updated = loadCachedMoments(section).map { cached ->
-                if (cached.momentId == momentId) transform(cached) else cached
+    private suspend fun updateMomentsAcrossSectionsAsync(
+        momentId: String,
+        transform: (CachedMoment) -> CachedMoment,
+    ) = withContext(Dispatchers.IO) {
+        momentsMutex.withLock {
+            val dao = MomentsRoomStore.dao()
+            val affected = dao.allMoments().filter { it.momentId == momentId }.map { it.feedSection }.distinct()
+            affected.forEach { section ->
+                val updated = dao.momentsIn(section).mapNotNull { entity ->
+                    runCatching { decodeCachedMoment(JSONObject(entity.payload)) }.getOrNull()
+                }.map { cached ->
+                    if (cached.momentId == momentId) transform(cached) else cached
+                }
+                dao.replaceMomentsIn(
+                    section,
+                    updated.map {
+                        MomentEntity(
+                            feedSection = section,
+                            momentId = it.momentId,
+                            timestamp = it.timestamp.time,
+                            lastSyncedAt = it.lastSyncedAt.time,
+                            payload = encodeCachedMoment(it).toString(),
+                        )
+                    },
+                )
             }
-            writeCachedMoments(section, updated)
         }
     }
 
-    /** ≡ iOS trimCachedUsersToLimit — excluye cacheSection == currentUser. */
-    private fun trimCachedUsers() {
-        val entries = runBlockingIo { MomentsRoomStore.dao().cachedNonCurrentUsers() }
-        if (entries.size <= MAX_CACHED_USERS) return
-        val toRemove = entries.sortedBy { it.lastSyncedAt }.take(entries.size - MAX_CACHED_USERS)
-        runBlockingIo {
-            toRemove.forEach { MomentsRoomStore.dao().deleteUser(it.userId, it.cacheSection) }
-        }
+    private suspend fun trimCachedUsersAsync() = withContext(Dispatchers.IO) {
+        val dao = MomentsRoomStore.dao()
+        val entries = dao.cachedNonCurrentUsers()
+        if (entries.size <= MAX_CACHED_USERS) return@withContext
+        entries.sortedBy { it.lastSyncedAt }
+            .take(entries.size - MAX_CACHED_USERS)
+            .forEach { dao.deleteUser(it.userId, it.cacheSection) }
     }
 
     /** ≡ iOS updateCachedConversation — no retrocede lastMessage/timestamp. */
@@ -1098,98 +1113,6 @@ object LocalPersistenceService {
         )
     }
 
-    private fun saveSearchHistory(searches: List<CachedSearch>) {
-        runBlockingIo {
-            MomentsRoomStore.dao().replaceSearches(
-                searches.map { SearchEntity(it.id, it.query, it.type, it.targetId, it.timestamp.time) },
-            )
-        }
-    }
-
-    private fun loadAllActions(): List<CachedAction> {
-        return runBlockingIo {
-            MomentsRoomStore.dao().allActions().map {
-                CachedAction(
-                    id = it.id,
-                    type = it.type,
-                    status = it.status,
-                    payloadData = it.payload,
-                    createdAt = Date(it.createdAt),
-                    retryCount = it.retryCount,
-                    lastError = it.lastError,
-                    lastAttemptAt = it.lastAttemptAt?.let(::Date),
-                )
-            }
-        }
-    }
-
-    private fun saveAllActions(actions: List<CachedAction>) {
-        runBlockingIo {
-            MomentsRoomStore.dao().replaceActions(
-                actions.map {
-                    PendingActionEntity(
-                        id = it.id,
-                        type = it.type,
-                        status = it.status,
-                        payload = it.payloadData,
-                        createdAt = it.createdAt.time,
-                        retryCount = it.retryCount,
-                        lastError = it.lastError,
-                        lastAttemptAt = it.lastAttemptAt?.time,
-                    )
-                },
-            )
-        }
-    }
-
-    private fun loadCachedConversations(): List<CachedConversation> {
-        return runBlockingIo {
-            MomentsRoomStore.dao().allConversations().mapNotNull { entity ->
-                runCatching { decodeCachedConversation(JSONObject(entity.payload)) }.getOrNull()
-            }
-        }
-    }
-
-    private fun writeCachedConversations(conversations: List<CachedConversation>) {
-        runBlockingIo {
-            MomentsRoomStore.dao().replaceConversations(
-                conversations.map {
-                    ConversationEntity(
-                        id = it.id,
-                        isPinned = it.isPinned,
-                        timestamp = it.timestamp.time,
-                        lastSyncedAt = it.lastSyncedAt.time,
-                        payload = encodeCachedConversation(it).toString(),
-                    )
-                },
-            )
-        }
-    }
-
-    private fun loadCachedNotifications(): List<CachedNotification> {
-        return runBlockingIo {
-            MomentsRoomStore.dao().allNotifications().mapNotNull { entity ->
-                runCatching { decodeCachedNotification(JSONObject(entity.payload)) }.getOrNull()
-            }
-        }
-    }
-
-    private fun writeCachedNotifications(notifications: List<CachedNotification>) {
-        runBlockingIo {
-            MomentsRoomStore.dao().replaceNotifications(
-                notifications.map {
-                    NotificationEntity(
-                        id = it.id,
-                        timestamp = it.timestamp.time,
-                        isPending = it.isPending,
-                        lastSyncedAt = it.lastSyncedAt.time,
-                        payload = encodeCachedNotification(it).toString(),
-                    )
-                },
-            )
-        }
-    }
-
     private data class DiskWarmResult(val mediaUrl: String?, val thumbnailUrl: String?, val changed: Boolean)
 
     private fun applyDiskWarm(message: EnhancedMessage): DiskWarmResult {
@@ -1200,20 +1123,30 @@ object LocalPersistenceService {
         return DiskWarmResult(mediaUrl, thumbnailUrl, changed)
     }
 
-    /** Bloquea en IO para lecturas síncronas desde UI legacy. */
-    private fun <T> runBlockingIo(block: suspend () -> T): T =
-        kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) { block() }
-
-    private fun markNotificationPending(notificationId: String, pending: Boolean) {
-        val updated = loadCachedNotifications().map { notification ->
-            if (notification.id == notificationId) notification.copy(isPending = pending, lastSyncedAt = Date())
-            else notification
+    private suspend fun markNotificationPendingAsync(notificationId: String, pending: Boolean) =
+        withContext(Dispatchers.IO) {
+            notificationsMutex.withLock {
+                val updated = MomentsRoomStore.dao().allNotifications().mapNotNull { entity ->
+                    runCatching { decodeCachedNotification(JSONObject(entity.payload)) }.getOrNull()
+                }.map { notification ->
+                    if (notification.id == notificationId) {
+                        notification.copy(isPending = pending, lastSyncedAt = Date())
+                    } else notification
+                }
+                MomentsRoomStore.dao().replaceNotifications(updated.map {
+                    NotificationEntity(
+                        it.id,
+                        it.timestamp.time,
+                        it.isPending,
+                        it.lastSyncedAt.time,
+                        encodeCachedNotification(it).toString(),
+                    )
+                })
+            }
         }
-        writeCachedNotifications(updated)
-    }
 
-    private fun trimCachedUsersByAge(cutoff: Date) {
-        runBlockingIo { MomentsRoomStore.dao().deleteUsersBefore(cutoff.time) }
+    private suspend fun trimCachedUsersByAgeAsync(cutoff: Date) = withContext(Dispatchers.IO) {
+        MomentsRoomStore.dao().deleteUsersBefore(cutoff.time)
     }
 
     private fun messagePreview(message: EnhancedMessage): String {

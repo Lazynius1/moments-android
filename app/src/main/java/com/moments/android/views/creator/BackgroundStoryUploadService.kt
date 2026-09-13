@@ -259,7 +259,7 @@ object BackgroundStoryUploadService {
                         return@launch
                     }
                 }
-                val action = LocalPersistenceService.loadAction(uploadingStory.tempId)
+                val action = LocalPersistenceService.loadActionAsync(uploadingStory.tempId)
                     ?: run {
                         markStoryAsFailed(uploadingStory, "Missing persisted story upload action")
                         return@launch
@@ -428,23 +428,27 @@ object BackgroundStoryUploadService {
 
     /** ≡ iOS `retryUpload` — reencola acción fallida. */
     fun retryUpload(actionId: String) {
-        LocalPersistenceService.updateActionStatus(actionId, CachedAction.ActionStatus.PENDING)
-        val action = LocalPersistenceService.loadAction(actionId) ?: return
-        StoryUploadProgressManager.startUpload()
-        uploadingStory?.takeIf { it.tempId == actionId }?.let {
-            it.status = UploadStatus.Uploading
-            it.uploadProgress = 0.0
-            it.errorMessage = null
+        uploadScope.launch {
+            LocalPersistenceService.updateActionStatusAsync(actionId, CachedAction.ActionStatus.PENDING)
+            val action = LocalPersistenceService.loadActionAsync(actionId) ?: return@launch
+            StoryUploadProgressManager.startUpload()
+            uploadingStory?.takeIf { it.tempId == actionId }?.let {
+                it.status = UploadStatus.Uploading
+                it.uploadProgress = 0.0
+                it.errorMessage = null
+            }
+            isProcessing = true
+            resumeUpload(action)
         }
-        isProcessing = true
-        uploadScope.launch { resumeUpload(action) }
     }
 
     /** ≡ iOS `cancelUpload` — quita progreso y borra outbox + ficheros. */
     fun cancelUpload(actionId: String) {
         inFlightActionIds.remove(actionId)
-        LocalPersistenceService.loadAction(actionId)?.let(::deleteActionFiles)
-        LocalPersistenceService.deleteAction(actionId)
+        uploadScope.launch {
+            LocalPersistenceService.loadActionAsync(actionId)?.let(::deleteActionFiles)
+            LocalPersistenceService.deleteActionAsync(actionId)
+        }
         StoryUploadProgressManager.cancelUpload()
         if (uploadingStory?.tempId == actionId) {
             uploadingStory = null
@@ -455,7 +459,9 @@ object BackgroundStoryUploadService {
 
     /** ≡ iOS `deleteActionFiles(id:)`. */
     fun deleteActionFiles(actionId: String) {
-        LocalPersistenceService.loadAction(actionId)?.let(::deleteActionFiles)
+        uploadScope.launch {
+            LocalPersistenceService.loadActionAsync(actionId)?.let(::deleteActionFiles)
+        }
         // ≡ iOS: también borra ficheros cuyo nombre contiene el actionId
         val dir = runCatching { pendingUploadsDir() }.getOrNull() ?: return
         dir.listFiles()?.forEach { file ->
@@ -524,7 +530,7 @@ object BackgroundStoryUploadService {
             type = CachedAction.ActionType.STORY_UPLOAD.raw,
             payloadData = UploadPayloadDecoder.encodeStoryPayload(payload),
         )
-        LocalPersistenceService.saveActionOrThrow(action)
+        LocalPersistenceService.saveActionOrThrowAsync(action)
     }
 
     /** ≡ iOS `saveMediaToDisk`. */
@@ -586,10 +592,10 @@ object BackgroundStoryUploadService {
     suspend fun resumeUpload(action: CachedAction) {
         if (action.type != CachedAction.ActionType.STORY_UPLOAD.raw) return
         if (!inFlightActionIds.add(action.id)) {
-            LocalPersistenceService.updateActionStatus(action.id, CachedAction.ActionStatus.PENDING)
+            LocalPersistenceService.updateActionStatusAsync(action.id, CachedAction.ActionStatus.PENDING)
             return
         }
-        LocalPersistenceService.updateActionStatus(action.id, CachedAction.ActionStatus.EXECUTING)
+        LocalPersistenceService.updateActionStatusAsync(action.id, CachedAction.ActionStatus.EXECUTING)
         // OfflineSync / retry: FGS si aún no lo sostiene publishPrepared (refcount anida).
         val ctx = appContext
         if (ctx != null) UploadForegroundKeeper.acquire(ctx)
@@ -1499,11 +1505,13 @@ object BackgroundStoryUploadService {
     }
 
     private fun failAction(actionId: String, message: String?) {
-        LocalPersistenceService.updateActionStatus(
-            actionId,
-            CachedAction.ActionStatus.FAILED,
-            error = message,
-        )
+        uploadScope.launch {
+            LocalPersistenceService.updateActionStatusAsync(
+                actionId,
+                CachedAction.ActionStatus.FAILED,
+                error = message,
+            )
+        }
         StoryUploadProgressManager.cancelUpload()
         uploadingStory?.takeIf { it.tempId == actionId }?.let { story ->
             story.status = UploadStatus.Failed
@@ -1518,9 +1526,9 @@ object BackgroundStoryUploadService {
         }
     }
 
-    private fun finishSuccess(action: CachedAction) {
+    private suspend fun finishSuccess(action: CachedAction) {
         deleteActionFiles(action)
-        LocalPersistenceService.deleteAction(action.id)
+        LocalPersistenceService.deleteActionAsync(action.id)
         StoryUploadProgressManager.finishUpload()
         uploadingStory?.takeIf { it.tempId == action.id }?.let { story ->
             story.status = UploadStatus.Completed

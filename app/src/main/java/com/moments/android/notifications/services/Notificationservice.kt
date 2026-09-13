@@ -74,12 +74,14 @@ object NotificationService {
         _isLoading.value = true
         isFirstSnapshot = true
 
-        val cached = LocalPersistenceService.loadNotifications()
-        if (cached.isNotEmpty()) {
-            _notifications.value = visibleNotifications(cached)
-            updateUnreadCount()
-            _isLoading.value = false
-            Log.d(TAG, "Loaded ${cached.size} notifications from cache")
+        scope.launch {
+            val cached = LocalPersistenceService.loadNotificationsAsync()
+            if (cached.isNotEmpty() && isFirstSnapshot) {
+                _notifications.value = visibleNotifications(cached)
+                updateUnreadCount()
+                _isLoading.value = false
+                Log.d(TAG, "Loaded ${cached.size} notifications from cache")
+            }
         }
 
         val query = db.collection("users").document(userId).collection("notifications")
@@ -99,7 +101,9 @@ object NotificationService {
             _canLoadMore.value = documents.size >= PAGE_SIZE
             val fetched = documents.mapNotNull { decodeNotificationDocument(it) }
             _notifications.value = visibleNotifications(fetched)
-            LocalPersistenceService.saveNotifications(_notifications.value, sync = isFirstSnapshot)
+            scope.launch {
+                LocalPersistenceService.saveNotificationsAsync(_notifications.value, sync = isFirstSnapshot)
+            }
             isFirstSnapshot = false
             updateUnreadCount()
             _isLoading.value = false
@@ -166,7 +170,7 @@ object NotificationService {
                         }
                 }
                 ref.set(toSave.toMap()).await()
-                LocalPersistenceService.saveNotifications(listOf(toSave))
+                LocalPersistenceService.saveNotificationsAsync(listOf(toSave))
             }.onFailure { Log.e(TAG, "Error saving notification: $it") }
         }
     }
@@ -187,28 +191,29 @@ object NotificationService {
         targetAuthorUsername: String? = null,
     ) {
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        val username = senderUsername
-            ?: LocalPersistenceService.loadCurrentUser()?.username
-            ?: "Alguien" // ≡ UserDefaults current_username fallback en iOS
-
-        val notification = MomentsNotification(
-            id = notificationId,
-            type = type,
-            senderId = currentUserId,
-            senderUsername = username,
-            timestamp = Date(),
-            isPending = true,
-            momentId = momentId,
-            storyId = storyId,
-            storyAuthorId = storyAuthorId,
-            mentionContext = mentionContext,
-            targetAuthorId = targetAuthorId,
-            targetAuthorUsername = targetAuthorUsername,
-            reaction = reaction,
-            commentId = commentId,
-            echoId = echoId,
-        )
-        saveNotification(notification, targetUserId)
+        scope.launch {
+            val username = senderUsername
+                ?: LocalPersistenceService.loadCurrentUserAsync()?.username
+                ?: "Alguien"
+            val notification = MomentsNotification(
+                id = notificationId,
+                type = type,
+                senderId = currentUserId,
+                senderUsername = username,
+                timestamp = Date(),
+                isPending = true,
+                momentId = momentId,
+                storyId = storyId,
+                storyAuthorId = storyAuthorId,
+                mentionContext = mentionContext,
+                targetAuthorId = targetAuthorId,
+                targetAuthorUsername = targetAuthorUsername,
+                reaction = reaction,
+                commentId = commentId,
+                echoId = echoId,
+            )
+            saveNotification(notification, targetUserId)
+        }
     }
 
     fun sendMentionNotification(targetUserId: String, momentId: String? = null, storyId: String? = null) {
@@ -436,7 +441,9 @@ object NotificationService {
         val existingIds = _notifications.value.mapNotNull { it.id }.toSet()
         val restored = pending.notifications.filter { it.id !in existingIds }
         _notifications.value = (_notifications.value + restored).sortedByDescending { it.timestamp }
-        LocalPersistenceService.saveNotifications(restored, sync = false)
+        scope.launch {
+            LocalPersistenceService.saveNotificationsAsync(restored, sync = false)
+        }
         _pendingDeletion.value = null
         updateUnreadCount()
     }
@@ -471,7 +478,7 @@ object NotificationService {
         val idSet = notificationsToDelete.mapNotNull { it.id }.toSet()
         _notifications.value = _notifications.value.filter { it.id !in idSet }
         updateUnreadCount()
-        LocalPersistenceService.deleteNotifications(idSet.toList())
+        scope.launch { LocalPersistenceService.deleteNotificationsAsync(idSet.toList()) }
     }
 
     private fun commitDeletionToFirestore(notificationsToDelete: List<MomentsNotification>) {

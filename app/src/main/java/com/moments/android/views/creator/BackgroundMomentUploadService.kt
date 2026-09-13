@@ -276,7 +276,7 @@ object BackgroundMomentUploadService {
                 if (uploadingMoment.status == UploadStatus.Completed ||
                     uploadingMoment.status == UploadStatus.Moderated
                 ) {
-                    LocalPersistenceService.deleteAction(uploadingMoment.tempId)
+                    LocalPersistenceService.deleteActionAsync(uploadingMoment.tempId)
                     deleteActionFiles(uploadingMoment.tempId)
                 }
             } finally {
@@ -744,7 +744,7 @@ object BackgroundMomentUploadService {
     }
 
     /** Port de iOS `persistAction`. */
-    private fun persistAction(ctx: Context, uploadingMoment: UploadingMoment) {
+    private suspend fun persistAction(ctx: Context, uploadingMoment: UploadingMoment) {
         val cachedMedia = uploadingMoment.mediaItems.map { media ->
             saveMediaToDisk(ctx, media, uploadingMoment.tempId)
         }
@@ -777,7 +777,7 @@ object BackgroundMomentUploadService {
             type = CachedAction.ActionType.MOMENT_UPLOAD.raw,
             payloadData = UploadPayloadDecoder.encodeMomentPayload(payload),
         )
-        LocalPersistenceService.saveActionOrThrow(action)
+        LocalPersistenceService.saveActionOrThrowAsync(action)
     }
 
     /** Port de iOS `saveMediaToDisk`. */
@@ -901,7 +901,7 @@ object BackgroundMomentUploadService {
                     moment.audienceSetting == payload.audienceSetting
             }
             if (alreadyUploading) {
-                LocalPersistenceService.updateActionStatus(
+                LocalPersistenceService.updateActionStatusAsync(
                     action.id,
                     CachedAction.ActionStatus.PENDING,
                 )
@@ -938,7 +938,7 @@ object BackgroundMomentUploadService {
             }
 
             if (mediaItems.isEmpty()) {
-                LocalPersistenceService.updateActionStatus(
+                LocalPersistenceService.updateActionStatusAsync(
                     action.id,
                     CachedAction.ActionStatus.FAILED,
                     error = "Missing cached media for pending moment upload",
@@ -1005,7 +1005,7 @@ object BackgroundMomentUploadService {
                 )
             }
         } catch (e: Exception) {
-            LocalPersistenceService.updateActionStatus(
+            LocalPersistenceService.updateActionStatusAsync(
                 action.id,
                 CachedAction.ActionStatus.FAILED,
                 error = e.message,

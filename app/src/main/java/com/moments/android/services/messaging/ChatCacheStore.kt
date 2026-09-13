@@ -184,7 +184,7 @@ object ChatCacheStore {
 
     private const val QUOTA_PROTECTION_DAYS = 7
 
-    fun enforceQuota() {
+    suspend fun enforceQuota() {
         val maxBytes = MAX_MEDIA_BYTES
         var total = totalMediaBytes()
         if (total <= maxBytes) return
@@ -192,7 +192,7 @@ object ChatCacheStore {
         val protectionCutoff = Calendar.getInstance().apply {
             add(Calendar.DAY_OF_YEAR, -QUOTA_PROTECTION_DAYS)
         }.time
-        val protectedKeys = LocalPersistenceService.cachedMessageKeys(protectionCutoff)
+        val protectedKeys = LocalPersistenceService.cachedMessageKeysAsync(protectionCutoff)
 
         val candidates = trackedFiles().sortedBy { it.modificationDate }
         val mutable = candidates.toMutableList()
@@ -213,11 +213,11 @@ object ChatCacheStore {
         file.setLastModified(System.currentTimeMillis())
     }
 
-    fun enforceRetention() {
+    suspend fun enforceRetention() {
         val retentionDays = RETENTION_DAYS
         if (retentionDays <= 0) return
         val cutoff = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -retentionDays) }.time
-        val protectedKeys = LocalPersistenceService.cachedMessageKeys(cutoff)
+        val protectedKeys = LocalPersistenceService.cachedMessageKeysAsync(cutoff)
         trackedFiles().forEach { tracked ->
             if (tracked.modificationDate >= cutoff) return@forEach
             if (tracked.messageKey != null && tracked.messageKey in protectedKeys) return@forEach
@@ -225,7 +225,7 @@ object ChatCacheStore {
         }
     }
 
-    fun runMaintenance() {
+    suspend fun runMaintenance() {
         migrateFromLegacyCachesIfNeeded()
         enforceRetention()
         enforceQuota()

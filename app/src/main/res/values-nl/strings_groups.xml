@@ -81,6 +81,7 @@
     <string name="groups_typing_one">%1$s typt…</string>
     <string name="groups_typing_two">%1$s en %2$s typen…</string>
     <string name="groups_typing_several">Meerdere mensen typen…</string>
+    <string name="groups_typing_more">%1$s en %2$d anderen typen…</string>
     <string name="groups_search_members">Leden zoeken</string>
     <string name="groups_no_members_found">Geen leden gevonden.</string>
     <string name="groups_mention_placeholder">Een lid vermelden</string>

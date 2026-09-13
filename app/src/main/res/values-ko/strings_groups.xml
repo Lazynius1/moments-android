@@ -81,6 +81,7 @@
     <string name="groups_typing_one">%1$s님이 입력 중…</string>
     <string name="groups_typing_two">%1$s님과 %2$s님이 입력 중…</string>
     <string name="groups_typing_several">여러 명이 입력 중…</string>
+    <string name="groups_typing_more">%1$s 외 %2$d명이 입력 중…</string>
     <string name="groups_search_members">멤버 검색</string>
     <string name="groups_no_members_found">멤버를 찾을 수 없어요.</string>
     <string name="groups_mention_placeholder">멤버 언급</string>
