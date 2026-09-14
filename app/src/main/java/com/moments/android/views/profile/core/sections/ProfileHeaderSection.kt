@@ -463,10 +463,26 @@ fun ModernStatsSection(
     val secondary = if (dark) Color.White.copy(alpha = .65f) else Color(0xFF52626A)
     val border = if (dark) Color.White.copy(alpha = 0.24f) else Color(0xFF0B1215).copy(alpha = 0.4f)
     val stats = listOf(
-        Triple(R.string.profile_header_visits, viewModel.groupedVisits.size, onOpenVisits),
-        Triple(R.string.profile_header_followers, viewModel.followers.size, onOpenFollowers),
-        Triple(R.string.profile_header_following, viewModel.following.size, onOpenFollowing),
-        Triple(R.string.profile_header_mutuals, viewModel.mutuals.size, onOpenMutuals),
+        Triple(
+            R.string.profile_header_visits,
+            maxOf(viewModel.groupedVisits.size, viewModel.userProfile?.profileVisitorsCount ?: 0),
+            onOpenVisits,
+        ),
+        Triple(
+            R.string.profile_header_followers,
+            maxOf(viewModel.followers.size, viewModel.userProfile?.followersCount ?: 0),
+            onOpenFollowers,
+        ),
+        Triple(
+            R.string.profile_header_following,
+            maxOf(viewModel.following.size, viewModel.userProfile?.followingCount ?: 0),
+            onOpenFollowing,
+        ),
+        Triple(
+            R.string.profile_header_mutuals,
+            maxOf(viewModel.mutuals.size, viewModel.userProfile?.mutualsCount ?: 0),
+            onOpenMutuals,
+        ),
     )
     Row(
         modifier

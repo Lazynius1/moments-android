@@ -22,6 +22,8 @@ data class CachedUser(
     val followersCount: Int? = 0,
     val followingCount: Int? = 0,
     val momentsCount: Int? = 0,
+    val mutualsCount: Int? = 0,
+    val profileVisitorsCount: Int? = 0,
     val isVerified: Boolean? = false,
     val isPrivate: Boolean? = false,
     val isActive: Boolean? = true,
@@ -59,6 +61,8 @@ data class CachedUser(
         followersCount = followersCount ?: 0,
         followingCount = followingCount ?: 0,
         momentsCount = momentsCount ?: 0,
+        mutualsCount = mutualsCount ?: 0,
+        profileVisitorsCount = profileVisitorsCount ?: 0,
         isActive = isActive ?: true,
         selectedProfileTheme = selectedProfileTheme,
         isVerified = isVerified ?: false,
@@ -77,6 +81,8 @@ data class CachedUser(
         put("followersCount", followersCount)
         put("followingCount", followingCount)
         put("momentsCount", momentsCount)
+        put("mutualsCount", mutualsCount)
+        put("profileVisitorsCount", profileVisitorsCount)
         put("isVerified", isVerified)
         put("isPrivate", isPrivate)
         put("isActive", isActive)
@@ -105,6 +111,8 @@ data class CachedUser(
             followersCount == other.followersCount &&
             followingCount == other.followingCount &&
             momentsCount == other.momentsCount &&
+            mutualsCount == other.mutualsCount &&
+            profileVisitorsCount == other.profileVisitorsCount &&
             isVerified == other.isVerified &&
             isPrivate == other.isPrivate &&
             isActive == other.isActive &&
@@ -131,6 +139,8 @@ data class CachedUser(
         result = 31 * result + (followersCount ?: 0)
         result = 31 * result + (followingCount ?: 0)
         result = 31 * result + (momentsCount ?: 0)
+        result = 31 * result + (mutualsCount ?: 0)
+        result = 31 * result + (profileVisitorsCount ?: 0)
         result = 31 * result + (isVerified?.hashCode() ?: 0)
         result = 31 * result + (isPrivate?.hashCode() ?: 0)
         result = 31 * result + (isActive?.hashCode() ?: 0)
@@ -168,6 +178,8 @@ data class CachedUser(
             followersCount = user.followersCount,
             followingCount = user.followingCount,
             momentsCount = user.momentsCount,
+            mutualsCount = user.mutualsCount,
+            profileVisitorsCount = user.profileVisitorsCount,
             interestsData = encodeStringList(user.interests),
             blockedUsersData = encodeStringList(user.blockedUsers),
             bestFriendsData = encodeStringList(user.bestFriends),
@@ -188,6 +200,8 @@ data class CachedUser(
                 followersCount = json.optInt("followersCount"),
                 followingCount = json.optInt("followingCount"),
                 momentsCount = json.optInt("momentsCount"),
+                mutualsCount = json.optInt("mutualsCount"),
+                profileVisitorsCount = json.optInt("profileVisitorsCount"),
                 isVerified = json.optBoolean("isVerified", false),
                 isPrivate = json.optBoolean("isPrivate", false),
                 isActive = json.optBoolean("isActive", true),

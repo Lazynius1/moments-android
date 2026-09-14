@@ -120,8 +120,6 @@ class ProfileViewModel(
             profileResult.onSuccess { profile ->
                 isOffline = false
                 applyFetchedProfile(profile)
-                fetchConnections(userId)
-                fetchVisits(userId)
                 fetchCustomAudienceListNames(userId)
             }.onFailure { error ->
                 if (isNetworkError(error)) {
@@ -201,6 +199,11 @@ class ProfileViewModel(
     fun refreshVisits() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         viewModelScope.launch { fetchVisits(userId) }
+    }
+
+    fun refreshConnections() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        viewModelScope.launch { fetchConnections(userId) }
     }
 
     private suspend fun fetchVisits(userId: String) {

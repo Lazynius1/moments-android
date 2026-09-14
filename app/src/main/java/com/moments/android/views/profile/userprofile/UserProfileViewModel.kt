@@ -68,6 +68,8 @@ class UserProfileViewModel(
     var isLoadingMoments by mutableStateOf(true); private set
     var isLoadingMoreMoments by mutableStateOf(false); private set
     var hasMoreMoments by mutableStateOf(false); private set
+    /** El stat usa el total publicado; la cuadrícula aplica privacidad en cada página. */
+    val displayMomentsCount: Int get() = maxOf(userProfile?.momentsCount ?: 0, moments.size)
     var taggedMoments by mutableStateOf<List<Moment>>(emptyList()); private set
     var isLoadingTagged by mutableStateOf(false); private set
     var isLoadingMoreTagged by mutableStateOf(false); private set

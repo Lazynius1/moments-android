@@ -149,7 +149,7 @@ fun UserModernStatsSection(
     modifier: Modifier = Modifier,
 ) {
     val colors = rememberAdaptiveColors()
-    val postsCount = maxOf(viewModel.moments.size, viewModel.userProfile?.momentsCount ?: 0)
+    val postsCount = viewModel.displayMomentsCount
 
     data class Stat(val label: String, val count: Int, val action: () -> Unit)
     val stats = buildList {
@@ -158,26 +158,36 @@ fun UserModernStatsSection(
             add(
                 Stat(
                     stringResource(R.string.profile_header_followers),
-                    if (viewModel.visibleConnectionTypes.canViewFollowers) viewModel.followers.size else 0,
+                    if (viewModel.visibleConnectionTypes.canViewFollowers) {
+                        maxOf(viewModel.followers.size, viewModel.userProfile?.followersCount ?: 0)
+                    } else 0,
                 ) { onOpenSocial(SocialConnectionTab.FOLLOWERS) },
             )
             add(
                 Stat(
                     stringResource(R.string.profile_header_following),
-                    if (viewModel.visibleConnectionTypes.canViewFollowing) viewModel.following.size else 0,
+                    if (viewModel.visibleConnectionTypes.canViewFollowing) {
+                        maxOf(viewModel.following.size, viewModel.userProfile?.followingCount ?: 0)
+                    } else 0,
                 ) { onOpenSocial(SocialConnectionTab.FOLLOWING) },
             )
         } else {
             if (viewModel.visibleConnectionTypes.canViewFollowers) {
                 add(
-                    Stat(stringResource(R.string.profile_header_followers), viewModel.followers.size) {
+                    Stat(
+                        stringResource(R.string.profile_header_followers),
+                        maxOf(viewModel.followers.size, viewModel.userProfile?.followersCount ?: 0),
+                    ) {
                         onOpenSocial(SocialConnectionTab.FOLLOWERS)
                     },
                 )
             }
             if (viewModel.visibleConnectionTypes.canViewFollowing) {
                 add(
-                    Stat(stringResource(R.string.profile_header_following), viewModel.following.size) {
+                    Stat(
+                        stringResource(R.string.profile_header_following),
+                        maxOf(viewModel.following.size, viewModel.userProfile?.followingCount ?: 0),
+                    ) {
                         onOpenSocial(SocialConnectionTab.FOLLOWING)
                     },
                 )

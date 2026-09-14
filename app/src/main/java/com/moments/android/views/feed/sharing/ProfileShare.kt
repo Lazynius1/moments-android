@@ -405,7 +405,7 @@ fun SharedProfilePreviewCard(
                         )
                     }
                 }
-                SharedProfileStatsRow(viewModel, isOwnProfile)
+                SharedProfileStatsRow(sharedProfileData, viewModel, isOwnProfile)
             }
         }
     }
@@ -605,12 +605,13 @@ private fun parseSnapshotPreviewURLs(sharedProfileData: Map<String, String>): Li
 
 @Composable
 private fun SharedProfileStatsRow(
+    sharedProfileData: Map<String, String>,
     viewModel: UserProfileViewModel,
     isOwnProfile: Boolean,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    val stats = sharedProfileVisibleStats(viewModel, isOwnProfile)
+    val stats = sharedProfileVisibleStats(sharedProfileData, viewModel, isOwnProfile)
     if (stats.isEmpty()) return
     val isDark = isSystemInDarkTheme()
     Row(Modifier.fillMaxWidth()) {
@@ -654,39 +655,59 @@ private data class SharedProfileStat(val label: String, val count: Int)
 
 @Composable
 private fun sharedProfileVisibleStats(
+    sharedProfileData: Map<String, String>,
     viewModel: UserProfileViewModel,
     isOwnProfile: Boolean,
 ): List<SharedProfileStat> {
     val postsLabel = stringResource(R.string.profile_ui_posts)
     val followersLabel = stringResource(R.string.profile_ui_followers)
     val followingLabel = stringResource(R.string.profile_ui_following)
-    val postsCount = max(viewModel.moments.size, viewModel.userProfile?.momentsCount ?: 0)
+    fun resolvedCount(key: String, live: Int): Int =
+        if (viewModel.userProfile != null) live
+        else max(live, sharedProfileData[key]?.toIntOrNull() ?: 0)
+
+    val postsCount = resolvedCount(
+        "momentsCount",
+        max(viewModel.moments.size, viewModel.userProfile?.momentsCount ?: 0),
+    )
     val stats = mutableListOf<SharedProfileStat>()
     if (viewModel.canViewContent || isOwnProfile) {
         stats += SharedProfileStat(postsLabel, postsCount)
         if (viewModel.visibleConnectionTypes.canViewFollowers) {
             stats += SharedProfileStat(
                 followersLabel,
-                max(viewModel.followers.size, viewModel.userProfile?.followersCount ?: 0),
+                resolvedCount(
+                    "followersCount",
+                    max(viewModel.followers.size, viewModel.userProfile?.followersCount ?: 0),
+                ),
             )
         }
         if (viewModel.visibleConnectionTypes.canViewFollowing) {
             stats += SharedProfileStat(
                 followingLabel,
-                max(viewModel.following.size, viewModel.userProfile?.followingCount ?: 0),
+                resolvedCount(
+                    "followingCount",
+                    max(viewModel.following.size, viewModel.userProfile?.followingCount ?: 0),
+                ),
             )
         }
     } else {
         if (viewModel.visibleConnectionTypes.canViewFollowers) {
             stats += SharedProfileStat(
                 followersLabel,
-                max(viewModel.followers.size, viewModel.userProfile?.followersCount ?: 0),
+                resolvedCount(
+                    "followersCount",
+                    max(viewModel.followers.size, viewModel.userProfile?.followersCount ?: 0),
+                ),
             )
         }
         if (viewModel.visibleConnectionTypes.canViewFollowing) {
             stats += SharedProfileStat(
                 followingLabel,
-                max(viewModel.following.size, viewModel.userProfile?.followingCount ?: 0),
+                resolvedCount(
+                    "followingCount",
+                    max(viewModel.following.size, viewModel.userProfile?.followingCount ?: 0),
+                ),
             )
         }
     }

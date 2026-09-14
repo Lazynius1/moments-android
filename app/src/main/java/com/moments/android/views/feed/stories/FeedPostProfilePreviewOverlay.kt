@@ -193,8 +193,11 @@ fun FeedPostProfilePreviewOverlay(
                         conversation = conversation,
                         user = user,
                         currentUserId = currentUserId,
-                        followersCountOverride = profileViewModel.followers.size,
-                        momentsCountOverride = profileViewModel.moments.size,
+                        followersCountOverride = maxOf(
+                            profileViewModel.followers.size,
+                            profileViewModel.userProfile?.followersCount ?: 0,
+                        ),
+                        momentsCountOverride = profileViewModel.displayMomentsCount,
                     ) ?: return@launch
 
                     when (val destination = presentation.destination) {
@@ -717,22 +720,34 @@ private fun previewStats(
     val postsLabel = stringResource(R.string.profile_ui_posts)
     val followersLabel = stringResource(R.string.profile_ui_followers)
     val followingLabel = stringResource(R.string.profile_ui_following)
-    val postsCount = max(viewModel.moments.size, viewModel.userProfile?.momentsCount ?: 0)
+    val postsCount = viewModel.displayMomentsCount
     val stats = mutableListOf<PreviewStat>()
     if (viewModel.canViewContent || isOwnProfile) {
         stats += PreviewStat(postsLabel, postsCount)
         if (viewModel.visibleConnectionTypes.canViewFollowers) {
-            stats += PreviewStat(followersLabel, viewModel.followers.size)
+            stats += PreviewStat(
+                followersLabel,
+                maxOf(viewModel.followers.size, viewModel.userProfile?.followersCount ?: 0),
+            )
         }
         if (viewModel.visibleConnectionTypes.canViewFollowing) {
-            stats += PreviewStat(followingLabel, viewModel.following.size)
+            stats += PreviewStat(
+                followingLabel,
+                maxOf(viewModel.following.size, viewModel.userProfile?.followingCount ?: 0),
+            )
         }
     } else {
         if (viewModel.visibleConnectionTypes.canViewFollowers) {
-            stats += PreviewStat(followersLabel, viewModel.followers.size)
+            stats += PreviewStat(
+                followersLabel,
+                maxOf(viewModel.followers.size, viewModel.userProfile?.followersCount ?: 0),
+            )
         }
         if (viewModel.visibleConnectionTypes.canViewFollowing) {
-            stats += PreviewStat(followingLabel, viewModel.following.size)
+            stats += PreviewStat(
+                followingLabel,
+                maxOf(viewModel.following.size, viewModel.userProfile?.followingCount ?: 0),
+            )
         }
     }
     return stats

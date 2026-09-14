@@ -328,6 +328,9 @@ fun SocialConnectionsScreen(
     }
 
     LaunchedEffect(Unit) {
+        if (isOwnProfile) {
+            (listViewModel as? ProfileViewModel)?.refreshConnections()
+        }
         if (includesVisits) {
             if (isOwnProfile) {
                 (listViewModel as? ProfileViewModel)?.refreshVisits()

@@ -14,7 +14,6 @@ import com.moments.android.models.WrappedConversationKey
 import com.moments.android.models.toMap
 import com.moments.android.models.cache.CachedMessage
 import com.moments.android.services.cache.UserCacheService
-import com.moments.android.services.content.BackendFeedService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.messaging.MessageRequestService
@@ -1345,14 +1344,12 @@ object PendingChatContextFactory {
         val viewerFollowedAt = followTimestamp(currentUserId, otherId)
         val otherFollowedViewerAt = followerTimestamp(currentUserId, otherId)
         val stats = profileStats(otherId)
-        val followers = aggregateFollowersCount(otherId)
-        val moments = visibleMomentsCount(otherId)
         val context = PendingChatContext(
             otherUserId = otherId,
             otherUsername = user?.username ?: conversation.otherParticipantUsername.orEmpty(),
             otherProfileImagePath = user?.profileImagePath ?: conversation.otherParticipantProfileImagePath,
-            otherFollowersCount = resolvedCount(user?.followersCount, stats?.followersCount, followers),
-            otherMomentsCount = moments ?: resolvedCount(user?.momentsCount, stats?.momentsCount),
+            otherFollowersCount = resolvedCount(user?.followersCount, stats?.followersCount),
+            otherMomentsCount = resolvedCount(user?.momentsCount, stats?.momentsCount),
             otherIsVerified = user?.isVerified ?: false,
             viewerFollowsOther = viewerFollowedAt != null,
             otherFollowsViewer = otherFollowedViewerAt != null,
@@ -1375,8 +1372,6 @@ object PendingChatContextFactory {
         val otherFollowedViewerAt = followerTimestamp(currentUserId, user.id)
         val stats = profileStats(user.id)
         val request = pendingOutgoingRequest(currentUserId, user.id)
-        val followers = aggregateFollowersCount(user.id)
-        val moments = visibleMomentsCount(user.id)
         val receiverFollowsViewer = otherFollowedViewerAt != null
         val policy = stats?.requestPolicy ?: user.messageRequestPolicy
         val closed = policy == MessageRequestPolicy.NOBODY || (policy == MessageRequestPolicy.FOLLOWING && !receiverFollowsViewer)
@@ -1384,8 +1379,8 @@ object PendingChatContextFactory {
             otherUserId = user.id,
             otherUsername = user.username,
             otherProfileImagePath = user.profileImagePath,
-            otherFollowersCount = resolvedCount(user.followersCount, followersCountOverride, stats?.followersCount, followers),
-            otherMomentsCount = momentsCountOverride ?: moments ?: resolvedCount(user.momentsCount, stats?.momentsCount),
+            otherFollowersCount = resolvedCount(user.followersCount, followersCountOverride, stats?.followersCount),
+            otherMomentsCount = momentsCountOverride ?: resolvedCount(user.momentsCount, stats?.momentsCount),
             otherIsVerified = user.isVerified,
             viewerFollowsOther = viewerFollowedAt != null,
             otherFollowsViewer = receiverFollowsViewer,
@@ -1403,14 +1398,12 @@ object PendingChatContextFactory {
         val viewerFollowedAt = followTimestamp(viewerId, request.senderId)
         val otherFollowedViewerAt = followerTimestamp(viewerId, request.senderId)
         val stats = profileStats(request.senderId)
-        val followers = aggregateFollowersCount(request.senderId)
-        val moments = visibleMomentsCount(request.senderId)
         return PendingChatContext(
             otherUserId = request.senderId,
             otherUsername = sender?.username ?: request.senderUsername.orEmpty(),
             otherProfileImagePath = sender?.profileImagePath ?: request.senderProfileImagePath,
-            otherFollowersCount = resolvedCount(sender?.followersCount, stats?.followersCount, followers),
-            otherMomentsCount = moments ?: resolvedCount(sender?.momentsCount, stats?.momentsCount),
+            otherFollowersCount = resolvedCount(sender?.followersCount, stats?.followersCount),
+            otherMomentsCount = resolvedCount(sender?.momentsCount, stats?.momentsCount),
             otherIsVerified = sender?.isVerified ?: false,
             viewerFollowsOther = viewerFollowedAt != null,
             otherFollowsViewer = otherFollowedViewerAt != null,
@@ -1441,16 +1434,6 @@ object PendingChatContextFactory {
     private suspend fun timestampAt(collection: String, userId: String, otherId: String): Date? = runCatching {
         if (userId.isBlank() || otherId.isBlank()) return@runCatching null
         (db.collection("users").document(userId).collection(collection).document(otherId).get().await().get("timestamp") as? Timestamp)?.toDate()
-    }.getOrNull()
-    private suspend fun aggregateFollowersCount(userId: String): Int? = countCollection("followers", userId)
-    private suspend fun visibleMomentsCount(userId: String): Int? {
-        if (userId.isBlank()) return null
-        BackendFeedService.fetchProfileMoments(targetUserId = userId, limit = 1, includeTotalCount = true)?.totalVisibleCount?.let { return it }
-        return runCatching { db.collection("users").document(userId).collection("moments").whereEqualTo("audience", "everyone").get().await().size() }.getOrNull()
-    }
-    private suspend fun countCollection(collection: String, userId: String): Int? = runCatching {
-        if (userId.isBlank()) return@runCatching null
-        db.collection("users").document(userId).collection(collection).get().await().size()
     }.getOrNull()
     private data class ProfileStats(val followersCount: Int?, val momentsCount: Int?, val requestPolicy: MessageRequestPolicy?)
     private suspend fun profileStats(userId: String): ProfileStats? = runCatching {
