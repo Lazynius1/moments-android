@@ -304,9 +304,7 @@ fun FeedView(
         viewModel.refreshMoments(userId)
         storyRingCoordinator.loadStoryUsers(scope, userId, allowInstantCache = false)
         prefetchImages()
-        delay(400)
         notificationsViewModel.refreshNotifications()
-        messagingViewModel.fetchConversations(userId)
     }
 
     suspend fun performManualRefresh(userId: String) {

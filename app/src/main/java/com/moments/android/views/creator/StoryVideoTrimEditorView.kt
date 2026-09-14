@@ -220,9 +220,10 @@ fun StoryVideoTrimEditorView(
                 )
 
                 // iOS hardcodes "%.1fs selected" (no Localizable key).
+                // Texto adaptativo: el glass claro en día deja el blanco ilegible.
                 Text(
                     String.format("%.1fs selected", trimDuration),
-                    color = Color.White,
+                    color = chromeIcon,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier

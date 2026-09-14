@@ -16,6 +16,8 @@ import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.utilities.HapticManager
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 /**
  * Port de `SuggestedUsersViewModel` (SuggestedUsersView.swift).
@@ -59,9 +61,7 @@ class SuggestedUsersViewModel(
         currentUserId = userId
         isLoading = true
         viewModelScope.launch {
-            loadCurrentUserInterests(userId)
-            loadBlockedUsers(userId)
-            loadFollowedUsers(userId)
+            loadPrerequisites(userId)
             loadSuggestedUsers()
         }
     }
@@ -74,9 +74,7 @@ class SuggestedUsersViewModel(
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         currentUserId = userId
         isLoading = true
-        loadCurrentUserInterests(userId)
-        loadBlockedUsers(userId)
-        loadFollowedUsers(userId)
+        loadPrerequisites(userId)
         loadSuggestedUsers()
     }
 
@@ -131,21 +129,16 @@ class SuggestedUsersViewModel(
         }
     }
 
-    private suspend fun loadCurrentUserInterests(userId: String) {
-        runCatching { firestore.fetchUserProfile(userId) }
-            .onSuccess { currentUserInterests = it.interests }
-    }
-
-    private suspend fun loadBlockedUsers(userId: String) {
-        runCatching { firestore.fetchUserProfile(userId) }
-            .onSuccess { blockedUsers = it.blockedUsers.toSet() }
-    }
-
-    private suspend fun loadFollowedUsers(userId: String) {
-        followedUserIds = runCatching { firestore.fetchFollowing(userId) }
-            .getOrDefault(emptyList())
-            .map { it.id }
-            .toSet()
+    private suspend fun loadPrerequisites(userId: String) = coroutineScope {
+        val viewerProfile = async { runCatching { firestore.fetchUserProfile(userId) }.getOrNull() }
+        val followedUsers = async {
+            runCatching { firestore.fetchFollowing(userId) }.getOrDefault(emptyList())
+        }
+        viewerProfile.await()?.let { profile ->
+            currentUserInterests = profile.interests
+            blockedUsers = profile.blockedUsers.toSet()
+        }
+        followedUserIds = followedUsers.await().map { it.id }.toSet()
     }
 
     private suspend fun loadSuggestedUsers() {

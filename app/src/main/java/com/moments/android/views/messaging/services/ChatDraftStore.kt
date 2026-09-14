@@ -5,6 +5,7 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Port de `ChatDraftStore.swift` + `Notification.Name` del mismo archivo.
@@ -16,6 +17,7 @@ sealed interface ChatDraftEvent {
     data class VanishModeChanged(val conversationId: String, val vanishModeActive: Boolean) : ChatDraftEvent
     /** ≡ `conversationMarkedReadLocally`. */
     data class MarkedReadLocally(val conversationId: String) : ChatDraftEvent
+    data class ParticipantStateChanged(val userId: String) : ChatDraftEvent
 }
 
 object ChatDraftEvents {
@@ -75,6 +77,7 @@ object ChatDraftStore {
     private const val KEY_PREFIX = "chatDraft"
 
     @Volatile private var appContext: Context? = null
+    private val memoryCache = ConcurrentHashMap<String, String>()
 
     fun initialize(context: Context) {
         if (appContext == null) appContext = context.applicationContext
@@ -89,7 +92,7 @@ object ChatDraftStore {
         userId: String? = FirebaseAuth.getInstance().currentUser?.uid,
     ): String {
         val key = storageKey(conversationId, userId) ?: return ""
-        return prefs().getString(key, null).orEmpty()
+        return memoryCache[key] ?: prefs().getString(key, null).orEmpty().also { memoryCache[key] = it }
     }
 
     fun draft(
@@ -112,9 +115,11 @@ object ChatDraftStore {
         val normalized = text.trim()
         if (normalized.isEmpty()) {
             p.edit().remove(key).apply()
+            memoryCache[key] = ""
         } else {
             // iOS guarda `text` original (no trimmed) si normalized no está vacío.
             p.edit().putString(key, text).apply()
+            memoryCache[key] = text
         }
         val next = p.getString(key, null).orEmpty()
         if (previous != next) {

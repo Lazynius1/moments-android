@@ -13,6 +13,7 @@ import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.firestore.fetchUserProfileWithAvailability
 import com.moments.android.services.firestore.fetchNewConversationSuggestions
 import com.moments.android.services.firestore.searchUsersUncapped
 import com.moments.android.services.messaging.LocalFirstMessagingSettings
@@ -28,6 +29,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import java.util.Date
 
 /** ≡ iOS `!(readStatus[uid] ?? true)` — missing cuenta como leído. */
@@ -41,6 +44,13 @@ data class GlobalMessageSearchResult(
 ) {
     val id: String get() = message.id
 }
+
+data class InboxParticipantState(
+    val username: String,
+    val imagePath: String,
+    val isUnavailable: Boolean,
+    val isBlockedByCurrentUser: Boolean,
+)
 
 /**
  * Port de `Views/Messaging/Core/MessagingViewModel.swift`.
@@ -65,6 +75,8 @@ class MessagingViewModel(
     var searchedUsers by mutableStateOf<List<AppUser>>(emptyList()); private set
     var searchedMessages by mutableStateOf<List<GlobalMessageSearchResult>>(emptyList()); private set
     var isSearchingContent by mutableStateOf(false); private set
+    var participantStates by mutableStateOf<Map<String, InboxParticipantState>>(emptyMap()); private set
+    var draftTexts by mutableStateOf<Map<String, String>>(emptyMap()); private set
 
     var isLoading by mutableStateOf(true); private set
 
@@ -76,6 +88,9 @@ class MessagingViewModel(
     private val locallyReadConversationIds = mutableSetOf<String>()
     private val messageRequestService = MessageRequestService()
     private var targetWaitJob: Job? = null
+    private val participantStateFetches = mutableSetOf<String>()
+    private val participantStateFetchTimes = mutableMapOf<String, Long>()
+    private val participantStateTtlMillis = 300_000L
 
     private val currentUserId: String? get() = FirebaseAuth.getInstance().currentUser?.uid
 
@@ -122,8 +137,8 @@ class MessagingViewModel(
                     sortConversationsForInbox(filtered.filter { it.isArchived(userId) }),
                     userId,
                 )
-                conversations = applyingInboxSnapshot(conversations, active)
-                archivedConversations = applyingInboxSnapshot(archivedConversations, archived)
+                conversations = applyingInboxSnapshot(active)
+                archivedConversations = applyingInboxSnapshot(archived)
                 hasUnreadMessages = (active + archived).any { it.isUnreadFor(userId) }
                 errorMessage = null
                 isLoading = false
@@ -191,42 +206,61 @@ class MessagingViewModel(
     private fun hasDraft(conversation: Conversation, userId: String?): Boolean {
         val conversationId = conversation.id ?: return false
         val context = MomentsApplication.instance ?: return false
-        return ChatDraftStore.draft(context, conversationId, userId).isNotBlank()
+        return (draftTexts[conversationId] ?: ChatDraftStore.draft(context, conversationId, userId)).isNotBlank()
     }
 
-    fun refreshDraftOrdering() {
+    fun draftText(conversationId: String): String =
+        draftTexts[conversationId] ?: ChatDraftStore.draft(conversationId)
+
+    fun refreshDraftOrdering(conversationId: String? = null) {
+        if (!conversationId.isNullOrBlank()) {
+            draftTexts = draftTexts + (conversationId to ChatDraftStore.draft(conversationId))
+        }
         conversations = sortConversationsForInbox(conversations)
         archivedConversations = sortConversationsForInbox(archivedConversations)
         filteredConversations = sortConversationsForInbox(filteredConversations)
     }
 
-    /** Misma fila por `id`. Conserva si no cambió; sustituye / inserta / quita el resto. */
-    private fun mergingInboxById(existing: List<Conversation>, incoming: List<Conversation>): List<Conversation> {
-        if (existing.isEmpty()) return incoming
-        val existingById = existing.mapNotNull { conversation ->
-            conversation.id?.takeIf { it.isNotEmpty() }?.let { it to conversation }
-        }.toMap()
-        return incoming.map { next ->
-            val previous = next.id?.let { existingById[it] }
-            if (previous != null && previous == next) previous else next
-        }
-    }
-
-    private fun applyingInboxSnapshot(existing: List<Conversation>, incoming: List<Conversation>): List<Conversation> {
-        val merged = mergingInboxById(existing, incoming)
-        return if (existing == merged) existing else merged
-    }
+    /** Las keys estables conservan identidad visual; el modelo siempre refleja el último snapshot. */
+    private fun applyingInboxSnapshot(incoming: List<Conversation>): List<Conversation> = incoming
 
     fun archivedUnreadCount(userId: String): Int =
         archivedConversations.count { it.isUnreadFor(userId) }
 
     // MARK: - Refresh de perfiles visibles (≡ refreshUserData / refreshVisibleUsers)
 
-    fun refreshUserData(userId: String) {
-        if (userId.isBlank()) return
-        UserCacheService.refreshUser(userId) { user ->
-            val username = user?.username ?: localized(R.string.messaging_user_default)
-            val imagePath = user?.profileImagePath.orEmpty()
+    fun loadParticipantState(conversation: Conversation, force: Boolean = false) {
+        if (conversation.isGroup) return
+        val userId = conversation.otherParticipantId.trim()
+        if (userId.isEmpty()) return
+        val now = System.currentTimeMillis()
+        if (!force && participantStates[userId] != null &&
+            now - (participantStateFetchTimes[userId] ?: 0L) < participantStateTtlMillis
+        ) return
+        if (!participantStateFetches.add(userId)) return
+
+        viewModelScope.launch {
+            val fetched = runCatching { firestoreService.fetchUserProfileWithAvailability(userId) }.getOrNull()
+            val user = fetched?.first
+            val availability = fetched?.second
+                ?: com.moments.android.services.firestore.PublicProfileAvailability.AVAILABLE
+            if (user != null) UserCacheService.cacheUser(user)
+            val ownId = currentUserId.orEmpty()
+            val currentUser: AppUser? = if (ownId.isBlank()) null else suspendCancellableCoroutine<AppUser?> { continuation ->
+                UserCacheService.getUser(ownId) { continuation.resume(it) }
+            }
+            val blockedByCurrentUser = currentUser?.blockedUsers?.contains(userId) == true
+            val blockedCurrentUser = user?.blockedUsers?.contains(ownId) == true
+            val username = user?.username ?: conversation.otherParticipantUsername ?: localized(R.string.messaging_user_default)
+            val imagePath = user?.profileImagePath ?: conversation.otherParticipantProfileImagePath.orEmpty()
+            participantStateFetches.remove(userId)
+            participantStateFetchTimes[userId] = System.currentTimeMillis()
+            participantStates = participantStates + (userId to InboxParticipantState(
+                username = username,
+                imagePath = imagePath,
+                isUnavailable = availability == com.moments.android.services.firestore.PublicProfileAvailability.UNAVAILABLE || blockedByCurrentUser || blockedCurrentUser,
+                isBlockedByCurrentUser = blockedByCurrentUser,
+            ))
             conversations = applyRefreshedParticipant(userId, username, imagePath, conversations)
             archivedConversations = applyRefreshedParticipant(userId, username, imagePath, archivedConversations)
             filteredConversations = applyRefreshedParticipant(userId, username, imagePath, filteredConversations)
@@ -256,7 +290,19 @@ class MessagingViewModel(
     }
 
     fun refreshVisibleUsers() {
-        conversations.filterNot { it.isGroup }.take(10).forEach { refreshUserData(it.otherParticipantId) }
+        val visible = conversations.filterNot { it.isGroup }.take(10)
+        val ownId = currentUserId ?: return
+        UserCacheService.refreshUser(ownId) {
+            visible.forEach { loadParticipantState(it, force = true) }
+        }
+    }
+
+    fun invalidateParticipantState(userId: String) {
+        participantStates = participantStates - userId
+        participantStateFetchTimes.remove(userId)
+        currentUserId?.let(UserCacheService::invalidateUser)
+        (conversations + archivedConversations).firstOrNull { it.otherParticipantId == userId }
+            ?.let { loadParticipantState(it, force = true) }
     }
 
     /**

@@ -20,6 +20,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,6 +74,7 @@ fun ArchivedConversationsView(
     var conversationRowFrames by remember { mutableStateOf<Map<String, Rect>>(emptyMap()) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val archived = viewModel.archivedConversations
+    val groups by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
 
     LaunchedEffect(archived.isEmpty()) {
         if (archived.isEmpty()) onBack()
@@ -123,6 +125,9 @@ fun ArchivedConversationsView(
                         val selected = conversationMenuSelection?.item?.conversation?.id == id
                         GlassmorphicConversationRow(
                             conversation = conversation,
+                            participantState = viewModel.participantStates[conversation.otherParticipantId],
+                            draftText = conversation.id?.let(viewModel::draftText).orEmpty(),
+                            groupMemberIds = conversation.participants.ifEmpty { groups[conversation.id]?.members?.map { it.id }.orEmpty() },
                             onOpenProfile = {
                                 val trimmed = conversation.otherParticipantId.trim()
                                 if (trimmed.isNotEmpty()) onOpenProfile(trimmed)
@@ -156,6 +161,7 @@ fun ArchivedConversationsView(
                             modifier = Modifier.onGloballyPositioned { coords ->
                                 conversationRowFrames = conversationRowFrames + (id to coords.boundsInRoot())
                             },
+                            onNeedsParticipantState = { viewModel.loadParticipantState(conversation) },
                         )
                     }
                 }

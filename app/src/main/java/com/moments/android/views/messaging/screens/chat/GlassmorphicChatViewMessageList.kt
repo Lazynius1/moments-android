@@ -39,6 +39,7 @@ import com.moments.android.views.messaging.components.chatMenuDimmedWhenOpen
 import com.moments.android.views.messaging.core.EnhancedChatViewModel
 import com.moments.android.views.messaging.core.ChatRenderRow
 import com.moments.android.views.messaging.core.MessageItem
+import com.moments.android.views.messaging.groups.GroupConversation
 import com.moments.android.views.messaging.core.PendingChatTimelineMessage
 import androidx.compose.runtime.collectAsState
 
@@ -184,7 +185,7 @@ fun prefetchMediaForRows(rows: List<ChatRenderRow>, viewModel: EnhancedChatViewM
 }
 
 @Composable
-fun GlassmorphicChatMessageList(
+internal fun GlassmorphicChatMessageList(
     transaction: ChatListUpdateTransaction,
     listController: ChatMessageListController,
     presentation: ChatMessageListPresentation,
@@ -192,6 +193,7 @@ fun GlassmorphicChatMessageList(
     adaptiveColors: AdaptiveColors,
     fallbackName: String,
     fallbackUserId: String,
+    group: GroupConversation?,
     callbacks: ChatMessageListCallbacks,
     /** ≡ iOS `composerBottomInset` → contentInset.bottom (LazyColumn reverseLayout: contentPadding.bottom). */
     composerChromeHeight: Dp = ChatComposerChromeMetrics.estimatedComposerChromeHeight,
@@ -261,9 +263,8 @@ fun GlassmorphicChatMessageList(
                             Modifier.chatMenuDimmedWhenOpen(menuOpen),
                         )
                         ChatRenderRow.GroupIntro -> {
-                            val directory by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
                             ChatGroupConversationIntroRow(
-                                group = directory[viewModel.conversation.id],
+                                group = group,
                                 fallbackName = fallbackName,
                                 fallbackImage = viewModel.conversation.otherParticipantProfileImagePath.orEmpty(),
                                 memberCount = viewModel.conversation.participants.size,

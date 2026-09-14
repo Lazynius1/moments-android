@@ -4,22 +4,16 @@ import android.content.Context
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.Icon
@@ -33,13 +27,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
@@ -122,17 +123,17 @@ fun NotificationSummaryPopup(
             appearAnimation -> 1f
             else -> 0.8f
         },
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "summaryScale",
     )
     val alpha by animateFloatAsState(
         targetValue = if (appearAnimation && !dismissing) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "summaryAlpha",
     )
     val offsetY by animateFloatAsState(
         targetValue = if (appearAnimation && !dismissing) 0f else -20f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "summaryOffset",
     )
 
@@ -157,15 +158,19 @@ fun NotificationSummaryPopup(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 100.dp),
-        contentAlignment = Alignment.TopCenter,
+            .padding(top = 106.dp, end = 20.dp),
+        contentAlignment = Alignment.TopEnd,
     ) {
         SummaryPill(
             unreadNotifications = unreadNotifications,
             unreadMessages = unreadMessages,
             isDark = isDark,
             modifier = Modifier
-                .scale(scale)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    transformOrigin = TransformOrigin(0.80f, 0f)
+                }
                 .alpha(alpha)
                 .offset(y = offsetY.dp)
                 .clickable {
@@ -190,8 +195,20 @@ private fun SummaryPill(
     isDark: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val shape = CircleShape
+    val shape = NotificationSummaryBubbleShape
     val primary = if (isDark) Color.White else Color.Black
+    val accessibilityLabel = when {
+        unreadNotifications > 0 && unreadMessages > 0 -> stringResource(
+            R.string.notification_summary_both,
+            unreadNotifications,
+            unreadMessages,
+        )
+        unreadNotifications > 0 -> stringResource(
+            R.string.notification_summary_notifications_only,
+            unreadNotifications,
+        )
+        else -> stringResource(R.string.notification_summary_messages_only, unreadMessages)
+    }
     Row(
         modifier = modifier
             .shadow(
@@ -201,67 +218,29 @@ private fun SummaryPill(
                 spotColor = Color.Black.copy(alpha = 0.1f),
             )
             .momentsChromeGlass(shape, interactive = true)
-            .border(
-                1.5.dp,
-                Brush.linearGradient(
-                    listOf(
-                        Color.White.copy(alpha = 0.4f),
-                        Color.White.copy(alpha = 0.1f),
-                        Color(0xFF6B73FF).copy(alpha = 0.2f),
-                    ),
-                ),
-                shape,
-            )
-            .padding(horizontal = 18.dp, vertical = 12.dp),
+            // 8 dp superiores pertenecen a la cola; el contenido vive sobre
+            // el mismo vidrio, sin fondos o cápsulas adicionales.
+            .padding(horizontal = 16.dp)
+            .padding(top = 16.dp, bottom = 10.dp)
+            .semantics { contentDescription = accessibilityLabel },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.padding(end = 4.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.AutoAwesome,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = Color(0xFF6B73FF),
-            )
-            Text(
-                text = stringResource(R.string.feed_summary_highlights),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = primary.copy(alpha = 0.92f),
+        if (unreadNotifications > 0) {
+            SummaryItemView(
+                icon = Icons.Filled.Favorite,
+                count = unreadNotifications,
+                tint = Color.Red,
+                primary = primary,
             )
         }
-
-        Box(
-            modifier = Modifier
-                .width(1.dp)
-                .height(16.dp)
-                .background(primary.copy(alpha = 0.1f)),
-        )
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(15.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (unreadNotifications > 0) {
-                SummaryItemView(
-                    icon = Icons.Filled.Favorite,
-                    count = unreadNotifications,
-                    tint = Color.Red,
-                    primary = primary,
-                )
-            }
-            if (unreadMessages > 0) {
-                SummaryItemView(
-                    icon = Icons.AutoMirrored.Filled.Chat,
-                    count = unreadMessages,
-                    tint = Color(0xFF007AFF),
-                    primary = primary,
-                )
-            }
+        if (unreadMessages > 0) {
+            SummaryItemView(
+                icon = Icons.AutoMirrored.Filled.Chat,
+                count = unreadMessages,
+                tint = Color(0xFF007AFF),
+                primary = primary,
+            )
         }
 
         Icon(
@@ -270,6 +249,49 @@ private fun SummaryPill(
             modifier = Modifier.size(12.dp),
             tint = primary.copy(alpha = 0.35f),
         )
+    }
+}
+
+/**
+ * Bocadillo anclado al corazón del header.
+ *
+ * La cola se calcula desde el borde derecho. Como el bocadillo también se
+ * alinea desde ese borde, la punta conserva su posición aunque cambie el ancho
+ * por contadores de una, dos o tres cifras.
+ */
+private object NotificationSummaryBubbleShape : Shape {
+    override fun createOutline(
+        size: androidx.compose.ui.geometry.Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline = with(density) {
+        val tailHeight = 8.dp.toPx()
+        val tailWidth = 14.dp.toPx()
+        val halfTail = tailWidth / 2f
+        val bodyHeight = (size.height - tailHeight).coerceAtLeast(0f)
+        val radius = minOf(24.dp.toPx(), bodyHeight / 2f)
+        val trailingInset = 52.dp.toPx()
+        val minimumTailX = radius + halfTail
+        val maximumTailX = size.width - radius - halfTail
+        val tailCenterX = (size.width - trailingInset).coerceIn(minimumTailX, maximumTailX)
+        val bodyTop = tailHeight
+
+        val path = Path().apply {
+            moveTo(radius, bodyTop)
+            lineTo(tailCenterX - halfTail, bodyTop)
+            quadraticTo(tailCenterX - halfTail * 0.45f, bodyTop, tailCenterX, 0f)
+            quadraticTo(tailCenterX + halfTail * 0.45f, bodyTop, tailCenterX + halfTail, bodyTop)
+            lineTo(size.width - radius, bodyTop)
+            quadraticTo(size.width, bodyTop, size.width, bodyTop + radius)
+            lineTo(size.width, size.height - radius)
+            quadraticTo(size.width, size.height, size.width - radius, size.height)
+            lineTo(radius, size.height)
+            quadraticTo(0f, size.height, 0f, size.height - radius)
+            lineTo(0f, bodyTop + radius)
+            quadraticTo(0f, bodyTop, radius, bodyTop)
+            close()
+        }
+        Outline.Generic(path)
     }
 }
 

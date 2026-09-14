@@ -26,7 +26,13 @@ class MomentsChatViewModel(
         private set
 
     fun syncMessagePresentation() {
-        val sorted = messages.value.sortedWith(compareBy<EnhancedMessage> { MessageSyncCursor(it.timestamp, it.id) })
+        val source = messages.value
+        val comparator = compareBy<EnhancedMessage> { MessageSyncCursor(it.timestamp, it.id) }
+        val ordered = if (source.zipWithNext().all { (previous, next) -> comparator.compare(previous, next) <= 0 }) {
+            source
+        } else {
+            source.sortedWith(comparator)
+        }
         val grouped = mutableListOf<Pair<Date, List<EnhancedMessage>>>()
         val rows = mutableListOf<ChatRenderRow>()
         var currentDay: Date? = null
@@ -46,7 +52,7 @@ class MomentsChatViewModel(
             }
         }
 
-        sorted.forEach { message ->
+        ordered.forEach { message ->
             val day = Calendar.getInstance().apply { time = message.timestamp; set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.time
             if (day != currentDay) {
                 flushDay()

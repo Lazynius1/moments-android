@@ -67,8 +67,18 @@ fun FeedOverlaysSection(
     val peekShape = FeedMomentCardLayout.continuousRoundedRectShape
     // iOS ultraThinMaterial → surface (Android sin material blur nativo equivalente)
     val peekBackdrop = rememberAdaptiveColors().surfaceBackground
+    // Compose acota zIndex al padre: proyectamos la capa activa al contenedor
+    // para que equivalga a los siblings del ZStack de iOS.
+    val activeOverlayZ = when {
+        pendingEchoInvitationRoute != null -> 2100f
+        showNotificationSummary -> 2000f
+        showShareSheet && selectedMoment != null -> 1001f
+        showContextMenu && selectedMoment != null -> 1000f
+        isPeeking && peekImageUrl != null -> 998f
+        else -> 0f
+    }
 
-    Box(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().zIndex(activeOverlayZ)) {
         // iOS: allowsHitTesting(false). Compose 1.11: sin clickable/pointerInput → no elegible
         // para hit-test; el gesto de long-press sigue en el card debajo.
         AnimatedVisibility(

@@ -91,7 +91,7 @@ import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
 import com.moments.android.models.OnlineStatus
 import com.moments.android.services.firestore.FirestoreService
-import com.moments.android.services.firestore.fetchUser
+import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.messaging.OnlineStatusService
 import com.moments.android.services.messaging.displayName
@@ -279,9 +279,11 @@ fun MessagingView(
     LaunchedEffect(Unit) {
         ChatDraftEvents.events.collectLatest { event ->
             when (event) {
-                is ChatDraftEvent.Changed -> viewModel.refreshDraftOrdering()
+                is ChatDraftEvent.Changed -> viewModel.refreshDraftOrdering(event.conversationId)
                 is ChatDraftEvent.VanishModeChanged ->
                     viewModel.updateVanishMode(event.conversationId, event.vanishModeActive)
+                is ChatDraftEvent.ParticipantStateChanged ->
+                    viewModel.invalidateParticipantState(event.userId)
                 else -> Unit
             }
         }
@@ -920,6 +922,7 @@ private fun MessagingConversationList(
 ) {
     val colors = rememberAdaptiveColors()
     val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+    val groups by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
     val error = viewModel.errorMessage
     val emptyInbox =
         viewModel.conversations.isEmpty() &&
@@ -986,6 +989,9 @@ private fun MessagingConversationList(
                             val selected = conversationMenuSelection?.item?.conversation?.id == id
                             GlassmorphicConversationRow(
                                 conversation = conv,
+                                participantState = viewModel.participantStates[conv.otherParticipantId],
+                                draftText = conv.id?.let(viewModel::draftText).orEmpty(),
+                                groupMemberIds = conv.participants.ifEmpty { groups[conv.id]?.members?.map { it.id }.orEmpty() },
                                 onOpenProfile = { /* profile destination stub */ },
                                 onTap = { onOpenConversation(conv) },
                                 onOpenStory = onOpenStory,
@@ -998,6 +1004,7 @@ private fun MessagingConversationList(
                                 modifier = Modifier.onGloballyPositioned { coords ->
                                     if (id.isNotBlank()) onRowFrame(id, coords.boundsInRoot())
                                 },
+                                onNeedsParticipantState = { viewModel.loadParticipantState(conv) },
                             )
                         }
                         is MergedListRow.OutgoingRequestItem -> {
@@ -1142,13 +1149,9 @@ private fun OutgoingSentRequestRow(
     onOpen: (AppUser) -> Unit,
 ) {
     val colors = rememberAdaptiveColors()
-    val firestore = remember { FirestoreService() }
     var receiver by remember(request.receiverId) { mutableStateOf<AppUser?>(null) }
     LaunchedEffect(request.receiverId) {
-        receiver = runCatching { firestore.fetchUser(request.receiverId) }.getOrNull()
-            ?: runCatching {
-                firestore.fetchUsers(listOf(request.receiverId)).firstOrNull()
-            }.getOrNull()
+        UserCacheService.getUser(request.receiverId) { receiver = it }
     }
     Row(
         Modifier
@@ -1198,6 +1201,7 @@ private fun MessagingSearchResults(
     onStartDraftWithUser: (AppUser) -> Unit,
 ) {
     val colors = rememberAdaptiveColors()
+    val groups by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
     val empty =
         viewModel.filteredConversations.isEmpty() &&
             viewModel.searchedUsers.isEmpty() &&
@@ -1217,9 +1221,13 @@ private fun MessagingSearchResults(
             items(viewModel.filteredConversations, key = { "fc:${it.id}" }) { conversation ->
                 GlassmorphicConversationRow(
                     conversation = conversation,
+                    participantState = viewModel.participantStates[conversation.otherParticipantId],
+                    draftText = conversation.id?.let(viewModel::draftText).orEmpty(),
+                    groupMemberIds = conversation.participants.ifEmpty { groups[conversation.id]?.members?.map { it.id }.orEmpty() },
                     onOpenProfile = {},
                     onTap = { onOpenConversation(conversation) },
                     onOpenStory = onOpenStory,
+                    onNeedsParticipantState = { viewModel.loadParticipantState(conversation) },
                 )
             }
         }

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
@@ -392,7 +393,6 @@ fun VoiceRecordingGestureButton(
     gestureState: VoiceRecordingGestureState,
     glassInteractive: Boolean,
     standaloneChrome: Boolean = false,
-    audioPower: Float,
     onStart: (String, Boolean) -> Unit,
     onFinish: (String, VoiceRecordingFinishAction) -> Unit,
     onLockChanged: (Boolean) -> Unit,
@@ -446,9 +446,6 @@ fun VoiceRecordingGestureButton(
 
     @Suppress("UNUSED_VARIABLE")
     val unusedGlass = glassInteractive
-    @Suppress("UNUSED_VARIABLE")
-    val unusedPower = audioPower
-
     fun resetLocalState() {
         holdJob?.cancel()
         holdJob = null
@@ -710,12 +707,12 @@ fun VoiceRecordingGestureButton(
 @Composable
 fun VoiceRecordingBlobOverlay(
     anchorBounds: IntRect?,
-    audioPower: Float,
     gestureState: VoiceRecordingGestureState,
     isRecording: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     if (anchorBounds == null || !isRecording) return
+    val audioPower by AudioRecordingManager.shared.audioPower.collectAsState()
     val density = LocalDensity.current
     val colors = rememberAdaptiveColors()
     val centerX = (anchorBounds.left + anchorBounds.right) / 2

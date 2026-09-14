@@ -59,7 +59,10 @@ object NotificationService {
     )
 
     private var listener: ListenerRegistration? = null
+    private var observedUserId: String? = null
     private var lastDocument: DocumentSnapshot? = null
+    private var liveHeadNotificationIds: Set<String> = emptySet()
+    private var hasLoadedAdditionalPages = false
     private val hiddenPendingDeletionIds = ConcurrentHashMap.newKeySet<String>()
     private var pendingDeletionJob: kotlinx.coroutines.Job? = null
     private var isFirstSnapshot = true
@@ -68,9 +71,21 @@ object NotificationService {
         startObserving()
     }
 
-    fun startObserving() {
-        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+    fun startObserving(forceRefresh: Boolean = false) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: run {
+            stopObserving()
+            return
+        }
+        // El servicio ya observa durante toda la sesión. Reentrar en la pantalla
+        // no debe recrear el listener ni sustituir las páginas cargadas por la primera.
+        if (!forceRefresh && listener != null && observedUserId == userId) return
+
         listener?.remove()
+        observedUserId = userId
+        lastDocument = null
+        liveHeadNotificationIds = emptySet()
+        hasLoadedAdditionalPages = false
+        _canLoadMore.value = true
         _isLoading.value = true
         isFirstSnapshot = true
 
@@ -97,10 +112,24 @@ object NotificationService {
                 _isLoading.value = false
                 return@addSnapshotListener
             }
-            lastDocument = documents.lastOrNull()
-            _canLoadMore.value = documents.size >= PAGE_SIZE
             val fetched = documents.mapNotNull { decodeNotificationDocument(it) }
-            _notifications.value = visibleNotifications(fetched)
+            val liveHead = visibleNotifications(fetched)
+            val nextHeadIds = liveHead.mapNotNull { it.id }.toSet()
+            _notifications.value = if (isFirstSnapshot) {
+                liveHead
+            } else {
+                // Sustituir solo la ventana viva; conservar y deduplicar la cola paginada.
+                val retainedTail = _notifications.value.filter { notification ->
+                    val id = notification.id ?: return@filter true
+                    id !in liveHeadNotificationIds && id !in nextHeadIds
+                }
+                liveHead + retainedTail
+            }
+            liveHeadNotificationIds = nextHeadIds
+            if (!hasLoadedAdditionalPages) {
+                lastDocument = documents.lastOrNull()
+                _canLoadMore.value = documents.size >= PAGE_SIZE
+            }
             scope.launch {
                 LocalPersistenceService.saveNotificationsAsync(_notifications.value, sync = isFirstSnapshot)
             }
@@ -113,6 +142,7 @@ object NotificationService {
     fun stopObserving() {
         listener?.remove()
         listener = null
+        observedUserId = null
     }
 
     fun loadMore() {
@@ -133,10 +163,15 @@ object NotificationService {
 
                 lastDocument = snapshot.documents.lastOrNull()
                 _canLoadMore.value = snapshot.size() >= PAGE_SIZE
+                hasLoadedAdditionalPages = true
                 val newNotifications = visibleNotifications(
                     snapshot.documents.mapNotNull { decodeNotificationDocument(it) },
                 )
-                _notifications.value = _notifications.value + newNotifications
+                val existingIds = _notifications.value.mapNotNull { it.id }.toMutableSet()
+                val uniqueNotifications = newNotifications.filter { notification ->
+                    notification.id?.let(existingIds::add) ?: true
+                }
+                _notifications.value = _notifications.value + uniqueNotifications
             }
             _isLoadingMore.value = false
         }
@@ -540,6 +575,8 @@ object NotificationService {
         _pendingDeletion.value = null
         hiddenPendingDeletionIds.clear()
         lastDocument = null
+        liveHeadNotificationIds = emptySet()
+        hasLoadedAdditionalPages = false
         isFirstSnapshot = true
     }
 }

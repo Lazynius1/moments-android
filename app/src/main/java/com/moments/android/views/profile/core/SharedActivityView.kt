@@ -68,6 +68,8 @@ import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.settings.AnimatedReactionIcon
 import com.moments.android.views.settings.SettingsToolbarBackButton
 import com.moments.android.views.story.StoryRingAvatarView
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -118,10 +120,17 @@ fun SharedActivityView(
         val viewerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         runCatching {
             val firestore = FirebaseFirestore.getInstance()
-            val followed = firestore.collection("users").document(viewerId)
-                .collection("followers").document(otherUser.id).get().await()
-            val following = firestore.collection("users").document(viewerId)
-                .collection("following").document(otherUser.id).get().await()
+            val (followed, following) = coroutineScope {
+                val followedRequest = async {
+                    firestore.collection("users").document(viewerId)
+                        .collection("followers").document(otherUser.id).get().await()
+                }
+                val followingRequest = async {
+                    firestore.collection("users").document(viewerId)
+                        .collection("following").document(otherUser.id).get().await()
+                }
+                followedRequest.await() to followingRequest.await()
+            }
             followedYouAt = (followed.data?.get("timestamp") as? Timestamp)?.toDate()
             followingSince = (following.data?.get("timestamp") as? Timestamp)?.toDate()
         }

@@ -88,7 +88,6 @@ import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.core.PendingChatContext
 import com.moments.android.views.messaging.core.PendingChatContextFactory
 import com.moments.android.views.feed.rememberAdaptiveColors
-import com.moments.android.views.messaging.components.AudioRecordingManager
 import com.moments.android.views.messaging.components.ChatAttachmentMediaAsset
 import com.moments.android.views.messaging.components.ChatAttachmentMediaSheetOverlay
 import com.moments.android.views.messaging.components.ChatAttachmentMenuPopover
@@ -205,7 +204,6 @@ fun GlassmorphicChatView(
     MomentsTabBarHidden()
     val messages by session.messages.collectAsState()
     val timelineMutation by session.chatTimelineMutation.collectAsState()
-    val downloadProgress by session.downloadProgress.collectAsState()
     val searching by session.isSearchingHistory.collectAsState()
     val canLoadMore by session.canLoadMore.collectAsState()
     val vanishModeActive by session.vanishModeActive.collectAsState()
@@ -218,7 +216,6 @@ fun GlassmorphicChatView(
     val listPresentation = rememberChatMessageListPresentation()
     val unreadDivider = remember(session) { ChatUnreadDividerController(session) }
     val voiceGestureState = remember { VoiceRecordingGestureState() }
-    val audioPower by AudioRecordingManager.shared.audioPower.collectAsState()
     var messageText by remember(conversation.id) { mutableStateOf("") }
     var replyingTo by remember { mutableStateOf<EnhancedMessage?>(null) }
     var editingMessage by remember { mutableStateOf<EnhancedMessage?>(null) }
@@ -747,6 +744,13 @@ fun GlassmorphicChatView(
         onReply = ::activateReply,
         onClusterReply = { cluster -> clusterForReply = cluster },
         onAvatarTap = { onProfile(conversation.otherParticipantId) },
+        participantName = { senderId ->
+            com.moments.android.services.cache.UserCacheService.getCachedUser(senderId)?.username
+                ?: groupDirectory[conversation.id]?.allMemberNames?.get(senderId)
+                ?: conversation.groupMemberNames[senderId]
+                ?: context.getString(R.string.messaging_user_default)
+        },
+        onParticipantAvatarTap = { senderId -> onProfile(senderId) },
         onReplyTap = { messageId ->
             jumpToRepliedMessage(messageId)
         },
@@ -899,6 +903,7 @@ fun GlassmorphicChatView(
                     adaptiveColors = colors,
                     fallbackName = displayName,
                     fallbackUserId = conversation.otherParticipantId,
+                    group = groupDirectory[conversation.id],
                     composerChromeHeight = scroll.lastComposerHeight
                         ?: ChatComposerChromeMetrics.estimatedComposerChromeHeight,
                     composerGap = if (
@@ -1416,7 +1421,6 @@ fun GlassmorphicChatView(
 
     VoiceRecordingBlobOverlay(
         anchorBounds = voiceButtonAnchorBounds,
-        audioPower = audioPower,
         gestureState = voiceGestureState,
         isRecording = voice.isRecording && !voice.isLocked,
     )
@@ -1681,7 +1685,8 @@ fun GlassmorphicChatView(
             },
             onHydrateMedia = session::hydrateMediaIfNeeded,
             isDownloadingMedia = session::isDownloadingMedia,
-            downloadProgress = { downloadProgress[it] },
+            downloadProgressUpdates = session.downloadProgress,
+            downloadProgress = { session.downloadProgress.value[it] },
             onDeleteForMe = { items -> items.forEach(session::deleteMessageForMe) },
             onDeleteForEveryone = { items -> items.forEach(session::deleteMessageForEveryone) },
             detail = { selectedMessage, dismissDetail ->

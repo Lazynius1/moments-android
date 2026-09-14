@@ -65,6 +65,12 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
 
+data class SharedGalleryMediaPage(
+    val messages: List<EnhancedMessage>,
+    val nextCursor: MessageSyncCursor?,
+    val hasMore: Boolean,
+)
+
 /**
  * Port core de `ChatService.swift` (por trozos).
  * Trozo 1: Properties + Listeners Management.
@@ -195,22 +201,36 @@ object ChatService {
     /** Media compartido del hilo (fotos/vídeos) para Conversation Settings. */
     suspend fun fetchSharedGalleryMedia(
         conversationId: String,
-        limit: Int = 400,
-    ): Result<List<EnhancedMessage>> = runCatching {
+        limit: Int = 30,
+        before: MessageSyncCursor? = null,
+    ): Result<SharedGalleryMediaPage> = runCatching {
         preloadEncryption(conversationId)
-        val snapshot = db.messagingThread(conversationId)
+        var query = db.messagingThread(conversationId)
             .messagingMessages
             .whereIn("type", listOf(MessageType.IMAGE.raw, MessageType.VIDEO.raw))
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .orderBy(FieldPath.documentId(), Query.Direction.DESCENDING)
             .limit(limit.toLong())
-            .get()
-            .await()
-        handleMessagesSnapshot(
+        if (before != null) {
+            query = query.startAfter(Timestamp(before.timestamp), before.messageId)
+        }
+        val snapshot = query.get().await()
+        val messages = handleMessagesSnapshot(
             documents = snapshot.documents,
             error = null,
             conversationId = conversationId,
             cutoffDate = null,
             hydrateReactions = false,
         ).getOrThrow()
+        val nextCursor = snapshot.documents.lastOrNull()?.let { document ->
+            val timestamp = document.getTimestamp("timestamp")?.toDate() ?: return@let null
+            MessageSyncCursor(timestamp, document.id)
+        }
+        SharedGalleryMediaPage(
+            messages = messages,
+            nextCursor = nextCursor,
+            hasMore = snapshot.documents.size == limit && nextCursor != null,
+        )
     }
 
     suspend fun fetchMessagesAfter(
@@ -854,6 +874,7 @@ object ChatService {
                 "participants" to participants,
                 "lastMessage" to "",
                 "timestamp" to FieldValue.serverTimestamp(),
+                "createdAt" to FieldValue.serverTimestamp(),
                 "readStatus" to mapOf(user1Id to true, user2Id to false),
                 "participantData" to participantData,
                 "wrappedKeys" to wrappedKeys,

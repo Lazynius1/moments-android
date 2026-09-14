@@ -87,6 +87,17 @@ object UserCacheService {
 
     fun getCachedUser(userId: String): AppUser? = userCache[userId]
 
+    /** Comparte perfiles obtenidos por consultas combinadas con el resto de la app. */
+    fun cacheUser(user: AppUser) {
+        userCache[user.id] = user
+        lastFetchTimes[user.id] = Date()
+        evictIfNeeded()
+    }
+
+    fun invalidateUser(userId: String) {
+        lastFetchTimes.remove(userId)
+    }
+
     fun preloadUsers(userIds: List<String>) {
         for (userId in userIds) {
             if (userCache[userId] == null) getUser(userId) { }

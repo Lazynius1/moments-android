@@ -152,6 +152,7 @@ open class EnhancedChatViewModel(
     var messagesById: Map<String, EnhancedMessage> = emptyMap(); private set
     var messageIndexById: Map<String, Int> = emptyMap(); private set
     var unreadIncomingCount: Int = 0; private set
+    var lastOutgoingMessageId: String? = null; private set
     var isChatVisible = false
     val conversationId: String get() = conversation.id.orEmpty()
     val isDraftConversation: Boolean get() = conversationId.isBlank()
@@ -2433,7 +2434,12 @@ open class EnhancedChatViewModel(
         if (next <= 0.0 || next >= 1.0) return next != previous
         return kotlin.math.abs(next - previous) >= 0.03
     }
-    private fun rebuildMessageIndex(items: List<EnhancedMessage>) { messagesById = items.associateBy { it.id }; messageIndexById = items.mapIndexed { index, message -> message.id to index }.toMap(); unreadIncomingCount = items.count { !it.isRead && it.senderId != currentUserId } }
+    private fun rebuildMessageIndex(items: List<EnhancedMessage>) {
+        messagesById = items.associateBy { it.id }
+        messageIndexById = items.mapIndexed { index, message -> message.id to index }.toMap()
+        unreadIncomingCount = items.count { !it.isRead && it.senderId != currentUserId }
+        lastOutgoingMessageId = items.lastOrNull { it.senderId == currentUserId }?.id
+    }
     private fun pruneUploadProgress(items: List<EnhancedMessage>) { val active = items.filter { it.status == MessageStatus.SENDING }.map { it.id }.toSet(); _uploadProgress.value = _uploadProgress.value.filterKeys(active::contains) }
     private fun pruneLocalMessageStates(items: List<EnhancedMessage>) { val remote = items.associateBy { it.id }; localMessageStates.entries.removeAll { (id, state) -> remote[id]?.status?.ordinal?.let { it >= state.ordinal && state != MessageStatus.FAILED } ?: false } }
     private fun statusPriority(status: MessageStatus): Int = when (status) { MessageStatus.SENDING -> 0; MessageStatus.SENT -> 1; MessageStatus.DELIVERED -> 2; MessageStatus.READ -> 3; MessageStatus.FAILED, MessageStatus.PENDING -> -1 }

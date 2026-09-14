@@ -23,11 +23,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,10 +39,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
-import com.moments.android.services.cache.UserCacheService
-import com.moments.android.services.firestore.FirestoreService
-import com.moments.android.services.firestore.PublicProfileAvailability
-import com.moments.android.services.firestore.checkPublicProfileAvailability
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.components.VerifiedBadgeView
 import com.moments.android.views.messaging.components.ChatVanishInboxIndicator
@@ -53,14 +46,9 @@ import com.moments.android.views.messaging.components.ChatViewOnceInboxIndicator
 import com.moments.android.views.messaging.components.ConversationListInteraction
 import com.moments.android.views.messaging.components.conversationRowMenuHighlight
 import com.moments.android.views.messaging.core.Conversation
-import com.moments.android.views.messaging.services.ChatDraftEvent
-import com.moments.android.views.messaging.services.ChatDraftEvents
-import com.moments.android.views.messaging.services.ChatDraftStore
+import com.moments.android.views.messaging.core.InboxParticipantState
 import com.moments.android.views.profile.userprofile.sections.ProfileUnavailableAvatar
 import com.moments.android.views.story.StoryRingAvatarView
-import kotlin.coroutines.resume
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.suspendCancellableCoroutine
 
 data class InboxStoryLaunch(
     val startUserId: String,
@@ -74,6 +62,9 @@ data class InboxStoryLaunch(
 @Composable
 fun GlassmorphicConversationRow(
     conversation: Conversation,
+    participantState: InboxParticipantState?,
+    draftText: String,
+    groupMemberIds: List<String>,
     onOpenProfile: () -> Unit,
     onTap: () -> Unit,
     onOpenStory: (InboxStoryLaunch) -> Unit = {},
@@ -81,10 +72,10 @@ fun GlassmorphicConversationRow(
     isMenuSelected: Boolean = false,
     pressScale: Float = 1f,
     modifier: Modifier = Modifier,
+    onNeedsParticipantState: () -> Unit = {},
 ) {
     val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
-    val firestore = remember { FirestoreService() }
     val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
     val muteDeadline = conversation.mutedUntil?.get(uid)
     val showsMute by produceState(conversation.isMuted(uid), uid,
@@ -95,73 +86,19 @@ fun GlassmorphicConversationRow(
             value = conversation.isMuted(uid)
         }
     }
-    val groups by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
 
-    var liveUsername by remember(conversation.otherParticipantId) { mutableStateOf("") }
-    var isUnavailable by remember(conversation.otherParticipantId) { mutableStateOf(false) }
-    var isBlockedByCurrentUser by remember(conversation.otherParticipantId) { mutableStateOf(false) }
-    var draftText by remember(conversation.id) { mutableStateOf("") }
+    val isUnavailable = participantState?.isUnavailable == true
+    val isBlockedByCurrentUser = participantState?.isBlockedByCurrentUser == true
 
-    val displayUsername = remember(liveUsername, conversation.otherParticipantUsername) {
-        val live = liveUsername.trim()
+    val displayUsername = remember(participantState?.username, conversation.otherParticipantUsername) {
+        val live = participantState?.username?.trim().orEmpty()
         if (live.isNotEmpty()) live
         else conversation.otherParticipantUsername
             ?: context.getString(R.string.messaging_user_default)
     }
 
-    LaunchedEffect(conversation.id) {
-        val id = conversation.id
-        draftText = if (id.isNullOrBlank()) "" else runCatching { ChatDraftStore.draft(context, id) }.getOrDefault("")
-    }
-    LaunchedEffect(conversation.id) {
-        ChatDraftEvents.events.collectLatest { event ->
-            if (event is ChatDraftEvent.Changed && event.conversationId == conversation.id) {
-                draftText = runCatching { ChatDraftStore.draft(context, event.conversationId) }.getOrDefault("")
-            }
-        }
-    }
     LaunchedEffect(conversation.otherParticipantId, conversation.isGroup) {
-        if (conversation.isGroup) {
-            liveUsername = ""
-            isUnavailable = false
-            isBlockedByCurrentUser = false
-            return@LaunchedEffect
-        }
-        val otherId = conversation.otherParticipantId.trim()
-        if (otherId.isEmpty()) return@LaunchedEffect
-        liveUsername = ""
-        isUnavailable = false
-        isBlockedByCurrentUser = false
-        runCatching {
-            suspendCancellableCoroutine { cont ->
-                UserCacheService.refreshUser(otherId) { user ->
-                    cont.resume(user?.username?.trim().orEmpty())
-                }
-            }
-        }.onSuccess { name ->
-            if (conversation.otherParticipantId.trim() == otherId) liveUsername = name
-        }
-        val availability = runCatching { firestore.checkPublicProfileAvailability(otherId) }.getOrNull()
-        if (availability == PublicProfileAvailability.UNAVAILABLE) {
-            if (conversation.otherParticipantId.trim() == otherId) {
-                isUnavailable = true
-                liveUsername = ""
-                isBlockedByCurrentUser = false
-            }
-            return@LaunchedEffect
-        }
-        if (uid.isNotBlank()) {
-            val block = runCatching { firestore.checkIfBlocked(uid, otherId) }.getOrNull()
-            if (block != null && (block.isBlockedByCurrentUser || block.isCurrentUserBlocked)) {
-                if (conversation.otherParticipantId.trim() == otherId) {
-                    isBlockedByCurrentUser = block.isBlockedByCurrentUser
-                    isUnavailable = true
-                }
-            } else if (conversation.otherParticipantId.trim() == otherId) {
-                isBlockedByCurrentUser = false
-                isUnavailable = false
-            }
-        }
+        onNeedsParticipantState()
     }
 
     val showsUnavailablePreview = isUnavailable && !isBlockedByCurrentUser
@@ -231,12 +168,8 @@ fun GlassmorphicConversationRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (conversation.isGroup) {
-            val memberIds = remember(conversation.participants, conversation.id, uid, groups) {
-                var ids = conversation.participants
-                if (ids.isEmpty()) {
-                    ids = groups[conversation.id]?.members?.map { it.id }.orEmpty()
-                }
-                ids.filter { it.isNotBlank() && it != uid }
+            val memberIds = remember(groupMemberIds, uid) {
+                groupMemberIds.filter { it.isNotBlank() && it != uid }
             }
             com.moments.android.views.story.GroupStoryRingAvatarView(
                 memberUserIds = memberIds,

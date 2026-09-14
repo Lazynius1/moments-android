@@ -13,6 +13,8 @@ import com.moments.android.models.AppUser
 import com.moments.android.models.CustomAudienceList
 import com.moments.android.models.Moment
 import com.moments.android.services.content.BackendFeedService
+import com.moments.android.services.content.FeedCursor
+import com.moments.android.services.content.BackendTagsCursor
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.PublicProfileAvailability
 import com.moments.android.services.firestore.fetchCustomLists
@@ -64,8 +66,12 @@ class UserProfileViewModel(
     var suggestedConnectionsForViewer by mutableStateOf<List<AppUser>>(emptyList()); private set
     var moments by mutableStateOf<List<Moment>>(emptyList()); private set
     var isLoadingMoments by mutableStateOf(true); private set
+    var isLoadingMoreMoments by mutableStateOf(false); private set
+    var hasMoreMoments by mutableStateOf(false); private set
     var taggedMoments by mutableStateOf<List<Moment>>(emptyList()); private set
     var isLoadingTagged by mutableStateOf(false); private set
+    var isLoadingMoreTagged by mutableStateOf(false); private set
+    var hasMoreTagged by mutableStateOf(false); private set
     var isFollowing by mutableStateOf(false); private set
     var isBlockedByCurrentUser by mutableStateOf(false); private set
     var isCurrentUserBlocked by mutableStateOf(false); private set
@@ -96,7 +102,12 @@ class UserProfileViewModel(
     private var targetVisibleFollowingIds: Set<String> = emptySet()
     private var targetVisibleFollowerIds: Set<String> = emptySet()
     private var lastSuggestionsSignature: String? = null
-    private var momentsFetchLimit: Int = 50
+    private var momentsPageSize: Int = 18
+    private var momentsCursor: FeedCursor? = null
+    private var legacyVisibleMoments: List<Moment> = emptyList()
+    private var isFetchingMomentsPage = false
+    private var taggedCursor: BackendTagsCursor? = null
+    private var isFetchingTaggedPage = false
     private val recentUnfollows = mutableSetOf<String>()
     private val lastUnfollowTime = mutableMapOf<String, Date>()
 
@@ -132,8 +143,8 @@ class UserProfileViewModel(
 
     // MARK: - Carga principal
 
-    fun fetchProfile(momentsLimit: Int = 50) {
-        momentsFetchLimit = maxOf(1, momentsLimit)
+    fun fetchProfile(momentsLimit: Int = 18) {
+        momentsPageSize = maxOf(1, momentsLimit)
         val current = currentUserId ?: run { isLoading = false; return }
         isLoading = true
         isProfileUnavailable = false
@@ -165,7 +176,7 @@ class UserProfileViewModel(
             }
             val cachedMoments = cached.second
             if (cachedMoments.isNotEmpty() && moments.isEmpty()) {
-                moments = cachedMoments.take(momentsFetchLimit)
+                moments = cachedMoments.take(momentsPageSize)
             }
 
             val (cachedFollowers, cachedFollowing, cachedMutuals) = cached.third
@@ -302,11 +313,41 @@ class UserProfileViewModel(
 
     // MARK: - Momentos etiquetados
 
-    suspend fun fetchTaggedMoments() {
+    suspend fun fetchTaggedMoments(reset: Boolean = true) {
         if (currentUserId == null) return
-        isLoadingTagged = true
-        taggedMoments = BackendFeedService.fetchTaggedMoments(targetUserId = userId, limit = 50)?.moments ?: emptyList()
+        if (reset) {
+            if (isFetchingTaggedPage) return
+            taggedCursor = null
+            hasMoreTagged = false
+            isLoadingTagged = true
+        } else {
+            if (!hasMoreTagged || isLoadingMoreTagged || taggedCursor == null) return
+            isLoadingMoreTagged = true
+        }
+        isFetchingTaggedPage = true
+        val result = BackendFeedService.fetchTaggedMoments(
+            targetUserId = userId,
+            cursor = if (reset) null else taggedCursor,
+            limit = momentsPageSize,
+        )
+        if (result != null) {
+            taggedMoments = if (reset) {
+                result.moments
+            } else {
+                val existingIds = taggedMoments.map { it.id }.toSet()
+                taggedMoments + result.moments.filter { it.id !in existingIds }
+            }
+            taggedCursor = result.nextCursor
+            hasMoreTagged = result.nextCursor != null
+        }
         isLoadingTagged = false
+        isLoadingMoreTagged = false
+        isFetchingTaggedPage = false
+    }
+
+    fun loadMoreTaggedMoments() {
+        if (!hasMoreTagged || isLoadingMoreTagged) return
+        viewModelScope.launch { fetchTaggedMoments(reset = false) }
     }
 
     // MARK: - Categorización de conexiones
@@ -412,30 +453,78 @@ class UserProfileViewModel(
 
     // MARK: - Momentos
 
-    suspend fun fetchMoments() {
-        val current = currentUserId ?: run { isLoadingMoments = false; return }
+    suspend fun fetchMoments(reset: Boolean = true) {
+        val current = currentUserId ?: run {
+            isLoadingMoments = false
+            isLoadingMoreMoments = false
+            return
+        }
+        if (reset) {
+            if (isFetchingMomentsPage) return
+            momentsCursor = null
+            legacyVisibleMoments = emptyList()
+            hasMoreMoments = false
+        } else {
+            if (!hasMoreMoments || isLoadingMoreMoments) return
+            if (legacyVisibleMoments.isNotEmpty()) {
+                val nextCount = minOf(moments.size + momentsPageSize, legacyVisibleMoments.size)
+                moments = legacyVisibleMoments.take(nextCount)
+                hasMoreMoments = nextCount < legacyVisibleMoments.size
+                return
+            }
+            if (momentsCursor == null) {
+                hasMoreMoments = false
+                return
+            }
+            isLoadingMoreMoments = true
+        }
+        isFetchingMomentsPage = true
         val backend = BackendFeedService.fetchProfileMoments(
             targetUserId = userId,
-            limit = momentsFetchLimit,
+            cursor = if (reset) null else momentsCursor,
+            limit = momentsPageSize,
         )
         if (backend != null) {
-            moments = backend.moments
-            isLoadingMoments = false
-            if (momentsFetchLimit >= 50) {
-                LocalPersistenceService.saveProfileMomentsAsync(backend.moments, userId, current, sync = true)
+            moments = if (reset) {
+                backend.moments
+            } else {
+                val existingIds = moments.map { it.id }.toSet()
+                moments + backend.moments.filter { it.id !in existingIds }
             }
+            momentsCursor = backend.nextCursor
+            hasMoreMoments = backend.nextCursor != null
+            isLoadingMoments = false
+            isLoadingMoreMoments = false
+            isFetchingMomentsPage = false
+            LocalPersistenceService.saveProfileMomentsAsync(moments, userId, current, sync = true)
+            return
+        }
+        if (!reset) {
+            isLoadingMoreMoments = false
+            isFetchingMomentsPage = false
             return
         }
         // Fallback: visibilidad por-momento vía repositorio (equivale a filterMomentsForAudience en iOS).
         runCatching { firestoreService.fetchMomentsWithVisibility(userId, current) }
             .onSuccess { filtered ->
-                moments = filtered.take(momentsFetchLimit)
+                legacyVisibleMoments = filtered
+                moments = filtered.take(momentsPageSize)
+                hasMoreMoments = moments.size < filtered.size
                 isLoadingMoments = false
-                if (momentsFetchLimit >= 50) {
-                    LocalPersistenceService.saveProfileMomentsAsync(filtered, userId, current, sync = true)
-                }
+                isLoadingMoreMoments = false
+                isFetchingMomentsPage = false
+                LocalPersistenceService.saveProfileMomentsAsync(filtered, userId, current, sync = true)
             }
-            .onFailure { isLoadingMoments = false }
+            .onFailure {
+                isLoadingMoments = false
+                isLoadingMoreMoments = false
+                isFetchingMomentsPage = false
+            }
+    }
+
+    fun loadMoreMoments() {
+        if (!hasMoreMoments || isLoadingMoreMoments) return
+        viewModelScope.launch { fetchMoments(reset = false) }
     }
 
     // MARK: - Estado del botón de seguir

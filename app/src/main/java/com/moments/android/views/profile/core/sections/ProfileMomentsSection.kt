@@ -1,7 +1,6 @@
 package com.moments.android.views.profile.core.sections
 
 import android.graphics.Bitmap
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -61,13 +60,12 @@ import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.models.Moment
+import com.moments.android.services.cache.VideoThumbnailCache
 import com.moments.android.views.components.ActivityGridAudienceIcon
 import com.moments.android.views.creator.audienceselector.ContentAudience
 import com.moments.android.views.messaging.components.ChatVideoPlayBadge
 import com.moments.android.views.profile.core.GridPreviewThumbnailFrame
 import com.moments.android.views.profile.core.gridPreviewSettings
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlin.math.max
 
 /** Métricas del grid, equivalente a `ProfileMomentsGridMetrics`. */
@@ -285,20 +283,15 @@ private fun ProfileThumbnailImage(url: String, moment: Moment, size: Dp, cellWid
 
 @Composable
 private fun ProfileThumbnailVideo(url: String, moment: Moment, size: Dp, cellWidth: Dp, cellHeight: Dp, portrait: Boolean) {
-    var thumbnail by remember(url) { mutableStateOf<Bitmap?>(null) }
-    var loading by remember(url) { mutableStateOf(true) }
-    LaunchedEffect(url) {
-        thumbnail = withContext(Dispatchers.IO) {
-            runCatching {
-                val retriever = MediaMetadataRetriever()
-                try {
-                    retriever.setDataSource(profileThumbnailUrl(url))
-                    retriever.getFrameAtTime(1_000_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                } finally {
-                    retriever.release()
-                }
-            }.getOrNull()
-        }
+    val resolvedUrl = profileThumbnailUrl(url)
+    var thumbnail by remember(resolvedUrl) {
+        mutableStateOf<Bitmap?>(VideoThumbnailCache.cachedThumbnail(resolvedUrl))
+    }
+    var loading by remember(resolvedUrl) { mutableStateOf(thumbnail == null) }
+    LaunchedEffect(resolvedUrl) {
+        if (thumbnail != null) return@LaunchedEffect
+        loading = true
+        thumbnail = VideoThumbnailCache.thumbnail(resolvedUrl)
         loading = false
     }
     val content: @Composable (ContentScale) -> Unit = { contentScale ->

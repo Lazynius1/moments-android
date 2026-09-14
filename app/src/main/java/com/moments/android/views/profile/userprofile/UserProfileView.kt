@@ -401,7 +401,7 @@ fun UserProfileView(
                     user = targetUser,
                     currentUserId = currentUserId,
                     followersCountOverride = viewModel.followers.size,
-                    momentsCountOverride = viewModel.moments.size,
+                    momentsCountOverride = maxOf(viewModel.moments.size, viewModel.userProfile?.momentsCount ?: 0),
                 )
                 if (presentation != null) {
                     when (val destination = presentation.destination) {

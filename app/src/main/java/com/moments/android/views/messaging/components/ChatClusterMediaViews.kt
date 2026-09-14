@@ -29,9 +29,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items as columnItems
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -45,6 +47,7 @@ import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,6 +84,7 @@ import com.moments.android.views.shared.ScreenshotProtectionMode
 import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import kotlin.math.abs
 import java.net.URI
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun GlassmorphicClusterRow(
@@ -586,11 +590,18 @@ fun ClusterGalleryView(
     onDeleteForEveryone: ((List<EnhancedMessage>) -> Unit)? = null,
     onHydrateMedia: ((EnhancedMessage) -> Unit)? = null,
     isDownloadingMedia: (String) -> Boolean = { false },
+    downloadProgressUpdates: StateFlow<Map<String, Double>>? = null,
     downloadProgress: (String) -> Double? = { null },
+    canLoadMore: Boolean = false,
+    isLoadingMore: Boolean = false,
+    onLoadMore: (() -> Unit)? = null,
     /** ≡ iOS `detail:` — FullScreenMedia within gallery stack; null → fallback [onOpenMedia]. */
     detail: (@Composable (message: EnhancedMessage, onDismissDetail: () -> Unit) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    if (presentation == ClusterGalleryPresentation.PUSHED) {
+        androidx.activity.compose.BackHandler(onBack = onClose)
+    }
     // ≡ iOS `.momentsFloatingTabBarHidden` en galería + detalle media.
     MomentsTabBarHidden()
     var tab by remember { mutableStateOf(initialTab) }
@@ -602,7 +613,7 @@ fun ClusterGalleryView(
     val isDark = isSystemInDarkTheme()
     val background = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
     val contentColor = if (isDark) Color.White else Color(0xFF0B1215)
-    val scroll = rememberScrollState()
+    val observedDownloadProgress = downloadProgressUpdates?.collectAsState()?.value
     var hadGalleryContent by remember { mutableStateOf(false) }
 
     val available = remember(messages) { messages.filterNot { it.isDeleted } }
@@ -638,7 +649,6 @@ fun ClusterGalleryView(
         if (tab == ClusterGalleryTab.LINKS) detailRoute = null
     }
     LaunchedEffect(visible.map { it.id }) {
-        visible.forEach { onHydrateMedia?.invoke(it) }
         val route = detailRoute
         if (route != null && visible.none { it.id == route.messageId }) {
             detailRoute = null
@@ -775,50 +785,48 @@ fun ClusterGalleryView(
                 }
             }
         } else {
-            val (left, right) = remember(visible) { distributeGalleryColumns(visible) }
-            Row(
-                Modifier
+            LazyVerticalStaggeredGrid(
+                columns = StaggeredGridCells.Fixed(2),
+                modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .verticalScroll(scroll)
                     .padding(horizontal = gallerySpacing, vertical = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(gallerySpacing),
-                verticalAlignment = Alignment.Top,
+                verticalItemSpacing = gallerySpacing,
             ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(gallerySpacing)) {
-                    left.forEach { message ->
-                        GalleryMediaCard(
-                            message = message,
-                            selectionMode = selectionMode,
-                            selected = message.id in selectedIds,
-                            isDownloading = isDownloadingMedia(message.id),
-                            downloadProgress = downloadProgress(message.id),
-                            onClick = {
-                                if (selectionMode) toggleSelection(message.id) else openMessage(message)
-                            },
-                            onLongClick = {
-                                if (!selectionMode) enterSelection(message.id)
-                            },
-                            onAppear = { onHydrateMedia?.invoke(message) },
-                        )
-                    }
+                staggeredItems(visible, key = { it.id }) { message ->
+                    GalleryMediaCard(
+                        message = message,
+                        selectionMode = selectionMode,
+                        selected = message.id in selectedIds,
+                        isDownloading = isDownloadingMedia(message.id),
+                        downloadProgress = observedDownloadProgress?.get(message.id) ?: downloadProgress(message.id),
+                        onClick = {
+                            if (selectionMode) toggleSelection(message.id) else openMessage(message)
+                        },
+                        onLongClick = {
+                            if (!selectionMode) enterSelection(message.id)
+                        },
+                        onAppear = { onHydrateMedia?.invoke(message) },
+                    )
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(gallerySpacing)) {
-                    right.forEach { message ->
-                        GalleryMediaCard(
-                            message = message,
-                            selectionMode = selectionMode,
-                            selected = message.id in selectedIds,
-                            isDownloading = isDownloadingMedia(message.id),
-                            downloadProgress = downloadProgress(message.id),
-                            onClick = {
-                                if (selectionMode) toggleSelection(message.id) else openMessage(message)
-                            },
-                            onLongClick = {
-                                if (!selectionMode) enterSelection(message.id)
-                            },
-                            onAppear = { onHydrateMedia?.invoke(message) },
-                        )
+                if (canLoadMore && onLoadMore != null) {
+                    item(span = StaggeredGridItemSpan.FullLine, key = "shared-media-load-more") {
+                        LaunchedEffect(visible.size, canLoadMore, isLoadingMore) {
+                            if (!isLoadingMore) onLoadMore()
+                        }
+                        Box(
+                            Modifier.fillMaxWidth().height(56.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (isLoadingMore) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    strokeWidth = 2.dp,
+                                    color = contentColor,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -921,25 +929,6 @@ private fun canDeleteGalleryMessageForEveryone(message: EnhancedMessage, current
         !message.isDeleted &&
         !message.isRead &&
         System.currentTimeMillis() - message.timestamp.time < galleryDeleteEveryoneWindowMillis
-
-/** ≡ iOS `distribute` — balancea altura relativa 1/aspectRatio en dos columnas. */
-private fun distributeGalleryColumns(items: List<EnhancedMessage>): Pair<List<EnhancedMessage>, List<EnhancedMessage>> {
-    val left = mutableListOf<EnhancedMessage>()
-    val right = mutableListOf<EnhancedMessage>()
-    var leftHeight = 0f
-    var rightHeight = 0f
-    items.forEach { message ->
-        val relativeHeight = 1f / galleryAspectRatio(message)
-        if (leftHeight <= rightHeight) {
-            left += message
-            leftHeight += relativeHeight
-        } else {
-            right += message
-            rightHeight += relativeHeight
-        }
-    }
-    return left to right
-}
 
 @Composable
 private fun GalleryTabButton(

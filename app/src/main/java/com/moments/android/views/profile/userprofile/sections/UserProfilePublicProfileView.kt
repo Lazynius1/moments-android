@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -51,6 +52,7 @@ import com.moments.android.views.profile.userprofile.UserProfileTabType
 import com.moments.android.views.profile.userprofile.UserProfileViewModel
 import com.moments.android.views.shared.ScreenshotProtectedView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * Port de `UserModernPublicProfileView` (`UserProfilePublicProfileView.swift`).
@@ -83,6 +85,7 @@ fun UserModernPublicProfileView(
     val colors = rememberAdaptiveColors()
     val density = LocalDensity.current
     val scrollState = rememberScrollState()
+    val loadMoreThresholdPx = with(density) { 900.dp.roundToPx() }
     // ≡ ProfileShellComponents: statusTop + topContentInset (chrome sticky bajo safe area)
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     var highlightsRefreshToken by remember { mutableIntStateOf(0) }
@@ -103,6 +106,32 @@ fun UserModernPublicProfileView(
         ) {
             viewModel.fetchTaggedMoments()
         }
+    }
+
+    LaunchedEffect(scrollState, selectedTab) {
+        snapshotFlow {
+            val hasMore = if (selectedTab == UserProfileTabType.MOMENTS) {
+                viewModel.hasMoreMoments
+            } else {
+                viewModel.hasMoreTagged
+            }
+            val loadedCount = if (selectedTab == UserProfileTabType.MOMENTS) {
+                viewModel.moments.size
+            } else {
+                viewModel.taggedMoments.size
+            }
+            if (hasMore && scrollState.maxValue - scrollState.value < loadMoreThresholdPx) loadedCount else -1
+        }
+            .distinctUntilChanged()
+            .collect { visibleCountNearBottom ->
+                if (visibleCountNearBottom >= 0) {
+                    if (selectedTab == UserProfileTabType.MOMENTS) {
+                        viewModel.loadMoreMoments()
+                    } else {
+                        viewModel.loadMoreTaggedMoments()
+                    }
+                }
+            }
     }
 
     Box(
@@ -205,6 +234,14 @@ fun UserModernPublicProfileView(
                                     )
                                 }
                             }
+                            if (viewModel.isLoadingMoreMoments) {
+                                Box(
+                                    Modifier.fillMaxWidth().padding(vertical = 18.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    MomentsCircularProgressIndicator()
+                                }
+                            }
                         }
                     }
 
@@ -242,6 +279,14 @@ fun UserModernPublicProfileView(
                                             gridIndex = index,
                                             descriptor = descriptor,
                                         )
+                                    }
+                                }
+                                if (viewModel.isLoadingMoreTagged) {
+                                    Box(
+                                        Modifier.fillMaxWidth().padding(vertical = 18.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        MomentsCircularProgressIndicator()
                                     }
                                 }
                             }

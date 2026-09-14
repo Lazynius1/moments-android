@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -266,7 +267,7 @@ fun NotificationsScreen(
                 .background(canvas)
                 .momentRefresh {
                     // ≡ iOS await refreshNotifications(); delay para que la gota sea visible
-                    viewModel.refreshNotifications()
+                    viewModel.refreshNotifications(force = true)
                     kotlinx.coroutines.delay(700)
                 },
         ) {
@@ -466,6 +467,14 @@ private fun NotificationsList(
     onTapAction: (NotificationGroup) -> Unit,
 ) {
     val listState = rememberLazyListState()
+    val shouldLoadMore by remember(listState) {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            val prefetchIndex = (layoutInfo.totalItemsCount - 3).coerceAtLeast(0)
+            layoutInfo.totalItemsCount > 0 && lastVisibleIndex >= prefetchIndex
+        }
+    }
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
         item {
             NotificationTabBar(
@@ -546,19 +555,13 @@ private fun NotificationsList(
                 Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     if (isLoadingMore) {
                         MomentsCircularProgressIndicator(modifier = Modifier.size(24.dp))
-                    } else {
-                        Text(
-                            stringResource(R.string.notifications_load_more),
-                            modifier = Modifier.clickable { viewModel.loadMoreNotifications() },
-                            color = if (isDark) Color.White else Color.Black,
-                        )
                     }
                 }
             }
         }
     }
-    LaunchedEffect(listState.canScrollForward, canLoadMore, isLoadingMore) {
-        if (!listState.canScrollForward && canLoadMore && !isLoadingMore) {
+    LaunchedEffect(shouldLoadMore, canLoadMore, isLoadingMore) {
+        if (shouldLoadMore && canLoadMore && !isLoadingMore) {
             viewModel.loadMoreNotifications()
         }
     }

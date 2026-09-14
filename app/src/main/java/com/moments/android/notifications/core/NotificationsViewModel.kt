@@ -67,6 +67,7 @@ class NotificationsViewModel(
     val pendingDeletion: StateFlow<NotificationService.PendingNotificationDeletion?> = _pendingDeletion.asStateFlow()
 
     private val userProfileImageCache = mutableMapOf<String, String>()
+    private val resolvedProfileUserIds = mutableSetOf<String>()
 
     enum class NotificationsTab {
         ALL, REACTIONS, FOLLOWS, COMMENTS, STORY_REACTIONS, REQUESTS,
@@ -86,8 +87,8 @@ class NotificationsViewModel(
         scope.launch { NotificationService.pendingDeletion.collectLatest { _pendingDeletion.value = it } }
     }
 
-    fun refreshNotifications() {
-        NotificationService.startObserving()
+    fun refreshNotifications(force: Boolean = false) {
+        NotificationService.startObserving(forceRefresh = force)
     }
 
     fun loadMoreNotifications() = NotificationService.loadMore()
@@ -168,6 +169,7 @@ class NotificationsViewModel(
         // ≡ Swift Dictionary: nil elimina la clave
         if (imagePath != null) userProfileImageCache[userId] = imagePath
         else userProfileImageCache.remove(userId)
+        resolvedProfileUserIds.add(userId)
     }
 
     private fun updatePendingCounts() {
@@ -282,13 +284,23 @@ class NotificationsViewModel(
     }
 
     private fun preloadSenderProfiles(notifications: List<MomentsNotification>) {
-        val uncached = notifications.map { it.senderId }.filter { it.isNotEmpty() && it !in userProfileImageCache }.distinct()
+        val uncached = notifications.map { it.senderId }
+            .filter { it.isNotEmpty() && it !in resolvedProfileUserIds }
+            .distinct()
         if (uncached.isEmpty()) return
+        // Reservar antes de lanzar la consulta evita batches duplicados si llega
+        // otro snapshot o cambia la pestaña mientras Firestore responde.
+        resolvedProfileUserIds.addAll(uncached)
         scope.launch {
             uncached.chunked(30).forEach { chunk ->
-                runCatching {
+                val snapshot = runCatching {
                     db.collection("users").whereIn(FieldPath.documentId(), chunk).get().await()
-                }.getOrNull()?.documents?.forEach { doc ->
+                }.getOrNull()
+                if (snapshot == null) {
+                    resolvedProfileUserIds.removeAll(chunk.toSet())
+                    return@forEach
+                }
+                snapshot.documents.forEach { doc ->
                     doc.getString("profileImagePath")?.takeIf { it.isNotEmpty() }?.let {
                         userProfileImageCache[doc.id] = it
                     }

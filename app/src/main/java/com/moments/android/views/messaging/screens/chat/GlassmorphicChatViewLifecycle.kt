@@ -342,6 +342,9 @@ class GlassmorphicChatLifecycleController(
         if (otherUserId.isEmpty()) return
         scope.launch {
             runCatching { firestoreService.unblockUser(currentUserId, otherUserId) }.onSuccess {
+                com.moments.android.views.messaging.services.ChatDraftEvents.emit(
+                    com.moments.android.views.messaging.services.ChatDraftEvent.ParticipantStateChanged(otherUserId),
+                )
                 isOtherParticipantBlockedByCurrentUser = false
                 isOtherParticipantUnavailable = false
                 refreshOtherParticipantUsername()

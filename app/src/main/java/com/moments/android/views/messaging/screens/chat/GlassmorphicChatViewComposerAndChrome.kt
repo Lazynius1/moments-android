@@ -26,6 +26,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -83,6 +84,8 @@ import com.moments.android.views.messaging.services.ChatSessionEngine
 import com.moments.android.views.messaging.screens.SharedMedia
 import java.util.Date
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 private data class RootKeyboardMetrics(
@@ -642,6 +645,8 @@ data class ChatMessageRendererCallbacks(
         cluster.lastOrNull()?.let(onReply)
     },
     val onAvatarTap: () -> Unit = {},
+    val participantName: (String) -> String = { otherParticipantName },
+    val onParticipantAvatarTap: (String) -> Unit = { onAvatarTap() },
     val onReplyTap: (String) -> Unit = {},
     val onOpenMedia: (EnhancedMessage) -> Unit = {},
     val onOpenCluster: (List<EnhancedMessage>) -> Unit = {},
@@ -712,8 +717,8 @@ class ChatMessagePresentationState {
 @Composable
 fun rememberChatMessagePresentationState() = remember { ChatMessagePresentationState() }
 
-fun lastOutgoingMessageId(messages: List<EnhancedMessage>, currentUserId: String): String? = messages.lastOrNull { it.senderId == currentUserId }?.id
-fun shouldShowSeenLabel(messageId: String, status: MessageStatus, messages: List<EnhancedMessage>, currentUserId: String): Boolean = status == MessageStatus.READ && messageId == lastOutgoingMessageId(messages, currentUserId)
+fun shouldShowSeenLabel(messageId: String, status: MessageStatus, lastOutgoingMessageId: String?): Boolean =
+    status == MessageStatus.READ && messageId == lastOutgoingMessageId
 fun reactionToken(messageId: String, viewModel: EnhancedChatViewModel): String = viewModel.displayReactions(messageId)?.takeIf { it.isNotEmpty() }?.entries?.map { "${it.key}:${it.value.size}" }?.sorted()?.joinToString(",").orEmpty()
 fun reactionIdentitySuffix(item: MessageItem, viewModel: EnhancedChatViewModel): String = when (item) {
     is MessageItem.Single -> reactionToken(item.message.id, viewModel)
@@ -745,13 +750,20 @@ fun GlassmorphicChatMessageItem(
     when (item) {
         is MessageItem.Single -> {
             val message = live(item.message)
+            val downloadProgress by remember(viewModel, message.id) {
+                viewModel.downloadProgress
+                    .map { progressById -> progressById[message.id] }
+                    .distinctUntilChanged()
+            }.collectAsState(initial = viewModel.downloadProgress.value[message.id])
+            val participantId = if (viewModel.conversation.isGroup) message.senderId else callbacks.otherParticipantId
+            val participantName = if (viewModel.conversation.isGroup) callbacks.participantName(message.senderId) else callbacks.otherParticipantName
             if (message.type == MessageType.CHAT_NOTICE) {
                 // Avisos sin `content` (o con un token no reconocido) no pintan texto pero
                 // `ChatDisappearingNoticeRow` seguía reservando su padding/altura — dejaba
                 // huecos vacíos en el timeline. Si no hay nada que mostrar, no se compone
                 // la fila (0×0), en vez de reservar espacio para un aviso en blanco.
                 if (!message.content.isNullOrBlank()) {
-                    ChatNoticeTimelineRow(message.content.orEmpty(), message.senderId, viewModel.currentUserId, callbacks.otherParticipantName, callbacks.onChangeVanishTimer, callbacks.onTurnOnVanish, modifier)
+                    ChatNoticeTimelineRow(message.content.orEmpty(), message.senderId, viewModel.currentUserId, participantName, callbacks.onChangeVanishTimer, callbacks.onTurnOnVanish, modifier)
                 }
             } else {
                 GlassmorphicMessageRow(
@@ -760,22 +772,22 @@ fun GlassmorphicChatMessageItem(
                     isCurrentUser = message.senderId == viewModel.currentUserId,
                     showAvatar = callbacks.shouldShowAvatar(message, messages),
                     groupPosition = callbacks.groupPosition(message, messages),
-                    otherUserId = callbacks.otherParticipantId,
+                    otherUserId = participantId,
                     isOtherParticipantUnavailable = callbacks.isOtherParticipantUnavailable,
-                    otherParticipantName = callbacks.otherParticipantName,
+                    otherParticipantName = participantName,
                     repliedMessage = message.replyTo?.let(viewModel.messagesById::get),
                     isMenuSelected = menuSelected,
                     isBubbleFlashing = presentationState.isBubbleFlashing(message.id),
                     progress = viewModel.uploadProgress.value[message.id],
-                    downloadProgress = viewModel.downloadProgress.value[message.id],
-                    isDownloadingMedia = viewModel.isDownloadingMedia(message.id),
-                    showSeenLabel = shouldShowSeenLabel(message.id, message.status, messages, viewModel.currentUserId),
+                    downloadProgress = downloadProgress,
+                    isDownloadingMedia = downloadProgress != null || viewModel.isDownloadingMedia(message.id),
+                    showSeenLabel = shouldShowSeenLabel(message.id, message.status, viewModel.lastOutgoingMessageId),
                     isStarred = message.isStarred(viewModel.currentUserId) || viewModel.isStarred(message.id),
                     timestampRevealState = timestampRevealState,
                     callbacks = ChatMessageBubbleCallbacks(
                         onReply = { callbacks.onReply(message) },
                         onReaction = { emoji -> viewModel.addReaction(message, emoji); pulse(message.id) },
-                        onAvatarTap = callbacks.onAvatarTap,
+                        onAvatarTap = { callbacks.onParticipantAvatarTap(message.senderId) },
                         onReplyTap = callbacks.onReplyTap,
                         onMomentNavigation = callbacks.onMomentNavigation,
                         onStoryNavigation = callbacks.onStoryNavigation,
@@ -809,6 +821,8 @@ fun GlassmorphicChatMessageItem(
             val cluster = item.messages.map(live)
             // ≡ iOS liveCluster.last as anchor for seen/reply chrome
             val anchor = cluster.lastOrNull()
+            val participantId = if (viewModel.conversation.isGroup) anchor?.senderId else callbacks.otherParticipantId
+            val participantName = if (viewModel.conversation.isGroup) callbacks.participantName(anchor?.senderId.orEmpty()) else callbacks.otherParticipantName
             GlassmorphicClusterRow(
                 messages = cluster,
                 isCurrentUser = anchor?.senderId == viewModel.currentUserId,
@@ -816,11 +830,11 @@ fun GlassmorphicChatMessageItem(
                 onOpenCluster = callbacks.onOpenCluster,
                 onHydrateMedia = callbacks.onHydrateMedia,
                 showAvatar = anchor?.let { callbacks.shouldShowAvatar(it, messages) } == true,
-                otherUserId = callbacks.otherParticipantId,
+                otherUserId = participantId,
                 isOtherParticipantUnavailable = callbacks.isOtherParticipantUnavailable,
-                otherParticipantName = callbacks.otherParticipantName,
+                otherParticipantName = participantName,
                 repliedMessage = anchor?.replyTo?.let(viewModel.messagesById::get),
-                onAvatarTap = callbacks.onAvatarTap,
+                onAvatarTap = { anchor?.senderId?.let(callbacks.onParticipantAvatarTap) },
                 onReply = { callbacks.onClusterReply(cluster) },
                 onReplyTap = callbacks.onReplyTap,
                 displayReactions = { id -> viewModel.displayReactions(id) },
@@ -828,7 +842,7 @@ fun GlassmorphicChatMessageItem(
                     viewModel.addReaction(message, emoji)
                     pulse(message.id)
                 },
-                showSeenLabel = anchor?.let { shouldShowSeenLabel(it.id, clusterAggregateStatus(cluster), messages, viewModel.currentUserId) } == true,
+                showSeenLabel = anchor?.let { shouldShowSeenLabel(it.id, clusterAggregateStatus(cluster), viewModel.lastOutgoingMessageId) } == true,
                 isStarred = anchor?.let { it.isStarred(viewModel.currentUserId) || viewModel.isStarred(it.id) } == true,
                 isMenuSelected = menuSelected,
                 isBubbleFlashing = presentationState.isMessageItemHighlighted(item),

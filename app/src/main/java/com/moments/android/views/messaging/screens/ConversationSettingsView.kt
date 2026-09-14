@@ -7,6 +7,7 @@ import android.content.ContentValues
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -26,11 +27,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items as lazyItems
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -89,10 +85,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -106,6 +104,8 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.AggregateSource
+import com.google.firebase.firestore.Query
 import com.moments.android.R
 import com.moments.android.MomentsApplication
 import com.moments.android.coordinators.AsyncProfileImageView
@@ -140,6 +140,7 @@ import com.moments.android.views.messaging.services.ConversationForwardingPrefer
 import com.moments.android.views.messaging.services.ConversationMuteEvents
 import com.moments.android.views.messaging.services.ChatEncryptedMediaResolver
 import com.moments.android.views.messaging.services.resolveVideoThumbnail
+import com.moments.android.views.messaging.services.SharedGalleryMediaPage
 import com.moments.android.views.messaging.services.setVanishMode
 import com.moments.android.views.messaging.services.sendChatNotice
 import com.moments.android.views.messaging.services.updateChatNotice
@@ -153,9 +154,13 @@ import com.moments.android.views.shared.ChatPreviewPrivacy
 import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 /** Port de `Views/Messaging/Screens/ConversationSettingsView.swift`. */
 enum class SharedContentTab { MEDIA, LINKS }
@@ -176,7 +181,7 @@ data class SharedMedia(
 @Stable
 class ConversationSettingsViewModel(
     private val currentUserId: String = FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
-) {
+) : ViewModel() {
     var conversation by mutableStateOf<Conversation?>(null)
         private set
     var totalMessages by mutableIntStateOf(0)
@@ -184,6 +189,8 @@ class ConversationSettingsViewModel(
     var sentMessagesCount by mutableIntStateOf(0)
         private set
     var receivedMessagesCount by mutableIntStateOf(0)
+        private set
+    var isLoadingConversationStatistics by mutableStateOf(true)
         private set
     var sharedMedia by mutableStateOf<List<SharedMedia>>(emptyList())
         private set
@@ -210,6 +217,12 @@ class ConversationSettingsViewModel(
     var showSharedGallery by mutableStateOf(false)
     var sharedGalleryInitialTab by mutableStateOf(ClusterGalleryTab.MEDIA)
         private set
+    var isLoadingSharedContent by mutableStateOf(true)
+        private set
+    var isLoadingMoreSharedMedia by mutableStateOf(false)
+        private set
+    var canLoadMoreSharedMedia by mutableStateOf(true)
+        private set
     var downloadProgress by mutableStateOf<Map<String, Double>>(emptyMap())
         private set
     private val downloadingMediaIds = mutableSetOf<String>()
@@ -217,6 +230,7 @@ class ConversationSettingsViewModel(
     private val refreshingMetadataIds = mutableSetOf<String>()
     private val firestoreService = FirestoreService()
     private var privacyMutationVersion = 0L
+    private var sharedMediaCursor: com.moments.android.views.messaging.core.MessageSyncCursor? = null
 
     fun openSharedGallery(tab: ClusterGalleryTab = ClusterGalleryTab.MEDIA) {
         sharedGalleryInitialTab = tab
@@ -224,12 +238,17 @@ class ConversationSettingsViewModel(
     }
 
     fun loadConversationData(value: Conversation, context: android.content.Context? = null) {
+        isLoadingSharedContent = true
+        isLoadingMoreSharedMedia = false
+        canLoadMoreSharedMedia = true
+        sharedMediaCursor = null
         conversation = value
         vanishModeActive = value.vanishModeActive == true
         vanishTimer = VanishMessageTimer.fromStored(value.vanishMessageTimer)
         notificationsEnabled = !value.isMuted(currentUserId)
         conversationCreatedDate = MomentsFormat.smartDate(value.timestamp, MomentsFormat.DateContext.MEDIUM_DATE)
-        value.id?.let { conversationId ->
+        val conversationId = value.id
+        if (conversationId != null) {
             val prefsCtx = context ?: MomentsApplication.instance
             if (prefsCtx != null) {
                 messagePreviewEnabled = ChatPreviewPrivacy.isUserPreviewEnabled(prefsCtx, conversationId)
@@ -244,21 +263,34 @@ class ConversationSettingsViewModel(
                 typingIndicatorEnabled = boolPref("chat_typing_indicator_enabled_$conversationId", "typing_$conversationId", true)
                 buzzEnabled = boolPref("chat_buzz_enabled_$conversationId", "buzz_$conversationId", true)
             }
-            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            viewModelScope.launch(Dispatchers.IO) {
                 val cached = LocalPersistenceService.loadMessagesFastAsync(conversationId)
                 withContext(Dispatchers.Main) {
-                    if (cached.isNotEmpty()) processMessages(cached)
+                    if (cached.isNotEmpty()) {
+                        processMessages(cached)
+                        isLoadingSharedContent = false
+                    }
                 }
                 MessageCatchUpService.sync(conversationId)
                 val refreshed = LocalPersistenceService.loadMessagesFastAsync(conversationId)
-                val remoteMedia = ChatService.fetchSharedGalleryMedia(conversationId).getOrDefault(emptyList())
-                val merged = mergeMessages(refreshed, remoteMedia)
+                val remotePage = ChatService.fetchSharedGalleryMedia(
+                    conversationId,
+                    limit = SHARED_MEDIA_PAGE_SIZE,
+                ).getOrDefault(SharedGalleryMediaPage(emptyList(), null, false))
+                val merged = mergeMessages(refreshed, remotePage.messages)
                 withContext(Dispatchers.Main) {
+                    updateSharedMediaPagination(remotePage)
                     if (merged.isNotEmpty()) processMessages(merged)
+                    isLoadingSharedContent = false
                     hydrateGalleryThumbnails()
                 }
             }
+            loadConversationStatistics(conversationId, value.timestamp)
             loadPrivacySettings(prefsCtx)
+        } else {
+            isLoadingSharedContent = false
+            isLoadingConversationStatistics = false
+            canLoadMoreSharedMedia = false
         }
         if (value.isGroup) {
             liveOtherParticipantUsername = value.otherParticipantUsername.orEmpty()
@@ -276,7 +308,7 @@ class ConversationSettingsViewModel(
         val conversationId = conversation?.id ?: return
         if (currentUserId.isBlank()) return
         val requestVersion = privacyMutationVersion
-        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val globalEnabled = runCatching {
                 firestoreService.fetchUsersAsync(listOf(currentUserId)).firstOrNull()?.showReadReceipts
             }.getOrNull() ?: true
@@ -334,14 +366,124 @@ class ConversationSettingsViewModel(
     }
 
     fun processMessages(messages: List<EnhancedMessage>) {
-        totalMessages = messages.size
         val active = messages.filterNot { it.isDeleted }
-        sentMessagesCount = active.count { it.senderId == currentUserId }
-        receivedMessagesCount = active.size - sentMessagesCount
-        sharedGalleryMessages = messages.filter(::isSharedGalleryEligible).sortedByDescending { it.timestamp }
+        if (isLoadingConversationStatistics) {
+            totalMessages = active.size
+            sentMessagesCount = active.count { it.senderId == currentUserId }
+            receivedMessagesCount = active.size - sentMessagesCount
+        }
+        updateSharedContent(messages)
+        starredMessages = active.filter { currentUserId in it.starredBy.orEmpty() }.sortedByDescending { it.timestamp }
+    }
+
+    private fun loadConversationStatistics(conversationId: String, fallbackDate: java.util.Date) {
+        isLoadingConversationStatistics = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val thread = FirebaseFirestore.getInstance().messagingThread(conversationId)
+            val messages = thread.messagingMessages
+            val documentDate = async {
+                runCatching {
+                    val snapshot = thread.get().await()
+                    listOfNotNull(
+                        snapshot.getTimestamp("createdAt")?.toDate(),
+                        snapshot.getTimestamp("acceptedAt")?.toDate(),
+                    ).minOrNull()
+                }.getOrNull()
+            }
+            val oldestMessageDate = async {
+                runCatching {
+                    messages.orderBy("timestamp", Query.Direction.ASCENDING)
+                        .limit(1)
+                        .get()
+                        .await()
+                        .documents
+                        .firstOrNull()
+                        ?.getTimestamp("timestamp")
+                        ?.toDate()
+                }.getOrNull()
+            }
+            val totalCount = async {
+                runCatching { messages.count().get(AggregateSource.SERVER).await().count.toInt() }.getOrNull()
+            }
+            val sentCount = async {
+                runCatching {
+                    messages.whereEqualTo("senderId", currentUserId)
+                        .count()
+                        .get(AggregateSource.SERVER)
+                        .await()
+                        .count
+                        .toInt()
+                }.getOrNull()
+            }
+
+            val storedDate = documentDate.await()
+            val oldestDate = oldestMessageDate.await()
+            val exactTotal = totalCount.await()
+            val exactSent = sentCount.await()
+            withContext(Dispatchers.Main) {
+                if (conversation?.id != conversationId) return@withContext
+                val creationDate = listOfNotNull(storedDate, oldestDate).minOrNull() ?: fallbackDate
+                conversationCreatedDate = MomentsFormat.smartDate(
+                    creationDate,
+                    MomentsFormat.DateContext.MEDIUM_DATE,
+                )
+                if (exactTotal != null) {
+                    totalMessages = exactTotal
+                    sentMessagesCount = minOf(exactSent ?: sentMessagesCount, exactTotal)
+                    receivedMessagesCount = maxOf(0, exactTotal - sentMessagesCount)
+                }
+                isLoadingConversationStatistics = false
+            }
+        }
+    }
+
+    private fun updateSharedContent(messages: List<EnhancedMessage>) {
+        sharedGalleryMessages = messages
+            .filter(::isSharedGalleryEligible)
+            .map(::warmCachedMediaUrls)
+            .sortedByDescending { it.timestamp }
         // Incluir siempre, aunque aún no haya URL local (E2E sin descifrar).
         sharedMedia = sharedGalleryMessages.filter(::isSharedMedia).mapNotNull(::makeSharedMedia)
-        starredMessages = active.filter { currentUserId in it.starredBy.orEmpty() }.sortedByDescending { it.timestamp }
+    }
+
+    /** Reenlaza el fichero determinista del caché para no resolverlo otra vez al reabrir. */
+    private fun warmCachedMediaUrls(message: EnhancedMessage): EnhancedMessage {
+        val (cachedMedia, cachedThumbnail) = ChatCacheStore.localURLsIfPresent(message)
+        if (cachedMedia.isNullOrBlank() && cachedThumbnail.isNullOrBlank()) return message
+        return message.copy(
+            mediaUrl = cachedMedia ?: message.mediaUrl,
+            thumbnailUrl = cachedThumbnail ?: message.thumbnailUrl,
+        )
+    }
+
+    private fun updateSharedMediaPagination(page: SharedGalleryMediaPage) {
+        sharedMediaCursor = page.nextCursor
+        canLoadMoreSharedMedia = page.hasMore
+    }
+
+    fun loadMoreSharedMedia() {
+        val conversationId = conversation?.id ?: return
+        val cursor = sharedMediaCursor ?: return
+        if (!canLoadMoreSharedMedia || isLoadingMoreSharedMedia) return
+        isLoadingMoreSharedMedia = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val page = ChatService.fetchSharedGalleryMedia(
+                conversationId,
+                limit = SHARED_MEDIA_PAGE_SIZE,
+                before = cursor,
+            ).getOrDefault(SharedGalleryMediaPage(emptyList(), null, false))
+            withContext(Dispatchers.Main) {
+                if (conversation?.id != conversationId) {
+                    isLoadingMoreSharedMedia = false
+                    return@withContext
+                }
+                updateSharedMediaPagination(page)
+                if (page.messages.isNotEmpty()) {
+                    updateSharedContent(mergeMessages(sharedGalleryMessages, page.messages))
+                }
+                isLoadingMoreSharedMedia = false
+            }
+        }
     }
 
     /** Une local + remoto por id; gana la copia con más campos de media resueltos. */
@@ -364,8 +506,8 @@ class ConversationSettingsViewModel(
     }
 
     /** Miniaturas del grid de Media (listar + resolver thumbs E2E). */
-    fun hydrateGalleryThumbnails() {
-        for (message in sharedGalleryMessages) {
+    fun hydrateGalleryThumbnails(messages: List<EnhancedMessage> = sharedGalleryMessages.take(6)) {
+        for (message in messages) {
             if (!isSharedMedia(message)) continue
             val (cachedMedia, cachedThumb) = ChatCacheStore.localURLsIfPresent(message)
             val hasThumb = !cachedThumb.isNullOrBlank() || !message.thumbnailUrl.isNullOrBlank()
@@ -383,7 +525,7 @@ class ConversationSettingsViewModel(
             val thumbnailKey = "thumb_${message.id}"
             if (thumbnailKey in hydratingMediaIds) return
             hydratingMediaIds += thumbnailKey
-            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            viewModelScope.launch(Dispatchers.IO) {
                 val resolvedThumb = ChatService.resolveVideoThumbnail(message)
                 withContext(Dispatchers.Main) {
                     hydratingMediaIds -= thumbnailKey
@@ -415,7 +557,7 @@ class ConversationSettingsViewModel(
         val id = conversation?.id ?: return
         sharedGalleryMessages = sharedGalleryMessages.filterNot { it.id == message.id }
         sharedMedia = sharedMedia.filterNot { it.id == message.id }
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             ChatService.deleteMessageForMe(id, message.id, currentUserId)
         }
     }
@@ -425,7 +567,7 @@ class ConversationSettingsViewModel(
         val id = conversation?.id ?: return
         sharedGalleryMessages = sharedGalleryMessages.filterNot { it.id == message.id }
         sharedMedia = sharedMedia.filterNot { it.id == message.id }
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             ChatService.deleteMessageWithCleanup(id, message.id)
         }
     }
@@ -434,7 +576,7 @@ class ConversationSettingsViewModel(
         val id = conversation?.id ?: return
         notificationsEnabled = !notificationsEnabled
         val isMuted = !notificationsEnabled
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             if (notificationsEnabled) ChatService.unmuteConversation(id, currentUserId)
             else ChatService.muteConversation(id, currentUserId)
             withContext(Dispatchers.Main.immediate) {
@@ -446,7 +588,7 @@ class ConversationSettingsViewModel(
     fun muteNotifications(until: java.util.Date?) {
         val id = conversation?.id ?: return
         notificationsEnabled = false
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             ChatService.muteConversation(id, currentUserId, until)
             withContext(Dispatchers.Main.immediate) {
                 ConversationMuteEvents.emit(id, true)
@@ -457,7 +599,7 @@ class ConversationSettingsViewModel(
     /** ≡ iOS `updateVanishSettings` + post `conversationVanishModeDidChange`. */
     fun updateVanish(active: Boolean, timer: VanishMessageTimer) {
         val id = conversation?.id ?: return
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val result = ChatService.setVanishMode(id, active, currentUserId, timer.takeIf { active })
             if (result.isFailure) return@launch
 
@@ -534,7 +676,7 @@ class ConversationSettingsViewModel(
             .putBoolean("read_receipts_$id", readReceiptsEnabled)
             .apply()
         val requestedValue = readReceiptsEnabled
-        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val error = runCatching {
                 FirebaseFirestore.getInstance().messagingThread(id)
                     .update("readReceiptPreferences.$currentUserId", requestedValue)
@@ -599,7 +741,7 @@ class ConversationSettingsViewModel(
         val id = conversation?.id ?: return
         val outgoing = text.trim()
         if (outgoing.isEmpty() || currentUserId.isEmpty()) return
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             ChatService.sendTextMessage(id, currentUserId, outgoing, replyTo = media.id, isVanishModeMessage = vanishModeActive)
         }
     }
@@ -700,7 +842,7 @@ class ConversationSettingsViewModel(
             }
         }
         if (!refreshingMetadataIds.add(message.id)) return
-        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val fresh = ChatService.fetchMessage(conversationId, message.id).getOrNull()
             withContext(Dispatchers.Main) {
                 refreshingMetadataIds -= message.id
@@ -721,7 +863,7 @@ class ConversationSettingsViewModel(
             val thumbnailKey = "thumb_${message.id}"
             if (thumbnailKey in hydratingMediaIds) return
             hydratingMediaIds += thumbnailKey
-            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            viewModelScope.launch(Dispatchers.IO) {
                 val resolvedThumb = ChatService.resolveVideoThumbnail(message)
                 withContext(Dispatchers.Main) {
                     hydratingMediaIds -= thumbnailKey
@@ -761,7 +903,7 @@ class ConversationSettingsViewModel(
         val previewKey = "thumb_preview_${message.id}"
         if (previewKey in hydratingMediaIds) return
         hydratingMediaIds += previewKey
-        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val thumbnail = ChatService.resolveVideoThumbnail(message)
             withContext(Dispatchers.Main) {
                 hydratingMediaIds -= previewKey
@@ -780,7 +922,7 @@ class ConversationSettingsViewModel(
         val posterKey = "poster_${message.id}"
         if (posterKey in hydratingMediaIds) return
         hydratingMediaIds += posterKey
-        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val poster = ChatVideoPosterGenerator.poster(mediaUrl, message.id)
             withContext(Dispatchers.Main) {
                 hydratingMediaIds -= posterKey
@@ -806,7 +948,7 @@ class ConversationSettingsViewModel(
             completion(message)
             return
         }
-        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val resolved = ChatEncryptedMediaResolver.resolveForMessage(message)
                 withContext(Dispatchers.Main) {
@@ -820,7 +962,7 @@ class ConversationSettingsViewModel(
                     )
                     updateGalleryMessage(updated)
                     conversation?.id?.let { conversationId ->
-                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                        viewModelScope.launch(Dispatchers.IO) {
                             LocalPersistenceService.saveMessagesInBackground(listOf(updated), conversationId, sync = false)
                         }
                     }
@@ -836,8 +978,9 @@ class ConversationSettingsViewModel(
         if (conversation?.isGroup == true) return
         val targetUserId = conversation?.otherParticipantId?.takeIf { it.isNotBlank() } ?: return
         if (currentUserId.isBlank()) return
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             FirestoreService().blockUser(currentUserId, targetUserId)
+            ChatDraftEvents.emit(ChatDraftEvent.ParticipantStateChanged(targetUserId))
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onBlocked() }
         }
     }
@@ -845,7 +988,7 @@ class ConversationSettingsViewModel(
     fun clearConversation(onCleared: () -> Unit = {}) {
         val groupId = conversation?.takeIf { it.isGroup }?.id
         if (groupId != null) {
-            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            viewModelScope.launch(Dispatchers.IO) {
                 runCatching {
                     FirebaseFirestore.getInstance().collection("groupConversations").document(groupId).update(mapOf(
                         "deletedFor" to FieldValue.arrayUnion(currentUserId), "lastDeletedAt.$currentUserId" to FieldValue.serverTimestamp()
@@ -859,7 +1002,7 @@ class ConversationSettingsViewModel(
         }
         val targetUserId = conversation?.otherParticipantId?.takeIf { it.isNotBlank() } ?: return
         if (currentUserId.isBlank()) return
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        viewModelScope.launch(Dispatchers.IO) {
             ChatService.deleteConversationsBetweenUsers(currentUserId, targetUserId)
             conversation?.id?.let { LocalPersistenceService.deleteConversationCacheAsync(it) }
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onCleared() }
@@ -897,7 +1040,10 @@ class ConversationSettingsViewModel(
         )
     }
 
-    companion object { private val LINK = Regex("https?://\\S+", RegexOption.IGNORE_CASE) }
+    companion object {
+        private const val SHARED_MEDIA_PAGE_SIZE = 30
+        private val LINK = Regex("https?://\\S+", RegexOption.IGNORE_CASE)
+    }
 }
 
 @Composable
@@ -912,7 +1058,7 @@ fun ConversationSettingsView(
 ) {
     val colors = rememberAdaptiveColors()
     val context = LocalContext.current
-    val model = remember(conversation.id) { ConversationSettingsViewModel() }
+    val model: ConversationSettingsViewModel = viewModel(key = "conversation-settings:${conversation.id.orEmpty()}")
     MomentsTabBarHidden()
     var tab by remember { mutableStateOf(SharedContentTab.MEDIA) }
     var showStarred by remember { mutableStateOf(false) }
@@ -933,20 +1079,42 @@ fun ConversationSettingsView(
     var showHideChat by remember { mutableStateOf(false) }
     var showLinkAdminOnly by remember { mutableStateOf(false) }
     var showDissolveGroup by remember { mutableStateOf(false) }
-    var showMuteDuration by remember { mutableStateOf(false) }
     var showGroupReport by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val groups by GroupDirectory.groups.collectAsState()
     val groupSnapshot = conversation.id?.let { groups[it] }
     val isGroupAdmin = groupSnapshot?.admins?.contains(FirebaseAuth.getInstance().currentUser?.uid) == true
     val isGroupOwner = groupSnapshot?.owner == FirebaseAuth.getInstance().currentUser?.uid
+    val settingsScrollState = rememberScrollState()
+    val collapseDistancePx = with(LocalDensity.current) { 112.dp.toPx() }
+    val heroCollapsed by remember(settingsScrollState, collapseDistancePx) {
+        derivedStateOf { settingsScrollState.value.toFloat() >= collapseDistancePx * 0.72f }
+    }
+    val settingsDisplayName = if (conversation.isGroup) {
+        groupSnapshot?.name?.trim()?.takeIf { it.isNotEmpty() }
+            ?: conversation.otherParticipantUsername.orEmpty()
+    } else {
+        model.liveOtherParticipantUsername.ifBlank {
+            conversation.otherParticipantUsername.orEmpty()
+        }
+    }
     LaunchedEffect(conversation.id) { model.loadConversationData(conversation, context) }
+
+    BackHandler(onBack = onBack)
 
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().background(colors.chatBackground.first()).statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = colors.primary) }
-                Text(stringResource(R.string.conversation_settings_title), modifier = Modifier.weight(1f), color = colors.primary, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (heroCollapsed && settingsDisplayName.isNotBlank()) settingsDisplayName
+                    else stringResource(R.string.conversation_settings_title),
+                    modifier = Modifier.weight(1f),
+                    color = colors.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Box {
                     IconButton(onClick = { showMenu = true }) {
                         Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = colors.primary)
@@ -1074,18 +1242,11 @@ fun ConversationSettingsView(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(settingsScrollState),
             ) {
                 ConversationSettingsHeader(
                     conversation = conversation,
-                    displayName = if (conversation.isGroup) {
-                        groupSnapshot?.name?.trim()?.takeIf { it.isNotEmpty() }
-                            ?: conversation.otherParticipantUsername.orEmpty()
-                    } else {
-                        model.liveOtherParticipantUsername.ifBlank {
-                            conversation.otherParticipantUsername.orEmpty()
-                        }
-                    },
+                    displayName = settingsDisplayName,
                     avatarURL = if (conversation.isGroup) {
                         groupSnapshot?.image?.trim()?.takeIf { it.isNotEmpty() }
                             ?: conversation.otherParticipantProfileImagePath
@@ -1109,13 +1270,18 @@ fun ConversationSettingsView(
                     },
                     onSearch = onSearchRequested,
                     onToggleMute = {
-                        if (conversation.isGroup && model.notificationsEnabled) {
-                            showMuteDuration = true
-                        } else {
-                            model.toggleNotifications()
-                        }
+                        model.toggleNotifications()
+                    },
+                    onMuteDurationSelected = { until ->
+                        model.muteNotifications(until)
                     },
                     identitySubtitle = groupSnapshot?.groupDescription?.trim()?.takeIf { it.isNotEmpty() },
+                    modifier = Modifier.graphicsLayer {
+                        val fraction = (settingsScrollState.value / collapseDistancePx).coerceIn(0f, 1f)
+                        alpha = 1f - fraction * 0.28f
+                        scaleX = 1f - fraction * 0.08f
+                        scaleY = scaleX
+                    },
                 )
                 SettingsRows(
                     model = model,
@@ -1132,14 +1298,9 @@ fun ConversationSettingsView(
                     },
                     onVanish = { showVanish = true },
                     onPreferences = { showPreferences = true },
-                    onOpenGallery = {
-                        HapticManager.shared.lightImpact()
-                        model.openSharedGallery(ClusterGalleryTab.MEDIA)
-                    },
                 )
-                // ≡ iOS: settingsFooter debajo de vaciar media, antes de Media/Links
-                if (!conversation.isGroup) SettingsFooter(model, colors)
                 SharedContentTabs(tab, { tab = it }, model, colors, onOpenMedia = { model.openMediaForViewing(it) { resolved -> selectedMedia = resolved } })
+                if (!conversation.isGroup) SettingsFooter(model, colors)
             }
         }
 
@@ -1197,6 +1358,9 @@ fun ConversationSettingsView(
                 onHydrateMedia = model::hydrateMediaIfNeeded,
                 isDownloadingMedia = model::isDownloadingMedia,
                 downloadProgress = { model.downloadProgress[it] },
+                canLoadMore = model.canLoadMoreSharedMedia,
+                isLoadingMore = model.isLoadingMoreSharedMedia,
+                onLoadMore = model::loadMoreSharedMedia,
                 onDeleteForMe = { messages -> messages.forEach(model::deleteForMe) },
                 onDeleteForEveryone = { messages -> messages.forEach(model::deleteForEveryone) },
                 detail = { selectedMessage, dismissDetail ->
@@ -1320,37 +1484,6 @@ fun ConversationSettingsView(
         },
         dismissButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable { showDissolveGroup = false }.padding(16.dp)) },
     )
-    if (showMuteDuration) AlertDialog(
-        onDismissRequest = { showMuteDuration = false },
-        title = { Text(stringResource(R.string.conversation_settings_quick_action_mute)) },
-        text = {
-            Column {
-                Text(
-                    stringResource(R.string.groups_mute_8h),
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        showMuteDuration = false
-                        model.muteNotifications(java.util.Date(System.currentTimeMillis() + 8 * 3600_000L))
-                    }.padding(vertical = 12.dp),
-                )
-                Text(
-                    stringResource(R.string.groups_mute_week),
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        showMuteDuration = false
-                        model.muteNotifications(java.util.Date(System.currentTimeMillis() + 7 * 24 * 3600_000L))
-                    }.padding(vertical = 12.dp),
-                )
-                Text(
-                    stringResource(R.string.groups_mute_always),
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        showMuteDuration = false
-                        model.muteNotifications(null)
-                    }.padding(vertical = 12.dp),
-                )
-            }
-        },
-        confirmButton = {},
-        dismissButton = { Text(stringResource(R.string.common_cancel), modifier = Modifier.clickable { showMuteDuration = false }.padding(16.dp)) },
-    )
     if (showHideChat) AlertDialog(
         onDismissRequest = { showHideChat = false },
         title = { Text(stringResource(R.string.conversation_settings_hide)) },
@@ -1473,10 +1606,13 @@ private fun ConversationSettingsHeader(
     onProfile: () -> Unit,
     onSearch: () -> Unit,
     onToggleMute: () -> Unit,
+    onMuteDurationSelected: (java.util.Date?) -> Unit,
     identitySubtitle: String? = null,
+    modifier: Modifier = Modifier,
 ) {
     val isGroup = conversation.isGroup
     var presence by remember { mutableStateOf<PresenceDisplay?>(null) }
+    var showMuteDuration by remember { mutableStateOf(false) }
     DisposableEffect(conversation.otherParticipantId, isGroup) {
         if (isGroup) {
             onDispose { }
@@ -1487,7 +1623,7 @@ private fun ConversationSettingsHeader(
             onDispose { stop() }
         }
     }
-    Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         if (isGroup) {
             GroupChatAvatar(
                 image = avatarURL.orEmpty(),
@@ -1544,16 +1680,53 @@ private fun ConversationSettingsHeader(
                 HapticManager.shared.lightImpact()
                 onSearch()
             }
-            HeaderAction(
-                if (notificationsEnabled) Icons.Default.Notifications else Icons.Default.NotificationsOff,
-                if (notificationsEnabled) {
-                    R.string.conversation_settings_quick_action_mute
-                } else {
-                    R.string.conversation_settings_quick_action_unmute
-                },
-            ) {
-                HapticManager.shared.lightImpact()
-                onToggleMute()
+            Box {
+                HeaderAction(
+                    if (notificationsEnabled) Icons.Default.Notifications else Icons.Default.NotificationsOff,
+                    if (notificationsEnabled) {
+                        R.string.conversation_settings_quick_action_mute
+                    } else {
+                        R.string.conversation_settings_quick_action_unmute
+                    },
+                ) {
+                    HapticManager.shared.lightImpact()
+                    if (isGroup && notificationsEnabled) {
+                        showMuteDuration = true
+                    } else {
+                        onToggleMute()
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = showMuteDuration,
+                    onDismissRequest = { showMuteDuration = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.groups_mute_8h)) },
+                        onClick = {
+                            showMuteDuration = false
+                            onMuteDurationSelected(
+                                java.util.Date(System.currentTimeMillis() + 8 * 3600_000L),
+                            )
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.groups_mute_week)) },
+                        onClick = {
+                            showMuteDuration = false
+                            onMuteDurationSelected(
+                                java.util.Date(System.currentTimeMillis() + 7 * 24 * 3600_000L),
+                            )
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.groups_mute_always)) },
+                        onClick = {
+                            showMuteDuration = false
+                            onMuteDurationSelected(null)
+                        },
+                    )
+                }
             }
         }
     }
@@ -1584,7 +1757,6 @@ private fun SettingsRows(
     onInviteLink: (() -> Unit)?,
     onVanish: () -> Unit,
     onPreferences: () -> Unit,
-    onOpenGallery: () -> Unit,
 ) {
     Column(Modifier.padding(horizontal = 16.dp)) {
         SettingsRow(Icons.Default.Star, R.string.conversation_settings_starred, model.starredMessages.size.takeIf { it > 0 }?.toString() ?: stringResource(R.string.conversation_settings_starred_none), colors, onStarred)
@@ -1611,13 +1783,6 @@ private fun SettingsRows(
             subtitle = stringResource(R.string.conversation_settings_preferences_desc),
             colors = colors,
             action = onPreferences,
-        )
-        SettingsRow(
-            Icons.Default.Image,
-            R.string.conversation_settings_shared_media,
-            null,
-            colors,
-            onOpenGallery,
         )
     }
 }
@@ -1689,14 +1854,66 @@ private fun SharedContentTabs(
     colors: AdaptiveColors,
     onOpenMedia: (SharedMedia) -> Unit,
 ) {
+    val links = remember(model.sharedGalleryMessages) { model.sharedLinks() }
     Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.conversation_settings_shared_media),
+                color = colors.primary,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+                modifier = Modifier.weight(1f),
+            )
+            val hasContent = if (tab == SharedContentTab.MEDIA) {
+                model.sharedMedia.isNotEmpty()
+            } else {
+                links.isNotEmpty()
+            }
+            if (!model.isLoadingSharedContent && hasContent) {
+                Text(
+                    stringResource(R.string.common_view_all),
+                    color = colors.secondary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .clickable {
+                            HapticManager.shared.lightImpact()
+                            model.openSharedGallery(
+                                if (tab == SharedContentTab.MEDIA) ClusterGalleryTab.MEDIA else ClusterGalleryTab.LINKS,
+                            )
+                        }
+                        .padding(vertical = 8.dp),
+                )
+            }
+        }
         // ≡ iOS `.pickerStyle(.segmented)` width 200, centrado — estilo pill perfil
         SharedContentTabPill(selected = tab, onSelect = onTab)
         if (tab == SharedContentTab.MEDIA) {
-            if (model.sharedMedia.isEmpty()) {
+            if (model.isLoadingSharedContent && model.sharedMedia.isEmpty()) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    repeat(2) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            repeat(3) {
+                                Box(
+                                    Modifier
+                                        .weight(1f)
+                                        .height(118.dp)
+                                        .background(colors.tertiary.copy(alpha = 0.10f), RoundedCornerShape(2.dp)),
+                                )
+                            }
+                        }
+                    }
+                }
+            } else if (model.sharedMedia.isEmpty()) {
                 EmptyContent(Icons.Default.Folder, R.string.conversation_settings_media_empty, colors)
             } else {
-                val rows = model.sharedMedia.chunked(3)
+                val rows = model.sharedMedia.take(6).chunked(3)
                 Column(
                     Modifier.fillMaxWidth().padding(horizontal = 2.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -1717,15 +1934,28 @@ private fun SharedContentTabs(
                 }
             }
         } else {
-            val links = model.sharedLinks()
-            if (links.isEmpty()) {
+            if (model.isLoadingSharedContent && links.isEmpty()) {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    repeat(3) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(72.dp)
+                                .background(colors.tertiary.copy(alpha = 0.10f), RoundedCornerShape(14.dp)),
+                        )
+                    }
+                }
+            } else if (links.isEmpty()) {
                 EmptyContent(Icons.Default.Link, R.string.conversation_settings_links_empty, colors)
             } else {
                 Column(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    links.forEach { message ->
+                    links.take(3).forEach { message ->
                         val url = Regex("https?://\\S+", RegexOption.IGNORE_CASE).find(message.content.orEmpty())?.value
                         if (url != null) {
                             LinkPreviewCard(url = url, outgoing = false, embedded = true)
@@ -1830,15 +2060,28 @@ private fun SettingsFooter(model: ConversationSettingsViewModel, colors: Adaptiv
     val received = stringResource(R.string.conversation_settings_messages_received)
     val createdLabel = stringResource(R.string.conversation_settings_created)
     val messagesLabel = stringResource(R.string.conversation_settings_messages)
-    Text(
-        "$createdLabel: ${model.conversationCreatedDate}  •  $messagesLabel: ${model.totalMessages} (${model.sentMessagesCount} $sent, ${model.receivedMessagesCount} $received)",
-        color = colors.tertiary,
-        fontSize = 12.sp,
-        textAlign = TextAlign.Center,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-    )
+            .height(52.dp)
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (model.isLoadingConversationStatistics) {
+            androidx.compose.material3.CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = colors.tertiary,
+            )
+        } else {
+            Text(
+                "$createdLabel: ${model.conversationCreatedDate}  •  $messagesLabel: ${model.totalMessages} (${model.sentMessagesCount} $sent, ${model.receivedMessagesCount} $received)",
+                color = colors.tertiary,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
 }
 
 @Composable
@@ -1984,6 +2227,7 @@ private fun ConversationChatPreferencesView(
     onRequestClearConversation: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    BackHandler(onBack = onDismiss)
     val context = LocalContext.current
     val colors = rememberAdaptiveColors()
     val scope = rememberCoroutineScope()
@@ -2157,6 +2401,7 @@ private fun ConversationVanishModeView(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    BackHandler(onBack = onDismiss)
     val colors = rememberAdaptiveColors()
     MomentsTabBarHidden()
     Column(modifier.fillMaxSize().background(colors.chatBackground.first())) {
