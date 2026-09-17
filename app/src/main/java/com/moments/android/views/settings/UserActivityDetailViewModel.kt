@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.moments.android.MomentsApplication
@@ -15,7 +16,6 @@ import com.moments.android.models.Echo
 import com.moments.android.models.Moment
 import com.moments.android.models.Story
 import com.moments.android.services.firestore.FirestoreService
-import com.moments.android.services.firestore.fetchArchivedMoments
 import com.moments.android.services.firestore.fetchCustomLists
 import com.moments.android.services.firestore.fetchMoments
 import com.moments.android.services.firestore.fetchVisitsWithUsers
@@ -68,11 +68,15 @@ class ActivityInteractionDetailViewModel(
 
     /** Para resolver audiencias custom. */
     var customListNamesById by mutableStateOf<Map<String, String>>(emptyMap()); private set
+    var canLoadMoreArchived by mutableStateOf(false); private set
+    var isLoadingMoreArchived by mutableStateOf(false); private set
 
     private val db: FirebaseFirestore get() = FirebaseFirestore.getInstance()
     private var didLoadOnce = false
     private var reactionsNextCursor: BackendReactionsCursor? = null
     private var commentsNextCursor: BackendCommentsCursor? = null
+    private var archivedLastDocument: DocumentSnapshot? = null
+    private val archivedPageSize = 36L
 
     private fun string(@StringRes res: Int): String =
         MomentsApplication.instance?.getString(res).orEmpty()
@@ -414,10 +418,33 @@ class ActivityInteractionDetailViewModel(
     }
 
     private fun loadArchived(userId: String) {
+        archivedLastDocument = null
+        canLoadMoreArchived = true
+        loadArchivedPage(userId, reset = true)
+    }
+
+    fun loadMoreArchived() {
+        if (category != ActivityInteractionCategory.ARCHIVED) return
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        if (!canLoadMoreArchived || isLoadingMoreArchived) return
+        loadArchivedPage(userId, reset = false)
+    }
+
+    private fun loadArchivedPage(userId: String, reset: Boolean) {
         viewModelScope.launch {
-            runCatching { firestoreService.fetchArchivedMoments(userId) }
-                .onSuccess { archived ->
-                    reactionItems = archived.mapNotNull { moment ->
+            if (!reset) isLoadingMoreArchived = true
+            var query: Query = db.collection("users").document(userId).collection("moments")
+                .whereEqualTo("isArchived", true)
+                .orderBy("archivedAt", Query.Direction.DESCENDING)
+                .limit(archivedPageSize)
+            if (!reset) archivedLastDocument?.let { query = query.startAfter(it) }
+            runCatching { query.get().await() }
+                .onSuccess { snapshot ->
+                    val mapped = snapshot.documents.mapNotNull { doc ->
+                        @Suppress("UNCHECKED_CAST")
+                        val moment = runCatching {
+                            Moment.from(doc.id, doc.data as Map<String, Any?>)
+                        }.getOrNull() ?: return@mapNotNull null
                         val id = moment.id ?: return@mapNotNull null
                         ActivityReactionItem(
                             id = id,
@@ -429,13 +456,18 @@ class ActivityInteractionDetailViewModel(
                             canView = true,
                         )
                     }
+                    reactionItems = if (reset) mapped else (reactionItems + mapped).distinctBy { it.id }
+                    archivedLastDocument = snapshot.documents.lastOrNull()
+                    canLoadMoreArchived = snapshot.size() == archivedPageSize.toInt()
                     commentItems = emptyList()
                     events = emptyList()
                     isLoading = false
+                    isLoadingMoreArchived = false
                 }
                 .onFailure { error ->
                     isLoading = false
-                    errorMessage = if (moments.isEmpty()) error.message else null
+                    isLoadingMoreArchived = false
+                    errorMessage = if (reactionItems.isEmpty()) error.message else null
                 }
         }
     }

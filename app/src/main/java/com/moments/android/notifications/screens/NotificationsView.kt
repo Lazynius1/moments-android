@@ -51,8 +51,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -139,6 +141,7 @@ fun NotificationsScreen(
     var zoomDestination by remember { mutableStateOf<MomentZoomDestination?>(null) }
     var zoomResolvedMoment by remember { mutableStateOf<Moment?>(null) }
     var postProfilePreviewSelection by remember { mutableStateOf<FeedPostProfilePreviewSelection?>(null) }
+    var hiddenNotificationPreviewId by remember { mutableStateOf<String?>(null) }
     val messagingViewModel = remember { MessagingViewModel() }
 
     // System back: primero cierra preview de perfil / zoom de moment; luego la pantalla.
@@ -331,14 +334,17 @@ fun NotificationsScreen(
                         onOpenProfile = onOpenProfile,
                         onModerationReviewTap = { moderationReviewNotification = it },
                         onTapAction = ::handleNotificationTap,
-                        onProfilePreview = { userId, momentId, anchorFrame ->
+                        onProfilePreview = { groupId, userId, momentId, rowFrame ->
+                            hiddenNotificationPreviewId = groupId
                             postProfilePreviewSelection = FeedPostProfilePreviewSelection(
                                 userId = userId,
                                 momentId = momentId,
-                                anchorFrame = anchorFrame,
-                                postFrame = Rect.Zero,
+                                anchorFrame = rowFrame,
+                                postFrame = rowFrame,
+                                anchorsToSource = true,
                             )
                         },
+                        hiddenPreviewRowId = hiddenNotificationPreviewId,
                     )
                 }
             }
@@ -373,6 +379,9 @@ fun NotificationsScreen(
                     onOpenProfile(userId)
                 },
                 onPresentMessages = { LegacyNavigationBridge.showMessages() },
+                onPresentedChange = { presented ->
+                    if (!presented) hiddenNotificationPreviewId = null
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(5001f),
@@ -496,7 +505,8 @@ private fun NotificationsList(
     onOpenProfile: (String) -> Unit,
     onModerationReviewTap: (MomentsNotification) -> Unit,
     onTapAction: (NotificationGroup) -> Unit,
-    onProfilePreview: (userId: String, momentId: String, anchorFrame: Rect) -> Unit,
+    onProfilePreview: (groupId: String, userId: String, momentId: String, rowFrame: Rect) -> Unit,
+    hiddenPreviewRowId: String?,
 ) {
     val listState = rememberLazyListState()
     val shouldLoadMore by remember(listState) {
@@ -507,7 +517,12 @@ private fun NotificationsList(
             layoutInfo.totalItemsCount > 0 && lastVisibleIndex >= prefetchIndex
         }
     }
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { clip = false },
+    ) {
         item {
             NotificationTabBar(
                 selectedTab = selectedTab,
@@ -566,7 +581,8 @@ private fun NotificationsList(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(canvas),
+                                .background(canvas)
+                                .alpha(if (hiddenPreviewRowId == group.id) 0f else 1f),
                         ) {
                             EnhancedNotificationRow(
                                 group = group,
@@ -576,7 +592,9 @@ private fun NotificationsList(
                                 onShowGroupedFollowers = onShowGroupedFollowers,
                                 onModerationReviewTap = onModerationReviewTap,
                                 onOpenProfile = onOpenProfile,
-                                onProfilePreview = onProfilePreview,
+                                onProfilePreview = { userId, momentId, rowFrame ->
+                                    onProfilePreview(group.id, userId, momentId, rowFrame)
+                                },
                             )
                         }
                     }

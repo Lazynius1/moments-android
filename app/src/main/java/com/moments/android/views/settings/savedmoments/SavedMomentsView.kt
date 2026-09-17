@@ -73,6 +73,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.roundToPx
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
@@ -361,6 +362,9 @@ fun SavedMomentsView(
                                     }
                                 }
                             },
+                            canLoadMore = viewModel.canLoadMore,
+                            isLoadingMore = viewModel.isLoadingMore,
+                            onLoadMore = viewModel::loadMoreSavedMoments,
                             chrome = {
                                 Column(
                                     Modifier
@@ -431,6 +435,8 @@ fun SavedMomentsView(
                                             if (!isSelectionMode) isSelectionMode = true
                                             toggleSelection(moment)
                                         },
+                                        canLoadMore = viewModel.canLoadMore,
+                                        isLoadingMore = viewModel.isLoadingMore,
                                     )
                                 }
                             },
@@ -596,6 +602,9 @@ private fun SavedMomentsToolbar(
 @Composable
 private fun SavedMomentsToolbarFilterScroll(
     onRefresh: suspend () -> Unit,
+    canLoadMore: Boolean = false,
+    isLoadingMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
     chrome: @Composable () -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -605,8 +614,21 @@ private fun SavedMomentsToolbarFilterScroll(
     var chromeHeightPx by remember { mutableIntStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
     val chromeHeight = with(density) { chromeHeightPx.toDp() }
+    val loadMoreThresholdPx = with(density) { 400.dp.roundToPx() }
     val isDark = isSystemInDarkTheme()
     val canvas = ProfileMomentZoomNavigation.canvasBackground(isDark)
+
+    LaunchedEffect(
+        scrollState.value,
+        scrollState.maxValue,
+        canLoadMore,
+        isLoadingMore,
+    ) {
+        if (!canLoadMore || isLoadingMore) return@LaunchedEffect
+        if (scrollState.maxValue == 0 || scrollState.maxValue - scrollState.value < loadMoreThresholdPx) {
+            onLoadMore()
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
         PullToRefreshBox(
@@ -663,6 +685,8 @@ private fun SavedMomentsScrollGrid(
     isMuted: (Moment) -> Boolean,
     onTap: (Moment) -> Unit,
     onLongPress: (Moment) -> Unit,
+    canLoadMore: Boolean = false,
+    isLoadingMore: Boolean = false,
 ) {
     BoxWithConstraints(
         Modifier
@@ -711,6 +735,16 @@ private fun SavedMomentsScrollGrid(
                     repeat(3 - row.size) {
                         Spacer(Modifier.width(side).aspectRatio(1f))
                     }
+                }
+            }
+            if (canLoadMore || isLoadingMore) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 }
             }
         }

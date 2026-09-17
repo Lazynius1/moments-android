@@ -854,6 +854,7 @@ fun FeedView(
                 onPresentedChange = { presented ->
                     if (!presented) hiddenPostPreviewMomentId = null
                 },
+                reserveFloatingTabBar = true,
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(1601f),

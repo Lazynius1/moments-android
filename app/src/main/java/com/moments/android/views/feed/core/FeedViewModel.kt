@@ -723,7 +723,7 @@ class FeedViewModel : ViewModel() {
     }
 
     fun listenForCommentUpdates(momentId: String, authorId: String) {
-        if (commentListeners.containsKey(momentId) || momentListeners.containsKey(momentId)) return
+        if (momentListeners.containsKey(momentId)) return
         if (isPausedForUploads) return
 
         val currentUserId = viewerId ?: return
@@ -761,15 +761,7 @@ class FeedViewModel : ViewModel() {
                 }
             momentListeners[momentId] = momentListener
 
-            if (commentListeners.containsKey(momentId)) return@launch
-            val commentListener = FirebaseFirestore.getInstance()
-                .collection("users").document(authorId)
-                .collection("moments").document(momentId)
-                .collection("comments")
-                .addSnapshotListener { _, _ ->
-                    // iOS postea NotificationCenter "CommentAdded"; cards escuchan vía state.
-                }
-            commentListeners[momentId] = commentListener
+            // El recuento de comentarios se lee de `commentCount` en el documento del momento.
         }
     }
 

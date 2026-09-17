@@ -212,17 +212,17 @@ fun ReelVideoView(
     }
 
     fun loadCommentCount() {
+        commentCount = video.moment.commentCount
         val momentId = video.moment.id ?: return
         scope.launch {
             runCatching {
                 val snap = FirebaseFirestore.getInstance()
                     .collection("users").document(video.moment.authorId)
                     .collection("moments").document(momentId)
-                    .collection("comments")
                     .get()
                     .await()
-                commentCount = snap.size()
-            }
+                (snap.getLong("commentCount") ?: 0L).toInt()
+            }.onSuccess { commentCount = it }
         }
     }
 
@@ -391,6 +391,10 @@ fun ReelVideoView(
         }
         FollowStateStore.addListener(listener)
         onDispose { FollowStateStore.removeListener(listener) }
+    }
+
+    LaunchedEffect(video.moment.commentCount) {
+        commentCount = video.moment.commentCount
     }
 
     LaunchedEffect(isCurrentVideo, video.id) {

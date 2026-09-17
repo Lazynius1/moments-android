@@ -21,7 +21,7 @@ import java.util.Locale
 
 /**
  * Port de `ArchiveViewModel` en `archived stories.swift`.
- * Query: `users/{uid}/stories` where `expirationDate < now`, order `timestamp` DESC, limit 100.
+ * Query: `users/{uid}/stories` where `expirationDate < now`, order `timestamp` DESC, páginas de 36.
  */
 class ArchiveViewModel : ViewModel() {
     var groupedStories by mutableStateOf<Map<String, List<Story>>>(emptyMap())
@@ -31,6 +31,8 @@ class ArchiveViewModel : ViewModel() {
     var isLoadingMore by mutableStateOf(false)
         private set
     var canLoadMore by mutableStateOf(true)
+        private set
+    var isFillingAll by mutableStateOf(false)
         private set
 
     private val firestore = FirestoreService()
@@ -48,6 +50,7 @@ class ArchiveViewModel : ViewModel() {
         loadJob?.cancel()
         lastDocument = null
         canLoadMore = true
+        isFillingAll = false
         groupedStories = emptyMap()
         loadJob = viewModelScope.launch {
             isLoading = true
@@ -63,9 +66,14 @@ class ArchiveViewModel : ViewModel() {
 
     fun loadAllArchivedStories() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        isFillingAll = true
         loadJob = viewModelScope.launch {
-            while (canLoadMore) {
-                if (isLoading) kotlinx.coroutines.delay(100) else loadPage(userId, reset = false)
+            try {
+                while (canLoadMore) {
+                    if (isLoading) kotlinx.coroutines.delay(100) else loadPage(userId, reset = false)
+                }
+            } finally {
+                isFillingAll = false
             }
         }
     }

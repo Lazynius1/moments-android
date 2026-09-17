@@ -528,6 +528,7 @@ fun ModernPostCardView(
     onNearEnd: () -> Unit = {},
     onAuthorAvatarTap: ((authorId: String, hasStory: Boolean) -> Unit)? = null,
     onAuthorAvatarLongPress: ((authorId: String, avatarFrame: Rect, postFrame: Rect) -> Unit)? = null,
+    hidesAuthorAvatar: Boolean = false,
     onPeek: ((imageUrl: String, ratio: Float, isPressing: Boolean) -> Unit)? = null,
     onTagTap: ((String) -> Unit)? = null,
     authorHasStory: Boolean = false,
@@ -741,6 +742,7 @@ fun ModernPostCardView(
                         callback(authorId, avatarFrame, postFrameInWindow)
                     }
                 },
+                hidesAuthorAvatar = hidesAuthorAvatar,
             )
         }
 
@@ -911,6 +913,7 @@ private fun PostHeader(
     onOpenLocation: (String, com.moments.android.models.Moment.LocationCoordinate?) -> Unit,
     onAuthorAvatarTap: (hasStory: Boolean) -> Unit,
     onAuthorAvatarLongPress: ((authorId: String, Rect) -> Unit)? = null,
+    hidesAuthorAvatar: Boolean = false,
 ) {
     val colors = rememberFeedAdaptiveColors()
     val context = LocalContext.current
@@ -962,7 +965,7 @@ private fun PostHeader(
                 .graphicsLayer {
                     scaleX = pressScale
                     scaleY = pressScale
-                    alpha = pressAlpha
+                    alpha = if (hidesAuthorAvatar) 0f else pressAlpha
                 }
                 .then(if (onAuthorAvatarLongPress != null) pressClassifier else Modifier),
         ) {

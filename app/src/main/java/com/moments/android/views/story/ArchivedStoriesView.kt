@@ -332,6 +332,7 @@ fun ArchivedStoriesView(
                                 LaunchedEffect(Unit) { viewModel.loadAllArchivedStories() }
                                 ArchiveMapView(
                                     allStories = storiesForGrid,
+                                    isFillingArchive = viewModel.isLoadingMore || viewModel.isFillingAll,
                                     onOpenPin = { pinStories ->
                                         if (pinStories.isNotEmpty()) {
                                             viewerInitialIndex = 0
@@ -559,6 +560,7 @@ private fun ArchiveStorySquareCard(
 @Composable
 private fun ArchiveMapView(
     allStories: List<Story>,
+    isFillingArchive: Boolean,
     onOpenPin: (List<Story>) -> Unit,
 ) {
     val context = LocalContext.current
@@ -675,6 +677,24 @@ private fun ArchiveMapView(
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
+                )
+            }
+        }
+
+        if (isFillingArchive) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(0.28f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = Color.White,
                 )
             }
         }
@@ -804,6 +824,7 @@ private fun ArchiveCalendarView(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             row.forEach { cell ->
+                                key(cell.id) {
                                 val dayNumber = cell.dayNumber
                                 Box(
                                     Modifier
@@ -859,6 +880,7 @@ private fun ArchiveCalendarView(
                                             )
                                         }
                                     }
+                                }
                                 }
                             }
                             repeat(7 - row.size) {
@@ -1033,6 +1055,7 @@ private data class ArchiveCalendarMonthSection(
 }
 
 private data class ArchiveCalendarDayCell(
+    val id: String,
     val dayNumber: Int?,
     val bucket: ArchiveCalendarDayBucket?,
 )
@@ -1124,12 +1147,23 @@ private fun archiveCalendarCells(monthSection: ArchiveCalendarMonthSection): Lis
     }
 
     val cells = mutableListOf<ArchiveCalendarDayCell>()
-    repeat(leadingBlanks) { cells.add(ArchiveCalendarDayCell(dayNumber = null, bucket = null)) }
-    for (day in 1..daysInMonth) {
-        cells.add(ArchiveCalendarDayCell(dayNumber = day, bucket = bucketsByDay[day]))
+    val monthId = monthSection.id
+    repeat(leadingBlanks) { index ->
+        cells.add(ArchiveCalendarDayCell(id = "$monthId-lead-$index", dayNumber = null, bucket = null))
     }
+    for (day in 1..daysInMonth) {
+        cells.add(
+            ArchiveCalendarDayCell(
+                id = "$monthId-day-$day",
+                dayNumber = day,
+                bucket = bucketsByDay[day],
+            ),
+        )
+    }
+    var trailing = 0
     while (cells.size % 7 != 0) {
-        cells.add(ArchiveCalendarDayCell(dayNumber = null, bucket = null))
+        cells.add(ArchiveCalendarDayCell(id = "$monthId-trail-$trailing", dayNumber = null, bucket = null))
+        trailing += 1
     }
     return cells
 }

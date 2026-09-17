@@ -73,6 +73,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.roundToPx
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.moments.android.R
@@ -680,23 +681,44 @@ fun ActivityInteractionDetailView(
                             ActivityInteractionCategory.REACTIONS,
                             ActivityInteractionCategory.TAGS,
                             ActivityInteractionCategory.ARCHIVED,
-                            -> if (reactionItems.isEmpty()) empty()
-                            else ReactionsGrid(
-                                items = reactionItems,
-                                category = category,
-                                isSelectionMode = isSelectionMode,
-                                selectedIds = selectedIds,
-                                onToggle = { toggle(it, selectedIds) { s -> selectedIds = s } },
-                                onOpen = ::openActivityMomentZoom,
-                                onLongPress = ::enterSelectionWith,
-                                allowLongPress = category == ActivityInteractionCategory.ARCHIVED,
-                                longPressActivatedItemId = longPressActivatedItemId,
-                                onClearLongPress = { longPressActivatedItemId = null },
-                                dragEnabled = false,
-                                onDragLocation = { _, _, _, _ -> },
-                                onDragEnd = {},
-                                viewportHeightFraction = configuration.screenHeightDp * 0.62f,
-                            )
+                            -> {
+                                if (category == ActivityInteractionCategory.ARCHIVED) {
+                                    val loadMoreThresholdPx = with(density) { 400.dp.roundToPx() }
+                                    LaunchedEffect(
+                                        scrollState.value,
+                                        scrollState.maxValue,
+                                        viewModel.canLoadMoreArchived,
+                                        viewModel.isLoadingMoreArchived,
+                                        reactionItems.size,
+                                    ) {
+                                        if (!viewModel.canLoadMoreArchived || viewModel.isLoadingMoreArchived) return@LaunchedEffect
+                                        if (scrollState.maxValue == 0 ||
+                                            scrollState.maxValue - scrollState.value < loadMoreThresholdPx
+                                        ) {
+                                            viewModel.loadMoreArchived()
+                                        }
+                                    }
+                                }
+                                if (reactionItems.isEmpty()) empty()
+                                else ReactionsGrid(
+                                    items = reactionItems,
+                                    category = category,
+                                    isSelectionMode = isSelectionMode,
+                                    selectedIds = selectedIds,
+                                    onToggle = { toggle(it, selectedIds) { s -> selectedIds = s } },
+                                    onOpen = ::openActivityMomentZoom,
+                                    onLongPress = ::enterSelectionWith,
+                                    allowLongPress = category == ActivityInteractionCategory.ARCHIVED,
+                                    longPressActivatedItemId = longPressActivatedItemId,
+                                    onClearLongPress = { longPressActivatedItemId = null },
+                                    dragEnabled = false,
+                                    onDragLocation = { _, _, _, _ -> },
+                                    onDragEnd = {},
+                                    viewportHeightFraction = configuration.screenHeightDp * 0.62f,
+                                    canLoadMore = category == ActivityInteractionCategory.ARCHIVED && viewModel.canLoadMoreArchived,
+                                    isLoadingMore = viewModel.isLoadingMoreArchived,
+                                )
+                            }
                             ActivityInteractionCategory.COMMENTS -> if (commentItems.isEmpty()) empty()
                             else CommentsList(
                                 items = commentItems,
@@ -1603,6 +1625,8 @@ private fun ReactionsGrid(
     onDragLocation: (Offset, Float, Float, Float) -> Unit,
     onDragEnd: () -> Unit,
     viewportHeightFraction: Float,
+    canLoadMore: Boolean = false,
+    isLoadingMore: Boolean = false,
 ) {
     val overlay = when (category) {
         ActivityInteractionCategory.REACTIONS, ActivityInteractionCategory.TAGS -> ActivityOverlayBadgeStyle.REACTION_DISCREET
@@ -1677,6 +1701,16 @@ private fun ReactionsGrid(
                     repeat(3 - row.size) {
                         Spacer(Modifier.width(side).height(side))
                     }
+                }
+            }
+            if (canLoadMore || isLoadingMore) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 14.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 }
             }
         }

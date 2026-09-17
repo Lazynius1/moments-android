@@ -1,9 +1,5 @@
 package com.moments.android.views.feed.core.sections
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -281,18 +277,9 @@ fun FeedListSection(
                         val isProtected = (moment.audience?.lowercase() ?: "") != "everyone"
                         val isHiddenForPreview =
                             !hiddenMomentId.isNullOrEmpty() && moment.id == hiddenMomentId
-                        val hideAlpha by animateFloatAsState(
-                            targetValue = if (isHiddenForPreview) 0f else 1f,
-                            animationSpec = when {
-                                MotionPolicy.reduceMotion -> tween(0)
-                                isHiddenForPreview -> spring(dampingRatio = 0.84f, stiffness = 380f)
-                                else -> tween(durationMillis = 120, easing = FastOutSlowInEasing)
-                            },
-                            label = "hiddenPostPreviewAlpha",
-                        )
                         LaunchedEffect(moment.id) { prefetchUpcoming(index) }
                         Column(Modifier.fillMaxWidth()) {
-                            Box(Modifier.graphicsLayer { alpha = hideAlpha }) {
+                            Box {
                                 ScreenshotProtectedView(
                                     isProtected = isProtected,
                                     containsHardwareVideo = moment.hasHardwareVideo,
@@ -323,6 +310,7 @@ fun FeedListSection(
                                                 callback(userId, moment.id, avatarFrame, postFrame)
                                             }
                                         },
+                                        hidesAuthorAvatar = isHiddenForPreview,
                                         availableHeight = availableHeightPx,
                                         reelsVideos = feedReelsVideos,
                                     )

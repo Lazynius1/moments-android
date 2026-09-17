@@ -1,5 +1,8 @@
 package com.moments.android.notifications.row
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,8 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -102,6 +108,12 @@ fun EnhancedNotificationRow(
     val opensContentOnBodyTap = !opensSenderProfileOnTap && !isModeration
     val mostRecentSenderId = senderIds.firstOrNull().orEmpty()
     val supportsRowProfilePreview = !isModeration && mostRecentSenderId.isNotEmpty() && onProfilePreview != null
+    val isRowLifted = supportsRowProfilePreview && isPressed
+    val liftScale by animateFloatAsState(
+        targetValue = if (isRowLifted) 1.07f else 1f,
+        animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
+        label = "notificationRowLift",
+    )
     val leadingInset = if (displaySenderIds.size > 1) {
         NotificationRowMetrics.stackedRowWidthDp.dp + 16.dp
     } else {
@@ -118,11 +130,12 @@ fun EnhancedNotificationRow(
     // ≡ canvas de NotificationsView (0B1215 / FAF9F6) — no Transparent (tapaba el swipe rojo)
     val canvas = if (isDark) FeedInk else FeedCanvas
     val rowBackground = when {
+        isRowLifted -> canvas
         group.isUnread -> if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.04f)
         else -> Color.Transparent
     }
     val bodyPressHighlight =
-        if (isPressed) {
+        if (!supportsRowProfilePreview && isPressed) {
             if (isDark) Color.White.copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.04f)
         } else {
             Color.Transparent
@@ -146,6 +159,13 @@ fun EnhancedNotificationRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .zIndex(if (isRowLifted) 8f else 0f)
+            .graphicsLayer {
+                scaleX = liftScale
+                scaleY = liftScale
+                shadowElevation = if (isRowLifted) 22.dp.toPx() else 0f
+                clip = false
+            }
             .background(canvas),
     ) {
         Row(
@@ -274,7 +294,8 @@ fun EnhancedNotificationRow(
                 .fillMaxWidth()
                 .padding(start = leadingInset)
                 .height(0.5.dp)
-                .background(if (isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.06f)),
+                .background(if (isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.06f))
+                .alpha(if (isRowLifted) 0f else 1f),
         )
     }
 }

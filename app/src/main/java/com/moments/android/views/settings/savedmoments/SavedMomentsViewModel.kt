@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.Query
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.models.Moment
@@ -47,6 +49,10 @@ class SavedMomentsViewModel : ViewModel() {
 
     var error by mutableStateOf<Throwable?>(null)
         private set
+    var canLoadMore by mutableStateOf(false)
+        private set
+    var isLoadingMore by mutableStateOf(false)
+        private set
 
     private val firestoreService = FirestoreService()
     private val privacyService = PrivacyService
@@ -55,6 +61,8 @@ class SavedMomentsViewModel : ViewModel() {
     private var loadJob: Job? = null
     private var loadGeneration = 0
     private var dataOwnerId: String? = null
+    private var lastDocument: DocumentSnapshot? = null
+    private val pageSize = 24L
 
     fun loadSavedMoments(completion: (Throwable?) -> Unit = {}) {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: run {
@@ -73,6 +81,8 @@ class SavedMomentsViewModel : ViewModel() {
             mutedUserIds = emptySet()
             dataOwnerId = userId
         }
+        lastDocument = null
+        canLoadMore = true
         isLoading = true
         error = null
 
@@ -87,35 +97,8 @@ class SavedMomentsViewModel : ViewModel() {
             }
 
             try {
-                val snapshot = firestoreService.db.collection("users")
-                    .document(userId)
-                    .collection("savedMoments")
-                    .get()
-                    .await()
-
-                if (generation != loadGeneration || FirebaseAuth.getInstance().currentUser?.uid != userId) return@launch
-                val momentIds = snapshot.documents.map { it.id }
-                withContext(Dispatchers.Main) {
-                    savedMomentIds = momentIds
-                }
-
-                if (momentIds.isEmpty()) {
-                    withContext(Dispatchers.Main) {
-                        moments = emptyList()
-                        visibilityByMomentId.clear()
-                        isLoading = false
-                    }
-                    completion(null)
-                    return@launch
-                }
-
-                val cachedAuthors = moments.associate { it.id to it.authorId }
-                val authors = snapshot.documents.mapNotNull { document ->
-                    (document.getString("authorId") ?: cachedAuthors[document.id])
-                        ?.takeIf { it.isNotBlank() }?.let { document.id to it }
-                }.toMap()
-                val loadError = fetchSavedMomentsDirectly(momentIds, authors, userId, generation)
-                withContext(Dispatchers.Main) { completion(loadError) }
+                loadSavedPage(userId, generation, reset = true)
+                withContext(Dispatchers.Main) { completion(error) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -123,14 +106,79 @@ class SavedMomentsViewModel : ViewModel() {
                     if (generation != loadGeneration || FirebaseAuth.getInstance().currentUser?.uid != userId) return@withContext
                     error = e
                     isLoading = false
+                    isLoadingMore = false
                 }
                 completion(e)
             }
         }
     }
 
+    fun loadMoreSavedMoments() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        if (!canLoadMore || isLoading || isLoadingMore) return
+        val generation = loadGeneration
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { loadSavedPage(userId, generation, reset = false) }
+        }
+    }
+
+    private suspend fun loadSavedPage(userId: String, generation: Int, reset: Boolean) {
+        if (!reset) {
+            withContext(Dispatchers.Main) { isLoadingMore = true }
+        }
+        var query = firestoreService.db.collection("users")
+            .document(userId)
+            .collection("savedMoments")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .limit(pageSize)
+        if (!reset) lastDocument?.let { query = query.startAfter(it) }
+        val snapshot = query.get().await()
+        if (generation != loadGeneration || FirebaseAuth.getInstance().currentUser?.uid != userId) return
+        val documents = snapshot.documents
+        val momentIds = documents.map { it.id }
+        val cachedAuthors = moments.associate { it.id to it.authorId }
+        val missingStoredAuthor = mutableListOf<String>()
+        val authorsById = documents.mapNotNull { document ->
+            val stored = document.getString("authorId")
+            when {
+                !stored.isNullOrBlank() -> document.id to stored
+                cachedAuthors[document.id]?.isNotBlank() == true -> {
+                    missingStoredAuthor += document.id
+                    document.id to cachedAuthors[document.id]!!
+                }
+                else -> null
+            }
+        }.toMap()
+        val loadError = fetchSavedMomentsDirectly(
+            momentIds = momentIds,
+            authorsById = authorsById,
+            viewerId = userId,
+            generation = generation,
+            reset = reset,
+            lastSnapshotDoc = documents.lastOrNull(),
+            pageCount = documents.size,
+            missingStoredAuthor = missingStoredAuthor,
+        )
+        if (generation == loadGeneration) {
+            withContext(Dispatchers.Main) {
+                error = loadError
+                isLoading = false
+                isLoadingMore = false
+            }
+        }
+    }
+
     /** Exact document paths for new bookmarks; bounded compatibility lookup for old ones. */
-    private suspend fun fetchSavedMomentsDirectly(momentIds: List<String>, authorsById: Map<String, String>, viewerId: String, generation: Int): Throwable? {
+    private suspend fun fetchSavedMomentsDirectly(
+        momentIds: List<String>,
+        authorsById: Map<String, String>,
+        viewerId: String,
+        generation: Int,
+        reset: Boolean,
+        lastSnapshotDoc: DocumentSnapshot?,
+        pageCount: Int,
+        missingStoredAuthor: List<String>,
+    ): Throwable? {
         val foundMoments = mutableListOf<Moment>()
         var firstError: Throwable? = null
         for (batch in authorsById.entries.chunked(6)) {
@@ -152,28 +200,41 @@ class SavedMomentsViewModel : ViewModel() {
                     .onFailure { firstError = firstError ?: it }
             }
         }
+        foundMoments.filter { it.id in missingStoredAuthor }.forEach { moment ->
+            moment.id?.let { migrateSavedAuthorId(viewerId, it, moment.authorId) }
+        }
         val legacyIds = momentIds.toSet() - authorsById.keys
         if (legacyIds.isNotEmpty()) {
             for (batch in fetchActiveUsers().chunked(6)) {
-                foundMoments += coroutineScope {
+                val legacyMoments = coroutineScope {
                     batch.map { author -> async { fetchMomentsFromUser(author).filter { it.id in legacyIds } } }
                         .awaitAll().flatten()
                 }
+                foundMoments += legacyMoments
+                legacyMoments.forEach { moment ->
+                    moment.id?.let { migrateSavedAuthorId(viewerId, it, moment.authorId) }
+                }
             }
         }
-        // Unknown is not deleted: network failures, permissions and the legacy lookup
-        // cannot prove that a saved publication no longer exists.
-        firstError?.let { if (foundMoments.isEmpty()) throw it }
+        firstError?.let { if (foundMoments.isEmpty() && reset) throw it }
         if (generation != loadGeneration || FirebaseAuth.getInstance().currentUser?.uid != viewerId) return null
-        val sortedMoments = foundMoments.sortedByDescending { it.timestamp }
         withContext(Dispatchers.Main) {
             if (generation != loadGeneration || FirebaseAuth.getInstance().currentUser?.uid != viewerId) return@withContext
-            moments = sortedMoments
-            error = firstError
-            isLoading = false
+            lastDocument = lastSnapshotDoc
+            canLoadMore = pageCount == pageSize.toInt()
+            savedMomentIds = if (reset) momentIds else (savedMomentIds + momentIds).distinct()
+            val merged = if (reset) foundMoments else moments + foundMoments
+            moments = merged.distinctBy { it.id }.sortedByDescending { it.timestamp }
         }
-        validateVisibilityForLoadedMoments(sortedMoments)
+        validateVisibilityForLoadedMoments(foundMoments, replacing = reset)
         return firstError
+    }
+
+    private fun migrateSavedAuthorId(userId: String, momentId: String, authorId: String) {
+        if (momentId.isBlank() || authorId.isBlank()) return
+        firestoreService.db.collection("users").document(userId)
+            .collection("savedMoments").document(momentId)
+            .set(mapOf("authorId" to authorId), com.google.firebase.firestore.SetOptions.merge())
     }
 
     private suspend fun fetchMomentsFromUser(userId: String): List<Moment> =
@@ -286,24 +347,31 @@ class SavedMomentsViewModel : ViewModel() {
         loadSavedMoments()
     }
 
-    private fun validateVisibilityForLoadedMoments(moments: List<Moment>) {
+    private fun validateVisibilityForLoadedMoments(moments: List<Moment>, replacing: Boolean = true) {
         val viewerId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val token = UUID.randomUUID().toString()
-        visibilityValidationToken = token
+        if (replacing) visibilityValidationToken = token
 
         viewModelScope.launch(Dispatchers.IO) {
             val result = coroutineScope {
                 moments.mapNotNull { moment ->
                     val momentId = moment.id ?: return@mapNotNull null
+                    if (mutedUserIds.contains(moment.authorId)) {
+                        return@mapNotNull async { momentId to false }
+                    }
                     async {
                         momentId to privacyService.canUserViewMomentEnhanced(moment, viewerId)
                     }
                 }.awaitAll().toMap()
             }
             withContext(Dispatchers.Main) {
-                if (visibilityValidationToken != token) return@withContext
-                visibilityByMomentId.clear()
-                visibilityByMomentId.putAll(result)
+                if (replacing) {
+                    if (visibilityValidationToken != token) return@withContext
+                    visibilityByMomentId.clear()
+                    visibilityByMomentId.putAll(result)
+                } else {
+                    visibilityByMomentId.putAll(result)
+                }
             }
         }
     }
