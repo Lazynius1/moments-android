@@ -27,6 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -48,6 +51,8 @@ import com.moments.android.notifications.core.NotificationsViewModel
 import com.moments.android.notifications.core.normalizedCommentPreview
 import com.moments.android.notifications.core.uniqueSenderIds
 import com.moments.android.notifications.row.EnhancedNotificationRowFollow.resolveSenderUsername
+import com.moments.android.utilities.HapticManager
+import com.moments.android.views.messaging.components.chatMessagePressClassifier
 import com.moments.android.views.story.StoryRingLayout
 import com.moments.android.notifications.row.EnhancedNotificationRowMessages.messageForGroup
 import com.moments.android.utilities.MomentsFormat
@@ -67,9 +72,12 @@ fun EnhancedNotificationRow(
     onShowGroupedFollowers: ((NotificationGroup) -> Unit)? = null,
     onModerationReviewTap: ((MomentsNotification) -> Unit)? = null,
     onOpenProfile: ((String) -> Unit)? = null,
+    /** Long-press de la fila → preview del actor más reciente (como feed). */
+    onProfilePreview: ((userId: String, momentId: String, anchorFrame: Rect) -> Unit)? = null,
 ) {
     val first = group.notifications.firstOrNull() ?: return
     var isPressed by remember { mutableStateOf(false) }
+    var rowAnchorFrame by remember { mutableStateOf(Rect.Zero) }
     var senderUsernameOverride by remember(group.id) { mutableStateOf<String?>(null) }
     val senderIds = remember(group) { uniqueSenderIds(group) }
     // ≡ displaySenderIds: 3+ → solo el más reciente; si no, hasta 2
@@ -90,6 +98,10 @@ fun EnhancedNotificationRow(
         NotificationType.REQUEST_ACCEPTED,
     )
     val isModeration = first.type == NotificationType.MEDIA_MODERATION
+    // ≡ iOS opensContentOnBodyTap: cuerpo abre contenido; social solo nick/foto.
+    val opensContentOnBodyTap = !opensSenderProfileOnTap && !isModeration
+    val mostRecentSenderId = senderIds.firstOrNull().orEmpty()
+    val supportsRowProfilePreview = !isModeration && mostRecentSenderId.isNotEmpty() && onProfilePreview != null
     val leadingInset = if (displaySenderIds.size > 1) {
         NotificationRowMetrics.stackedRowWidthDp.dp + 16.dp
     } else {
@@ -105,10 +117,25 @@ fun EnhancedNotificationRow(
     }
     // ≡ canvas de NotificationsView (0B1215 / FAF9F6) — no Transparent (tapaba el swipe rojo)
     val canvas = if (isDark) FeedInk else FeedCanvas
-    val highlight = when {
-        isPressed -> if (isDark) Color.White.copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.04f)
+    val rowBackground = when {
         group.isUnread -> if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.04f)
         else -> Color.Transparent
+    }
+    val bodyPressHighlight =
+        if (isPressed) {
+            if (isDark) Color.White.copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.04f)
+        } else {
+            Color.Transparent
+        }
+
+    fun openMostRecentProfilePreview() {
+        if (!supportsRowProfilePreview) return
+        HapticManager.shared.mediumImpact()
+        onProfilePreview?.invoke(
+            mostRecentSenderId,
+            first.momentId?.trim().orEmpty(),
+            rowAnchorFrame,
+        )
     }
 
     // ≡ resolveSenderDisplayData (onAppear)
@@ -124,26 +151,8 @@ fun EnhancedNotificationRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(highlight)
-                .pointerInput(opensSenderProfileOnTap, displaySenderIds, group) {
-                    detectTapGestures(
-                        onPress = {
-                            isPressed = true
-                            try {
-                                awaitRelease()
-                            } finally {
-                                isPressed = false
-                            }
-                        },
-                        onTap = {
-                            if (opensSenderProfileOnTap && displaySenderIds.isNotEmpty()) {
-                                onOpenProfile?.invoke(displaySenderIds.first())
-                            } else {
-                                onTapAction()
-                            }
-                        },
-                    )
-                }
+                .background(rowBackground)
+                .onGloballyPositioned { rowAnchorFrame = it.boundsInWindow() }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -167,7 +176,37 @@ fun EnhancedNotificationRow(
 
             Spacer(Modifier.width(12.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
+            // Cuerpo: tap → contenido (si aplica); long-press → preview del más reciente.
+            // Trailing (Seguir/Ver/thumb) fuera del gesto.
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(bodyPressHighlight)
+                    .then(
+                        when {
+                            supportsRowProfilePreview -> Modifier.chatMessagePressClassifier(
+                                onPressingChanged = { isPressed = it },
+                                onTap = if (opensContentOnBodyTap) onTapAction else null,
+                                onLongPress = { openMostRecentProfilePreview() },
+                                childHandlesTap = true,
+                            )
+                            opensContentOnBodyTap -> Modifier.pointerInput(group.id) {
+                                detectTapGestures(
+                                    onPress = {
+                                        isPressed = true
+                                        try {
+                                            awaitRelease()
+                                        } finally {
+                                            isPressed = false
+                                        }
+                                    },
+                                    onTap = { onTapAction() },
+                                )
+                            }
+                            else -> Modifier
+                        },
+                    ),
+            ) {
                 ClickableText(
                     text = message,
                     style = TextStyle(
@@ -185,12 +224,10 @@ fun EnhancedNotificationRow(
                             offset,
                         ).firstOrNull()
                         val userId = ann?.let { NotificationProfileLink.userIdFromPath(it.item) }
-                        if (userId != null) {
-                            onOpenProfile?.invoke(userId)
-                        } else if (opensSenderProfileOnTap && displaySenderIds.isNotEmpty()) {
-                            onOpenProfile?.invoke(displaySenderIds.first())
-                        } else {
-                            onTapAction()
+                        when {
+                            userId != null -> onOpenProfile?.invoke(userId)
+                            opensContentOnBodyTap -> onTapAction()
+                            // Social: solo el nick anotado abre perfil.
                         }
                     },
                 )

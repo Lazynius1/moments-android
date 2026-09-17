@@ -302,6 +302,14 @@ fun ArchivedStoriesView(
                                                 },
                                             )
                                         }
+                                        if (viewModel.canLoadMore) {
+                                            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                                                Box(Modifier.fillMaxWidth().padding(14.dp), contentAlignment = Alignment.Center) {
+                                                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                                    LaunchedEffect(storiesForGrid.size) { viewModel.loadMoreArchivedStories() }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -309,6 +317,9 @@ fun ArchivedStoriesView(
                                 ArchiveCalendarView(
                                     allStories = storiesForGrid,
                                     textColor = textColor,
+                                    canLoadMore = viewModel.canLoadMore,
+                                    isLoadingMore = viewModel.isLoadingMore,
+                                    onLoadMore = viewModel::loadMoreArchivedStories,
                                     onOpenDay = { dayStories ->
                                         if (dayStories.isNotEmpty()) {
                                             viewerInitialIndex = 0
@@ -318,6 +329,7 @@ fun ArchivedStoriesView(
                                 )
                             }
                             ArchiveDisplayMode.MAP -> {
+                                LaunchedEffect(Unit) { viewModel.loadAllArchivedStories() }
                                 ArchiveMapView(
                                     allStories = storiesForGrid,
                                     onOpenPin = { pinStories ->
@@ -712,6 +724,9 @@ private fun ArchiveMapPinAnnotation(pin: ArchiveStoryPin) {
 private fun ArchiveCalendarView(
     allStories: List<Story>,
     textColor: Color,
+    canLoadMore: Boolean,
+    isLoadingMore: Boolean,
+    onLoadMore: () -> Unit,
     onOpenDay: (List<Story>) -> Unit,
 ) {
     val monthSections = remember(allStories) { archiveCalendarMonthSections(allStories) }
@@ -850,6 +865,18 @@ private fun ArchiveCalendarView(
                                 Spacer(Modifier.weight(1f).height(42.dp))
                             }
                         }
+                    }
+                }
+                if (monthSection.id == monthSections.lastOrNull()?.id) {
+                    LaunchedEffect(monthSection.id, canLoadMore) {
+                        if (canLoadMore && !isLoadingMore) onLoadMore()
+                    }
+                }
+            }
+            if (canLoadMore) {
+                item {
+                    Box(Modifier.fillMaxWidth().padding(14.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                     }
                 }
             }
@@ -1066,7 +1093,7 @@ private fun archiveCalendarMonthSections(allStories: List<Story>): List<ArchiveC
             monthStart = Date(monthStart),
             days = days.sortedBy { it.date.time },
         )
-    }.sortedBy { it.monthStart.time }
+    }.sortedByDescending { it.monthStart.time }
 }
 
 private fun archiveWeekdaySymbols(): List<String> {

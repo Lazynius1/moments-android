@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.Query
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Story
 import com.moments.android.services.cache.ImagePrefetchManager
@@ -26,9 +28,16 @@ class ArchiveViewModel : ViewModel() {
         private set
     var isLoading by mutableStateOf(false)
         private set
+    var isLoadingMore by mutableStateOf(false)
+        private set
+    var canLoadMore by mutableStateOf(true)
+        private set
 
     private val firestore = FirestoreService()
     private val dayFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    private val pageSize = 36L
+    private var lastDocument: DocumentSnapshot? = null
+    private var loadJob: kotlinx.coroutines.Job? = null
 
     /** Flat list sorted by timestamp DESC (≡ grid iOS `storiesForGrid`). */
     val storiesForGrid: List<Story>
@@ -36,26 +45,54 @@ class ArchiveViewModel : ViewModel() {
 
     fun loadArchivedStories() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        viewModelScope.launch {
+        loadJob?.cancel()
+        lastDocument = null
+        canLoadMore = true
+        groupedStories = emptyMap()
+        loadJob = viewModelScope.launch {
             isLoading = true
-            runCatching {
-                val snapshot = firestore.db.collection("users").document(userId)
-                    .collection("stories")
-                    .whereLessThan("expirationDate", Timestamp(Date()))
-                    .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
-                    .limit(100)
-                    .get()
-                    .await()
-                snapshot.documents.mapNotNull { doc ->
-                    @Suppress("UNCHECKED_CAST")
-                    Story.from(doc.id, doc.data as? Map<String, Any?> ?: return@mapNotNull null)
-                }
-            }.onSuccess { stories ->
-                groupStoriesByDate(stories)
-                prefetchRecentImages(stories)
-            }
-            isLoading = false
+            loadPage(userId, reset = true)
         }
+    }
+
+    fun loadMoreArchivedStories() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        if (!canLoadMore || isLoading || isLoadingMore) return
+        loadJob = viewModelScope.launch { loadPage(userId, reset = false) }
+    }
+
+    fun loadAllArchivedStories() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        loadJob = viewModelScope.launch {
+            while (canLoadMore) {
+                if (isLoading) kotlinx.coroutines.delay(100) else loadPage(userId, reset = false)
+            }
+        }
+    }
+
+    private suspend fun loadPage(userId: String, reset: Boolean) {
+        if (!reset && (!canLoadMore || isLoadingMore)) return
+        if (!reset) isLoadingMore = true
+        var query: Query = firestore.db.collection("users").document(userId).collection("stories")
+            .whereLessThan("expirationDate", Timestamp(Date()))
+            .orderBy("timestamp", Query.Direction.DESCENDING)
+            .limit(pageSize)
+        if (!reset) lastDocument?.let { query = query.startAfter(it) }
+        runCatching { query.get().await() }.onSuccess { snapshot ->
+            val page = snapshot.documents.mapNotNull { doc ->
+                @Suppress("UNCHECKED_CAST")
+                Story.from(doc.id, doc.data as? Map<String, Any?> ?: return@mapNotNull null)
+            }
+            val merged = ((if (reset) emptyList() else storiesForGrid) + page)
+                .distinctBy { it.id }
+                .sortedByDescending { it.timestamp.time }
+            lastDocument = snapshot.documents.lastOrNull()
+            canLoadMore = snapshot.size() == pageSize.toInt()
+            groupStoriesByDate(merged)
+            prefetchRecentImages(page)
+        }.onFailure { canLoadMore = false }
+        isLoading = false
+        isLoadingMore = false
     }
 
     private fun groupStoriesByDate(stories: List<Story>) {

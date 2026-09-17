@@ -98,11 +98,15 @@ import com.moments.android.views.shared.MomentsContainerTransformOverlay
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.MomentsSharedTransitionLayout
 import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
+import com.moments.android.views.messaging.core.MessagingViewModel
+import com.moments.android.views.feed.stories.FeedPostProfilePreviewOverlay
+import com.moments.android.views.feed.stories.FeedPostProfilePreviewSelection
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Port de NotificationsView.swift */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationsScreen(
@@ -134,9 +138,14 @@ fun NotificationsScreen(
     var moderationReviewNotification by remember { mutableStateOf<MomentsNotification?>(null) }
     var zoomDestination by remember { mutableStateOf<MomentZoomDestination?>(null) }
     var zoomResolvedMoment by remember { mutableStateOf<Moment?>(null) }
+    var postProfilePreviewSelection by remember { mutableStateOf<FeedPostProfilePreviewSelection?>(null) }
+    val messagingViewModel = remember { MessagingViewModel() }
 
-    // System back: primero cierra zoom de moment; luego la pantalla (Dialog).
-    androidx.activity.compose.BackHandler(enabled = zoomDestination != null) {
+    // System back: primero cierra preview de perfil / zoom de moment; luego la pantalla.
+    androidx.activity.compose.BackHandler(enabled = postProfilePreviewSelection != null) {
+        postProfilePreviewSelection = null
+    }
+    androidx.activity.compose.BackHandler(enabled = zoomDestination != null && postProfilePreviewSelection == null) {
         zoomDestination = null
         zoomResolvedMoment = null
     }
@@ -322,6 +331,14 @@ fun NotificationsScreen(
                         onOpenProfile = onOpenProfile,
                         onModerationReviewTap = { moderationReviewNotification = it },
                         onTapAction = ::handleNotificationTap,
+                        onProfilePreview = { userId, momentId, anchorFrame ->
+                            postProfilePreviewSelection = FeedPostProfilePreviewSelection(
+                                userId = userId,
+                                momentId = momentId,
+                                anchorFrame = anchorFrame,
+                                postFrame = Rect.Zero,
+                            )
+                        },
                     )
                 }
             }
@@ -346,6 +363,20 @@ fun NotificationsScreen(
                     onOpenProfile = { overlayGroup = null; onOpenProfile(it) },
                 )
             }
+
+            FeedPostProfilePreviewOverlay(
+                selection = postProfilePreviewSelection,
+                onSelectionChange = { postProfilePreviewSelection = it },
+                messagingViewModel = messagingViewModel,
+                onOpenProfile = { userId ->
+                    postProfilePreviewSelection = null
+                    onOpenProfile(userId)
+                },
+                onPresentMessages = { LegacyNavigationBridge.showMessages() },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(5001f),
+            )
         }
     }
 
@@ -465,6 +496,7 @@ private fun NotificationsList(
     onOpenProfile: (String) -> Unit,
     onModerationReviewTap: (MomentsNotification) -> Unit,
     onTapAction: (NotificationGroup) -> Unit,
+    onProfilePreview: (userId: String, momentId: String, anchorFrame: Rect) -> Unit,
 ) {
     val listState = rememberLazyListState()
     val shouldLoadMore by remember(listState) {
@@ -544,6 +576,7 @@ private fun NotificationsList(
                                 onShowGroupedFollowers = onShowGroupedFollowers,
                                 onModerationReviewTap = onModerationReviewTap,
                                 onOpenProfile = onOpenProfile,
+                                onProfilePreview = onProfilePreview,
                             )
                         }
                     }
