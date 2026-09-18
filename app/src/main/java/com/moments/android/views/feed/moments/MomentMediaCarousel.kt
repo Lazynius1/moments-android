@@ -58,13 +58,14 @@ import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
 import com.moments.android.R
+import com.moments.android.views.creator.creatoruikit.NormalizedMediaCropContainer
+import com.moments.android.views.creator.creatoruikit.feedCropTransformations
 import com.moments.android.models.MediaItem
 import com.moments.android.services.content.FeedMediaItem
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.services.performance.FeedVisibilityCoordinator
 import com.moments.android.services.performance.VideoMoment
 import com.moments.android.services.performance.VideoMomentsIndex
-import com.moments.android.services.performance.isReelsAspectFormat
 import com.moments.android.services.performance.toIndexMoment
 import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.services.video.VideoLayerLease
@@ -116,13 +117,20 @@ fun MomentMediaCarousel(
      * Vacío (detalle) → `VideoMomentsIndex`, como iOS `reelsVideos == nil`.
      */
     reelsVideos: List<VideoMoment> = emptyList(),
+    /**
+     * ≡ iOS `EnhancedCarouselView(aspectRatio:)` — ratio del card (detected),
+     * no el string crudo de `moment.aspectRatio`.
+     */
+    canvasAspectRatioOverride: Float? = null,
 ) {
     // iOS: mediaItems pasados desde ModernPostCardView
     val mediaItems = mediaItemsOverride ?: moment.visibleMediaItems
     val pagerState = rememberPagerState(pageCount = { mediaItems.size.coerceAtLeast(1) })
     // iOS EnhancedCarouselView pasa `aspectRatio` del card (detected), no el de cada página
-    val rawRatio = MomentCarouselLayoutRules.aspectRatioValue(moment.aspectRatio)
-    val canvasAspectRatio = MomentCarouselLayoutRules.feedDisplayAspectRatio(rawRatio)
+    val canvasAspectRatio = canvasAspectRatioOverride?.takeIf { it > 0f && it.isFinite() }
+        ?: MomentCarouselLayoutRules.feedDisplayAspectRatio(
+            MomentCarouselLayoutRules.aspectRatioValue(moment.aspectRatio),
+        )
     val isCarousel = mediaItems.size > 1
     var showReelsViewer by remember { mutableStateOf(false) }
     var reelsStartSeconds by remember { mutableFloatStateOf(0f) }
@@ -374,13 +382,28 @@ private fun MediaItemView(
                 ?: canvasAspectRatio
         }
     }
-    // iOS usesBlurredFitLayout
-    val usesBlurredFitLayout = prefersUnifiedCarouselFrame &&
+    // iOS: fullBounds ≡ sin crop real → fill; solo crop real fuerza Fit path
+    val activeFeedCrop = item.feedCrop?.takeUnless { it.isFullBounds }
+    val usesBlurredFitLayout = activeFeedCrop == null &&
+        prefersUnifiedCarouselFrame &&
         MomentCarouselLayoutRules.presentationMode(resolvedItemAspectRatio, canvasAspectRatio) ==
         MomentCarouselPresentationMode.FitWithBlur
     val tags = item.tags.orEmpty()
-    // iOS CroppedVideoPlayer.isReelsFormat (chrome del card; no filtra apertura)
-    val isReelsFormat = moment.isReelsAspectFormat(canvasAspectRatio)
+    // iOS CroppedVideoPlayer.isReelsFormat: aspectRatio < 0.7 || moment == "9:16"
+    val isReelsFormat = canvasAspectRatio < 0.7f ||
+        moment.aspectRatio?.trim() == "9:16" ||
+        MomentCarouselLayoutRules.aspectRatioValue(moment.aspectRatio) < 0.70f
+
+    LaunchedEffect(item.id, canvasAspectRatio, activeFeedCrop, usesBlurredFitLayout, isReelsFormat) {
+        val crop = item.feedCrop
+        android.util.Log.d(
+            "FeedAspect",
+            "media id=${moment.id} item=${item.id} type=${item.type} " +
+                "canvas=${"%.4f".format(canvasAspectRatio)} resolved=${"%.4f".format(resolvedItemAspectRatio)} " +
+                "blurFit=$usesBlurredFitLayout reels=$isReelsFormat " +
+                "feedCrop=${crop?.let { "${it.cardAspect} full=${it.isFullBounds} active=${activeFeedCrop != null}" } ?: "nil"}",
+        )
+    }
 
     Box(
         Modifier.fillMaxSize(),
@@ -403,7 +426,7 @@ private fun MediaItemView(
                     // iOS MediaItemView → CroppedVideoPlayer.onTap
                     if (tags.isNotEmpty()) {
                         onToggleTags()
-                    } else {
+                    } else if (!prefersUnifiedCarouselFrame) {
                         onOpenReels()
                     }
                 },
@@ -421,27 +444,81 @@ private fun MediaItemView(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (usesBlurredFitLayout) {
-                    CarouselMediaBackdropView(item = item)
+                when {
+                    // La transformación deja ya el bitmap en la ventana exacta de feedCrop.
+                    // Crop solo absorbe el redondeo a píxeles del bitmap (menos de 1 px);
+                    // Fit revelaba el fondo del contenedor como un borde que iOS no muestra.
+                    activeFeedCrop != null -> {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(item.url)
+                                .size(1080, 1920)
+                                .allowHardware(false)
+                                .transformations(feedCropTransformations(activeFeedCrop))
+                                .build(),
+                            contentDescription = moment.username,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                            onSuccess = { state: AsyncImagePainter.State.Success ->
+                                val size = state.painter.intrinsicSize
+                                if (size.width > 0f && size.height > 0f &&
+                                    size.width.isFinite() && size.height.isFinite()
+                                ) {
+                                    val ratio = size.width / size.height
+                                    if (ratio.isFinite() && ratio > 0f) {
+                                        loadedAspectRatio = ratio
+                                    }
+                                }
+                            },
+                        )
+                    }
+                    usesBlurredFitLayout -> {
+                        CarouselMediaBackdropView(item = item)
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(item.url)
+                                .size(1080, 1920)
+                                .build(),
+                            contentDescription = moment.username,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize(),
+                            onSuccess = { state: AsyncImagePainter.State.Success ->
+                                val size = state.painter.intrinsicSize
+                                if (size.width > 0f && size.height > 0f &&
+                                    size.width.isFinite() && size.height.isFinite()
+                                ) {
+                                    val ratio = size.width / size.height
+                                    if (ratio.isFinite() && ratio > 0f) {
+                                        loadedAspectRatio = ratio
+                                    }
+                                }
+                            },
+                        )
+                    }
+                    // ≡ iOS: sin feedCrop / fullBounds → scaledToFill
+                    else -> {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(item.url)
+                                .size(1080, 1920)
+                                .build(),
+                            contentDescription = moment.username,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                            onSuccess = { state: AsyncImagePainter.State.Success ->
+                                val size = state.painter.intrinsicSize
+                                if (size.width > 0f && size.height > 0f &&
+                                    size.width.isFinite() && size.height.isFinite()
+                                ) {
+                                    val ratio = size.width / size.height
+                                    if (ratio.isFinite() && ratio > 0f) {
+                                        loadedAspectRatio = ratio
+                                    }
+                                }
+                            },
+                        )
+                    }
                 }
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(item.url)
-                        .size(1080, 1920)
-                        .build(),
-                    contentDescription = moment.username,
-                    contentScale = if (usesBlurredFitLayout) ContentScale.Fit else ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                    onSuccess = { state: AsyncImagePainter.State.Success ->
-                        val size = state.painter.intrinsicSize
-                        if (size.width > 0f && size.height > 0f && size.width.isFinite() && size.height.isFinite()) {
-                            val ratio = size.width / size.height
-                            if (ratio.isFinite() && ratio > 0f) {
-                                loadedAspectRatio = ratio
-                            }
-                        }
-                    },
-                )
             }
         }
 
@@ -479,7 +556,7 @@ private fun CroppedVideoPoster(
             VideoPosterOverlay(
                 posterUrl = posterUrl,
                 isReadyToPlay = false,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
@@ -526,7 +603,55 @@ private fun CroppedVideoPlayer(
     val showMute = allowsVideoPlayback && !isImmersive && !hasFinishedPlayback
 
     Box(Modifier.fillMaxSize()) {
+        val activeFeedCrop = item.feedCrop?.takeUnless { it.isFullBounds }
         when {
+            // ≡ iOS feedCroppedVideo — solo crop real (no fullBounds)
+            activeFeedCrop != null -> {
+                NormalizedMediaCropContainer(
+                    feedCrop = activeFeedCrop,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    if (shouldMountPlayer) {
+                        FeedVideoPage(
+                            url = playbackUrl,
+                            thumbnailUrl = posterUrl,
+                            consumerId = consumerId,
+                            mediaItem = domainMediaItem,
+                            modifier = Modifier.fillMaxSize(),
+                            allowsPlayback = true,
+                            allowsPauseInteraction = false,
+                            showMute = showMute,
+                            onTap = onTap,
+                        )
+                    } else {
+                        CroppedVideoPoster(posterUrl = posterUrl, onTap = onTap)
+                    }
+                }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onTap,
+                        ),
+                )
+                AnimatedVisibility(
+                    visible = !isImmersive,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    Box(Modifier.fillMaxSize()) {
+                        LiveVideoTimeLabel(
+                            consumerId = consumerId,
+                            totalDuration = totalDuration,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(12.dp),
+                        )
+                    }
+                }
+            }
             !allowsVideoPlayback -> {
                 CroppedVideoPoster(posterUrl = posterUrl)
             }
@@ -586,6 +711,11 @@ private fun CroppedVideoPlayer(
                             Brush.verticalGradient(
                                 listOf(Color(0x000B1215), Color(0x4D0B1215)),
                             ),
+                        )
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onTap,
                         ),
                 )
                 AnimatedVisibility(

@@ -68,18 +68,31 @@ data class ProfileGridTileDescriptor(
 object ProfileBentoTileAssigner {
     fun assign(moments: List<Moment>): List<ProfileGridTileDescriptor> {
         if (moments.isEmpty()) return emptyList()
-        val kinds = MutableList(moments.size) { BentoTileKind.UNIT }
-        heroCandidateIndex(moments)?.let { kinds[it] = BentoTileKind.HERO }
+
+        // Hero/tall en orden cronológico (sin pines), mapeado por id — pinear no cambia tamaños.
+        val chronological = moments.sortedWith(
+            compareByDescending<Moment> { it.timestamp }
+                .thenBy { it.id.orEmpty() },
+        )
+        val chronoKinds = MutableList(chronological.size) { BentoTileKind.UNIT }
+        heroCandidateIndex(chronological)?.let { chronoKinds[it] = BentoTileKind.HERO }
         var tallCount = 0
-        for (index in moments.indices) {
+        for (index in chronological.indices) {
             if (index >= 12) break
-            if (kinds[index] != BentoTileKind.UNIT) continue
+            if (chronoKinds[index] != BentoTileKind.UNIT) continue
             if (tallCount >= 2) break
-            if (!moments[index].isReelCandidate) continue
-            kinds[index] = BentoTileKind.TALL
+            if (!chronological[index].isReelCandidate) continue
+            chronoKinds[index] = BentoTileKind.TALL
             tallCount++
         }
-        return moments.indices.map { ProfileGridTileDescriptor.standard(moments[it], kinds[it]) }
+        val kindsByMomentId = chronological.mapIndexedNotNull { index, moment ->
+            moment.id?.let { it to chronoKinds[index] }
+        }.toMap()
+
+        return moments.map { moment ->
+            val kind = moment.id?.let { kindsByMomentId[it] } ?: BentoTileKind.UNIT
+            ProfileGridTileDescriptor.standard(moment, kind)
+        }
     }
 
     fun simple(moments: List<Moment>): List<ProfileGridTileDescriptor> =
@@ -87,11 +100,7 @@ object ProfileBentoTileAssigner {
 
     private fun heroCandidateIndex(moments: List<Moment>): Int? {
         val candidates = moments.indices.take(9)
-        candidates.firstOrNull { moments[it].isPinned == true && moments[it].isReelCandidate }?.let { return it }
-        candidates.firstOrNull { moments[it].isReelCandidate }?.let { return it }
-        return candidates.firstOrNull {
-            moments[it].isPinned == true && moments[it].previewImageURLString != null
-        }
+        return candidates.firstOrNull { moments[it].isReelCandidate }
     }
 }
 

@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
@@ -59,12 +60,15 @@ import com.moments.android.utilities.HapticManager
 import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
 import com.moments.android.views.creator.audienceselector.ContentAudience
+import com.moments.android.views.creator.creatoruikit.NormalizedMediaCropContainer
+import com.moments.android.views.creator.creatoruikit.feedCropTransformations
 import com.moments.android.views.feed.reactions.ReactionType
 import com.moments.android.views.feed.video.LiveVideoTimeDisplayMode
 import com.moments.android.views.feed.video.LiveVideoTimeLabel
 import com.moments.android.views.feed.video.ModernVideoPlayer
 import com.moments.android.views.feed.video.VideoPlaybackActivationMode
 import com.moments.android.views.feed.video.VideoPlaybackChromeStyle
+import androidx.compose.ui.platform.LocalContext
 import kotlin.math.min
 import kotlinx.coroutines.launch
 
@@ -217,27 +221,37 @@ private fun ProfileGridHeroMedia(
     aspectRatio: Float,
     secondaryText: Color,
 ) {
+    val feedCrop = media?.feedCrop
+    val videoAspect = media?.resolvedAspectRatioValue ?: aspectRatio
     when {
         media != null && media.url.isNotEmpty() && media.type == MediaItem.MediaType.VIDEO -> {
-            ModernVideoPlayer(
-                url = media.url,
-                videoId = GlobalVideoManager.profileVideoConsumerId(moment),
+            NormalizedMediaCropContainer(
+                feedCrop = feedCrop,
                 modifier = Modifier.fillMaxSize(),
-                aspectRatio = aspectRatio,
-                hideMuteButton = true,
-                chromeStyle = VideoPlaybackChromeStyle.SocialReels,
-                allowsPauseInteraction = false,
-                posterUrl = media.thumbnailUrl?.takeIf { it.isNotEmpty() }
-                    ?: moment.previewImageURLString,
-                mediaItem = media,
-                moment = moment,
-                activationMode = VideoPlaybackActivationMode.AlwaysWhenVisible,
-                consumesDetailHandoff = false,
-            )
+            ) {
+                ModernVideoPlayer(
+                    url = media.url,
+                    videoId = GlobalVideoManager.profileVideoConsumerId(moment),
+                    modifier = Modifier.fillMaxSize(),
+                    aspectRatio = videoAspect,
+                    hideMuteButton = true,
+                    chromeStyle = VideoPlaybackChromeStyle.SocialReels,
+                    allowsPauseInteraction = false,
+                    posterUrl = media.thumbnailUrl?.takeIf { it.isNotEmpty() }
+                        ?: moment.previewImageURLString,
+                    mediaItem = media,
+                    moment = moment,
+                    activationMode = VideoPlaybackActivationMode.AlwaysWhenVisible,
+                    consumesDetailHandoff = false,
+                )
+            }
         }
         media != null && media.url.isNotEmpty() -> {
             AsyncImage(
-                model = media.url,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(media.url)
+                    .transformations(feedCropTransformations(feedCrop))
+                    .build(),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,

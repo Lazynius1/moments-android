@@ -4,6 +4,7 @@
     <string name="upload_progress_story_title">Enviando story</string>
     <string name="upload_progress_status_uploading">Enviando… %d%%</string>
     <string name="upload_progress_status_processing">Processando…</string>
+    <string name="upload_progress_status_compressing">Compactando...</string>
     <string name="upload_progress_status_completed">Concluído</string>
     <string name="upload_progress_status_failed">Erro</string>
     <string name="upload_foreground_body">Mantendo o envio em segundo plano</string>

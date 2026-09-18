@@ -73,25 +73,17 @@ object MomentCarouselLayoutRules {
     }
 
     fun aspectRatioValue(raw: String?): Float {
-        if (raw.isNullOrBlank()) return 1f
-        val v = if (raw.contains(":")) {
-            val parts = raw.split(":")
-            val w = parts.getOrNull(0)?.toFloatOrNull() ?: 1f
-            val h = parts.getOrNull(1)?.toFloatOrNull() ?: 1f
-            if (h != 0f) w / h else 1f
-        } else {
-            raw.toFloatOrNull() ?: 1f
-        }
-        return v.coerceIn(minAspectRatio, maxAspectRatio)
+        // ≡ iOS `ProcessedMedia.AspectRatio(from:).value` / `parsePersisted`
+        return com.moments.android.views.creator.CreatorAspectRatio.parsePersisted(raw).value
     }
 
     /**
-     * Ratio de display en el feed (iOS ModernPostCardView):
-     * todo más vertical que 4:5 se cropea a 0.8.
+     * Ratio de display en el feed (≡ iOS MomentFeedCrop.feedCardAspect):
+     * 9:16 → 4:5; rango continuo 3:4…1.91:1.
      */
     fun feedDisplayAspectRatio(raw: Float): Float {
         val safe = if (raw > 0f && raw.isFinite()) raw else 1f
-        return if (safe < 0.8f) 0.8f else safe
+        return com.moments.android.views.creator.creatoruikit.MomentFeedCrop.feedCardAspect(safe)
     }
 }
 

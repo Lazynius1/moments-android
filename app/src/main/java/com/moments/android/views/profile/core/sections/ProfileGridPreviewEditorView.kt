@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import com.moments.android.views.components.MomentsCircularProgressIndicator
+import com.moments.android.views.profile.core.GridPreviewModeChipIcon
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -82,6 +83,7 @@ import kotlin.math.pow
 @Composable
 fun ProfileGridPreviewEditorView(
     imageUrl: String,
+    feedCrop: com.moments.android.models.MediaItemFeedCrop? = null,
     initialSettings: MomentGridPreviewSettings,
     onDismiss: () -> Unit,
     onSave: (MomentGridPreviewSettings) -> Unit,
@@ -103,6 +105,7 @@ fun ProfileGridPreviewEditorView(
     val painter = rememberAsyncImagePainter(
         model = ImageRequest.Builder(context)
             .data(imageUrl)
+            .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(feedCrop))
             .size(CoilSize.ORIGINAL)
             .build(),
     )
@@ -531,55 +534,6 @@ private fun PreviewChip(
         horizontalArrangement = Arrangement.Center,
     ) {
         content()
-    }
-}
-
-@Composable
-private fun GridPreviewModeChipIcon(
-    fitMode: MomentGridPreviewSettings.FitMode,
-    tint: Color,
-) {
-    Canvas(Modifier.size(18.dp)) {
-        val leg = 5.5.dp.toPx()
-        val stroke = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-        val corners = when (fitMode) {
-            MomentGridPreviewSettings.FitMode.FILL -> listOf(
-                Alignment.TopEnd to Offset(size.width, 0f),
-                Alignment.BottomStart to Offset(0f, size.height),
-            )
-            MomentGridPreviewSettings.FitMode.FIT -> listOf(
-                Alignment.TopStart to Offset(0f, 0f),
-                Alignment.TopEnd to Offset(size.width, 0f),
-                Alignment.BottomStart to Offset(0f, size.height),
-                Alignment.BottomEnd to Offset(size.width, size.height),
-            )
-        }
-        corners.forEach { (align, origin) ->
-            val path = Path()
-            when (align) {
-                Alignment.TopStart -> {
-                    path.moveTo(origin.x, origin.y + leg)
-                    path.lineTo(origin.x, origin.y)
-                    path.lineTo(origin.x + leg, origin.y)
-                }
-                Alignment.TopEnd -> {
-                    path.moveTo(origin.x - leg, origin.y)
-                    path.lineTo(origin.x, origin.y)
-                    path.lineTo(origin.x, origin.y + leg)
-                }
-                Alignment.BottomStart -> {
-                    path.moveTo(origin.x, origin.y - leg)
-                    path.lineTo(origin.x, origin.y)
-                    path.lineTo(origin.x + leg, origin.y)
-                }
-                else -> {
-                    path.moveTo(origin.x - leg, origin.y)
-                    path.lineTo(origin.x, origin.y)
-                    path.lineTo(origin.x, origin.y - leg)
-                }
-            }
-            drawPath(path, tint, style = stroke)
-        }
     }
 }
 

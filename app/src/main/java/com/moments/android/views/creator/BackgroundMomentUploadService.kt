@@ -23,6 +23,7 @@ import com.moments.android.models.HiddenLayerImageFrameStyle
 import com.moments.android.models.HiddenLayerPresentationStyle
 import com.moments.android.models.HiddenLayerTextStyle
 import com.moments.android.models.MediaItem
+import com.moments.android.models.MediaItemFeedCrop
 import com.moments.android.models.Moment
 import com.moments.android.models.MomentHiddenLayer
 import com.moments.android.models.MomentUploadPayload
@@ -127,7 +128,7 @@ class UploadingMoment(
     /** Equiv. iOS `UploadStatus.shouldShowInFeed`. */
     val shouldShowInFeed: Boolean
         get() = when (status) {
-            UploadStatus.Initializing, UploadStatus.Uploading, UploadStatus.Processing, UploadStatus.Failed -> true
+            UploadStatus.Initializing, UploadStatus.Compressing, UploadStatus.Uploading, UploadStatus.Processing, UploadStatus.Failed -> true
             UploadStatus.Completed, UploadStatus.Moderated -> false
         }
 }
@@ -136,6 +137,7 @@ class UploadingMoment(
 fun UploadStatus.displayText(context: Context): String {
     val res = when (this) {
         UploadStatus.Initializing -> R.string.creator_upload_initializing
+        UploadStatus.Compressing -> R.string.creator_upload_compressing
         UploadStatus.Uploading -> R.string.creator_upload_uploading
         UploadStatus.Processing -> R.string.creator_upload_processing
         UploadStatus.Completed, UploadStatus.Moderated -> R.string.creator_upload_completed
@@ -155,7 +157,8 @@ sealed class MomentVideoUploadPreparationError(message: String) : Exception(mess
 /**
  * Port de `BackgroundMomentUploadService.swift` (Views/Creator).
  *
- * Live Activity / Dynamic Island (ActivityKit): **fuera de alcance Android** — stubs no-op.
+ * Live Activity / Dynamic Island (ActivityKit): Android usa
+ * [UploadProgressNotificationHelper] (Live Updates). Status `compressing` ≡ iOS.
  * Paridad: UploadingMoment en feed, persistencia outbox, Storage → Firestore → hidden layers →
  * moderación → notificaciones tag/mention → EchoService.
  */
@@ -335,7 +338,9 @@ object BackgroundMomentUploadService {
             resumeFeedListeners()
         }
         isProcessing = uploadingMoments.any {
-            it.status == UploadStatus.Uploading || it.status == UploadStatus.Processing
+            it.status == UploadStatus.Compressing ||
+                it.status == UploadStatus.Uploading ||
+                it.status == UploadStatus.Processing
         }
     }
 
@@ -433,8 +438,9 @@ object BackgroundMomentUploadService {
                     },
                 )
             } else {
+                val uploadUri = media.immersiveUri ?: media.uri
                 val bitmap = withContext(Dispatchers.IO) {
-                    ctx.contentResolver.openInputStream(media.uri)?.use { BitmapFactory.decodeStream(it) }
+                    ctx.contentResolver.openInputStream(uploadUri)?.use { BitmapFactory.decodeStream(it) }
                 } ?: error("Invalid image")
                 if (uploadingMoment.thumbnailBitmap == null) {
                     uploadingMoment.thumbnailBitmap = bitmap
@@ -457,11 +463,18 @@ object BackgroundMomentUploadService {
             val shouldProcessVideo = media.isVideo &&
                 (videoFileSize ?: 0L) > CreatorMediaLimits.MAX_MOMENT_VIDEO_READY_SIZE_BYTES
 
+            val publishedAspect = media.immersiveAspectRatio?.let {
+                CreatorAspectRatio.fromFeedPostRatio(it).displayName
+            } ?: media.aspectRatio.displayName
+            val publishedFeedCrop = media.feedCrop
+                ?: MediaItemFeedCrop.fullBounds(media.aspectRatio.displayName)
+
             uploaded += MediaItem(
                 id = mediaId,
                 type = if (media.isVideo) MediaItem.MediaType.VIDEO else MediaItem.MediaType.IMAGE,
                 url = url,
-                aspectRatio = media.aspectRatio.displayName,
+                aspectRatio = if (media.isVideo) media.aspectRatio.displayName else publishedAspect,
+                feedCrop = publishedFeedCrop,
                 thumbnailUrl = thumbnailUrl,
                 videoDuration = media.durationSeconds,
                 videoFileSize = videoFileSize,
@@ -510,7 +523,7 @@ object BackgroundMomentUploadService {
         if (originalSize <= CreatorMediaLimits.MAX_MOMENT_VIDEO_UPLOAD_SIZE_BYTES) {
             return media.uri
         }
-        updateProgress(uploadingMoment, baseProgress, UploadStatus.Processing)
+        updateProgress(uploadingMoment, baseProgress, UploadStatus.Compressing)
         val compressed = compressVideo(media.uri)
         val compressedSize = fileSize(ctx, compressed)
         if (compressedSize > CreatorMediaLimits.MAX_MOMENT_VIDEO_UPLOAD_SIZE_BYTES) {
@@ -605,11 +618,21 @@ object BackgroundMomentUploadService {
         trackProgress(moment)
         // iOS Live Activity status strings
         val statusString = when (status) {
-            UploadStatus.Initializing, UploadStatus.Uploading -> "uploading"
-            UploadStatus.Processing, UploadStatus.Moderated -> "processing"
-            UploadStatus.Completed -> "completed"
-            UploadStatus.Failed -> "failed"
-            null -> if (progress < 0.7) "uploading" else "processing"
+            UploadStatus.Initializing, UploadStatus.Uploading ->
+                MomentUploadActivityAttributes.ContentState.STATUS_UPLOADING
+            UploadStatus.Compressing ->
+                MomentUploadActivityAttributes.ContentState.STATUS_COMPRESSING
+            UploadStatus.Processing, UploadStatus.Moderated ->
+                MomentUploadActivityAttributes.ContentState.STATUS_PROCESSING
+            UploadStatus.Completed ->
+                MomentUploadActivityAttributes.ContentState.STATUS_COMPLETED
+            UploadStatus.Failed ->
+                MomentUploadActivityAttributes.ContentState.STATUS_FAILED
+            null -> if (progress < 0.7) {
+                MomentUploadActivityAttributes.ContentState.STATUS_UPLOADING
+            } else {
+                MomentUploadActivityAttributes.ContentState.STATUS_PROCESSING
+            }
         }
         updateLiveActivity(progress, statusString)
     }
@@ -631,13 +654,19 @@ object BackgroundMomentUploadService {
         uploadingMoments.removeAll { it.tempId == moment.tempId }
         MomentUploadTracker.remove(moment.tempId)
         isProcessing = uploadingMoments.any {
-            it.status == UploadStatus.Uploading || it.status == UploadStatus.Processing
+            it.status == UploadStatus.Compressing ||
+                it.status == UploadStatus.Uploading ||
+                it.status == UploadStatus.Processing
         }
     }
 
     fun retryUpload(moment: UploadingMoment) {
         if (moment.status != UploadStatus.Failed) return
-        moment.status = UploadStatus.Uploading
+        moment.status = if (moment.mediaItems.any { it.isVideo }) {
+            UploadStatus.Compressing
+        } else {
+            UploadStatus.Uploading
+        }
         moment.uploadProgress = 0.0
         moment.errorMessage = null
         moment.currentMediaIndex = 0
@@ -796,7 +825,8 @@ object BackgroundMomentUploadService {
                 FileOutputStream(out).use { output -> input.copyTo(output) }
             } ?: error("Missing video for persist")
         } else {
-            val bitmap = ctx.contentResolver.openInputStream(media.uri)?.use { BitmapFactory.decodeStream(it) }
+            val uploadUri = media.immersiveUri ?: media.uri
+            val bitmap = ctx.contentResolver.openInputStream(uploadUri)?.use { BitmapFactory.decodeStream(it) }
                 ?: error("Missing image for persist")
             val jpeg = bitmap.storageUploadJpegData(compressionQuality = 0.8f, maxPixelDimension = 4096)
                 ?: error("Cannot encode image")
@@ -823,7 +853,9 @@ object BackgroundMomentUploadService {
             type = if (media.isVideo) "video" else "image",
             localFileName = fileName,
             thumbnailFileName = thumbName,
-            aspectRatio = media.aspectRatio.displayName,
+            aspectRatio = media.immersiveAspectRatio?.let { CreatorAspectRatio.fromFeedPostRatio(it).displayName }
+                ?: media.aspectRatio.displayName,
+            feedCrop = media.feedCrop ?: MediaItemFeedCrop.fullBounds(media.aspectRatio.displayName),
             videoDuration = media.durationSeconds,
             videoFileSize = if (media.isVideo) fileSize(ctx, media.uri) else null,
             tags = media.tags.takeIf { it.isNotEmpty() },
@@ -894,7 +926,8 @@ object BackgroundMomentUploadService {
 
             // Duplicate check (iOS)
             val alreadyUploading = uploadingMoments.any { moment ->
-                val active = moment.status == UploadStatus.Uploading ||
+                val active = moment.status == UploadStatus.Compressing ||
+                    moment.status == UploadStatus.Uploading ||
                     moment.status == UploadStatus.Processing
                 active &&
                     moment.content == payload.content &&
@@ -916,7 +949,7 @@ object BackgroundMomentUploadService {
                 val isVideo = item.type == "video"
                 val thumbFile = item.thumbnailFileName?.let { File(dir, it) }
                 val aspect = item.aspectRatio?.let { name ->
-                    CreatorAspectRatio.entries.find { it.displayName == name }
+                    CreatorAspectRatio.parsePersisted(name)
                 } ?: if (!isVideo) {
                     loadCachedBitmap(file)?.let { bmp ->
                         CreatorAspectRatio.fromRatio(
@@ -934,6 +967,7 @@ object BackgroundMomentUploadService {
                     thumbnailUri = thumbFile?.takeIf { it.exists() }?.let { Uri.fromFile(it) },
                     aspectRatio = aspect,
                     tags = item.tags.orEmpty(),
+                    feedCrop = item.feedCrop,
                 )
             }
 

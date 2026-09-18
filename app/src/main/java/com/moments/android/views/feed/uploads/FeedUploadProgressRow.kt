@@ -86,7 +86,9 @@ fun UploadProgressRow(
     )
 
     val status = uploadingMoment.status
-    val showProgress = status == UploadStatus.Uploading || status == UploadStatus.Processing
+    val showProgress = status == UploadStatus.Compressing ||
+        status == UploadStatus.Uploading ||
+        status == UploadStatus.Processing
 
     Column(
         modifier
@@ -160,7 +162,9 @@ fun FeedUploadProgressRow(
     val primary = if (isDark) Color.fromHex("FAF9F6") else Color.fromHex("0B1215")
     val cardShape = RoundedCornerShape(16.dp)
     val status = item.status
-    val showProgress = status == UploadStatus.Uploading || status == UploadStatus.Processing
+    val showProgress = status == UploadStatus.Compressing ||
+        status == UploadStatus.Uploading ||
+        status == UploadStatus.Processing
 
     Column(
         modifier
@@ -237,14 +241,18 @@ private fun UploadStatusView(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-            UploadStatus.Uploading -> {
+            UploadStatus.Compressing, UploadStatus.Uploading -> {
                 CircularProgressIndicator(
                     modifier = Modifier.size(14.dp),
                     color = Color.Blue,
                     strokeWidth = 2.dp,
                 )
                 Text(
-                    stringResource(R.string.feed_uploading_progress, (progress * 100).toInt()),
+                    if (status == UploadStatus.Compressing) {
+                        stringResource(R.string.feed_uploading_compressing)
+                    } else {
+                        stringResource(R.string.feed_uploading_progress, (progress * 100).toInt())
+                    },
                     color = Color.Blue,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -338,7 +346,7 @@ private fun ProgressBarView(
     val track = primary.copy(0.1f)
     val shadowColor = when (status) {
         UploadStatus.Uploading -> Color.fromHex("007AFF").copy(0.5f)
-        UploadStatus.Processing -> Color(0xFFFF9500).copy(0.5f)
+        UploadStatus.Compressing, UploadStatus.Processing -> Color(0xFFFF9500).copy(0.5f)
         else -> Color.Transparent
     }
 
@@ -380,6 +388,7 @@ private fun ProgressBarView(
 @Composable
 private fun statusDetailText(status: UploadStatus, errorMessage: String?): String = when (status) {
     UploadStatus.Initializing -> stringResource(R.string.feed_uploading_initializing)
+    UploadStatus.Compressing -> stringResource(R.string.feed_uploading_compressing)
     UploadStatus.Uploading -> stringResource(R.string.feed_uploading_uploading)
     UploadStatus.Processing -> stringResource(R.string.feed_uploading_creating)
     UploadStatus.Completed, UploadStatus.Moderated -> stringResource(R.string.feed_uploading_available)
@@ -387,7 +396,7 @@ private fun statusDetailText(status: UploadStatus, errorMessage: String?): Strin
 }
 
 private fun progressBrush(status: UploadStatus): Brush = when (status) {
-    UploadStatus.Initializing, UploadStatus.Uploading -> Brush.horizontalGradient(
+    UploadStatus.Initializing, UploadStatus.Compressing, UploadStatus.Uploading -> Brush.horizontalGradient(
         listOf(Color.fromHex("007AFF"), Color.fromHex("00D2B4")),
     )
     UploadStatus.Processing -> Brush.horizontalGradient(
@@ -397,7 +406,7 @@ private fun progressBrush(status: UploadStatus): Brush = when (status) {
 }
 
 private fun statusBorderColor(status: UploadStatus): Color = when (status) {
-    UploadStatus.Initializing, UploadStatus.Uploading, UploadStatus.Processing ->
+    UploadStatus.Initializing, UploadStatus.Compressing, UploadStatus.Uploading, UploadStatus.Processing ->
         Color.White.copy(0.15f)
     UploadStatus.Completed, UploadStatus.Moderated -> Color.Green.copy(0.3f)
     UploadStatus.Failed -> Color.Red.copy(0.3f)

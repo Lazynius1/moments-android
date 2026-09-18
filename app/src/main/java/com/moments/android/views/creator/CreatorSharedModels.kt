@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
+import com.moments.android.models.MediaItemFeedCrop
 import com.moments.android.models.PhotoTag
 import com.moments.android.utilities.HapticManager
 import kotlin.math.abs
@@ -71,22 +72,52 @@ object StoryMediaLayoutRules {
         )
 }
 
-/** Espejo de `CreatorMedia.AspectRatio`. */
-enum class CreatorAspectRatio(val displayName: String, val ratio: Float) {
-    SQUARE("1:1", 1f),
-    PORTRAIT("4:5", 0.8f),
-    LANDSCAPE("16:9", 16f / 9f),
-    NINE_BY_SIXTEEN("9:16", 9f / 16f);
-
+/**
+ * Espejo de `CreatorMedia.AspectRatio`.
+ * iOS: enum con `.custom(CGFloat)` para ratios intermedios del feed.
+ * Android: data class — presets en companion + [custom] para el continuo 3:4…1.91:1.
+ */
+data class CreatorAspectRatio(
+    val displayName: String,
+    val ratio: Float,
+    private val valueOverride: Float? = null,
+) {
     /** Alias iOS `value` (== [ratio] salvo landscape float legacy 1.777). */
-    val value: Float get() = when (this) {
-        SQUARE -> 1f
-        PORTRAIT -> 0.8f
-        LANDSCAPE -> 1.777f
-        NINE_BY_SIXTEEN -> 0.5625f
-    }
+    val value: Float
+        get() = valueOverride ?: if (displayName == "16:9") 1.777f else ratio
 
     companion object {
+        val SQUARE = CreatorAspectRatio("1:1", 1f)
+        val PORTRAIT = CreatorAspectRatio("4:5", 0.8f)
+        val LANDSCAPE = CreatorAspectRatio("16:9", 16f / 9f, valueOverride = 1.777f)
+        val NINE_BY_SIXTEEN = CreatorAspectRatio("9:16", 9f / 16f, valueOverride = 0.5625f)
+        /** 3:4 — retrato alto de post. */
+        val REELS_GRID = CreatorAspectRatio("3:4", 1080f / 1440f)
+        /** 1.91:1 — apaisado IG. */
+        val FEED_LANDSCAPE = CreatorAspectRatio("1.91:1", 1080f / 566f)
+
+        /** Presets para UI que cicla (≡ enum cases, sin custom). */
+        val entries: List<CreatorAspectRatio> = listOf(
+            SQUARE, PORTRAIT, LANDSCAPE, NINE_BY_SIXTEEN, REELS_GRID, FEED_LANDSCAPE,
+        )
+
+        /** ≡ iOS `.custom(safe)` + `displayName` del case custom. */
+        fun custom(safe: Float): CreatorAspectRatio {
+            val m = com.moments.android.views.creator.creatoruikit.MomentFeedCrop
+            val name = when {
+                abs(safe - m.reelsGridAspect) < 0.02f -> "3:4"
+                abs(safe - m.landscapeMax) < 0.03f -> "1.91:1"
+                abs(safe - 3f / 2f) < 0.02f -> "3:2"
+                abs(safe - 4f / 3f) < 0.02f -> "4:3"
+                else -> "%.4f".format(safe).trimEnd('0').trimEnd('.')
+            }
+            return when (name) {
+                "3:4" -> REELS_GRID
+                "1.91:1" -> FEED_LANDSCAPE
+                else -> CreatorAspectRatio(name, safe, valueOverride = safe)
+            }
+        }
+
         fun fromRatio(imageRatio: Float): CreatorAspectRatio {
             val tolerance = 0.15f
             return when {
@@ -98,6 +129,42 @@ enum class CreatorAspectRatio(val displayName: String, val ratio: Float) {
                 imageRatio < 0.85f -> PORTRAIT
                 imageRatio < 1.15f -> SQUARE
                 else -> LANDSCAPE
+            }
+        }
+
+        /** ≡ iOS `fromFeedPostRatio` — card continua; Reels 9:16 → 4:5. */
+        fun fromFeedPostRatio(ratio: Float): CreatorAspectRatio {
+            val safe = com.moments.android.views.creator.creatoruikit.MomentFeedCrop.feedCardAspect(ratio)
+            val m = com.moments.android.views.creator.creatoruikit.MomentFeedCrop
+            return when {
+                abs(safe - m.squareAspect) < 0.008f -> SQUARE
+                abs(safe - m.portraitMax) < 0.008f -> PORTRAIT
+                abs(safe - m.reelsGridAspect) < 0.008f -> REELS_GRID
+                abs(safe - m.landscapeMax) < 0.015f -> FEED_LANDSCAPE
+                else -> custom(safe)
+            }
+        }
+
+        fun parsePersisted(raw: String?): CreatorAspectRatio {
+            val trimmed = raw?.trim().orEmpty()
+            if (trimmed.isEmpty()) return SQUARE
+            return when (trimmed) {
+                "1:1" -> SQUARE
+                "4:5" -> PORTRAIT
+                "3:4" -> REELS_GRID
+                "1.91:1" -> FEED_LANDSCAPE
+                "16:9" -> LANDSCAPE
+                "9:16" -> NINE_BY_SIXTEEN
+                else -> {
+                    val parts = trimmed.split(":")
+                    if (parts.size == 2) {
+                        val w = parts[0].toFloatOrNull()
+                        val h = parts[1].toFloatOrNull()
+                        if (w != null && h != null && h > 0f) return fromFeedPostRatio(w / h)
+                    }
+                    trimmed.toFloatOrNull()?.takeIf { it > 0f }?.let { return fromFeedPostRatio(it) }
+                    SQUARE
+                }
             }
         }
     }
@@ -133,6 +200,12 @@ data class CreatorMedia(
     val tags: List<PhotoTag> = emptyList(),
     val videoFileSize: Long? = null,
     val videoResolution: String? = null,
+    /** ≡ iOS `feedCrop` — encuadre no destructivo de la card. */
+    val feedCrop: MediaItemFeedCrop? = null,
+    /** ≡ iOS `immersiveImage` — archivo publicado (peek ≤9:16); null = usar [uri]. */
+    val immersiveUri: Uri? = null,
+    /** Aspect del archivo inmersivo si difiere de [aspectRatio]. */
+    val immersiveAspectRatio: Float? = null,
 ) {
     companion object {
         /** iOS `maxMomentVideoDuration` = 5 min */

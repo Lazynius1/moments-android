@@ -43,6 +43,8 @@ data class FeedMediaItem(
     val videoVariants: com.moments.android.models.VideoVariants? = null,
     /** Paridad iOS/CF `hlsMasterUrl` — master ABR. */
     val hlsMasterUrl: String? = null,
+    /** Paridad iOS `MediaItem.feedCrop`. */
+    val feedCrop: com.moments.android.models.MediaItemFeedCrop? = null,
 ) {
     /** Paridad iOS `MediaItem.resolvedAspectRatioValue` (sin videoResolution en FeedMediaItem). */
     val resolvedAspectRatioValue: Float?
@@ -57,12 +59,15 @@ data class FeedMediaItem(
                     if (r.isFinite() && r > 0f) return r
                 }
             }
+            normalized.toFloatOrNull()?.takeIf { it.isFinite() && it > 0f }?.let { return it }
             return when (normalized) {
                 "1:1" -> 1f
                 "4:5" -> 0.8f
+                "3:4" -> 0.75f
+                "1.91:1" -> 1.91f
                 "16:9" -> 16f / 9f
                 "9:16" -> 9f / 16f
-                else -> normalized.toFloatOrNull()?.takeIf { it.isFinite() && it > 0f }
+                else -> null
             }
         }
 }
@@ -639,6 +644,7 @@ private fun JSONObject.toFeedMoment(): FeedMoment {
                             ).takeIf { it.low != null || it.medium != null || it.high != null }
                         },
                         hlsMasterUrl = item.stringOrNull("hlsMasterUrl"),
+                        feedCrop = item.optJSONObject("feedCrop")?.toMediaItemFeedCrop(),
                     )
                 }
             }
@@ -711,6 +717,7 @@ private fun JSONObject.toMoment(): Moment {
                     type = type,
                     url = item.optString("url"),
                     aspectRatio = item.stringOrNull("aspectRatio"),
+                    feedCrop = item.optJSONObject("feedCrop")?.toMediaItemFeedCrop(),
                     thumbnailUrl = item.stringOrNull("thumbnailUrl"),
                     videoDuration = item.optDoubleOrNull("videoDuration"),
                     videoFileSize = item.optLongOrNull("videoFileSize"),
@@ -767,6 +774,8 @@ private fun JSONObject.toMoment(): Moment {
         hideLikeCounts = optBoolean("hideLikeCounts"),
         allowSharing = optBoolean("allowSharing", true),
         scheduledDate = optLongOrNull("scheduledDate")?.let { Date(it) },
+        isPinned = if (has("isPinned") && !isNull("isPinned") && optBoolean("isPinned")) true else null,
+        pinnedAt = optLongOrNull("pinnedAt")?.let { Date(it) },
         hasHiddenLayers = optBoolean("hasHiddenLayers"),
         hiddenLayerCount = optInt("hiddenLayerCount"),
     )
@@ -884,6 +893,21 @@ fun BackendStoryDocument.toStory(): Story? =
 
 private fun JSONArray.toStringList(): List<String> =
     (0 until length()).mapNotNull { optString(it).takeIf { s -> s.isNotBlank() } }
+
+private fun JSONObject.toMediaItemFeedCrop(): com.moments.android.models.MediaItemFeedCrop? {
+    val cardAspect = stringOrNull("cardAspect") ?: return null
+    val x = optDoubleOrNull("x") ?: return null
+    val y = optDoubleOrNull("y") ?: return null
+    val width = optDoubleOrNull("width") ?: return null
+    val height = optDoubleOrNull("height") ?: return null
+    return com.moments.android.models.MediaItemFeedCrop(
+        cardAspect = cardAspect,
+        x = x,
+        y = y,
+        width = width,
+        height = height,
+    )
+}
 
 /** Stickers del bundle CF → Reveal / poll / etc. en StoryViewer. */
 private fun JSONArray.toStoryStickers(): List<StickerData>? {

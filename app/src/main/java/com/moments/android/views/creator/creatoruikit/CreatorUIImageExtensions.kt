@@ -58,6 +58,17 @@ fun Uri.exifOrientation(context: Context): Int =
         } ?: ExifInterface.ORIENTATION_NORMAL
     }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
 
+/** Tamaño visual (como `UIImage.size` ya orientado). */
+fun orientedDisplaySize(rawWidth: Float, rawHeight: Float, exifOrientation: Int): Pair<Float, Float> {
+    val swap = exifOrientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+        exifOrientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+        exifOrientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+        exifOrientation == ExifInterface.ORIENTATION_TRANSVERSE
+    val w = rawWidth.coerceAtLeast(1f)
+    val h = rawHeight.coerceAtLeast(1f)
+    return if (swap) h to w else w to h
+}
+
 /** Atajo: normaliza usando el EXIF del [uri]. */
 fun Bitmap.creatorNormalizedUp(context: Context, uri: Uri): Bitmap =
     creatorNormalizedUp(uri.exifOrientation(context))

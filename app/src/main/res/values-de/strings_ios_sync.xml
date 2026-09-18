@@ -834,6 +834,7 @@
     <string name="live_activity_error">Fehler</string>
     <string name="live_activity_processing">Wird verarbeitet...</string>
     <string name="live_activity_uploading">Wird hochgeladen...</string>
+    <string name="live_activity_compressing">Wird komprimiert...</string>
     <string name="live_activity_uploading_moment">Moment wird hochgeladen</string>
     <string name="live_activity_uploading_story">Story wird hochgeladen</string>
     <string name="location_moment_detail_photo_count">%1$d Foto</string>

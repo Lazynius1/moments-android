@@ -611,6 +611,7 @@
     <string name="live_activity_error">Error</string>
     <string name="live_activity_processing">Procesando...</string>
     <string name="live_activity_uploading">Subiendo...</string>
+    <string name="live_activity_compressing">Comprimiendo...</string>
     <string name="live_activity_uploading_moment">Subiendo momento</string>
     <string name="live_activity_uploading_story">Subiendo historia</string>
     <string name="location_moment_detail_photo_count">%1$d foto</string>

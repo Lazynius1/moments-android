@@ -49,6 +49,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.moments.android.views.creator.creatoruikit.feedCropTransformations
+import com.moments.android.views.feed.maps.mapPreferredFeedCrop
+import com.moments.android.views.feed.maps.mapPreferredImageUrl
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.views.components.LocationMomentCardSkeletonView
@@ -520,7 +524,10 @@ fun MapPlaceIndexRow(
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             place.moments.take(3).forEach { moment ->
                 AsyncImage(
-                    model = moment.mapPreferredImageUrl,
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(moment.mapPreferredImageUrl)
+                        .transformations(feedCropTransformations(moment.mapPreferredFeedCrop))
+                        .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier

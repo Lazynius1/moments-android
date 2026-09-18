@@ -45,6 +45,7 @@ object StoryUploadProgressManager {
 /** ≡ iOS `UploadStatus` (BackgroundMomentUploadService.swift). */
 enum class UploadStatus {
     Initializing,
+    Compressing,
     Uploading,
     Processing,
     Completed,

@@ -255,6 +255,7 @@ private fun resolvedContentAudience(moment: Moment): ContentAudience {
 @Composable
 private fun ProfileThumbnailMedia(moment: Moment, size: Dp, cellWidth: Dp, cellHeight: Dp, descriptor: ProfileGridTileDescriptor) {
     val primary = moment.primaryVisibleMediaItem
+    val feedCrop = primary?.feedCrop
     val image = when {
         primary?.type?.raw == "image" -> primary.url
         primary?.thumbnailUrl?.isNotBlank() == true -> primary.thumbnailUrl
@@ -267,22 +268,46 @@ private fun ProfileThumbnailMedia(moment: Moment, size: Dp, cellWidth: Dp, cellH
         else -> null
     }
     when {
-        image != null -> ProfileThumbnailImage(image, moment, size, cellWidth, cellHeight, descriptor.usesPortraitCrop)
-        video != null -> ProfileThumbnailVideo(video, moment, size, cellWidth, cellHeight, descriptor.usesPortraitCrop)
+        image != null -> ProfileThumbnailImage(image, moment, size, cellWidth, cellHeight, descriptor.usesPortraitCrop, feedCrop)
+        video != null -> ProfileThumbnailVideo(video, moment, size, cellWidth, cellHeight, descriptor.usesPortraitCrop, feedCrop)
         else -> ProfileThumbnailEmpty(moment, cellWidth, cellHeight)
     }
 }
 
 @Composable
-private fun ProfileThumbnailImage(url: String, moment: Moment, size: Dp, cellWidth: Dp, cellHeight: Dp, portrait: Boolean) {
+private fun ProfileThumbnailImage(
+    url: String,
+    moment: Moment,
+    size: Dp,
+    cellWidth: Dp,
+    cellHeight: Dp,
+    portrait: Boolean,
+    feedCrop: com.moments.android.models.MediaItemFeedCrop? = null,
+) {
     val image: @Composable (ContentScale) -> Unit = { contentScale ->
-        AsyncImage(model = profileThumbnailUrl(url), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = contentScale)
+        AsyncImage(
+            model = coil.request.ImageRequest.Builder(LocalContext.current)
+                .data(profileThumbnailUrl(url))
+                .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(feedCrop))
+                .build(),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = contentScale,
+        )
     }
     if (portrait) Box(Modifier.size(cellWidth, cellHeight)) { image(ContentScale.Crop) } else GridPreviewThumbnailFrame(size, moment.gridPreviewSettings, image)
 }
 
 @Composable
-private fun ProfileThumbnailVideo(url: String, moment: Moment, size: Dp, cellWidth: Dp, cellHeight: Dp, portrait: Boolean) {
+private fun ProfileThumbnailVideo(
+    url: String,
+    moment: Moment,
+    size: Dp,
+    cellWidth: Dp,
+    cellHeight: Dp,
+    portrait: Boolean,
+    feedCrop: com.moments.android.models.MediaItemFeedCrop? = null,
+) {
     val resolvedUrl = profileThumbnailUrl(url)
     var thumbnail by remember(resolvedUrl) {
         mutableStateOf<Bitmap?>(VideoThumbnailCache.cachedThumbnail(resolvedUrl))
@@ -295,8 +320,13 @@ private fun ProfileThumbnailVideo(url: String, moment: Moment, size: Dp, cellWid
         loading = false
     }
     val content: @Composable (ContentScale) -> Unit = { contentScale ->
-        thumbnail?.let { androidx.compose.foundation.Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = contentScale) }
-            ?: ProfileMediaPlaceholder(loading, R.string.profile_thumbnail_video_uploading, R.string.profile_thumbnail_video)
+        thumbnail?.let { bmp ->
+            val cropped = remember(bmp, feedCrop) {
+                if (feedCrop == null || feedCrop.isFullBounds) bmp
+                else com.moments.android.views.creator.creatoruikit.MomentFeedCrop.cropBitmap(bmp, feedCrop)
+            }
+            androidx.compose.foundation.Image(cropped.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = contentScale)
+        } ?: ProfileMediaPlaceholder(loading, R.string.profile_thumbnail_video_uploading, R.string.profile_thumbnail_video)
     }
     if (portrait) Box(Modifier.size(cellWidth, cellHeight)) { content(ContentScale.Crop) } else GridPreviewThumbnailFrame(size, moment.gridPreviewSettings, content)
 }

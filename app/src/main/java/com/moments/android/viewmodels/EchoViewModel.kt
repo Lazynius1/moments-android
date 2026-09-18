@@ -431,6 +431,7 @@ class EchoViewModel(
                     type = if (slide.mediaType == "video") MediaItem.MediaType.VIDEO else MediaItem.MediaType.IMAGE,
                     url = slide.mediaUrl,
                     aspectRatio = slide.aspectRatio ?: post.aspectRatio,
+                    feedCrop = slide.feedCrop,
                     thumbnailUrl = slide.thumbnailUrl,
                 )
             }

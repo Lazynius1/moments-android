@@ -793,6 +793,7 @@
     <string name="live_activity_error">Erreur</string>
     <string name="live_activity_processing">Traitement...</string>
     <string name="live_activity_uploading">Envoi en cours...</string>
+    <string name="live_activity_compressing">Compression...</string>
     <string name="live_activity_uploading_moment">Envoi du moment en cours</string>
     <string name="live_activity_uploading_story">Envoi de la story en cours</string>
     <string name="location_moment_detail_photo_count">%1$d photo</string>

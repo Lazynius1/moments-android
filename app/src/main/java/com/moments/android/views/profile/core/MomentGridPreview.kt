@@ -8,10 +8,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.moments.android.models.Moment
 import com.moments.android.models.MomentGridPreviewSettings
 
@@ -88,6 +91,63 @@ fun GridPreviewThumbnailFrame(
             contentAlignment = Alignment.Center,
         ) {
             content(contentScale)
+        }
+    }
+}
+
+/**
+ * ≡ iOS `GridPreviewModeChipIcon`: 2 esquinas en Rellenar, 4 en Ajustar.
+ */
+@Composable
+fun GridPreviewModeChipIcon(
+    fitMode: MomentGridPreviewFitMode,
+    modifier: Modifier = Modifier.size(18.dp),
+    tint: Color = Color.White,
+) {
+    androidx.compose.foundation.Canvas(modifier) {
+        val leg = 5.5.dp.toPx()
+        val stroke = androidx.compose.ui.graphics.drawscope.Stroke(
+            width = 1.8.dp.toPx(),
+            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            join = androidx.compose.ui.graphics.StrokeJoin.Round,
+        )
+        val corners = when (fitMode) {
+            MomentGridPreviewFitMode.FILL -> listOf(
+                Alignment.TopEnd to Offset(size.width, 0f),
+                Alignment.BottomStart to Offset(0f, size.height),
+            )
+            MomentGridPreviewFitMode.FIT -> listOf(
+                Alignment.TopStart to Offset(0f, 0f),
+                Alignment.TopEnd to Offset(size.width, 0f),
+                Alignment.BottomStart to Offset(0f, size.height),
+                Alignment.BottomEnd to Offset(size.width, size.height),
+            )
+        }
+        corners.forEach { (align, origin) ->
+            val path = Path()
+            when (align) {
+                Alignment.TopStart -> {
+                    path.moveTo(origin.x, origin.y + leg)
+                    path.lineTo(origin.x, origin.y)
+                    path.lineTo(origin.x + leg, origin.y)
+                }
+                Alignment.TopEnd -> {
+                    path.moveTo(origin.x - leg, origin.y)
+                    path.lineTo(origin.x, origin.y)
+                    path.lineTo(origin.x, origin.y + leg)
+                }
+                Alignment.BottomStart -> {
+                    path.moveTo(origin.x, origin.y - leg)
+                    path.lineTo(origin.x, origin.y)
+                    path.lineTo(origin.x + leg, origin.y)
+                }
+                else -> {
+                    path.moveTo(origin.x - leg, origin.y)
+                    path.lineTo(origin.x, origin.y)
+                    path.lineTo(origin.x, origin.y - leg)
+                }
+            }
+            drawPath(path, tint, style = stroke)
         }
     }
 }

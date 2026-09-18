@@ -168,13 +168,17 @@ private fun CompactInAppBanner(
     val detailSp = with(density) { legacyPoppinsSize(context, 12).toSp() }
 
     var contentPreviewImage by remember(notification.id) { mutableStateOf<String?>(null) }
+    var contentPreviewFeedCrop by remember(notification.id) { mutableStateOf<com.moments.android.models.MediaItemFeedCrop?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     var suppressTapUntilMs by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(notification.id) {
         contentPreviewImage = null
+        contentPreviewFeedCrop = null
         HapticManager.shared.success()
-        contentPreviewImage = loadPreviewImage(notification)
+        val preview = loadPreviewImage(notification)
+        contentPreviewImage = preview.first
+        contentPreviewFeedCrop = preview.second
     }
 
     // iOS: wash sutil (sin borde gradient gordo)
@@ -303,6 +307,7 @@ private fun CompactInAppBanner(
                         isSystem = isSystem,
                         accentColor = accent,
                         contentPreviewImage = contentPreviewImage,
+                        contentPreviewFeedCrop = contentPreviewFeedCrop,
                     )
                 }
             }
@@ -410,10 +415,14 @@ private fun BannerTrailingIcon(
     isSystem: Boolean,
     accentColor: Color,
     contentPreviewImage: String?,
+    contentPreviewFeedCrop: com.moments.android.models.MediaItemFeedCrop? = null,
 ) {
     if (!isSystem && !contentPreviewImage.isNullOrBlank()) {
         AsyncImage(
-            model = contentPreviewImage,
+            model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                .data(contentPreviewImage)
+                .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(contentPreviewFeedCrop))
+                .build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -472,29 +481,30 @@ private fun isSystemModerationBanner(notification: MomentsNotification): Boolean
 private fun isSystemBanner(notification: MomentsNotification): Boolean =
     isSystemTimeLimitBanner(notification) || isSystemModerationBanner(notification)
 
-private suspend fun loadPreviewImage(notification: MomentsNotification): String? {
-    if (isSystemBanner(notification)) return null
+private suspend fun loadPreviewImage(notification: MomentsNotification): Pair<String?, com.moments.android.models.MediaItemFeedCrop?> {
+    if (isSystemBanner(notification)) return null to null
     return withContext(Dispatchers.IO) {
         runCatching {
             when {
                 notification.type == NotificationType.MENTION && notification.storyId != null ->
-                    fetchStoryPreview(notification.storyId, storyAuthorId(notification))
+                    fetchStoryPreview(notification.storyId, storyAuthorId(notification)) to null
                 notification.type in setOf(
                     NotificationType.LIKE,
                     NotificationType.COMMENT,
                     NotificationType.REACTION,
                     NotificationType.MENTION,
                 ) && notification.momentId != null -> {
-                    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@runCatching null
-                    FirestoreService().fetchMoment(notification.momentId, uid).previewImageURLString
+                    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@runCatching null to null
+                    val moment = FirestoreService().fetchMoment(notification.momentId, uid)
+                    moment.previewImageURLString to moment.primaryVisibleMediaItem?.feedCrop
                 }
                 notification.type == NotificationType.STORY_REACTION && notification.storyId != null ->
-                    fetchStoryPreview(notification.storyId, notification.storyAuthorId)
+                    fetchStoryPreview(notification.storyId, notification.storyAuthorId) to null
                 notification.type == NotificationType.STORY_CHAIN_CONTINUED && notification.storyId != null ->
-                    fetchStoryPreview(notification.storyId, notification.senderId)
-                else -> null
+                    fetchStoryPreview(notification.storyId, notification.senderId) to null
+                else -> null to null
             }
-        }.getOrNull()
+        }.getOrNull() ?: (null to null)
     }
 }
 

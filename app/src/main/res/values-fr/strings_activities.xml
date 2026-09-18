@@ -4,6 +4,7 @@
     <string name="upload_progress_story_title">Publication de la story</string>
     <string name="upload_progress_status_uploading">Publication… %d%%</string>
     <string name="upload_progress_status_processing">Traitement…</string>
+    <string name="upload_progress_status_compressing">Compression...</string>
     <string name="upload_progress_status_completed">Terminé</string>
     <string name="upload_progress_status_failed">Erreur</string>
     <string name="upload_foreground_body">Maintien de l’envoi en arrière-plan</string>

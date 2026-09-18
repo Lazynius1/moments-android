@@ -433,7 +433,7 @@ private fun ExploreThumbnailMedia(moment: Moment, usesPortraitCrop: Boolean) {
                 else -> null
             }
             if (url != null) {
-                FillImage(url)
+                FillImage(url, media?.feedCrop)
             } else {
                 val video = media?.url?.takeIf { it.isNotBlank() }
                     ?: moment.previewVideoURLString?.takeIf { it.isNotBlank() }
@@ -443,9 +443,9 @@ private fun ExploreThumbnailMedia(moment: Moment, usesPortraitCrop: Boolean) {
         media != null && media.url.isNotBlank() -> {
             if (media.type.raw == "video") {
                 val thumb = media.thumbnailUrl?.takeIf { it.isNotBlank() }
-                if (thumb != null) FillImage(thumb) else GeneratedVideoThumbnail(media.url)
+                if (thumb != null) FillImage(thumb, media.feedCrop) else GeneratedVideoThumbnail(media.url)
             } else {
-                FillImage(media.url)
+                FillImage(media.url, media.feedCrop)
             }
         }
         !moment.previewImageURLString.isNullOrBlank() -> FillImage(moment.previewImageURLString!!)
@@ -455,9 +455,12 @@ private fun ExploreThumbnailMedia(moment: Moment, usesPortraitCrop: Boolean) {
 }
 
 @Composable
-private fun FillImage(url: String) {
+private fun FillImage(url: String, feedCrop: com.moments.android.models.MediaItemFeedCrop? = null) {
     AsyncImage(
-        model = url,
+        model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+            .data(url)
+            .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(feedCrop))
+            .build(),
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = Modifier.fillMaxSize(),

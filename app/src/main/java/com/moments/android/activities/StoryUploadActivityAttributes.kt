@@ -18,6 +18,7 @@ data class StoryUploadActivityAttributes(
 
         companion object {
             const val STATUS_UPLOADING = "uploading"
+            const val STATUS_COMPRESSING = "compressing"
             const val STATUS_PROCESSING = "processing"
             const val STATUS_COMPLETED = "completed"
             const val STATUS_FAILED = "failed"

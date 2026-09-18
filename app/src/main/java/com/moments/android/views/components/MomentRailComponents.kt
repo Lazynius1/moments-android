@@ -44,8 +44,10 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -141,6 +143,12 @@ fun ModernActionButtons(
 ) {
     val colors = rememberAdaptiveColors()
     val isDark = isSystemInDarkTheme()
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp.toFloat()
+    // El iPhone de referencia dibuja el media a 432 pt. En el Android actual
+    // son ~385 dp: mantener 44 dp hacía que el rail ocupase más imagen y tapase
+    // una zona que en iOS queda visible. Escalamos todo el rail como una unidad.
+    val railScale = ((screenWidthDp - 8f) / 432f).coerceIn(0.86f, 1f)
+    val railInset = (16f * railScale).dp
     val uid = FirebaseAuth.getInstance().currentUser?.uid
     val showReactionCount = moment.authorId == uid || !moment.hideLikeCounts
     val immersiveAlpha by animateFloatAsState(
@@ -151,12 +159,19 @@ fun ModernActionButtons(
     Box(
         modifier
             .fillMaxWidth()
-            .padding(end = 16.dp, bottom = 16.dp),
+            .padding(end = railInset, bottom = railInset),
         contentAlignment = Alignment.BottomEnd,
     ) {
         // Glass en capa hermana (clip solo del chrome). El Row no se clippea:
         // el picker de reacciones / badges pueden dibujar fuera (como iOS overlays).
-        Box(Modifier.graphicsLayer { alpha = immersiveAlpha }) {
+        Box(
+            Modifier.graphicsLayer {
+                alpha = immersiveAlpha
+                scaleX = railScale
+                scaleY = railScale
+                transformOrigin = TransformOrigin(1f, 1f)
+            },
+        ) {
             Box(
                 Modifier
                     .matchParentSize()

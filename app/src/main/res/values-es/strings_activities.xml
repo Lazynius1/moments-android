@@ -4,6 +4,7 @@
     <string name="upload_progress_story_title">Subiendo historia</string>
     <string name="upload_progress_status_uploading">Subiendo… %d%%</string>
     <string name="upload_progress_status_processing">Procesando…</string>
+    <string name="upload_progress_status_compressing">Comprimiendo...</string>
     <string name="upload_progress_status_completed">Completado</string>
     <string name="upload_progress_status_failed">Error</string>
     <string name="upload_foreground_body">Manteniendo la subida en segundo plano</string>

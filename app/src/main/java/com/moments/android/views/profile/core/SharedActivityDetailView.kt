@@ -1140,9 +1140,20 @@ private fun SharedReactionTile(
                 onLongClick = onEnterSelection,
             ),
     ) {
-        val url = item.moment?.previewImageURLString
+        val media = item.moment?.primaryVisibleMediaItem
+        val url = media?.thumbnailUrl?.takeIf { it.isNotBlank() }
+            ?: media?.url?.takeIf { it.isNotBlank() }
+            ?: item.moment?.previewImageURLString
         if (url != null) {
-            AsyncImage(url, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            AsyncImage(
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(url)
+                    .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(media?.feedCrop))
+                    .build(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
         } else {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(0.12f)))
         }
@@ -1295,8 +1306,20 @@ private fun SharedCommentPreview(item: ActivityCommentItem) {
             .clip(RoundedCornerShape(8.dp))
             .background(Color.Black.copy(0.10f)),
     ) {
-        item.moment?.previewImageURLString?.let {
-            AsyncImage(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        val media = item.moment?.primaryVisibleMediaItem
+        val url = media?.thumbnailUrl?.takeIf { it.isNotBlank() }
+            ?: media?.url?.takeIf { it.isNotBlank() }
+            ?: item.moment?.previewImageURLString
+        url?.let {
+            AsyncImage(
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(it)
+                    .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(media?.feedCrop))
+                    .build(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
         }
         if (item.moment?.isCarouselMoment == true && item.canView) {
             Icon(

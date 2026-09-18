@@ -1248,9 +1248,9 @@ private fun VideoThumbnailPicker(
 }
 
 private fun inferVideoFormat(aspect: CreatorAspectRatio) = when (aspect) {
-    CreatorAspectRatio.LANDSCAPE -> VideoFormat.LANDSCAPE
-    CreatorAspectRatio.SQUARE, CreatorAspectRatio.PORTRAIT -> VideoFormat.SQUARE
+    CreatorAspectRatio.LANDSCAPE, CreatorAspectRatio.FEED_LANDSCAPE -> VideoFormat.LANDSCAPE
     CreatorAspectRatio.NINE_BY_SIXTEEN -> VideoFormat.REELS
+    else -> VideoFormat.SQUARE // SQUARE / PORTRAIT / REELS_GRID / custom
 }
 
 private fun formatEditorTime(seconds: Double): String {

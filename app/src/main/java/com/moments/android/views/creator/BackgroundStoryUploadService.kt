@@ -844,6 +844,7 @@ object BackgroundStoryUploadService {
         val isVideo = payload.mediaItem.type == "video"
         var workingFile = mediaFile
         if (isVideo && needsCompressionBySize(workingFile)) {
+            updateProgress(actionId, progressRange.start, UploadStatus.Compressing)
             runCatching {
                 val compressed = VideoCompressionService.compressVideoForStory(Uri.fromFile(workingFile))
                 compressed.path?.let(::File)?.takeIf { it.exists() }?.let { workingFile = it }
@@ -1494,6 +1495,8 @@ object BackgroundStoryUploadService {
         val statusString = when (status) {
             UploadStatus.Initializing, UploadStatus.Uploading ->
                 StoryUploadActivityAttributes.ContentState.STATUS_UPLOADING
+            UploadStatus.Compressing ->
+                StoryUploadActivityAttributes.ContentState.STATUS_COMPRESSING
             UploadStatus.Processing, UploadStatus.Moderated ->
                 StoryUploadActivityAttributes.ContentState.STATUS_PROCESSING
             UploadStatus.Completed ->

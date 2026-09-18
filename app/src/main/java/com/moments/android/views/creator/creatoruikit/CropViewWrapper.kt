@@ -116,8 +116,10 @@ fun CropViewWrapper(
         guideAspect = aspectRatio.ratio
     }
 
-    Column(modifier.fillMaxSize().background(Color.Black)) {
-        val chromeFg = MomentsChromeGlass.contentColor(isSystemInDarkTheme())
+    val isDark = isSystemInDarkTheme()
+    val canvas = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+    Column(modifier.fillMaxSize().background(canvas)) {
+        val chromeFg = MomentsChromeGlass.contentColor(isDark)
         Row(
             Modifier
                 .fillMaxWidth()
@@ -136,7 +138,7 @@ fun CropViewWrapper(
             Spacer(Modifier.weight(1f))
             Text(
                 stringResource(R.string.creator_crop_title),
-                color = Color.White,
+                color = chromeFg,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 17.sp,
             )
@@ -368,7 +370,7 @@ private fun cropAndSave(
         (bottom - top).coerceAtLeast(1),
     )
     val finalRatio = lockedAspect
-        ?: CreatorAspectRatio.fromRatio(
+        ?: CreatorAspectRatio.fromFeedPostRatio(
             cropped.width.toFloat() / cropped.height.toFloat().coerceAtLeast(1f),
         )
 

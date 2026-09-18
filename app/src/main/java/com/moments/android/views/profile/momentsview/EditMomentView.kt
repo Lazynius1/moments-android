@@ -519,6 +519,7 @@ private fun EditMomentPhotoTagSheet(
             recommendedAspectRatio = aspect,
             hasEdits = false,
             tags = item.tags.orEmpty(),
+            feedCrop = item.feedCrop,
         )
         loadFailed = false
     }
@@ -678,9 +679,10 @@ private fun DetailRow(
 
 @Composable
 private fun EditMomentPreviewCard(moment: FeedMoment) {
-    val url = moment.visibleMediaItems.firstOrNull()?.url
-        ?: moment.mediaItems.firstOrNull()?.url
-    val ratio = moment.aspectRatio?.toFloatOrNull()?.takeIf { it > 0f } ?: (4f / 5f)
+    val media = moment.visibleMediaItems.firstOrNull() ?: moment.mediaItems.firstOrNull()
+    val url = media?.url
+    val crop = media?.feedCrop
+    val ratio = crop?.cardAspectValue ?: media?.resolvedAspectRatioValue?.takeIf { it > 0f } ?: moment.aspectRatio?.toFloatOrNull()?.takeIf { it > 0f } ?: (4f / 5f)
     Box(
         Modifier
             .fillMaxWidth()
@@ -690,13 +692,16 @@ private fun EditMomentPreviewCard(moment: FeedMoment) {
     ) {
         if (!url.isNullOrBlank()) {
             AsyncImage(
-                model = url,
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(url)
+                    .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(crop))
+                    .build(),
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(ratio)
                     .clip(RoundedCornerShape(24.dp)),
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
             )
         } else {
             Box(

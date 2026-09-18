@@ -102,6 +102,7 @@ fun FirestoreService.serializedMediaItems(mediaItems: List<MediaItem>): List<Map
             put("type", item.type.raw)
             put("url", item.url)
             item.aspectRatio?.let { put("aspectRatio", it) }
+            item.feedCrop?.let { put("feedCrop", it.toMap()) }
             item.thumbnailUrl?.let { put("thumbnailUrl", it) }
             item.videoDuration?.let { put("videoDuration", it) }
             item.videoFileSize?.let { put("videoFileSize", it) }

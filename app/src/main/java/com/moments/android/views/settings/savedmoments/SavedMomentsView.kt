@@ -1251,7 +1251,10 @@ private fun SavedMomentPreview(moment: Moment, isRestricted: Boolean, isDark: Bo
         }
         media != null && media.url.isNotBlank() -> {
             AsyncImage(
-                model = profileThumbnailUrl(media.url),
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(profileThumbnailUrl(media.url))
+                    .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(media.feedCrop))
+                    .build(),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,

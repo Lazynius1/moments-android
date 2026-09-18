@@ -64,6 +64,7 @@ import com.moments.android.views.components.LiveUsernameText
 import com.moments.android.views.feed.maps.MapPlaceCluster
 import com.moments.android.views.feed.maps.mapAvailabilityKey
 import com.moments.android.views.feed.maps.mapHasVideoMedia
+import com.moments.android.views.feed.maps.mapPreferredFeedCrop
 import com.moments.android.views.feed.maps.mapPreferredImageUrl
 import com.moments.android.views.feed.maps.mapPreferredVideoThumbnailUrl
 import com.moments.android.views.feed.rememberAdaptiveColors
@@ -543,7 +544,14 @@ fun ModernLocationMomentRow(
                         MapsVideoThumbnailView(moment = moment, cornerRadius = 18.dp, modifier = Modifier.fillMaxSize())
                     } else {
                         SubcomposeAsyncImage(
-                            model = moment.mapPreferredImageUrl,
+                            model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                                .data(moment.mapPreferredImageUrl)
+                                .transformations(
+                                    com.moments.android.views.creator.creatoruikit.feedCropTransformations(
+                                        moment.mapPreferredFeedCrop,
+                                    ),
+                                )
+                                .build(),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),

@@ -809,7 +809,10 @@ private fun EchoDeckSlide(
         } else {
             if (isFit) {
                 AsyncImage(
-                    model = preview,
+                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(preview)
+                        .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(slide.feedCrop))
+                        .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
@@ -819,7 +822,10 @@ private fun EchoDeckSlide(
                 )
             }
             AsyncImage(
-                model = preview,
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(preview)
+                    .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(slide.feedCrop))
+                    .build(),
                 contentDescription = null,
                 contentScale = if (isFit) ContentScale.Fit else ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

@@ -90,6 +90,7 @@ fun YourStoryRing(
     val status = uploadingStory?.status
     val label = when {
         status == UploadStatus.Initializing -> stringResource(R.string.feed_uploading_initializing)
+        status == UploadStatus.Compressing -> stringResource(R.string.feed_uploading_compressing)
         status == UploadStatus.Uploading || status == UploadStatus.Processing ->
             stringResource(R.string.feed_uploading_uploading)
         status == UploadStatus.Completed || status == UploadStatus.Moderated ->
@@ -570,7 +571,9 @@ fun StoryUploadCircleOverlay(
     }
 
     val isUploadingPhase =
-        status == UploadStatus.Uploading || status == UploadStatus.Processing
+        status == UploadStatus.Compressing ||
+            status == UploadStatus.Uploading ||
+            status == UploadStatus.Processing
     val isCompleting =
         status == UploadStatus.Completed || status == UploadStatus.Moderated
 

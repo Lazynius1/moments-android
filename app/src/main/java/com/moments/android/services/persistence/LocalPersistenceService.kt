@@ -382,7 +382,18 @@ object LocalPersistenceService {
                 .sortedByDescending { it.timestamp.time }
                 .take(maxCount)
                 .mapNotNull { it.toMoment() }
+                .let { moments ->
+                    if (section.startsWith("profile_")) sortProfileMoments(moments) else moments
+                }
         }
+
+    /** ≡ iOS `LocalPersistenceService.sortProfileMoments` — pineados arriba. */
+    private fun sortProfileMoments(moments: List<Moment>): List<Moment> =
+        moments.sortedWith(
+            compareByDescending<Moment> { it.isPinned == true }
+                .thenByDescending { it.pinnedAt ?: it.timestamp }
+                .thenByDescending { it.timestamp },
+        )
 
     private suspend fun saveMomentsAsync(
         moments: List<Moment>,

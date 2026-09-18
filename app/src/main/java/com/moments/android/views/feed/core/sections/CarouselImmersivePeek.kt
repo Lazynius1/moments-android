@@ -15,7 +15,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import com.moments.android.services.content.FeedMediaItem
 import com.moments.android.utilities.HapticManager
-import com.moments.android.views.feed.moments.MomentCarouselLayoutRules
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -68,14 +67,32 @@ fun Modifier.carouselImmersivePeekGesture(
             return
         }
 
-        val currentItemRatio = MomentCarouselLayoutRules.aspectRatioValue(currentItem.aspectRatio)
-            .takeIf { it > 0f && it.isFinite() }
+        // iOS: `item.resolvedAspectRatioValue ?? realAspectRatio` (exacto, no parsePersisted)
+        val currentItemRatio = currentItem.resolvedAspectRatioValue
+            ?.takeIf { it > 0f && it.isFinite() }
             ?: realState.value
         val detected = detectedState.value
+        val hasNewPeek = currentItem.feedCrop?.let { !it.isFullBounds } ?: false
+        val hasLegacyPeek = currentItem.feedCrop == null &&
+            !currentItem.thumbnailUrl.isNullOrBlank()
         if (currentItemRatio <= 0f || !currentItemRatio.isFinite()) return
-        if (!shouldUseFullscreenPeek && abs(currentItemRatio - detected) <= 0.035f) return
+        if (!hasNewPeek && !hasLegacyPeek) return
+        if (!shouldUseFullscreenPeek &&
+            !hasNewPeek &&
+            abs(currentItemRatio - detected) <= 0.035f
+        ) {
+            return
+        }
 
-        peekState.value?.invoke(currentItem.url, currentItemRatio, true)
+        val peekURL = if (currentItem.feedCrop == null &&
+            !currentItem.thumbnailUrl.isNullOrBlank()
+        ) {
+            currentItem.thumbnailUrl.orEmpty()
+        } else {
+            currentItem.url
+        }
+        if (peekURL.isBlank()) return
+        peekState.value?.invoke(peekURL, currentItemRatio, true)
     }
 
     // iOS onDisappear: cancel immersiveActivationTask + end immersive

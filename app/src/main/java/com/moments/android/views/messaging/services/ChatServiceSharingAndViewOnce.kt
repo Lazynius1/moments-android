@@ -90,18 +90,23 @@ suspend fun ChatService.sendSharedMomentMessage(
     val author = UserCacheService.getCachedUser(moment.authorId)?.username ?: moment.username
     // iOS: String(moment.timestamp.timeIntervalSince1970) — segundos, no ms.
     val epochSeconds = (moment.timestamp.time / 1000.0).toString()
-    val sharedMomentData = mapOf(
-        "momentId" to moment.id.orEmpty(),
-        "momentAuthor" to author,
-        "momentAuthorId" to moment.authorId,
-        "momentContent" to moment.content,
-        "momentImageUrl" to moment.previewImageURLString.orEmpty(),
-        "momentAspectRatio" to (moment.primaryVisibleMediaItem?.aspectRatio ?: moment.aspectRatio ?: "1:1"),
-        "momentMediaCount" to maxOf(moment.visibleMediaCount, 1).toString(),
-        "momentVideoUrl" to moment.previewVideoURLString.orEmpty(),
-        "momentTimestamp" to epochSeconds,
-        "shareUrl" to momentUrl,
-    )
+    val crop = moment.primaryVisibleMediaItem?.feedCrop
+    val sharedMomentData = buildMap {
+        put("momentId", moment.id.orEmpty())
+        put("momentAuthor", author)
+        put("momentAuthorId", moment.authorId)
+        put("momentContent", moment.content)
+        put("momentImageUrl", moment.previewImageURLString.orEmpty())
+        put(
+            "momentAspectRatio",
+            crop?.cardAspect ?: moment.primaryVisibleMediaItem?.aspectRatio ?: moment.aspectRatio ?: "1:1",
+        )
+        put("momentMediaCount", maxOf(moment.visibleMediaCount, 1).toString())
+        put("momentVideoUrl", moment.previewVideoURLString.orEmpty())
+        put("momentTimestamp", epochSeconds)
+        put("shareUrl", momentUrl)
+        if (crop != null) putAll(crop.toSharedMomentFields())
+    }
     val sent = sendMessage(
         EnhancedMessage(
             id = UUID.randomUUID().toString(),

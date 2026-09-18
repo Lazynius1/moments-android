@@ -502,6 +502,7 @@
     <string name="live_activity_error">Error</string>
     <string name="live_activity_processing">Processing...</string>
     <string name="live_activity_uploading">Uploading...</string>
+    <string name="live_activity_compressing">Compressing...</string>
     <string name="live_activity_uploading_moment">Uploading moment</string>
     <string name="live_activity_uploading_story">Uploading story</string>
     <string name="location_moment_detail_photo_count">%1$d photo</string>

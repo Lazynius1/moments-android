@@ -11,6 +11,7 @@ data class CachedUploadMediaItem(
     val localFileName: String,
     val thumbnailFileName: String? = null,
     val aspectRatio: String? = null,
+    val feedCrop: MediaItemFeedCrop? = null,
     val videoDuration: Double? = null,
     val videoFileSize: Long? = null,
     val videoResolution: String? = null,
@@ -153,6 +154,17 @@ object UploadPayloadDecoder {
                 localFileName = item.getString("localFileName"),
                 thumbnailFileName = item.optString("thumbnailFileName").takeIf { item.has("thumbnailFileName") && !item.isNull("thumbnailFileName") },
                 aspectRatio = item.optString("aspectRatio").takeIf { item.has("aspectRatio") && !item.isNull("aspectRatio") },
+                feedCrop = item.optJSONObject("feedCrop")?.let { crop ->
+                    MediaItemFeedCrop.from(
+                        mapOf(
+                            "cardAspect" to crop.optString("cardAspect"),
+                            "x" to crop.optDouble("x"),
+                            "y" to crop.optDouble("y"),
+                            "width" to crop.optDouble("width"),
+                            "height" to crop.optDouble("height"),
+                        ),
+                    )
+                },
                 videoDuration = item.optDouble("videoDuration").takeIf { item.has("videoDuration") && !item.isNull("videoDuration") },
                 videoFileSize = item.optLong("videoFileSize").takeIf { item.has("videoFileSize") },
                 videoResolution = item.optString("videoResolution").takeIf { item.has("videoResolution") && !item.isNull("videoResolution") },
@@ -269,6 +281,7 @@ object UploadPayloadDecoder {
                             put("localFileName", item.localFileName)
                             item.thumbnailFileName?.let { put("thumbnailFileName", it) }
                             item.aspectRatio?.let { put("aspectRatio", it) }
+                            item.feedCrop?.let { put("feedCrop", JSONObject(it.toMap())) }
                             item.videoDuration?.let { put("videoDuration", it) }
                             item.videoFileSize?.let { put("videoFileSize", it) }
                             item.videoResolution?.let { put("videoResolution", it) }

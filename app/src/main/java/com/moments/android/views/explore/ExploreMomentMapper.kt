@@ -17,6 +17,7 @@ fun Moment.toExploreFeedMoment(): FeedMoment {
             videoDuration = item.videoDuration,
             videoVariants = item.videoVariants,
             hlsMasterUrl = item.hlsMasterUrl,
+            feedCrop = item.feedCrop,
         )
     }.ifEmpty {
         buildList {

@@ -4,6 +4,7 @@
     <string name="upload_progress_story_title">Pujant història</string>
     <string name="upload_progress_status_uploading">Pujant… %d%%</string>
     <string name="upload_progress_status_processing">Processant…</string>
+    <string name="upload_progress_status_compressing">Comprimint...</string>
     <string name="upload_progress_status_completed">Completat</string>
     <string name="upload_progress_status_failed">Error</string>
     <string name="upload_foreground_body">Mantenint la pujada en segon pla</string>

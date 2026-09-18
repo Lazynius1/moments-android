@@ -183,6 +183,7 @@ private fun Moment.toFeedMoment(): FeedMoment {
             isHiddenByModeration = item.isHiddenByModeration,
             tags = item.tags,
             videoDuration = item.videoDuration,
+            feedCrop = item.feedCrop,
         )
     }.ifEmpty {
         buildList {

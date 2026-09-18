@@ -832,6 +832,7 @@
     <string name="live_activity_error">Errore</string>
     <string name="live_activity_processing">Elaborazione...</string>
     <string name="live_activity_uploading">Caricamento...</string>
+    <string name="live_activity_compressing">Compressione...</string>
     <string name="live_activity_uploading_moment">Caricamento momento</string>
     <string name="live_activity_uploading_story">Caricamento storia</string>
     <string name="location_moment_detail_photo_count">%1$d foto</string>

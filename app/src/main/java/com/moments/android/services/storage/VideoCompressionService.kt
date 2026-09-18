@@ -95,6 +95,29 @@ object VideoCompressionService {
         val limits = limits(preset)
         val inputSize = fileSize(context, inputUri)
             ?: throw invalidSource(context)
+        if (preset == VideoCompressionPreset.MOMENT) {
+            val path = inputUri.path.orEmpty()
+            val name = File(path).name
+            val prepared = (name.startsWith("compressed_") || name.startsWith("moment_video_")) &&
+                name.endsWith(".mp4", ignoreCase = true) &&
+                path.contains(context.cacheDir.absolutePath)
+            if (prepared) {
+                if (inputSize > limits.maxOutputBytes) {
+                    throw outputTooLarge(context, inputSize, limits.maxOutputBytes)
+                }
+                return inputUri
+            }
+            val compressedUri = compressVideo(context, inputUri)
+            val compressedSize = fileSize(context, compressedUri)
+                ?: throw exportFailed(context)
+            if (compressedSize > limits.maxOutputBytes) {
+                if (compressedUri != inputUri) {
+                    runCatching { compressedUri.path?.let { File(it).delete() } }
+                }
+                throw outputTooLarge(context, compressedSize, limits.maxOutputBytes)
+            }
+            return compressedUri
+        }
 
         if (inputSize <= limits.compressIfLargerThan) {
             return inputUri

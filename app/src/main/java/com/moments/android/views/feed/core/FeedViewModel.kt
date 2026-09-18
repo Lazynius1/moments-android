@@ -1020,6 +1020,7 @@ class FeedViewModel : ViewModel() {
                 videoDuration = item.videoDuration,
                 videoVariants = item.videoVariants,
                 hlsMasterUrl = item.hlsMasterUrl,
+                feedCrop = item.feedCrop,
             )
         }
         return FeedMoment(

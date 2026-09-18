@@ -488,10 +488,12 @@ class UserProfileViewModel(
         )
         if (backend != null) {
             moments = if (reset) {
-                backend.moments
+                sortProfileMoments(backend.moments)
             } else {
                 val existingIds = moments.map { it.id }.toSet()
-                moments + backend.moments.filter { it.id !in existingIds }
+                sortProfileMoments(
+                    moments + backend.moments.filter { it.id !in existingIds },
+                )
             }
             momentsCursor = backend.nextCursor
             hasMoreMoments = backend.nextCursor != null
@@ -509,13 +511,14 @@ class UserProfileViewModel(
         // Fallback: visibilidad por-momento vía repositorio (equivale a filterMomentsForAudience en iOS).
         runCatching { firestoreService.fetchMomentsWithVisibility(userId, current) }
             .onSuccess { filtered ->
-                legacyVisibleMoments = filtered
-                moments = filtered.take(momentsPageSize)
-                hasMoreMoments = moments.size < filtered.size
+                val sorted = sortProfileMoments(filtered)
+                legacyVisibleMoments = sorted
+                moments = sorted.take(momentsPageSize)
+                hasMoreMoments = moments.size < sorted.size
                 isLoadingMoments = false
                 isLoadingMoreMoments = false
                 isFetchingMomentsPage = false
-                LocalPersistenceService.saveProfileMomentsAsync(filtered, userId, current, sync = true)
+                LocalPersistenceService.saveProfileMomentsAsync(sorted, userId, current, sync = true)
             }
             .onFailure {
                 isLoadingMoments = false
@@ -528,6 +531,13 @@ class UserProfileViewModel(
         if (!hasMoreMoments || isLoadingMoreMoments) return
         viewModelScope.launch { fetchMoments(reset = false) }
     }
+
+    private fun sortProfileMoments(values: List<Moment>): List<Moment> =
+        values.sortedWith(
+            compareByDescending<Moment> { it.isPinned == true }
+                .thenByDescending { it.pinnedAt ?: it.timestamp }
+                .thenByDescending { it.timestamp },
+        )
 
     // MARK: - Estado del botón de seguir
 

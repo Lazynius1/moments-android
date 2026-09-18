@@ -626,6 +626,7 @@ fun ProfileView(
         ) {
             ProfileGridPreviewEditorView(
                 imageUrl = imageUrl,
+                feedCrop = moment.primaryVisibleMediaItem?.feedCrop,
                 initialSettings = moment.gridPreviewSettings,
                 onDismiss = { gridPreviewMoment = null },
                 onSave = { settings ->

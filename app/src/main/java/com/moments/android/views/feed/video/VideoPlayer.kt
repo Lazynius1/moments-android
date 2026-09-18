@@ -83,6 +83,7 @@ import com.moments.android.services.video.VideoPlaybackSelector
 import com.moments.android.services.video.VideoPlaybackSource
 import com.moments.android.services.video.configure
 import com.moments.android.services.video.makeConfiguredPlayerItem
+import com.moments.android.views.creator.creatoruikit.MomentFeedCrop
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -424,7 +425,7 @@ fun ModernVideoPlayer(
                 )
                 ModernLoadingView(
                     hasLoadError = hasLoadError,
-                    aspectRatio = minOf(aspectRatio, 0.8f),
+                    aspectRatio = MomentFeedCrop.feedCardAspect(aspectRatio),
                     onRetry = { forceReloadPlayer() },
                 )
             }
@@ -637,7 +638,7 @@ private fun ClassicMuteButton(isMuted: Boolean, onToggle: () -> Unit) {
 }
 
 @Composable
-private fun CroppedMuteButton(
+internal fun CroppedMuteButton(
     isMuted: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,

@@ -119,6 +119,8 @@ object UploadProgressNotificationHelper {
     ): String = when (status) {
         MomentUploadActivityAttributes.ContentState.STATUS_UPLOADING ->
             context.getString(R.string.upload_progress_status_uploading, percentage)
+        MomentUploadActivityAttributes.ContentState.STATUS_COMPRESSING ->
+            context.getString(R.string.live_activity_compressing)
         MomentUploadActivityAttributes.ContentState.STATUS_PROCESSING ->
             context.getString(R.string.upload_progress_status_processing)
         MomentUploadActivityAttributes.ContentState.STATUS_COMPLETED ->

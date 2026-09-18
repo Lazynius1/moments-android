@@ -4,6 +4,7 @@
     <string name="upload_progress_story_title">Caricamento storia</string>
     <string name="upload_progress_status_uploading">Caricamento… %d%%</string>
     <string name="upload_progress_status_processing">Elaborazione…</string>
+    <string name="upload_progress_status_compressing">Compressione...</string>
     <string name="upload_progress_status_completed">Completato</string>
     <string name="upload_progress_status_failed">Errore</string>
     <string name="upload_foreground_body">Manteniamo il caricamento in background</string>

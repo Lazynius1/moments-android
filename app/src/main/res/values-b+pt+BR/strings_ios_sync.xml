@@ -838,6 +838,7 @@
     <string name="live_activity_error">Erro</string>
     <string name="live_activity_processing">Processando...</string>
     <string name="live_activity_uploading">Enviando...</string>
+    <string name="live_activity_compressing">Compactando...</string>
     <string name="live_activity_uploading_moment">Enviando momento</string>
     <string name="live_activity_uploading_story">Enviando story</string>
     <string name="location_moment_detail_photo_count">%1$d foto</string>

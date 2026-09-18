@@ -839,6 +839,7 @@
     <string name="live_activity_error">Error</string>
     <string name="live_activity_processing">Processant...</string>
     <string name="live_activity_uploading">Pujant...</string>
+    <string name="live_activity_compressing">Comprimint...</string>
     <string name="live_activity_uploading_moment">Pujant moment</string>
     <string name="live_activity_uploading_story">Pujant història</string>
     <string name="location_moment_detail_photo_count">%1$d foto</string>

@@ -4,6 +4,7 @@
     <string name="upload_progress_story_title">Story wird hochgeladen</string>
     <string name="upload_progress_status_uploading">Wird hochgeladen… %d%%</string>
     <string name="upload_progress_status_processing">Wird verarbeitet…</string>
+    <string name="upload_progress_status_compressing">Wird komprimiert...</string>
     <string name="upload_progress_status_completed">Abgeschlossen</string>
     <string name="upload_progress_status_failed">Fehler</string>
     <string name="upload_foreground_body">Upload läuft im Hintergrund weiter</string>

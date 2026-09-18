@@ -9,7 +9,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -24,19 +23,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterNone
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -45,6 +40,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -54,22 +50,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.MomentsChromeGlass
-import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.views.creator.CreatorAlbumInfo
 import com.moments.android.views.creator.CreatorAspectRatio
 import com.moments.android.views.creator.CreatorFlow
 import com.moments.android.views.creator.CreatorMedia
-import com.moments.android.views.creator.creatoruikit.CameraCapture
+import com.moments.android.models.MediaItemFeedCrop
+import com.moments.android.views.creator.creatoruikit.AssetCropSession
+import com.moments.android.views.creator.creatoruikit.MomentFeedCrop
+import com.moments.android.views.creator.creatoruikit.MomentFeedCropCanvas
+import com.moments.android.views.creator.creatoruikit.creatorNormalizedUp
+import com.moments.android.views.creator.creatoruikit.exifOrientation
+import com.moments.android.views.creator.creatoruikit.framedFeedCropFromSession
+import com.moments.android.views.creator.creatoruikit.orientedDisplaySize
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
@@ -77,11 +77,15 @@ import com.moments.android.views.permission.shared.PermissionPrimerGate
 import com.moments.android.views.permission.shared.PermissionPrimerGateHost
 import com.moments.android.views.permission.shared.PhotoLibraryAccess
 import com.moments.android.views.permission.shared.photoLibraryAccess
-import com.moments.android.views.permissions.CameraAccessBoundary
 import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+import java.util.UUID
+import kotlin.math.abs
+import kotlin.math.max
 
 /**
  * Port de `MediaSelectionView.swift`.
@@ -110,9 +114,101 @@ fun MediaSelectionView(
     var availableAlbums by remember { mutableStateOf<List<CreatorAlbumInfo>>(emptyList()) }
     var selectedAlbum by remember { mutableStateOf<CreatorAlbumInfo?>(null) }
     var showingAlbumPicker by remember { mutableStateOf(false) }
-    var showingCamera by remember { mutableStateOf(false) }
+    var isMultiSelect by remember { mutableStateOf(false) }
     var showingVideoTooLongAlert by remember { mutableStateOf(false) }
     var rejectedVideoDuration by remember { mutableStateOf(0.0) }
+    var cropSessions by remember { mutableStateOf<Map<String, AssetCropSession>>(emptyMap()) }
+    var cropWindowSizes by remember { mutableStateOf<Map<String, Pair<Float, Float>>>(emptyMap()) }
+    var assetPixelSizes by remember { mutableStateOf<Map<String, Pair<Float, Float>>>(emptyMap()) }
+
+    fun ensureCropSession(asset: GalleryAsset) {
+        if (cropSessions.containsKey(asset.id)) return
+        val stored = assetPixelSizes[asset.id]
+        val width = stored?.first ?: asset.pixelWidth.toFloat()
+        val height = stored?.second ?: asset.pixelHeight.toFloat()
+        if (width > 2f && height > 2f && stored == null) {
+            assetPixelSizes = assetPixelSizes + (asset.id to (width to height))
+        }
+        cropSessions = cropSessions + (
+            asset.id to AssetCropSession(
+                width.toInt().coerceAtLeast(1),
+                height.toInt().coerceAtLeast(1),
+            )
+        )
+    }
+
+    fun autoSelectFirstIfNeeded(assets: List<GalleryAsset>) {
+        if (selectedAssetIds.isNotEmpty()) return
+        val first = assets.firstOrNull { asset ->
+            !asset.isVideo || (asset.durationSeconds ?: 0.0) <= CreatorMedia.MAX_MOMENT_VIDEO_DURATION_SECONDS
+        } ?: return
+        ensureCropSession(first)
+        selectedAssetIds = listOf(first.id)
+    }
+
+    fun resolvePixelSize(uri: Uri, isVideo: Boolean): Pair<Float, Float> {
+        return runCatching {
+            if (isVideo) {
+                MediaMetadataRetriever().let { retriever ->
+                    try {
+                        retriever.setDataSource(context, uri)
+                        val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toFloatOrNull() ?: 1f
+                        val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toFloatOrNull() ?: 1f
+                        val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+                            ?.toIntOrNull() ?: 0
+                        if (rotation == 90 || rotation == 270) h to w.coerceAtLeast(1f) else w to h.coerceAtLeast(1f)
+                    } finally {
+                        retriever.release()
+                    }
+                }
+            } else {
+                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+                orientedDisplaySize(
+                    opts.outWidth.toFloat().coerceAtLeast(1f),
+                    opts.outHeight.toFloat().coerceAtLeast(1f),
+                    uri.exifOrientation(context),
+                )
+            }
+        }.getOrDefault(1f to 1f)
+    }
+
+    fun toggleAssetSelection(asset: GalleryAsset) {
+        val id = asset.id
+        if (
+            asset.isVideo &&
+            (asset.durationSeconds ?: 0.0) > CreatorMedia.MAX_MOMENT_VIDEO_DURATION_SECONDS &&
+            !selectedAssetIds.contains(id)
+        ) {
+            rejectedVideoDuration = asset.durationSeconds ?: 0.0
+            showingVideoTooLongAlert = true
+            return
+        }
+        if (isMultiSelect) {
+            if (selectedAssetIds.contains(id)) {
+                if (selectedAssetIds.size == 1) return
+                selectedAssetIds = selectedAssetIds.filterNot { it == id }
+            } else if (selectedAssetIds.size < 20) {
+                selectedAssetIds = selectedAssetIds + id
+                ensureCropSession(asset)
+            }
+        } else {
+            if (selectedAssetIds == listOf(id)) return
+            selectedAssetIds = listOf(id)
+            ensureCropSession(asset)
+        }
+        if (!assetPixelSizes.containsKey(id)) {
+            scope.launch {
+                val size = withContext(Dispatchers.IO) { resolvePixelSize(asset.uri, asset.isVideo) }
+                assetPixelSizes = assetPixelSizes + (id to size)
+                val session = (
+                    cropSessions[id]
+                        ?: AssetCropSession(size.first.toInt().coerceAtLeast(1), size.second.toInt().coerceAtLeast(1))
+                    ).applyOrientedSize(size.first, size.second)
+                cropSessions = cropSessions + (id to session)
+            }
+        }
+    }
 
     fun usePickerUris(uris: List<Uri>) {
         if (uris.isEmpty()) return
@@ -140,13 +236,15 @@ fun MediaSelectionView(
                         }.getOrNull()
                     } else null
                     val aspectRatio = detectAspectRatio(context, uri, isVideo)
+                    val cardAspect = CreatorAspectRatio.fromFeedPostRatio(aspectRatio.ratio)
                     CreatorMedia(
                         id = uri.toString(),
                         uri = uri,
                         isVideo = isVideo,
                         durationSeconds = duration,
-                        aspectRatio = aspectRatio,
+                        aspectRatio = cardAspect,
                         recommendedAspectRatio = aspectRatio,
+                        feedCrop = MediaItemFeedCrop.fullBounds(cardAspect.displayName),
                     )
                 }
             }
@@ -179,6 +277,7 @@ fun MediaSelectionView(
             permissionGranted = true
             permissionDenied = false
             isLoadingLibrary = false
+            autoSelectFirstIfNeeded(mediaAssets)
         }
     }
 
@@ -188,6 +287,7 @@ fun MediaSelectionView(
             selectedAssetIds = emptyList()
             mediaAssets = withContext(Dispatchers.IO) { loadGalleryAssets(context, album?.bucketId) }
             isLoadingLibrary = false
+            autoSelectFirstIfNeeded(mediaAssets)
         }
     }
 
@@ -213,36 +313,8 @@ fun MediaSelectionView(
         wasPhotosGatePresenting = photosGate.isPresenting
     }
 
-    // ≡ fullScreenCover CameraAccessBoundary + CameraCapture
-    if (showingCamera) {
-        CameraAccessBoundary(
-            requiresMicrophone = true,
-            onCancel = { showingCamera = false },
-        ) {
-            CameraCapture(
-                onCapture = { media ->
-                    showingCamera = false
-                    if (
-                        media.isVideo &&
-                        (media.durationSeconds ?: 0.0) > CreatorMedia.MAX_MOMENT_VIDEO_DURATION_SECONDS
-                    ) {
-                        rejectedVideoDuration = media.durationSeconds ?: 0.0
-                        showingVideoTooLongAlert = true
-                    } else {
-                        onSelectedMediaItemsChange(selectedMediaItems + media)
-                        onCurrentFlowChange(CreatorFlow.MEDIA_EDITING)
-                    }
-                },
-                onDismiss = { showingCamera = false },
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        return
-    }
-
     Box(modifier.fillMaxSize().background(canvas)) {
         Column(Modifier.fillMaxSize()) {
-        // iOS headerView: H 16 / top 10 / bottom 12; back 40; title centered
         Box(
             Modifier
                 .fillMaxWidth()
@@ -253,7 +325,6 @@ fun MediaSelectionView(
                 Modifier
                     .size(40.dp)
                     .align(Alignment.CenterStart)
-                    .momentsChromeGlass(CircleShape, interactive = true)
                     .clickable { onCurrentFlowChange(CreatorFlow.TYPE_SELECTION) },
                 contentAlignment = Alignment.Center,
             ) {
@@ -272,201 +343,181 @@ fun MediaSelectionView(
                 modifier = Modifier.align(Alignment.Center),
             )
             if (selectedAssetIds.isNotEmpty()) {
-                Row(
-                    Modifier
+                Text(
+                    stringResource(R.string.creator_next),
+                    color = Color(0xFF0095F6),
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .clip(RoundedCornerShape(50))
-                        .background(Brush.horizontalGradient(listOf(Color(0xFF9C27B0), Color(0xFFE91E63))))
                         .clickable {
-                            val selected = selectedAssetIds.mapNotNull { id ->
-                                mediaAssets.firstOrNull { it.id == id }
+                            scope.launch {
+                                val selected = selectedAssetIds.mapNotNull { id ->
+                                    mediaAssets.firstOrNull { it.id == id }
+                                }
+                                var lockAspect: Float? = null
+                                val media = withContext(Dispatchers.IO) {
+                                    selected.map { asset ->
+                                        val size = assetPixelSizes[asset.id]
+                                            ?: resolvePixelSize(asset.uri, asset.isVideo).takeIf {
+                                                it.first > 2f && it.second > 2f
+                                            }
+                                            ?: (asset.pixelWidth.toFloat() to asset.pixelHeight.toFloat())
+                                        val imgW = size.first.coerceAtLeast(1f)
+                                        val imgH = size.second.coerceAtLeast(1f)
+                                        val session = cropSessions[asset.id]
+                                            ?: AssetCropSession(imgW.toInt(), imgH.toInt())
+                                        val previewWindow = cropWindowSizes[asset.id]
+                                            ?: (MomentFeedCrop.squareSize to MomentFeedCrop.squareSize)
+                                        val targetAspect = lockAspect ?: session.cropAspect
+                                        val (feedCrop, framedAspect) = framedFeedCropFromSession(
+                                            imgW, imgH, session, previewWindow.first, previewWindow.second, lockAspect,
+                                        )
+                                        if (lockAspect == null) lockAspect = framedAspect
+                                        // ≡ iOS: aspectRatio = fromFeedPostRatio(targetAspect)
+                                        val cardAspect = CreatorAspectRatio.fromFeedPostRatio(targetAspect)
+                                        val cardUri = if (asset.isVideo) {
+                                            asset.uri
+                                        } else {
+                                            cropCardJpeg(context, asset.uri, feedCrop) ?: asset.uri
+                                        }
+                                        CreatorMedia(
+                                            id = asset.id,
+                                            uri = cardUri,
+                                            isVideo = asset.isVideo,
+                                            durationSeconds = asset.durationSeconds,
+                                            aspectRatio = cardAspect,
+                                            recommendedAspectRatio = cardAspect,
+                                            hasEdits = true,
+                                            feedCrop = feedCrop,
+                                            immersiveUri = asset.uri,
+                                            immersiveAspectRatio = imgW / max(imgH, 1f),
+                                        )
+                                    }
+                                }
+                                onSelectedMediaItemsChange(media)
+                                onCurrentFlowChange(CreatorFlow.MEDIA_EDITING)
                             }
-                            val media = selected.map {
-                                val detected = detectAspectRatio(context, it.uri, it.isVideo)
-                                CreatorMedia(
-                                    id = it.id,
-                                    uri = it.uri,
-                                    isVideo = it.isVideo,
-                                    durationSeconds = it.durationSeconds,
-                                    aspectRatio = detected,
-                                    recommendedAspectRatio = detected,
-                                )
-                            }
-                            onSelectedMediaItemsChange(media)
-                            val hasImages = media.any { !it.isVideo }
-                            val hasVideos = media.any { it.isVideo }
-                            onCurrentFlowChange(
-                                when {
-                                    hasVideos && !hasImages -> CreatorFlow.VIDEO_EDITING
-                                    hasImages && !hasVideos -> CreatorFlow.MEDIA_EDITING
-                                    hasImages && hasVideos -> CreatorFlow.CAPTION_AND_DETAILS
-                                    else -> CreatorFlow.MEDIA_EDITING
-                                },
-                            )
-                        }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        stringResource(R.string.creator_next),
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
+                        },
+                )
             } else {
                 Spacer(Modifier.size(40.dp).align(Alignment.CenterEnd))
             }
         }
 
-        // mainPreviewSection
-        if (selectedAssetIds.isNotEmpty()) {
-            val previewId = selectedAssetIds.last()
-            val preview = mediaAssets.firstOrNull { it.id == previewId }
-            if (preview != null) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(320.dp)
-                        .background(Color.Black), // sólido — sin blur de imagen
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AsyncImage(
-                        model = preview.uri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(vertical = 10.dp)
-                            .clip(RoundedCornerShape(12.dp)),
-                    )
-                    Box(
-                        Modifier
-                            .align(Alignment.TopStart)
-                            .padding(12.dp)
-                            .size(28.dp)
-                            .clickable {
-                                selectedAssetIds = selectedAssetIds.filterNot { it == preview.id }
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Filled.Close,
-                            contentDescription = null,
-                            tint = Color.White.copy(0.8f),
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                    if (preview.isVideo) {
-                        Row(
-                            Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(12.dp)
-                                .background(Color.Black.copy(0.5f), RoundedCornerShape(50))
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Icon(
-                                Icons.Filled.Videocam,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(12.dp),
-                            )
-                            Text(
-                                formatMediaDuration(preview.durationSeconds ?: 0.0),
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
-                    }
+        val previewId = selectedAssetIds.lastOrNull()
+        val preview = previewId?.let { id -> mediaAssets.firstOrNull { it.id == id } }
+        if (preview != null) {
+            LaunchedEffect(preview.id) {
+                val size = withContext(Dispatchers.IO) {
+                    resolvePixelSize(preview.uri, preview.isVideo)
                 }
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.background(canvas.copy(if (isDark) 0.92f else 0.98f)),
-                ) {
-                    items(selectedAssetIds, key = { it }) { id ->
-                        val asset = mediaAssets.firstOrNull { it.id == id } ?: return@items
-                        AsyncImage(
-                            model = asset.uri,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(
-                                    2.dp,
-                                    if (id == selectedAssetIds.last()) Color(0xFFFF2D55) else Color.White.copy(0.3f),
-                                    RoundedCornerShape(8.dp),
-                                )
-                                .clickable {
-                                    selectedAssetIds = selectedAssetIds.filterNot { it == id } + id
-                                },
+                assetPixelSizes = assetPixelSizes + (preview.id to size)
+                val existing = cropSessions[preview.id]
+                if (existing == null) {
+                    cropSessions = cropSessions + (
+                        preview.id to AssetCropSession(
+                            size.first.toInt().coerceAtLeast(1),
+                            size.second.toInt().coerceAtLeast(1),
                         )
-                    }
+                    )
+                } else {
+                    cropSessions = cropSessions + (
+                        preview.id to existing.applyOrientedSize(size.first, size.second)
+                    )
                 }
             }
         }
+        val pixel = preview?.let { assetPixelSizes[it.id] }
+            ?: preview?.let { it.pixelWidth.toFloat() to it.pixelHeight.toFloat() }
+            ?: (1f to 1f)
+        val session = preview?.let { cropSessions[it.id] }
+            ?: AssetCropSession(pixel.first.toInt().coerceAtLeast(1), pixel.second.toInt().coerceAtLeast(1))
+        val sharedCropAspect = selectedAssetIds.firstOrNull()?.let { cropSessions[it]?.cropAspect }
+            ?: MomentFeedCrop.squareAspect
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f),
+        ) {
+            key(previewId) {
+                MomentFeedCropCanvas(
+                    imageUri = preview?.uri,
+                    imageWidth = pixel.first,
+                    imageHeight = pixel.second,
+                    isVideo = preview?.isVideo == true,
+                    videoDurationText = if (preview?.isVideo == true) {
+                        formatMediaDuration(preview.durationSeconds ?: 0.0)
+                    } else null,
+                    session = session,
+                    onSessionChange = { next ->
+                        previewId?.let { cropSessions = cropSessions + (it to next) }
+                    },
+                    cropAspect = sharedCropAspect,
+                    showsAspectToggle = previewId != null && previewId == selectedAssetIds.first(),
+                    onWindowSizeChange = { w, h ->
+                        previewId?.let { cropWindowSizes = cropWindowSizes + (it to (w to h)) }
+                    },
+                    onImageSizeResolved = { w, h ->
+                        previewId?.let { id ->
+                            assetPixelSizes = assetPixelSizes + (id to (w to h))
+                            val existing = cropSessions[id]
+                                ?: AssetCropSession(w.toInt().coerceAtLeast(1), h.toInt().coerceAtLeast(1))
+                            cropSessions = cropSessions + (id to existing.applyOrientedSize(w, h))
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
 
-        // mediaGridSection
         Box(Modifier.fillMaxWidth().height(1.dp).background(Color.Gray.copy(0.3f)))
         Row(
             Modifier
                 .fillMaxWidth()
                 .background(canvas)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
-                Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(if (isDark) Color.White.copy(0.1f) else Color.Black.copy(0.05f))
-                    .clickable { showingAlbumPicker = true }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                Modifier.clickable { showingAlbumPicker = true },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
                     selectedAlbum?.title ?: stringResource(R.string.creator_album_recents),
                     color = contentColor,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
                 )
                 Icon(
                     Icons.Filled.KeyboardArrowDown,
                     contentDescription = null,
-                    tint = contentColor.copy(0.7f),
-                    modifier = Modifier.size(10.dp),
+                    tint = contentColor,
+                    modifier = Modifier.size(11.dp),
                 )
             }
             Spacer(Modifier.weight(1f))
-            Row(
+            Box(
                 Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(Brush.horizontalGradient(listOf(Color(0xFF9C27B0), Color(0xFFE91E63))))
-                    .clickable { showingCamera = true }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    .size(32.dp)
+                    .background(
+                        if (isMultiSelect) Color.White else if (isDark) Color.White.copy(0.18f) else Color.Black.copy(0.08f),
+                        CircleShape,
+                    )
+                    .clickable {
+                        isMultiSelect = !isMultiSelect
+                        if (!isMultiSelect) {
+                            selectedAssetIds.lastOrNull()?.let { selectedAssetIds = listOf(it) }
+                        }
+                    },
+                contentAlignment = Alignment.Center,
             ) {
-                AttachmentIconView(
-                    icon = AttachmentIcon.CAMERA,
-                    preset = AttachmentIconPreset.CREATOR_CAMERA_CHIP,
-                    tintColor = Color.White,
-                )
-                Text(
-                    stringResource(R.string.creator_camera),
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
+                Icon(
+                    Icons.Filled.FilterNone,
+                    contentDescription = stringResource(R.string.creator_multiple),
+                    tint = if (isMultiSelect) Color(0xFF0B1215) else contentColor,
+                    modifier = Modifier.size(15.dp),
                 )
             }
         }
@@ -542,13 +593,12 @@ fun MediaSelectionView(
             }
             else -> {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(120.dp),
+                    columns = GridCells.Fixed(4),
                     modifier = Modifier
                         .fillMaxSize()
-                        .weight(1f)
-                        .padding(horizontal = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                        .weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(1.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
                     contentPadding = PaddingValues(bottom = 20.dp),
                 ) {
                     items(mediaAssets, key = { it.id }) { asset ->
@@ -559,23 +609,9 @@ fun MediaSelectionView(
                                 isVideo = asset.isVideo,
                                 durationSeconds = asset.durationSeconds,
                                 isSelected = selectedIndex >= 0,
-                                selectionNumber = if (selectedIndex >= 0) selectedIndex + 1 else null,
-                                onTap = {
-                                    if (selectedAssetIds.contains(asset.id)) {
-                                        selectedAssetIds = selectedAssetIds.filterNot { it == asset.id }
-                                    } else {
-                                        if (asset.isVideo &&
-                                            (asset.durationSeconds ?: 0.0) > CreatorMedia.MAX_MOMENT_VIDEO_DURATION_SECONDS
-                                        ) {
-                                            rejectedVideoDuration = asset.durationSeconds ?: 0.0
-                                            showingVideoTooLongAlert = true
-                                            return@MediaGridCell
-                                        }
-                                        if (selectedAssetIds.size < 10) {
-                                            selectedAssetIds = selectedAssetIds + asset.id
-                                        }
-                                    }
-                                },
+                                isMultiSelect = isMultiSelect,
+                                selectionNumber = if (isMultiSelect && selectedIndex >= 0) selectedIndex + 1 else null,
+                                onTap = { toggleAssetSelection(asset) },
                             )
                         }
                     }
@@ -637,6 +673,8 @@ private data class GalleryAsset(
     val isVideo: Boolean,
     val durationSeconds: Double?,
     val bucketId: String?,
+    val pixelWidth: Int,
+    val pixelHeight: Int,
 )
 
 private fun loadAlbums(context: android.content.Context): List<CreatorAlbumInfo> {
@@ -689,6 +727,8 @@ private fun loadGalleryAssets(context: android.content.Context, bucketId: String
         MediaStore.Files.FileColumns.MEDIA_TYPE,
         MediaStore.Files.FileColumns.DURATION,
         MediaStore.Files.FileColumns.BUCKET_ID,
+        MediaStore.Files.FileColumns.WIDTH,
+        MediaStore.Files.FileColumns.HEIGHT,
     )
     val selection = buildString {
         append("(${MediaStore.Files.FileColumns.MEDIA_TYPE}=? OR ${MediaStore.Files.FileColumns.MEDIA_TYPE}=?)")
@@ -711,6 +751,8 @@ private fun loadGalleryAssets(context: android.content.Context, bucketId: String
         val typeCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE)
         val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DURATION)
         val bucketCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.BUCKET_ID)
+        val widthCol = cursor.getColumnIndex(MediaStore.Files.FileColumns.WIDTH)
+        val heightCol = cursor.getColumnIndex(MediaStore.Files.FileColumns.HEIGHT)
         var count = 0
         while (cursor.moveToNext() && count < 500) {
             val id = cursor.getLong(idCol)
@@ -722,17 +764,41 @@ private fun loadGalleryAssets(context: android.content.Context, bucketId: String
             } else {
                 ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
             }
+            val pixelWidth = if (widthCol >= 0) cursor.getInt(widthCol) else 0
+            val pixelHeight = if (heightCol >= 0) cursor.getInt(heightCol) else 0
             assets += GalleryAsset(
                 id = id.toString(),
                 uri = uri,
                 isVideo = isVideo,
                 durationSeconds = if (isVideo) durationMs / 1000.0 else null,
                 bucketId = cursor.getString(bucketCol),
+                pixelWidth = pixelWidth.coerceAtLeast(1),
+                pixelHeight = pixelHeight.coerceAtLeast(1),
             )
             count++
         }
     }
     return assets
+}
+
+/** ≡ iOS `framedMedia` — `oriented.cropped(to: cropRect)` como `item.image`. */
+private fun cropCardJpeg(
+    context: android.content.Context,
+    source: Uri,
+    feedCrop: MediaItemFeedCrop,
+): Uri? {
+    return runCatching {
+        val bitmap = context.contentResolver.openInputStream(source)?.use {
+            android.graphics.BitmapFactory.decodeStream(it)
+        }?.creatorNormalizedUp(context, source) ?: return null
+        val cropped = MomentFeedCrop.cropBitmap(bitmap, feedCrop)
+        val dir = File(context.cacheDir, "creator_feed_crop").also { it.mkdirs() }
+        val file = File(dir, "card_${UUID.randomUUID()}.jpg")
+        FileOutputStream(file).use { out ->
+            cropped.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, out)
+        }
+        Uri.fromFile(file)
+    }.getOrNull()
 }
 
 /** Paridad con `detectAspectRatio` de MediaSelectionView.swift. */
@@ -748,7 +814,7 @@ private fun detectAspectRatio(
                 retriever.setDataSource(context, uri)
                 val w = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toFloatOrNull() ?: return@runCatching CreatorAspectRatio.SQUARE
                 val h = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toFloatOrNull()?.coerceAtLeast(1f) ?: return@runCatching CreatorAspectRatio.SQUARE
-                CreatorAspectRatio.fromRatio(w / h)
+                CreatorAspectRatio.fromFeedPostRatio(w / h)
             } finally {
                 retriever.release()
             }
@@ -757,7 +823,7 @@ private fun detectAspectRatio(
             context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
             val w = opts.outWidth.toFloat()
             val h = opts.outHeight.toFloat().coerceAtLeast(1f)
-            if (w <= 0f) CreatorAspectRatio.SQUARE else CreatorAspectRatio.fromRatio(w / h)
+            if (w <= 0f) CreatorAspectRatio.SQUARE else CreatorAspectRatio.fromFeedPostRatio(w / h)
         }
     }.getOrDefault(CreatorAspectRatio.SQUARE)
 }

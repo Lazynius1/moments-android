@@ -274,7 +274,7 @@ private fun UploadCluster(
                 onForceExpand()
                 resetAnimationStates()
             }
-            UploadStatus.Uploading, UploadStatus.Processing -> resetAnimationStates()
+            UploadStatus.Uploading, UploadStatus.Compressing, UploadStatus.Processing -> resetAnimationStates()
         }
     }
 
@@ -299,7 +299,9 @@ private fun UploadCluster(
 
     // ≡ iOS updateArrowAnimation bob + aura
     val infinite = rememberInfiniteTransition(label = "uploadOrbBob")
-    val auraActive = status == UploadStatus.Uploading || status == UploadStatus.Processing
+    val auraActive = status == UploadStatus.Compressing ||
+        status == UploadStatus.Uploading ||
+        status == UploadStatus.Processing
     val arrowBob by infinite.animateFloat(
         initialValue = 0f,
         targetValue = if (auraActive) -3f else 0f,
@@ -531,7 +533,7 @@ private fun OrbIcon(
             tint = colors.icon,
             modifier = Modifier.size(22.dp),
         )
-        UploadStatus.Uploading, UploadStatus.Processing -> {
+        UploadStatus.Uploading, UploadStatus.Compressing, UploadStatus.Processing -> {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     Icons.Filled.KeyboardArrowUp,
@@ -741,6 +743,7 @@ private fun detailText(
     val fileDetail = stringResource(R.string.feed_uploading_files, mediaCount)
     return when (status) {
         UploadStatus.Initializing -> stringResource(R.string.feed_uploading_initializing)
+        UploadStatus.Compressing -> stringResource(R.string.feed_uploading_compressing)
         UploadStatus.Uploading -> {
             val statusTxt = stringResource(R.string.feed_uploading_uploading)
             if (mediaCount > 1) {
@@ -758,6 +761,7 @@ private fun detailText(
 @Composable
 private fun statusLabel(status: UploadStatus): String = when (status) {
     UploadStatus.Initializing -> stringResource(R.string.feed_uploading_initializing)
+    UploadStatus.Compressing -> stringResource(R.string.feed_uploading_compressing)
     UploadStatus.Uploading -> stringResource(R.string.feed_uploading_uploading)
     UploadStatus.Processing -> stringResource(R.string.feed_uploading_processing)
     UploadStatus.Completed, UploadStatus.Moderated -> stringResource(R.string.feed_uploading_published)

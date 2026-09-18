@@ -94,6 +94,108 @@ data class FollowerRecord(val id: String, val userId: String, val timestamp: Dat
     }
 }
 
+/**
+ * Encuadre no destructivo de una card sobre el único archivo publicado.
+ * Coordenadas normalizadas en el espacio orientado-up de [MediaItem.url].
+ * ≡ iOS `MediaItemFeedCrop` (init clampa x/y/width/height a 0…1).
+ */
+data class MediaItemFeedCrop private constructor(
+    val cardAspect: String,
+    val x: Double,
+    val y: Double,
+    val width: Double,
+    val height: Double,
+) {
+    val isFullBounds: Boolean
+        get() = kotlin.math.abs(x) < 0.0001 &&
+            kotlin.math.abs(y) < 0.0001 &&
+            kotlin.math.abs(width - 1) < 0.0001 &&
+            kotlin.math.abs(height - 1) < 0.0001
+
+    /** Ratio ancho/alto de la card (p. ej. "4:5" → 0.8). */
+    val cardAspectValue: Float
+        get() {
+            val parts = cardAspect.split(":")
+            if (parts.size == 2) {
+                val w = parts[0].toDoubleOrNull()
+                val h = parts[1].toDoubleOrNull()
+                if (w != null && h != null && h > 0) return (w / h).toFloat()
+            }
+            return cardAspect.toFloatOrNull()?.takeIf { it > 0f } ?: 1f
+        }
+
+    /** Rectángulo en píxeles dentro de [imageWidth]×[imageHeight]. ≡ iOS `rect(in:)`. */
+    fun rect(imageWidth: Float, imageHeight: Float): android.graphics.RectF {
+        val left = (x * imageWidth).toFloat()
+        val top = (y * imageHeight).toFloat()
+        val right = ((x + width) * imageWidth).toFloat().coerceAtMost(imageWidth)
+        val bottom = ((y + height) * imageHeight).toFloat().coerceAtMost(imageHeight)
+        return android.graphics.RectF(
+            left.coerceAtLeast(0f),
+            top.coerceAtLeast(0f),
+            right.coerceAtLeast(left),
+            bottom.coerceAtLeast(top),
+        )
+    }
+
+    fun toMap(): Map<String, Any> = mapOf(
+        "cardAspect" to cardAspect,
+        "x" to x,
+        "y" to y,
+        "width" to width,
+        "height" to height,
+    )
+
+    /** Claves iOS `momentFeedCrop*` en mensajes compartidos. */
+    fun toSharedMomentFields(): Map<String, String> = mapOf(
+        "momentFeedCropAspect" to cardAspect,
+        "momentFeedCropX" to x.toString(),
+        "momentFeedCropY" to y.toString(),
+        "momentFeedCropWidth" to width.toString(),
+        "momentFeedCropHeight" to height.toString(),
+    )
+
+    companion object {
+        /** ≡ iOS `init(cardAspect:x:y:width:height:)` con clamp 0…1. */
+        operator fun invoke(
+            cardAspect: String,
+            x: Double,
+            y: Double,
+            width: Double,
+            height: Double,
+        ): MediaItemFeedCrop = MediaItemFeedCrop(
+            cardAspect = cardAspect,
+            x = x.coerceIn(0.0, 1.0),
+            y = y.coerceIn(0.0, 1.0),
+            width = width.coerceIn(0.0, 1.0),
+            height = height.coerceIn(0.0, 1.0),
+        )
+
+        fun fromSharedMomentData(data: Map<String, String>?): MediaItemFeedCrop? {
+            if (data == null) return null
+            val aspect = data["momentFeedCropAspect"] ?: return null
+            val x = data["momentFeedCropX"]?.toDoubleOrNull() ?: return null
+            val y = data["momentFeedCropY"]?.toDoubleOrNull() ?: return null
+            val width = data["momentFeedCropWidth"]?.toDoubleOrNull() ?: return null
+            val height = data["momentFeedCropHeight"]?.toDoubleOrNull() ?: return null
+            return MediaItemFeedCrop(aspect, x, y, width, height)
+        }
+
+        fun fullBounds(cardAspect: String) =
+            MediaItemFeedCrop(cardAspect, x = 0.0, y = 0.0, width = 1.0, height = 1.0)
+
+        fun from(data: Map<String, Any?>?): MediaItemFeedCrop? {
+            if (data == null) return null
+            val cardAspect = data["cardAspect"] as? String ?: return null
+            val x = (data["x"] as? Number)?.toDouble() ?: return null
+            val y = (data["y"] as? Number)?.toDouble() ?: return null
+            val width = (data["width"] as? Number)?.toDouble() ?: return null
+            val height = (data["height"] as? Number)?.toDouble() ?: return null
+            return MediaItemFeedCrop(cardAspect, x, y, width, height)
+        }
+    }
+}
+
 /** Ratio ancho/alto resuelto desde aspectRatio ("w:h") o la resolución de vídeo ("WxH"). */
 fun resolveAspectRatioValue(aspectRatio: String?, videoResolution: String?): Float? {
     aspectRatio?.trim()?.takeIf { it.isNotEmpty() }?.let { normalized ->
@@ -106,10 +208,14 @@ fun resolveAspectRatioValue(aspectRatio: String?, videoResolution: String?): Flo
                 if (r.isFinite() && r > 0) return r
             }
         }
+        // ≡ iOS: exact float aspect (p. ej. "0.8") antes de buckets canónicos
+        normalized.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 }?.let { return it.toFloat() }
         // ≡ CreatorMedia.AspectRatio(from:).value (CreatorView.swift)
         val canonical = when (normalized) {
             "1:1" -> 1f
             "4:5" -> 0.8f
+            "3:4" -> 0.75f
+            "1.91:1" -> 1.91f
             "16:9" -> 16f / 9f
             "9:16" -> 9f / 16f
             else -> 1f // default .square
@@ -182,6 +288,7 @@ data class MediaItem(
     val type: MediaType,
     val url: String,
     val aspectRatio: String? = null,
+    val feedCrop: MediaItemFeedCrop? = null,
     val thumbnailUrl: String? = null,
     val videoDuration: Double? = null,
     val videoFileSize: Long? = null,
@@ -225,6 +332,7 @@ data class MediaItem(
             type = MediaType.from(data["type"] as? String),
             url = data["url"] as? String ?: "",
             aspectRatio = data["aspectRatio"] as? String,
+            feedCrop = MediaItemFeedCrop.from(data["feedCrop"] as? Map<String, Any?>),
             thumbnailUrl = data["thumbnailUrl"] as? String,
             videoDuration = (data["videoDuration"] as? Number)?.toDouble(),
             videoFileSize = (data["videoFileSize"] as? Number)?.toLong(),
@@ -1410,6 +1518,7 @@ fun VideoVariants.toMap(): Map<String, Any> = buildMap {
 fun MediaItem.toMap(): Map<String, Any> = buildMap {
     put("id", id); put("type", type.raw); put("url", url)
     aspectRatio?.let { put("aspectRatio", it) }
+    feedCrop?.let { put("feedCrop", it.toMap()) }
     thumbnailUrl?.let { put("thumbnailUrl", it) }
     videoDuration?.let { put("videoDuration", it) }
     videoFileSize?.let { put("videoFileSize", it) }

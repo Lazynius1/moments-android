@@ -3,6 +3,8 @@ package com.moments.android.views.creator.creatorscreens
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -78,6 +81,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
 import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.models.MediaItemFeedCrop
 import com.moments.android.models.Moment
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MentionDraftToken
@@ -98,6 +102,8 @@ import com.moments.android.views.creator.HiddenLayersEditorView
 import com.moments.android.views.creator.PhotoTagSelectionView
 import com.moments.android.views.creator.audienceselector.AudienceSelectionView
 import com.moments.android.views.creator.audienceselector.ContentAudience
+import com.moments.android.views.creator.creatoruikit.MomentFeedCrop
+import com.moments.android.views.creator.creatoruikit.creatorNormalizedUp
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
@@ -110,6 +116,8 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Date
+import kotlin.math.abs
+import kotlin.math.max
 
 /**
  * Port de `CaptionAndDetailsView.swift`.
@@ -162,6 +170,8 @@ fun CaptionAndDetailsView(
     var isPreviewingMedia by remember { mutableStateOf(false) }
     var showingLocationPicker by remember { mutableStateOf(false) }
     var showingAudience by remember { mutableStateOf(false) }
+    var keepOriginalDimensions by remember { mutableStateOf(true) }
+    var showingKeepOriginalInfo by remember { mutableStateOf(false) }
     var showingTagSelector by remember { mutableStateOf(false) }
     var showingHiddenLayers by remember { mutableStateOf(false) }
     var hiddenLayerDrafts by remember { mutableStateOf<List<HiddenLayerDraft>>(emptyList()) }
@@ -229,7 +239,7 @@ fun CaptionAndDetailsView(
                         val aspect = preferredMomentAspectRatio(selectedMediaItems)
                         val spatialTagged = selectedMediaItems.flatMap { it.tags }.map { it.userId }
                         val captionSnapshot = captionText
-                        val mediaSnapshot = selectedMediaItems
+                        val keepOriginalSnapshot = keepOriginalDimensions
                         val audienceSnapshot = audience
                         val customSnapshot = customSelectedUsers.takeIf { it.isNotEmpty() }
                         val listIdSnapshot = selectedListId
@@ -247,6 +257,9 @@ fun CaptionAndDetailsView(
                         }
                         val manualTagged = taggedUsers
                         scope.launch {
+                            val mediaSnapshot = withContext(Dispatchers.IO) {
+                                prepareMediaForPublish(context, selectedMediaItems, keepOriginalSnapshot)
+                            }
                             val captionMentionIds = withContext(Dispatchers.IO) {
                                 MomentMentionResolver.resolveUserIds(captionSnapshot)
                             }
@@ -422,6 +435,17 @@ fun CaptionAndDetailsView(
                         muted = muted,
                         onClick = { showingAudience = true },
                     )
+                    val canKeepOriginal = selectedMediaItems.any { it.immersiveUri != null }
+                    if (canKeepOriginal) {
+                        OptionDivider(divider)
+                        MinimalToggleRow(
+                            icon = Icons.Filled.AspectRatio,
+                            title = stringResource(R.string.creator_keep_original_dimensions),
+                            checked = keepOriginalDimensions,
+                            primary = primary,
+                            onCheckedChange = { keepOriginalDimensions = it },
+                        )
+                    }
                 }
 
                 Column(Modifier.padding(top = 25.dp)) {
@@ -820,12 +844,82 @@ private fun audienceLabel(audience: ContentAudience): String = when (audience) {
     ContentAudience.ONLY_ME -> stringResource(R.string.audience_type_only_me)
 }
 
-/** ≡ `preferredMomentAspectRatio` — ratio más vertical. */
+/** ≡ iOS `preferredMomentAspectRatio` — primer ítem. */
 private fun preferredMomentAspectRatio(items: List<CreatorMedia>): String {
-    if (items.isEmpty()) return "1:1"
-    val preferred = items.map { it.recommendedAspectRatio ?: it.aspectRatio }
-    val mostVertical = preferred.minByOrNull { it.ratio } ?: CreatorAspectRatio.SQUARE
-    return mostVertical.displayName
+    val first = items.firstOrNull() ?: return "1:1"
+    return first.aspectRatio.displayName
+}
+
+/**
+ * ≡ iOS `mediaForPublish`.
+ * keepOriginal: archivo inmersivo (≤9:16) + feedCrop remapeado (Bitmap nativo).
+ * !keepOriginal: card = archivo completo (feedCrop fullBounds).
+ */
+private fun prepareMediaForPublish(
+    context: Context,
+    items: List<CreatorMedia>,
+    keepOriginal: Boolean,
+): List<CreatorMedia> {
+    return items.map { item ->
+        if (item.isVideo) return@map item
+        if (!keepOriginal) {
+            return@map item.copy(
+                immersiveUri = null,
+                immersiveAspectRatio = null,
+                feedCrop = MediaItemFeedCrop.fullBounds(item.aspectRatio.displayName),
+            )
+        }
+        val sourceUri = item.immersiveUri ?: item.uri
+        val bitmap = runCatching {
+            context.contentResolver.openInputStream(sourceUri)?.use {
+                BitmapFactory.decodeStream(it)
+            }?.creatorNormalizedUp(context, sourceUri)
+        }.getOrNull() ?: return@map item
+
+        val imgW = bitmap.width.toFloat()
+        val imgH = bitmap.height.toFloat()
+        val feedCrop = item.feedCrop
+            ?: MediaItemFeedCrop.fullBounds(item.aspectRatio.displayName)
+        val sourceRect = MomentFeedCrop.immersiveCropRect(imgW, imgH, feedCrop)
+        val isFull = sourceRect.left <= 0.5f && sourceRect.top <= 0.5f &&
+            abs(sourceRect.width() - imgW) < 1f && abs(sourceRect.height() - imgH) < 1f
+        val remapped = if (isFull) {
+            feedCrop
+        } else {
+            MomentFeedCrop.remap(feedCrop, imgW, imgH, sourceRect)
+        }
+        val cappedBitmap = if (isFull) {
+            bitmap
+        } else {
+            MomentFeedCrop.cropBitmap(
+                bitmap,
+                MomentFeedCrop.normalizedFeedCrop(sourceRect, imgW, imgH, sourceRect.width() / max(sourceRect.height(), 1f)),
+            )
+        }
+        val cappedRatio = cappedBitmap.width.toFloat() / max(cappedBitmap.height.toFloat(), 1f)
+        val immersiveAspect = if (abs(cappedRatio - MomentFeedCrop.immersivePortraitMax) < 0.02f) {
+            9f / 16f
+        } else {
+            cappedRatio
+        }
+        val immersiveOut = if (isFull) {
+            sourceUri
+        } else {
+            runCatching {
+                val dir = java.io.File(context.cacheDir, "creator_immersive").also { it.mkdirs() }
+                val file = java.io.File(dir, "imm_${java.util.UUID.randomUUID()}.jpg")
+                java.io.FileOutputStream(file).use { out ->
+                    cappedBitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
+                }
+                android.net.Uri.fromFile(file)
+            }.getOrDefault(sourceUri)
+        }
+        item.copy(
+            immersiveUri = immersiveOut,
+            immersiveAspectRatio = immersiveAspect,
+            feedCrop = remapped,
+        )
+    }
 }
 
 private fun pickScheduleDateTime(context: Context, currentMillis: Long, onPicked: (Long) -> Unit) {

@@ -5,6 +5,7 @@
     <string name="upload_progress_story_title">Uploading story</string>
     <string name="upload_progress_status_uploading">Uploading… %d%%</string>
     <string name="upload_progress_status_processing">Processing…</string>
+    <string name="upload_progress_status_compressing">Compressing...</string>
     <string name="upload_progress_status_completed">Completed</string>
     <string name="upload_progress_status_failed">Error</string>
     <string name="upload_foreground_body">Keeping the upload alive in the background</string>

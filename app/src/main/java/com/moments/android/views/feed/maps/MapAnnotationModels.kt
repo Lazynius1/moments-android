@@ -1,6 +1,7 @@
 package com.moments.android.views.feed.maps
 
 import com.moments.android.models.MediaItem
+import com.moments.android.models.MediaItemFeedCrop
 import com.moments.android.models.Moment
 import java.util.UUID
 
@@ -67,6 +68,17 @@ val Moment.mapPreferredVideoThumbnailUrl: String?
         thumbnailUrl?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
         imagePath?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
         return null
+    }
+
+/** ≡ iOS `mapPreferredFeedCrop`. */
+val Moment.mapPreferredFeedCrop: MediaItemFeedCrop?
+    get() {
+        mediaItems?.firstOrNull {
+            it.type == MediaItem.MediaType.IMAGE && !it.isHiddenByModeration
+        }?.feedCrop?.let { return it }
+        return mediaItems?.firstOrNull {
+            it.type == MediaItem.MediaType.VIDEO && !it.isHiddenByModeration
+        }?.feedCrop
     }
 
 /** ≡ iOS `CombinedMapAnnotation`. */

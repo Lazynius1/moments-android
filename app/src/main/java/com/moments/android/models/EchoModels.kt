@@ -60,11 +60,13 @@ data class EchoMomentRef(
     val mediaType: String,
     val mediaUrl: String,
     val aspectRatio: String? = null,
+    val feedCrop: MediaItemFeedCrop? = null,
     val thumbnailUrl: String? = null,
     val audience: String? = null,
     val customListId: String? = null,
 ) {
     companion object {
+        /** ≡ iOS `init(from moment:)` — feedCrop nil (sin mediaItem). */
         fun fromMoment(moment: Moment): EchoMomentRef = EchoMomentRef(
             momentId = moment.id ?: "",
             authorId = moment.authorId,
@@ -73,6 +75,7 @@ data class EchoMomentRef(
             mediaType = if (moment.videoUrl != null) "video" else "image",
             mediaUrl = moment.videoUrl ?: moment.imagePath ?: "",
             aspectRatio = moment.aspectRatio,
+            feedCrop = null,
             thumbnailUrl = moment.thumbnailUrl,
             audience = moment.audience,
             customListId = moment.customListId,
@@ -86,7 +89,8 @@ data class EchoMomentRef(
             timestamp = author.timestamp,
             mediaType = if (mediaItem.type == MediaItem.MediaType.VIDEO) "video" else "image",
             mediaUrl = mediaItem.url,
-            aspectRatio = author.aspectRatio,
+            aspectRatio = mediaItem.aspectRatio ?: author.aspectRatio,
+            feedCrop = mediaItem.feedCrop,
             thumbnailUrl = mediaItem.thumbnailUrl,
             audience = author.audience,
             customListId = author.customListId,
@@ -100,6 +104,7 @@ data class EchoMomentRef(
             mediaType = data["mediaType"] as? String ?: "image",
             mediaUrl = data["mediaUrl"] as? String ?: "",
             aspectRatio = data["aspectRatio"] as? String,
+            feedCrop = MediaItemFeedCrop.from(data["feedCrop"] as? Map<String, Any?>),
             thumbnailUrl = data["thumbnailUrl"] as? String,
             audience = data["audience"] as? String,
             customListId = data["customListId"] as? String,
@@ -202,6 +207,7 @@ fun EchoMomentRef.toMap(): Map<String, Any> = buildMap {
     put("mediaType", mediaType)
     put("mediaUrl", mediaUrl)
     aspectRatio?.let { put("aspectRatio", it) }
+    feedCrop?.let { put("feedCrop", it.toMap()) }
     thumbnailUrl?.let { put("thumbnailUrl", it) }
     audience?.let { put("audience", it) }
     customListId?.let { put("customListId", it) }

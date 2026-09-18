@@ -53,15 +53,18 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.Moment
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.creator.creatoruikit.feedCropTransformations
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.messaging.components.ChatVideoPlayBadge
 import com.moments.android.views.shared.ScreenshotProtectedView
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.ceil
@@ -414,12 +417,16 @@ fun ProfileSavedMomentThumbnail(
 @Composable
 private fun ProfileSavedThumbnailMedia(moment: Moment, size: Dp) {
     val primary = moment.primaryVisibleMediaItem
+    val feedCrop = primary?.feedCrop
     when {
         primary != null && primary.type.raw == "video" -> {
             val thumb = primary.thumbnailUrl?.takeIf { it.isNotBlank() }
             if (thumb != null) {
                 AsyncImage(
-                    model = profileThumbnailUrl(thumb),
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(profileThumbnailUrl(thumb))
+                        .transformations(feedCropTransformations(feedCrop))
+                        .build(),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
@@ -430,7 +437,10 @@ private fun ProfileSavedThumbnailMedia(moment: Moment, size: Dp) {
         }
         primary != null && primary.url.isNotBlank() -> {
             AsyncImage(
-                model = profileThumbnailUrl(primary.url),
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(profileThumbnailUrl(primary.url))
+                    .transformations(feedCropTransformations(feedCrop))
+                    .build(),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,

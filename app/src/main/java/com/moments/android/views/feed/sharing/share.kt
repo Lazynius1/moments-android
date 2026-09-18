@@ -112,6 +112,7 @@ import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
+import com.moments.android.views.creator.creatoruikit.feedCropTransformations
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
@@ -120,6 +121,7 @@ import com.moments.android.extensions.fromHex
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
 import com.moments.android.models.Moment
+import com.moments.android.models.MediaItemFeedCrop
 import com.moments.android.models.Point
 import com.moments.android.models.StickerData
 import com.moments.android.models.StickerInteractionData
@@ -1371,10 +1373,13 @@ private suspend fun prepareShareMomentSticker(
     ImagePrefetchManager.initialize(context)
     ImagePrefetchManager.prefetch(urlsToPrefetch)
 
-    val contentBitmap = loadShareBitmap(context, contentUrl)
+    val contentBitmapRaw = loadShareBitmap(context, contentUrl)
         ?: return@withContext Result.failure(
             IllegalStateException(context.getString(R.string.errors_sticker_generation_failed)),
         )
+    val contentBitmap = primaryMedia?.feedCrop?.let { crop ->
+        com.moments.android.views.creator.creatoruikit.MomentFeedCrop.cropBitmap(contentBitmapRaw, crop)
+    } ?: contentBitmapRaw
     // Profile se prefetchea como iOS; con renderClean no entra en el bitmap final.
     if (!profilePath.isNullOrBlank()) {
         loadShareBitmap(context, profilePath)
@@ -1954,17 +1959,22 @@ fun SharedMomentMessageBubble(
             val ownMoment = runCatching { firestore.fetchMoment(momentId, authorId) }.getOrNull()
             if (ownMoment != null) {
                 val author = UserCacheService.getCachedUser(ownMoment.authorId)?.username ?: ownMoment.username
-                displayData = data + mapOf(
-                    "momentId" to ownMoment.id.orEmpty(),
-                    "momentAuthor" to author,
-                    "momentAuthorId" to ownMoment.authorId,
-                    "momentContent" to ownMoment.content,
-                    "momentImageUrl" to ownMoment.previewImageURLString.orEmpty(),
-                    "momentAspectRatio" to (ownMoment.primaryVisibleMediaItem?.aspectRatio ?: ownMoment.aspectRatio ?: "1:1"),
-                    "momentMediaCount" to maxOf(ownMoment.visibleMediaCount, 1).toString(),
-                    "momentVideoUrl" to ownMoment.previewVideoURLString.orEmpty(),
-                    "momentTimestamp" to (ownMoment.timestamp.time / 1000.0).toString(),
-                )
+                val crop = ownMoment.primaryVisibleMediaItem?.feedCrop
+                displayData = data + buildMap {
+                    put("momentId", ownMoment.id.orEmpty())
+                    put("momentAuthor", author)
+                    put("momentAuthorId", ownMoment.authorId)
+                    put("momentContent", ownMoment.content)
+                    put("momentImageUrl", ownMoment.previewImageURLString.orEmpty())
+                    put(
+                        "momentAspectRatio",
+                        crop?.cardAspect ?: ownMoment.primaryVisibleMediaItem?.aspectRatio ?: ownMoment.aspectRatio ?: "1:1",
+                    )
+                    put("momentMediaCount", maxOf(ownMoment.visibleMediaCount, 1).toString())
+                    put("momentVideoUrl", ownMoment.previewVideoURLString.orEmpty())
+                    put("momentTimestamp", (ownMoment.timestamp.time / 1000.0).toString())
+                    if (crop != null) putAll(crop.toSharedMomentFields())
+                }
                 canViewMoment = true
             } else {
                 canViewMoment = false
@@ -1981,17 +1991,22 @@ fun SharedMomentMessageBubble(
         canViewMoment = PrivacyService.canUserViewMomentEnhanced(moment, currentUserId)
         if (canViewMoment == true) {
             val author = UserCacheService.getCachedUser(moment.authorId)?.username ?: moment.username
-            displayData = data + mapOf(
-                "momentId" to moment.id.orEmpty(),
-                "momentAuthor" to author,
-                "momentAuthorId" to moment.authorId,
-                "momentContent" to moment.content,
-                "momentImageUrl" to moment.previewImageURLString.orEmpty(),
-                "momentAspectRatio" to (moment.primaryVisibleMediaItem?.aspectRatio ?: moment.aspectRatio ?: "1:1"),
-                "momentMediaCount" to maxOf(moment.visibleMediaCount, 1).toString(),
-                "momentVideoUrl" to moment.previewVideoURLString.orEmpty(),
-                "momentTimestamp" to (moment.timestamp.time / 1000.0).toString(),
-            )
+            val crop = moment.primaryVisibleMediaItem?.feedCrop
+            displayData = data + buildMap {
+                put("momentId", moment.id.orEmpty())
+                put("momentAuthor", author)
+                put("momentAuthorId", moment.authorId)
+                put("momentContent", moment.content)
+                put("momentImageUrl", moment.previewImageURLString.orEmpty())
+                put(
+                    "momentAspectRatio",
+                    crop?.cardAspect ?: moment.primaryVisibleMediaItem?.aspectRatio ?: moment.aspectRatio ?: "1:1",
+                )
+                put("momentMediaCount", maxOf(moment.visibleMediaCount, 1).toString())
+                put("momentVideoUrl", moment.previewVideoURLString.orEmpty())
+                put("momentTimestamp", (moment.timestamp.time / 1000.0).toString())
+                if (crop != null) putAll(crop.toSharedMomentFields())
+            }
         }
         isLoading = false
     }
@@ -2174,8 +2189,12 @@ fun MomentVisualContent(
         when {
             imageUrl != null -> {
                 var loading by remember(imageUrl) { mutableStateOf(true) }
+                val feedCrop = MediaItemFeedCrop.fromSharedMomentData(sharedMomentData)
                 AsyncImage(
-                    model = imageUrl,
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(imageUrl)
+                        .transformations(feedCropTransformations(feedCrop))
+                        .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),

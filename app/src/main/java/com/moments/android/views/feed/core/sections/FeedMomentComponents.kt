@@ -91,6 +91,7 @@ import com.moments.android.views.components.VerifiedBadgeView
 import com.moments.android.views.feed.FeedInk
 import com.moments.android.views.feed.FeedTeal
 import com.moments.android.views.feed.rememberAdaptiveColors
+import com.moments.android.views.creator.creatoruikit.MomentFeedCrop
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.moments.HiddenLayersOverlayView
 import com.moments.android.views.feed.moments.MomentCarouselIndicatorTone
@@ -124,27 +125,29 @@ private val HeaderIconHitSize = 36.dp
 private val HeaderIconSize = 22.dp
 private val MediaCornerShape = FeedMomentCardLayout.continuousRoundedRectShape
 
-/** Port de `ModernPostCardView.AspectRatioType` (FeedMomentComponents.swift). */
+/** Port de `ModernPostCardView.AspectRatioType` + `cardType(for:)` (FeedMomentComponents.swift). */
 private enum class PostCardAspectRatioType(
     val maxHeight: Float,
     val exactRatio: Float,
     val displayName: String,
 ) {
-    SQUARE(400f, 1.0f, "1:1"),
-    PORTRAIT(500f, 0.8f, "4:5"),
-    LANDSCAPE(300f, 1.78f, "16:9"),
-    REELS(600f, 0.5625f, "9:16"),
+    SQUARE(400f, MomentFeedCrop.squareAspect, "1:1"),
+    PORTRAIT(500f, MomentFeedCrop.portraitMax, "4:5"),
+    TALL_PORTRAIT(533f, MomentFeedCrop.reelsGridAspect, "3:4"),
+    LANDSCAPE(300f, MomentFeedCrop.landscapeMax, "1.91:1"),
+    /** Reels en card se muestran como 4:5 (≡ iOS). */
+    REELS(500f, MomentFeedCrop.portraitMax, "4:5"),
 }
 
-/** Port de `classifyAspectRatio` (FeedMomentComponents.swift). */
+/** ≡ iOS `Self.cardType(for:)`. */
 private fun classifyAspectRatio(ratio: Float): PostCardAspectRatioType {
-    val tolerance = 0.05f
+    val display = MomentFeedCrop.feedCardAspect(ratio)
     return when {
-        abs(ratio - 1.0f) < tolerance -> PostCardAspectRatioType.SQUARE
-        abs(ratio - 0.8f) < tolerance -> PostCardAspectRatioType.PORTRAIT
-        abs(ratio - 0.5625f) < tolerance -> PostCardAspectRatioType.REELS
-        ratio > 1.4f -> PostCardAspectRatioType.LANDSCAPE
-        ratio < 0.7f -> PostCardAspectRatioType.REELS
+        abs(display - MomentFeedCrop.reelsGridAspect) < 0.03f -> PostCardAspectRatioType.TALL_PORTRAIT
+        abs(display - MomentFeedCrop.portraitMax) < 0.03f -> PostCardAspectRatioType.PORTRAIT
+        abs(display - MomentFeedCrop.landscapeMax) < 0.05f -> PostCardAspectRatioType.LANDSCAPE
+        display > 1.15f -> PostCardAspectRatioType.LANDSCAPE
+        display < 0.9f -> PostCardAspectRatioType.PORTRAIT
         else -> PostCardAspectRatioType.SQUARE
     }
 }
@@ -191,13 +194,7 @@ private suspend fun detectPostCardAspectRatio(
         val expected = MomentCarouselLayoutRules.aspectRatioValue(saved)
         val display = MomentCarouselLayoutRules.feedDisplayAspectRatio(expected)
         if (currentDetected == display) return null
-        val type = when {
-            display < 0.7f -> PostCardAspectRatioType.REELS
-            display < 0.9f -> PostCardAspectRatioType.PORTRAIT
-            display < 1.3f -> PostCardAspectRatioType.SQUARE
-            else -> PostCardAspectRatioType.LANDSCAPE
-        }
-        return Triple(display, expected, type)
+        return Triple(display, expected, classifyAspectRatio(display))
     }
 
     // Solo fallback si aún no se detectó (iOS: detected == 1.0 || == 0)
@@ -205,7 +202,7 @@ private suspend fun detectPostCardAspectRatio(
 
     val first = mediaItems.firstOrNull()
     if (first == null || first.url.isBlank()) {
-        return Triple(0.8f, 0.8f, PostCardAspectRatioType.PORTRAIT)
+        return Triple(MomentFeedCrop.portraitMax, MomentFeedCrop.portraitMax, PostCardAspectRatioType.PORTRAIT)
     }
 
     return if (first.type == "image") {
@@ -221,12 +218,14 @@ private suspend fun detectPostCardAspectRatio(
             }.getOrNull()
         }
         when {
-            ratio != null && ratio > 0f && ratio.isFinite() ->
-                Triple(ratio, ratio, classifyAspectRatio(ratio))
-            else -> Triple(0.8f, 0.8f, PostCardAspectRatioType.PORTRAIT)
+            ratio != null && ratio > 0f && ratio.isFinite() -> {
+                val display = MomentFeedCrop.feedCardAspect(ratio)
+                Triple(display, ratio, classifyAspectRatio(display))
+            }
+            else -> Triple(MomentFeedCrop.portraitMax, MomentFeedCrop.portraitMax, PostCardAspectRatioType.PORTRAIT)
         }
     } else {
-        // iOS: default reels 0.5625, then refine with track size
+        // iOS: fallback portraitMax; refine with track size
         val videoRatio = withContext(Dispatchers.IO) {
             runCatching {
                 val retriever = MediaMetadataRetriever()
@@ -243,9 +242,11 @@ private suspend fun detectPostCardAspectRatio(
             }.getOrNull()
         }
         when {
-            videoRatio != null && videoRatio > 0f && videoRatio.isFinite() ->
-                Triple(videoRatio, videoRatio, classifyAspectRatio(videoRatio))
-            else -> Triple(0.5625f, 0.5625f, PostCardAspectRatioType.REELS)
+            videoRatio != null && videoRatio > 0f && videoRatio.isFinite() -> {
+                val display = MomentFeedCrop.feedCardAspect(videoRatio)
+                Triple(display, videoRatio, classifyAspectRatio(display))
+            }
+            else -> Triple(MomentFeedCrop.portraitMax, MomentFeedCrop.portraitMax, PostCardAspectRatioType.PORTRAIT)
         }
     }
 }
@@ -548,7 +549,8 @@ fun ModernPostCardView(
     val colors = rememberFeedAdaptiveColors()
     val density = LocalDensity.current
     val context = LocalContext.current
-    val adaptiveWindow = LocalAdaptiveWindowState.current
+    @Suppress("UNUSED_PARAMETER")
+    val unusedAvailableHeight = availableHeight
     val scope = rememberCoroutineScope()
     val firestore = remember { FirestoreService() }
     var followState by remember(moment.authorId) { mutableStateOf(FollowButtonState.CAN_FOLLOW) }
@@ -582,19 +584,15 @@ fun ModernPostCardView(
     val currentMedia = mediaItems.getOrNull(currentImageIndex)
     val currentTags = currentMedia?.tags.orEmpty()
 
-    // iOS calculateCardHeight / refreshCardHeight
-    val cardHeightDp = availableHeight?.takeIf { postWidthPx > 0f }?.let { availPx ->
+    // ≡ iOS calculateCardHeight: maxWidth / feedCardAspect(detected) — sin clamp por availableHeight.
+    val cardHeightDp = remember(postWidthPx, detectedAspectRatio, density) {
+        if (postWidthPx <= 0f) return@remember null
         with(density) {
-            val maxWidthPx = (postWidthPx -
-                (ListHorizontalPadding * 2 + ActionRowHorizontalPadding * 2).toPx())
+            // postWidth ya descuenta listHorizontalPadding; el media resta actionRow.
+            val maxWidthPx = (postWidthPx - ActionRowHorizontalPadding.toPx() * 2f)
                 .coerceAtLeast(1f)
-            val ideal = maxWidthPx / detectedAspectRatio.coerceAtLeast(0.01f)
-            val resolved = if (adaptiveWindow.isLargeScreen) {
-                ideal
-            } else {
-                min(ideal, availPx * 0.95f)
-            }
-            max(resolved.coerceAtLeast(150f), 200f).toDp()
+            val ratio = MomentFeedCrop.feedCardAspect(detectedAspectRatio.coerceAtLeast(0.01f))
+            (maxWidthPx / ratio).toDp()
         }
     }
 
@@ -614,9 +612,17 @@ fun ModernPostCardView(
         }
     }
 
-    // Suppress unused until DEBUG_ASPECT_RATIO overlay (iOS ProcessInfo env)
-    @Suppress("UNUSED_VARIABLE")
-    val debugAspectLabel = aspectRatioType.displayName
+    LaunchedEffect(moment.id, detectedAspectRatio, realAspectRatio, aspectRatioType, cardHeightDp, mediaItems) {
+        val crop = mediaItems.firstOrNull()?.feedCrop
+        val h = cardHeightDp
+        android.util.Log.d(
+            "FeedAspect",
+            "id=${moment.id} db=${moment.aspectRatio} raw=${"%.4f".format(realAspectRatio)} " +
+                "display=${"%.4f".format(detectedAspectRatio)} type=${aspectRatioType.displayName} " +
+                "cardH=${h?.value?.let { "%.1f".format(it) } ?: "null"}dp " +
+                "feedCrop=${crop?.let { "${it.cardAspect} full=${it.isFullBounds} ${it.width}x${it.height}" } ?: "nil"}",
+        )
+    }
 
     // iOS: onChange savedMomentIds + loadAllPostData checkIfSaved
     // Saved detail: `isSaved: .constant(true)` — no re-sincronizar desde Firestore.
@@ -773,6 +779,7 @@ fun ModernPostCardView(
                         consumerId = "feed_${moment.id}",
                         mediaItemsOverride = mediaItems,
                         reelsVideos = reelsVideos,
+                        canvasAspectRatioOverride = detectedAspectRatio,
                         modifier = Modifier
                             .fillMaxWidth()
                             .shadow(
