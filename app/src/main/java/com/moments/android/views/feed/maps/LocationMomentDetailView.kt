@@ -37,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -82,6 +81,7 @@ import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.profile.momentsview.EditMomentSheet
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
+import com.moments.android.views.profile.momentsview.MomentDeleteConfirmationAlert
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.momentdetail.FeedPinnedTopChrome
 import com.moments.android.views.shared.momentdetail.MomentDetailSolidTopChrome
@@ -126,6 +126,7 @@ fun LocationMomentDetailView(
     var backgroundOpacity by remember { mutableFloatStateOf(1f) }
 
     var showContextMenu by remember { mutableStateOf(false) }
+    var showDeleteAlert by remember { mutableStateOf(false) }
     var contextMenuMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var showEditSheet by remember { mutableStateOf(false) }
     var commentsMoment by remember { mutableStateOf<FeedMoment?>(null) }
@@ -383,8 +384,6 @@ fun LocationMomentDetailView(
                 contentPadding = PaddingValues(
                     top = listTopInset,
                     bottom = 24.dp,
-                    start = FeedMomentCardLayout.listHorizontalPadding,
-                    end = FeedMomentCardLayout.listHorizontalPadding,
                 ),
                 verticalArrangement = Arrangement.spacedBy(FeedMomentCardLayout.rowSpacing),
             ) {
@@ -393,10 +392,6 @@ fun LocationMomentDetailView(
                     val availabilityKey = source?.mapAvailabilityKey ?: moment.id
                     val available = momentAvailability[availabilityKey] ?: true
                     val isProtected = (moment.audience?.lowercase() ?: "") != "everyone"
-                    val previewUrl = moment.thumbnailUrl?.takeIf { it.isNotBlank() }
-                        ?: moment.imagePath?.takeIf { it.isNotBlank() }
-                        ?: moment.visibleMediaItems.firstOrNull()?.thumbnailUrl?.takeIf { it.isNotBlank() }
-                        ?: moment.visibleMediaItems.firstOrNull()?.url?.takeIf { it.isNotBlank() }
                     Box(Modifier.fillMaxWidth()) {
                         // ≡ iOS ModernPostCardView.blur(isAvailable ? 0 : 14).overlay { MomentUnavailableOverlay }
                         // Compose blur no afecta ExoPlayer/SurfaceView seguro → still + blur si unavailable.
@@ -407,16 +402,6 @@ fun LocationMomentDetailView(
                                     .height(with(density) { feedCardHeightPx.toDp() })
                                     .clip(RoundedCornerShape(20.dp)),
                             ) {
-                                if (previewUrl != null) {
-                                    AsyncImage(
-                                        model = previewUrl,
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize().blur(14.dp),
-                                    )
-                                } else {
-                                    Box(Modifier.fillMaxSize().background(Color.Black))
-                                }
                                 MomentUnavailableOverlay(
                                     compact = false,
                                     cornerRadius = 20.dp,
@@ -489,14 +474,20 @@ fun LocationMomentDetailView(
                     showEditSheet = true
                     showContextMenu = false
                 },
-                onDelete = {
-                    showContextMenu = false
-                    deleteMoment()
-                },
+                onDelete = { showDeleteAlert = true },
                 onReport = {},
                 modifier = Modifier.fillMaxSize(),
             )
         }
+
+        MomentDeleteConfirmationAlert(
+            visible = showDeleteAlert,
+            onConfirm = {
+                showDeleteAlert = false
+                deleteMoment()
+            },
+            onDismiss = { showDeleteAlert = false },
+        )
 
         if (isPeeking && peekImageUrl != null) {
             ScreenshotProtectedView(isProtected = peekIsProtected, fillsContainer = true) {

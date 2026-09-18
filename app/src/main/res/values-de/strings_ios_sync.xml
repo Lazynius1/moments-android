@@ -657,6 +657,8 @@
     <string name="echo_viewer_location_header">Aufgenommen um %1$s</string>
     <string name="echo_viewer_location_view_maps">In Karten ansehen</string>
     <string name="echo_viewer_perspective_change">Perspektive wechseln</string>
+    <string name="echo_viewer_perspective_previous">Vorherige Perspektive</string>
+    <string name="echo_viewer_perspective_next">Nächste Perspektive</string>
     <string name="errors_auth_required">Bitte melde dich an, um fortzufahren.</string>
     <string name="errors_cancel_request_failed">Anfrage konnte nicht abgebrochen werden: %1$s</string>
     <string name="errors_document_not_found">Dokument nicht gefunden</string>

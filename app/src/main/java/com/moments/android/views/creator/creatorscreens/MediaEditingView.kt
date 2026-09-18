@@ -13,7 +13,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -202,10 +200,8 @@ fun MediaEditingView(
         }
     }
 
-    // ≡ MediaEditingView.swift: header fijo + preview ≤ 60% contenedor + bottom fijo.
-    // No usar fillMaxHeight(0.6f) sobre el Column completo: desborda y tapa el header.
-    BoxWithConstraints(modifier.fillMaxSize().background(screenBackground)) {
-        val previewMaxHeight = maxHeight * 0.6f
+    // ≡ MediaEditingView.swift: header + bottom fijos; el media hace Fit dentro del hueco restante.
+    Box(modifier.fillMaxSize().background(screenBackground)) {
         Column(Modifier.fillMaxSize()) {
             Box(
                 Modifier
@@ -291,14 +287,12 @@ fun MediaEditingView(
             Box(
                 Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .fillMaxHeight(),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = previewMaxHeight)
-                        .fillMaxHeight(),
+                    Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (showingFilterToolbar && previewBitmap != null && pagerState.currentPage == currentMediaIndex) {

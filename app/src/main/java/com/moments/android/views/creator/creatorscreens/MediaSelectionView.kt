@@ -342,8 +342,7 @@ fun MediaSelectionView(
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp)
+                            .fillMaxSize()
                             .padding(vertical = 10.dp)
                             .clip(RoundedCornerShape(12.dp)),
                     )

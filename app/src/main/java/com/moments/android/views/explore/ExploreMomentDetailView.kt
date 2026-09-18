@@ -77,6 +77,7 @@ import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.profile.core.sections.UserProfileZoomNavigationHost
 import com.moments.android.views.profile.momentsview.EditMomentSheet
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
+import com.moments.android.views.profile.momentsview.MomentDeleteConfirmationAlert
 import com.moments.android.views.settings.hasVideoMedia
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.momentdetail.FeedPinnedTopChrome
@@ -130,6 +131,7 @@ fun ExploreMomentDetailView(
     var backgroundOpacity by remember { mutableFloatStateOf(1f) }
 
     var showContextMenu by remember { mutableStateOf(false) }
+    var showDeleteAlert by remember { mutableStateOf(false) }
     var contextMenuMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var showEditSheet by remember { mutableStateOf(false) }
     var commentsMoment by remember { mutableStateOf<FeedMoment?>(null) }
@@ -362,8 +364,6 @@ fun ExploreMomentDetailView(
                 contentPadding = PaddingValues(
                     top = listTopInset,
                     bottom = 24.dp,
-                    start = FeedMomentCardLayout.listHorizontalPadding,
-                    end = FeedMomentCardLayout.listHorizontalPadding,
                 ),
                 verticalArrangement = Arrangement.spacedBy(rowSpacing),
             ) {
@@ -407,9 +407,7 @@ fun ExploreMomentDetailView(
                                     handlePeek(url, ratio, pressing, moment)
                                 },
                                 onTagTap = { userId -> openUserProfile(userId) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(feedCardHeight),
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                         // iOS For You cadence. Not in Reels (aspect not always vertical).
@@ -442,15 +440,21 @@ fun ExploreMomentDetailView(
                         showEditSheet = true
                         showContextMenu = false
                     },
-                    onDelete = {
-                        showContextMenu = false
-                        deleteContextMoment()
-                    },
+                    onDelete = { showDeleteAlert = true },
                     onReport = {},
                     modifier = Modifier.fillMaxSize(),
                 )
             }
         }
+
+        MomentDeleteConfirmationAlert(
+            visible = showDeleteAlert,
+            onConfirm = {
+                showDeleteAlert = false
+                deleteContextMoment()
+            },
+            onDismiss = { showDeleteAlert = false },
+        )
 
         if (isPeeking && peekImageUrl != null) {
             ScreenshotProtectedView(isProtected = peekIsProtected, fillsContainer = true) {

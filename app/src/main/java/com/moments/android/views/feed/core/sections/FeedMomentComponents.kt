@@ -93,7 +93,9 @@ import com.moments.android.views.feed.FeedTeal
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.moments.HiddenLayersOverlayView
+import com.moments.android.views.feed.moments.MomentCarouselIndicatorTone
 import com.moments.android.views.feed.moments.MomentCarouselLayoutRules
+import com.moments.android.views.feed.moments.MomentCarouselPageIndicators
 import com.moments.android.views.feed.moments.MomentMediaCarousel
 import com.moments.android.views.components.ModernActionButtons
 import com.moments.android.views.components.ModernFollowButton
@@ -795,6 +797,8 @@ fun ModernPostCardView(
                         isImmersive = isImmersive,
                         onImmersiveChange = { isImmersive = it },
                         onPageChange = { currentImageIndex = it },
+                        showsPageIndicators = false,
+                        seekToPage = currentImageIndex,
                         onTagTap = onTagTap ?: { onOpenProfile() },
                         fixedHeight = cardHeightDp,
                     )
@@ -863,6 +867,17 @@ fun ModernPostCardView(
                         )
                     }
                 }
+            }
+        }
+
+        if (mediaItems.size > 1) {
+            AnimatedVisibility(visible = !isImmersive, enter = fadeIn(), exit = fadeOut()) {
+                MomentCarouselPageIndicators(
+                    count = mediaItems.size,
+                    currentIndex = currentImageIndex,
+                    tone = MomentCarouselIndicatorTone.OnCanvas,
+                    onIndexChange = { currentImageIndex = it },
+                )
             }
         }
 

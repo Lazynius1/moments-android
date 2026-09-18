@@ -148,6 +148,7 @@ fun ModernMomentDetailView(
     var backgroundOpacity by remember { mutableFloatStateOf(1f) }
 
     var showContextMenu by remember { mutableStateOf(false) }
+    var showDeleteAlert by remember { mutableStateOf(false) }
     var contextMenuMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var showEditSheet by remember { mutableStateOf(false) }
     var showShareSheet by remember { mutableStateOf(false) }
@@ -379,8 +380,6 @@ fun ModernMomentDetailView(
                 contentPadding = PaddingValues(
                     top = listTopInset + topContentInset,
                     bottom = 24.dp,
-                    start = FeedMomentCardLayout.listHorizontalPadding,
-                    end = FeedMomentCardLayout.listHorizontalPadding,
                 ),
                 verticalArrangement = Arrangement.spacedBy(rowSpacing),
             ) {
@@ -424,9 +423,7 @@ fun ModernMomentDetailView(
                             },
                             onTagTap = { userId -> openUserProfile(userId) },
                             reelsVideos = emptyList(),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(feedCardHeight),
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
@@ -451,15 +448,21 @@ fun ModernMomentDetailView(
                         showEditSheet = true
                         showContextMenu = false
                     },
-                    onDelete = {
-                        showContextMenu = false
-                        deleteContextMoment()
-                    },
+                    onDelete = { showDeleteAlert = true },
                     onReport = {},
                     modifier = Modifier.fillMaxSize(),
                 )
             }
         }
+
+        MomentDeleteConfirmationAlert(
+            visible = showDeleteAlert,
+            onConfirm = {
+                showDeleteAlert = false
+                deleteContextMoment()
+            },
+            onDismiss = { showDeleteAlert = false },
+        )
 
         // ≡ iOS ModernShareBottomSheet overlay (zIndex encima del context menu)
         if (showShareSheet) {

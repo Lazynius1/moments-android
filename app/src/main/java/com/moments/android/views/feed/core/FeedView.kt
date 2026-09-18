@@ -806,8 +806,7 @@ fun FeedView(
                     showGlobalContextMenu = false
                 },
                 onDelete = {
-                    selectedMomentForMenu?.let { deleteMoment(it) }
-                    showGlobalContextMenu = false
+                    showDeleteAlert = true
                 },
                 onDismissEchoInvitation = {
                     pendingEchoInvitationRoute = null

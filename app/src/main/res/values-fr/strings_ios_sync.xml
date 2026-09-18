@@ -642,6 +642,8 @@
     <string name="echo_viewer_location_header">Touché à %1$s</string>
     <string name="echo_viewer_location_view_maps">Voir dans Plans</string>
     <string name="echo_viewer_perspective_change">Changer de perspective</string>
+    <string name="echo_viewer_perspective_previous">Perspective précédente</string>
+    <string name="echo_viewer_perspective_next">Perspective suivante</string>
     <string name="errors_auth_required">Veuillez vous connecter pour continuer.</string>
     <string name="errors_cancel_request_failed">Impossible d\'annuler la demande : %1$s</string>
     <string name="errors_document_not_found">Document introuvable</string>

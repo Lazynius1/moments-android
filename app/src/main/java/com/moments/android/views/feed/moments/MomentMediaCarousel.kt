@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -100,6 +101,8 @@ fun MomentMediaCarousel(
     isImmersive: Boolean = false,
     onImmersiveChange: (Boolean) -> Unit = {},
     onPageChange: (Int) -> Unit = {},
+    showsPageIndicators: Boolean = true,
+    seekToPage: Int? = null,
     onTagTap: ((String) -> Unit)? = null,
     /** Altura fija (iOS cardHeight). Si null, usa aspectRatio. */
     fixedHeight: Dp? = null,
@@ -155,6 +158,13 @@ fun MomentMediaCarousel(
 
     LaunchedEffect(pagerState.currentPage) {
         onPageChange(pagerState.currentPage)
+    }
+    val pagerScope = rememberCoroutineScope()
+    LaunchedEffect(seekToPage) {
+        val target = seekToPage ?: return@LaunchedEffect
+        if (target != pagerState.currentPage && target in 0 until pagerState.pageCount) {
+            pagerState.scrollToPage(target)
+        }
     }
 
     val chromeModifier = if (applyOwnChrome) {
@@ -311,17 +321,22 @@ fun MomentMediaCarousel(
                     },
                 )
             }
-            AnimatedVisibility(
-                visible = !isImmersive,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier.align(Alignment.TopCenter),
-            ) {
-                MomentCarouselPageIndicators(
-                    count = mediaItems.size,
-                    currentIndex = pagerState.currentPage,
-                    modifier = Modifier.padding(top = 20.dp),
-                )
+            if (showsPageIndicators) {
+                AnimatedVisibility(
+                    visible = !isImmersive,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.TopCenter),
+                ) {
+                    MomentCarouselPageIndicators(
+                        count = mediaItems.size,
+                        currentIndex = pagerState.currentPage,
+                        modifier = Modifier.padding(top = 20.dp),
+                        onIndexChange = { page ->
+                            pagerScope.launch { pagerState.scrollToPage(page) }
+                        },
+                    )
+                }
             }
         }
     }

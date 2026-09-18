@@ -1,19 +1,23 @@
 package com.moments.android.views.echoes
 
-import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,13 +28,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -45,7 +49,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -56,12 +60,15 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -70,90 +77,52 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.graphics.drawable.toBitmap
-import coil.ImageLoader
-import coil.imageLoader
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import coil.request.SuccessResult
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.Echo
+import com.moments.android.models.EchoMomentRef
 import com.moments.android.models.EchoParticipant
 import com.moments.android.models.EchoParticipantStatus
+import com.moments.android.models.Moment
+import com.moments.android.models.resolveAspectRatioValue
 import com.moments.android.services.social.EchoService
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MomentsFormat
+import com.moments.android.viewmodels.EchoDeckPost
 import com.moments.android.viewmodels.EchoViewModel
 import com.moments.android.viewmodels.GroupedPerspective
 import com.moments.android.views.components.EchoesIconGradients
 import com.moments.android.views.components.EchoesIconMetrics
 import com.moments.android.views.components.EchoesIconView
+import com.moments.android.views.components.MomentCaptionPresentationStyle
+import com.moments.android.views.components.MomentCaptionView
 import com.moments.android.views.creator.components.StoryVideoGravity
 import com.moments.android.views.creator.components.StoryVideoPlayerView
 import com.moments.android.views.feed.maps.LocationMapView
-import kotlinx.coroutines.Dispatchers
+import com.moments.android.views.feed.moments.MomentCarouselIndicatorTone
+import com.moments.android.views.feed.moments.MomentCarouselLayoutRules
+import com.moments.android.views.feed.moments.MomentCarouselPageIndicators
+import com.moments.android.views.feed.moments.MomentCarouselPresentationMode
+import com.moments.android.views.feed.rememberAdaptiveColors
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
-private data class EchoOverlayTone(
-    val topUsesDarkForeground: Boolean = false,
-    val bottomUsesDarkForeground: Boolean = false,
-)
-
-@Composable
-private fun rememberEchoOverlayTone(assetUrl: String?): EchoOverlayTone {
-    val context = LocalContext.current
-    var tone by remember(assetUrl) { mutableStateOf(EchoOverlayTone()) }
-    LaunchedEffect(assetUrl) {
-        tone = if (assetUrl.isNullOrBlank()) {
-            EchoOverlayTone()
-        } else {
-            withContext(Dispatchers.IO) {
-                val request = ImageRequest.Builder(context).data(assetUrl).allowHardware(false).build()
-                val drawable = (context.imageLoader.execute(request) as? SuccessResult)?.drawable
-                drawable?.toBitmap()?.let(::computeEchoOverlayTone) ?: EchoOverlayTone()
-            }
-        }
-    }
-    return tone
+private enum class DeckSwipeAxis {
+    Horizontal,
+    Vertical,
 }
 
-/** ≡ `computeOverlayTextTone` — muestreo 24×24 top/bottom. */
-private fun computeEchoOverlayTone(image: Bitmap): EchoOverlayTone {
-    val scaled = Bitmap.createScaledBitmap(image, 24, 24, true)
-    fun luminance(fromRow: Int, untilRow: Int): Float {
-        var total = 0f
-        var samples = 0
-        for (y in fromRow until untilRow) for (x in 0 until 24) {
-            val pixel = scaled.getPixel(x, y)
-            total += (android.graphics.Color.red(pixel) * .299f +
-                android.graphics.Color.green(pixel) * .587f +
-                android.graphics.Color.blue(pixel) * .114f) / 255f
-            samples++
-        }
-        return if (samples == 0) 0f else total / samples
-    }
-    return EchoOverlayTone(
-        topUsesDarkForeground = luminance(0, 8) > .62f,
-        bottomUsesDarkForeground = luminance(16, 24) > .62f,
-    )
-}
-
-private fun isHorizontalAspect(aspectRatio: String?): Boolean {
-    val parts = aspectRatio?.split(":") ?: return false
-    if (parts.size != 2) return false
-    val w = parts[0].toIntOrNull() ?: return false
-    val h = parts[1].toIntOrNull() ?: return false
-    return w > h
-}
+/** Debug: fuerza un caption largo para validar truncado / ver más / traducción. */
+private const val DebugForceEchoCaption = true
+private const val DebugEchoCaptionText =
+    "Debug Echo: un momento compartido desde este ángulo con bastante texto para probar el truncado a una línea, el ver más del feed y la fila de traducción debajo."
 
 /**
- * Port 1:1 de `EchoViewerUI.swift`.
- * Navegación 2D (perspectivas + vertical), overlays glass, mapa fullscreen.
+ * Port 1:1 de `EchoViewerUI.swift` — mazo de postales + selector de perspectiva.
  */
 @Composable
 fun EchoViewerUI(
@@ -162,6 +131,7 @@ fun EchoViewerUI(
     modifier: Modifier = Modifier,
     initialEcho: Echo? = null,
 ) {
+    val colors = rememberAdaptiveColors()
     val isDark = isSystemInDarkTheme()
     val viewModel = remember(echoId) { EchoViewModel(echoId, initialEcho) }
     val echo by viewModel.echo.collectAsState()
@@ -170,26 +140,23 @@ fun EchoViewerUI(
     val perspectiveIndex by viewModel.currentPerspectiveIndex.collectAsState()
     val verticalIndex by viewModel.currentVerticalIndex.collectAsState()
     val availability by viewModel.momentAvailability.collectAsState()
+    val postCaptions by viewModel.postCaptions.collectAsState()
+    val postMoments by viewModel.postMoments.collectAsState()
+    val postAspectRatios by viewModel.postAspectRatios.collectAsState()
     val isVideoPlaying by viewModel.isVideoPlaying.collectAsState()
-    val ripplePhase by viewModel.ripplePhase.collectAsState()
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
 
-    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    var deckSwipeAxis by remember { mutableStateOf<DeckSwipeAxis?>(null) }
     var showIncompleteDecision by remember { mutableStateOf(false) }
     var showLockoutAlert by remember { mutableStateOf(false) }
     var showLeaveMenu by remember { mutableStateOf(false) }
     var showLocation by remember { mutableStateOf(false) }
+    var carouselIndex by remember { mutableIntStateOf(0) }
 
-    val toneAsset = viewModel.currentMoment?.let { moment ->
-        moment.thumbnailUrl?.takeIf(String::isNotBlank)
-            ?: moment.mediaUrl.takeIf { moment.mediaType == "image" }
-    }
-    val overlayTone = rememberEchoOverlayTone(toneAsset)
-    val topPrimary = if (overlayTone.topUsesDarkForeground) Color.Black else Color.White
-    val topSecondary = topPrimary.copy(alpha = if (overlayTone.topUsesDarkForeground) .66f else .72f)
-    val bottomPrimary = if (overlayTone.bottomUsesDarkForeground) Color.Black else Color.White
-    val bottomSecondary = bottomPrimary.copy(alpha = .66f)
     val locationFallback = stringResource(R.string.echo_viewer_location_fallback)
+    val currentPost = perspectives.getOrNull(perspectiveIndex)?.posts?.getOrNull(verticalIndex)
 
     LaunchedEffect(echoId) {
         showIncompleteDecision = viewModel.isHistoricalIncomplete
@@ -197,6 +164,18 @@ fun EchoViewerUI(
     }
     LaunchedEffect(viewModel.isHistoricalIncomplete) {
         showIncompleteDecision = viewModel.isHistoricalIncomplete
+    }
+    LaunchedEffect(currentPost?.momentId, perspectiveIndex) {
+        carouselIndex = 0
+    }
+    LaunchedEffect(currentPost?.momentId, postMoments) {
+        val slides = currentPost?.let { viewModel.visibleSlides(it) }.orEmpty()
+        if (slides.isNotEmpty() && carouselIndex >= slides.size) {
+            carouselIndex = slides.lastIndex
+        }
+    }
+    LaunchedEffect(currentPost?.momentId) {
+        currentPost?.let { viewModel.loadPostDetailsIfNeeded(it) }
     }
     DisposableEffect(viewModel) { onDispose { viewModel.clear() } }
 
@@ -222,143 +201,134 @@ fun EchoViewerUI(
     Box(
         modifier
             .fillMaxSize()
-            .background(Color(0xFF0B1215)),
+            .background(colors.surfaceBackground),
     ) {
         when {
-            loading -> CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
-            echo == null -> EchoWaitingState(emptyList())
-            else -> {
-                val current = viewModel.currentMoment
-                when {
-                    current != null -> {
-                        val isAvailable = availability[current.momentId] != false
-                        EchoPerspectiveMedia(
-                            mediaUrl = current.mediaUrl,
-                            thumbnailUrl = current.thumbnailUrl,
-                            mediaType = current.mediaType,
-                            isHorizontal = isHorizontalAspect(current.aspectRatio),
-                            unavailable = !isAvailable,
-                            isVideoPlaying = isVideoPlaying,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .offset { IntOffset(0, dragOffset.roundToInt()) }
-                                .pointerInput(viewModel.canBrowseMedia, verticalIndex) {
-                                    detectVerticalDragGestures(
-                                        onVerticalDrag = { change, amount ->
-                                            if (viewModel.canBrowseMedia) {
-                                                change.consume()
-                                                dragOffset += amount
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            if (!viewModel.canBrowseMedia) {
-                                                dragOffset = 0f
-                                                return@detectVerticalDragGestures
-                                            }
-                                            if (dragOffset < -50f) {
-                                                HapticManager.shared.selection()
-                                                viewModel.switchVerticalIndex(verticalIndex + 1)
-                                            } else if (dragOffset > 50f) {
-                                                HapticManager.shared.selection()
-                                                viewModel.switchVerticalIndex(verticalIndex - 1)
-                                            }
-                                            dragOffset = 0f
-                                        },
-                                        onDragCancel = { dragOffset = 0f },
-                                    )
-                                },
-                        )
-                    }
-                    viewModel.isHistoricalIncomplete -> {
-                        Box(Modifier.fillMaxSize().background(Color(0xFF0B1215)))
-                    }
-                    else -> EchoWaitingState(echo?.participants.orEmpty())
-                }
-
-                // Overlay UI ≡ iOS VStack (safe top + header + location + Spacer + switcher)
-                // navigationBarsPadding: sin esto los usernames quedan bajo la gesture/nav bar.
+            loading -> CircularProgressIndicator(
+                Modifier.align(Alignment.Center),
+                color = colors.primary,
+            )
+            echo != null -> {
                 Column(
                     Modifier
                         .fillMaxSize()
                         .statusBarsPadding()
-                        .navigationBarsPadding()
-                        .padding(top = 8.dp),
+                        .navigationBarsPadding(),
                 ) {
-                    EchoHeader(
-                        perspectives = perspectives,
-                        selectedIndex = perspectiveIndex,
-                        currentMomentTimestamp = current?.timestamp,
-                        primaryColor = topPrimary,
-                        secondaryColor = topSecondary,
+                    EchoSessionHeader(
+                        echo = echo!!,
+                        perspectiveCount = perspectives.size,
+                        canOpenMap = viewModel.canOpenLocationMap,
                         showLeaveMenu = showLeaveMenu,
                         onShowLeaveMenuChange = { showLeaveMenu = it },
+                        onOpenMap = {
+                            HapticManager.shared.lightImpact()
+                            showLocation = true
+                        },
                         onLeave = {
                             FirebaseAuth.getInstance().currentUser?.uid?.let(::leaveEchoAction)
                         },
                         onDismiss = onDismiss,
                     )
-                    LocationContextBox(
-                        locationName = echo?.locationName?.takeIf { it.isNotBlank() } ?: locationFallback,
-                        createdAt = echo?.createdAt,
-                        enabled = viewModel.canOpenLocationMap,
-                        primary = topPrimary,
-                        secondary = topSecondary,
-                        onClick = {
-                            HapticManager.shared.lightImpact()
-                            showLocation = true
-                        },
-                    )
-                    Spacer(Modifier.weight(1f))
-                    EchoPerspectiveSwitcher(
-                        perspectives = perspectives,
-                        selectedIndex = perspectiveIndex,
-                        primaryColor = bottomPrimary,
-                        secondaryColor = bottomSecondary,
-                        onSelect = viewModel::switchPerspective,
-                    )
-                }
 
-                // Lateral vertical indicator
-                if (viewModel.canBrowseMedia) {
-                    val verticalCount = perspectives.getOrNull(perspectiveIndex)?.moments?.size ?: 0
-                    if (verticalCount > 1) {
-                        Column(
-                            Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(end = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            repeat(verticalCount) { index ->
-                                Box(
-                                    Modifier
-                                        .width(if (index == verticalIndex) 4.dp else 3.dp)
-                                        .height(if (index == verticalIndex) 20.dp else 10.dp)
-                                        .clip(RoundedCornerShape(50))
-                                        .background(
-                                            Color.White.copy(if (index == verticalIndex) .92f else .28f),
-                                        ),
-                                )
-                            }
+                    when {
+                        viewModel.canBrowseMedia && currentPost != null -> {
+                            EchoDeckStage(
+                                viewModel = viewModel,
+                                perspectives = perspectives,
+                                perspectiveIndex = perspectiveIndex,
+                                verticalIndex = verticalIndex,
+                                availability = availability,
+                                postCaptions = postCaptions,
+                                postMoments = postMoments,
+                                postAspectRatios = postAspectRatios,
+                                isVideoPlaying = isVideoPlaying,
+                                currentPost = currentPost,
+                                dragOffset = dragOffset,
+                                carouselIndex = carouselIndex,
+                                onCarouselIndexChange = { carouselIndex = it },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .pointerInput(viewModel.canBrowseMedia, perspectiveIndex, verticalIndex) {
+                                        val thresholdPx = with(density) { 56.dp.toPx() }
+                                        detectDragGestures(
+                                            onDragStart = {
+                                                dragOffset = Offset.Zero
+                                                deckSwipeAxis = null
+                                            },
+                                            onDragCancel = {
+                                                dragOffset = Offset.Zero
+                                                deckSwipeAxis = null
+                                            },
+                                            onDragEnd = {
+                                                if (viewModel.canBrowseMedia) {
+                                                    when (deckSwipeAxis) {
+                                                        DeckSwipeAxis.Horizontal -> {
+                                                            if (dragOffset.x < -thresholdPx) {
+                                                                HapticManager.shared.selection()
+                                                                viewModel.switchPerspective(perspectiveIndex + 1)
+                                                            } else if (dragOffset.x > thresholdPx) {
+                                                                HapticManager.shared.selection()
+                                                                viewModel.switchPerspective(perspectiveIndex - 1)
+                                                            }
+                                                        }
+                                                        DeckSwipeAxis.Vertical -> {
+                                                            if (dragOffset.y < -thresholdPx) {
+                                                                HapticManager.shared.selection()
+                                                                viewModel.switchVerticalIndex(verticalIndex + 1)
+                                                            } else if (dragOffset.y > thresholdPx) {
+                                                                HapticManager.shared.selection()
+                                                                viewModel.switchVerticalIndex(verticalIndex - 1)
+                                                            }
+                                                        }
+                                                        null -> Unit
+                                                    }
+                                                }
+                                                dragOffset = Offset.Zero
+                                                deckSwipeAxis = null
+                                            },
+                                            onDrag = { change, amount ->
+                                                if (!viewModel.canBrowseMedia) return@detectDragGestures
+                                                change.consume()
+                                                val next = dragOffset + amount
+                                                if (deckSwipeAxis == null) {
+                                                    if (kotlin.math.abs(next.x) > kotlin.math.abs(next.y)) {
+                                                        deckSwipeAxis = DeckSwipeAxis.Horizontal
+                                                    } else if (kotlin.math.abs(next.y) > kotlin.math.abs(next.x)) {
+                                                        deckSwipeAxis = DeckSwipeAxis.Vertical
+                                                    }
+                                                }
+                                                dragOffset = when (deckSwipeAxis) {
+                                                    DeckSwipeAxis.Horizontal -> Offset(next.x, 0f)
+                                                    DeckSwipeAxis.Vertical -> Offset(0f, next.y)
+                                                    null -> Offset.Zero
+                                                }
+                                            },
+                                        )
+                                    },
+                            )
                         }
+                        viewModel.isHistoricalIncomplete -> {
+                            Spacer(Modifier.weight(1f))
+                        }
+                        else -> {
+                            EchoWaitingState(
+                                echo?.participants.orEmpty(),
+                                Modifier.weight(1f).fillMaxWidth(),
+                            )
+                        }
+                    }
+
+                    if (viewModel.canBrowseMedia && perspectives.isNotEmpty()) {
+                        EchoPerspectiveChooser(
+                            perspectives = perspectives,
+                            selectedIndex = perspectiveIndex,
+                            onSelect = viewModel::switchPerspective,
+                        )
                     }
                 }
             }
-        }
-
-        // Ripple
-        if (ripplePhase > 0.0) {
-            Box(
-                Modifier
-                    .align(Alignment.Center)
-                    .size(240.dp)
-                    .scale(ripplePhase.toFloat())
-                    .clip(CircleShape)
-                    .border(
-                        2.dp,
-                        Color.White.copy((1.0 - ripplePhase).toFloat().coerceIn(0f, 1f) * 0.3f),
-                        CircleShape,
-                    ),
-            )
         }
 
         if (showLockoutAlert) {
@@ -374,7 +344,6 @@ fun EchoViewerUI(
             )
         }
 
-        // ≡ fullScreenCover LocationMapView
         if (showLocation && echo != null) {
             Dialog(
                 onDismissRequest = { showLocation = false },
@@ -394,82 +363,744 @@ fun EchoViewerUI(
     }
 }
 
-// MARK: - Components
-
 @Composable
-private fun EchoPerspectiveMedia(
-    mediaUrl: String,
-    thumbnailUrl: String?,
-    mediaType: String,
-    isHorizontal: Boolean,
-    unavailable: Boolean,
-    isVideoPlaying: Boolean,
-    modifier: Modifier,
+private fun EchoSessionHeader(
+    echo: Echo,
+    perspectiveCount: Int,
+    canOpenMap: Boolean,
+    showLeaveMenu: Boolean,
+    onShowLeaveMenuChange: (Boolean) -> Unit,
+    onOpenMap: () -> Unit,
+    onLeave: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    val preview = thumbnailUrl?.takeIf { it.isNotBlank() } ?: mediaUrl
-    // ≡ iOS: perspectiveView.blur(isAvailable ? 0 : 20).overlay { unavailableOverlay }
-    // Compose blur no afecta SurfaceView/ExoPlayer → si unavailable, still frame en vez de vídeo.
-    Box(modifier.background(Color.Black).clip(RoundedCornerShape(0)), contentAlignment = Alignment.Center) {
-        Box(
+    val colors = rememberAdaptiveColors()
+    val locationFallback = stringResource(R.string.echo_viewer_location_fallback)
+    val time = MomentsFormat.smartDate(echo.createdAt, MomentsFormat.DateContext.TIME_ONLY)
+    val subtitle = if (perspectiveCount > 0) "$time · $perspectiveCount" else time
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(top = 10.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
             Modifier
-                .fillMaxSize()
-                .then(if (unavailable) Modifier.blur(20.dp) else Modifier),
+                .weight(1f)
+                .graphicsLayer { alpha = if (canOpenMap) 1f else 0.55f }
+                .clickable(enabled = canOpenMap, onClick = onOpenMap),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (isHorizontal) {
-                AsyncImage(
-                    model = preview,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .blur(20.dp),
-                    alpha = 0.6f,
+            Icon(
+                Icons.Filled.LocationOn,
+                contentDescription = null,
+                tint = colors.primary.copy(0.88f),
+                modifier = Modifier.size(13.dp),
+            )
+            Column(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    echo.locationName?.takeIf { it.isNotBlank() } ?: locationFallback,
+                    color = colors.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 15.sp),
+                    modifier = Modifier.fillMaxWidth(),
                 )
-            }
-            if (mediaType == "video" && !unavailable) {
-                StoryVideoPlayerView(
-                    Uri.parse(mediaUrl),
-                    if (isHorizontal) StoryVideoGravity.RESIZE_ASPECT else StoryVideoGravity.RESIZE_ASPECT_FILL,
-                    isPlaying = isVideoPlaying,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                AsyncImage(
-                    model = preview,
-                    contentDescription = null,
-                    contentScale = if (isHorizontal) ContentScale.Fit else ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                Text(
+                    subtitle,
+                    color = colors.secondary,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
-        if (unavailable) {
+
+        Box {
             Box(
-                Modifier.fillMaxSize().background(Color.Black.copy(0.4f)),
+                Modifier
+                    .size(36.dp)
+                    .momentsChromeGlass(CircleShape, interactive = true)
+                    .clickable { onShowLeaveMenuChange(true) },
                 contentAlignment = Alignment.Center,
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.padding(horizontal = 40.dp),
-                ) {
-                    Icon(Icons.Filled.VisibilityOff, null, tint = Color.White.copy(0.8f), modifier = Modifier.size(40.dp))
+                Icon(Icons.Filled.MoreHoriz, null, tint = colors.primary, modifier = Modifier.size(16.dp))
+            }
+            DropdownMenu(
+                expanded = showLeaveMenu,
+                onDismissRequest = { onShowLeaveMenuChange(false) },
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.echo_viewer_leave), color = Color.Red) },
+                    onClick = {
+                        onShowLeaveMenuChange(false)
+                        onLeave()
+                    },
+                )
+            }
+        }
+        Box(
+            Modifier
+                .size(36.dp)
+                .momentsChromeGlass(CircleShape, interactive = true)
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.Close, null, tint = colors.primary, modifier = Modifier.size(15.dp))
+        }
+    }
+}
+
+@Composable
+private fun EchoDeckStage(
+    viewModel: EchoViewModel,
+    perspectives: List<GroupedPerspective>,
+    perspectiveIndex: Int,
+    verticalIndex: Int,
+    availability: Map<String, Boolean>,
+    postCaptions: Map<String, String>,
+    postMoments: Map<String, Moment>,
+    postAspectRatios: Map<String, String>,
+    isVideoPlaying: Boolean,
+    currentPost: EchoDeckPost,
+    dragOffset: Offset,
+    carouselIndex: Int,
+    onCarouselIndexChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = rememberAdaptiveColors()
+    val isDark = isSystemInDarkTheme()
+    val density = LocalDensity.current
+
+    BoxWithConstraints(modifier) {
+        val hasSidePeeks = perspectives.size > 1
+        val peekWidth = 18.dp
+        val authorsBehind = perspectiveIndex
+        val authorsAhead = maxOf(0, perspectives.size - perspectiveIndex - 1)
+        val isLastAuthor = perspectives.isEmpty() || perspectiveIndex >= perspectives.size - 1
+        val peekLeading = isLastAuthor
+        val stackCount = if (isLastAuthor) authorsBehind else authorsAhead
+        val visibleLayerCount = minOf(stackCount, 3)
+        val deckLayerDepths = if (visibleLayerCount > 0) (visibleLayerCount downTo 1).toList() else emptyList()
+        val sidePeekStep = 4.dp
+        val bottomPeekStep = 4.dp
+        val maxDeckDepth = (deckLayerDepths.maxOrNull() ?: 0).toFloat()
+        val deckSideOverflow = sidePeekStep * maxDeckDepth
+        val deckBottomOverflow = bottomPeekStep * maxDeckDepth
+        val revealDenom = with(density) { 72.dp.toPx() }
+        val dragReveal = ((if (peekLeading) dragOffset.x else -dragOffset.x) / revealDenom)
+            .coerceIn(0f, 1f)
+        val cardWidth = maxWidth - (if (hasSidePeeks) peekWidth * 2 else 20.dp) - deckSideOverflow
+        val caption = resolvedCaption(currentPost, postCaptions, postMoments)
+        val hasCaption = caption.trim().isNotEmpty()
+        val slideCount = currentPost?.let { viewModel.visibleSlides(it).size } ?: 0
+        val hasSlideDots = slideCount > 1
+        val slideDotsOutside = if (hasSlideDots) 18.dp else 0.dp
+        val captionOutside = (if (hasCaption) 52.dp else 0.dp) + slideDotsOutside
+        val maxCardHeight = maxHeight - captionOutside - deckBottomOverflow - 6.dp
+        val mediaRatio = resolvedMediaAspectRatio(currentPost, postAspectRatios)
+        val mediaHeight = deckMediaHeight(cardWidth, mediaRatio, maxCardHeight)
+        val headerHeight = 48.dp
+        val cardHeight = headerHeight + mediaHeight
+        val canGoPrev = perspectiveIndex > 0
+        val canGoNext = perspectiveIndex < perspectives.size - 1
+        val layerFill = if (isDark) Color(0xFF3A4550) else Color(0xFFC9C4BA)
+        val perspective = perspectives.getOrNull(perspectiveIndex)
+        val isAvailable = availability[currentPost.momentId] != false
+
+        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Spacer(Modifier.weight(1f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (hasSidePeeks) {
+                    PerspectiveHandle(
+                        leading = true,
+                        width = peekWidth,
+                        height = cardHeight * 0.5f,
+                        enabled = canGoPrev,
+                        onClick = {
+                            HapticManager.shared.selection()
+                            viewModel.switchPerspective(perspectiveIndex - 1)
+                        },
+                    )
+                } else {
+                    Spacer(Modifier.width(10.dp))
+                }
+
+                Column(horizontalAlignment = Alignment.Start) {
+                    Box(
+                        Modifier.size(
+                            width = cardWidth + deckSideOverflow,
+                            height = cardHeight + deckBottomOverflow,
+                        ),
+                        contentAlignment = if (peekLeading) Alignment.TopEnd else Alignment.TopStart,
+                    ) {
+                        deckLayerDepths.forEach { depth ->
+                            val grow = sidePeekStep * depth + 1.5.dp * dragReveal
+                            val growY = bottomPeekStep * depth + 1.5.dp * dragReveal
+                            Box(
+                                Modifier
+                                    .zIndex((visibleLayerCount - depth).toFloat())
+                                    .size(cardWidth + grow, cardHeight + growY)
+                                    .clip(RoundedCornerShape(22.dp))
+                                    .background(layerFill)
+                                    .border(1.dp, colors.primary.copy(0.35f), RoundedCornerShape(22.dp)),
+                            )
+                        }
+
+                        EchoDeckFrontCard(
+                            post = currentPost,
+                            slides = currentPost.let { viewModel.visibleSlides(it) },
+                            perspective = perspective,
+                            isAvailable = isAvailable,
+                            width = cardWidth,
+                            headerHeight = headerHeight,
+                            mediaHeight = mediaHeight,
+                            mediaRatio = mediaRatio,
+                            carouselIndex = carouselIndex,
+                            onCarouselIndexChange = onCarouselIndexChange,
+                            isVideoPlaying = isVideoPlaying,
+                            modifier = Modifier
+                                .zIndex(10f)
+                                .offset {
+                                    IntOffset(
+                                        (dragOffset.x * 0.35f).roundToInt(),
+                                        (dragOffset.y * 0.35f).roundToInt(),
+                                    )
+                                },
+                        )
+
+                        LayerDots(
+                            postsCount = perspective?.posts?.size ?: 0,
+                            verticalIndex = verticalIndex,
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(
+                                    end = if (peekLeading) 8.dp else 8.dp + deckSideOverflow,
+                                    bottom = deckBottomOverflow,
+                                ),
+                        )
+                    }
+
+                    if (hasSlideDots) {
+                        MomentCarouselPageIndicators(
+                            count = slideCount,
+                            currentIndex = carouselIndex,
+                            tone = MomentCarouselIndicatorTone.OnCanvas,
+                            onIndexChange = onCarouselIndexChange,
+                            modifier = Modifier
+                                .width(cardWidth)
+                                .padding(top = 8.dp)
+                                .padding(start = if (peekLeading) deckSideOverflow else 0.dp),
+                        )
+                    }
+
+                    if (hasCaption) {
+                        MomentCaptionView(
+                            content = caption,
+                            onHashtagTap = {},
+                            style = MomentCaptionPresentationStyle.Echo,
+                            moment = viewModel.playbackMoment(currentPost).let { base ->
+                                if (caption.trim() == base.content.trim()) base
+                                else base.copy(content = caption)
+                            },
+                            modifier = Modifier
+                                .width(cardWidth)
+                                .padding(start = if (peekLeading) deckSideOverflow else 0.dp)
+                                .padding(top = if (hasSlideDots) 4.dp else 0.dp),
+                        )
+                    }
+                }
+
+                if (hasSidePeeks) {
+                    PerspectiveHandle(
+                        leading = false,
+                        width = peekWidth,
+                        height = cardHeight * 0.5f,
+                        enabled = canGoNext,
+                        onClick = {
+                            HapticManager.shared.selection()
+                            viewModel.switchPerspective(perspectiveIndex + 1)
+                        },
+                    )
+                } else {
+                    Spacer(Modifier.width(10.dp))
+                }
+            }
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun EchoDeckFrontCard(
+    post: EchoDeckPost,
+    slides: List<EchoMomentRef>,
+    perspective: GroupedPerspective?,
+    isAvailable: Boolean,
+    width: androidx.compose.ui.unit.Dp,
+    headerHeight: androidx.compose.ui.unit.Dp,
+    mediaHeight: androidx.compose.ui.unit.Dp,
+    mediaRatio: Float,
+    carouselIndex: Int,
+    onCarouselIndexChange: (Int) -> Unit,
+    isVideoPlaying: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = rememberAdaptiveColors()
+    val isDark = isSystemInDarkTheme()
+    val cardShape = RoundedCornerShape(22.dp)
+    Column(
+        modifier
+            .width(width)
+            .shadow(8.dp, cardShape, ambientColor = Color.Black.copy(if (isDark) 0.28f else 0.1f))
+            .clip(cardShape)
+            .background(colors.surfaceBackground)
+            .border(1.dp, colors.primary.copy(0.1f), cardShape),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(headerHeight)
+                .background(colors.surfaceBackground)
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (perspective != null) {
+                AsyncProfileImageView(
+                    perspective.authorId,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, colors.primary.copy(0.16f), CircleShape),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp), modifier = Modifier.weight(1f)) {
                     Text(
-                        stringResource(R.string.echo_viewer_unavailable),
-                        color = Color.White,
+                        perspective.username,
+                        color = colors.primary,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        textAlign = TextAlign.Center,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        MomentsFormat.relativeTime(post.timestamp),
+                        color = colors.secondary,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 11.sp,
+                        maxLines = 1,
                     )
                 }
+            }
+        }
+
+        Box(
+            Modifier
+                .width(width)
+                .height(mediaHeight)
+                .clip(RoundedCornerShape(0.dp)),
+        ) {
+            // SurfaceView del vídeo no se difumina: no montar media si no está disponible.
+            if (isAvailable && slides.isNotEmpty()) {
+                EchoDeckCarousel(
+                    slides = slides,
+                    currentIndex = carouselIndex,
+                    onIndexChange = onCarouselIndexChange,
+                    isAvailable = true,
+                    mediaRatio = mediaRatio,
+                    isVideoPlaying = isVideoPlaying,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                UnavailablePlaceholder()
             }
         }
     }
 }
 
 @Composable
-private fun EchoWaitingState(participants: List<EchoParticipant>) {
+private fun EchoDeckCarousel(
+    slides: List<EchoMomentRef>,
+    currentIndex: Int,
+    onIndexChange: (Int) -> Unit,
+    isAvailable: Boolean,
+    mediaRatio: Float,
+    isVideoPlaying: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = rememberAdaptiveColors()
+    val isCarousel = slides.size > 1
+    val pagerState = rememberPagerState(initialPage = currentIndex.coerceAtLeast(0)) { slides.size.coerceAtLeast(1) }
+
+    LaunchedEffect(currentIndex, slides.size) {
+        if (slides.isEmpty()) return@LaunchedEffect
+        val target = currentIndex.coerceIn(0, slides.lastIndex)
+        if (pagerState.currentPage != target) {
+            pagerState.scrollToPage(target)
+        }
+    }
+    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
+        if (!pagerState.isScrollInProgress && pagerState.currentPage != currentIndex) {
+            onIndexChange(pagerState.currentPage)
+        }
+    }
+
+    BoxWithConstraints(modifier.background(colors.primary.copy(0.06f))) {
+        val canvasRatio = maxWidth.value / maxOf(maxHeight.value, 1f)
+        if (slides.isEmpty()) return@BoxWithConstraints
+        HorizontalPager(
+            state = pagerState,
+            userScrollEnabled = false,
+            modifier = Modifier.fillMaxSize(),
+        ) { page ->
+            val slide = slides[page]
+            EchoDeckSlide(
+                slide = slide,
+                canvasRatio = canvasRatio,
+                mediaRatio = mediaRatio,
+                allowsVideo = isAvailable && page == currentIndex,
+                isVideoPlaying = isVideoPlaying,
+                isCarousel = isCarousel,
+                onMediaTap = { direction ->
+                    if (!isCarousel) return@EchoDeckSlide
+                    val count = slides.size
+                    val next = (currentIndex + direction + count) % count
+                    if (next != currentIndex) {
+                        HapticManager.shared.selection()
+                        onIndexChange(next)
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun EchoDeckSlide(
+    slide: EchoMomentRef,
+    canvasRatio: Float,
+    mediaRatio: Float,
+    allowsVideo: Boolean,
+    isVideoPlaying: Boolean,
+    isCarousel: Boolean,
+    onMediaTap: (Int) -> Unit,
+) {
+    val slideRatio = parseSlideRatio(slide.aspectRatio) ?: mediaRatio
+    val mode = MomentCarouselLayoutRules.presentationMode(slideRatio, canvasRatio)
+    val isFit = mode == MomentCarouselPresentationMode.FitWithBlur
+    val preview = slide.thumbnailUrl?.takeIf { it.isNotBlank() } ?: slide.mediaUrl
+
+    Box(Modifier.fillMaxSize()) {
+        if (slide.mediaType == "video") {
+            StoryVideoPlayerView(
+                Uri.parse(slide.mediaUrl),
+                if (isFit) StoryVideoGravity.RESIZE_ASPECT else StoryVideoGravity.RESIZE_ASPECT_FILL,
+                isPlaying = allowsVideo && isVideoPlaying,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            if (isFit) {
+                AsyncImage(
+                    model = preview,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(18.dp),
+                    alpha = 0.55f,
+                )
+            }
+            AsyncImage(
+                model = preview,
+                contentDescription = null,
+                contentScale = if (isFit) ContentScale.Fit else ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        if (isCarousel) {
+            CarouselTapZones(onMediaTap = onMediaTap)
+        }
+    }
+}
+
+@Composable
+private fun CarouselTapZones(onMediaTap: (Int) -> Unit) {
+    Row(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onMediaTap(-1) },
+            )
+            Row(Modifier.height(64.dp).fillMaxWidth()) {
+                Spacer(Modifier.size(72.dp, 64.dp))
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { onMediaTap(-1) },
+                )
+            }
+        }
+        Box(
+            Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { onMediaTap(1) },
+        )
+    }
+}
+
+@Composable
+private fun PerspectiveHandle(
+    leading: Boolean,
+    width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = rememberAdaptiveColors()
+    val isDark = isSystemInDarkTheme()
+    val shape = RoundedCornerShape(
+        topStart = if (leading) 0.dp else 14.dp,
+        topEnd = if (leading) 14.dp else 0.dp,
+        bottomEnd = if (leading) 14.dp else 0.dp,
+        bottomStart = if (leading) 0.dp else 14.dp,
+    )
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val label = stringResource(
+        if (leading) R.string.echo_viewer_perspective_previous else R.string.echo_viewer_perspective_next,
+    )
+    val scale = if (pressed && enabled) 0.92f else 1f
+    Box(
+        Modifier
+            .width(width)
+            .height(height)
+            .scale(scale)
+            .graphicsLayer { alpha = if (!enabled) 0.35f else if (pressed) 0.75f else 1f }
+            .clip(shape)
+            .background(colors.primary.copy(if (isDark) 0.16f else 0.22f))
+            .border(1.dp, colors.primary.copy(if (isDark) 0.14f else 0.32f), shape)
+            .semantics { contentDescription = label }
+            .clickable(
+                enabled = enabled,
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick,
+            ),
+    )
+}
+
+@Composable
+private fun LayerDots(
+    postsCount: Int,
+    verticalIndex: Int,
+    modifier: Modifier = Modifier,
+) {
+    if (postsCount <= 1) return
+    val colors = rememberAdaptiveColors()
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        repeat(postsCount) { index ->
+            val selected = index == verticalIndex
+            Box(
+                Modifier
+                    .width(if (selected) 4.dp else 3.dp)
+                    .height(if (selected) 18.dp else 9.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(colors.primary.copy(if (selected) 0.9f else 0.22f)),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EchoPerspectiveChooser(
+    perspectives: List<GroupedPerspective>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+) {
+    val colors = rememberAdaptiveColors()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(colors.surfaceBackground)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp)
+            .padding(top = 2.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        perspectives.forEachIndexed { index, perspective ->
+            val selected = index == selectedIndex
+            val scale by animateFloatAsState(if (selected) 1.04f else 1f, tween(180), label = "echoPerspectiveScale")
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) {
+                    if (index != selectedIndex) {
+                        HapticManager.shared.selection()
+                        onSelect(index)
+                    }
+                },
+            ) {
+                Box {
+                    AsyncProfileImageView(
+                        perspective.authorId,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .scale(scale)
+                            .clip(CircleShape)
+                            .border(
+                                if (selected) 2.5.dp else 1.dp,
+                                if (selected) colors.accent else colors.primary.copy(0.18f),
+                                CircleShape,
+                            ),
+                    )
+                    if (perspective.posts.size > 1) {
+                        Text(
+                            "${perspective.posts.size}",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.primary,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .offset(x = 4.dp, y = 2.dp)
+                                .background(colors.surfaceBackground, RoundedCornerShape(50))
+                                .border(1.dp, colors.primary.copy(0.16f), RoundedCornerShape(50))
+                                .padding(horizontal = 5.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+                Text(
+                    perspective.username,
+                    color = if (selected) colors.primary else colors.secondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 72.dp),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UnavailablePlaceholder() {
+    val colors = rememberAdaptiveColors()
     Column(
-        Modifier.fillMaxSize(),
+        Modifier
+            .fillMaxSize()
+            .background(colors.surfaceBackground)
+            .padding(horizontal = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+    ) {
+        Icon(
+            Icons.Filled.VisibilityOff,
+            null,
+            tint = colors.secondary,
+            modifier = Modifier.size(40.dp),
+        )
+        Text(
+            stringResource(R.string.echo_viewer_unavailable),
+            color = colors.primary,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 16.sp,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+private fun resolvedCaption(
+    post: EchoDeckPost?,
+    postCaptions: Map<String, String>,
+    postMoments: Map<String, Moment>,
+): String {
+    if (post == null) return if (DebugForceEchoCaption) DebugEchoCaptionText else ""
+    val cached = postCaptions[post.momentId] ?: postMoments[post.momentId]?.content.orEmpty()
+    if (cached.trim().isEmpty() && DebugForceEchoCaption) return DebugEchoCaptionText
+    return cached
+}
+
+private fun resolvedMediaAspectRatio(post: EchoDeckPost, postAspectRatios: Map<String, String>): Float {
+    val raw = postAspectRatios[post.momentId] ?: post.aspectRatio
+    return parseAspectRatio(raw)
+}
+
+private fun parseAspectRatio(raw: String?): Float {
+    if (raw.isNullOrBlank()) return 1f
+    val normalized = raw.trim()
+    val parts = normalized.split(":")
+    if (parts.size == 2) {
+        val width = parts[0].toDoubleOrNull()
+        val height = parts[1].toDoubleOrNull()
+        if (width != null && height != null && height > 0) {
+            val ratio = (width / height).toFloat()
+            if (ratio.isFinite() && ratio > 0f) return ratio
+        }
+    }
+    return resolveAspectRatioValue(normalized, null) ?: 1f
+}
+
+private fun parseSlideRatio(raw: String?): Float? {
+    if (raw.isNullOrBlank()) return null
+    val parts = raw.split(":")
+    if (parts.size == 2) {
+        val width = parts[0].toDoubleOrNull()
+        val height = parts[1].toDoubleOrNull()
+        if (width != null && height != null && height > 0) {
+            val ratio = (width / height).toFloat()
+            if (ratio.isFinite() && ratio > 0f) return ratio
+        }
+    }
+    return null
+}
+
+private fun deckMediaHeight(
+    cardWidth: androidx.compose.ui.unit.Dp,
+    mediaRatio: Float,
+    maxCardHeight: androidx.compose.ui.unit.Dp,
+): androidx.compose.ui.unit.Dp {
+    val headerReserve = 48.dp
+    val available = maxOf(200.dp, maxCardHeight - headerReserve)
+    val ideal = cardWidth / maxOf(mediaRatio, 0.01f)
+    val softCap = cardWidth * 1.45f
+    return minOf(maxOf(ideal, 200.dp), available, softCap)
+}
+
+@Composable
+private fun EchoWaitingState(
+    participants: List<EchoParticipant>,
+    modifier: Modifier = Modifier,
+) {
+    val colors = rememberAdaptiveColors()
+    Column(
+        modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -480,13 +1111,13 @@ private fun EchoWaitingState(participants: List<EchoParticipant>) {
         Spacer(Modifier.height(24.dp))
         Text(
             stringResource(R.string.echo_viewer_waiting_title),
-            color = Color.White,
+            color = colors.primary,
             fontWeight = FontWeight.Bold,
             fontSize = 20.sp,
         )
         Text(
             stringResource(R.string.echo_viewer_waiting_subtitle),
-            color = Color.White.copy(0.6f),
+            color = colors.secondary,
             fontSize = 14.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 40.dp, vertical = 8.dp),
@@ -514,235 +1145,6 @@ private fun EchoWaitingState(participants: List<EchoParticipant>) {
                             ),
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EchoHeader(
-    perspectives: List<GroupedPerspective>,
-    selectedIndex: Int,
-    currentMomentTimestamp: java.util.Date?,
-    primaryColor: Color,
-    secondaryColor: Color,
-    showLeaveMenu: Boolean,
-    onShowLeaveMenuChange: (Boolean) -> Unit,
-    onLeave: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (perspectives.isNotEmpty()) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                perspectives.forEachIndexed { index, _ ->
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .height(2.2.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(primaryColor.copy(if (index < selectedIndex) 0.46f else 0.18f)),
-                    ) {
-                        if (index == selectedIndex) {
-                            Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .background(primaryColor, RoundedCornerShape(50)),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            val p = perspectives.getOrNull(selectedIndex)
-            if (p != null) {
-                AsyncProfileImageView(
-                    p.authorId,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .border(1.dp, primaryColor.copy(0.28f), CircleShape),
-                )
-                Column(Modifier.padding(start = 0.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        p.username,
-                        color = primaryColor,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    currentMomentTimestamp?.let { ts ->
-                        Text(
-                            MomentsFormat.relativeTime(ts),
-                            color = secondaryColor,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.weight(1f))
-            Box {
-                Box(
-                    Modifier
-                        .size(36.dp)
-                        .momentsChromeGlass(CircleShape, interactive = true)
-                        .clickable { onShowLeaveMenuChange(true) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Filled.MoreHoriz, null, tint = primaryColor, modifier = Modifier.size(16.dp))
-                }
-                DropdownMenu(
-                    expanded = showLeaveMenu,
-                    onDismissRequest = { onShowLeaveMenuChange(false) },
-                ) {
-                    DropdownMenuItem(
-                        text = {
-                            Text(stringResource(R.string.echo_viewer_leave), color = Color.Red)
-                        },
-                        onClick = {
-                            onShowLeaveMenuChange(false)
-                            onLeave()
-                        },
-                    )
-                }
-            }
-            Box(
-                Modifier
-                    .size(36.dp)
-                    .momentsChromeGlass(CircleShape, interactive = true)
-                    .clickable(onClick = onDismiss),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.Close, null, tint = primaryColor, modifier = Modifier.size(16.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun LocationContextBox(
-    locationName: String,
-    createdAt: java.util.Date?,
-    enabled: Boolean,
-    primary: Color,
-    secondary: Color,
-    onClick: () -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    Row(
-        Modifier
-            .padding(horizontal = 16.dp)
-            .padding(top = 10.dp)
-            .graphicsLayer { alpha = if (enabled) 1f else 0.55f }
-            .scale(if (pressed) 0.97f else 1f)
-            .momentsChromeGlass(RoundedCornerShape(50), interactive = enabled)
-            .clickable(
-                enabled = enabled,
-                interactionSource = interaction,
-                indication = null,
-                onClick = onClick,
-            )
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(Icons.Filled.LocationOn, null, tint = primary.copy(0.88f), modifier = Modifier.size(13.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(
-                locationName,
-                color = primary,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                MomentsFormat.smartDate(createdAt ?: java.util.Date(), MomentsFormat.DateContext.TIME_ONLY),
-                color = secondary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-            )
-        }
-        Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            null,
-            tint = primary.copy(0.34f),
-            modifier = Modifier.size(12.dp),
-        )
-    }
-}
-
-@Composable
-private fun EchoPerspectiveSwitcher(
-    perspectives: List<GroupedPerspective>,
-    selectedIndex: Int,
-    primaryColor: Color,
-    secondaryColor: Color,
-    onSelect: (Int) -> Unit,
-) {
-    // ≡ iOS perspectiveSwitcher: HStack(spacing: 14) + Text.frame(maxWidth: 70)
-    LazyRow(
-        Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 6.dp),
-    ) {
-        itemsIndexed(perspectives, key = { _, p -> p.id }) { index, p ->
-            val selected = index == selectedIndex
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier
-                    .wrapContentWidth()
-                    .clickable {
-                        if (index != selectedIndex) {
-                            HapticManager.shared.selection()
-                            onSelect(index)
-                        }
-                    },
-            ) {
-                AsyncProfileImageView(
-                    p.authorId,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .scale(if (selected) 1.03f else 1f)
-                        .then(
-                            if (selected) Modifier.shadow(8.dp, CircleShape, spotColor = Color.White.copy(0.18f))
-                            else Modifier,
-                        )
-                        .clip(CircleShape)
-                        .border(
-                            if (selected) 2.dp else 1.dp,
-                            Color.White.copy(if (selected) 0.95f else 0.22f),
-                            CircleShape,
-                        ),
-                )
-                Text(
-                    p.username,
-                    color = if (selected) primaryColor else secondaryColor,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    // ≡ iOS `.frame(maxWidth: 70)` — no width fijo (separaba de más)
-                    modifier = Modifier.widthIn(max = 70.dp),
-                    textAlign = TextAlign.Center,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
         }
     }

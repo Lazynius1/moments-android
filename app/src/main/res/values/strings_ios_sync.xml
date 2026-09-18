@@ -395,6 +395,8 @@
     <string name="echo_viewer_location_header">Tapped at %1$s</string>
     <string name="echo_viewer_location_view_maps">View in Maps</string>
     <string name="echo_viewer_perspective_change">Switch Perspective</string>
+    <string name="echo_viewer_perspective_previous">Previous perspective</string>
+    <string name="echo_viewer_perspective_next">Next perspective</string>
     <string name="errors_auth_required">Please sign in to continue.</string>
     <string name="errors_cancel_request_failed">Could not cancel request: %1$s</string>
     <string name="errors_document_not_found">Document not found</string>

@@ -86,6 +86,8 @@ enum class MomentCaptionPresentationStyle {
     Feed,
     Reels,
     Detail,
+    /** Echo deck: 1 línea + ver más + traducción. */
+    Echo,
 }
 
 /** Port de `MomentCaptionText` — normalización para cards feed/reels. */
@@ -311,6 +313,7 @@ fun MomentCaptionView(
     val cardContent = when (style) {
         MomentCaptionPresentationStyle.Feed,
         MomentCaptionPresentationStyle.Reels,
+        MomentCaptionPresentationStyle.Echo,
         -> MomentCaptionText.flowing(visibleContent)
         MomentCaptionPresentationStyle.Detail -> visibleContent
     }
@@ -356,7 +359,11 @@ fun MomentCaptionView(
     }
 
     val bodyFontSize = if (style == MomentCaptionPresentationStyle.Detail) 15.sp else 14.sp
-    val lineLimit = if (style == MomentCaptionPresentationStyle.Detail) 4 else 3
+    val lineLimit = when (style) {
+        MomentCaptionPresentationStyle.Detail -> 4
+        MomentCaptionPresentationStyle.Echo -> 1
+        else -> 3
+    }
     val openFullCaption = {
         HapticManager.shared.lightImpact()
         showFullCaption = true

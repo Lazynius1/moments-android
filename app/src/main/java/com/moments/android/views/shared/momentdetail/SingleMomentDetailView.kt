@@ -67,6 +67,7 @@ import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.profile.momentsview.EditMomentSheet
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
+import com.moments.android.views.profile.momentsview.MomentDeleteConfirmationAlert
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.momentdetail.FeedPinnedTopChrome
 import com.moments.android.views.shared.momentdetail.MomentDetailSolidTopChrome
@@ -107,6 +108,7 @@ fun SingleMomentDetailView(
     var dragVelocityPx by remember { mutableFloatStateOf(0f) }
 
     var showContextMenu by remember { mutableStateOf(false) }
+    var showDeleteAlert by remember { mutableStateOf(false) }
     var showEditSheet by remember { mutableStateOf(false) }
     var selectedForComments by remember { mutableStateOf(false) }
     var selectedHashtag by remember { mutableStateOf("") }
@@ -267,7 +269,6 @@ fun SingleMomentDetailView(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
-                    .padding(horizontal = FeedMomentCardLayout.listHorizontalPadding)
                     .padding(bottom = 24.dp),
             ) {
                 Spacer(Modifier.height(listTopInset))
@@ -322,14 +323,20 @@ fun SingleMomentDetailView(
                     showEditSheet = true
                     showContextMenu = false
                 },
-                onDelete = {
-                    showContextMenu = false
-                    deleteMoment()
-                },
+                onDelete = { showDeleteAlert = true },
                 onReport = {},
                 modifier = Modifier.fillMaxSize(),
             )
         }
+
+        MomentDeleteConfirmationAlert(
+            visible = showDeleteAlert,
+            onConfirm = {
+                showDeleteAlert = false
+                deleteMoment()
+            },
+            onDismiss = { showDeleteAlert = false },
+        )
 
         if (isPeeking && peekImageUrl != null) {
             ScreenshotProtectedView(isProtected = peekIsProtected, fillsContainer = true) {

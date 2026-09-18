@@ -32,8 +32,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
@@ -42,11 +40,14 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -99,7 +100,6 @@ import java.util.Date
 /** Paridad iOS `ContextMenuViewState`. */
 enum class ContextMenuViewState {
     Main,
-    DeleteConfirm,
     HiddenLayerMetrics,
     HiddenLayerMetricDetail,
     Sharing,
@@ -153,7 +153,6 @@ fun ModernContextMenuOverlay(
     fun handleBack() {
         when (viewState) {
             ContextMenuViewState.Main -> dismiss()
-            ContextMenuViewState.DeleteConfirm -> viewState = ContextMenuViewState.Main
             ContextMenuViewState.HiddenLayerMetrics -> viewState = ContextMenuViewState.Main
             ContextMenuViewState.HiddenLayerMetricDetail -> viewState = ContextMenuViewState.HiddenLayerMetrics
             ContextMenuViewState.Sharing -> viewState = ContextMenuViewState.Main
@@ -203,7 +202,6 @@ fun ModernContextMenuOverlay(
     val scrimAlpha = when (viewState) {
         ContextMenuViewState.PreparingStory -> 0.4f
         ContextMenuViewState.Main,
-        ContextMenuViewState.DeleteConfirm,
         ContextMenuViewState.Sharing,
         -> 0.3f
         else -> 0.01f
@@ -265,8 +263,9 @@ fun ModernContextMenuOverlay(
                                 viewState = ContextMenuViewState.HiddenLayerMetrics
                             },
                             onDelete = {
-                                // Confirmación in-tree (no AlertDialog anidado en Dialogs de detalle).
-                                viewState = ContextMenuViewState.DeleteConfirm
+                                // ≡ iOS: cierra el overlay y el host muestra `.alert`.
+                                onDelete()
+                                onPresentedChange(false)
                             },
                             onShare = { viewState = ContextMenuViewState.Sharing },
                             onReport = {
@@ -275,13 +274,6 @@ fun ModernContextMenuOverlay(
                             },
                             onCancel = { dismiss() },
                             onNotInterested = onNotInterested?.let { action -> { dismiss(); action() } },
-                        )
-                        ContextMenuViewState.DeleteConfirm -> ContextMenuDeleteConfirmPanel(
-                            onConfirm = {
-                                onDelete()
-                                dismiss()
-                            },
-                            onCancel = { viewState = ContextMenuViewState.Main },
                         )
                         ContextMenuViewState.HiddenLayerMetrics -> HiddenLayerMetricsListPanel(
                             metrics = hiddenLayerMetrics,
@@ -501,47 +493,28 @@ fun ModernContextMenuContent(
     }
 }
 
-/** Confirmación in-tree — evita AlertDialog anidado en Dialogs de detalle (no se muestra / no confirma). */
 @Composable
-private fun ContextMenuDeleteConfirmPanel(
+fun MomentDeleteConfirmationAlert(
+    visible: Boolean,
     onConfirm: () -> Unit,
-    onCancel: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    val isDark = isSystemInDarkTheme()
-    val primary = if (isDark) Color.White else Color.Black
-    val secondary = if (isDark) Color.White.copy(0.7f) else Color.Black.copy(0.6f)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(
-            stringResource(R.string.context_menu_delete_title),
-            color = primary,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            stringResource(R.string.context_menu_delete_message),
-            color = secondary,
-            fontSize = 14.sp,
-        )
-        ContextMenuButton(
-            icon = Icons.Filled.Delete,
-            title = stringResource(R.string.context_menu_delete_confirm),
-            subtitle = stringResource(R.string.context_menu_delete_moment_subtitle),
-            forceRedIcon = true,
-            onClick = onConfirm,
-        )
-        ContextMenuButton(
-            icon = Icons.Filled.Close,
-            title = stringResource(R.string.context_menu_delete_cancel),
-            subtitle = "",
-            forceRedIcon = false,
-            onClick = onCancel,
-        )
-    }
+    if (!visible) return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.context_menu_delete_title)) },
+        text = { Text(stringResource(R.string.context_menu_delete_message)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.context_menu_delete_confirm), color = Color.Red)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.context_menu_delete_cancel))
+            }
+        },
+    )
 }
 
 @Composable

@@ -125,6 +125,7 @@ import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
+import com.moments.android.views.profile.momentsview.MomentDeleteConfirmationAlert
 import com.moments.android.views.story.StoriesView
 import com.moments.android.views.story.StorySegmentedRing
 import com.moments.android.coordinators.AsyncProfileImageView
@@ -159,6 +160,7 @@ fun ReelVideoView(
     var commentCount by remember { mutableIntStateOf(video.moment.commentCount) }
     var isDoubleTapAnimating by remember { mutableStateOf(false) }
     var showContextMenu by remember { mutableStateOf(false) }
+    var showDeleteAlert by remember { mutableStateOf(false) }
     var showShareSheet by remember { mutableStateOf(false) }
     var storyRouteUserId by remember { mutableStateOf<String?>(null) }
     var hasStory by remember { mutableStateOf(false) }
@@ -917,13 +919,19 @@ fun ReelVideoView(
                 isPresented = showContextMenu,
                 onPresentedChange = { showContextMenu = it },
                 onEdit = {},
-                onDelete = {
-                    showContextMenu = false
-                    deleteMoment()
-                },
+                onDelete = { showDeleteAlert = true },
                 onReport = {},
             )
         }
+
+        MomentDeleteConfirmationAlert(
+            visible = showDeleteAlert,
+            onConfirm = {
+                showDeleteAlert = false
+                deleteMoment()
+            },
+            onDismiss = { showDeleteAlert = false },
+        )
 
         AnimatedVisibility(
             visible = showShareSheet,

@@ -75,9 +75,12 @@ fun ArchivedConversationsView(
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val archived = viewModel.archivedConversations
     val groups by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
+    var previousArchivedEmpty by remember { mutableStateOf(archived.isEmpty()) }
 
     LaunchedEffect(archived.isEmpty()) {
-        if (archived.isEmpty()) onBack()
+        val isEmpty = archived.isEmpty()
+        if (isEmpty && !previousArchivedEmpty) onBack()
+        previousArchivedEmpty = isEmpty
     }
 
     Box(

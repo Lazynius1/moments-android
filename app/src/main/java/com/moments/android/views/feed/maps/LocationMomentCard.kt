@@ -28,7 +28,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -158,6 +157,8 @@ fun LocationMomentCard(
                         isImmersive = isImmersive,
                         onImmersiveChange = { isImmersive = it },
                         onPageChange = { currentImageIndex = it },
+                        showsPageIndicators = false,
+                        seekToPage = currentImageIndex,
                         reelsVideos = reelsVideos,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -191,6 +192,7 @@ fun LocationMomentCard(
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
                                 .padding(top = 20.dp),
+                            onIndexChange = { currentImageIndex = it },
                         )
                     }
 
@@ -238,9 +240,8 @@ fun LocationMomentCard(
         }
     }
 
-    // ≡ iOS: card.blur(isAvailable ? 0 : 20).overlay { MomentUnavailableOverlay }
     Box(modifier) {
-        Box(Modifier.then(if (!isAvailable) Modifier.blur(20.dp) else Modifier)) {
+        if (isAvailable) {
             if (layoutMode == LocationMomentCardLayout.Feed) {
                 Box(Modifier.padding(horizontal = 15.dp)) { cardContent() }
             } else {

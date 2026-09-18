@@ -99,6 +99,7 @@ import com.moments.android.views.feed.sharing.ModernShareBottomSheet
 import com.moments.android.views.profile.core.sections.profileThumbnailUrl
 import com.moments.android.views.profile.momentsview.EditMomentSheet
 import com.moments.android.views.profile.momentsview.ModernContextMenuOverlay
+import com.moments.android.views.profile.momentsview.MomentDeleteConfirmationAlert
 import com.moments.android.views.settings.hasVideoMedia
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.momentdetail.MomentDetailSolidTopChrome
@@ -153,6 +154,7 @@ fun ModernSavedMomentsDetailView(
     var backgroundOpacity by remember { mutableFloatStateOf(1f) }
 
     var showContextMenu by remember { mutableStateOf(false) }
+    var showDeleteAlert by remember { mutableStateOf(false) }
     var contextMenuMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var showEditSheet by remember { mutableStateOf(false) }
     var showShareSheet by remember { mutableStateOf(false) }
@@ -402,8 +404,6 @@ fun ModernSavedMomentsDetailView(
                 contentPadding = PaddingValues(
                     top = listTopInset,
                     bottom = 40.dp,
-                    start = FeedMomentCardLayout.listHorizontalPadding,
-                    end = FeedMomentCardLayout.listHorizontalPadding,
                 ),
                 verticalArrangement = Arrangement.spacedBy(rowSpacing),
             ) {
@@ -452,9 +452,7 @@ fun ModernSavedMomentsDetailView(
                                 handlePeek(url, ratio, pressing, moment)
                             },
                             onTagTap = { userId -> openUserProfile(userId) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(feedCardHeight),
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
@@ -481,15 +479,21 @@ fun ModernSavedMomentsDetailView(
                         showEditSheet = true
                         showContextMenu = false
                     },
-                    onDelete = {
-                        showContextMenu = false
-                        deleteContextMoment()
-                    },
+                    onDelete = { showDeleteAlert = true },
                     onReport = {},
                     modifier = Modifier.fillMaxSize(),
                 )
             }
         }
+
+        MomentDeleteConfirmationAlert(
+            visible = showDeleteAlert,
+            onConfirm = {
+                showDeleteAlert = false
+                deleteContextMoment()
+            },
+            onDismiss = { showDeleteAlert = false },
+        )
 
         if (showShareSheet) {
             contextMenuMoment?.let { shareTarget ->

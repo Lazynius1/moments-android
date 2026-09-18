@@ -474,6 +474,8 @@
     <string name="echo_viewer_location_header">Tocado en %1$s</string>
     <string name="echo_viewer_location_view_maps">Ver Mapa</string>
     <string name="echo_viewer_perspective_change">Cambiar Perspectiva</string>
+    <string name="echo_viewer_perspective_previous">Perspectiva anterior</string>
+    <string name="echo_viewer_perspective_next">Siguiente perspectiva</string>
     <string name="errors_auth_required">Inicia sesión para continuar.</string>
     <string name="errors_cancel_request_failed">No se pudo cancelar la solicitud: %1$s</string>
     <string name="errors_document_not_found">Documento no encontrado</string>

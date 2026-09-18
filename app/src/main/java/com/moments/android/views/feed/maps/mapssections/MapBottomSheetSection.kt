@@ -42,7 +42,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -419,43 +418,40 @@ fun MapBottomSheetGridCell(
     Box(
         modifier.background(Color.Gray.copy(alpha = 0.12f)),
     ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .then(if (isAvailable) Modifier else Modifier.blur(14.dp)),
-        ) {
-            if (moment.mapHasVideoMedia) {
-                MapsVideoThumbnailView(moment = moment, cornerRadius = 0.dp, modifier = Modifier.fillMaxSize())
-            } else {
-                SubcomposeAsyncImage(
-                    model = moment.mapPreferredImageUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                    loading = {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(
-                                color = colors.accent,
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    },
-                )
+        if (isAvailable) {
+            Box(Modifier.fillMaxSize()) {
+                if (moment.mapHasVideoMedia) {
+                    MapsVideoThumbnailView(moment = moment, cornerRadius = 0.dp, modifier = Modifier.fillMaxSize())
+                } else {
+                    SubcomposeAsyncImage(
+                        model = moment.mapPreferredImageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                        loading = {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(
+                                    color = colors.accent,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        },
+                    )
+                }
+                if (hasMultipleMedia) {
+                    Icon(
+                        Icons.Filled.Collections,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp)
+                            .size(14.dp),
+                    )
+                }
             }
-            if (hasMultipleMedia && isAvailable) {
-                Icon(
-                    Icons.Filled.Collections,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(14.dp),
-                )
-            }
-        }
-        if (!isAvailable) {
+        } else {
             MomentUnavailableOverlay(compact = true, cornerRadius = 0.dp, modifier = Modifier.fillMaxSize())
         }
     }
@@ -534,9 +530,7 @@ fun ModernLocationMomentRow(
             ) { onTap(moment) },
     ) {
         Column(
-            Modifier
-                .fillMaxWidth()
-                .then(if (isAvailable) Modifier else Modifier.blur(16.dp)),
+            Modifier.fillMaxWidth(),
         ) {
             Box(
                 Modifier
@@ -544,20 +538,22 @@ fun ModernLocationMomentRow(
                     .height(180.dp)
                     .clip(RoundedCornerShape(18.dp)),
             ) {
-                if (moment.mapHasVideoMedia) {
-                    MapsVideoThumbnailView(moment = moment, cornerRadius = 18.dp, modifier = Modifier.fillMaxSize())
-                } else {
-                    SubcomposeAsyncImage(
-                        model = moment.mapPreferredImageUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                        loading = {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(color = colors.accent, strokeWidth = 2.dp)
-                            }
-                        },
-                    )
+                if (isAvailable) {
+                    if (moment.mapHasVideoMedia) {
+                        MapsVideoThumbnailView(moment = moment, cornerRadius = 18.dp, modifier = Modifier.fillMaxSize())
+                    } else {
+                        SubcomposeAsyncImage(
+                            model = moment.mapPreferredImageUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                            loading = {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(color = colors.accent, strokeWidth = 2.dp)
+                                }
+                            },
+                        )
+                    }
                 }
                 Box(
                     Modifier
@@ -620,7 +616,7 @@ fun MomentUnavailableOverlay(
     Box(
         modifier
             .clip(RoundedCornerShape(cornerRadius))
-            .background(Color.Black.copy(alpha = 0.45f)),
+            .background(Color.Black.copy(alpha = 0.78f)),
         contentAlignment = Alignment.Center,
     ) {
         Column(

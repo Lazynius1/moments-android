@@ -350,7 +350,7 @@ fun SocialVideoEditorView(
                 }
             }
 
-            // Preview canvas ≡ resolvedVideoPreviewHeight + aspectRatio(.fit) dentro del espacio restante
+            // Lienzo fijo (weight 1f). El ratio solo recuadra el vídeo dentro; no mueve header ni timeline.
             BoxWithConstraints(
                 Modifier
                     .weight(1f)
@@ -364,28 +364,34 @@ fun SocialVideoEditorView(
                 val fittedHeight = fittedWidth / ratio
                 Box(
                     Modifier
-                        .width(fittedWidth)
-                        .height(fittedHeight)
+                        .fillMaxSize()
                         .clip(RoundedCornerShape(20.dp))
                         .background(Color.Black)
                         .border(1.dp, chromeStroke, RoundedCornerShape(20.dp)),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    StoryVideoPlayerView(
-                        videoUri = currentVideo.uri,
-                        videoGravity = StoryVideoGravity.RESIZE_ASPECT_FILL,
-                        isMuted = volume <= 0f,
-                        volume = volume,
-                        playbackSpeed = speed.multiplier,
-                        trimStart = trimStart,
-                        trimEnd = trimEnd,
-                        previewTime = previewTime,
-                        onPlayProgress = { progress ->
-                            if (!isDragging && !isScrubbingPlayhead) {
-                                playbackProgress = progress
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    Box(
+                        Modifier
+                            .width(fittedWidth)
+                            .height(fittedHeight),
+                    ) {
+                        StoryVideoPlayerView(
+                            videoUri = currentVideo.uri,
+                            videoGravity = StoryVideoGravity.RESIZE_ASPECT_FILL,
+                            isMuted = volume <= 0f,
+                            volume = volume,
+                            playbackSpeed = speed.multiplier,
+                            trimStart = trimStart,
+                            trimEnd = trimEnd,
+                            previewTime = previewTime,
+                            onPlayProgress = { progress ->
+                                if (!isDragging && !isScrubbingPlayhead) {
+                                    playbackProgress = progress
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                     if (speed != PlaybackSpeed.NORMAL) {
                         Text(
                             stringResource(speed.labelRes),

@@ -660,6 +660,8 @@
     <string name="echo_viewer_location_header">Tocado em %1$s</string>
     <string name="echo_viewer_location_view_maps">Ver no Maps</string>
     <string name="echo_viewer_perspective_change">Trocar perspectiva</string>
+    <string name="echo_viewer_perspective_previous">Perspectiva anterior</string>
+    <string name="echo_viewer_perspective_next">Próxima perspectiva</string>
     <string name="errors_auth_required">Faça login para continuar.</string>
     <string name="errors_cancel_request_failed">Não foi possível cancelar a solicitação: %1$s</string>
     <string name="errors_document_not_found">Documento não encontrado</string>

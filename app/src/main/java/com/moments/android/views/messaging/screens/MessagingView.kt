@@ -35,11 +35,15 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,6 +69,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -94,7 +99,6 @@ import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.messaging.OnlineStatusService
-import com.moments.android.services.messaging.displayName
 import com.moments.android.utilities.momentsEmptyStateAppear
 import com.moments.android.views.components.MomentRefreshOverlayHost
 import com.moments.android.views.components.momentRefresh
@@ -457,6 +461,7 @@ fun MessagingView(
                 onCompose = { showingNewConversation = true },
                 onGroupRequests = { groupRequestsStartSent = false; showingGroupRequests = true },
                 onRequests = { showingRequests = true },
+                onArchived = { showingArchived = true },
                 onStatus = { showingStatusSelector = true },
                 groupRequestCount = groupRequests.received.size + groupRequests.sent.size,
                 pendingRequestCount = pendingRequestCount,
@@ -502,7 +507,6 @@ fun MessagingView(
                     searchText = searchText,
                     conversationMenuSelection = conversationMenuSelection,
                     onOpenConversation = { viewModel.openConversation(it) },
-                    onOpenArchived = { showingArchived = true },
                     onOpenOutgoing = { user ->
                         scope.launch {
                             val current = uid ?: return@launch
@@ -692,13 +696,15 @@ private fun MessagingToolbar(
     onCompose: () -> Unit,
     onGroupRequests: () -> Unit,
     onRequests: () -> Unit,
+    onArchived: () -> Unit,
     onStatus: () -> Unit,
     groupRequestCount: Int,
     pendingRequestCount: Int,
     currentStatus: OnlineStatus,
 ) {
     val colors = rememberAdaptiveColors()
-    val context = LocalContext.current
+    var filterExpanded by remember { mutableStateOf(false) }
+    val filterBadgeCount = pendingRequestCount + groupRequestCount
     Row(
         Modifier
             .fillMaxWidth()
@@ -723,7 +729,11 @@ private fun MessagingToolbar(
                 }
             }
         }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(
+            Modifier.clickable(onClick = onStatus),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             Text(
                 stringResource(R.string.messaging_title),
                 fontWeight = FontWeight.SemiBold,
@@ -731,25 +741,18 @@ private fun MessagingToolbar(
                 color = colors.primary,
                 maxLines = 1,
             )
-            Row(
-                Modifier.clickable(onClick = onStatus),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(onlineStatusColor(currentStatus)),
-                )
-                Text(
-                    currentStatus.displayName(context),
-                    fontSize = 11.sp,
-                    color = colors.secondary,
-                    maxLines = 1,
-                )
-                Icon(Icons.Filled.KeyboardArrowDown, null, tint = colors.secondary, modifier = Modifier.size(10.dp))
-            }
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(onlineStatusColor(currentStatus)),
+            )
+            Icon(
+                Icons.Filled.KeyboardArrowDown,
+                contentDescription = null,
+                tint = colors.secondary,
+                modifier = Modifier.size(14.dp),
+            )
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
             ProfileChromeControlsCluster {
@@ -763,18 +766,40 @@ private fun MessagingToolbar(
                     )
                 }
                 MessagingToolbarRequestButton(
-                    icon = AttachmentIcon.GROUPS,
-                    count = groupRequestCount,
-                    onClick = onGroupRequests,
-                    accessibilityLabel = stringResource(R.string.groups_requests_title),
+                    imageVector = Icons.Filled.FilterList,
+                    count = filterBadgeCount,
+                    onClick = { filterExpanded = true },
+                    accessibilityLabel = stringResource(R.string.saved_moments_filters_button),
                     foregroundColor = colors.primary,
                 )
-                MessagingToolbarRequestButton(
-                    icon = AttachmentIcon.MESSAGE_REQUESTS,
-                    count = pendingRequestCount,
-                    onClick = onRequests,
-                    accessibilityLabel = stringResource(R.string.message_requests_title),
-                    foregroundColor = colors.primary,
+            }
+            DropdownMenu(
+                expanded = filterExpanded,
+                onDismissRequest = { filterExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.message_requests_title)) },
+                    leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
+                    onClick = {
+                        filterExpanded = false
+                        onRequests()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.groups_requests_title)) },
+                    leadingIcon = { Icon(Icons.Outlined.Groups, contentDescription = null) },
+                    onClick = {
+                        filterExpanded = false
+                        onGroupRequests()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.messaging_section_archived)) },
+                    leadingIcon = { Icon(Icons.Filled.Archive, contentDescription = null) },
+                    onClick = {
+                        filterExpanded = false
+                        onArchived()
+                    },
                 )
             }
         }
@@ -783,7 +808,8 @@ private fun MessagingToolbar(
 
 @Composable
 private fun MessagingToolbarRequestButton(
-    icon: AttachmentIcon,
+    icon: AttachmentIcon? = null,
+    imageVector: ImageVector? = null,
     count: Int,
     onClick: () -> Unit,
     accessibilityLabel: String,
@@ -794,11 +820,14 @@ private fun MessagingToolbarRequestButton(
             onClick = onClick,
             modifier = Modifier.semantics { contentDescription = accessibilityLabel },
         ) {
-            AttachmentIconView(
-                icon = icon,
-                preset = AttachmentIconPreset.SETTINGS_ROW,
-                tintColor = foregroundColor,
-            )
+            when {
+                imageVector != null -> Icon(imageVector, contentDescription = null, tint = foregroundColor)
+                icon != null -> AttachmentIconView(
+                    icon = icon,
+                    preset = AttachmentIconPreset.SETTINGS_ROW,
+                    tintColor = foregroundColor,
+                )
+            }
         }
         if (count > 0) {
             Box(
@@ -911,7 +940,6 @@ private fun MessagingConversationList(
     searchText: String,
     conversationMenuSelection: ConversationMenuSelection?,
     onOpenConversation: (Conversation) -> Unit,
-    onOpenArchived: () -> Unit,
     onOpenOutgoing: (AppUser) -> Unit,
     onOpenStory: (InboxStoryLaunch) -> Unit,
     onCompose: () -> Unit,
@@ -965,14 +993,6 @@ private fun MessagingConversationList(
                 Modifier.fillMaxSize(),
                 userScrollEnabled = conversationMenuSelection == null,
             ) {
-                if (viewModel.archivedConversations.isNotEmpty()) {
-                    item(key = "archived-entry") {
-                        ArchivedEntryRow(
-                            unreadCount = viewModel.archivedUnreadCount(uid),
-                            onClick = onOpenArchived,
-                        )
-                    }
-                }
                 items(
                     merged,
                     key = {
@@ -1108,38 +1128,6 @@ private fun MessagingEmptyState(onCompose: () -> Unit) {
                 fontSize = 15.sp,
             )
         }
-    }
-}
-
-@Composable
-private fun ArchivedEntryRow(unreadCount: Int, onClick: () -> Unit) {
-    val colors = rememberAdaptiveColors()
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(Icons.Filled.Archive, null, tint = colors.primary.copy(0.85f), modifier = Modifier.size(22.dp))
-        Text(
-            if (unreadCount > 0) {
-                stringResource(R.string.messaging_section_archived_with_unread, unreadCount)
-            } else {
-                stringResource(R.string.messaging_section_archived)
-            },
-            color = colors.primary.copy(0.85f),
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 15.sp,
-            modifier = Modifier.weight(1f),
-        )
-        Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            null,
-            tint = colors.primary.copy(0.45f),
-            modifier = Modifier.size(16.dp),
-        )
     }
 }
 
