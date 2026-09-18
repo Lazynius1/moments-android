@@ -59,7 +59,6 @@ import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
 import com.moments.android.R
 import com.moments.android.views.creator.creatoruikit.NormalizedMediaCropContainer
-import com.moments.android.views.creator.creatoruikit.feedCropTransformations
 import com.moments.android.models.MediaItem
 import com.moments.android.services.content.FeedMediaItem
 import com.moments.android.services.content.FeedMoment
@@ -445,32 +444,39 @@ private fun MediaItemView(
                 contentAlignment = Alignment.Center,
             ) {
                 when {
-                    // La transformación deja ya el bitmap en la ventana exacta de feedCrop.
-                    // Crop solo absorbe el redondeo a píxeles del bitmap (menos de 1 px);
-                    // Fit revelaba el fondo del contenedor como un borde que iOS no muestra.
+                    // ≡ iOS MediaItemView: NormalizedMediaCropContainer + scaledToFit
+                    // (mismo path que el vídeo en Android). No Coil crop del bitmap.
                     activeFeedCrop != null -> {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(item.url)
-                                .size(1080, 1920)
-                                .allowHardware(false)
-                                .transformations(feedCropTransformations(activeFeedCrop))
-                                .build(),
-                            contentDescription = moment.username,
-                            contentScale = ContentScale.Crop,
+                        NormalizedMediaCropContainer(
+                            feedCrop = activeFeedCrop,
                             modifier = Modifier.fillMaxSize(),
-                            onSuccess = { state: AsyncImagePainter.State.Success ->
-                                val size = state.painter.intrinsicSize
-                                if (size.width > 0f && size.height > 0f &&
-                                    size.width.isFinite() && size.height.isFinite()
-                                ) {
-                                    val ratio = size.width / size.height
-                                    if (ratio.isFinite() && ratio > 0f) {
-                                        loadedAspectRatio = ratio
+                        ) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(item.url)
+                                    .size(
+                                        (1080f / activeFeedCrop.width.toFloat().coerceAtLeast(0.01f)).toInt()
+                                            .coerceIn(1, 4096),
+                                        (1920f / activeFeedCrop.height.toFloat().coerceAtLeast(0.01f)).toInt()
+                                            .coerceIn(1, 4096),
+                                    )
+                                    .build(),
+                                contentDescription = moment.username,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize(),
+                                onSuccess = { state: AsyncImagePainter.State.Success ->
+                                    val size = state.painter.intrinsicSize
+                                    if (size.width > 0f && size.height > 0f &&
+                                        size.width.isFinite() && size.height.isFinite()
+                                    ) {
+                                        val ratio = size.width / size.height
+                                        if (ratio.isFinite() && ratio > 0f) {
+                                            loadedAspectRatio = ratio
+                                        }
                                     }
-                                }
-                            },
-                        )
+                                },
+                            )
+                        }
                     }
                     usesBlurredFitLayout -> {
                         CarouselMediaBackdropView(item = item)
