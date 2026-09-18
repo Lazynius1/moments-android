@@ -116,6 +116,12 @@ fun ModernVideoPlayer(
     onExternalTap: (() -> Unit)? = null,
     /** Mute persistente estilo CroppedVideoPlayer (bottomLeading) — no está en ModernVideoPlayer iOS. */
     showCroppedMuteButton: Boolean = false,
+    /**
+     * true = ZOOM/Crop (rellena el frame; default social).
+     * false = FIT (respeta feedCrop dentro de [NormalizedMediaCropContainer]).
+     * Independiente de [chromeStyle] para no mezclar controles con resize.
+     */
+    contentScaleFill: Boolean = true,
 ) {
     val context = LocalContext.current
     val usesSocialChrome = chromeStyle == VideoPlaybackChromeStyle.SocialReels
@@ -378,8 +384,10 @@ fun ModernVideoPlayer(
     }
 
     val playerReady = playerManager.player != null && !hasLoadError
-    val contentScale = if (usesSocialChrome) ContentScale.Crop else ContentScale.Fit
-    val resizeMode = if (usesSocialChrome) {
+    // Resize desacoplado del chrome: SocialReels sigue con controles social, pero
+    // feedCrop necesita FIT para no recentrar/zoom encima del crop normalizado.
+    val contentScale = if (contentScaleFill) ContentScale.Crop else ContentScale.Fit
+    val resizeMode = if (contentScaleFill) {
         AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     } else {
         AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -421,6 +429,7 @@ fun ModernVideoPlayer(
                 VideoPosterOverlay(
                     posterUrl = posterUrl,
                     isReadyToPlay = false,
+                    contentScale = contentScale,
                     modifier = Modifier.fillMaxSize(),
                 )
                 ModernLoadingView(
@@ -501,12 +510,16 @@ fun FeedVideoPage(
     onTap: (() -> Unit)? = null,
     mediaItem: MomentsMediaItem? = null,
     moment: Moment? = null,
+    /** false dentro de feedCrop: FIT en lugar de ZOOM. */
+    contentScaleFill: Boolean = true,
 ) {
+    val posterScale = if (contentScaleFill) ContentScale.Crop else ContentScale.Fit
     if (!allowsPlayback) {
         Box(modifier.fillMaxSize()) {
             VideoPosterOverlay(
                 posterUrl = thumbnailUrl,
                 isReadyToPlay = false,
+                contentScale = posterScale,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -524,6 +537,7 @@ fun FeedVideoPage(
         moment = moment,
         onExternalTap = onTap,
         showCroppedMuteButton = showMute,
+        contentScaleFill = contentScaleFill,
     )
 }
 
