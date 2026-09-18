@@ -116,11 +116,6 @@ private enum class DeckSwipeAxis {
     Vertical,
 }
 
-/** Debug: fuerza un caption largo para validar truncado / ver más / traducción. */
-private const val DebugForceEchoCaption = true
-private const val DebugEchoCaptionText =
-    "Debug Echo: un momento compartido desde este ángulo con bastante texto para probar el truncado a una línea, el ver más del feed y la fila de traducción debajo."
-
 /**
  * Port 1:1 de `EchoViewerUI.swift` — mazo de postales + selector de perspectiva.
  */
@@ -1047,10 +1042,8 @@ private fun resolvedCaption(
     postCaptions: Map<String, String>,
     postMoments: Map<String, Moment>,
 ): String {
-    if (post == null) return if (DebugForceEchoCaption) DebugEchoCaptionText else ""
-    val cached = postCaptions[post.momentId] ?: postMoments[post.momentId]?.content.orEmpty()
-    if (cached.trim().isEmpty() && DebugForceEchoCaption) return DebugEchoCaptionText
-    return cached
+    if (post == null) return ""
+    return postCaptions[post.momentId] ?: postMoments[post.momentId]?.content.orEmpty()
 }
 
 private fun resolvedMediaAspectRatio(post: EchoDeckPost, postAspectRatios: Map<String, String>): Float {
