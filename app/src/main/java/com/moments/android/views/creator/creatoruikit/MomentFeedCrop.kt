@@ -503,6 +503,7 @@ fun NormalizedMediaCropContainer(
                         x = -sourceW * feedCrop.x.toFloat(),
                         y = -sourceH * feedCrop.y.toFloat(),
                     ),
+                contentAlignment = Alignment.TopStart, // ≡ iOS ZStack(alignment: .topLeading)
             ) {
                 content()
             }

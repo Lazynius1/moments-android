@@ -613,6 +613,11 @@ private fun CroppedVideoPlayer(
         when {
             // ≡ iOS feedCroppedVideo — solo crop real (no fullBounds)
             activeFeedCrop != null -> {
+                // ≡ iOS resolvedItemAspectRatio → ModernVideoPlayer(aspectRatio:)
+                val videoAspect = item.resolvedAspectRatioValue
+                    ?.takeIf { it.isFinite() && it > 0f }
+                    ?: item.aspectRatio?.toFloatOrNull()?.takeIf { it > 0f }
+                    ?: 0f
                 NormalizedMediaCropContainer(
                     feedCrop = activeFeedCrop,
                     modifier = Modifier.fillMaxSize(),
@@ -630,6 +635,7 @@ private fun CroppedVideoPlayer(
                             onTap = onTap,
                             // Dentro del crop normalizado: FIT (no ZOOM) para no comerse feedCrop.
                             contentScaleFill = false,
+                            playerAspectRatio = videoAspect,
                         )
                     } else {
                         CroppedVideoPoster(posterUrl = posterUrl, onTap = onTap)

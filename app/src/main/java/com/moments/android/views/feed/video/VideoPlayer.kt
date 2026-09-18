@@ -512,6 +512,8 @@ fun FeedVideoPage(
     moment: Moment? = null,
     /** false dentro de feedCrop: FIT en lugar de ZOOM. */
     contentScaleFill: Boolean = true,
+    /** >0 ≡ iOS ModernVideoPlayer(aspectRatio:); 0 = fillMaxSize. */
+    playerAspectRatio: Float = 0f,
 ) {
     val posterScale = if (contentScaleFill) ContentScale.Crop else ContentScale.Fit
     if (!allowsPlayback) {
@@ -529,7 +531,7 @@ fun FeedVideoPage(
         url = url,
         videoId = consumerId,
         modifier = modifier.fillMaxSize(),
-        aspectRatio = 0f, // el padre delimita (carousel); sin aspectRatio forzado
+        aspectRatio = playerAspectRatio,
         chromeStyle = VideoPlaybackChromeStyle.SocialReels,
         allowsPauseInteraction = allowsPauseInteraction,
         posterUrl = thumbnailUrl,
