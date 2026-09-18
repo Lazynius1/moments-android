@@ -633,8 +633,8 @@ private fun CroppedVideoPlayer(
                             allowsPauseInteraction = false,
                             showMute = showMute,
                             onTap = onTap,
-                            // Dentro del crop normalizado: FIT (no ZOOM) para no comerse feedCrop.
-                            contentScaleFill = false,
+                            // iOS socialReels = fill dentro del frame fuente (ya recortado).
+                            contentScaleFill = true,
                             playerAspectRatio = videoAspect,
                         )
                     } else {

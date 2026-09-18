@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
@@ -40,7 +39,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -477,9 +478,9 @@ data class AssetCropSession(
  * ≡ iOS `NormalizedMediaCropContainer`.
  * El [content] debe representar la fuente completa (aspect-fit) dentro del frame recibido.
  *
- * iOS: `ZStack(alignment: .topLeading)` + frame fuente + offset.
- * Compose: [requiredSize] (no [size], que clampa al padre) + [Alignment.TopStart]
- * (el Box centra por defecto → encuadre desplazado / rail tapa el crop).
+ * iOS: `content.frame(width:source, height:source).offset` + viewport `topLeading` + `clipped`.
+ * Compose: [Layout] con [Constraints.fixed] al tamaño fuente (no un Box+requiredSize:
+ * ExoPlayer/AndroidView ignora requiredSize y se mide a la card 16:9).
  */
 @Composable
 fun NormalizedMediaCropContainer(
@@ -487,29 +488,55 @@ fun NormalizedMediaCropContainer(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    BoxWithConstraints(
-        modifier = modifier.clipToBounds(),
-        contentAlignment = Alignment.TopStart,
-    ) {
-        val w = maxWidth
-        val h = maxHeight
-        if (feedCrop != null && feedCrop.width > 0.0001 && feedCrop.height > 0.0001) {
-            val sourceW = w / feedCrop.width.toFloat()
-            val sourceH = h / feedCrop.height.toFloat()
+    Layout(
+        content = {
             Box(
-                Modifier
-                    .requiredSize(sourceW, sourceH)
-                    .offset(
-                        x = -sourceW * feedCrop.x.toFloat(),
-                        y = -sourceH * feedCrop.y.toFloat(),
-                    ),
-                contentAlignment = Alignment.TopStart, // ≡ iOS ZStack(alignment: .topLeading)
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.TopStart,
             ) {
                 content()
             }
+        },
+        modifier = modifier.clipToBounds(),
+    ) { measurables, constraints ->
+        val viewportW = if (constraints.hasBoundedWidth) {
+            constraints.maxWidth
         } else {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                content()
+            constraints.minWidth
+        }.coerceAtLeast(0)
+        val viewportH = if (constraints.hasBoundedHeight) {
+            constraints.maxHeight
+        } else {
+            constraints.minHeight
+        }.coerceAtLeast(0)
+        val measurable = measurables.firstOrNull()
+            ?: return@Layout layout(viewportW, viewportH) {}
+        val crop = feedCrop
+        if (crop != null &&
+            crop.width > 0.0001 &&
+            crop.height > 0.0001 &&
+            viewportW > 0 &&
+            viewportH > 0
+        ) {
+            val sourceW = (viewportW / crop.width).roundToInt().coerceAtLeast(1)
+            val sourceH = (viewportH / crop.height).roundToInt().coerceAtLeast(1)
+            val placeable = measurable.measure(Constraints.fixed(sourceW, sourceH))
+            val x = (-sourceW * crop.x).roundToInt()
+            val y = (-sourceH * crop.y).roundToInt()
+            layout(viewportW, viewportH) {
+                placeable.placeRelative(x, y)
+            }
+        } else {
+            val placeable = if (viewportW > 0 && viewportH > 0) {
+                measurable.measure(Constraints.fixed(viewportW, viewportH))
+            } else {
+                measurable.measure(constraints)
+            }
+            layout(
+                viewportW.coerceAtLeast(placeable.width),
+                viewportH.coerceAtLeast(placeable.height),
+            ) {
+                placeable.placeRelative(0, 0)
             }
         }
     }

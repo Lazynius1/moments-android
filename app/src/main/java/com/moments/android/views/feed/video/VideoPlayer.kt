@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -395,8 +396,9 @@ fun ModernVideoPlayer(
 
     Box(
         modifier
-            .fillMaxWidth()
-            .then(if (aspectRatio > 0f) Modifier.aspectRatio(aspectRatio) else Modifier.fillMaxSize())
+            .fillMaxSize()
+            .then(if (aspectRatio > 0f) Modifier.aspectRatio(aspectRatio) else Modifier)
+            .clipToBounds()
             .clickable {
                 handleTap()
             },
@@ -780,6 +782,8 @@ fun VideoPlayerRepresentable(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
                 )
+                clipChildren = true
+                clipToOutline = true
                 useController = false
                 this.resizeMode = resizeMode
                 if (layerRole == VideoLayerRole.Reels) {
