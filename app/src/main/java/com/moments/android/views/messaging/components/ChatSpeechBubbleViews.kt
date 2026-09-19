@@ -38,6 +38,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -48,9 +52,6 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.utilities.MomentMentionNavigation
@@ -74,9 +75,52 @@ object ChatTextBubbleMetrics {
     val lineSpacing = 2.dp
     val cornerRadius = 20.dp
     val joinedRadius = 4.dp
-    /** ≡ iOS `maxWidthScreenFraction`. */
+    /** ≡ iOS `maxWidthScreenFraction` (fracción del contenedor del chat). */
     const val maxWidthScreenFraction = 0.78f
     const val maxWidthFraction = maxWidthScreenFraction
+}
+
+/**
+ * ≡ iOS `EnvironmentValues.chatListContainerWidth`.
+ * `0.dp` = sin inyección; [ChatBubbleLayoutWidth] cae al ancho de pantalla.
+ */
+val LocalChatListContainerWidth = compositionLocalOf { 0.dp }
+
+/** ≡ iOS `ChatBubbleLayoutWidth` — cap de tarjetas/burbujas al ancho real de la lista. */
+object ChatBubbleLayoutWidth {
+    val cardGutter = 24.dp
+
+    @Composable
+    fun containerWidth(chatListWidth: Dp = LocalChatListContainerWidth.current): Dp {
+        val fallback = LocalConfiguration.current.screenWidthDp.dp
+        return if (chatListWidth.value >= 120f) chatListWidth else fallback
+    }
+
+    @Composable
+    fun maxTextBubbleWidth(chatListWidth: Dp = LocalChatListContainerWidth.current): Dp =
+        containerWidth(chatListWidth) * ChatTextBubbleMetrics.maxWidthScreenFraction
+
+    @Composable
+    fun capped(
+        designWidth: Dp,
+        chatListWidth: Dp = LocalChatListContainerWidth.current,
+        gutter: Dp = cardGutter,
+    ): Dp {
+        val available = maxOf(120.dp, containerWidth(chatListWidth) - gutter)
+        return minOf(designWidth, available)
+    }
+
+    @Composable
+    fun cappedSize(
+        designWidth: Dp,
+        designHeight: Dp,
+        chatListWidth: Dp = LocalChatListContainerWidth.current,
+        gutter: Dp = cardGutter,
+    ): DpSize {
+        val width = capped(designWidth, chatListWidth, gutter)
+        if (designWidth.value <= 0f) return DpSize(width, designHeight)
+        return DpSize(width, width * (designHeight / designWidth))
+    }
 }
 
 /** ≡ iOS `ChatMessageFont.bubble` (~15pt escalado con tamaño de texto del sistema). */
@@ -165,7 +209,7 @@ fun ChatTextBubbleView(
     val linkUrl = remember(text) { ChatLinkOpener.firstUrl(text) }
     val hasLink = linkUrl != null
 
-    val maxBubbleWidth = LocalConfiguration.current.screenWidthDp.dp * ChatTextBubbleMetrics.maxWidthScreenFraction
+    val maxBubbleWidth = ChatBubbleLayoutWidth.maxTextBubbleWidth()
     val shape = chatBubbleShape(
         side = if (isOutgoing) ChatBubbleSide.TRAILING else ChatBubbleSide.LEADING,
         position = groupPosition,

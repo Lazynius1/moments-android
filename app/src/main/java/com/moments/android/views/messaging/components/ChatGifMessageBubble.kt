@@ -60,7 +60,8 @@ fun ChatGifMessageBubble(
     progress: Double?,
     modifier: Modifier = Modifier,
 ) {
-    val size = ChatGifLayout.displaySize(message.mediaWidth, message.mediaHeight)
+    val raw = ChatGifLayout.displaySize(message.mediaWidth, message.mediaHeight)
+    val size = ChatBubbleLayoutWidth.cappedSize(raw.width, raw.height)
     val shape = RoundedCornerShape(ChatGifLayout.cornerRadius)
     val isDark = isSystemInDarkTheme()
     val isSending = message.status == MessageStatus.SENDING

@@ -151,6 +151,7 @@ import com.moments.android.views.profile.core.sections.profileMomentZoomSource
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
+import com.moments.android.views.messaging.components.ChatBubbleLayoutWidth
 import com.moments.android.views.messaging.components.ChatVideoPlayBadge
 import com.moments.android.views.messaging.components.GlassmorphicAvatar
 import com.moments.android.views.messaging.core.Conversation
@@ -1574,6 +1575,20 @@ object SharedDMPostCardMetrics {
     val maximumMediaHeight = 240.dp
     val cornerRadius = 18.dp
     val mediaCornerRadius = 10.dp
+    val headerHeight = 48.dp
+    val captionBlockHeight = 40.dp
+
+    fun mediaHeight(aspectRatio: Float, mediaWidth: Dp = this.mediaWidth): Dp {
+        if (aspectRatio <= 0.01f) return defaultMediaHeight
+        val raw = mediaWidth / aspectRatio
+        return raw.coerceIn(minimumMediaHeight, maximumMediaHeight)
+    }
+
+    fun cardHeight(aspectRatio: Float, hasCaption: Boolean, mediaWidth: Dp = this.mediaWidth): Dp {
+        var height = headerHeight + mediaVerticalInset * 2 + mediaHeight(aspectRatio, mediaWidth)
+        if (hasCaption) height += captionBlockHeight
+        return height
+    }
 }
 
 /** ≡ iOS `parseSharedAspectRatio` — ("9:16", "4:5", "1.0") → width/height. */
@@ -1618,22 +1633,17 @@ fun SharedDMPostCard(
         Color.fromHex("E8EEF0")
     }
     val primaryText = if (isDark) Color.fromHex("FAF9F6") else Color.fromHex("0B1215")
-    val mediaHeight = remember(aspectRatio) {
-        if (aspectRatio <= 0.01f) {
-            SharedDMPostCardMetrics.defaultMediaHeight
-        } else {
-            val raw = SharedDMPostCardMetrics.mediaWidth / aspectRatio
-            raw.coerceIn(
-                SharedDMPostCardMetrics.minimumMediaHeight,
-                SharedDMPostCardMetrics.maximumMediaHeight,
-            )
-        }
-    }
+    val cardWidth = ChatBubbleLayoutWidth.capped(SharedDMPostCardMetrics.width)
+    val mediaWidth = cardWidth - SharedDMPostCardMetrics.mediaInset * 2
+    val hasCaption = !caption.isNullOrBlank()
+    val mediaHeight = SharedDMPostCardMetrics.mediaHeight(aspectRatio, mediaWidth)
+    val reservedCardHeight = SharedDMPostCardMetrics.cardHeight(aspectRatio, hasCaption, mediaWidth)
     val cardShape = RoundedCornerShape(SharedDMPostCardMetrics.cornerRadius)
 
     Column(
         modifier
-            .width(SharedDMPostCardMetrics.width)
+            .width(cardWidth)
+            .heightIn(min = reservedCardHeight)
             .clip(cardShape)
             .background(cardBackground)
             .border(
@@ -1686,7 +1696,7 @@ fun SharedDMPostCard(
                     horizontal = SharedDMPostCardMetrics.mediaInset,
                     vertical = SharedDMPostCardMetrics.mediaVerticalInset,
                 )
-                .width(SharedDMPostCardMetrics.mediaWidth)
+                .width(mediaWidth)
                 .height(mediaHeight)
                 .clip(RoundedCornerShape(SharedDMPostCardMetrics.mediaCornerRadius)),
             contentAlignment = Alignment.Center,
@@ -1706,7 +1716,7 @@ fun SharedDMPostCard(
             }
         }
 
-        if (!caption.isNullOrBlank()) {
+        if (hasCaption) {
             val captionAnnotated = buildAnnotatedString {
                 if (!captionAuthor.isNullOrBlank()) {
                     withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) {
@@ -1743,9 +1753,12 @@ fun SharedDMPreviewCardSkeleton(modifier: Modifier = Modifier) {
         Color.fromHex("E8EEF0")
     }
     val placeholderFill = if (isDark) Color.White.copy(0.10f) else Color.Black.copy(0.07f)
+    val cardWidth = ChatBubbleLayoutWidth.capped(SharedDMPostCardMetrics.width)
+    val mediaWidth = cardWidth - SharedDMPostCardMetrics.mediaInset * 2
     Column(
         modifier
-            .width(SharedDMPostCardMetrics.width)
+            .width(cardWidth)
+            .heightIn(min = SharedDMPostCardMetrics.cardHeight(aspectRatio = 1f, hasCaption = true, mediaWidth = mediaWidth))
             .clip(RoundedCornerShape(SharedDMPostCardMetrics.cornerRadius))
             .background(cardBackground)
             .border(
@@ -1775,7 +1788,7 @@ fun SharedDMPreviewCardSkeleton(modifier: Modifier = Modifier) {
                     horizontal = SharedDMPostCardMetrics.mediaInset,
                     vertical = SharedDMPostCardMetrics.mediaVerticalInset,
                 )
-                .width(SharedDMPostCardMetrics.mediaWidth)
+                .width(mediaWidth)
                 .height(SharedDMPostCardMetrics.defaultMediaHeight)
                 .clip(RoundedCornerShape(SharedDMPostCardMetrics.mediaCornerRadius))
                 .background(placeholderFill),
@@ -1785,6 +1798,20 @@ fun SharedDMPreviewCardSkeleton(modifier: Modifier = Modifier) {
                 color = Color.Gray.copy(0.7f),
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(28.dp),
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(SharedDMPostCardMetrics.captionBlockHeight)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth(0.72f)
+                    .height(11.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(placeholderFill),
             )
         }
     }
@@ -1874,12 +1901,12 @@ fun SharedDMCenteredPlayOverlay(modifier: Modifier = Modifier) {
 @Composable
 fun SharedDMUnavailablePreviewCard(
     title: String,
-    message: String,
     icon: ImageVector,
     previewImageURL: String?,
     authorId: String?,
     authorName: String?,
     modifier: Modifier = Modifier,
+    message: String? = null,
     useStoryRing: Boolean = true,
 ) {
     SharedDMPostCard(
@@ -2052,7 +2079,6 @@ fun BlockedMomentBubble(
 ) {
     SharedDMUnavailablePreviewCard(
         title = stringResource(R.string.share_moment_unavailable),
-        message = stringResource(R.string.share_no_permission),
         icon = Icons.Filled.Lock,
         previewImageURL = sharedMomentData?.get("momentImageUrl"),
         authorId = sharedMomentData?.get("momentAuthorId"),
@@ -2121,7 +2147,7 @@ fun ReelPreviewCard(
     val caption = sharedMomentData["momentContent"]?.trim()?.takeIf { it.isNotEmpty() }
     Box(
         modifier
-            .size(StoryShareCardMetrics.width, StoryShareCardMetrics.height)
+            .size(StoryShareCardMetrics.size())
             .clip(shape),
     ) {
         MomentVisualContent(

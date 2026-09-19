@@ -393,17 +393,6 @@ private fun MediaItemView(
         moment.aspectRatio?.trim() == "9:16" ||
         MomentCarouselLayoutRules.aspectRatioValue(moment.aspectRatio) < 0.70f
 
-    LaunchedEffect(item.id, canvasAspectRatio, activeFeedCrop, usesBlurredFitLayout, isReelsFormat) {
-        val crop = item.feedCrop
-        android.util.Log.d(
-            "FeedAspect",
-            "media id=${moment.id} item=${item.id} type=${item.type} " +
-                "canvas=${"%.4f".format(canvasAspectRatio)} resolved=${"%.4f".format(resolvedItemAspectRatio)} " +
-                "blurFit=$usesBlurredFitLayout reels=$isReelsFormat " +
-                "feedCrop=${crop?.let { "${it.cardAspect} full=${it.isFullBounds} active=${activeFeedCrop != null}" } ?: "nil"}",
-        )
-    }
-
     Box(
         Modifier.fillMaxSize(),
     ) {

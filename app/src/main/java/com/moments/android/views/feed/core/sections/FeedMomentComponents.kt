@@ -612,18 +612,6 @@ fun ModernPostCardView(
         }
     }
 
-    LaunchedEffect(moment.id, detectedAspectRatio, realAspectRatio, aspectRatioType, cardHeightDp, mediaItems) {
-        val crop = mediaItems.firstOrNull()?.feedCrop
-        val h = cardHeightDp
-        android.util.Log.d(
-            "FeedAspect",
-            "id=${moment.id} db=${moment.aspectRatio} raw=${"%.4f".format(realAspectRatio)} " +
-                "display=${"%.4f".format(detectedAspectRatio)} type=${aspectRatioType.displayName} " +
-                "cardH=${h?.value?.let { "%.1f".format(it) } ?: "null"}dp " +
-                "feedCrop=${crop?.let { "${it.cardAspect} full=${it.isFullBounds} ${it.width}x${it.height}" } ?: "nil"}",
-        )
-    }
-
     // iOS: onChange savedMomentIds + loadAllPostData checkIfSaved
     // Saved detail: `isSaved: .constant(true)` — no re-sincronizar desde Firestore.
     LaunchedEffect(savedIds, moment.id, forceSaved) {

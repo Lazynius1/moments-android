@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -61,6 +62,7 @@ import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.components.LiveUsernameContent
+import com.moments.android.views.messaging.components.ChatBubbleLayoutWidth
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.services.ChatService
@@ -459,6 +461,9 @@ object StoryShareCardMetrics {
     val width = 180.dp
     val height = 320.dp
     val cornerRadius = 18.dp
+
+    @Composable
+    fun size(): DpSize = ChatBubbleLayoutWidth.cappedSize(width, height)
 }
 
 @Composable
@@ -466,7 +471,7 @@ private fun SharedStoryPreviewSkeleton(modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(StoryShareCardMetrics.cornerRadius)
     Box(
         modifier
-            .size(StoryShareCardMetrics.width, StoryShareCardMetrics.height)
+            .size(StoryShareCardMetrics.size())
             .clip(shape)
             .background(Color.White.copy(0.1f)),
         contentAlignment = Alignment.Center,
@@ -492,7 +497,7 @@ private fun SharedStoryUnavailablePreview(
 
     Box(
         modifier
-            .size(StoryShareCardMetrics.width, StoryShareCardMetrics.height)
+            .size(StoryShareCardMetrics.size())
             .clip(shape),
     ) {
         if (!previewImageURL.isNullOrBlank()) {
@@ -553,7 +558,7 @@ fun StoryPreviewCard(
 
     Box(
         modifier
-            .size(StoryShareCardMetrics.width, StoryShareCardMetrics.height)
+            .size(StoryShareCardMetrics.size())
             .clip(shape),
     ) {
         if (story != null) {

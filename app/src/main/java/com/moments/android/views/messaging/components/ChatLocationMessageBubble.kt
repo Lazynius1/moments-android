@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -133,9 +134,9 @@ object ChatLocationLiveCountdownFormatter {
     }
 }
 
-private val bubbleWidth = 276.dp
-private val mapContentWidth = 264.dp
+private val designBubbleWidth = 276.dp
 private val mapHeight = 150.dp
+private val cardInset = 6.dp
 private val bubbleShape = RoundedCornerShape(18.dp)
 /** ≡ iOS MKMapSnapshotter span 0.01. */
 private const val BUBBLE_SNAPSHOT_LON_DELTA = 0.01
@@ -157,6 +158,8 @@ fun ChatLocationMessageBubble(
     val isDark = isSystemInDarkTheme()
     val canStopLive = isCurrentUser && isLive && isLiveActive && onStopLive != null
     val cardBackground = if (isDark) Color(0xFF151C1D) else Color(0xFFE8EEF0)
+    val bubbleWidth = ChatBubbleLayoutWidth.capped(designBubbleWidth)
+    val reservedMinHeight = mapHeight + cardInset + 56.dp + if (canStopLive) 40.dp else 0.dp
 
     LaunchedEffect(isLiveActive) {
         if (!isLiveActive) return@LaunchedEffect
@@ -190,6 +193,7 @@ fun ChatLocationMessageBubble(
     Column(
         modifier
             .width(bubbleWidth)
+            .heightIn(min = reservedMinHeight)
             .clip(bubbleShape)
             .background(cardBackground)
             .border(
@@ -201,8 +205,8 @@ fun ChatLocationMessageBubble(
         Column(Modifier.fillMaxWidth()) {
             Box(
                 Modifier
-                    .padding(horizontal = 6.dp)
-                    .padding(top = 6.dp)
+                    .padding(horizontal = cardInset)
+                    .padding(top = cardInset)
                     .fillMaxWidth()
                     .height(mapHeight)
                     .clip(RoundedCornerShape(14.dp)),
@@ -295,6 +299,7 @@ private fun ChatLocationBubbleMapThumbnail(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
+    val mapContentWidth = ChatBubbleLayoutWidth.capped(designBubbleWidth) - cardInset * 2
     val widthPx = with(density) { mapContentWidth.roundToPx() }
     val heightPx = with(density) { mapHeight.roundToPx() }
     var snapshot by remember(latitude, longitude, isDark, widthPx, heightPx) {

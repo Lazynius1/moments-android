@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -735,7 +737,7 @@ fun ChatMessageListView(
     val threadTranslationPx = -liftPx
     // nestedScroll en el padre; LazyColumn con overscrollEffect=null
     // para que el sobrante llegue a onPostScroll (el glow nativo se lo comía).
-    Box(
+    BoxWithConstraints(
         modifier
             .fillMaxSize()
             .nestedScroll(vanishConnection)
@@ -755,6 +757,7 @@ fun ChatMessageListView(
                 }
             },
     ) {
+        CompositionLocalProvider(LocalChatListContainerWidth provides maxWidth) {
         LazyColumn(
             state = state,
             reverseLayout = true,
@@ -793,5 +796,6 @@ fun ChatMessageListView(
             composerBottomInset = composerBottomInset,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+        }
     }
 }

@@ -163,7 +163,8 @@ object VoiceMessageLayout {
     const val timeLabelWidth = 36f
     const val speedControlWidth = 34f
 
-    fun bubbleWidth(screenWidthDp: Float): Float = screenWidthDp * bubbleWidthFraction
+    fun bubbleWidth(containerWidthDp: Float): Float =
+        min(containerWidthDp, 520f) * bubbleWidthFraction
 
     fun availableWaveformWidth(bubbleWidth: Float, includesSpeedControl: Boolean): Float {
         val trailing = timeLabelWidth + if (includesSpeedControl) outerSpacing + speedControlWidth else 0f
@@ -472,7 +473,7 @@ fun GlassmorphicAudioMessage(
     val dark = androidx.compose.foundation.isSystemInDarkTheme()
     val colors = AdaptiveColors(dark)
     val outgoingFill = LocalChatOutgoingBubbleColor.current
-    val screenW = LocalConfiguration.current.screenWidthDp.toFloat()
+    val screenW = ChatBubbleLayoutWidth.containerWidth().value
     val bubbleW = VoiceMessageLayout.bubbleWidth(screenW)
     val showsSpeedControl = !isSending && duration >= 8
     val trackWidth = VoiceMessageLayout.waveformTrackWidth(bubbleW, showsSpeedControl)

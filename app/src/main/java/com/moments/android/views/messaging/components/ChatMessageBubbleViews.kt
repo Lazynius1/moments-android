@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -542,7 +543,8 @@ private fun AttachBubbleBadges(
 
 @Composable
 private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Boolean, position: ChatMessageGroupPosition, progress: Double?, downloadProgress: Double?, downloading: Boolean, callbacks: ChatMessageBubbleCallbacks) {
-    val mediaModifier = Modifier.size(208.dp, 272.dp).clip(chatBubbleShape(outgoing, position))
+    val photoVideoSize = ChatBubbleLayoutWidth.cappedSize(208.dp, 272.dp)
+    val mediaModifier = Modifier.size(photoVideoSize).clip(chatBubbleShape(outgoing, position))
     if (video) {
         GlassmorphicVideoMessage(
             videoUrl = message.mediaUrl,
@@ -700,10 +702,17 @@ fun LinkPreviewCard(
     }
     val corner = if (embedded) 13.dp else 10.dp
     val imageMax = if (embedded) 150.dp else 120.dp
+    val standaloneCardWidth = ChatBubbleLayoutWidth.capped(240.dp)
+    val reservedMinHeight = if (!embedded) imageMax + 56.dp else null
     LaunchedEffect(url) { metadata = LinkMetadataCache.fetch(url); loading = false }
     Column(
         modifier
-            .then(if (embedded) Modifier.fillMaxWidth() else Modifier.width(240.dp))
+            .then(
+                if (embedded) Modifier.fillMaxWidth()
+                else Modifier
+                    .width(standaloneCardWidth)
+                    .then(reservedMinHeight?.let { Modifier.heightIn(min = it) } ?: Modifier),
+            )
             .clip(RoundedCornerShape(corner))
             .background(panelBg)
             .then(

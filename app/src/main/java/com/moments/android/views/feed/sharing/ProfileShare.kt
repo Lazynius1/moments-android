@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -60,6 +61,7 @@ import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.components.VerifiedBadge
+import com.moments.android.views.messaging.components.ChatBubbleLayoutWidth
 import com.moments.android.views.messaging.components.ChatVideoPlayBadge
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageType
@@ -86,6 +88,11 @@ private val sharedProfileCardPadding = 11.dp
 private val sharedProfileGridSpacing = 2.dp
 private val sharedProfileAvatarSize = 40.dp
 private val sharedProfileAvatarColumnWidth = 56.dp
+/** ≡ iOS `SharedProfileDMCardMetrics.headerHeight`. */
+private val sharedProfileHeaderHeight = 72.dp
+/** ≡ iOS `SharedProfileDMCardMetrics.statsHeight`. */
+private val sharedProfileStatsHeight = 28.dp
+private val sharedProfileStackSpacing = 10.dp
 
 // MARK: - Payload
 
@@ -295,6 +302,15 @@ fun SharedProfileMessageBubble(
     var profileUserIdToOpen by remember { mutableStateOf<String?>(null) }
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid
     message.sharedProfileData?.let { data ->
+        val cardWidth = ChatBubbleLayoutWidth.capped(sharedProfileCardWidth)
+        val contentWidth = cardWidth - sharedProfileCardPadding * 2
+        val cellSize = max(0f, (contentWidth - sharedProfileGridSpacing * 3).value / 4f).dp
+        val reservedCardHeight = sharedProfileCardPadding * 2 +
+            sharedProfileHeaderHeight +
+            sharedProfileStackSpacing +
+            cellSize +
+            sharedProfileStackSpacing +
+            sharedProfileStatsHeight
         SharedProfilePreviewCard(
             sharedProfileData = data,
             onOpenProfile = {
@@ -307,7 +323,8 @@ fun SharedProfileMessageBubble(
                 }
             },
             modifier = Modifier
-                .width(sharedProfileCardWidth)
+                .width(cardWidth)
+                .heightIn(min = reservedCardHeight)
                 .padding(vertical = 4.dp),
         )
     }
@@ -361,7 +378,6 @@ fun SharedProfilePreviewCard(
         profileUserId.isEmpty() || isUnavailableForViewer -> {
             SharedDMUnavailablePreviewCard(
                 title = stringResource(R.string.share_profile_unavailable),
-                message = stringResource(R.string.share_no_permission),
                 icon = Icons.Filled.Lock,
                 previewImageURL = null,
                 authorId = null,

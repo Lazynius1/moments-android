@@ -95,7 +95,6 @@ object NotificationService {
                 _notifications.value = visibleNotifications(cached)
                 updateUnreadCount()
                 _isLoading.value = false
-                Log.d(TAG, "Loaded ${cached.size} notifications from cache")
             }
         }
 
