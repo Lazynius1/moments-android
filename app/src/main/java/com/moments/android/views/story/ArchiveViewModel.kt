@@ -66,6 +66,7 @@ class ArchiveViewModel : ViewModel() {
 
     fun loadAllArchivedStories() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        if (isFillingAll) return
         isFillingAll = true
         loadJob = viewModelScope.launch {
             try {

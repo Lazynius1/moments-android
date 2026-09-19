@@ -119,6 +119,16 @@ class SavedMomentsViewModel : ViewModel() {
         val generation = loadGeneration
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { loadSavedPage(userId, generation, reset = false) }
+                .onFailure { failure ->
+                    if (failure is CancellationException) throw failure
+                    withContext(Dispatchers.Main) {
+                        if (generation != loadGeneration || FirebaseAuth.getInstance().currentUser?.uid != userId) {
+                            return@withContext
+                        }
+                        error = failure
+                        isLoadingMore = false
+                    }
+                }
         }
     }
 
