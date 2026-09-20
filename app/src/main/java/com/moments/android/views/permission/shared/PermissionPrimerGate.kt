@@ -45,12 +45,12 @@ class PermissionPrimerGate(val kind: Kind) {
             State.NOT_DETERMINED -> {
                 this.onGranted = onGranted
                 stage = PermissionPrimerStage.PRIMER
-                isPresenting = true
+                applyPresenting(true)
             }
             State.DENIED -> {
                 this.onGranted = onGranted
                 stage = PermissionPrimerStage.DENIED
-                isPresenting = true
+                applyPresenting(true)
             }
         }
     }
@@ -69,7 +69,7 @@ class PermissionPrimerGate(val kind: Kind) {
             stage = PermissionPrimerStage.DENIED
             return
         }
-        isPresenting = false
+        applyPresenting(false)
         val continuation = onGranted
         onGranted = null
         continuation?.invoke()
@@ -82,7 +82,7 @@ class PermissionPrimerGate(val kind: Kind) {
     }
 
     fun dismiss() {
-        isPresenting = false
+        applyPresenting(false)
     }
 
     /**
@@ -162,6 +162,13 @@ class PermissionPrimerGate(val kind: Kind) {
         edit.apply()
     }
 
+    private fun applyPresenting(value: Boolean) {
+        isPresenting = value
+        if (kind == Kind.NOTIFICATIONS) {
+            setNotificationsPrimerPresenting(value)
+        }
+    }
+
     private fun openSettings(context: Context) {
         context.startActivity(
             Intent(
@@ -169,7 +176,7 @@ class PermissionPrimerGate(val kind: Kind) {
                 Uri.fromParts("package", context.packageName, null),
             ),
         )
-        isPresenting = false
+        applyPresenting(false)
     }
 
     private fun askedKey(perm: String) = "asked_$perm"
@@ -177,6 +184,15 @@ class PermissionPrimerGate(val kind: Kind) {
 
     companion object {
         private const val PREFS = "moments_permission_primer"
+
+        /** Visible para WhatsNew / otros gates que deben esperar al primer de notifs. */
+        @Volatile
+        var notificationsPrimerPresenting: Boolean = false
+            private set
+
+        private fun setNotificationsPrimerPresenting(value: Boolean) {
+            notificationsPrimerPresenting = value
+        }
     }
 }
 

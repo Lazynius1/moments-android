@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -208,19 +209,21 @@ fun MapPlaceBottomSheet(
                         }
                     }
                     cluster.moments.isNotEmpty() && viewMode == MapPlaceSheetViewMode.Gallery -> {
+                        // Altura fija al max scrollable: no re-measure mid-fling si cambia el count.
+                        val galleryRows = ((cluster.moments.size + 2) / 3).coerceAtLeast(1)
+                        val galleryHeight = minOf(520, galleryRows * 118).dp
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(3),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 520.dp)
-                                .height(minOf(520, ((cluster.moments.size + 2) / 3) * 118).dp),
+                                .height(galleryHeight),
                             horizontalArrangement = Arrangement.spacedBy(1.dp),
                             verticalArrangement = Arrangement.spacedBy(1.dp),
                             contentPadding = PaddingValues(start = 2.dp, top = 0.dp, end = 2.dp, bottom = 30.dp),
                         ) {
                             itemsIndexed(
                                 cluster.moments,
-                                key = { _, m -> m.id ?: m.mapAvailabilityKey },
+                                key = { index, m -> m.id?.takeIf { it.isNotEmpty() } ?: "map-place-$index-${m.mapAvailabilityKey}" },
                             ) { _, moment ->
                                 val available = momentAvailability[moment.mapAvailabilityKey] ?: true
                                 MapBottomSheetGridCell(
@@ -240,15 +243,18 @@ fun MapPlaceBottomSheet(
                         }
                     }
                     cluster.moments.isNotEmpty() -> {
+                        val listHeight = minOf(480, cluster.moments.size * 220 + 40).dp
                         LazyColumn(
                             Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 480.dp)
-                                .height(minOf(480, cluster.moments.size * 220 + 40).dp),
+                                .height(listHeight),
                             contentPadding = PaddingValues(start = 20.dp, top = 0.dp, end = 20.dp, bottom = 30.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
-                            items(cluster.moments, key = { it.id ?: it.mapAvailabilityKey }) { moment ->
+                            itemsIndexed(
+                                cluster.moments,
+                                key = { index, m -> m.id?.takeIf { it.isNotEmpty() } ?: "map-place-row-$index-${m.mapAvailabilityKey}" },
+                            ) { _, moment ->
                                 ModernLocationMomentRow(
                                     moment = moment,
                                     isAvailable = momentAvailability[moment.mapAvailabilityKey] ?: true,

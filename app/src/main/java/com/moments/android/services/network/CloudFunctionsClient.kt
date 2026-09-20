@@ -74,6 +74,39 @@ object CloudFunctionsClient {
         timeoutMs: Int = 20_000,
     ): JSONObject = JSONObject(post(function, payload, region, timeoutMs))
 
+    /** POST público para inicios de sesión que todavía no tienen un token Firebase. */
+    suspend fun postPublicJson(
+        function: String,
+        payload: JSONObject = JSONObject(),
+        region: String = DEFAULT_REGION,
+        timeoutMs: Int = 20_000,
+    ): JSONObject = JSONObject(withContext(Dispatchers.IO) {
+        val projectId = FirebaseApp.getInstance().options.projectId
+            ?: throw IllegalStateException("Missing Firebase project ID")
+        val connection = URL("https://$region-$projectId.cloudfunctions.net/$function")
+            .openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "POST"
+            connection.connectTimeout = timeoutMs
+            connection.readTimeout = timeoutMs
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.outputStream.use { it.write(payload.toString().toByteArray()) }
+            val code = connection.responseCode
+            val text = (if (code in 200..299) connection.inputStream else connection.errorStream)
+                ?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (code !in 200..299) {
+                val message = runCatching {
+                    JSONObject(text).optString("details").ifBlank { JSONObject(text).optString("error") }
+                }.getOrDefault("").ifBlank { "Backend error $code" }
+                throw BackendException(code, message)
+            }
+            text
+        } finally {
+            connection.disconnect()
+        }
+    })
+
     /** Para endpoints cuya respuesta no se usa. */
     suspend fun postVoid(
         function: String,

@@ -80,6 +80,7 @@ import com.moments.android.views.feed.stories.FeedStoryRingPreviewOverlay
 import com.moments.android.views.feed.stories.FeedStoryRingPreviewSelection
 import com.moments.android.views.feed.uploads.FloatingMomentUploadOverlay
 import com.moments.android.views.messaging.core.MessagingViewModel
+import com.moments.android.views.misc.WhatsNewPresentationCoordinator
 import com.moments.android.views.permission.shared.PermissionPrimerGate
 import com.moments.android.views.permission.shared.PermissionPrimerGateHost
 import com.moments.android.views.shared.AppErrorBanner
@@ -386,6 +387,7 @@ fun FeedView(
         badgeService.setupListeners()
         setupPendingEchoesListener()
         requestNotificationPermissionIfNeeded()
+        WhatsNewPresentationCoordinator.feedBecameActive(context, scope)
         delay(1000)
         notificationSummaryService.checkShouldShowSummary(
             context = context,
@@ -393,6 +395,12 @@ fun FeedView(
             unreadMessages = unreadMessages,
             onShow = { showNotificationSummary = true },
         )
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            WhatsNewPresentationCoordinator.feedBecameInactive()
+        }
     }
 
     // Timer de currentTime cada 60s (startTimeUpdate)

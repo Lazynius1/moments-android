@@ -135,17 +135,23 @@ fun LocationBottomSheet(
             isLoadingMoments -> LocationBottomSheetLoading()
             moments.isEmpty() -> LocationBottomSheetEmpty()
             viewMode == LocationBottomSheetViewMode.Gallery -> {
+                val galleryRows = ((moments.size + 2) / 3).coerceAtLeast(1)
+                val galleryHeight = minOf(520, galleryRows * 118).dp
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 520.dp)
-                        .height(minOf(520, ((moments.size + 2) / 3) * 118).dp),
+                        .height(galleryHeight),
                     horizontalArrangement = Arrangement.spacedBy(1.dp),
                     verticalArrangement = Arrangement.spacedBy(1.dp),
                     contentPadding = PaddingValues(start = 2.dp, top = 0.dp, end = 2.dp, bottom = 30.dp),
                 ) {
-                    gridItems(moments, key = { it.id ?: it.mapAvailabilityKey }) { moment ->
+                    gridItems(
+                        items = moments,
+                        key = { m ->
+                            m.id?.takeIf { it.isNotEmpty() } ?: "map-loc-${m.mapAvailabilityKey}"
+                        },
+                    ) { moment ->
                         val available = momentAvailability[moment.mapAvailabilityKey] ?: true
                         MapBottomSheetGridCell(
                             moment = moment,
@@ -162,15 +168,20 @@ fun LocationBottomSheet(
                 }
             }
             else -> {
+                val listHeight = minOf(480, moments.size * 220 + 40).dp
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 480.dp)
-                        .height(minOf(480, moments.size * 220 + 40).dp),
+                        .height(listHeight),
                     contentPadding = PaddingValues(start = 20.dp, top = 0.dp, end = 20.dp, bottom = 30.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    items(moments, key = { it.id ?: it.mapAvailabilityKey }) { moment ->
+                    items(
+                        items = moments,
+                        key = { m ->
+                            m.id?.takeIf { it.isNotEmpty() } ?: "map-loc-row-${m.mapAvailabilityKey}"
+                        },
+                    ) { moment ->
                         ModernLocationMomentRow(
                             moment = moment,
                             isAvailable = momentAvailability[moment.mapAvailabilityKey] ?: true,

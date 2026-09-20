@@ -785,6 +785,7 @@ object BackgroundMomentUploadService {
 
         val payload = MomentUploadPayload(
             plannedMomentId = uploadingMoment.plannedMomentId,
+            userId = uploadingMoment.userId,
             content = uploadingMoment.content,
             mediaPaths = cachedMedia,
             taggedUsers = uploadingMoment.taggedUsers,

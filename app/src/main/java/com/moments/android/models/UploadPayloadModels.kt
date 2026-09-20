@@ -97,6 +97,8 @@ data class CachedHiddenLayerDraft(
 
 data class MomentUploadPayload(
     val plannedMomentId: String?,
+    /** Cuenta que creó el borrador; impide retomarlo desde otra sesión. */
+    val userId: String? = null,
     val content: String,
     val mediaPaths: List<CachedUploadMediaItem>,
     val taggedUsers: List<String>? = null,
@@ -189,6 +191,7 @@ object UploadPayloadDecoder {
         }
         MomentUploadPayload(
             plannedMomentId = json.optString("plannedMomentId").takeIf { json.has("plannedMomentId") && !json.isNull("plannedMomentId") },
+            userId = json.optString("userId").takeIf { json.has("userId") && !json.isNull("userId") },
             content = json.getString("content"),
             mediaPaths = mediaPaths,
             taggedUsers = json.optStringList("taggedUsers"),
@@ -270,6 +273,7 @@ object UploadPayloadDecoder {
     fun encodeMomentPayload(payload: MomentUploadPayload): ByteArray {
         val json = JSONObject()
         payload.plannedMomentId?.let { json.put("plannedMomentId", it) }
+        payload.userId?.let { json.put("userId", it) }
         json.put("content", payload.content)
         json.put(
             "mediaPaths",

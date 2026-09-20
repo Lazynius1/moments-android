@@ -1779,9 +1779,12 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="chat_deleted_file">Archivo eliminado</string>
     <string name="chat_deleted_location">Ubicación eliminada</string>
     <string name="chat_deleted_ephemeral">Momento efímero eliminado</string>
-    <string name="whats_new_title">¡Bienvenido a Moments!</string>
-    <string name="whats_new_subtitle">Moments llega a Android — comparte, chatea y explora con quien importa.</string>
-    <string name="whats_new_button">Empezar a explorar</string>
+    <string name="whats_new_title">¡Novedades en Moments!</string>
+
+    <string name="whats_new_subtitle">Por fin grupos — y un Para Ti más personal, un chat más cuidado y Echoes e historias más pulidos.</string>
+
+    <string name="whats_new_button">Explorar Moments 1.1.0</string>
+
     <string name="whats_new_feed_title">Tu feed de Moments</string>
     <string name="whats_new_feed_description">Mira lo que comparten tus amigos y publica Moments con captions, stickers y audiencias.</string>
     <string name="whats_new_stories_title">Historias</string>
@@ -2757,4 +2760,26 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="notification_chat_summary_single">Nuevo mensaje</string>
     <string name="notification_chat_summary_multiple">%1$s mensajes nuevos</string>
     <string name="notification_group_untitled">Grupo</string>
+    <string name="whats_new_section_title">MOMENTS 1.1.0</string>
+    <string name="whats_new_note_closing">¡Gracias por venir en este viaje! ⚡🤖</string>
+    <string name="whats_new_groups_title">Grupos</string>
+    <string name="whats_new_groups_description">Chats de grupo en el mismo inbox, con foto, invitaciones, roles de administración y mute.</string>
+    <string name="whats_new_for_you_title">Para Ti y Explorar</string>
+    <string name="whats_new_for_you_description">Ordenado por afinidad e intereses, con «No me interesa», búsqueda global y un Explorar más limpio.</string>
+    <string name="whats_new_chat_230_title">Chat más listo</string>
+    <string name="whats_new_chat_230_description">Vista previa de borradores, caché automática de medios y una señal para traducir mensajes que no están en el idioma de tu app.</string>
+    <string name="whats_new_echoes_title">Echoes</string>
+    <string name="whats_new_echoes_description">Visor más limpio, un cartel claro cuando un Echo no está disponible y traducción de la descripción.</string>
+    <string name="whats_new_stories_230_title">Historias</string>
+    <string name="whats_new_stories_230_description">Guías de alineación, editor de texto más estable, preview con pulsación larga (sin marcar vista) y anillos de historias de grupo.</string>
+    <string name="whats_new_create_230_title">Crear momentos</string>
+    <string name="whats_new_create_230_description">Relaciones de aspecto afinadas: más estables y más compatibles entre plataformas.</string>
+    <string name="whats_new_feed_reels_title">Feed y Reels</string>
+    <string name="whats_new_feed_reels_description">Un toque lleva el vídeo del feed a Reels, «Ver de nuevo» para repetirlo y un feed más estable al desplazarte.</string>
+    <string name="whats_new_profile_230_title">Perfil y notificaciones</string>
+    <string name="whats_new_profile_230_description">Seguidores, siguiendo, visitas y mutuas más fiables, y vista previa del perfil anclada a desde dónde llegaste.</string>
+    <string name="whats_new_nova_230_title">Nova</string>
+    <string name="whats_new_nova_230_description">Chispa diaria, aspecto renovado, y adjuntar una foto ya no publica un Momento por accidente.</string>
+    <string name="whats_new_offline_230_title">Offline y pulido</string>
+    <string name="whats_new_offline_230_description">Mejor comportamiento sin conexión, estados de relación más estables y textos pulidos en todos los idiomas.</string>
 </resources>

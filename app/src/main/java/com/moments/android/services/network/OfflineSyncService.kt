@@ -2,6 +2,7 @@ package com.moments.android.services.network
 
 import com.moments.android.services.network.NetworkMonitor
 import android.graphics.BitmapFactory
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.models.BlockActionPayload
@@ -110,9 +111,20 @@ object OfflineSyncService {
             return
         }
 
+        // Las acciones se persisten entre reinicios y logout. Nunca hay que
+        // reproducirlas sin credenciales ni bajo otra cuenta: las reglas de
+        // Firestore las rechazarían y, peor, una acción válida podría aplicarse
+        // desde una identidad equivocada.
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
         if (!syncMutex.tryLock()) return
         try {
             var pendingActions = LocalPersistenceService.loadPendingActionsAsync()
+            if (pendingActions.isEmpty()) return
+
+            pendingActions = pendingActions.filter { action ->
+                currentUserId in actionOwnerIds(action)
+            }
             if (pendingActions.isEmpty()) return
 
             pendingActions = optimizePendingActions(pendingActions)
@@ -147,6 +159,33 @@ object OfflineSyncService {
         val elapsed = (Date().time - action.lastAttemptAt.time) / 1000
         return elapsed >= delaySec
     }
+
+    /**
+     * Obtiene las identidades autorizadas a reintentar una acción ya guardada.
+     * Las cargas de momentos anteriores a este cambio no incluían propietario;
+     * se conservan en la cola, pero no se envían a ciegas desde otra sesión.
+     */
+    private fun actionOwnerIds(action: CachedAction): Set<String> = runCatching { when (action.type) {
+        CachedAction.ActionType.MOMENT_UPLOAD.raw ->
+            org.json.JSONObject(String(action.payloadData)).optString("userId").takeIf(String::isNotBlank)?.let(::setOf).orEmpty()
+        CachedAction.ActionType.STORY_UPLOAD.raw ->
+            org.json.JSONObject(String(action.payloadData)).optString("userId").takeIf(String::isNotBlank)?.let(::setOf).orEmpty()
+        CachedAction.ActionType.REACTION.raw -> decodeReactionPayload(action.payloadData)?.let { setOf(it.userId) }.orEmpty()
+        CachedAction.ActionType.COMMENT.raw -> decodeCommentPayload(action.payloadData)?.let { setOf(it.senderId) }.orEmpty()
+        CachedAction.ActionType.DELETE_COMMENT.raw -> decodeDeleteCommentPayload(action.payloadData)?.let { setOf(it.userId, it.authorId) }.orEmpty()
+        CachedAction.ActionType.MESSAGE.raw -> decodeMessagePayload(action.payloadData)?.let { setOf(it.message.senderId) }.orEmpty()
+        CachedAction.ActionType.MEDIA_MESSAGE.raw -> decodeMediaMessagePayload(action.payloadData)?.let { setOf(it.senderId) }.orEmpty()
+        CachedAction.ActionType.FOLLOW.raw -> decodeFollowPayload(action.payloadData)?.let { setOf(it.followerId) }.orEmpty()
+        CachedAction.ActionType.SAVE.raw -> decodeSavePayload(action.payloadData)?.let { setOf(it.userId) }.orEmpty()
+        CachedAction.ActionType.BLOCK.raw -> decodeBlockPayload(action.payloadData)?.let { setOf(it.currentUserId) }.orEmpty()
+        CachedAction.ActionType.UPDATE_PROFILE.raw -> decodeProfileUpdatePayload(action.payloadData)?.let { setOf(it.userId) }.orEmpty()
+        CachedAction.ActionType.ACCEPT_FOLLOW_REQUEST.raw,
+        CachedAction.ActionType.REJECT_FOLLOW_REQUEST.raw -> decodeFollowRequestPayload(action.payloadData)?.let { setOf(it.recipientId) }.orEmpty()
+        CachedAction.ActionType.REPORT_CONTENT.raw -> decodeReportPayload(action.payloadData)?.let { setOf(it.reporterId) }.orEmpty()
+        CachedAction.ActionType.MARK_AS_READ.raw -> decodeMarkAsReadPayload(action.payloadData)?.let { setOf(it.userId) }.orEmpty()
+        CachedAction.ActionType.DELETE_MOMENT.raw -> decodeDeleteMomentPayload(action.payloadData)?.let { setOf(it.userId) }.orEmpty()
+        else -> emptySet()
+    } }.getOrDefault(emptySet())
 
     private suspend fun handleExhaustedAction(action: CachedAction) {
         when (action.type) {

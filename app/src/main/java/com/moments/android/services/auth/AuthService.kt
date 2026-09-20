@@ -1577,6 +1577,9 @@ object AuthService {
             MessageIngestService.resetOnSignOut()
             MessageCatchUpService.resetOnSignOut()
             ChatSessionEngine.resetOnSignOut()
+            appContext?.let { context ->
+                RestoreCredentialsService.clearForLogout(context)
+            }
             runCatching { auth.signOut() }
             LocalPersistenceService.clearCurrentUserAsync()
             OnboardingDraftStore.clear()

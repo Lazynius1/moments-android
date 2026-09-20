@@ -1,12 +1,11 @@
 package com.moments.android
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -32,6 +31,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.coordinators.TabBarScreen
 import com.moments.android.notifications.services.NotificationBadgeService
 import com.moments.android.services.auth.AuthService
+import com.moments.android.services.auth.RestoreCredentialsService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.updateLastAppOpenAt
 import com.moments.android.services.incognito.IncognitoModeService
@@ -49,6 +49,7 @@ import com.moments.android.views.login.SplashScreen
 import com.moments.android.views.login.SuspendedScreen
 import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.messaging.services.LiveLocationSharingService
+import com.moments.android.views.misc.WhatsNewPresentationCoordinator
 import com.moments.android.views.misc.WhatsNewView
 import com.moments.android.views.profile.incognito.IncognitoGlobalOverlay
 import com.moments.android.views.shared.MomentsModalSheet
@@ -96,6 +97,7 @@ fun MomentsApp(
     // aviso para no rebotar al login en ese hueco.
     var manuallyAuthenticated by launchState.manuallyAuthenticated
     val signedIn = hasProfileSession || manuallyAuthenticated
+    var isRestoringSession by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser == null) }
     // ≡ iOS LoginView: suspended / deactivated salen de AuthService, sin get() extra a Firestore.
     val authState by AuthService.authState.collectAsState()
     val isAccountDeactivated by AuthService.isAccountDeactivated.collectAsState()
@@ -104,6 +106,21 @@ fun MomentsApp(
     val isRegistering by AuthService.isRegistering.collectAsState()
 
     val incognitoActive by IncognitoModeService.isActive.collectAsState()
+
+    // Restore Credentials may restore the Firebase session after Android has restored the
+    // app data (including a reinstall/restore), before exposing the normal login UI.
+    LaunchedEffect(Unit) {
+        if (FirebaseAuth.getInstance().currentUser == null) {
+            RestoreCredentialsService.restoreSignedOutSessionIfAvailable(context)
+        }
+        isRestoringSession = false
+    }
+
+    LaunchedEffect(signedIn) {
+        if (signedIn) {
+            RestoreCredentialsService.registerForCurrentUserIfNeeded(context)
+        }
+    }
 
     // ≡ Auth.auth().addStateDidChangeListener
     DisposableEffect(Unit) {
@@ -193,6 +210,7 @@ fun MomentsApp(
             isAccountDeactivated -> DeactivatedScreen(deactivatedUiState) {
                 // reactivateAccount ya hidrata AuthService; no hace falta otro get() a Firestore.
             }
+            isRestoringSession && !signedIn -> AccountLoading()
             isVerifyingAccount && !isRegistering && !signedIn -> AccountLoading()
             !signedIn -> LoginScreen(onAuthenticated = { manuallyAuthenticated = true })
             else -> TabBarScreen(
@@ -215,9 +233,15 @@ fun MomentsApp(
             SplashScreen(
                 onComplete = {
                     showSplash = false
-                    checkVersion(context, prefs, scope) { showWhatsNew = true }
+                    WhatsNewPresentationCoordinator.handleSplashFinished(context)
                 },
             )
+        }
+
+        LaunchedEffect(Unit) {
+            WhatsNewPresentationCoordinator.readyToPresent.collect {
+                showWhatsNew = true
+            }
         }
 
         if (showWhatsNew) {
@@ -226,41 +250,15 @@ fun MomentsApp(
                 onDismissRequest = { showWhatsNew = false },
                 largeOnly = false,
             ) { dismiss ->
-                WhatsNewView(onDismiss = dismiss)
+                // weight(1f): altura acotada → verticalScroll no pelea con el drag del sheet.
+                WhatsNewView(
+                    onDismiss = dismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = true),
+                )
             }
         }
-    }
-}
-
-/** ≡ checkVersion() — solo en actualización real, no en 1ª instalación / datos limpios. */
-private fun checkVersion(
-    context: Context,
-    prefs: android.content.SharedPreferences,
-    scope: CoroutineScope,
-    onShowWhatsNew: () -> Unit,
-) {
-    val currentVersion = runCatching {
-        val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0))
-        } else {
-            @Suppress("DEPRECATION")
-            context.packageManager.getPackageInfo(context.packageName, 0)
-        }
-        info.versionName
-    }.getOrNull() ?: "2.9.0"
-
-    // Sin clave = install limpio / clear: marcar y no enseñar (iOS default "1.0.0" dispara
-    // el sheet en cada wipe de debug; en Android no interrumpimos el arranque).
-    if (!prefs.contains(KEY_LAST_VERSION_PROMPTED)) {
-        prefs.edit().putString(KEY_LAST_VERSION_PROMPTED, currentVersion).apply()
-        return
-    }
-    val lastPrompted = prefs.getString(KEY_LAST_VERSION_PROMPTED, currentVersion) ?: currentVersion
-    if (lastPrompted == currentVersion) return
-    scope.launch {
-        delay(1_500)
-        prefs.edit().putString(KEY_LAST_VERSION_PROMPTED, currentVersion).apply()
-        onShowWhatsNew()
     }
 }
 
@@ -301,7 +299,6 @@ internal class MomentsAppLaunchState : ViewModel() {
 }
 
 private const val PREFS_NAME = "moments_app"
-private const val KEY_LAST_VERSION_PROMPTED = "lastVersionPrompted"
 private const val KEY_LAST_APP_OPEN_SYNC_AT = "lastAppOpenSyncAt"
 
 @Preview(showBackground = true)
