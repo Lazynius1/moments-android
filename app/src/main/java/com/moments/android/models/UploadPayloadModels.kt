@@ -437,6 +437,9 @@ object UploadPayloadDecoder {
             meta.gradientStopHexes?.let { put("gradientStopHexes", JSONArray(it)) }
             meta.gradientAngle?.let { put("gradientAngle", it) }
             put("rotationRadians", meta.rotationRadians)
+            put("canvasVersion", meta.canvasVersion)
+            meta.normalizedFontSize?.let { put("normalizedFontSize", it) }
+            meta.normalizedMaxWidth?.let { put("normalizedMaxWidth", it) }
         }
         payload.textOverlayMetadata?.let { json.put("textOverlayMetadata", encodeOverlay(it)) }
         payload.textOverlays?.takeIf { it.isNotEmpty() }?.let { list ->
@@ -625,6 +628,9 @@ object UploadPayloadDecoder {
             motionRaw = obj.optString("motionRaw", ""),
             forcesAllCaps = obj.optBoolean("forcesAllCaps"),
             isLiveOverlay = obj.optBoolean("isLiveOverlay", true),
+            canvasVersion = obj.optInt("canvasVersion", 1),
+            normalizedFontSize = obj.optDouble("normalizedFontSize").takeIf { obj.has("normalizedFontSize") },
+            normalizedMaxWidth = obj.optDouble("normalizedMaxWidth").takeIf { obj.has("normalizedMaxWidth") },
             gradientStopHexes = obj.optJSONArray("gradientStopHexes")?.let { arr ->
                 (0 until arr.length()).map { arr.getString(it) }
             },

@@ -1187,7 +1187,7 @@
     <string name="stickerview_question_description">Invite your followers to ask you questions</string>
     <string name="stickerview_question_placeholder">Ask me a question about...</string>
     <string name="stickerview_question_subtitle_compact">Write a short prompt to invite replies</string>
-    <string name="stickerview_search_gifs_placeholder">Search GIFs...</string>
+    <string name="stickerview_search_gifs_placeholder">Search Giphy</string>
     <string name="stickerview_search_placeholder">Search</string>
     <string name="stickerview_selfie">🤳 Selfie</string>
     <string name="stickerview_stickers">Stickers</string>

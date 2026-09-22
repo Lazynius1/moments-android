@@ -1,6 +1,7 @@
 package com.moments.android.views.creator
 
 import android.net.Uri
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MediaItemFeedCrop
 import com.moments.android.models.PhotoTag
 import com.moments.android.utilities.HapticManager
@@ -247,14 +249,10 @@ fun GlowSharePill(
     val vPad = if (isSmall) 8.dp else 10.dp
     val textSize = if (isSmall) 13.sp else 15.sp
     val iconSize = if (isSmall) 10.dp else 12.dp
+    val ink = if (isSystemInDarkTheme()) Color.White else Color.Black
     Box(
         modifier
-            .clip(RoundedCornerShape(percent = 50))
-            .background(
-                Brush.linearGradient(
-                    listOf(Color(0xFF9C27B0), Color(0xFFE91E63), Color(0xFFFF9800)),
-                ),
-            )
+            .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
             .clickable(enabled = !isLoading) {
                 HapticManager.shared.mediumImpact()
                 onClick()
@@ -264,7 +262,7 @@ fun GlowSharePill(
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                color = Color.White,
+                color = ink,
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(18.dp),
             )
@@ -272,14 +270,14 @@ fun GlowSharePill(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(titleRes),
-                    color = Color.White,
+                    color = ink,
                     fontWeight = FontWeight.Bold,
                     fontSize = textSize,
                 )
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = ink,
                     modifier = Modifier
                         .padding(start = 6.dp)
                         .size(iconSize),

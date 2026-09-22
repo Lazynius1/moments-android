@@ -709,7 +709,7 @@ private fun SavedMomentsScrollGrid(
                         val momentId = identified.id
                         val isRestricted = !(visibilityByMomentId[momentId] ?: true)
                         val isMutedRestriction = isRestricted && isMuted(moment)
-                        Box(Modifier.width(side)) {
+                        Box(Modifier.width(side).height(side)) {
                             ScreenshotProtectedView(
                                 isProtected = !isRestricted &&
                                     (moment.audience?.lowercase() ?: "") != "everyone",
@@ -732,7 +732,7 @@ private fun SavedMomentsScrollGrid(
                         }
                     }
                     repeat(3 - row.size) {
-                        Spacer(Modifier.width(side).aspectRatio(1f))
+                        Spacer(Modifier.width(side).height(side))
                     }
                 }
             }
@@ -1194,8 +1194,7 @@ private fun SavedMomentGridCard(
     val isDark = isSystemInDarkTheme()
     Box(
         Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
+            .fillMaxSize()
             .profileMomentZoomSource(zoomSourceID, cornerRadius = 8.dp)
             .clip(RoundedCornerShape(8.dp))
             .border(

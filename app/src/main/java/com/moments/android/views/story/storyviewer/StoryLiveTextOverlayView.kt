@@ -21,6 +21,7 @@ import com.moments.android.views.creator.components.StoryTextOverlayLabel
 import com.moments.android.views.creator.components.StoryTextStyle
 import com.moments.android.views.creator.components.displayPosition
 import com.moments.android.views.creator.components.motion
+import com.moments.android.views.creator.components.resolvedMaxLayoutWidth
 import com.moments.android.views.creator.components.scaledRenderConfiguration
 import kotlin.math.roundToInt
 
@@ -55,13 +56,10 @@ fun StoryLiveTextOverlayView(
         val containerWidthDp = with(density) { container.width.toDp() }
         val config = metadata.scaledRenderConfiguration(containerWidthDp.value)
         val anchor = metadata.displayPosition(container)
-        // ≡ iOS overlayMaxWidth: live = width−48pt; thumbnail = width×(327/375)
         val maxWidth = if (maxLayoutWidthDp != null) {
             maxLayoutWidthDp.dp
-        } else if (animates) {
-            (containerWidthDp - 48.dp).coerceAtLeast(120.dp)
         } else {
-            (containerWidthDp * (327f / 375f)).coerceAtLeast(1.dp)
+            metadata.resolvedMaxLayoutWidth(containerWidthDp.value).dp
         }
         var contentWidthPx by remember(metadata.id) { mutableFloatStateOf(0f) }
         var contentHeightPx by remember(metadata.id) { mutableFloatStateOf(0f) }

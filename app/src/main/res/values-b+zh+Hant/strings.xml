@@ -1400,7 +1400,7 @@
     <string name="sticker_audio_recorded">準備加入</string>
     <string name="sticker_audio_tap_to_record">點一下錄音</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">搜尋 GIF…</string>
+    <string name="sticker_gif_search_hint">在 Giphy 搜尋</string>
     <string name="sticker_gif_empty">目前沒有貼圖</string>
     <string name="sticker_gif_empty_subtitle">試試其他搜尋內容，或返回熱門內容。</string>
     <string name="sticker_category_frame">拍立得</string>

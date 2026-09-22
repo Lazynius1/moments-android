@@ -786,7 +786,7 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="sticker_audio_recorded">Llest per afegir</string>
     <string name="sticker_audio_tap_to_record">Toca per enregistrar</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">Cerca adhesius</string>
+    <string name="sticker_gif_search_hint">Cerca a Giphy</string>
     <string name="sticker_gif_empty">Ara mateix no hi ha stickers</string>
     <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">Marc Polaroid</string>

@@ -654,13 +654,8 @@ fun StoryEditingView(
                 draft.scale, canvasW, densityScale,
             ))
         }
-        val capturedTexts = textOverlays.mapNotNull { draft ->
-            draft.toMetadata()?.let { metadata ->
-                metadata.copy(
-                    fontSize = metadata.fontSize * 375.0 / (canvasW / densityScale).coerceAtLeast(1f),
-                    normalizedPosition = com.moments.android.models.Point(draft.normalizedX, draft.normalizedY),
-                )
-            }
+        val capturedTexts = textOverlays.mapNotNull {
+            it.toMetadata((canvasW / densityScale).coerceAtLeast(1f))
         }
         val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
         isSavingToGallery = true
@@ -1198,7 +1193,7 @@ fun StoryEditingView(
     fun chatOverlayPayload(): ChatMediaOverlayPayload? {
         val prepared = textOverlays.filter { it.isReady }
             .sortedBy { it.layerOrder }
-            .mapNotNull { it.toMetadata() }
+            .mapNotNull { it.toMetadata((mediaCanvasWidthPx / densityScale).coerceAtLeast(1f)) }
         val stickerPayload = stickers.sortedBy { it.zIndex }.mapIndexed { index, draft ->
             val normalizedScale = StoryViewerLayoutHelpers.normalizeStickerScaleForFirestore(
                 editorScale = draft.scale,
@@ -1349,7 +1344,7 @@ fun StoryEditingView(
         finishTextEditing()
         val prepared = textOverlays.filter { it.isReady }
             .sortedBy { it.layerOrder }
-            .mapNotNull { it.toMetadata() }
+            .mapNotNull { it.toMetadata((mediaCanvasWidthPx / densityScale).coerceAtLeast(1f)) }
         if (media == null && prepared.isEmpty() && drawingImage == null && stickers.isEmpty()) return
         isPublishing = true
         scope.launch {

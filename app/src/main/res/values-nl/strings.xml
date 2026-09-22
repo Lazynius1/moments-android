@@ -1400,7 +1400,7 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="sticker_audio_recorded">Klaar om toe te voegen</string>
     <string name="sticker_audio_tap_to_record">Tik om op te nemen</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">GIFs zoeken...</string>
+    <string name="sticker_gif_search_hint">Zoeken op Giphy</string>
     <string name="sticker_gif_empty">Geen stickers gevonden</string>
     <string name="sticker_gif_empty_subtitle">Probeer een andere zoekopdracht of ga terug naar trending.</string>
     <string name="sticker_category_frame">Polaroid</string>

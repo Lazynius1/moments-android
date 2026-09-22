@@ -1058,6 +1058,9 @@ data class StoryTextOverlayMetadata(
     val gradientStopHexes: List<String>? = null,
     val gradientAngle: Int? = null,
     val rotationRadians: Double = 0.0,
+    val canvasVersion: Int = 1,
+    val normalizedFontSize: Double? = null,
+    val normalizedMaxWidth: Double? = null,
 ) {
     companion object {
         fun from(data: Map<String, Any?>): StoryTextOverlayMetadata = StoryTextOverlayMetadata(
@@ -1078,6 +1081,9 @@ data class StoryTextOverlayMetadata(
             gradientStopHexes = (data["gradientStopHexes"] as? List<*>)?.filterIsInstance<String>(),
             gradientAngle = (data["gradientAngle"] as? Number)?.toInt(),
             rotationRadians = (data["rotationRadians"] as? Number)?.toDouble() ?: 0.0,
+            canvasVersion = (data["canvasVersion"] as? Number)?.toInt() ?: 1,
+            normalizedFontSize = (data["normalizedFontSize"] as? Number)?.toDouble(),
+            normalizedMaxWidth = (data["normalizedMaxWidth"] as? Number)?.toDouble(),
         )
     }
 }
@@ -1652,6 +1658,9 @@ fun StoryTextOverlayMetadata.toMap(): Map<String, Any> = buildMap {
     gradientStopHexes?.let { put("gradientStopHexes", it) }
     gradientAngle?.let { put("gradientAngle", it) }
     put("rotationRadians", rotationRadians)
+    put("canvasVersion", canvasVersion)
+    normalizedFontSize?.let { put("normalizedFontSize", it) }
+    normalizedMaxWidth?.let { put("normalizedMaxWidth", it) }
 }
 
 fun StickerData.toMap(): Map<String, Any> = buildMap {

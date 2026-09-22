@@ -1400,7 +1400,7 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="sticker_audio_recorded">Gotowe do dodania</string>
     <string name="sticker_audio_tap_to_record">Dotknij, aby nagrać</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">Szukaj GIF-ów...</string>
+    <string name="sticker_gif_search_hint">Szukaj w Giphy</string>
     <string name="sticker_gif_empty">Brak naklejek</string>
     <string name="sticker_gif_empty_subtitle">Spróbuj wyszukać coś innego lub wróć do popularnych.</string>
     <string name="sticker_category_frame">Polaroid</string>

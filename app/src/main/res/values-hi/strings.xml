@@ -1400,7 +1400,7 @@
     <string name="sticker_audio_recorded">जोड़ने के लिए तैयार</string>
     <string name="sticker_audio_tap_to_record">रिकॉर्ड करने के लिए टैप करें</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">GIF खोजें...</string>
+    <string name="sticker_gif_search_hint">Giphy पर खोजें</string>
     <string name="sticker_gif_empty">अभी कोई स्टिकर नहीं है</string>
     <string name="sticker_gif_empty_subtitle">कोई और खोज आज़माएं या ट्रेंडिंग पर वापस जाएं।</string>
     <string name="sticker_category_frame">Polaroid</string>

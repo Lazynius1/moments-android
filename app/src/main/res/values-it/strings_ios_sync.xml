@@ -1890,7 +1890,7 @@
     <string name="stickerview_question_description">Invita i tuoi follower a farti domande</string>
     <string name="stickerview_question_placeholder">Fammi una domanda su...</string>
     <string name="stickerview_question_subtitle_compact">Scrivi un breve invito per ricevere risposte</string>
-    <string name="stickerview_search_gifs_placeholder">Cerca GIF...</string>
+    <string name="stickerview_search_gifs_placeholder">Cerca su Giphy</string>
     <string name="stickerview_search_placeholder">Cerca</string>
     <string name="stickerview_selfie">🤳 Selfie</string>
     <string name="stickerview_stickers">Sticker</string>

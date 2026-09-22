@@ -1400,7 +1400,7 @@ Bu izinleri cihazının ayarlarından değiştirebilirsin. İzinleri kapatırsan
     <string name="sticker_audio_recorded">Eklemeye hazır</string>
     <string name="sticker_audio_tap_to_record">Kaydetmek için dokun</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">GIF ara...</string>
+    <string name="sticker_gif_search_hint">Giphy\'de ara</string>
     <string name="sticker_gif_empty">Şu anda çıkartma yok</string>
     <string name="sticker_gif_empty_subtitle">Başka bir arama dene veya trend olanlara dön.</string>
     <string name="sticker_category_frame">Polaroid</string>

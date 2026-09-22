@@ -282,11 +282,8 @@ fun StickerPickerView(
         var base = StickerCatalogCategory.entries.toList()
         if (hasRevealSticker) base = base.filter { it != StickerCatalogCategory.REVEAL }
         if (isVideo || hasAudioSticker) base = base.filter { it != StickerCatalogCategory.AUDIO }
-        val query = catalogSearchText.trim()
-        if (query.isEmpty()) return base
-        return base.filter {
-            context.getString(it.titleRes).contains(query, ignoreCase = true)
-        }
+        // El buscador del catálogo es Giphy (GIFs), no filtra pills.
+        return base
     }
 
     val framePhotoPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -328,7 +325,7 @@ fun StickerPickerView(
     fun jitteredCenter() = 0.5 + Random.nextDouble(-0.06, 0.06) to 0.42 + Random.nextDouble(-0.06, 0.06)
 
     /** Port de `loadTrendingStickers` / `searchTrendingStickers` / `fetchGiphyPage`. */
-    fun fetchGiphyPage(append: Boolean) {
+    fun fetchGiphyPage(append: Boolean, queryOverride: String? = null) {
         if (append && (!hasMoreGiphyPages || isLoadingGiphy || isLoadingMoreGiphy)) return
         if (append) isLoadingMoreGiphy = true else {
             isLoadingGiphy = true
@@ -337,7 +334,11 @@ fun StickerPickerView(
             giphyNextOffset = 0
             hasMoreGiphyPages = true
         }
-        val query = gifSearchInput.trim()
+        // Catálogo y detalle GIF comparten Giphy; el catálogo usa catalogSearchText.
+        val query = (queryOverride ?: when (mode) {
+            StickerPickerMode.CATALOG -> catalogSearchText
+            else -> gifSearchInput
+        }).trim()
         giphyActiveQuery = query
         val offset = if (append) giphyNextOffset else 0
         scope.launch {
@@ -364,15 +365,17 @@ fun StickerPickerView(
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (giphyResults.isEmpty() && !isLoadingGiphy) {
-            fetchGiphyPage(append = false)
-        }
+    LaunchedEffect(catalogSearchText, mode) {
+        if (mode != StickerPickerMode.CATALOG) return@LaunchedEffect
+        val query = catalogSearchText.trim()
+        // Debounce solo al tipar; trending al abrir / al limpiar sin espera.
+        if (query.isNotEmpty()) kotlinx.coroutines.delay(350)
+        fetchGiphyPage(append = false, queryOverride = catalogSearchText)
     }
 
     LaunchedEffect(mode) {
-        if (mode == StickerPickerMode.GIF && giphyResults.isEmpty() && !isLoadingGiphy) {
-            fetchGiphyPage(append = false)
+        if (mode == StickerPickerMode.GIF) {
+            fetchGiphyPage(append = false, queryOverride = gifSearchInput)
         }
     }
 
@@ -587,14 +590,22 @@ fun StickerPickerView(
                         Icon(Icons.Filled.Search, null, tint = muted, modifier = Modifier.size(18.dp))
                         BasicTextField(
                             value = catalogSearchText,
-                            onValueChange = { catalogSearchText = it.take(40) },
+                            onValueChange = { catalogSearchText = it.take(80) },
                             singleLine = true,
                             textStyle = TextStyle(color = fg, fontSize = 15.sp, fontWeight = FontWeight.Medium),
                             cursorBrush = SolidColor(fg),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(
+                                onSearch = {
+                                    HapticManager.shared.lightImpact()
+                                    fetchGiphyPage(append = false, queryOverride = catalogSearchText)
+                                },
+                            ),
                             modifier = Modifier.weight(1f),
                             decorationBox = { inner ->
                                 if (catalogSearchText.isBlank()) {
-                                    Text(stringResource(R.string.sticker_search_placeholder), color = muted, fontSize = 15.sp)
+                                    // ≡ iOS stickerview.searchGifs.placeholder
+                                    Text(stringResource(R.string.sticker_gif_search_hint), color = muted, fontSize = 15.sp)
                                 }
                                 inner()
                             },
@@ -606,7 +617,10 @@ fun StickerPickerView(
                                 tint = muted,
                                 modifier = Modifier
                                     .size(18.dp)
-                                    .clickable { catalogSearchText = "" },
+                                    .clickable {
+                                        HapticManager.shared.lightImpact()
+                                        catalogSearchText = ""
+                                    },
                             )
                         }
                     }
@@ -619,128 +633,110 @@ fun StickerPickerView(
                         verticalArrangement = Arrangement.spacedBy(22.dp),
                     ) {
                         val filtered = filteredCatalogCategories()
-                        if (filtered.isEmpty()) {
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 44.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                Text(
-                                    stringResource(R.string.sticker_catalog_empty_title),
-                                    color = fg,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 16.sp,
-                                )
-                                Text(
-                                    stringResource(R.string.sticker_catalog_empty_subtitle),
-                                    color = muted,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.padding(top = 6.dp),
-                                )
-                            }
-                        } else {
-                            StickerPillFlowLayout(
-                                modifier = Modifier.fillMaxWidth(),
-                                spacing = 10.dp,
-                                rowSpacing = 10.dp,
-                            ) {
-                                filtered.forEachIndexed { index, cat ->
-                                    val isEmojiSlider = cat == StickerCatalogCategory.EMOJI_SLIDER
-                                    Row(
-                                        Modifier
-                                            .then(
-                                                if (isEmojiSlider) {
-                                                    Modifier
-                                                        .height(44.dp)
-                                                        .widthIn(min = 148.dp)
-                                                } else {
-                                                    Modifier.height(46.dp)
-                                                },
-                                            )
-                                            .rotate(catalogPillTiltDegrees(index))
-                                            .offset(y = catalogPillVerticalOffsetDp(index).dp)
-                                            .shadow(
-                                                elevation = 8.dp,
-                                                shape = CircleShape,
-                                                ambientColor = Color.Black.copy(if (isDark) 0.10f else 0.06f),
-                                                spotColor = Color.Black.copy(if (isDark) 0.10f else 0.06f),
-                                            )
-                                            .clip(CircleShape)
-                                            .background(
-                                                Brush.verticalGradient(listOf(pillFillTop, pillFillBottom)),
-                                            )
-                                            .border(
-                                                1.dp,
-                                                if (isDark) Color.White.copy(0.80f) else Color.White.copy(0.08f),
-                                                CircleShape,
-                                            )
-                                            .stickerPressClickable {
-                                                HapticManager.shared.mediumImpact()
-                                                when (cat) {
-                                                    StickerCatalogCategory.LOCATION -> mode = StickerPickerMode.LOCATION_INPUT
-                                                    StickerCatalogCategory.TRENDING_GIF -> mode = StickerPickerMode.GIF
-                                                    StickerCatalogCategory.EMOJI -> mode = StickerPickerMode.EMOJI
-                                                    StickerCatalogCategory.TIME -> emit(createTimeDraft())
-                                                    StickerCatalogCategory.WEATHER -> scope.launch {
-                                                        val (x, y) = jitteredCenter()
-                                                        emit(createGeneratedWeatherStickerDraft(x, y))
-                                                    }
-                                                    StickerCatalogCategory.SELFIE -> {
-                                                        onSelfieRequested()
-                                                        onDismiss()
-                                                    }
-                                                    StickerCatalogCategory.FRAME -> mode = StickerPickerMode.FRAME
-                                                    StickerCatalogCategory.REVEAL -> mode = StickerPickerMode.REVEAL
-                                                    StickerCatalogCategory.AUDIO -> mode = StickerPickerMode.AUDIO
-                                                    StickerCatalogCategory.HASHTAG -> emit(createHashtagPlaceholder())
-                                                    StickerCatalogCategory.MENTION -> mode = StickerPickerMode.MENTION_INPUT
-                                                    StickerCatalogCategory.LINK -> mode = StickerPickerMode.LINK_INPUT
-                                                    StickerCatalogCategory.POLL -> emit(createPollPlaceholder())
-                                                    StickerCatalogCategory.QUESTION -> emit(createQuestionPlaceholder())
-                                                    StickerCatalogCategory.QUIZ -> emit(createQuizPlaceholder())
-                                                    StickerCatalogCategory.EMOJI_SLIDER -> emit(createEmojiSliderPlaceholder())
-                                                    StickerCatalogCategory.COUNTDOWN -> emit(createCountdownPlaceholder())
-                                                }
-                                            }
-                                            .padding(horizontal = if (isEmojiSlider) 10.dp else 14.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    ) {
-                                        if (isEmojiSlider) {
-                                            StickerEmojiSliderPillGlyph(Modifier.size(width = 122.dp, height = 28.dp))
-                                        } else {
-                                            // CatalogPillIcon ≡ accent + AttachmentIcon cuando aplica
-                                            val attachment = cat.attachmentIcon
-                                            if (attachment != null) {
-                                                AttachmentIconView(
-                                                    icon = attachment,
-                                                    preset = AttachmentIconPreset.STICKER_CATALOG_PILL,
-                                                    tintColor = cat.accentColor,
-                                                    modifier = Modifier.size(18.dp),
-                                                )
+                        val isSearchingGifs = catalogSearchText.isNotBlank()
+                        StickerPillFlowLayout(
+                            modifier = Modifier.fillMaxWidth(),
+                            spacing = 10.dp,
+                            rowSpacing = 10.dp,
+                        ) {
+                            filtered.forEachIndexed { index, cat ->
+                                val isEmojiSlider = cat == StickerCatalogCategory.EMOJI_SLIDER
+                                Row(
+                                    Modifier
+                                        .then(
+                                            if (isEmojiSlider) {
+                                                Modifier
+                                                    .height(44.dp)
+                                                    .widthIn(min = 148.dp)
                                             } else {
-                                                Icon(
-                                                    cat.icon,
-                                                    null,
-                                                    tint = cat.accentColor,
-                                                    modifier = Modifier.size(18.dp),
-                                                )
+                                                Modifier.height(46.dp)
+                                            },
+                                        )
+                                        .rotate(catalogPillTiltDegrees(index))
+                                        .offset(y = catalogPillVerticalOffsetDp(index).dp)
+                                        .shadow(
+                                            elevation = 8.dp,
+                                            shape = CircleShape,
+                                            ambientColor = Color.Black.copy(if (isDark) 0.10f else 0.06f),
+                                            spotColor = Color.Black.copy(if (isDark) 0.10f else 0.06f),
+                                        )
+                                        .clip(CircleShape)
+                                        .background(
+                                            Brush.verticalGradient(listOf(pillFillTop, pillFillBottom)),
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isDark) Color.White.copy(0.80f) else Color.White.copy(0.08f),
+                                            CircleShape,
+                                        )
+                                        .stickerPressClickable {
+                                            HapticManager.shared.mediumImpact()
+                                            when (cat) {
+                                                StickerCatalogCategory.LOCATION -> mode = StickerPickerMode.LOCATION_INPUT
+                                                StickerCatalogCategory.TRENDING_GIF -> {
+                                                    gifSearchInput = catalogSearchText
+                                                    mode = StickerPickerMode.GIF
+                                                }
+                                                StickerCatalogCategory.EMOJI -> mode = StickerPickerMode.EMOJI
+                                                StickerCatalogCategory.TIME -> emit(createTimeDraft())
+                                                StickerCatalogCategory.WEATHER -> scope.launch {
+                                                    val (x, y) = jitteredCenter()
+                                                    emit(createGeneratedWeatherStickerDraft(x, y))
+                                                }
+                                                StickerCatalogCategory.SELFIE -> {
+                                                    onSelfieRequested()
+                                                    onDismiss()
+                                                }
+                                                StickerCatalogCategory.FRAME -> mode = StickerPickerMode.FRAME
+                                                StickerCatalogCategory.REVEAL -> mode = StickerPickerMode.REVEAL
+                                                StickerCatalogCategory.AUDIO -> mode = StickerPickerMode.AUDIO
+                                                StickerCatalogCategory.HASHTAG -> emit(createHashtagPlaceholder())
+                                                StickerCatalogCategory.MENTION -> mode = StickerPickerMode.MENTION_INPUT
+                                                StickerCatalogCategory.LINK -> mode = StickerPickerMode.LINK_INPUT
+                                                StickerCatalogCategory.POLL -> emit(createPollPlaceholder())
+                                                StickerCatalogCategory.QUESTION -> emit(createQuestionPlaceholder())
+                                                StickerCatalogCategory.QUIZ -> emit(createQuizPlaceholder())
+                                                StickerCatalogCategory.EMOJI_SLIDER -> emit(createEmojiSliderPlaceholder())
+                                                StickerCatalogCategory.COUNTDOWN -> emit(createCountdownPlaceholder())
                                             }
-                                            Text(
-                                                stringResource(cat.titleRes),
-                                                color = pillText,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontSize = 15.5.sp,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
+                                        }
+                                        .padding(horizontal = if (isEmojiSlider) 10.dp else 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    if (isEmojiSlider) {
+                                        StickerEmojiSliderPillGlyph(Modifier.size(width = 122.dp, height = 28.dp))
+                                    } else {
+                                        val attachment = cat.attachmentIcon
+                                        if (attachment != null) {
+                                            AttachmentIconView(
+                                                icon = attachment,
+                                                preset = AttachmentIconPreset.STICKER_CATALOG_PILL,
+                                                tintColor = cat.accentColor,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        } else {
+                                            Icon(
+                                                cat.icon,
+                                                null,
+                                                tint = cat.accentColor,
+                                                modifier = Modifier.size(18.dp),
                                             )
                                         }
+                                        Text(
+                                            stringResource(cat.titleRes),
+                                            color = pillText,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 15.5.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
                                     }
                                 }
                             }
+                        }
 
-                        // CatalogGifPreviewSection ≡ iOS (bajo mosaic cuando hay pills)
+                        // CatalogGifPreviewSection ≡ iOS (siempre: trending o resultados de búsqueda)
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(
                                 Modifier.fillMaxWidth(),
@@ -764,6 +760,7 @@ fun StickerPickerView(
                                         .border(1.dp, chromeStroke, RoundedCornerShape(50))
                                         .stickerPressClickable {
                                             HapticManager.shared.mediumImpact()
+                                            gifSearchInput = catalogSearchText
                                             mode = StickerPickerMode.GIF
                                         }
                                         .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -784,7 +781,7 @@ fun StickerPickerView(
                                     }
                                 }
                                 giphyResults.isNotEmpty() -> {
-                                    val preview = giphyResults.take(12)
+                                    val preview = giphyResults.take(if (isSearchingGifs) 24 else 12)
                                     val rows = preview.chunked(3)
                                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                         rows.forEach { row ->
@@ -821,9 +818,30 @@ fun StickerPickerView(
                                         }
                                     }
                                 }
+                                isSearchingGifs -> {
+                                    Column(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 24.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Text(
+                                            stringResource(R.string.sticker_gif_empty),
+                                            color = muted,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                        Text(
+                                            stringResource(R.string.sticker_gif_empty_subtitle),
+                                            color = muted.copy(0.8f),
+                                            fontSize = 12.sp,
+                                            modifier = Modifier.padding(horizontal = 24.dp).padding(top = 6.dp),
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        )
+                                    }
+                                }
                             }
                         }
-                        } // end else filtered
                     }
                 }
 

@@ -16,11 +16,15 @@ import java.util.UUID
 
 /** ≡ `StoryTextCanvasPlacement`. */
 object StoryTextCanvasPlacement {
+    const val CONTRACT_VERSION = 2
+    const val REFERENCE_WIDTH = 375f
+    const val MAX_LAYOUT_WIDTH_FRACTION = 327f / 375f
+
     fun defaultPosition(canvasSize: Size): Offset =
         Offset(canvasSize.width / 2f, maxOf(canvasSize.height * 0.42f, 80f))
 
     fun maxLayoutWidth(canvasWidth: Float): Float =
-        maxOf(canvasWidth * StoryMediaTransformLimits.maxScale, 120f)
+        canvasWidth.coerceAtLeast(1f) * MAX_LAYOUT_WIDTH_FRACTION
 
     fun needsSeed(position: Offset, canvasSize: Size): Boolean {
         if (canvasSize.width <= 1f || canvasSize.height <= 1f) return false
@@ -85,7 +89,7 @@ data class StoryTextOverlayDraft(
         )
 
     /** Atajo cuando la posición ya está normalizada (sin rect de contenido). */
-    fun toMetadata(): StoryTextOverlayMetadata? {
+    fun toMetadata(canvasWidthDp: Float): StoryTextOverlayMetadata? {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return null
         val effect = StoryTextEffect.fromStoredRaw(visualEffectRaw)
@@ -99,7 +103,8 @@ data class StoryTextOverlayDraft(
             layerOrder = layerOrder,
             styleRaw = styleRaw.ifBlank { StoryTextStyle.MODERN.raw },
             colorHex = colorHex.ifBlank { "FFFFFF" },
-            fontSize = fontSize,
+            fontSize = fontSize * StoryTextCanvasPlacement.REFERENCE_WIDTH.toDouble() /
+                canvasWidthDp.coerceAtLeast(1f).toDouble(),
             alignmentRaw = encodeStoryTextAlignment(alignmentRaw),
             backgroundFillRaw = StoryTextBackgroundFill.fromRaw(backgroundFillRaw).raw,
             strokeRaw = StoryTextStroke.fromRaw(strokeRaw).raw,
@@ -112,6 +117,9 @@ data class StoryTextOverlayDraft(
             },
             gradientAngle = gradientAngle.takeIf { effect == StoryTextEffect.GRADIENT },
             rotationRadians = rotationRadians,
+            canvasVersion = StoryTextCanvasPlacement.CONTRACT_VERSION,
+            normalizedFontSize = fontSize / canvasWidthDp.coerceAtLeast(1f).toDouble(),
+            normalizedMaxWidth = StoryTextCanvasPlacement.MAX_LAYOUT_WIDTH_FRACTION.toDouble(),
         )
     }
 
@@ -193,7 +201,7 @@ fun buildStoryTextOverlayMetadata(
         layerOrder = layerOrder,
         styleRaw = style.raw,
         colorHex = textColor.toStoryHex(),
-        fontSize = fontSize.toDouble(),
+        fontSize = (fontSize * StoryTextCanvasPlacement.REFERENCE_WIDTH / safeWidth).toDouble(),
         alignmentRaw = encodeStoryTextAlignment(alignmentRaw),
         backgroundFillRaw = StoryTextBackgroundFill.fromRaw(backgroundFillRaw).raw,
         strokeRaw = StoryTextStroke.fromRaw(strokeRaw).raw,
@@ -206,6 +214,9 @@ fun buildStoryTextOverlayMetadata(
         },
         gradientAngle = gradientAngle.takeIf { effect == StoryTextEffect.GRADIENT },
         rotationRadians = rotationRadians,
+        canvasVersion = StoryTextCanvasPlacement.CONTRACT_VERSION,
+        normalizedFontSize = (fontSize / safeWidth).toDouble(),
+        normalizedMaxWidth = StoryTextCanvasPlacement.MAX_LAYOUT_WIDTH_FRACTION.toDouble(),
     )
 }
 
@@ -279,9 +290,25 @@ fun StoryTextOverlayMetadata.renderConfiguration(): StoryTextRenderConfiguration
 }
 
 fun StoryTextOverlayMetadata.scaledFontSize(containerWidthDp: Float): Float {
-    // ≡ iOS: containerWidth en points; en Android hay que pasar dp, no px.
-    val scaleFactor = containerWidthDp.coerceAtLeast(1f) / 375f
-    return (fontSize * scaleFactor).toFloat()
+    val width = containerWidthDp.coerceAtLeast(1f)
+    val normalized = normalizedFontSize
+    if (canvasVersion >= StoryTextCanvasPlacement.CONTRACT_VERSION &&
+        normalized != null && normalized.isFinite() && normalized > 0.0
+    ) {
+        return (normalized * width).toFloat()
+    }
+    return (fontSize * width / StoryTextCanvasPlacement.REFERENCE_WIDTH).toFloat()
+}
+
+fun StoryTextOverlayMetadata.resolvedMaxLayoutWidth(containerWidthDp: Float): Float {
+    val width = containerWidthDp.coerceAtLeast(1f)
+    val normalized = normalizedMaxWidth
+    if (canvasVersion >= StoryTextCanvasPlacement.CONTRACT_VERSION &&
+        normalized != null && normalized.isFinite() && normalized > 0.0
+    ) {
+        return (normalized * width).toFloat()
+    }
+    return StoryTextCanvasPlacement.maxLayoutWidth(width)
 }
 
 fun StoryTextOverlayMetadata.scaledRenderConfiguration(containerWidthDp: Float): StoryTextRenderConfiguration =

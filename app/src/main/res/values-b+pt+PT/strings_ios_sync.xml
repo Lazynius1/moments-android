@@ -1896,7 +1896,7 @@
     <string name="stickerview_question_description">Convida os teus seguidores a fazerem-te perguntas</string>
     <string name="stickerview_question_placeholder">Pergunta-me algo sobre...</string>
     <string name="stickerview_question_subtitle_compact">Escreve um pedido curto para convidar respostas</string>
-    <string name="stickerview_search_gifs_placeholder">Pesquisar GIFs...</string>
+    <string name="stickerview_search_gifs_placeholder">Pesquisar no Giphy</string>
     <string name="stickerview_search_placeholder">Pesquisar</string>
     <string name="stickerview_selfie">🤳 Selfie</string>
     <string name="stickerview_stickers">Adesivos</string>

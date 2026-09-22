@@ -1872,7 +1872,7 @@ Le contenu privé ou restreint utilise Blackout : Moments essaie de le masquer d
     <string name="stickerview_question_description">Invitez vos abonnés à vous poser des questions</string>
     <string name="stickerview_question_placeholder">Posez-moi une question sur...</string>
     <string name="stickerview_question_subtitle_compact">Écrivez un court texte pour inviter aux réponses</string>
-    <string name="stickerview_search_gifs_placeholder">Rechercher des GIFs...</string>
+    <string name="stickerview_search_gifs_placeholder">Rechercher sur Giphy</string>
     <string name="stickerview_search_placeholder">Rechercher</string>
     <string name="stickerview_selfie">🤳 Selfie</string>
     <string name="stickerview_stickers">Stickers</string>

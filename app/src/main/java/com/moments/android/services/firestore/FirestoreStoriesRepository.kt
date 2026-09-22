@@ -248,6 +248,9 @@ private fun FirestoreService.makeStoryPayload(
                 put("forcesAllCaps", overlay.forcesAllCaps)
                 put("isLiveOverlay", overlay.isLiveOverlay)
                 put("rotationRadians", overlay.rotationRadians)
+                put("canvasVersion", overlay.canvasVersion)
+                overlay.normalizedFontSize?.let { put("normalizedFontSize", it) }
+                overlay.normalizedMaxWidth?.let { put("normalizedMaxWidth", it) }
             }
         }
     }

@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.extensions.MomentsChromeGlass
+import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.views.creator.CreatorAlbumInfo
 import com.moments.android.views.creator.CreatorAspectRatio
 import com.moments.android.views.creator.CreatorFlow
@@ -325,6 +326,7 @@ fun MediaSelectionView(
                 Modifier
                     .size(40.dp)
                     .align(Alignment.CenterStart)
+                    .momentsChromeGlass(CircleShape, interactive = true)
                     .clickable { onCurrentFlowChange(CreatorFlow.TYPE_SELECTION) },
                 contentAlignment = Alignment.Center,
             ) {
@@ -345,11 +347,12 @@ fun MediaSelectionView(
             if (selectedAssetIds.isNotEmpty()) {
                 Text(
                     stringResource(R.string.creator_next),
-                    color = Color(0xFF0095F6),
+                    color = contentColor,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
+                        .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
                         .clickable {
                             scope.launch {
                                 val selected = selectedAssetIds.mapNotNull { id ->
@@ -398,7 +401,8 @@ fun MediaSelectionView(
                                 onSelectedMediaItemsChange(media)
                                 onCurrentFlowChange(CreatorFlow.MEDIA_EDITING)
                             }
-                        },
+                        }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             } else {
                 Spacer(Modifier.size(40.dp).align(Alignment.CenterEnd))

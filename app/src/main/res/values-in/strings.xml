@@ -1400,7 +1400,7 @@ Anda dapat mengubah izin ini di pengaturan perangkat. Jika izin dinonaktifkan, b
     <string name="sticker_audio_recorded">Siap ditambahkan</string>
     <string name="sticker_audio_tap_to_record">Ketuk untuk merekam</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">Cari GIF...</string>
+    <string name="sticker_gif_search_hint">Cari di Giphy</string>
     <string name="sticker_gif_empty">Belum ada stiker</string>
     <string name="sticker_gif_empty_subtitle">Coba pencarian lain atau kembali ke yang sedang tren.</string>
     <string name="sticker_category_frame">Polaroid</string>

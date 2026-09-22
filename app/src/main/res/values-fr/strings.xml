@@ -800,7 +800,7 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="sticker_audio_recorded">Prêt à ajouter</string>
     <string name="sticker_audio_tap_to_record">Touchez pour enregistrer</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">Rechercher des stickers</string>
+    <string name="sticker_gif_search_hint">Rechercher sur Giphy</string>
     <string name="sticker_gif_empty">Aucun sticker pour le moment</string>
     <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">Cadre Polaroid</string>

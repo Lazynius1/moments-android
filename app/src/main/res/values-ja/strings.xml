@@ -1400,7 +1400,7 @@
     <string name="sticker_audio_recorded">追加できます</string>
     <string name="sticker_audio_tap_to_record">タップして録音</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">GIFを検索…</string>
+    <string name="sticker_gif_search_hint">Giphyで検索</string>
     <string name="sticker_gif_empty">現在ステッカーはありません</string>
     <string name="sticker_gif_empty_subtitle">別のキーワードで検索するか、トレンドに戻ってください。</string>
     <string name="sticker_category_frame">Polaroid</string>

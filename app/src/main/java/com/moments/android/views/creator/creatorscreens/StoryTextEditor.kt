@@ -59,6 +59,7 @@ import com.moments.android.views.creator.components.StoryMediaTransformLimits
 import com.moments.android.views.creator.components.StoryTextBackgroundFill
 import com.moments.android.views.creator.components.StoryTextEditorContext
 import com.moments.android.views.creator.components.StoryTextEditorInput
+import com.moments.android.views.creator.components.StoryTextCanvasPlacement
 import com.moments.android.views.creator.components.StoryTextEffect
 import com.moments.android.views.creator.components.StoryTextGradientSettings
 import com.moments.android.views.creator.components.StoryTextRenderConfiguration
@@ -269,6 +270,11 @@ fun StoryTextEditor(
                 centeredGapPadding
             }
             val bottomToolbarPaddingDp = with(density) { bottomToolbarPadding.toDp() }
+            val textMaxWidthPx = StoryTextCanvasPlacement.maxLayoutWidth(captureRect.width)
+            val textMaxWidthDp = with(density) { textMaxWidthPx.toDp() }
+            val textHorizontalInsetDp = with(density) {
+                ((captureRect.width - textMaxWidthPx) / 2f).coerceAtLeast(0f).toDp()
+            }
 
         if (isEyedropperActive) {
             Text(
@@ -326,13 +332,13 @@ fun StoryTextEditor(
             onFocusedChange = { isTextFieldFocused = it },
             configuration = configuration,
             motionRaw = textMotionRaw,
-            maxWidth = 280.dp,
+            maxWidth = textMaxWidthDp,
             replayToken = motionReplayToken,
             placeholder = stringResource(R.string.story_editor_text_placeholder),
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
-                .padding(horizontal = 56.dp)
+                .padding(horizontal = textHorizontalInsetDp)
                 .padding(bottom = bottomToolbarPaddingDp),
         )
 

@@ -1874,7 +1874,7 @@
     <string name="stickerview_question_description">Lade deine Follower ein, dir Fragen zu stellen</string>
     <string name="stickerview_question_placeholder">Frag mich etwas zu...</string>
     <string name="stickerview_question_subtitle_compact">Schreibe eine kurze Aufforderung, um Antworten einzuladen</string>
-    <string name="stickerview_search_gifs_placeholder">GIFs suchen...</string>
+    <string name="stickerview_search_gifs_placeholder">Auf Giphy suchen</string>
     <string name="stickerview_search_placeholder">Suchen</string>
     <string name="stickerview_selfie">🤳 Selfie</string>
     <string name="stickerview_stickers">Stickers</string>

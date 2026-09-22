@@ -786,7 +786,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="sticker_audio_recorded">Bereit zum Hinzufügen</string>
     <string name="sticker_audio_tap_to_record">Tippen zum Aufnehmen</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">Sticker suchen</string>
+    <string name="sticker_gif_search_hint">Auf Giphy suchen</string>
     <string name="sticker_gif_empty">Gerade keine Sticker</string>
     <string name="sticker_category_frame">Sofortbild</string>
     <string name="sticker_frame_title">Polaroid-Rahmen</string>

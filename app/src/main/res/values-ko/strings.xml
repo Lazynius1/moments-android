@@ -1400,7 +1400,7 @@
     <string name="sticker_audio_recorded">추가할 준비가 됐어요</string>
     <string name="sticker_audio_tap_to_record">탭해서 녹음하기</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">GIF 검색...</string>
+    <string name="sticker_gif_search_hint">Giphy에서 검색</string>
     <string name="sticker_gif_empty">지금은 스티커가 없어요</string>
     <string name="sticker_gif_empty_subtitle">다른 검색어를 입력하거나 인기 콘텐츠로 돌아가 보세요.</string>
     <string name="sticker_category_frame">폴라로이드</string>

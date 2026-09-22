@@ -1420,7 +1420,7 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="sticker_audio_recorded">Ready to add</string>
     <string name="sticker_audio_tap_to_record">Tap to record</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">Search GIFs...</string>
+    <string name="sticker_gif_search_hint">Search Giphy</string>
     <string name="sticker_gif_empty">No stickers right now</string>
     <string name="sticker_gif_empty_subtitle">Try another search or go back to trending.</string>
     <string name="sticker_category_frame">Polaroid</string>

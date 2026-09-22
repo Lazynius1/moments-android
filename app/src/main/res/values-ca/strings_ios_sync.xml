@@ -1893,7 +1893,7 @@
     <string name="stickerview_question_description">Convida els teus seguidors a fer-te preguntes</string>
     <string name="stickerview_question_placeholder">Fes-me una pregunta sobre...</string>
     <string name="stickerview_question_subtitle_compact">Escriu una frase curta per convidar a respondre</string>
-    <string name="stickerview_search_gifs_placeholder">Cercar GIFs...</string>
+    <string name="stickerview_search_gifs_placeholder">Cerca a Giphy</string>
     <string name="stickerview_search_placeholder">Cercar</string>
     <string name="stickerview_selfie">🤳 Selfie</string>
     <string name="stickerview_stickers">Stickers</string>

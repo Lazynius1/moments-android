@@ -1272,7 +1272,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="sticker_audio_recorded">Listo para añadir</string>
     <string name="sticker_audio_tap_to_record">Toca para grabar</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">Buscar stickers</string>
+    <string name="sticker_gif_search_hint">Buscar en Giphy</string>
     <string name="sticker_gif_empty">No hay stickers ahora mismo</string>
     <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">Marco Polaroid</string>

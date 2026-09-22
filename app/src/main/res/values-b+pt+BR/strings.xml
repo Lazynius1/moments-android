@@ -786,7 +786,7 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="sticker_audio_recorded">Pronto para adicionar</string>
     <string name="sticker_audio_tap_to_record">Toque para gravar</string>
     <string name="sticker_category_gif">GIF</string>
-    <string name="sticker_gif_search_hint">Buscar figurinhas</string>
+    <string name="sticker_gif_search_hint">Buscar no Giphy</string>
     <string name="sticker_gif_empty">Nenhum sticker no momento</string>
     <string name="sticker_category_frame">Polaroid</string>
     <string name="sticker_frame_title">Moldura Polaroid</string>
