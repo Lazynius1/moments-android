@@ -87,6 +87,38 @@ private object StoryAudienceBottomInfo {
         audience?.trim()?.lowercase().orEmpty().ifEmpty { "everyone" }
 }
 
+/** Ocho reacciones sueltas sobre la historia, en dos filas, con el teclado abierto. */
+@Composable
+fun StoryQuickReactionsGrid(
+    reactions: List<String>,
+    onReaction: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val items = reactions.take(8)
+    val split = (items.size + 1) / 2
+    val rows = listOf(items.take(split), items.drop(split)).filter { it.isNotEmpty() }
+    Column(
+        modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        rows.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+                row.forEach { reaction ->
+                    Text(
+                        reaction,
+                        fontSize = 46.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .clickable { onReaction(reaction) }
+                            .padding(4.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
 /** Port de `StoryReactionsStrip`. */
 @Composable
 fun StoryReactionsStrip(

@@ -22,6 +22,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -114,6 +120,10 @@ fun FeedHeaderBar(
     val headerBg = rememberAdaptiveColors().surfaceBackground
     val unreadNotifications by NotificationBadgeService.unreadNotificationsCount.collectAsState()
     var echoMenuExpanded by remember { mutableStateOf(false) }
+    var chromeWidthPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val storyFade = 32.dp
+    val chromeWidth = with(density) { chromeWidthPx.toDp() }
 
     // iOS: YourStory usa storyUsers.first si first.userId == currentUser
     val firstUser = storyUsers.firstOrNull()
@@ -143,26 +153,29 @@ fun FeedHeaderBar(
     // iOS FeedHeaderBar:
     //   .padding(.top, 16).padding(.bottom, 4)
     //   .background(Rectangle().fill(...).ignoresSafeArea(edges: .top))
-    Row(
+    Box(
         modifier
             .fillMaxWidth()
             .background(headerBg)
             .statusBarsPadding()
             .padding(top = 16.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // iOS: skeleton row OR horizontal ScrollView — no ambos
+        // iOS: la fila va a todo el ancho, por debajo de los iconos.
         if (isLoadingStories && storyUsers.isEmpty()) {
             StoryRingTraySkeletonRow(
                 currentUserId = currentUserId,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = chromeWidth)
+                    .storyRingChromeFade(chromeWidthPx.toFloat(), with(density) { storyFade.toPx() }, headerBg),
             )
         } else {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(start = 12.dp, end = 4.dp),
-                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(start = 12.dp, end = chromeWidth + storyFade),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .storyRingChromeFade(chromeWidthPx.toFloat(), with(density) { storyFade.toPx() }, headerBg),
             ) {
                 item {
                     YourStoryRing(
@@ -212,7 +225,10 @@ fun FeedHeaderBar(
         }
 
         Row(
-            Modifier.padding(end = 12.dp),
+            Modifier
+                .align(Alignment.CenterEnd)
+                .onSizeChanged { chromeWidthPx = it.width }
+                .padding(end = 12.dp),
             // Cada acción ya reserva 36 dp; 6 dp deja los centros a 42 dp, como los glifos iOS.
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -255,6 +271,32 @@ fun FeedHeaderBar(
             ModernNovaButton(onClick = onOpenNova)
         }
     }
+}
+
+/** Fundido al color de la barra y tapa sólida debajo de los iconos. */
+private fun Modifier.storyRingChromeFade(
+    coverWidthPx: Float,
+    fadeWidthPx: Float,
+    color: Color,
+): Modifier = drawWithContent {
+    drawContent()
+    val total = fadeWidthPx + coverWidthPx
+    if (total <= 0f || size.width <= 0f) return@drawWithContent
+    val start = (size.width - total).coerceAtLeast(0f)
+    val fadeEnd = (fadeWidthPx / total).coerceIn(0f, 1f)
+    drawRect(
+        brush = Brush.horizontalGradient(
+            colorStops = arrayOf(
+                0f to Color.Transparent,
+                fadeEnd to color,
+                1f to color,
+            ),
+            startX = start,
+            endX = size.width,
+        ),
+        topLeft = Offset(start, 0f),
+        size = Size(size.width - start, size.height),
+    )
 }
 
 @Composable

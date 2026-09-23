@@ -45,8 +45,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.SentimentSatisfied
-import androidx.compose.material.icons.outlined.SentimentSatisfied
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -1332,6 +1332,34 @@ fun StoryViewerScreen(
                 }
             }
 
+            if (!isUIHidden && !isOwnStory && authorAllowsReactions && (isKeyboardVisible || isTextFieldFocused)) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.32f)),
+                )
+                val visibleHeight = (captureRect.height - imeBottomPx).coerceAtLeast(0f)
+                Box(
+                    Modifier
+                        .offset {
+                            IntOffset(
+                                captureRect.left.roundToInt(),
+                                (captureRect.top + visibleHeight * 0.62f - with(density) { 88.dp.toPx() }).roundToInt(),
+                            )
+                        }
+                        .width(with(density) { captureRect.width.toDp() }),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    StoryQuickReactionsGrid(
+                        reactions = EmojiReactionDefaults.story.take(8),
+                        onReaction = { emoji ->
+                            focusManager.clearFocus()
+                            sendReactionAction(emoji, screenW, screenH)
+                        },
+                    )
+                }
+            }
+
             // MARK: 5. Bottom area ≡ glassmorphicBottomArea
             if (!isUIHidden) {
                 if (isOwnStory) {
@@ -1391,7 +1419,7 @@ fun StoryViewerScreen(
                             if (adaptiveWindow.usesLargeStoryLayout) 6.dp else 12.dp,
                         ),
                     ) {
-                        if (showReactions && authorAllowsReactions) {
+                        if (showReactions && authorAllowsReactions && !isKeyboardVisible && !isTextFieldFocused) {
                             StoryReactionsStrip(
                                 reactions = reactionEmojis,
                                 showReactions = true,
@@ -1517,7 +1545,7 @@ fun StoryViewerScreen(
                                             if (replyIconsGlass) 6.dp else 2.dp,
                                         ),
                                     ) {
-                                        if (authorAllowsReactions && (messageText.isEmpty() || !authorAllowsMessages)) {
+                                        if (!isKeyboardVisible && !isTextFieldFocused && authorAllowsReactions && (messageText.isEmpty() || !authorAllowsMessages)) {
                                             StoryViewerReplyActionButton(
                                                     glass = replyIconsGlass,
                                                     compact = adaptiveWindow.usesLargeStoryLayout,
@@ -1538,9 +1566,9 @@ fun StoryViewerScreen(
                                             ) {
                                                 Icon(
                                                     if (showReactions) {
-                                                        Icons.Filled.SentimentSatisfied
+                                                        Icons.Filled.Favorite
                                                     } else {
-                                                        Icons.Outlined.SentimentSatisfied
+                                                        Icons.Outlined.FavoriteBorder
                                                     },
                                                     contentDescription = stringResource(R.string.stories_reactions),
                                                     tint = replyActionTint,
@@ -1548,7 +1576,7 @@ fun StoryViewerScreen(
                                                 )
                                             }
                                         }
-                                        if (authorAllowsEphemeralPhotos) {
+                                        if (!isKeyboardVisible && !isTextFieldFocused && authorAllowsEphemeralPhotos) {
                                             StoryViewerReplyActionButton(
                                                     glass = replyIconsGlass,
                                                     compact = adaptiveWindow.usesLargeStoryLayout,
@@ -1559,7 +1587,7 @@ fun StoryViewerScreen(
                                                 },
                                             ) {
                                                 AttachmentIconView(
-                                                    icon = AttachmentIcon.CAMERA,
+                                                    icon = AttachmentIcon.STORY_EPHEMERAL,
                                                     preset = AttachmentIconPreset.STORY_REPLY_ACTION,
                                                     tintColor = replyActionTint,
                                                 )

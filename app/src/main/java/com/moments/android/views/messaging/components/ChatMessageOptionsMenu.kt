@@ -1143,6 +1143,14 @@ private fun menuLayout(
         return centerX.coerceIn(minX, maxX)
     }
 
+    fun clampCenterY(centerY: Float, itemHeight: Float): Float {
+        val half = itemHeight / 2f
+        val minY = topMarginPx + half
+        val maxY = containerHeight - bottomMarginPx - half
+        if (maxY < minY) return containerHeight / 2f
+        return centerY.coerceIn(minY, maxY)
+    }
+
     val centerX = clampCenterX(scaled.center.x, max(reactionsBarEstimatedWidth, menuEstimatedWidth))
     // Encaja reacciones + mensaje + acciones en el viewport desplazando la fila
     // viva (no una copia de la burbuja).
@@ -1161,8 +1169,14 @@ private fun menuLayout(
 
     return ChatMessageMenuLayout(
         messageOffsetY = messageOffsetY,
-        reactionsCenter = Offset(centerX, reactionsCenterY),
-        menuCenter = Offset(clampCenterX(scaled.center.x, menuEstimatedWidth), menuCenterY),
+        reactionsCenter = Offset(
+            centerX,
+            clampCenterY(reactionsCenterY, reactionsBarHeight),
+        ),
+        menuCenter = Offset(
+            clampCenterX(scaled.center.x, menuEstimatedWidth),
+            clampCenterY(menuCenterY, menuHeight),
+        ),
         reactionsAreAbove = true,
     )
 }
