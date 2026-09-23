@@ -78,6 +78,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -86,6 +87,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -202,6 +204,7 @@ fun StoryViewerScreen(
     val context = LocalContext.current
     val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
     val isDark = isSystemInDarkTheme()
     val adaptive = rememberAdaptiveColors()
@@ -866,6 +869,17 @@ fun StoryViewerScreen(
     LaunchedEffect(activeStoryConfirmation != null) {
         pauseOrResumeForOverlay(activeStoryConfirmation != null)
     }
+    LaunchedEffect(isTextFieldFocused) {
+        if (!isTextFieldFocused) return@LaunchedEffect
+        // El campo tiene que seguir compuesto. Un solo requestFocus pierde
+        // la carrera con el gesto y el teclado no sale hasta el segundo swipe.
+        repeat(4) {
+            if (!isTextFieldFocused) return@LaunchedEffect
+            runCatching { focusRequester.requestFocus() }
+            keyboardController?.show()
+            delay(40)
+        }
+    }
     LaunchedEffect(isKeyboardVisible) {
         if (!isKeyboardVisible) {
             delay(100)
@@ -917,6 +931,16 @@ fun StoryViewerScreen(
         onProfileRouteChange = { profileRoute = it },
         modifier = modifier,
     ) { profileOpen ->
+    val replySwipeCanvas = remember { mutableStateOf(Rect.Zero) }
+    val replySwipeRegions = remember { mutableStateOf(emptyList<StoryGestureRegion>()) }
+    val replySwipeBlocked = rememberUpdatedState(isStoryInteractionBlocked)
+    val replySwipeDeck = rememberUpdatedState(isDeckPageActive)
+    val replySwipeMessages = rememberUpdatedState(authorAllowsMessages)
+    val replySwipeHolding = rememberUpdatedState(isHoldingStory)
+    val swipeUpPx = with(density) { 60.dp.toPx() }
+    val swipeSidePx = with(density) { 50.dp.toPx() }
+    val dragArmPx = with(density) { 8.dp.toPx() }
+    var suppressReplyFocusClear by remember { mutableStateOf(false) }
     Box(
         Modifier
             .fillMaxSize()
@@ -924,10 +948,77 @@ fun StoryViewerScreen(
             .graphicsLayer(scaleX = zoomScale, scaleY = zoomScale)
             .transformable(state = zoomGesture)
             .pointerInput(story.id, deckGestureGate) {
-                detectTapGestures(onTap = { focusManager.clearFocus() })
+                detectTapGestures(onTap = {
+                    if (!suppressReplyFocusClear) focusManager.clearFocus()
+                })
             },
     ) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                // ≡ unifiedDragGesture: el pase Initial ve el swipe aunque el
+                // media (AndroidView) se quede el toque. No solo el bottom chrome.
+                .pointerInput(story.id) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(
+                            requireUnconsumed = false,
+                            pass = PointerEventPass.Initial,
+                        )
+                        val start = down.position
+                        val screen = Size(size.width.toFloat(), size.height.toFloat())
+                        val allowDrag = gestureCoordinator.shouldAllowUnifiedViewerDragStart(
+                            point = start,
+                            screenSize = screen,
+                            canvasRect = replySwipeCanvas.value,
+                            regions = replySwipeRegions.value,
+                            gate = deckGestureGate,
+                            overlaysBlocked = replySwipeBlocked.value,
+                        )
+                        if (!allowDrag) return@awaitEachGesture
+
+                        var dragActive = false
+                        var swipeTriggered = false
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            val translation = change.position - start
+                            if (!dragActive &&
+                                (abs(translation.x) > dragArmPx || abs(translation.y) > dragArmPx)
+                            ) {
+                                dragActive = true
+                                if (!playbackCoordinator.isPaused &&
+                                    !replySwipeHolding.value &&
+                                    replySwipeDeck.value
+                                ) {
+                                    pauseStoryPlayback()
+                                }
+                            }
+                            if (dragActive && !swipeTriggered &&
+                                translation.y < -swipeUpPx &&
+                                abs(translation.x) < swipeSidePx &&
+                                replySwipeMessages.value
+                            ) {
+                                swipeTriggered = true
+                                suppressReplyFocusClear = true
+                                change.consume()
+                                isUIHidden = false
+                                isTextFieldFocused = true
+                            }
+                        }
+                        if (swipeTriggered) {
+                            isUIHidden = false
+                            isTextFieldFocused = true
+                            scope.launch {
+                                delay(350)
+                                suppressReplyFocusClear = false
+                            }
+                        } else if (dragActive && replySwipeDeck.value) {
+                            resumeStoryPlayback()
+                        }
+                    }
+                },
+        ) {
             val screenW = constraints.maxWidth.toFloat()
             val screenH = constraints.maxHeight.toFloat()
             SideEffect {
@@ -966,6 +1057,10 @@ fun StoryViewerScreen(
             SideEffect { downloadLayoutWidthDp = captureRect.width / density.density }
             val corner = storyViewerCanvasCornerRadius
             val regions = deckGestureGate?.interactionRegions.orEmpty()
+            SideEffect {
+                replySwipeCanvas.value = canvasRect
+                replySwipeRegions.value = regions
+            }
 
             fun shouldSuppressNav(point: Offset): Boolean =
                 System.currentTimeMillis() < suppressNavigationTapUntil ||
@@ -1057,10 +1152,6 @@ fun StoryViewerScreen(
                                         gestureActionTriggered = true
                                         isUIHidden = false
                                         isTextFieldFocused = true
-                                        try {
-                                            focusRequester.requestFocus()
-                                        } catch (_: Exception) {
-                                        }
                                     }
 
                                     if (!change.pressed) break
@@ -1075,7 +1166,7 @@ fun StoryViewerScreen(
                                     isDragging = false
                                     gestureActionTriggered = false
                                     isUIHidden = false
-                                    if (!textFocusedState.value && deckActiveState.value) {
+                                    if (!swipeTriggered && !textFocusedState.value && deckActiveState.value) {
                                         resumeStoryPlayback()
                                     }
                                 }
