@@ -38,15 +38,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.SentimentSatisfied
 import androidx.compose.material.icons.filled.VideocamOff
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,18 +59,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -98,10 +104,16 @@ import com.moments.android.views.messaging.services.markViewOnceAsViewed
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.ScreenshotProtectionMode
+import com.moments.android.views.story.StoryRevealStickerOverlay
 import com.moments.android.views.story.StoryRingAvatarView
 import com.moments.android.views.story.storyviewer.GlassmorphicStoryVideoPlayer
+import com.moments.android.views.story.storyviewer.StoryFloatingReactionLayer
 import com.moments.android.views.story.storyviewer.StoryMediaOverlayRendererView
+import com.moments.android.views.story.storystickers.FloatingHeart
+import com.moments.android.views.story.storyviewer.StoryQuickReactionsGrid
+import com.moments.android.views.story.storyviewer.StoryReactionBurst
 import com.moments.android.views.story.storyviewer.StoryReactionsStrip
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -127,6 +139,7 @@ fun ViewOnceImmersiveViewer(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
+    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
 
@@ -136,18 +149,26 @@ fun ViewOnceImmersiveViewer(
     var closing by remember { mutableStateOf(false) }
     var hasMarkedAsViewed by remember { mutableStateOf(false) }
     var didHandleDeletion by remember { mutableStateOf(false) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val replyFocusRequester = remember { FocusRequester() }
     var reply by remember { mutableStateOf("") }
     var replyFocused by remember { mutableStateOf(false) }
     var showReactions by remember { mutableStateOf(false) }
     var showEmojiPicker by remember { mutableStateOf(false) }
     var sentConfirmation by remember { mutableStateOf(false) }
+    var floatingHearts by remember { mutableStateOf<List<FloatingHeart>>(emptyList()) }
+    var reactionWidthDp by remember { mutableFloatStateOf(0f) }
+    var reactionHeightDp by remember { mutableFloatStateOf(0f) }
     var imageAspect by remember { mutableFloatStateOf(9f / 16f) }
     var videoAspect by remember { mutableStateOf<Float?>(null) }
 
     val emojiUsage = remember { EmojiUsageTracker() }
     val reactions = emojiUsage.orderedEmojis(EmojiReactionDefaults.story)
     val isVideo = message.type == MessageType.VIEW_ONCE_VIDEO
+    val stickers = message.resolvedStickers
+    val shouldMuteVideoForReveal = isVideo &&
+        stickers.any { it.type == "reveal" } &&
+        !context.getSharedPreferences("moments_story_stickers", android.content.Context.MODE_PRIVATE)
+            .getBoolean("reveal_revealed_${message.id}", false)
     val mediaUrl = message.mediaUrl.orEmpty()
     val relativeTime = remember(message.timestamp) {
         MomentsFormat.relativeTime(message.timestamp, MomentsFormat.RelativeTimeStyle.CONVERSATIONAL)
@@ -221,7 +242,17 @@ fun ViewOnceImmersiveViewer(
         emojiUsage.increment(emoji)
         onSendReaction(emoji)
         showReactions = false
-        flashSentConfirmation()
+        focusManager.clearFocus()
+        floatingHearts = StoryReactionBurst.emit(
+            floatingHearts,
+            emoji,
+            reactionWidthDp,
+            reactionHeightDp,
+        )
+        scope.launch {
+            delay(300)
+            if (!showReactions && !replyFocused && !showEmojiPicker) paused = false
+        }
     }
 
     BackHandler { closeViewer() }
@@ -267,11 +298,14 @@ fun ViewOnceImmersiveViewer(
     BoxWithConstraints(
         modifier
             .fillMaxSize()
-            .background(Color(0xFF0B1215))
-            .offset { IntOffset(0, dragOffset.roundToInt()) },
+            .background(Color(0xFF0B1215)),
     ) {
         val screenW = constraints.maxWidth.toFloat()
         val screenH = constraints.maxHeight.toFloat()
+        SideEffect {
+            reactionWidthDp = with(density) { screenW.toDp().value }
+            reactionHeightDp = with(density) { screenH.toDp().value }
+        }
         val baseCanvas = creatorMomentsCaptureRect(
             inSize = Size(screenW, screenH),
             topInsetPx = statusTop,
@@ -287,7 +321,6 @@ fun ViewOnceImmersiveViewer(
         val canvasMidY = canvasTop + canvasH / 2f
         val progressY = maxOf(statusTop + with(density) { 1.dp.toPx() }, canvasTop - with(density) { 26.dp.toPx() })
         val corner = storyViewerCanvasCornerRadius
-        val bottomChromeH = with(density) { 170.dp.toPx() }
         val bottomPad = if (keyboardVisible) {
             with(density) { (imeBottom.toFloat() + 8.dp.toPx()).toDp() }
         } else {
@@ -299,27 +332,37 @@ fun ViewOnceImmersiveViewer(
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(dragBlocked, screenH) {
+                .pointerInput(dragBlocked) {
+                    var swipeX = 0f
+                    var swipeY = 0f
+                    var triggered = false
                     detectDragGestures(
+                        onDragStart = {
+                            swipeX = 0f
+                            swipeY = 0f
+                            triggered = false
+                        },
                         onDrag = { change, amount ->
-                            if (dragBlocked) {
-                                dragOffset = 0f
-                                return@detectDragGestures
-                            }
-                            // ≡ shouldHandleDismissDrag: start above bottom chrome
-                            if (change.position.y >= screenH - bottomChromeH) {
-                                dragOffset = 0f
-                                return@detectDragGestures
-                            }
-                            if (amount.y > 0f) {
-                                dragOffset = (dragOffset + amount.y).coerceAtLeast(0f)
+                            if (dragBlocked || triggered) return@detectDragGestures
+                            swipeX += amount.x
+                            swipeY += amount.y
+                            if (swipeY < -60.dp.toPx() && abs(swipeX) < 50.dp.toPx()) {
+                                triggered = true
+                                replyFocusRequester.requestFocus()
+                                paused = true
                                 change.consume()
                             }
                         },
-                        onDragEnd = {
-                            if (dragOffset > 100f) closeViewer() else dragOffset = 0f
-                        },
+                        onDragEnd = {},
                     )
+                }
+                .pointerInput(replyFocused, keyboardVisible, showReactions, showEmojiPicker) {
+                    detectTapGestures {
+                        if (replyFocused || keyboardVisible) {
+                            focusManager.clearFocus()
+                            paused = showReactions || showEmojiPicker
+                        }
+                    }
                 },
         ) {
             // Media canvas
@@ -337,12 +380,18 @@ fun ViewOnceImmersiveViewer(
                     )
                     .clip(RoundedCornerShape(corner))
                     .background(Color.Black)
-                    .pointerInput(Unit) {
+                    .pointerInput(replyFocused, showReactions, showEmojiPicker) {
                         detectTapGestures(
                             onPress = {
+                                if (replyFocused) {
+                                    focusManager.clearFocus()
+                                    paused = showReactions || showEmojiPicker
+                                    tryAwaitRelease()
+                                    return@detectTapGestures
+                                }
                                 paused = true
                                 tryAwaitRelease()
-                                if (!replyFocused && !showReactions && !showEmojiPicker) {
+                                if (!showReactions && !showEmojiPicker) {
                                     paused = false
                                 }
                             },
@@ -360,14 +409,45 @@ fun ViewOnceImmersiveViewer(
                         mediaUrl = mediaUrl,
                         isVideo = isVideo,
                         isPaused = paused || closing || showEmojiPicker,
+                        isMuted = shouldMuteVideoForReveal,
                         mediaAspect = currentAspect,
                         onImageAspect = { imageAspect = it },
+                        onPauseStory = { paused = true },
+                        onResumeStory = {
+                            if (!replyFocused && !showReactions && !showEmojiPicker) paused = false
+                        },
                         onVideoLoopReset = {
                             if (progress > duration - 0.4f) progress = 0f
                         },
                     )
                 }
             }
+
+            StoryRevealStickerOverlay(
+                storyId = message.id,
+                stickers = stickers,
+                onPauseStory = { paused = true },
+                onResumeStory = {
+                    if (!replyFocused && !showReactions && !showEmojiPicker) paused = false
+                },
+                reportsDeckInteractionExclusion = false,
+                modifier = Modifier
+                    .offset { IntOffset(canvasLeft.roundToInt(), canvasTop.roundToInt()) }
+                    .size(
+                        width = with(density) { canvasW.toDp() },
+                        height = with(density) { canvasH.toDp() },
+                    )
+                    .clip(RoundedCornerShape(corner)),
+            )
+
+            StoryFloatingReactionLayer(
+                hearts = floatingHearts,
+                containerSize = DpSize(reactionWidthDp.dp, reactionHeightDp.dp),
+                onHeartExpired = { id ->
+                    floatingHearts = floatingHearts.filterNot { it.id == id }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
 
             // Progress above canvas
             ViewOnceProgressBar(
@@ -428,6 +508,28 @@ fun ViewOnceImmersiveViewer(
                 ViewerCircleButton(Icons.Filled.Close, stringResource(R.string.view_once_close), ::closeViewer)
             }
 
+            if (keyboardVisible) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.32f)))
+                val visibleHeight = (canvasH - imeBottom).coerceAtLeast(0f)
+                Box(
+                    Modifier.offset {
+                        IntOffset(
+                            canvasLeft.roundToInt(),
+                            (canvasTop + visibleHeight * 0.62f - 88.dp.toPx()).roundToInt(),
+                        )
+                    }.width(with(density) { canvasW.toDp() }),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    StoryQuickReactionsGrid(
+                        reactions = EmojiReactionDefaults.story.take(8),
+                        onReaction = { emoji ->
+                            focusManager.clearFocus()
+                            sendReaction(emoji)
+                        },
+                    )
+                }
+            }
+
             // Bottom chrome
             Column(
                 Modifier
@@ -437,7 +539,7 @@ fun ViewOnceImmersiveViewer(
                 verticalArrangement = Arrangement.Bottom,
             ) {
                 AnimatedVisibility(
-                    visible = showReactions,
+                    visible = showReactions && !keyboardVisible,
                     enter = scaleIn(initialScale = 0.85f) + fadeIn(),
                     exit = scaleOut(targetScale = 0.85f) + fadeOut(),
                 ) {
@@ -467,12 +569,13 @@ fun ViewOnceImmersiveViewer(
                         keyboardActions = KeyboardActions(onSend = { sendReplyText() }),
                         modifier = Modifier
                             .weight(1f)
+                            .focusRequester(replyFocusRequester)
                             .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
                             .onFocusChanged { state ->
                                 replyFocused = state.isFocused
                                 paused = state.isFocused || showReactions || showEmojiPicker
                             }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
                         decorationBox = { inner ->
                             if (reply.isEmpty()) {
                                 Text(
@@ -484,23 +587,24 @@ fun ViewOnceImmersiveViewer(
                             inner()
                         },
                     )
-                    if (reply.isBlank()) {
-                        ViewerCircleButton(
-                            Icons.Filled.SentimentSatisfied,
+                    val keepsReplyActions = !keyboardVisible && !replyFocused
+                    if (keepsReplyActions && reply.isBlank()) {
+                        ViewerChromeIcon(
+                            if (showReactions) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                             stringResource(R.string.view_once_reactions),
                         ) {
                             showReactions = !showReactions
                             paused = showReactions || replyFocused
                         }
-                        ViewerCircleButton(
+                        ViewerChromeIcon(
                             Icons.Filled.CameraAlt,
                             stringResource(R.string.view_once_camera_reply),
                         ) {
                             onOpenCameraReply()
                             closeViewer()
                         }
-                    } else {
-                        ViewerCircleButton(
+                    } else if (reply.isNotBlank()) {
+                        ViewerChromeIcon(
                             Icons.Filled.Send,
                             stringResource(R.string.view_once_send_reply),
                             ::sendReplyText,
@@ -564,8 +668,11 @@ private fun ViewOnceMediaCanvas(
     mediaUrl: String,
     isVideo: Boolean,
     isPaused: Boolean,
+    isMuted: Boolean,
     mediaAspect: Float,
     onImageAspect: (Float) -> Unit,
+    onPauseStory: () -> Unit,
+    onResumeStory: () -> Unit,
     onVideoLoopReset: () -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
@@ -609,7 +716,7 @@ private fun ViewOnceMediaCanvas(
                     url = mediaUrl,
                     isPlaying = !isPaused,
                     onReadyToPlayChanged = {},
-                    isMutedExternally = false,
+                    isMutedExternally = isMuted,
                     shouldLoop = true,
                     onProgressUpdate = { fraction ->
                         if (fraction < 0.05f) onVideoLoopReset()
@@ -646,7 +753,9 @@ private fun ViewOnceMediaCanvas(
             storyId = message.id,
             userId = message.senderId,
             reportsDeckInteractionExclusion = false,
-            allowsStickerHitTesting = false,
+            allowsStickerHitTesting = true,
+            onPauseStory = onPauseStory,
+            onResumeStory = onResumeStory,
             modifier = Modifier.fillMaxSize(),
         )
     }
@@ -662,6 +771,22 @@ private fun ViewOnceProgressBar(progress: Float, modifier: Modifier) {
                 .height(2.5.dp)
                 .background(Color(0xFFFFCC33), RoundedCornerShape(percent = 50)),
         )
+    }
+}
+
+@Composable
+private fun ViewerChromeIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    action: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(width = 34.dp, height = 40.dp)
+            .clickable(onClick = action),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, description, tint = Color.White, modifier = Modifier.size(22.dp))
     }
 }
 
