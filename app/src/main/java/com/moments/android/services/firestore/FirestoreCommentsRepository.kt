@@ -14,6 +14,8 @@ import com.moments.android.models.NotificationType
 import com.moments.android.models.cache.CachedAction
 import com.moments.android.models.encode
 import com.moments.android.models.toMap
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.notifications.services.NotificationService
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.ContentAudience
@@ -77,6 +79,7 @@ suspend fun FirestoreService.addComment(
             ),
         )
         LocalPersistenceService.updateCommentCountLocallyAsync(momentId, increment = 1)
+        InAppNotificationService.showActionToast(InAppActionToast.commentPosted())
         return
     }
 
@@ -147,6 +150,7 @@ suspend fun FirestoreService.addComment(
     } else {
         sendMentions(fetchUsername(userId), setOf(authorId))
     }
+    InAppNotificationService.showActionToast(InAppActionToast.commentPosted())
 }
 
 suspend fun FirestoreService.updateComment(

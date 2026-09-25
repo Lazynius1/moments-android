@@ -380,10 +380,10 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="notifications_message_request_accepted_two">%1$s und %2$s haben deine Folgeanfrage angenommen.</string>
     <string name="notifications_message_request_accepted_three_plus">%1$s, %2$s und %3$d weitere haben deine Folgeanfrage angenommen.</string>
     <string name="notifications_message_request_accepted_multiple">%1$s und %2$d weitere haben deine Folgeanfrage angenommen.</string>
-    <string name="notifications_message_mutual_single">Du hast jetzt eine gemeinsame Verbindung mit %1$s.</string>
-    <string name="notifications_message_mutual_two">Du hast jetzt eine gemeinsame Verbindung mit %1$s und %2$s.</string>
-    <string name="notifications_message_mutual_three_plus">Du hast jetzt eine gemeinsame Verbindung mit %1$s, %2$s und %3$d weiteren.</string>
-    <string name="notifications_message_mutual_multiple">Du hast jetzt eine gemeinsame Verbindung mit %1$s und %2$d weiteren.</string>
+    <string name="notifications_message_mutual_single">Jetzt folgt ihr euch gegenseitig, %1$s und du.</string>
+    <string name="notifications_message_mutual_two">Jetzt folgt ihr euch gegenseitig, %1$s, %2$s und du.</string>
+    <string name="notifications_message_mutual_three_plus">%1$s, %2$s und %3$d weitere folgt euch gegenseitig</string>
+    <string name="notifications_message_mutual_multiple">%1$s und %2$d weitere folgt euch gegenseitig</string>
     <string name="notifications_message_story_chain_single">%1$s hat die Kette \"%2$s\" fortgesetzt.</string>
     <string name="notifications_message_story_chain_multiple">%1$s hat die Kette \"%2$s\" fortgesetzt und %3$d weitere ebenfalls.</string>
     <string name="notifications_message_like_single">%1$s hat auf deinen Moment reagiert.</string>
@@ -485,10 +485,10 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="notification_story_chain_creator_body">Hat einen Moment zu \"%1$s\" hinzugefügt · schon %2$s</string>
     <string name="notification_story_chain_participant_title">Die Kette \"%1$s\" wächst weiter</string>
     <string name="notification_story_chain_participant_body">%1$s hat gerade einen Moment hinzugefügt · schon %2$s</string>
-    <string name="notification_mutual_connection_title">Neue gemeinsame Verbindung! 🎉</string>
-    <string name="notification_mutual_connection_body">Du und %1$s folgt euch jetzt gegenseitig</string>
-    <string name="notification_mutual_connection_multiple_title">Neue gemeinsame Verbindungen! 🎉</string>
-    <string name="notification_mutual_connection_multiple_body">%1$s und %2$s weitere sind jetzt gegenseitige Verbindungen</string>
+    <string name="notification_mutual_connection_title">Du und %1$s folgt euch gegenseitig</string>
+    <string name="notification_mutual_connection_body">Tippe, um das Profil zu sehen</string>
+    <string name="notification_mutual_connection_multiple_title">Du, %1$s und %2$s weitere folgt euch gegenseitig</string>
+    <string name="notification_mutual_connection_multiple_body">Tippe, um zu sehen wer</string>
     <string name="banner_verb_echo_suggestion">ist in deiner Nähe! Erstelle ein Echo</string>    <string name="notification_action_reply">Antworten</string>
     <string name="notification_action_placeholder">Nachricht</string>
     <string name="chat_preview_text">Neue Nachricht</string>
@@ -909,6 +909,9 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="incognito_onboarding_dismiss">Verstanden</string>
     <string name="incognito_onboarding_title">Schau dich um, ohne Spuren zu hinterlassen</string>
     <string name="incognito_overlay_label">Inkognito</string>
+    <string name="toast_action_incognito_activated">Inkognito aktiviert</string>
+    <string name="toast_action_incognito_activated_subtitle">Tippen zum Pausieren</string>
+    <string name="toast_action_incognito_paused">Inkognito pausiert</string>
     <string name="incognito_status_active">Jetzt aktiv</string>
     <string name="incognito_status_exhausted">Heute keine Zeit mehr übrig</string>
     <string name="incognito_status_paused">Pausiert</string>
@@ -1098,6 +1101,8 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="video_editor_format">Format</string>
     <string name="video_editor_choose_cover">Titelbild auswählen</string>
     <string name="echo_viewer_leave">Verlassen</string>
+    <string name="toast_action_echo_left">Du hast das Echo verlassen</string>
+    <string name="toast_action_echo_deleted">Echo gelöscht</string>
     <string name="echo_viewer_incomplete_title">Unvollständiges Echo</string>
     <string name="echo_viewer_incomplete_body">Einer der ursprünglichen Moments ist nicht mehr verfügbar. Du kannst dieses Echo als Erinnerung behalten, aber die Karte und einige Funktionen sind nicht mehr verfügbar.</string>
     <string name="echo_viewer_keep">Echo behalten</string>

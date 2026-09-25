@@ -30,6 +30,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.coordinators.TabBarScreen
 import com.moments.android.notifications.services.NotificationBadgeService
+import com.moments.android.notifications.services.NotificationService
+import com.moments.android.views.components.InAppBannerView
 import com.moments.android.services.auth.AuthService
 import com.moments.android.services.auth.RestoreCredentialsService
 import com.moments.android.services.firestore.FirestoreService
@@ -128,12 +130,14 @@ fun MomentsApp(
             val user = auth.currentUser
             if (user != null) {
                 NotificationBadgeService.setupListeners()
+                NotificationService.startObserving()
                 syncLastAppOpenIfNeeded(prefs, force = true, scope = scope)
                 IncognitoModeService.loadState()
                 scope.launch { MessageIngestService.drainPendingQueue() }
             } else {
                 manuallyAuthenticated = false
                 NotificationBadgeService.cleanup()
+                NotificationService.stopObserving()
                 IncognitoModeService.resetForSignedOutUser()
                 LiveLocationSharingService.handleUserSignedOut()
             }
@@ -217,6 +221,15 @@ fun MomentsApp(
                 deepLinkUri = deepLinkUri,
                 deepLinkFromNewTask = deepLinkFromNewTask,
                 onDeepLinkHandled = onDeepLinkHandled,
+            )
+        }
+
+        // ≡ iOS `InAppBannerWindowAnchor` / UIWindow `.alert+1`: encima de tabs, sheets y overlays.
+        if (signedIn) {
+            InAppBannerView(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .zIndex(1500f),
             )
         }
 

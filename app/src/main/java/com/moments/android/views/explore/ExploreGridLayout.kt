@@ -90,7 +90,7 @@ data class ExploreGridTileDescriptor(
             val isVideo = moment.hasVideoMedia
             val visualRole = when {
                 moment.isReelCandidate && layoutKind == ExploreBentoTileKind.HERO -> ExploreGridVisualRole.REEL_HERO
-                moment.isReelCandidate && layoutKind == ExploreBentoTileKind.TALL -> ExploreGridVisualRole.REEL_TALL
+                moment.isReelCandidate -> ExploreGridVisualRole.REEL_TALL
                 isVideo -> ExploreGridVisualRole.VIDEO
                 else -> ExploreGridVisualRole.PHOTO
             }
@@ -98,36 +98,23 @@ data class ExploreGridTileDescriptor(
                 layoutKind = layoutKind,
                 visualRole = visualRole,
                 showsPlayCue = isVideo,
-                showsDuration = isVideo && (layoutKind == ExploreBentoTileKind.HERO || layoutKind == ExploreBentoTileKind.TALL),
+                showsDuration = isVideo && moment.isReelCandidate,
             )
         }
     }
 }
 
-/** Patrón mosaic fijo de Explore (cada 12 ítems). ≡ `ExploreBentoTileAssigner`. */
+/** Todas las celdas son unidad 4:5. ≡ `ExploreBentoTileAssigner`. */
 object ExploreBentoTileAssigner {
     fun assign(moments: List<Moment>): List<ExploreGridTileDescriptor> =
-        moments.mapIndexed { index, moment ->
-            ExploreGridTileDescriptor.standard(moment, layoutKind(moment, index))
-        }
-
-    private fun layoutKind(moment: Moment, index: Int): ExploreBentoTileKind {
-        val slot = index % 12
-        return when (slot) {
-            0, 11 -> ExploreBentoTileKind.HERO
-            4, 7 -> if (moment.hasVideoMedia || moment.isReelCandidate) {
-                ExploreBentoTileKind.TALL
-            } else {
-                ExploreBentoTileKind.UNIT
-            }
-            else -> ExploreBentoTileKind.UNIT
-        }
-    }
+        moments.map { ExploreGridTileDescriptor.standard(it) }
 }
 
 object ExploreMomentsGridMetrics {
     val spacing: Dp = 1.dp
-    const val columns = 3
+    const val columns = 2
+    /** ≡ iOS `portraitAspectRatio` (ancho / alto). */
+    const val portraitAspectRatio = 4f / 5f
 
     fun columnWidth(availableWidth: Dp): Dp {
         val totalSpacing = spacing * (columns - 1)
@@ -140,11 +127,13 @@ object ExploreMomentsGridMetrics {
             ExploreBentoTileKind.HERO -> unitWidth * 2 + spacing
         }
 
-    fun tileHeight(kind: ExploreBentoTileKind, unitWidth: Dp): Dp =
-        when (kind) {
-            ExploreBentoTileKind.UNIT -> unitWidth
-            ExploreBentoTileKind.TALL, ExploreBentoTileKind.HERO -> unitWidth * 2 + spacing
+    fun tileHeight(kind: ExploreBentoTileKind, unitWidth: Dp): Dp {
+        val unitHeight = unitWidth / portraitAspectRatio
+        return when (kind) {
+            ExploreBentoTileKind.UNIT -> unitHeight
+            ExploreBentoTileKind.TALL, ExploreBentoTileKind.HERO -> unitHeight * 2 + spacing
         }
+    }
 }
 
 /**
@@ -206,8 +195,9 @@ fun exploreBentoGridHeight(moments: List<Moment>, availableWidth: Dp): Dp {
     val rows = ExploreBentoLayoutPlanner.heightUnits(kinds)
     if (rows == 0) return 0.dp
     val unit = ExploreMomentsGridMetrics.columnWidth(availableWidth)
+    val rowHeight = ExploreMomentsGridMetrics.tileHeight(ExploreBentoTileKind.UNIT, unit)
     val gap = ExploreMomentsGridMetrics.spacing
-    return unit * rows + gap * (rows - 1)
+    return rowHeight * rows + gap * (rows - 1)
 }
 
 // MARK: - Grid público de Explore
@@ -250,9 +240,10 @@ fun ExploreMomentsBentoGrid(
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val gap = ExploreMomentsGridMetrics.spacing
         val unit = ExploreMomentsGridMetrics.columnWidth(maxWidth)
-        val height = if (rows == 0) 0.dp else unit * rows + gap * (rows - 1)
+        val rowHeight = ExploreMomentsGridMetrics.tileHeight(ExploreBentoTileKind.UNIT, unit)
+        val height = if (rows == 0) 0.dp else rowHeight * rows + gap * (rows - 1)
         val density = androidx.compose.ui.platform.LocalDensity.current
-        val stepPx = with(density) { (unit + gap).toPx() }
+        val stepPx = with(density) { (rowHeight + gap).toPx() }
         val initialViewportRows = remember(rows, stepPx) {
             val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
             val bufferRows = if (stepPx > 0f) (screenHeightPx / stepPx).toInt() + 1 else 0
@@ -310,7 +301,7 @@ fun ExploreMomentsBentoGrid(
                         Modifier
                             .offset(
                                 x = (unit + gap) * placement.startColumn,
-                                y = (unit + gap) * placement.y.toInt(),
+                                y = (rowHeight + gap) * placement.y.toInt(),
                             )
                             .width(tileW)
                             .height(tileH)

@@ -4,8 +4,10 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.moments.android.models.MomentsNotification
-import com.moments.android.views.messaging.services.ChatSessionEngine
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.messaging.services.ChatSessionEngine
+import java.util.ArrayDeque
+import java.util.Date
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -15,7 +17,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.Date
 
 /** Port de InAppNotificationService.swift */
 object InAppNotificationService {
@@ -25,14 +26,29 @@ object InAppNotificationService {
     private val _currentNotification = MutableStateFlow<MomentsNotification?>(null)
     val currentNotification: StateFlow<MomentsNotification?> = _currentNotification.asStateFlow()
 
+    private val _actionToast = MutableStateFlow<InAppActionToast?>(null)
+    val actionToast: StateFlow<InAppActionToast?> = _actionToast.asStateFlow()
+
     private val _showBanner = MutableStateFlow(false)
     val showBanner: StateFlow<Boolean> = _showBanner.asStateFlow()
 
     private var dismissJob: Job? = null
+    private var pendingExpireAction: (() -> Unit)? = null
     private var listenerStartTime = Date()
     private val reactionListeners = mutableMapOf<String, ListenerRegistration>()
     private val buzzListeners = mutableMapOf<String, ListenerRegistration>()
-    private const val DISPLAY_DURATION_MS = 4_000L
+    private var activeDurationMs = InAppActionToast.STANDARD_DURATION_MS
+    private val displayDurationMs = InAppActionToast.STANDARD_DURATION_MS
+
+    private sealed class BannerQueueItem {
+        data class Notification(val value: MomentsNotification) : BannerQueueItem()
+        data class Toast(val value: InAppActionToast) : BannerQueueItem()
+    }
+
+    /** Cola FIFO: no sustituir ni perder banners mientras uno está en pantalla. */
+    private val bannerQueue = ArrayDeque<BannerQueueItem>()
+    /** Entre hide y clear (0.5s): nuevos items van a la cola. */
+    private var isClearing = false
 
     fun startListening() {
         if (FirebaseAuth.getInstance().currentUser?.uid == null) return
@@ -43,8 +59,11 @@ object InAppNotificationService {
 
     fun stopListening() {
         clearFallbackListeners()
-        dismissManually()
+        bannerQueue.clear()
+        dismissManually(consumeExpire = false)
         _currentNotification.value = null
+        _actionToast.value = null
+        pendingExpireAction = null
     }
 
     fun syncFallbackListeners(conversationIds: List<String>) {
@@ -66,29 +85,101 @@ object InAppNotificationService {
     }
 
     fun display(notification: MomentsNotification) {
-        _currentNotification.value = notification
-        _showBanner.value = true
-        HapticManager.shared.notification(HapticManager.NotificationType.SUCCESS)
-        startDismissTimer()
+        enqueue(BannerQueueItem.Notification(notification))
+    }
+
+    fun showActionToast(toast: InAppActionToast) {
+        enqueue(BannerQueueItem.Toast(toast))
+    }
+
+    fun dismissHeldActionToast() {
+        if (_actionToast.value?.holds != true) return
+        dismissManually(consumeExpire = false)
+    }
+
+    /** Deshacer del toast: cancela el commit diferido y cierra sin `onExpire`. */
+    fun performUndoFromActionToast() {
+        val undo = _actionToast.value?.undo ?: return
+        pendingExpireAction = null
+        undo()
+        dismissManually(consumeExpire = false)
+    }
+
+    private fun enqueue(item: BannerQueueItem) {
+        // Progress held → el done / siguiente toast lo sustituye (flujo activity).
+        if (_showBanner.value && _actionToast.value?.holds == true && item is BannerQueueItem.Toast) {
+            present(item)
+            return
+        }
+        if (_showBanner.value || isClearing) {
+            bannerQueue.addLast(item)
+            return
+        }
+        present(item)
+    }
+
+    private fun present(item: BannerQueueItem) {
+        when (item) {
+            is BannerQueueItem.Notification -> {
+                _actionToast.value = null
+                _currentNotification.value = item.value
+                pendingExpireAction = null
+                HapticManager.shared.notification(HapticManager.NotificationType.SUCCESS)
+                activeDurationMs = displayDurationMs
+                _showBanner.value = true
+                startDismissTimer()
+            }
+            is BannerQueueItem.Toast -> {
+                _currentNotification.value = null
+                _actionToast.value = item.value
+                pendingExpireAction = item.value.onExpire
+                _showBanner.value = true
+                if (item.value.showsProgress) {
+                    dismissJob?.cancel()
+                } else {
+                    HapticManager.shared.notification(HapticManager.NotificationType.SUCCESS)
+                    activeDurationMs = item.value.durationMs
+                    startDismissTimer()
+                }
+            }
+        }
     }
 
     private fun startDismissTimer() {
         dismissJob?.cancel()
         dismissJob = scope.launch {
-            delay(DISPLAY_DURATION_MS)
-            _showBanner.value = false
-            delay(500)
-            if (!_showBanner.value) _currentNotification.value = null
+            delay(activeDurationMs)
+            dismissManually(consumeExpire = true)
         }
     }
 
-    fun dismissManually() {
+    fun dismissManually(consumeExpire: Boolean = true) {
+        if (!_showBanner.value && _actionToast.value == null && _currentNotification.value == null) {
+            presentNextIfNeeded()
+            return
+        }
+        isClearing = true
         _showBanner.value = false
         dismissJob?.cancel()
         scope.launch {
             delay(500)
-            if (!_showBanner.value) _currentNotification.value = null
+            if (consumeExpire) consumePendingExpire() else pendingExpireAction = null
+            _currentNotification.value = null
+            _actionToast.value = null
+            isClearing = false
+            presentNextIfNeeded()
         }
+    }
+
+    private fun presentNextIfNeeded() {
+        if (_showBanner.value || isClearing || bannerQueue.isEmpty()) return
+        present(bannerQueue.removeFirst())
+    }
+
+    private fun consumePendingExpire() {
+        val action = pendingExpireAction
+        pendingExpireAction = null
+        action?.invoke()
     }
 
     fun pauseDismissTimer() {
@@ -96,7 +187,9 @@ object InAppNotificationService {
     }
 
     fun resumeDismissTimerIfNeeded() {
-        if (_showBanner.value) startDismissTimer()
+        if (_showBanner.value && _actionToast.value?.showsProgress != true) {
+            startDismissTimer()
+        }
     }
 
     private fun clearFallbackListeners() {

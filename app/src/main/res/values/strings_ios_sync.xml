@@ -1614,4 +1614,9 @@
     <string name="widget_echoes_plural">%1$d friends nearby</string>
     <string name="widget_tags_singular">1 new tag</string>
     <string name="widget_tags_plural">%1$d new tags</string>
+    <string name="messaging_toast_muted">Chat muted</string>
+    <string name="messaging_toast_unmuted">Notifications turned back on</string>
+    <string name="messaging_toast_pinned">Chat pinned</string>
+    <string name="messaging_toast_unpinned">Chat unpinned</string>
+    <string name="messaging_toast_deleted">Conversation deleted</string>
 </resources>

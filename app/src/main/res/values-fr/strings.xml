@@ -394,10 +394,10 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="notifications_message_request_accepted_two">%1$s et %2$s ont accepté ta demande d\'abonnement.</string>
     <string name="notifications_message_request_accepted_three_plus">%1$s, %2$s et %3$d autres ont accepté ta demande d\'abonnement.</string>
     <string name="notifications_message_request_accepted_multiple">%1$s et %2$d autres ont accepté ta demande d\'abonnement.</string>
-    <string name="notifications_message_mutual_single">Tu as maintenant une connexion mutuelle avec %1$s.</string>
-    <string name="notifications_message_mutual_two">Tu as maintenant une connexion mutuelle avec %1$s et %2$s.</string>
-    <string name="notifications_message_mutual_three_plus">Tu as une connexion mutuelle avec %1$s, %2$s et %3$d autres.</string>
-    <string name="notifications_message_mutual_multiple">Tu as maintenant une connexion mutuelle avec %1$s et %2$d autres.</string>
+    <string name="notifications_message_mutual_single">Maintenant, %1$s et vous vous suivez.</string>
+    <string name="notifications_message_mutual_two">Maintenant, %1$s, %2$s et vous vous suivez.</string>
+    <string name="notifications_message_mutual_three_plus">%1$s, %2$s et %3$d autres vous vous suivez mutuellement</string>
+    <string name="notifications_message_mutual_multiple">%1$s et %2$d autres et vous vous suivez mutuellement</string>
     <string name="notifications_message_story_chain_single">%1$s a continué la chaîne "%2$s".</string>
     <string name="notifications_message_story_chain_multiple">%1$s a continué la chaîne "%2$s" et %3$d autres l\'ont continuée aussi.</string>
     <string name="notifications_message_like_single">%1$s a réagi à votre moment.</string>
@@ -499,10 +499,10 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="notification_story_chain_creator_body">A ajouté un moment à \"%1$s\" · déjà %2$s</string>
     <string name="notification_story_chain_participant_title">La chaîne \"%1$s\" continue de grandir</string>
     <string name="notification_story_chain_participant_body">%1$s vient d\'ajouter un moment · déjà %2$s</string>
-    <string name="notification_mutual_connection_title">Nouvelle connexion mutuelle ! 🎉</string>
-    <string name="notification_mutual_connection_body">Toi et %1$s vous suivez désormais mutuellement</string>
-    <string name="notification_mutual_connection_multiple_title">Nouvelles connexions mutuelles ! 🎉</string>
-    <string name="notification_mutual_connection_multiple_body">%1$s et %2$s autres sont maintenant des connexions mutuelles</string>
+    <string name="notification_mutual_connection_title">Toi et %1$s vous vous suivez mutuellement</string>
+    <string name="notification_mutual_connection_body">Touchez pour voir le profil</string>
+    <string name="notification_mutual_connection_multiple_title">Toi, %1$s et %2$s autres vous vous suivez mutuellement</string>
+    <string name="notification_mutual_connection_multiple_body">Touchez pour voir qui</string>
     <string name="banner_verb_echo_suggestion">est près de vous! Créez un Echo</string>    <string name="notification_action_reply">Répondre</string>
     <string name="notification_action_placeholder">Message</string>
     <string name="chat_preview_text">Nouveau message</string>
@@ -891,6 +891,9 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="incognito_onboarding_dismiss">Compris</string>
     <string name="incognito_onboarding_title">Regarder sans laisser de trace</string>
     <string name="incognito_overlay_label">Incognito</string>
+    <string name="toast_action_incognito_activated">Incognito activé</string>
+    <string name="toast_action_incognito_activated_subtitle">Touchez pour mettre en pause</string>
+    <string name="toast_action_incognito_paused">Incognito en pause</string>
     <string name="incognito_status_active">Actif maintenant</string>
     <string name="incognito_status_exhausted">Plus de temps aujourd\'hui</string>
     <string name="incognito_status_paused">En pause</string>
@@ -1080,6 +1083,8 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="video_editor_format">Format</string>
     <string name="video_editor_choose_cover">Choisir la couverture</string>
     <string name="echo_viewer_leave">Quitter</string>
+    <string name="toast_action_echo_left">Vous avez quitté l’Echo</string>
+    <string name="toast_action_echo_deleted">Echo supprimé</string>
     <string name="echo_viewer_incomplete_title">Echo incomplet</string>
     <string name="echo_viewer_incomplete_body">L’un des moments d’origine n’est plus disponible. Vous pouvez conserver cet Echo comme souvenir, mais la carte et certaines fonctions ne sont plus disponibles.</string>
     <string name="echo_viewer_keep">Conserver l’Echo</string>

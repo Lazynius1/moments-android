@@ -404,6 +404,9 @@ fun ProfileView(
         heroCoordinator.onPin = { moment, shouldPin, replaceOldest ->
             viewModel.handleGridPin(moment, shouldPin, replaceOldest)
         }
+        heroCoordinator.onPinCommit = { moment, shouldPin, replaceOldest ->
+            viewModel.commitGridPin(moment, shouldPin, replaceOldest)
+        }
         heroCoordinator.onAdjustPreview = { moment ->
             if (!moment.previewImageURLString.isNullOrBlank()) {
                 gridPreviewMoment = moment

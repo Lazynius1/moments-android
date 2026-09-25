@@ -145,8 +145,12 @@ object NotificationPresentationCoordinator {
     private fun mapPushPayload(userInfo: Map<String, Any?>): MomentsNotification? {
         val rawType = userInfo["type"] as? String ?: return null
         val notificationType = mapPushType(rawType) ?: return null
-        val senderId = firstString(userInfo, listOf("senderId", "userId", "followerId", "continuerId", "hostId"))
-            ?: if (notificationType == NotificationType.GENTLE_REMINDER) "gentle_reminder" else ""
+        // `userId` en pushes sociales suele ser el destinatario; en reacciones a veces es el actor.
+        // Va al final para que new_follower use `followerId` (si no, senderId == currentUser y se suprime).
+        val senderId = firstString(
+            userInfo,
+            listOf("senderId", "followerId", "requesterId", "fromUserId", "continuerId", "hostId", "userId"),
+        ) ?: if (notificationType == NotificationType.GENTLE_REMINDER) "gentle_reminder" else ""
         return MomentsNotification(
             groupName = com.moments.android.services.messaging.ChatNotificationThread.resolvedGroupName(userInfo),
             groupImage = firstString(userInfo, listOf("groupImage", "groupImagePath")),
@@ -200,16 +204,15 @@ object NotificationPresentationCoordinator {
         "moment_comment" -> NotificationType.COMMENT
         "story_reaction" -> NotificationType.STORY_REACTION
         "story_chain_continued" -> NotificationType.STORY_CHAIN_CONTINUED
-        "new_follower" -> NotificationType.NEW_FOLLOWER
-        "follow_request" -> NotificationType.FOLLOW_REQUEST
-        "request_accepted" -> NotificationType.REQUEST_ACCEPTED
-        "photo_tag" -> NotificationType.PHOTO_TAG
-        "media_moderation" -> NotificationType.MEDIA_MODERATION
-        "echo_suggestion" -> NotificationType.ECHO_SUGGESTION
+        "new_follower", "newFollower" -> NotificationType.NEW_FOLLOWER
+        "follow_request", "followRequest" -> NotificationType.FOLLOW_REQUEST
+        "request_accepted", "requestAccepted" -> NotificationType.REQUEST_ACCEPTED
+        "photo_tag", "photoTag" -> NotificationType.PHOTO_TAG
+        "media_moderation", "mediaModeration" -> NotificationType.MEDIA_MODERATION
+        "echo_suggestion", "echoSuggestion" -> NotificationType.ECHO_SUGGESTION
         "data_export_ready" -> NotificationType.DATA_EXPORT_READY
         "mutual_connection", "mutualConnection" -> NotificationType.MUTUAL_CONNECTION
         "mention" -> NotificationType.MENTION
-        "requestAccepted" -> NotificationType.REQUEST_ACCEPTED
         else -> NotificationType.from(rawType)
     }
 

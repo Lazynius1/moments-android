@@ -24,6 +24,8 @@ import com.moments.android.services.firestore.fetchUserProfileWithAvailability
 import com.moments.android.services.firestore.fetchUsersWithSharedInterests
 import com.moments.android.services.firestore.registerVisit
 import com.moments.android.services.firestore.removeMembersFromCustomList
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.incognito.IncognitoModeService
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.FollowButtonState
@@ -637,6 +639,44 @@ class UserProfileViewModel(
         if (current == userId || isUpdatingMute) return
         isUpdatingMute = true
         val shouldMute = !isMutedByCurrentUser
+        if (shouldMute) {
+            isMutedByCurrentUser = true
+            val username = userProfile?.username.orEmpty()
+            viewModelScope.launch {
+                val muteSettings = runCatching {
+                    val snap = db.collection("users").document(current).get().await()
+                    @Suppress("UNCHECKED_CAST")
+                    val settings = (snap.data?.get("muteSettings") as? Map<String, Any?>)?.toMutableMap()
+                        ?: mutableMapOf()
+                    @Suppress("UNCHECKED_CAST")
+                    val muted = ((settings["mutedUsers"] as? List<*>)?.mapNotNull { it as? String }
+                        ?.filter { it.isNotEmpty() } ?: emptyList()).toMutableSet()
+                    muted.add(userId)
+                    settings["mutedUsers"] = muted.toList()
+                    settings
+                }.getOrNull()
+                isUpdatingMute = false
+                if (muteSettings == null) {
+                    isMutedByCurrentUser = false
+                    return@launch
+                }
+                InAppNotificationService.showActionToast(
+                    InAppActionToast.muted(
+                        username,
+                        undo = { isMutedByCurrentUser = false },
+                        onExpire = {
+                            viewModelScope.launch {
+                                runCatching {
+                                    db.collection("users").document(current)
+                                        .update("muteSettings", muteSettings).await()
+                                }
+                            }
+                        },
+                    ),
+                )
+            }
+            return
+        }
         viewModelScope.launch {
             val ok = runCatching {
                 val snap = db.collection("users").document(current).get().await()
@@ -646,13 +686,13 @@ class UserProfileViewModel(
                 @Suppress("UNCHECKED_CAST")
                 val mutedUsers = ((muteSettings["mutedUsers"] as? List<*>)?.mapNotNull { it as? String }
                     ?.filter { it.isNotEmpty() } ?: emptyList()).toMutableSet()
-                if (shouldMute) mutedUsers.add(userId) else mutedUsers.remove(userId)
+                mutedUsers.remove(userId)
                 muteSettings["mutedUsers"] = mutedUsers.toList()
                 db.collection("users").document(current)
                     .update("muteSettings", muteSettings).await()
             }.isSuccess
             isUpdatingMute = false
-            if (ok) isMutedByCurrentUser = shouldMute
+            if (ok) isMutedByCurrentUser = false
         }
     }
 

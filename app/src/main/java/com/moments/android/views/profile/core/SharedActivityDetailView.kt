@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.AlertDialog
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -413,7 +415,7 @@ fun SharedActivityDetailView(
     var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
     var confirmation by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
-    var success by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     LaunchedEffect(viewModel) { viewModel.loadIfNeeded() }
     DisposableEffect(viewModel) { onDispose(viewModel::clear) }
@@ -573,24 +575,6 @@ fun SharedActivityDetailView(
                     }
                 }
             }
-
-            if (success) {
-                Text(
-                    stringResource(R.string.shared_activity_remove_success),
-                    color = Color(0xFF22C55E),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = if (selectionMode) 72.dp else 16.dp),
-                )
-            }
-        }
-    }
-
-    LaunchedEffect(success) {
-        if (success) {
-            delay(2_000)
-            success = false
         }
     }
 
@@ -608,6 +592,16 @@ fun SharedActivityDetailView(
                 TextButton({
                     confirmation = false
                     deleting = true
+                    val progressTitle = context.getString(
+                        when (category) {
+                            SharedActivityCategory.REACTIONS -> R.string.user_activity_reactions_delete_multiple
+                            SharedActivityCategory.COMMENTS -> R.string.user_activity_comments_delete_multiple
+                            SharedActivityCategory.TAGS -> R.string.user_activity_tags_remove_multiple
+                        },
+                    )
+                    InAppNotificationService.showActionToast(
+                        InAppActionToast.activityProgress(progressTitle),
+                    )
                     scope.launch {
                         val result = when (category) {
                             SharedActivityCategory.COMMENTS -> viewModel.removeComments(selected)
@@ -618,8 +612,16 @@ fun SharedActivityDetailView(
                         if (result.isSuccess) {
                             selected = emptySet()
                             selectionMode = false
-                            success = true
+                            val doneRes = when (category) {
+                                SharedActivityCategory.REACTIONS -> R.string.user_activity_reactions_success_delete
+                                SharedActivityCategory.COMMENTS -> R.string.user_activity_comments_success_delete
+                                SharedActivityCategory.TAGS -> R.string.user_activity_tags_success_remove
+                            }
+                            InAppNotificationService.showActionToast(
+                                InAppActionToast.activityDone(context.getString(doneRes)),
+                            )
                         } else {
+                            InAppNotificationService.dismissHeldActionToast()
                             viewModel.errorMessage =
                                 result.exceptionOrNull()?.message ?: SharedActivityFailure.GENERIC
                         }

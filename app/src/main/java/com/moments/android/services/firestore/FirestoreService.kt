@@ -23,6 +23,8 @@ import com.moments.android.models.ReactionPayload
 import com.moments.android.models.cache.CachedAction
 import com.moments.android.models.encode
 import com.moments.android.models.NotificationType
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.notifications.services.NotificationService
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.ContentAudience
@@ -41,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Calendar
@@ -218,17 +221,21 @@ class FirestoreService(
             BlockCheckResult(currentDeferred.await(), targetDeferred.await())
         }
 
-    suspend fun blockUser(currentUserId: String, targetUserId: String) {
+    suspend fun blockUser(currentUserId: String, targetUserId: String, announce: Boolean = true) {
         db.collection("users").document(currentUserId)
             .update("blockedUsers", FieldValue.arrayUnion(targetUserId)).await()
         invalidateFollowingCache(currentUserId, targetUserId)
         invalidateFollowingCache(targetUserId, currentUserId)
-        runCatching { unfollowUser(currentUserId, targetUserId) }
-        runCatching { unfollowUser(targetUserId, currentUserId) }
+        runCatching { unfollowUser(currentUserId, targetUserId, announce = false) }
+        runCatching { unfollowUser(targetUserId, currentUserId, announce = false) }
         runCatching { deleteNotificationsBetweenUsers(currentUserId, targetUserId) }
         runCatching { deleteNotificationsBetweenUsers(targetUserId, currentUserId) }
         runCatching { deleteVisitsBetweenUsers(currentUserId, targetUserId) }
         runCatching { deleteVisitsBetweenUsers(targetUserId, currentUserId) }
+        if (announce) {
+            val username = runCatching { fetchUserProfile(targetUserId).username }.getOrDefault("")
+            InAppNotificationService.showActionToast(InAppActionToast.blocked(username))
+        }
     }
 
     private suspend fun deleteNotificationsBetweenUsers(recipientId: String, senderId: String) {
@@ -378,7 +385,7 @@ class FirestoreService(
         createFollowRequest(currentUser.id, currentUser.username, targetUserId)
     }
 
-    suspend fun followUser(currentUserId: String, targetUserId: String) {
+    suspend fun followUser(currentUserId: String, targetUserId: String, announce: Boolean = true) {
         LocalPersistenceService.toggleFollowLocallyAsync(currentUserId, targetUserId, isFollow = true)
         require(currentUserId != targetUserId) { "Cannot follow yourself" }
         if (shouldQueueFirestoreOutbox()) {
@@ -403,9 +410,15 @@ class FirestoreService(
         val targetUser = fetchUserProfile(targetUserId)
         if (targetUser.isPrivate) {
             sendFollowRequest(currentUserId, targetUserId)
+            if (announce) {
+                InAppNotificationService.showActionToast(InAppActionToast.followRequested(targetUser.username))
+            }
         } else {
             performFollow(currentUserId, targetUserId)
             invalidateFollowingCache(currentUserId, targetUserId)
+            if (announce) {
+                InAppNotificationService.showActionToast(InAppActionToast.followed(targetUser.username))
+            }
         }
     }
 
@@ -543,9 +556,66 @@ class FirestoreService(
         invalidateFollowingCache(currentUserId, targetUserId)
     }
 
-    suspend fun unfollowUser(currentUserId: String, targetUserId: String) {
+    suspend fun unfollowUser(currentUserId: String, targetUserId: String, announce: Boolean = true) {
         LocalPersistenceService.toggleFollowLocallyAsync(currentUserId, targetUserId, isFollow = false)
         require(currentUserId != targetUserId) { "Cannot unfollow yourself" }
+
+        if (announce) {
+            val deferred = beginDeferredUnfollowIfPossible(currentUserId, targetUserId)
+            if (deferred) return
+            commitUnfollowUser(currentUserId, targetUserId, announceAfter = true)
+            return
+        }
+
+        commitUnfollowUser(currentUserId, targetUserId, announceAfter = false)
+    }
+
+    /** Toast con deshacer (pública o privada); Firestore solo al expirar. */
+    private suspend fun beginDeferredUnfollowIfPossible(
+        currentUserId: String,
+        targetUserId: String,
+    ): Boolean {
+        val cached = com.moments.android.services.cache.UserCacheService.getCachedUser(targetUserId)
+        val cachedName = cached?.username?.trim().orEmpty()
+        if (cachedName.isNotEmpty()) {
+            presentDeferredUnfollowToast(currentUserId, targetUserId, cachedName)
+            return true
+        }
+        val target = runCatching { fetchUserProfile(targetUserId) }.getOrNull()
+        val username = target?.username?.trim().orEmpty()
+        if (username.isEmpty()) return false
+        presentDeferredUnfollowToast(currentUserId, targetUserId, username)
+        return true
+    }
+
+    private fun presentDeferredUnfollowToast(
+        currentUserId: String,
+        targetUserId: String,
+        username: String,
+    ) {
+        val undo: () -> Unit = {
+            globalFirestoreScope.launch {
+                LocalPersistenceService.toggleFollowLocallyAsync(currentUserId, targetUserId, isFollow = true)
+            }
+            followingCache["${currentUserId}_$targetUserId"] = true
+        }
+        val onExpire: () -> Unit = {
+            globalFirestoreScope.launch {
+                runCatching {
+                    commitUnfollowUser(currentUserId, targetUserId, announceAfter = false)
+                }
+            }
+        }
+        InAppNotificationService.showActionToast(
+            InAppActionToast.unfollowed(username, undo = undo, onExpire = onExpire),
+        )
+    }
+
+    private suspend fun commitUnfollowUser(
+        currentUserId: String,
+        targetUserId: String,
+        announceAfter: Boolean,
+    ) {
         if (shouldQueueFirestoreOutbox()) {
             val payload = FollowActionPayload(
                 followerId = currentUserId,
@@ -560,6 +630,9 @@ class FirestoreService(
                     payloadData = payload.encode(),
                 ),
             )
+            if (announceAfter) {
+                announceUnfollowIfNeeded(currentUserId, targetUserId, announce = true)
+            }
             return
         }
         followingCache.remove("${currentUserId}_$targetUserId")
@@ -568,15 +641,20 @@ class FirestoreService(
         if (!followingRef.get().await().exists()) return
         db.runBatch { batch ->
             batch.delete(followingRef)
-            batch.delete(db.collection("users").document(targetUserId)
-                .collection("followers").document(currentUserId))
-            batch.delete(db.collection("users").document(currentUserId)
-                .collection("mutuals").document(targetUserId))
-            batch.delete(db.collection("users").document(targetUserId)
-                .collection("mutuals").document(currentUserId))
+            batch.delete(
+                db.collection("users").document(targetUserId)
+                    .collection("followers").document(currentUserId),
+            )
+            batch.delete(
+                db.collection("users").document(currentUserId)
+                    .collection("mutuals").document(targetUserId),
+            )
+            batch.delete(
+                db.collection("users").document(targetUserId)
+                    .collection("mutuals").document(currentUserId),
+            )
         }.await()
         followingCache.remove("${currentUserId}_$targetUserId")
-        // Limpieza defensiva; servidor también limpia vía onFollowerRemoved.
         NotificationService.removeNotification(
             NotificationType.NEW_FOLLOWER, currentUserId, targetUserId,
         )
@@ -586,10 +664,33 @@ class FirestoreService(
         NotificationService.removeNotification(
             NotificationType.MUTUAL_CONNECTION, targetUserId, currentUserId,
         )
-        // Verificación post-unfollow con delay (sin cache); force unfollow si persiste.
+        if (announceAfter) {
+            announceUnfollowIfNeeded(currentUserId, targetUserId, announce = true)
+        }
         delay(500)
         if (followingRef.get().await().exists()) {
             forceUnfollow(currentUserId, targetUserId)
+        }
+    }
+
+    /** Toast post-commit sin undo (p. ej. sin username para defer). */
+    private fun announceUnfollowIfNeeded(
+        currentUserId: String,
+        targetUserId: String,
+        announce: Boolean,
+    ) {
+        if (!announce) return
+        val cached = com.moments.android.services.cache.UserCacheService.getCachedUser(targetUserId)
+        val cachedName = cached?.username?.trim().orEmpty()
+        if (cachedName.isNotEmpty()) {
+            InAppNotificationService.showActionToast(InAppActionToast.unfollowed(cachedName, undo = null))
+            return
+        }
+        globalFirestoreScope.launch(Dispatchers.Main.immediate) {
+            val target = runCatching { fetchUserProfile(targetUserId) }.getOrNull()
+            val username = target?.username?.trim().orEmpty()
+            if (username.isEmpty()) return@launch
+            InAppNotificationService.showActionToast(InAppActionToast.unfollowed(username, undo = null))
         }
     }
 
@@ -678,6 +779,9 @@ class FirestoreService(
         momentRef.update(updateData).await()
         if (audience == ContentAudience.CUSTOM.raw && !customViewers.isNullOrEmpty()) {
             saveCustomAudienceForContent("moment", momentId, userId, customViewers)
+        }
+        withContext(Dispatchers.Main.immediate) {
+            InAppNotificationService.showActionToast(InAppActionToast.momentUpdated())
         }
     }
 

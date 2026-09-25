@@ -72,6 +72,8 @@ import kotlin.math.max
 object ProfileMomentsGridMetrics {
     const val columns = 3
     val spacing = 1.dp
+    /** ≡ iOS `portraitAspectRatio` (ancho / alto). */
+    const val portraitAspectRatio = 4f / 5f
     /** ≡ iOS `defaultAvailableWidth` fallback (393pt). */
     val defaultAvailableWidth = 393.dp
 
@@ -79,7 +81,13 @@ object ProfileMomentsGridMetrics {
 
     fun tileWidth(kind: BentoTileKind, unitWidth: Dp): Dp = unitWidth * kind.colSpan + spacing * (kind.colSpan - 1)
 
-    fun tileHeight(kind: BentoTileKind, unitWidth: Dp): Dp = unitWidth * kind.rowSpan + spacing * (kind.rowSpan - 1)
+    fun tileHeight(kind: BentoTileKind, unitWidth: Dp): Dp {
+        val unitHeight = unitWidth / portraitAspectRatio
+        return when (kind) {
+            BentoTileKind.UNIT -> unitHeight
+            BentoTileKind.TALL, BentoTileKind.HERO -> unitHeight * kind.rowSpan + spacing * (kind.rowSpan - 1)
+        }
+    }
 
     /**
      * ≡ iOS `bentoHeight`: shortest-column en Dp (no unidades enteras),
@@ -295,7 +303,11 @@ private fun ProfileThumbnailImage(
             contentScale = contentScale,
         )
     }
-    if (portrait) Box(Modifier.size(cellWidth, cellHeight)) { image(ContentScale.Crop) } else GridPreviewThumbnailFrame(size, moment.gridPreviewSettings, image)
+    if (portrait) {
+        Box(Modifier.size(cellWidth, cellHeight)) { image(ContentScale.Crop) }
+    } else {
+        GridPreviewThumbnailFrame(cellWidth, cellHeight, moment.gridPreviewSettings, image)
+    }
 }
 
 @Composable
@@ -328,7 +340,11 @@ private fun ProfileThumbnailVideo(
             androidx.compose.foundation.Image(cropped.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = contentScale)
         } ?: ProfileMediaPlaceholder(loading, R.string.profile_thumbnail_video_uploading, R.string.profile_thumbnail_video)
     }
-    if (portrait) Box(Modifier.size(cellWidth, cellHeight)) { content(ContentScale.Crop) } else GridPreviewThumbnailFrame(size, moment.gridPreviewSettings, content)
+    if (portrait) {
+        Box(Modifier.size(cellWidth, cellHeight)) { content(ContentScale.Crop) }
+    } else {
+        GridPreviewThumbnailFrame(cellWidth, cellHeight, moment.gridPreviewSettings, content)
+    }
 }
 
 @Composable

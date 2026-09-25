@@ -3,10 +3,13 @@ package com.moments.android.notifications.services
 import android.content.Context
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
 import com.moments.android.models.toMap
@@ -30,7 +33,7 @@ import java.util.concurrent.ConcurrentHashMap
 object NotificationService {
     private const val TAG = "NotificationService"
     private const val PAGE_SIZE = 20L
-    private const val DELETION_UNDO_WINDOW_MS = 3_000L
+    private const val DELETION_UNDO_WINDOW_MS = InAppActionToast.UNDO_DURATION_MS
 
     private val db = FirebaseFirestore.getInstance()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -111,6 +114,18 @@ object NotificationService {
                 _isLoading.value = false
                 return@addSnapshotListener
             }
+            // Banners in-app desde inbox (mutual/follower/…): ADDED tras el primer snapshot.
+            // Dedup del coordinador evita doble con FCM. iOS lo quitó del listener propio;
+            // en Android el token FCM a menudo es el de iOS → sin esto no hay banner.
+            if (!isFirstSnapshot && isAppInForeground()) {
+                snapshot?.documentChanges
+                    ?.filter { it.type == DocumentChange.Type.ADDED }
+                    ?.forEach { change ->
+                        decodeNotificationDocument(change.document)?.let { notification ->
+                            InAppNotificationService.handleNewNotification(notification)
+                        }
+                    }
+            }
             val fetched = documents.mapNotNull { decodeNotificationDocument(it) }
             val liveHead = visibleNotifications(fetched)
             val nextHeadIds = liveHead.mapNotNull { it.id }.toSet()
@@ -137,6 +152,9 @@ object NotificationService {
             _isLoading.value = false
         }
     }
+
+    private fun isAppInForeground(): Boolean =
+        ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
 
     fun stopObserving() {
         listener?.remove()
@@ -464,6 +482,13 @@ object NotificationService {
         removeFromLocalState(valid)
         _pendingDeletion.value = PendingNotificationDeletion(notifications = valid)
         schedulePendingDeletionCommit()
+        InAppNotificationService.showActionToast(
+            InAppActionToast.notificationDeleted(
+                count = valid.size,
+                undo = { undoPendingDeletion() },
+                onExpire = { commitPendingDeletion() },
+            ),
+        )
     }
 
     fun undoPendingDeletion() {

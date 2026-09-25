@@ -1188,11 +1188,21 @@ object ChatService {
     }
 
     suspend fun archiveConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
-        db.messagingThread(conversationId).update("archivedByUserIds", FieldValue.arrayUnion(userId)).await()
+        db.messagingThread(conversationId).update(
+            mapOf(
+                "archivedByUserIds" to FieldValue.arrayUnion(userId),
+                "archivedByTimestamps.$userId" to FieldValue.serverTimestamp(),
+            ),
+        ).await()
     }
 
     suspend fun unarchiveConversation(conversationId: String, userId: String): Result<Unit> = runCatching {
-        db.messagingThread(conversationId).update("archivedByUserIds", FieldValue.arrayRemove(userId)).await()
+        db.messagingThread(conversationId).update(
+            mapOf(
+                "archivedByUserIds" to FieldValue.arrayRemove(userId),
+                "archivedByTimestamps.$userId" to FieldValue.delete(),
+            ),
+        ).await()
     }
 
     // Fijar y silenciar conversaciones: mismo contrato Firestore que iOS (array de ids + mapa de

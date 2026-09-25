@@ -89,6 +89,8 @@ import com.moments.android.models.EchoParticipant
 import com.moments.android.models.EchoParticipantStatus
 import com.moments.android.models.Moment
 import com.moments.android.models.resolveAspectRatioValue
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.social.EchoService
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MomentsFormat
@@ -176,13 +178,23 @@ fun EchoViewerUI(
 
     fun leaveEchoAction(userId: String) {
         val id = viewModel.echo.value?.id ?: echoId
+        val deletesIncompleteEcho = viewModel.isHistoricalIncomplete
         if (id.isBlank()) {
             onDismiss()
             return
         }
         scope.launch {
             runCatching { EchoService.leaveEcho(id, userId) }
-                .onSuccess { onDismiss() }
+                .onSuccess {
+                    InAppNotificationService.showActionToast(
+                        if (deletesIncompleteEcho) {
+                            InAppActionToast.echoDeleted()
+                        } else {
+                            InAppActionToast.echoLeft()
+                        },
+                    )
+                    onDismiss()
+                }
                 .onFailure { error ->
                     if (error.message?.contains("echo.leave.locked") == true) {
                         showLockoutAlert = true

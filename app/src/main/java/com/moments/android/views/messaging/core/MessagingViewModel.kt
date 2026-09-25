@@ -11,6 +11,8 @@ import com.moments.android.R
 import com.moments.android.models.AppUser
 import com.moments.android.views.messaging.core.Conversation
 import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchUserProfileWithAvailability
@@ -635,6 +637,7 @@ class MessagingViewModel(
         viewModelScope.launch {
             LocalPersistenceService.saveConversationsAsync(conversations + archivedConversations, sync = true)
             LocalPersistenceService.deleteConversationCacheAsync(conversationId)
+            InAppNotificationService.showActionToast(InAppActionToast.chatDeleted())
             (if (conversation.isGroup) runCatching {
                 com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("groupConversations").document(conversationId)
                     .update(mapOf("deletedFor" to com.google.firebase.firestore.FieldValue.arrayUnion(userId), "lastDeletedAt.$userId" to com.google.firebase.firestore.FieldValue.serverTimestamp())).await()
@@ -687,10 +690,39 @@ class MessagingViewModel(
             LocalPersistenceService.saveConversationsAsync(conversations + archivedConversations, sync = true)
         }
 
-        viewModelScope.launch {
-            val result = if (pinned) ChatService.unpinConversation(conversationId, userId)
-            else ChatService.pinConversation(conversationId, userId)
-            result.onFailure { errorMessage = it.message }
+        if (pinned) {
+            InAppNotificationService.showActionToast(InAppActionToast.chatUnpinned())
+            viewModelScope.launch {
+                ChatService.unpinConversation(conversationId, userId)
+                    .onFailure { errorMessage = it.message }
+            }
+        } else {
+            InAppNotificationService.showActionToast(
+                InAppActionToast.chatPinned(
+                    undo = {
+                        // Solo UI: el pin aún no se escribió en Firestore.
+                        val revertedIds = conversation.pinnedByUserIds
+                        val reverted = conversation.copy(pinnedByUserIds = revertedIds)
+                        fun patch(list: List<Conversation>) =
+                            sortConversationsForInbox(list.map { if (it.id == conversationId) reverted else it })
+                        conversations = patch(conversations)
+                        archivedConversations = patch(archivedConversations)
+                        filteredConversations = patch(filteredConversations)
+                        viewModelScope.launch {
+                            LocalPersistenceService.saveConversationsAsync(
+                                conversations + archivedConversations,
+                                sync = true,
+                            )
+                        }
+                    },
+                    onExpire = {
+                        viewModelScope.launch {
+                            ChatService.pinConversation(conversationId, userId)
+                                .onFailure { errorMessage = it.message }
+                        }
+                    },
+                ),
+            )
         }
     }
 
@@ -711,10 +743,37 @@ class MessagingViewModel(
             LocalPersistenceService.saveConversationsAsync(conversations + archivedConversations, sync = true)
         }
 
-        viewModelScope.launch {
-            val result = if (muted) ChatService.unmuteConversation(conversationId, userId)
-            else ChatService.muteConversation(conversationId, userId)
-            result.onFailure { errorMessage = it.message }
+        if (muted) {
+            InAppNotificationService.showActionToast(InAppActionToast.chatUnmuted())
+            viewModelScope.launch {
+                ChatService.unmuteConversation(conversationId, userId)
+                    .onFailure { errorMessage = it.message }
+            }
+        } else {
+            InAppNotificationService.showActionToast(
+                InAppActionToast.chatMuted(
+                    undo = {
+                        val reverted = conversation.copy(mutedByUserIds = conversation.mutedByUserIds)
+                        fun patch(list: List<Conversation>) =
+                            list.map { if (it.id == conversationId) reverted else it }
+                        conversations = patch(conversations)
+                        archivedConversations = patch(archivedConversations)
+                        filteredConversations = patch(filteredConversations)
+                        viewModelScope.launch {
+                            LocalPersistenceService.saveConversationsAsync(
+                                conversations + archivedConversations,
+                                sync = true,
+                            )
+                        }
+                    },
+                    onExpire = {
+                        viewModelScope.launch {
+                            ChatService.muteConversation(conversationId, userId)
+                                .onFailure { errorMessage = it.message }
+                        }
+                    },
+                ),
+            )
         }
     }
 
@@ -744,10 +803,35 @@ class MessagingViewModel(
             LocalPersistenceService.saveConversationsAsync(conversations + archivedConversations, sync = true)
         }
 
-        viewModelScope.launch {
-            val result = if (archived) ChatService.archiveConversation(conversationId, userId)
-            else ChatService.unarchiveConversation(conversationId, userId)
-            result.onFailure { errorMessage = it.message }
+        if (archived) {
+            InAppNotificationService.showActionToast(
+                InAppActionToast.chatArchived(
+                    undo = {
+                        archivedConversations = archivedConversations.filterNot { it.id == conversationId }
+                        conversations = sortConversationsForInbox(
+                            listOf(conversation) + conversations.filterNot { it.id == conversationId },
+                        )
+                        viewModelScope.launch {
+                            LocalPersistenceService.saveConversationsAsync(
+                                conversations + archivedConversations,
+                                sync = true,
+                            )
+                        }
+                    },
+                    onExpire = {
+                        viewModelScope.launch {
+                            ChatService.archiveConversation(conversationId, userId)
+                                .onFailure { errorMessage = it.message }
+                        }
+                    },
+                ),
+            )
+        } else {
+            InAppNotificationService.showActionToast(InAppActionToast.chatUnarchived())
+            viewModelScope.launch {
+                ChatService.unarchiveConversation(conversationId, userId)
+                    .onFailure { errorMessage = it.message }
+            }
         }
     }
 

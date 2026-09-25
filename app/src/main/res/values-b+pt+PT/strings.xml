@@ -380,10 +380,10 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="notifications_message_request_accepted_two">%1$s e %2$s aceitaram o teu pedido para seguir.</string>
     <string name="notifications_message_request_accepted_three_plus">%1$s, %2$s e mais %3$d pessoas aceitaram o teu pedido para seguir.</string>
     <string name="notifications_message_request_accepted_multiple">%1$s e mais %2$d pessoas aceitaram o teu pedido para seguir.</string>
-    <string name="notifications_message_mutual_single">Agora tens uma ligação mútua com %1$s.</string>
-    <string name="notifications_message_mutual_two">Agora tens uma ligação mútua com %1$s e %2$s.</string>
-    <string name="notifications_message_mutual_three_plus">Tens uma ligação mútua com %1$s, %2$s e mais %3$d pessoas.</string>
-    <string name="notifications_message_mutual_multiple">Agora tens uma ligação mútua com %1$s e mais %2$d pessoas.</string>
+    <string name="notifications_message_mutual_single">Tu e %1$s seguem-se mutuamente</string>
+    <string name="notifications_message_mutual_two">%1$s, %2$s e tu seguem-se mutuamente</string>
+    <string name="notifications_message_mutual_three_plus">%1$s, %2$s e mais %3$d pessoas seguem-se mutuamente</string>
+    <string name="notifications_message_mutual_multiple">%1$s e mais %2$d pessoas e tu seguem-se mutuamente</string>
     <string name="notifications_message_story_chain_single">%1$s continuou a cadeia \"%2$s\".</string>
     <string name="notifications_message_story_chain_multiple">%1$s continuou a cadeia \"%2$s\" e mais %3$d pessoas também a continuaram.</string>
     <string name="notifications_message_like_single">%1$s reagiu ao teu moment.</string>
@@ -485,10 +485,10 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="notification_story_chain_creator_body">Adicionou um momento a \"%1$s\" · já vão %2$s</string>
     <string name="notification_story_chain_participant_title">A cadeia \"%1$s\" continua a crescer</string>
     <string name="notification_story_chain_participant_body">%1$s acabou de adicionar um momento · já vão %2$s</string>
-    <string name="notification_mutual_connection_title">Nova ligação mútua! 🎉</string>
-    <string name="notification_mutual_connection_body">Tu e %1$s seguem-se agora mutuamente</string>
-    <string name="notification_mutual_connection_multiple_title">Novas ligações mútuas! 🎉</string>
-    <string name="notification_mutual_connection_multiple_body">%1$s e mais %2$s pessoas agora são ligações mútuas</string>
+    <string name="notification_mutual_connection_title">Tu e %1$s seguem-se mutuamente</string>
+    <string name="notification_mutual_connection_body">Toca para ver o perfil</string>
+    <string name="notification_mutual_connection_multiple_title">Tu, %1$s e mais %2$s seguem-se mutuamente</string>
+    <string name="notification_mutual_connection_multiple_body">Toca para ver quem</string>
     <string name="banner_verb_echo_suggestion">está perto de ti! Cria um Echo</string>    <string name="notification_action_reply">Responder</string>
     <string name="notification_action_placeholder">Mensagem</string>
     <string name="chat_preview_text">Nova mensagem</string>
@@ -877,6 +877,9 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="incognito_onboarding_dismiss">Percebi</string>
     <string name="incognito_onboarding_title">Vê sem deixar rasto</string>
     <string name="incognito_overlay_label">Incógnito</string>
+    <string name="toast_action_incognito_activated">Incógnito ativado</string>
+    <string name="toast_action_incognito_activated_subtitle">Toca para pausar</string>
+    <string name="toast_action_incognito_paused">Incógnito em pausa</string>
     <string name="incognito_status_active">Ativo agora</string>
     <string name="incognito_status_exhausted">Sem tempo restante hoje</string>
     <string name="incognito_status_paused">Em pausa</string>
@@ -1066,6 +1069,8 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="video_editor_format">Formato</string>
     <string name="video_editor_choose_cover">Escolher capa</string>
     <string name="echo_viewer_leave">Sair</string>
+    <string name="toast_action_echo_left">Saíste do Echo</string>
+    <string name="toast_action_echo_deleted">Echo eliminado</string>
     <string name="echo_viewer_incomplete_title">Echo incompleto</string>
     <string name="echo_viewer_incomplete_body">Um dos moments originais já não está disponível. Podes manter este Echo como recordação, mas o mapa e algumas funcionalidades já não estarão disponíveis.</string>
     <string name="echo_viewer_keep">Manter Echo</string>

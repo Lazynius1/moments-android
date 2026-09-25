@@ -64,44 +64,12 @@ data class ProfileGridTileDescriptor(
     }
 }
 
-/** Port de `ProfileBentoTileAssigner`. */
+/** Port de `ProfileBentoTileAssigner`. Todas las celdas son unidad 4:5. */
 object ProfileBentoTileAssigner {
-    fun assign(moments: List<Moment>): List<ProfileGridTileDescriptor> {
-        if (moments.isEmpty()) return emptyList()
-
-        // Hero/tall en orden cronológico (sin pines), mapeado por id — pinear no cambia tamaños.
-        val chronological = moments.sortedWith(
-            compareByDescending<Moment> { it.timestamp }
-                .thenBy { it.id.orEmpty() },
-        )
-        val chronoKinds = MutableList(chronological.size) { BentoTileKind.UNIT }
-        heroCandidateIndex(chronological)?.let { chronoKinds[it] = BentoTileKind.HERO }
-        var tallCount = 0
-        for (index in chronological.indices) {
-            if (index >= 12) break
-            if (chronoKinds[index] != BentoTileKind.UNIT) continue
-            if (tallCount >= 2) break
-            if (!chronological[index].isReelCandidate) continue
-            chronoKinds[index] = BentoTileKind.TALL
-            tallCount++
-        }
-        val kindsByMomentId = chronological.mapIndexedNotNull { index, moment ->
-            moment.id?.let { it to chronoKinds[index] }
-        }.toMap()
-
-        return moments.map { moment ->
-            val kind = moment.id?.let { kindsByMomentId[it] } ?: BentoTileKind.UNIT
-            ProfileGridTileDescriptor.standard(moment, kind)
-        }
-    }
+    fun assign(moments: List<Moment>): List<ProfileGridTileDescriptor> = simple(moments)
 
     fun simple(moments: List<Moment>): List<ProfileGridTileDescriptor> =
         moments.map { ProfileGridTileDescriptor.standard(it) }
-
-    private fun heroCandidateIndex(moments: List<Moment>): Int? {
-        val candidates = moments.indices.take(9)
-        return candidates.firstOrNull { moments[it].isReelCandidate }
-    }
 }
 
 data class BentoPlacement(

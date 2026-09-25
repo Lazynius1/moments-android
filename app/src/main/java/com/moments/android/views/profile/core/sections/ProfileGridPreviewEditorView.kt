@@ -7,8 +7,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +42,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +60,8 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -64,6 +71,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.fastForEach
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
@@ -75,10 +83,11 @@ import com.moments.android.utilities.HapticManager
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlinx.coroutines.launch
 
 /**
  * Port de `ProfileGridPreviewEditorView.swift`.
- * Crop cuadrado, pan/pinch con límites, fill/fit + fondo, double-tap reset.
+ * Crop 4:5, pan/pinch con límites, fill/fit + fondo, double-tap reset.
  */
 @Composable
 fun ProfileGridPreviewEditorView(
@@ -263,7 +272,7 @@ private fun previewCropSide(maxWidth: Dp, maxHeight: Dp): Dp {
     val bottomInset = 10.dp
     val widthLimit = maxWidth - horizontalInset * 2
     val heightLimit = maxHeight - headerBlock - controlsBlock - verticalSpacing - bottomInset
-    val side = minOf(widthLimit, heightLimit)
+    val side = minOf(widthLimit, heightLimit * ProfileMomentsGridMetrics.portraitAspectRatio)
     return maxOf(220.dp, side)
 }
 
@@ -326,32 +335,146 @@ private fun PreviewCropArea(
     onDoubleTapReset: () -> Unit,
 ) {
     val minScale = if (fitMode == MomentGridPreviewSettings.FitMode.FILL) 1f else 0.5f
+    val cropHeight = cropSide / ProfileMomentsGridMetrics.portraitAspectRatio
+    val cropHeightPx = with(LocalDensity.current) { cropHeight.toPx() }
+    val scope = rememberCoroutineScope()
+
+    // Estado vivo sin reiniciar pointerInput (≡ iOS DragGesture + MagnifyGesture).
+    val latestScale = rememberUpdatedState(scale)
+    val latestOffset = rememberUpdatedState(offset)
+    val latestOnChange = rememberUpdatedState(onScaleOffsetChange)
+    val latestDoubleTap = rememberUpdatedState(onDoubleTapReset)
 
     Box(
         Modifier
-            .size(cropSide)
+            .size(cropSide, cropHeight)
             .shadow(18.dp, RoundedCornerShape(4.dp), ambientColor = Color.Black.copy(0.18f), spotColor = Color.Black.copy(0.18f))
             .clip(RoundedCornerShape(4.dp))
             .border(1.dp, Color.White.copy(0.35f), RoundedCornerShape(4.dp))
             .clipToBounds()
-            .pointerInput(imageSize, cropSidePx, fitMode, scale) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val damped = zoom.toDouble().pow(0.9).toFloat()
-                    val proposedScale = (scale * damped).coerceIn(minScale, 4f)
-                    val ratio = proposedScale / max(scale, 0.001f)
-                    val proposed = Offset(offset.x * ratio + pan.x, offset.y * ratio + pan.y)
-                    val clamped = limitOffset(proposed, imageSize, proposedScale, cropSidePx, fitMode)
-                    onScaleOffsetChange(proposedScale, clamped, true)
+            .pointerInput(imageSize, cropSidePx, cropHeightPx, fitMode, minScale) {
+                // Un solo detector: pan inmediato + pinch + double-tap,
+                // sin que detectTapGestures robe el pointer (antes iba mal).
+                var lastTapUptime = 0L
+                var lastTapPos = Offset.Zero
+
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    latestOnChange.value(latestScale.value, latestOffset.value, true)
+
+                    var workingScale = latestScale.value
+                    var workingOffset = latestOffset.value
+                    var lastCentroid: Offset? = null
+                    var lastSpan = 0f
+                    var moved = false
+                    var lastEventUptime = down.uptimeMillis
+                    val velocityTracker = VelocityTracker()
+                    velocityTracker.addPosition(down.uptimeMillis, down.position)
+
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        event.changes.fastForEach { lastEventUptime = max(lastEventUptime, it.uptimeMillis) }
+                        val pressed = event.changes.filter { it.pressed }
+                        if (pressed.isEmpty()) break
+
+                        val centroid = pressed
+                            .fold(Offset.Zero) { acc, c -> acc + c.position } / pressed.size.toFloat()
+                        val previous = lastCentroid
+                        lastCentroid = centroid
+
+                        if (pressed.size >= 2) {
+                            moved = true
+                            val span = (pressed[0].position - pressed[1].position).getDistance()
+                                .coerceAtLeast(0.001f)
+                            if (lastSpan > 0f) {
+                                val zoom = span / lastSpan
+                                val damped = zoom.toDouble().pow(0.9).toFloat()
+                                val proposedScale = (workingScale * damped).coerceIn(minScale, 4f)
+                                val ratio = proposedScale / max(workingScale, 0.001f)
+                                workingScale = proposedScale
+                                workingOffset = limitOffset(
+                                    Offset(workingOffset.x * ratio, workingOffset.y * ratio),
+                                    imageSize,
+                                    workingScale,
+                                    cropSidePx,
+                                    cropHeightPx,
+                                    fitMode,
+                                )
+                                latestOnChange.value(workingScale, workingOffset, true)
+                            }
+                            lastSpan = span
+                            velocityTracker.resetTracking()
+                        } else {
+                            lastSpan = 0f
+                            if (previous != null) {
+                                val pan = centroid - previous
+                                if (pan.getDistance() > 0.5f) moved = true
+                                workingOffset = limitOffset(
+                                    Offset(workingOffset.x + pan.x, workingOffset.y + pan.y),
+                                    imageSize,
+                                    workingScale,
+                                    cropSidePx,
+                                    cropHeightPx,
+                                    fitMode,
+                                )
+                                latestOnChange.value(workingScale, workingOffset, true)
+                                val change = pressed.first()
+                                velocityTracker.addPosition(change.uptimeMillis, change.position)
+                            }
+                        }
+
+                        event.changes.fastForEach {
+                            if (it.positionChanged()) it.consume()
+                        }
+                    }
+
+                    val isQuickTap = !moved && (lastEventUptime - down.uptimeMillis) < 280
+                    if (isQuickTap) {
+                        val isDouble = lastTapUptime > 0L &&
+                            (lastEventUptime - lastTapUptime) < 320 &&
+                            (down.position - lastTapPos).getDistance() < 56f
+                        if (isDouble) {
+                            lastTapUptime = 0L
+                            latestOnChange.value(workingScale, workingOffset, false)
+                            latestDoubleTap.value()
+                            return@awaitEachGesture
+                        }
+                        lastTapUptime = lastEventUptime
+                        lastTapPos = down.position
+                        latestOnChange.value(workingScale, workingOffset, false)
+                        return@awaitEachGesture
+                    }
+                    lastTapUptime = 0L
+
+                    // Inercia ligera ≡ iOS velocity * 0.04 + easeOut 0.22.
+                    val velocity = velocityTracker.calculateVelocity()
+                    val proposed = Offset(
+                        workingOffset.x + velocity.x * 0.04f,
+                        workingOffset.y + velocity.y * 0.04f,
+                    )
+                    val clamped = limitOffset(
+                        proposed,
+                        imageSize,
+                        workingScale,
+                        cropSidePx,
+                        cropHeightPx,
+                        fitMode,
+                    )
+                    if (clamped != workingOffset) {
+                        val start = workingOffset
+                        scope.launch {
+                            val anim = Animatable(start, Offset.VectorConverter)
+                            anim.animateTo(clamped, tween(220)) {
+                                latestOnChange.value(workingScale, value, true)
+                            }
+                            latestOnChange.value(workingScale, anim.value, false)
+                            HapticManager.shared.lightImpact()
+                        }
+                    } else {
+                        latestOnChange.value(workingScale, workingOffset, false)
+                        HapticManager.shared.lightImpact()
+                    }
                 }
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        tryAwaitRelease()
-                        onScaleOffsetChange(scale, offset, false)
-                    },
-                    onDoubleTap = { onDoubleTapReset() },
-                )
             },
         contentAlignment = Alignment.Center,
     ) {
@@ -395,7 +518,7 @@ private fun PreviewCropArea(
                 ContentScale.Crop
             },
         )
-        // Mask dim around crop already clipped to square — iOS destinationOut outside window;
+        // Mask dim around crop already clipped — iOS destinationOut outside window;
         // here crop IS the window, so only dim isn't needed inside. Keep subtle edge via border.
 
         AnimatedVisibility(
@@ -403,20 +526,21 @@ private fun PreviewCropArea(
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
-            PreviewGridOverlay(cropSide)
+            PreviewGridOverlay(cropSide, cropHeight)
         }
     }
 }
 
 @Composable
-private fun PreviewGridOverlay(cropSide: Dp) {
-    Canvas(Modifier.size(cropSide)) {
-        val third = size.width / 3f
+private fun PreviewGridOverlay(cropSide: Dp, cropHeight: Dp) {
+    Canvas(Modifier.size(cropSide, cropHeight)) {
+        val xThird = size.width / 3f
+        val yThird = size.height / 3f
         val stroke = Color.White.copy(0.18f)
-        drawLine(stroke, Offset(third, 0f), Offset(third, size.height), 0.5.dp.toPx())
-        drawLine(stroke, Offset(third * 2, 0f), Offset(third * 2, size.height), 0.5.dp.toPx())
-        drawLine(stroke, Offset(0f, third), Offset(size.width, third), 0.5.dp.toPx())
-        drawLine(stroke, Offset(0f, third * 2), Offset(size.width, third * 2), 0.5.dp.toPx())
+        drawLine(stroke, Offset(xThird, 0f), Offset(xThird, size.height), 0.5.dp.toPx())
+        drawLine(stroke, Offset(xThird * 2, 0f), Offset(xThird * 2, size.height), 0.5.dp.toPx())
+        drawLine(stroke, Offset(0f, yThird), Offset(size.width, yThird), 0.5.dp.toPx())
+        drawLine(stroke, Offset(0f, yThird * 2), Offset(size.width, yThird * 2), 0.5.dp.toPx())
     }
 }
 
@@ -537,10 +661,15 @@ private fun PreviewChip(
     }
 }
 
-private fun displaySize(imageSize: Size, cropSide: Float, fitMode: MomentGridPreviewSettings.FitMode): Size {
-    if (imageSize.width <= 0f || imageSize.height <= 0f) return Size(cropSide, cropSide)
+private fun displaySize(
+    imageSize: Size,
+    cropSide: Float,
+    cropHeight: Float,
+    fitMode: MomentGridPreviewSettings.FitMode,
+): Size {
+    if (imageSize.width <= 0f || imageSize.height <= 0f) return Size(cropSide, cropHeight)
     val widthScale = cropSide / imageSize.width
-    val heightScale = cropSide / imageSize.height
+    val heightScale = cropHeight / imageSize.height
     val applied = if (fitMode == MomentGridPreviewSettings.FitMode.FILL) {
         max(widthScale, heightScale)
     } else {
@@ -554,13 +683,14 @@ private fun limitOffset(
     imageSize: Size,
     scale: Float,
     cropSide: Float,
+    cropHeight: Float,
     fitMode: MomentGridPreviewSettings.FitMode,
 ): Offset {
-    val base = displaySize(imageSize, cropSide, fitMode)
+    val base = displaySize(imageSize, cropSide, cropHeight, fitMode)
     val scaledW = base.width * scale
     val scaledH = base.height * scale
     val maxX = max(0f, (scaledW - cropSide) / 2f)
-    val maxY = max(0f, (scaledH - cropSide) / 2f)
+    val maxY = max(0f, (scaledH - cropHeight) / 2f)
     return Offset(
         proposed.x.coerceIn(-maxX, maxX),
         proposed.y.coerceIn(-maxY, maxY),
@@ -581,6 +711,7 @@ private fun applyInitialTransform(
         imageSize,
         s,
         cropSide,
+        cropSide / ProfileMomentsGridMetrics.portraitAspectRatio,
         fitMode,
     )
     return s to o

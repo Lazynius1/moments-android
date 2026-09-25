@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.views.feed.core.FeedProfileSheetRoute
 import com.moments.android.views.profile.core.sections.UserProfileZoomNavigationHost
 import com.moments.android.views.profile.core.sections.userProfileZoomSource
@@ -750,6 +752,7 @@ fun GroupInviteLinkManageView(groupId: String, onBack: () -> Unit) {
                         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                         clipboard.setPrimaryClip(android.content.ClipData.newPlainText(inviteLinkLabel, url))
                         copied = true
+                        InAppNotificationService.showActionToast(InAppActionToast.linkCopied())
                     }) {
                         Icon(if (copied) Icons.Default.Check else Icons.Default.ContentCopy, null)
                         Spacer(Modifier.width(8.dp))

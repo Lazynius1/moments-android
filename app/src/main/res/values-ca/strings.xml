@@ -380,10 +380,10 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="notifications_message_request_accepted_two">%1$s i %2$s han acceptat la teva sol·licitud de seguiment.</string>
     <string name="notifications_message_request_accepted_three_plus">%1$s, %2$s i %3$d més han acceptat la teva sol·licitud de seguiment.</string>
     <string name="notifications_message_request_accepted_multiple">%1$s i %2$d més han acceptat la teva sol·licitud de seguiment.</string>
-    <string name="notifications_message_mutual_single">Ara tens una connexió mútua amb %1$s.</string>
-    <string name="notifications_message_mutual_two">Ara tens connexió mútua amb %1$s i %2$s.</string>
-    <string name="notifications_message_mutual_three_plus">Ara tens connexió mútua amb %1$s, %2$s i %3$d més.</string>
-    <string name="notifications_message_mutual_multiple">Ara tens una connexió mútua amb %1$s i %2$d més.</string>
+    <string name="notifications_message_mutual_single">Tu i %1$s us seguiu mútuament</string>
+    <string name="notifications_message_mutual_two">%1$s, %2$s i tu us seguiu mútuament</string>
+    <string name="notifications_message_mutual_three_plus">%1$s, %2$s i %3$d més us seguiu mútuament</string>
+    <string name="notifications_message_mutual_multiple">%1$s, %2$d més i tu us seguiu mútuament</string>
     <string name="notifications_message_story_chain_single">%1$s ha continuat la cadena \"%2$s\".</string>
     <string name="notifications_message_story_chain_multiple">%1$s ha continuat la cadena \"%2$s\" i %3$d més també l\'han continuada.</string>
     <string name="notifications_message_like_single">%1$s ha reaccionat al teu moment.</string>
@@ -485,10 +485,10 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="notification_story_chain_creator_body">Va afegir un moment a \"%1$s\" · ja en van %2$s</string>
     <string name="notification_story_chain_participant_title">La cadena \"%1$s\" segueix creixent</string>
     <string name="notification_story_chain_participant_body">%1$s acaba d\'afegir un moment · ja en van %2$s</string>
-    <string name="notification_mutual_connection_title">Nova connexió mútua! 🎉</string>
-    <string name="notification_mutual_connection_body">Tu i %1$s ara us seguiu mútuament</string>
-    <string name="notification_mutual_connection_multiple_title">Noves connexions mútues! 🎉</string>
-    <string name="notification_mutual_connection_multiple_body">%1$s i %2$s més ara són connexions mútues</string>
+    <string name="notification_mutual_connection_title">Tu i %1$s us seguiu mútuament</string>
+    <string name="notification_mutual_connection_body">Toca per veure el seu perfil</string>
+    <string name="notification_mutual_connection_multiple_title">Tu, %1$s i %2$s més us seguiu mútuament</string>
+    <string name="notification_mutual_connection_multiple_body">Toca per veure qui</string>
     <string name="banner_verb_echo_suggestion">està a prop teu! Creeu un Echo</string>    <string name="notification_action_reply">Respon</string>
     <string name="notification_action_placeholder">Missatge</string>
     <string name="chat_preview_text">Missatge nou</string>
@@ -909,6 +909,9 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="incognito_onboarding_dismiss">Entès</string>
     <string name="incognito_onboarding_title">Mira sense deixar rastre</string>
     <string name="incognito_overlay_label">Incògnit</string>
+    <string name="toast_action_incognito_activated">Incògnit activat</string>
+    <string name="toast_action_incognito_activated_subtitle">Toca per pausar</string>
+    <string name="toast_action_incognito_paused">Incògnit en pausa</string>
     <string name="incognito_status_active">Actiu ara</string>
     <string name="incognito_status_exhausted">No queda temps avui</string>
     <string name="incognito_status_paused">Pausat</string>
@@ -1098,6 +1101,8 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="video_editor_format">Format</string>
     <string name="video_editor_choose_cover">Selecciona la portada</string>
     <string name="echo_viewer_leave">Sortir</string>
+    <string name="toast_action_echo_left">Has sortit de l’Echo</string>
+    <string name="toast_action_echo_deleted">Echo eliminat</string>
     <string name="echo_viewer_incomplete_title">Echo incomplet</string>
     <string name="echo_viewer_incomplete_body">Un dels moments originals ja no està disponible. Pots conservar aquest Echo com a record, però el mapa i algunes funcions ja no estaran disponibles.</string>
     <string name="echo_viewer_keep">Conservar Echo</string>

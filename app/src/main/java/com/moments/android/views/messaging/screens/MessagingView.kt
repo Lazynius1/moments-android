@@ -643,7 +643,6 @@ fun MessagingView(
                 onArchive = {
                     viewModel.archiveConversation(it)
                     conversationMenuSelection = null
-                    showToast(context.getString(R.string.messaging_menu_archive))
                 },
                 onUnarchive = {
                     viewModel.unarchiveConversation(it)

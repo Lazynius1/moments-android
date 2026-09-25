@@ -71,6 +71,8 @@ import android.view.View
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.Moment
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.performance.FeedVisibilityCoordinator
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.services.video.GlobalVideoManager
@@ -347,6 +349,8 @@ class ProfileGridHeroTransitionCoordinator {
     var onArchive: ((Moment) -> Unit)? = null
     var onAdjustPreview: ((Moment) -> Unit)? = null
     var onPin: ((Moment, Boolean, Boolean) -> Unit)? = null
+    /** Commit Firestore del pin (tras expirar el toast de deshacer). */
+    var onPinCommit: ((Moment, Boolean, Boolean) -> Unit)? = null
     var openZoomDetail: ((ProfileMomentZoomDestination) -> Unit)? = null
     var clearZoomNavigation: (() -> Unit)? = null
     var zoomMomentsSnapshot: List<Moment> = emptyList()
@@ -940,8 +944,14 @@ fun ProfileGridHeroDetailLayer(
                     coordinator.showPinConfirm -> PinConfirmPanel(
                         dark = dark,
                         onConfirm = {
-                            coordinator.onPin?.invoke(selection.moment, true, true)
-                            coordinator.toastMessage = pinnedToast
+                            val moment = selection.moment
+                            coordinator.onPin?.invoke(moment, true, true)
+                            InAppNotificationService.showActionToast(
+                                InAppActionToast.pinnedMoment(
+                                    undo = { coordinator.onPin?.invoke(moment, false, false) },
+                                    onExpire = { coordinator.onPinCommit?.invoke(moment, true, true) },
+                                ),
+                            )
                             coordinator.dismissMenu()
                         },
                         onCancel = { coordinator.showPinConfirm = false },
@@ -1025,8 +1035,23 @@ private fun OwnerActionsMenu(
             ) {
                 if (moment.isPinned != true && pinnedCount >= 3) {
                     coordinator.showPinConfirm = true
+                } else if (moment.isPinned == true) {
+                    coordinator.onPin?.invoke(moment, false, false)
+                    InAppNotificationService.showActionToast(
+                        InAppActionToast.unpinnedMoment(
+                            undo = { coordinator.onPin?.invoke(moment, true, false) },
+                            onExpire = { coordinator.onPinCommit?.invoke(moment, false, false) },
+                        ),
+                    )
+                    coordinator.dismissMenu()
                 } else {
-                    coordinator.onPin?.invoke(moment, moment.isPinned != true, false)
+                    coordinator.onPin?.invoke(moment, true, false)
+                    InAppNotificationService.showActionToast(
+                        InAppActionToast.pinnedMoment(
+                            undo = { coordinator.onPin?.invoke(moment, false, false) },
+                            onExpire = { coordinator.onPinCommit?.invoke(moment, true, false) },
+                        ),
+                    )
                     coordinator.dismissMenu()
                 }
             },

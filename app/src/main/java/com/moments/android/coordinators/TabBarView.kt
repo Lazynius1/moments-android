@@ -104,7 +104,6 @@ import com.moments.android.services.firestore.fetchUserByUsername
 import com.moments.android.views.shared.OfflineBannerOverlay
 import com.moments.android.views.shared.tabbar.LocalTabBarHide
 import com.moments.android.views.shared.tabbar.TabBarHideController
-import com.moments.android.views.components.InAppBannerView
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.story.StoryRingAvatarView
 import com.moments.android.views.feed.video.FeedReelsHostOverlay
@@ -487,8 +486,7 @@ fun TabBarScreen(
             )
         }
 
-        InAppBannerView(Modifier.align(Alignment.TopCenter))
-
+        // InAppBannerView vive en MomentsApp (≡ UIWindow iOS), no aquí.
         OfflineBannerOverlay(Modifier.align(Alignment.TopCenter))
 
         echoInvitationRoute?.let { echoId ->

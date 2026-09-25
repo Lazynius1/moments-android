@@ -1806,4 +1806,9 @@
     <string name="widget_echoes_plural">%1$d amigos cerca</string>
     <string name="widget_tags_singular">1 etiqueta nueva</string>
     <string name="widget_tags_plural">%1$d etiquetas nuevas</string>
+    <string name="messaging_toast_muted">Chat silenciado</string>
+    <string name="messaging_toast_unmuted">Notificaciones reactivadas</string>
+    <string name="messaging_toast_pinned">Chat fijado</string>
+    <string name="messaging_toast_unpinned">Chat desfijado</string>
+    <string name="messaging_toast_deleted">Conversación eliminada</string>
 </resources>

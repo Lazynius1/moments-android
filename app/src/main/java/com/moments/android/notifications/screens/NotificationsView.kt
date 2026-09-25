@@ -71,7 +71,6 @@ import com.moments.android.models.Moment
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
 import com.moments.android.notifications.components.NotificationDateHeader
-import com.moments.android.notifications.components.NotificationDeletionUndoToast
 import com.moments.android.notifications.components.NotificationGroupedFollowersOverlay
 import com.moments.android.notifications.components.NotificationSkeletonRow
 import com.moments.android.notifications.core.NotificationGroup
@@ -128,7 +127,6 @@ fun NotificationsScreen(
     val groupedNotifications by viewModel.groupedNotifications.collectAsState()
     val dateKeys by viewModel.dateKeys.collectAsState()
     val groupedByDate by viewModel.groupedByDate.collectAsState()
-    val pendingDeletion by viewModel.pendingDeletion.collectAsState()
     val pendingRequestsCount by viewModel.pendingRequestsCount.collectAsState()
     MomentsTabBarHidden()
     val canLoadMore by viewModel.canLoadMore.collectAsState()
@@ -350,15 +348,6 @@ fun NotificationsScreen(
             }
 
             MomentRefreshOverlayHost(modifier = Modifier.align(Alignment.TopCenter))
-
-            pendingDeletion?.let {
-                Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)) {
-                    NotificationDeletionUndoToast(it.notifications.size, isDark) {
-            HapticManager.shared.lightImpact()
-            viewModel.undoPendingDeletion()
-                    }
-                }
-            }
 
             overlayGroup?.let { group ->
                 NotificationGroupedFollowersOverlay(

@@ -6,6 +6,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.activities.IncognitoLiveUpdateNotificationHelper
 import com.moments.android.extensions.optStringOrNull
 import com.moments.android.services.network.NetworkMonitor
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.utilities.HapticManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -187,8 +189,16 @@ object IncognitoModeService {
             }
 
             when (action) {
-                Action.ACTIVATE, Action.RESUME -> HapticManager.shared.mediumImpact()
-                Action.PAUSE -> HapticManager.shared.selection()
+                Action.ACTIVATE, Action.RESUME -> {
+                    HapticManager.shared.mediumImpact()
+                    if (response.state.isActive) {
+                        InAppNotificationService.showActionToast(InAppActionToast.incognitoActivated())
+                    }
+                }
+                Action.PAUSE -> {
+                    HapticManager.shared.selection()
+                    InAppNotificationService.showActionToast(InAppActionToast.incognitoPaused())
+                }
                 Action.GET -> Unit
             }
         } catch (e: java.net.UnknownHostException) {

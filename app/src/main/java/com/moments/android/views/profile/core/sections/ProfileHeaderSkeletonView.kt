@@ -66,11 +66,7 @@ fun ProfileHeaderSkeletonView(modifier: Modifier = Modifier) {
 /** Port de `ProfileMomentsGridSkeletonView.swift`: anticipa el bento de contenido real. */
 @Composable
 fun ProfileMomentsGridSkeletonView(modifier: Modifier = Modifier) {
-    val kinds = listOf(
-        BentoTileKind.HERO, BentoTileKind.UNIT, BentoTileKind.UNIT,
-        BentoTileKind.UNIT, BentoTileKind.TALL, BentoTileKind.UNIT,
-        BentoTileKind.UNIT, BentoTileKind.UNIT, BentoTileKind.UNIT,
-    )
+    val kinds = List(9) { BentoTileKind.UNIT }
     val onSurface = MaterialTheme.colorScheme.onSurface
     BoxWithConstraints(
         modifier = modifier

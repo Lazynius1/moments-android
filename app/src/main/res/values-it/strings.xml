@@ -380,10 +380,10 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="notifications_message_request_accepted_two">%1$s e %2$s hanno accettato la tua richiesta di follow.</string>
     <string name="notifications_message_request_accepted_three_plus">%1$s, %2$s e altre %3$d persone hanno accettato la tua richiesta di follow.</string>
     <string name="notifications_message_request_accepted_multiple">%1$s e altre %2$d persone hanno accettato la tua richiesta di follow.</string>
-    <string name="notifications_message_mutual_single">Ora hai una connessione reciproca con %1$s.</string>
-    <string name="notifications_message_mutual_two">Ora hai una connessione reciproca con %1$s e %2$s.</string>
-    <string name="notifications_message_mutual_three_plus">Hai una connessione reciproca con %1$s, %2$s e altre %3$d persone.</string>
-    <string name="notifications_message_mutual_multiple">Ora hai una connessione reciproca con %1$s e altre %2$d persone.</string>
+    <string name="notifications_message_mutual_single">Tu e %1$s vi seguite a vicenda</string>
+    <string name="notifications_message_mutual_two">%1$s, %2$s e tu vi seguite a vicenda</string>
+    <string name="notifications_message_mutual_three_plus">%1$s, %2$s e altri %3$d vi seguite a vicenda</string>
+    <string name="notifications_message_mutual_multiple">%1$s e altri %2$d e tu vi seguite a vicenda</string>
     <string name="notifications_message_story_chain_single">%1$s ha continuato la catena \"%2$s\".</string>
     <string name="notifications_message_story_chain_multiple">%1$s ha continuato la catena \"%2$s\" e anche altre %3$d persone l\'hanno continuata.</string>
     <string name="notifications_message_like_single">%1$s ha reagito al tuo momento.</string>
@@ -485,10 +485,10 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="notification_story_chain_creator_body">Ha aggiunto un momento a \"%1$s\" · già %2$s</string>
     <string name="notification_story_chain_participant_title">La catena \"%1$s\" continua a crescere</string>
     <string name="notification_story_chain_participant_body">%1$s ha appena aggiunto un momento · già %2$s</string>
-    <string name="notification_mutual_connection_title">Nuova connessione reciproca! 🎉</string>
-    <string name="notification_mutual_connection_body">Tu e %1$s ora vi seguite a vicenda</string>
-    <string name="notification_mutual_connection_multiple_title">Nuove connessioni reciproche! 🎉</string>
-    <string name="notification_mutual_connection_multiple_body">%1$s e altre %2$s persone ora sono connessioni reciproche</string>
+    <string name="notification_mutual_connection_title">Tu e %1$s vi seguite a vicenda</string>
+    <string name="notification_mutual_connection_body">Tocca per vedere il profilo</string>
+    <string name="notification_mutual_connection_multiple_title">Tu, %1$s e altri %2$s vi seguite a vicenda</string>
+    <string name="notification_mutual_connection_multiple_body">Tocca per vedere chi</string>
     <string name="banner_verb_echo_suggestion">è vicino a te! Crea un Echo</string>    <string name="notification_action_reply">Rispondi</string>
     <string name="notification_action_placeholder">Messaggio</string>
     <string name="chat_preview_text">Nuovo messaggio</string>
@@ -877,6 +877,9 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="incognito_onboarding_dismiss">Capito</string>
     <string name="incognito_onboarding_title">Guarda senza lasciare traccia</string>
     <string name="incognito_overlay_label">Incognito</string>
+    <string name="toast_action_incognito_activated">Incognito attivato</string>
+    <string name="toast_action_incognito_activated_subtitle">Tocca per mettere in pausa</string>
+    <string name="toast_action_incognito_paused">Incognito in pausa</string>
     <string name="incognito_status_active">Attivo ora</string>
     <string name="incognito_status_exhausted">Nessun tempo rimasto oggi</string>
     <string name="incognito_status_paused">In pausa</string>
@@ -1066,6 +1069,8 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="video_editor_format">Formato</string>
     <string name="video_editor_choose_cover">Scegli copertina</string>
     <string name="echo_viewer_leave">Lascia</string>
+    <string name="toast_action_echo_left">Hai lasciato l’Echo</string>
+    <string name="toast_action_echo_deleted">Echo eliminato</string>
     <string name="echo_viewer_incomplete_title">Echo incompleto</string>
     <string name="echo_viewer_incomplete_body">Uno dei moment originali non è più disponibile. Puoi conservare questo Echo come ricordo, ma la mappa e alcune funzioni non sono più disponibili.</string>
     <string name="echo_viewer_keep">Mantieni Echo</string>

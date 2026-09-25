@@ -332,15 +332,20 @@ object NotificationCopyResolver {
 
     private fun mutualConnectionCopy(ctx: Context, notification: MomentsNotification): NotificationBannerCopy {
         val count = notification.reactionCount ?: 1
+        // Título = frase de inbox; subtitle = body de push (`Toca para ver…`).
         return if (count > 1) {
             NotificationBannerCopy(
-                ctx.getString(R.string.notification_mutual_connection_multiple_title),
-                ctx.getString(R.string.notification_mutual_connection_multiple_body, notification.senderUsername, (count - 1).toString()),
+                ctx.getString(
+                    R.string.notifications_message_mutual_multiple,
+                    notification.senderUsername,
+                    count - 1,
+                ),
+                ctx.getString(R.string.notification_mutual_connection_multiple_body),
             )
         } else {
             NotificationBannerCopy(
-                ctx.getString(R.string.notification_mutual_connection_title),
-                ctx.getString(R.string.notification_mutual_connection_body, notification.senderUsername),
+                ctx.getString(R.string.notifications_message_mutual_single, notification.senderUsername),
+                ctx.getString(R.string.notification_mutual_connection_body),
             )
         }
     }

@@ -13,6 +13,8 @@ import com.moments.android.MomentsApplication
 import com.moments.android.R
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Story
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.cache.ImagePrefetchManager
 import com.moments.android.services.content.StoryTrayService
 import com.moments.android.services.firestore.FirestoreService
@@ -585,6 +587,9 @@ class StoryViewModel(
                 firestore.rebuildStorySummary(userId)
                 checkActiveStories(userId)
             }.exceptionOrNull()
+            if (err == null) {
+                InAppNotificationService.showActionToast(InAppActionToast.storyDeleted())
+            }
             completion(err)
         }
     }

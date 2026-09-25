@@ -140,6 +140,8 @@ import java.util.Date
 import java.util.UUID
 import android.content.ClipData
 import android.content.ClipboardManager
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import kotlinx.coroutines.launch
 
 /**
@@ -1312,6 +1314,7 @@ fun GlassmorphicChatView(
                 if (text.isNotBlank()) {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("message", text))
+                    InAppNotificationService.showActionToast(InAppActionToast.messageCopied(text))
                 }
             },
             onForward = { message -> forwardingMessage = message },

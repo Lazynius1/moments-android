@@ -13,21 +13,28 @@ import com.moments.android.models.SavePayload
 import com.moments.android.models.cache.CachedAction
 import com.moments.android.models.encode
 import com.moments.android.models.toMap
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.services.privacy.ContentVisibilityService
 import com.moments.android.services.privacy.ContentVisibilityType
 import com.moments.android.services.network.CloudFunctionsClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Date
 import java.util.UUID
 
+private val momentsToastScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 /** Port de FirestoreMomentsRepository.swift. */
 suspend fun FirestoreService.updateMoment(userId: String, momentId: String, content: String) {
     db.collection("users").document(userId).collection("moments").document(momentId)
@@ -45,6 +52,7 @@ suspend fun FirestoreService.deleteMoment(userId: String, momentId: String) {
     data["type"] = "moment"
     recentlyDeletedRef.set(data).await()
     momentRef.delete().await()
+    InAppNotificationService.showActionToast(InAppActionToast.momentDeleted())
 }
 
 suspend fun FirestoreService.permanentlyDeleteRecentlyDeleted(ids: List<String>) {
@@ -189,7 +197,37 @@ suspend fun FirestoreService.checkIfSaved(userId: String, momentId: String): Boo
     return snap.exists()
 }
 
-suspend fun FirestoreService.toggleSaveMoment(userId: String, momentId: String, authorId: String? = null, desiredSaved: Boolean) {
+suspend fun FirestoreService.toggleSaveMoment(
+    userId: String,
+    momentId: String,
+    authorId: String? = null,
+    desiredSaved: Boolean,
+    announce: Boolean = true,
+) {
+    // Unsave con toast: UI/cache ya; Firestore solo al expirar el deshacer.
+    if (!desiredSaved && announce) {
+        _savedMomentIds.update { ids -> ids.filterNot { it == momentId } }
+        InAppNotificationService.showActionToast(
+            InAppActionToast.momentUnsaved(
+                undo = {
+                    _savedMomentIds.update { ids -> (ids + momentId).distinct() }
+                },
+                onExpire = {
+                    momentsToastScope.launch {
+                        FirestoreService.shared.toggleSaveMoment(
+                            userId = userId,
+                            momentId = momentId,
+                            authorId = authorId,
+                            desiredSaved = false,
+                            announce = false,
+                        )
+                    }
+                },
+            ),
+        )
+        return
+    }
+
     if (shouldQueueFirestoreOutbox()) {
         val payload = SavePayload(userId, momentId, authorId, desiredSaved)
         LocalPersistenceService.saveActionAsync(
@@ -200,6 +238,7 @@ suspend fun FirestoreService.toggleSaveMoment(userId: String, momentId: String, 
             ),
         )
         _savedMomentIds.update { ids -> if (desiredSaved) (ids + momentId).distinct() else ids.filterNot { it == momentId } }
+        announceSaveChange(userId, momentId, authorId, desiredSaved, announce)
         return
     }
     val savedMomentRef = db.collection("users").document(userId)
@@ -219,6 +258,21 @@ suspend fun FirestoreService.toggleSaveMoment(userId: String, momentId: String, 
         null
     }.await()
     _savedMomentIds.update { ids -> if (desiredSaved) (ids + momentId).distinct() else ids.filterNot { it == momentId } }
+    announceSaveChange(userId, momentId, authorId, desiredSaved, announce)
+}
+
+private fun announceSaveChange(
+    userId: String,
+    momentId: String,
+    authorId: String?,
+    desiredSaved: Boolean,
+    announce: Boolean,
+) {
+    if (!announce) return
+    if (desiredSaved) {
+        InAppNotificationService.showActionToast(InAppActionToast.momentSaved())
+    }
+    // Unsave con undo se anuncia en el path diferido de `toggleSaveMoment`.
 }
 
 /** Paridad `createMoment` iOS: `addDocument` (ID auto) y **sin** `mapVisibility`. */

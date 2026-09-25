@@ -92,6 +92,8 @@ import com.moments.android.services.firestore.fetchUserByUsername
 import com.moments.android.services.firestore.updateComment
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MentionDraftToken
 import com.moments.android.views.components.CommentRowSkeletonList
@@ -709,7 +711,12 @@ fun ModernCommentsView(
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            commentToDelete?.let { deleteComment(it) }
+                            commentToDelete?.let { comment ->
+                                InAppNotificationService.showActionToast(
+                                    InAppActionToast.commentDeleted(comment.username),
+                                )
+                                deleteComment(comment)
+                            }
                             showDeleteAlert = false
                             commentToDelete = null
                         },

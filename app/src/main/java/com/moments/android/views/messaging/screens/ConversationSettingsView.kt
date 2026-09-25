@@ -110,6 +110,8 @@ import com.moments.android.R
 import com.moments.android.MomentsApplication
 import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.models.OnlineStatus
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.messaging.OnlineStatusService
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.messaging.core.Conversation
@@ -1458,7 +1460,13 @@ fun ConversationSettingsView(
                     showLeaveGroup = false
                     val group = groupSnapshot ?: return@clickable
                     scope.launch {
-                        if (GroupChatStore(scope).command("leave", group)) onBack()
+                        if (GroupChatStore(scope).command("leave", group)) {
+                            val name = group.name.trim()
+                            if (name.isNotEmpty()) {
+                                InAppNotificationService.showActionToast(InAppActionToast.leftGroup(name))
+                            }
+                            onBack()
+                        }
                     }
                 }.padding(16.dp),
             )

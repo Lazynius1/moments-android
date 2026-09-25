@@ -5,6 +5,8 @@ import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.notifications.services.NotificationService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.persistence.LocalPersistenceService
@@ -120,6 +122,9 @@ class NotificationsViewModel(
             }
             groupNotifications()
             updatePendingCounts()
+            InAppNotificationService.showActionToast(
+                InAppActionToast.requestAccepted(notification.senderUsername),
+            )
         }
     }
 
@@ -130,6 +135,9 @@ class NotificationsViewModel(
                 val notificationId = notification.id ?: return@forEach
                 LocalPersistenceService.rejectFollowRequest(notificationId, notification.senderId, userId)
                 _notifications.value = _notifications.value.filter { it.id != notificationId }
+                InAppNotificationService.showActionToast(
+                    InAppActionToast.requestRejected(notification.senderUsername),
+                )
             }
             groupNotifications()
             updatePendingCounts()

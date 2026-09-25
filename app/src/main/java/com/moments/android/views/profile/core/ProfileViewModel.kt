@@ -27,8 +27,11 @@ import com.moments.android.services.firestore.fetchUser
 import com.moments.android.services.firestore.pinMoment
 import com.moments.android.services.firestore.pinMomentReplacingOldestIfNeeded
 import com.moments.android.services.firestore.unpinMoment
+import com.moments.android.services.firestore.unarchiveMoment
 import com.moments.android.services.firestore.updateMomentGridPreview
 import com.moments.android.services.persistence.LocalPersistenceService
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.services.privacy.PrivacyService
@@ -384,24 +387,35 @@ class ProfileViewModel(
     fun handleGridPin(moment: Moment, shouldPin: Boolean, replaceOldest: Boolean) {
         val momentId = moment.id ?: return
         val pinnedAt = Date()
+        // Solo UI local; el commit a Firestore va en onExpire del toast.
+        if (shouldPin) {
+            if (replaceOldest) {
+                val oldestId = oldestPinnedMomentId(excluding = momentId)
+                if (oldestId != null) {
+                    applyPinReplacement(oldestId, momentId, pinnedAt)
+                } else {
+                    applyMomentPinState(momentId, isPinned = true, pinnedAt = pinnedAt)
+                }
+            } else {
+                applyMomentPinState(momentId, isPinned = true, pinnedAt = pinnedAt)
+            }
+        } else {
+            applyMomentPinState(momentId, isPinned = false, pinnedAt = pinnedAt)
+        }
+    }
+
+    fun commitGridPin(moment: Moment, shouldPin: Boolean, replaceOldest: Boolean) {
+        val momentId = moment.id ?: return
         viewModelScope.launch {
             runCatching {
                 if (shouldPin) {
                     if (replaceOldest) {
                         firestoreService.pinMomentReplacingOldestIfNeeded(moment.authorId, momentId, moments)
-                        val oldestId = oldestPinnedMomentId(excluding = momentId)
-                        if (oldestId != null) {
-                            applyPinReplacement(oldestId, momentId, pinnedAt)
-                        } else {
-                            applyMomentPinState(momentId, isPinned = true, pinnedAt = pinnedAt)
-                        }
                     } else {
                         firestoreService.pinMoment(moment.authorId, momentId)
-                        applyMomentPinState(momentId, isPinned = true, pinnedAt = pinnedAt)
                     }
                 } else {
                     firestoreService.unpinMoment(moment.authorId, momentId)
-                    applyMomentPinState(momentId, isPinned = false, pinnedAt = pinnedAt)
                 }
             }.onFailure { errorMessage = it.message }
         }
@@ -409,13 +423,24 @@ class ProfileViewModel(
 
     fun archiveMomentLocally(moment: Moment) {
         val momentId = moment.id ?: return
-        viewModelScope.launch {
-            runCatching {
-                firestoreService.archiveMoment(moment.authorId, momentId)
-                moments = moments.filterNot { it.id == momentId }
-                persistMoments()
-            }.onFailure { errorMessage = it.message }
-        }
+        moments = moments.filterNot { it.id == momentId }
+        persistMoments()
+        InAppNotificationService.showActionToast(
+            InAppActionToast.momentArchived(
+                undo = {
+                    if (moments.none { it.id == momentId }) {
+                        moments = listOf(moment) + moments
+                        persistMoments()
+                    }
+                },
+                onExpire = {
+                    viewModelScope.launch {
+                        runCatching { firestoreService.archiveMoment(moment.authorId, momentId) }
+                            .onFailure { errorMessage = it.message }
+                    }
+                },
+            ),
+        )
     }
 
     fun deleteMomentLocally(moment: Moment) {

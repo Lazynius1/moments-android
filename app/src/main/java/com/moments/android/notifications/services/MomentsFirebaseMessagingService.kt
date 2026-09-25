@@ -54,7 +54,10 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         }
 
         scope.launch { handleBackgroundSideEffects(userInfo) }
-        NotificationPresentationCoordinator.present(userInfo, NotificationPresentationSource.PUSH)
+        // Banner in-app en Main (FCM llega en hilo de servicio).
+        scope.launch(Dispatchers.Main.immediate) {
+            NotificationPresentationCoordinator.present(userInfo, NotificationPresentationSource.PUSH)
+        }
 
         if (NotificationPresentationCoordinator.isSilentPush(userInfo)) {
             NotificationBadgeService.refreshAllCounts()

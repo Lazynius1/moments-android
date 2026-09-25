@@ -3,15 +3,31 @@ package com.moments.android.views.components
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateContentSize
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -20,16 +36,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HourglassFull
@@ -37,11 +58,13 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -54,19 +77,34 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import android.view.Gravity
+import android.view.WindowManager
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -77,17 +115,21 @@ import com.moments.android.extensions.MomentsGlassStyle
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MomentsNotification
 import com.moments.android.models.NotificationType
+import com.moments.android.notifications.services.InAppActionToast
 import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.notifications.services.NotificationBannerCopy
 import com.moments.android.notifications.services.NotificationCopyResolver
 import com.moments.android.notifications.services.NotificationNavigationService
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.incognito.IncognitoModeService
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.legacyPoppinsSize
+import com.moments.android.views.feed.reactions.ReactionType
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.messaging.services.ChatNavigationIntentStore
+import com.moments.android.views.profile.incognito.IncognitoBannerPill
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -97,51 +139,177 @@ import kotlin.math.roundToInt
 private val BannerCapsule = RoundedCornerShape(percent = 50)
 
 /**
- * Port de `InAppBannerView.swift`.
- * Quick reply: `InAppMessageQuickReplyPanel` (archivo propio, como en iOS).
+ * Port de `InAppBannerView.swift` + `InAppBannerWindowPresenter`.
+ *
+ * Usa [Dialog] (ventana propia) encima de Nav3 `fullScreenDialog` (notificaciones,
+ * mensajes, stories…) ≡ iOS `UIWindow` `.alert + 1`.
+ *
+ * Mientras Incognito está activo el Dialog **permanece abierto** con
+ * [IncognitoBannerPill] (misma cápsula glass + tap → panel Pausar).
  */
+private enum class IncognitoChromePhase { Message, Timer, TimerIcon }
+
 @Composable
 fun InAppBannerView(modifier: Modifier = Modifier) {
     val visible by InAppNotificationService.showBanner.collectAsState()
     val notification by InAppNotificationService.currentNotification.collectAsState()
+    val actionToast by InAppNotificationService.actionToast.collectAsState()
+    val incognitoActive by IncognitoModeService.isActive.collectAsState()
     var isQuickReplyExpanded by remember { mutableStateOf(false) }
+
+    val incognitoBridgeToast = actionToast?.takeIf {
+        it.bridgesToIncognitoPill || it.isIncognitoPaused
+    }
+    val incognitoPhase: IncognitoChromePhase? = when {
+        incognitoBridgeToast != null -> IncognitoChromePhase.Message
+        !incognitoActive -> null
+        visible -> IncognitoChromePhase.TimerIcon
+        else -> IncognitoChromePhase.Timer
+    }
+    val showsStandardBanner = visible && !incognitoActive && incognitoBridgeToast == null
+    val showHost = showsStandardBanner || incognitoPhase != null
 
     LaunchedEffect(visible) {
         if (!visible) isQuickReplyExpanded = false
     }
 
-    Box(
-        modifier
-            .fillMaxWidth()
-            .statusBarsPadding(),
-        contentAlignment = Alignment.TopCenter,
+    if (!showHost) return
+
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
     ) {
-        // iOS: allowsHitTesting(isBannerInteractive) — solo cuando showBanner
-        AnimatedVisibility(
-            visible = visible && notification != null,
-            enter = slideInVertically(
-                animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
-                initialOffsetY = { -it },
-            ) + fadeIn(),
-            exit = slideOutVertically(
-                animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
-                targetOffsetY = { -it },
-            ) + fadeOut(),
+        val view = LocalView.current
+        // Banner tapeable; alrededor pasa (WRAP_CONTENT + NOT_TOUCH_MODAL).
+        SideEffect {
+            val window = (view.parent as? DialogWindowProvider)?.window ?: return@SideEffect
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
+            window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
+            window.setDimAmount(0f)
+            window.setBackgroundDrawableResource(android.R.color.transparent)
+            window.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL)
+            window.setLayout(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+            )
+            window.attributes = window.attributes.apply {
+                width = WindowManager.LayoutParams.WRAP_CONTENT
+                height = WindowManager.LayoutParams.WRAP_CONTENT
+                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                flags = (flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL) and
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+            }
+        }
+
+        Column(
+            modifier
+                .wrapContentWidth()
+                .wrapContentHeight()
+                .statusBarsPadding()
+                .padding(top = 8.dp)
+                .animateContentSize(
+                    animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            notification?.let { current ->
-                // iOS: padding(.top, 8)
-                Box(Modifier.padding(top = 8.dp)) {
-                    if (isQuickReplyExpanded && current.type == NotificationType.MESSAGE) {
-                        InAppMessageQuickReplyPanel(
-                            notification = current,
-                            onDismiss = { isQuickReplyExpanded = false },
-                        )
-                    } else {
-                        CompactInAppBanner(
-                            notification = current,
-                            onExpandQuickReply = { isQuickReplyExpanded = true },
-                            onCollapseQuickReply = { isQuickReplyExpanded = false },
-                        )
+            val phase = incognitoPhase
+            if (phase != null) {
+                Row(
+                    modifier = Modifier.animateContentSize(
+                        animationSpec = spring(
+                            dampingRatio = 0.82f,
+                            stiffness = Spring.StiffnessMediumLow,
+                        ),
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IncognitoBannerPill(
+                        horizontalPadding = if (phase == IncognitoChromePhase.TimerIcon) 0.dp else 20.dp,
+                        showsCompactOnly = phase != IncognitoChromePhase.Timer,
+                        compact = {
+                            AnimatedContent(
+                                targetState = phase,
+                                transitionSpec = {
+                                    (
+                                        fadeIn(tween(180)) +
+                                            expandHorizontally(
+                                                animationSpec = spring(
+                                                    dampingRatio = 0.82f,
+                                                    stiffness = Spring.StiffnessMediumLow,
+                                                ),
+                                                expandFrom = Alignment.CenterHorizontally,
+                                            )
+                                        ) togetherWith (
+                                        fadeOut(tween(120)) +
+                                            shrinkHorizontally(
+                                                animationSpec = spring(
+                                                    dampingRatio = 0.82f,
+                                                    stiffness = Spring.StiffnessMediumLow,
+                                                ),
+                                                shrinkTowards = Alignment.CenterHorizontally,
+                                            )
+                                        ) using SizeTransform(clip = false)
+                                },
+                                label = "incognitoChromeMorph",
+                            ) { targetPhase ->
+                                UnifiedIncognitoChrome(
+                                    phase = targetPhase,
+                                    bridgeToast = incognitoBridgeToast,
+                                )
+                            }
+                        },
+                    )
+
+                    if (phase == IncognitoChromePhase.TimerIcon) {
+                        when {
+                            actionToast != null && incognitoBridgeToast == null -> {
+                                ActionToastBanner(actionToast!!, clustered = true)
+                            }
+
+                            notification != null -> {
+                                val current = notification!!
+                                if (isQuickReplyExpanded && current.type == NotificationType.MESSAGE) {
+                                    InAppMessageQuickReplyPanel(
+                                        notification = current,
+                                        onDismiss = { isQuickReplyExpanded = false },
+                                    )
+                                } else {
+                                    CompactInAppBanner(
+                                        notification = current,
+                                        clustered = true,
+                                        onExpandQuickReply = { isQuickReplyExpanded = true },
+                                        onCollapseQuickReply = { isQuickReplyExpanded = false },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (showsStandardBanner) {
+                when {
+                    actionToast != null -> ActionToastBanner(actionToast!!)
+                    notification != null -> {
+                        val current = notification!!
+                        if (isQuickReplyExpanded && current.type == NotificationType.MESSAGE) {
+                            InAppMessageQuickReplyPanel(
+                                notification = current,
+                                onDismiss = { isQuickReplyExpanded = false },
+                            )
+                        } else {
+                            CompactInAppBanner(
+                                notification = current,
+                                onExpandQuickReply = { isQuickReplyExpanded = true },
+                                onCollapseQuickReply = { isQuickReplyExpanded = false },
+                            )
+                        }
                     }
                 }
             }
@@ -150,8 +318,310 @@ fun InAppBannerView(modifier: Modifier = Modifier) {
 }
 
 @Composable
+private fun UnifiedIncognitoChrome(
+    phase: IncognitoChromePhase,
+    bridgeToast: InAppActionToast? = null,
+) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val isDark = isSystemInDarkTheme()
+    val titleSp = with(density) { legacyPoppinsSize(context, 14).toSp() }
+    val subtitleSp = with(density) { legacyPoppinsSize(context, 12).toSp() }
+    val remainingSeconds by IncognitoModeService.remainingSeconds.collectAsState()
+    val formattedTime = remember(remainingSeconds) {
+        val remaining = maxOf(remainingSeconds, 0)
+        "%02d:%02d".format(remaining / 60, remaining % 60)
+    }
+
+    CompositionLocalProvider(
+        LocalContentColor provides MomentsChromeGlass.contentColor(isDark),
+    ) {
+        Row(
+            modifier = Modifier
+                .then(
+                    when (phase) {
+                        IncognitoChromePhase.Timer -> Modifier.width(108.dp)
+                        IncognitoChromePhase.TimerIcon -> Modifier.width(40.dp)
+                        IncognitoChromePhase.Message -> Modifier.widthIn(max = 340.dp)
+                    },
+                )
+                .heightIn(min = 40.dp)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = BannerCapsule,
+                    ambientColor = Color.Black.copy(alpha = 0.08f),
+                    spotColor = Color.Black.copy(alpha = 0.08f),
+                )
+                .momentsChromeGlass(
+                    shape = BannerCapsule,
+                    interactive = phase != IncognitoChromePhase.Message,
+                    style = MomentsGlassStyle.NATIVE,
+                )
+                .padding(
+                    horizontal = when (phase) {
+                        IncognitoChromePhase.TimerIcon -> 11.dp
+                        IncognitoChromePhase.Message -> 16.dp
+                        IncognitoChromePhase.Timer -> 14.dp
+                    },
+                    vertical = if (phase == IncognitoChromePhase.Message) 10.dp else 9.dp,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            when (phase) {
+                IncognitoChromePhase.Message -> {
+                    val toast = bridgeToast
+                    if (toast != null) {
+                        Column(modifier = Modifier.weight(1f, fill = false)) {
+                            Text(
+                                text = buildAnnotatedString {
+                                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) {
+                                        append(toast.prefix)
+                                    }
+                                    val emphasis = toast.emphasis
+                                    if (!emphasis.isNullOrEmpty()) {
+                                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                            append(emphasis)
+                                        }
+                                        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) {
+                                            append(toast.suffix)
+                                        }
+                                    }
+                                },
+                                color = LocalContentColor.current,
+                                fontSize = titleSp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            toast.subtitle?.trim()?.takeIf { it.isNotEmpty() }?.let { sub ->
+                                Text(
+                                    sub,
+                                    color = LocalContentColor.current.copy(alpha = 0.62f),
+                                    fontSize = subtitleSp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.Filled.VisibilityOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = LocalContentColor.current,
+                        )
+                    }
+                }
+                IncognitoChromePhase.Timer -> {
+                    Icon(
+                        Icons.Filled.VisibilityOff,
+                        contentDescription = null,
+                        tint = LocalContentColor.current,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        formattedTime,
+                        color = LocalContentColor.current,
+                        fontSize = titleSp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    )
+                }
+                IncognitoChromePhase.TimerIcon -> {
+                    Icon(
+                        Icons.Filled.HourglassFull,
+                        contentDescription = null,
+                        tint = LocalContentColor.current,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = false) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val isDark = isSystemInDarkTheme()
+    val titleSp = with(density) { legacyPoppinsSize(context, 14).toSp() }
+    val subtitleSp = with(density) { legacyPoppinsSize(context, 12).toSp() }
+    val undoSp = with(density) { legacyPoppinsSize(context, 14).toSp() }
+    var dragOffsetY by remember(toast.id) { mutableFloatStateOf(0f) }
+    val subtitle = toast.subtitle?.trim().orEmpty()
+    val hasUndo = toast.undo != null
+    val undoProgress = remember(toast.id) { Animatable(1f) }
+
+    LaunchedEffect(toast.id) {
+        if (!toast.showsProgress) HapticManager.shared.success()
+        if (hasUndo) {
+            undoProgress.snapTo(1f)
+            undoProgress.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(
+                    durationMillis = toast.durationMs.toInt().coerceAtLeast(1),
+                    easing = LinearEasing,
+                ),
+            )
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalContentColor provides MomentsChromeGlass.contentColor(isDark),
+    ) {
+    Box(
+        modifier = Modifier
+            .widthIn(max = if (clustered) 280.dp else 340.dp)
+            .then(if (clustered) Modifier else Modifier.padding(horizontal = 20.dp)),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset { IntOffset(0, dragOffsetY.roundToInt()) }
+                .shadow(
+                    elevation = 8.dp,
+                    shape = BannerCapsule,
+                    ambientColor = Color.Black.copy(alpha = 0.08f),
+                    spotColor = Color.Black.copy(alpha = 0.08f),
+                )
+                .momentsChromeGlass(
+                    shape = BannerCapsule,
+                    interactive = false,
+                    style = MomentsGlassStyle.NATIVE,
+                )
+                .then(
+                    if (hasUndo) {
+                        Modifier.drawWithContent {
+                            drawContent()
+                            val strokeWidth = 2.dp.toPx()
+                            val inset = strokeWidth / 2f
+                            val capsule = Path().apply {
+                                addRoundRect(
+                                    RoundRect(
+                                        left = inset,
+                                        top = inset,
+                                        right = size.width - inset,
+                                        bottom = size.height - inset,
+                                        cornerRadius = CornerRadius(size.height / 2f),
+                                    ),
+                                )
+                            }
+                            val measure = PathMeasure()
+                            measure.setPath(capsule, forceClosed = false)
+                            val segment = Path()
+                            measure.getSegment(
+                                startDistance = 0f,
+                                stopDistance = measure.length * undoProgress.value,
+                                destination = segment,
+                                startWithMoveTo = true,
+                            )
+                            drawPath(
+                                path = segment,
+                                color = Color.Red.copy(alpha = 0.85f),
+                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                            )
+                        }
+                    } else {
+                        Modifier
+                    },
+                )
+                .pointerInput(toast.id) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { _, dragAmount ->
+                            if (dragAmount < 0f) dragOffsetY += dragAmount
+                        },
+                        onDragEnd = {
+                            if (dragOffsetY < -20f) InAppNotificationService.dismissManually()
+                            dragOffsetY = 0f
+                        },
+                        onDragCancel = { dragOffsetY = 0f },
+                    )
+                }
+                .heightIn(min = if (clustered) 56.dp else 48.dp)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { InAppNotificationService.dismissManually() },
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) {
+                            append(toast.prefix)
+                        }
+                        val emphasis = toast.emphasis
+                        if (!emphasis.isNullOrEmpty()) {
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                append(emphasis)
+                            }
+                            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) {
+                                append(toast.suffix)
+                            }
+                        }
+                    },
+                    color = LocalContentColor.current,
+                    fontSize = titleSp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (subtitle.isNotEmpty()) {
+                    Text(
+                        text = subtitle,
+                        color = LocalContentColor.current.copy(alpha = 0.62f),
+                        fontSize = subtitleSp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            if (toast.showsProgress) {
+                MomentsCircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = if (toast.bridgesToIncognitoPill || toast.isIncognitoPaused) {
+                        Icons.Filled.VisibilityOff
+                    } else {
+                        Icons.Filled.CheckCircle
+                    },
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clickable { InAppNotificationService.dismissManually() },
+                    tint = LocalContentColor.current,
+                )
+            }
+
+            toast.undo?.let {
+                Text(
+                    text = stringResource(R.string.notifications_deleted_undo),
+                    color = Color.Red,
+                    fontSize = undoSp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clickable { InAppNotificationService.performUndoFromActionToast() }
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                )
+            }
+        }
+    }
+    }
+}
+
+@Composable
 private fun CompactInAppBanner(
     notification: MomentsNotification,
+    clustered: Boolean = false,
     onExpandQuickReply: () -> Unit,
     onCollapseQuickReply: () -> Unit,
 ) {
@@ -193,13 +663,12 @@ private fun CompactInAppBanner(
     // Mismo gestos de siempre; tamaño + look tipo iOS SToasts.
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
+            .widthIn(max = if (clustered) 280.dp else 310.dp)
+            .then(if (clustered) Modifier else Modifier.padding(horizontal = 20.dp)),
         contentAlignment = Alignment.TopCenter,
     ) {
         Box(
             modifier = Modifier
-                .widthIn(max = 310.dp)
                 .fillMaxWidth()
                 .offset { IntOffset(0, dragOffsetY.roundToInt()) }
                 .shadow(
@@ -269,7 +738,7 @@ private fun CompactInAppBanner(
                 CompositionLocalProvider(
                     LocalContentColor provides MomentsChromeGlass.contentColor(isDark),
                 ) {
-                    BannerAvatar(notification = notification, isSystem = isSystem, isDark = isDark)
+                    MaskedBannerAvatar(notification = notification, isSystem = isSystem, isDark = isDark)
 
                     Column(
                         modifier = Modifier.weight(1f),
@@ -302,13 +771,24 @@ private fun CompactInAppBanner(
                         }
                     }
 
-                    BannerTrailingIcon(
-                        notification = notification,
-                        isSystem = isSystem,
-                        accentColor = accent,
-                        contentPreviewImage = contentPreviewImage,
-                        contentPreviewFeedCrop = contentPreviewFeedCrop,
-                    )
+                    // iOS: solo preview de media a la derecha; el tipo va en cutout del avatar.
+                    if (!isSystem && !contentPreviewImage.isNullOrBlank()) {
+                        AsyncImage(
+                            model = coil.request.ImageRequest.Builder(context)
+                                .data(contentPreviewImage)
+                                .transformations(
+                                    com.moments.android.views.creator.creatoruikit.feedCropTransformations(
+                                        contentPreviewFeedCrop,
+                                    ),
+                                )
+                                .build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(RoundedCornerShape(7.dp)),
+                        )
+                    }
                 }
             }
         }
@@ -331,6 +811,14 @@ private fun bannerTextLines(
     if (notification.type == NotificationType.GENTLE_REMINDER) {
         return BannerTextLines(copy.title, copy.body)
     }
+    // Título (frase) + subtitle (CTA en notification_mutual_connection_body).
+    if (notification.type == NotificationType.MUTUAL_CONNECTION) {
+        return BannerTextLines(copy.title, copy.body)
+    }
+    if (notification.type == NotificationType.ECHO_SUGGESTION) {
+        val sentence = copy.body?.trim().orEmpty()
+        return BannerTextLines(null, sentence.ifEmpty { copy.title })
+    }
     val body = copy.body?.trim().orEmpty()
     if (body.isNotEmpty()) {
         return if (body.startsWith(name)) {
@@ -346,7 +834,48 @@ private fun bannerTextLines(
 }
 
 @Composable
-private fun BannerAvatar(
+private fun MaskedBannerAvatar(
+    notification: MomentsNotification,
+    isSystem: Boolean,
+    isDark: Boolean,
+) {
+    val density = LocalDensity.current
+    Box(
+        modifier = Modifier.size(36.dp),
+        contentAlignment = Alignment.BottomEnd,
+    ) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    // ≡ iOS reversedMask: Circle 18×18 offset(+2,+2) bottomTrailing
+                    val cut = with(density) { 18.dp.toPx() }
+                    val shift = with(density) { 2.dp.toPx() }
+                    drawCircle(
+                        color = Color.Black,
+                        radius = cut / 2f,
+                        center = Offset(size.width - cut / 2f + shift, size.height - cut / 2f + shift),
+                        blendMode = BlendMode.Clear,
+                    )
+                },
+        ) {
+            BannerAvatarCore(notification = notification, isSystem = isSystem, isDark = isDark)
+        }
+        Box(
+            modifier = Modifier
+                .size(14.dp)
+                .offset(x = 2.dp, y = 2.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            BannerAvatarCutoutGlyph(notification)
+        }
+    }
+}
+
+@Composable
+private fun BannerAvatarCore(
     notification: MomentsNotification,
     isSystem: Boolean,
     isDark: Boolean,
@@ -354,7 +883,10 @@ private fun BannerAvatar(
     if (isSystem) {
         SystemBannerAvatar(notification = notification, isDark = isDark)
     } else if (com.moments.android.services.messaging.GroupChatScope.isGroup(notification.conversationId)) {
-        com.moments.android.views.messaging.groups.GroupChatAvatar(image = notification.groupImage.orEmpty(), size = 34.dp)
+        com.moments.android.views.messaging.groups.GroupChatAvatar(
+            image = notification.groupImage.orEmpty(),
+            size = 34.dp,
+        )
     } else {
         AsyncProfileImageView(
             userId = notification.senderId,
@@ -364,6 +896,72 @@ private fun BannerAvatar(
                 .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape),
         )
     }
+}
+
+@Composable
+private fun BannerAvatarCutoutGlyph(notification: MomentsNotification) {
+    val reactionGlyph = momentReactionGlyph(notification)
+    when {
+        reactionGlyph != null -> Text(
+            text = reactionGlyph,
+            fontSize = with(LocalDensity.current) { 13.dp.toSp() },
+            maxLines = 1,
+        )
+        usesCustomCutout(notification) -> BannerCustomCutoutIcon(notification)
+        else -> Icon(
+            imageVector = trailingSystemIcon(notification),
+            contentDescription = null,
+            tint = LocalContentColor.current.copy(alpha = 0.72f),
+            modifier = Modifier.size(11.dp),
+        )
+    }
+}
+
+private fun usesCustomCutout(notification: MomentsNotification): Boolean {
+    if (isSystemTimeLimitBanner(notification) || isSystemModerationBanner(notification)) return false
+    return when (notification.type) {
+        NotificationType.PHOTO_TAG,
+        NotificationType.MUTUAL_CONNECTION,
+        NotificationType.CHAT_BUZZ,
+        NotificationType.ECHO_SUGGESTION,
+        -> true
+        else -> false
+    }
+}
+
+@Composable
+private fun BannerCustomCutoutIcon(notification: MomentsNotification) {
+    val tint = LocalContentColor.current.copy(alpha = 0.72f)
+    when (notification.type) {
+        NotificationType.PHOTO_TAG -> AttachmentIconView(
+            icon = AttachmentIcon.TAGGED,
+            preset = AttachmentIconPreset.IN_APP_BANNER,
+            tintColor = tint,
+        )
+        NotificationType.MUTUAL_CONNECTION -> AttachmentIconView(
+            icon = AttachmentIcon.MUTUALS,
+            preset = AttachmentIconPreset.IN_APP_BANNER,
+            tintColor = tint,
+        )
+        NotificationType.CHAT_BUZZ -> AttachmentIconView(
+            icon = AttachmentIcon.BUZZ,
+            preset = AttachmentIconPreset.IN_APP_BANNER,
+            tintColor = tint,
+        )
+        NotificationType.ECHO_SUGGESTION -> EchoesIconView(size = 15.dp, tintColor = tint)
+        else -> Unit
+    }
+}
+
+private fun momentReactionGlyph(notification: MomentsNotification): String? {
+    if (notification.type != NotificationType.REACTION &&
+        notification.type != NotificationType.STORY_REACTION
+    ) {
+        return null
+    }
+    val raw = notification.reaction?.trim().orEmpty()
+    if (raw.isEmpty()) return null
+    return ReactionType.fromRaw(raw)?.icon ?: raw
 }
 
 @Composable
@@ -404,56 +1002,6 @@ private fun SystemBannerAvatar(notification: MomentsNotification, isDark: Boolea
                 contentDescription = null,
                 tint = Color(0xFFFF9500),
                 modifier = Modifier.size(15.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun BannerTrailingIcon(
-    notification: MomentsNotification,
-    isSystem: Boolean,
-    accentColor: Color,
-    contentPreviewImage: String?,
-    contentPreviewFeedCrop: com.moments.android.models.MediaItemFeedCrop? = null,
-) {
-    if (!isSystem && !contentPreviewImage.isNullOrBlank()) {
-        AsyncImage(
-            model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                .data(contentPreviewImage)
-                .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(contentPreviewFeedCrop))
-                .build(),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(30.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(7.dp)),
-        )
-        return
-    }
-
-    val tint = if (isSystemModerationBanner(notification)) {
-        LocalContentColor.current.copy(alpha = 0.85f)
-    } else {
-        accentColor
-    }
-    Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
-        if (!isSystemTimeLimitBanner(notification) &&
-            !isSystemModerationBanner(notification) &&
-            notification.type == NotificationType.PHOTO_TAG
-        ) {
-            AttachmentIconView(
-                icon = AttachmentIcon.TAGGED,
-                preset = AttachmentIconPreset.IN_APP_BANNER,
-                tintColor = tint,
-            )
-        } else {
-            Icon(
-                imageVector = trailingSystemIcon(notification),
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(14.dp),
             )
         }
     }

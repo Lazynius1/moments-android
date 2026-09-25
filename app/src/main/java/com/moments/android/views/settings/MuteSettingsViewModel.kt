@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.models.AppUser
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchUserProfile
 import kotlinx.coroutines.CoroutineScope
@@ -78,7 +80,13 @@ class MuteSettingsViewModel {
     fun muteUser(user: AppUser) {
         if (mutedUsers.none { it.id == user.id }) {
             mutedUsers = mutedUsers + user
-            saveSettings()
+            InAppNotificationService.showActionToast(
+                InAppActionToast.muted(
+                    user.username,
+                    undo = { mutedUsers = mutedUsers.filterNot { it.id == user.id } },
+                    onExpire = { saveSettings() },
+                ),
+            )
         }
     }
 

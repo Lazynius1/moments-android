@@ -54,6 +54,20 @@ fun GridPreviewThumbnailFrame(
     settings: MomentGridPreviewSettings,
     content: @Composable (ContentScale) -> Unit,
 ) {
+    GridPreviewThumbnailFrame(width = size, height = size, settings = settings, content = content)
+}
+
+/**
+ * Port de `GridPreviewThumbnailFrame`.
+ * El offset vertical sigue el ancho, como los ajustes guardados del grid 1:1.
+ */
+@Composable
+fun GridPreviewThumbnailFrame(
+    width: Dp,
+    height: Dp,
+    settings: MomentGridPreviewSettings,
+    content: @Composable (ContentScale) -> Unit,
+) {
     val contentScale = if (settings.fitMode == MomentGridPreviewFitMode.FIT) {
         ContentScale.Fit
     } else {
@@ -65,10 +79,9 @@ fun GridPreviewThumbnailFrame(
         Color.White
     }
 
-    // iOS ZStack centra por defecto — crítico en fit (letterbox).
     Box(
         Modifier
-            .size(size)
+            .size(width, height)
             .clipToBounds()
             .then(
                 if (settings.fitMode == MomentGridPreviewFitMode.FIT) {
@@ -85,8 +98,8 @@ fun GridPreviewThumbnailFrame(
                 .graphicsLayer {
                     scaleX = settings.scale.toFloat()
                     scaleY = settings.scale.toFloat()
-                    translationX = settings.offsetX.toFloat() * size.toPx()
-                    translationY = settings.offsetY.toFloat() * size.toPx()
+                    translationX = settings.offsetX.toFloat() * width.toPx()
+                    translationY = settings.offsetY.toFloat() * width.toPx()
                 },
             contentAlignment = Alignment.Center,
         ) {

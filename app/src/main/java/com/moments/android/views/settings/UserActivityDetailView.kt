@@ -75,6 +75,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.Moment
@@ -145,6 +147,7 @@ fun ActivityInteractionDetailView(
     }
     MomentsTabBarHidden()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
     val ink = if (isDark) Color.White else Color.Black
     val inkMuted = ink.copy(alpha = 0.55f)
@@ -168,7 +171,6 @@ fun ActivityInteractionDetailView(
     var pendingConfirmation by remember { mutableStateOf<ActivitySelectionConfirmationAction?>(null) }
     var isMutating by remember { mutableStateOf(false) }
     var mutatingAction by remember { mutableStateOf<ActivitySelectionConfirmationAction?>(null) }
-    var actionBanner by remember { mutableStateOf<ActivityActionBanner?>(null) }
     var selectedEchoId by remember { mutableStateOf<String?>(null) }
     var longPressActivatedItemId by remember { mutableStateOf<String?>(null) }
 
@@ -225,12 +227,13 @@ fun ActivityInteractionDetailView(
     }
 
     fun showBanner(res: Int, isError: Boolean = false) {
-        val banner = ActivityActionBanner(res = res, isError = isError)
-        actionBanner = banner
-        scope.launch {
-            delay(2000)
-            if (actionBanner == banner) actionBanner = null
+        if (isError) {
+            InAppNotificationService.dismissHeldActionToast()
+            return
         }
+        InAppNotificationService.showActionToast(
+            InAppActionToast.activityDone(context.getString(res)),
+        )
     }
 
     fun stopRecentlyDeletedAutoScroll(resetSelectionState: Boolean = true) {
@@ -790,38 +793,6 @@ fun ActivityInteractionDetailView(
             )
         }
 
-        Column(
-            Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 12.dp)
-                .padding(horizontal = 16.dp)
-                .zIndex(20f),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            AnimatedVisibility(
-                visible = actionBanner != null,
-                enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { -it / 2 }) + fadeOut(),
-            ) {
-                actionBanner?.let {
-                    ActionBanner(
-                        res = it.res,
-                        isError = it.isError,
-                        isDark = isDark,
-                        ink = ink,
-                    )
-                }
-            }
-            if (isMutating) {
-                ProcessingBanner(
-                    titleRes = processingTitleRes(mutatingAction),
-                    ink = ink,
-                    isDark = isDark,
-                )
-            }
-        }
-
         selectedEchoId?.let { echoId ->
             EchoViewerUI(
                 echoId = echoId,
@@ -898,6 +869,11 @@ fun ActivityInteractionDetailView(
                 scope.launch {
                     isMutating = true
                     mutatingAction = action
+                    InAppNotificationService.showActionToast(
+                        InAppActionToast.activityProgress(
+                            context.getString(processingTitleRes(action)),
+                        ),
+                    )
                     val ids = selectedIds
                     val result = when (action) {
                         is ActivitySelectionConfirmationAction.ReactionsDelete -> viewModel.removeReactions(ids)
