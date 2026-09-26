@@ -1443,6 +1443,10 @@ Anda dapat mengubah izin ini di pengaturan perangkat. Jika izin dinonaktifkan, b
     <string name="echo_viewer_leave">Keluar</string>
     <string name="toast_action_echo_left">Kamu keluar dari Echo</string>
     <string name="toast_action_echo_deleted">Echo dihapus</string>
+    <string name="toast_action_message_request_deleted">Permintaan pesan dihapus</string>
+    <string name="toast_action_message_requests_deleted">Permintaan pesan dihapus</string>
+    <string name="toast_action_message_request_reported">Permintaan pesan dilaporkan</string>
+    <string name="toast_action_message_request_accepted">Permintaan pesan diterima</string>
     <string name="echo_viewer_incomplete_title">Echo tidak lengkap</string>
     <string name="echo_viewer_incomplete_body">Salah satu momen asli sudah tidak tersedia. Kamu tetap bisa menyimpan Echo ini sebagai kenangan, tetapi peta dan beberapa fiturnya sudah tidak tersedia.</string>
     <string name="echo_viewer_keep">Simpan Echo</string>
@@ -2973,4 +2977,15 @@ Anda dapat mengubah izin ini di pengaturan perangkat. Jika izin dinonaktifkan, b
     <string name="messaging_toast_deleted">Percakapan dihapus</string>
     <string name="messaging_toast_archived">Obrolan diarsipkan</string>
     <string name="messaging_toast_unarchived">Obrolan dikeluarkan dari arsip</string>
+    <string name="message_requests_recent_empty_title">Tidak ada permintaan pesan terbaru</string>
+    <string name="message_requests_recent_empty_description">Permintaan yang lebih dari 30 hari tidak ditampilkan di sini.</string>
+    <string name="message_requests_view_all">Lihat semua</string>
+    <string name="message_requests_load_more">Tampilkan lebih banyak permintaan pesan</string>
+    <string name="message_requests_hidden_row">Permintaan tersembunyi</string>
+    <string name="message_requests_hidden_preferences">Kelola preferensi kata yang difilter</string>
+    <string name="message_requests_privacy_description">Open a chat to learn more about who sent the message. They won\'t know you\'ve seen the request until you accept it.</string>
+    <string name="message_requests_privacy_settings">Decide who can send you messages</string>
+    <string name="message_requests_delete_all">Hapus semua</string>
+    <string name="message_requests_delete_all_confirmation_title">Hapus semua permintaan?</string>
+    <string name="message_requests_delete_all_confirmation_message">Tindakan ini tidak dapat dibatalkan.</string>
 </resources>

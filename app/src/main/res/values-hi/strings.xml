@@ -1443,6 +1443,10 @@
     <string name="echo_viewer_leave">छोड़ें</string>
     <string name="toast_action_echo_left">आप Echo से बाहर निकल गए</string>
     <string name="toast_action_echo_deleted">Echo मिटा दिया गया</string>
+    <string name="toast_action_message_request_deleted">संदेश अनुरोध हटाया गया</string>
+    <string name="toast_action_message_requests_deleted">संदेश अनुरोध हटाए गए</string>
+    <string name="toast_action_message_request_reported">संदेश अनुरोध रिपोर्ट किया गया</string>
+    <string name="toast_action_message_request_accepted">संदेश अनुरोध स्वीकार किया गया</string>
     <string name="echo_viewer_incomplete_title">अधूरा Echo</string>
     <string name="echo_viewer_incomplete_body">मूल Moments में से एक अब उपलब्ध नहीं है। आप इस Echo को याद के तौर पर रख सकते हैं, लेकिन मैप और कुछ सुविधाएँ अब उपलब्ध नहीं हैं।</string>
     <string name="echo_viewer_keep">Echo रखें</string>
@@ -2973,4 +2977,15 @@
     <string name="messaging_toast_deleted">बातचीत हटाई गई</string>
     <string name="messaging_toast_archived">चैट आर्काइव की गई</string>
     <string name="messaging_toast_unarchived">चैट आर्काइव से निकाल दी गई</string>
+    <string name="message_requests_recent_empty_title">कोई हालिया संदेश अनुरोध नहीं</string>
+    <string name="message_requests_recent_empty_description">30 दिन से पुराने अनुरोध यहां नहीं दिखाए जाते।</string>
+    <string name="message_requests_view_all">सभी देखें</string>
+    <string name="message_requests_load_more">और संदेश अनुरोध दिखाएं</string>
+    <string name="message_requests_hidden_row">छिपे हुए अनुरोध</string>
+    <string name="message_requests_hidden_preferences">फ़िल्टर किए गए शब्दों की प्राथमिकताएं प्रबंधित करें</string>
+    <string name="message_requests_privacy_description">Open a chat to learn more about who sent the message. They won\'t know you\'ve seen the request until you accept it.</string>
+    <string name="message_requests_privacy_settings">Decide who can send you messages</string>
+    <string name="message_requests_delete_all">सभी हटाएं</string>
+    <string name="message_requests_delete_all_confirmation_title">सभी अनुरोध हटाएं?</string>
+    <string name="message_requests_delete_all_confirmation_message">इस क्रिया को वापस नहीं किया जा सकता।</string>
 </resources>

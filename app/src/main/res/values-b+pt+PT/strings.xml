@@ -1071,6 +1071,10 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="echo_viewer_leave">Sair</string>
     <string name="toast_action_echo_left">Saíste do Echo</string>
     <string name="toast_action_echo_deleted">Echo eliminado</string>
+    <string name="toast_action_message_request_deleted">Pedido de mensagem eliminado</string>
+    <string name="toast_action_message_requests_deleted">Pedidos de mensagem eliminados</string>
+    <string name="toast_action_message_request_reported">Pedido de mensagem denunciado</string>
+    <string name="toast_action_message_request_accepted">Pedido de mensagem aceite</string>
     <string name="echo_viewer_incomplete_title">Echo incompleto</string>
     <string name="echo_viewer_incomplete_body">Um dos moments originais já não está disponível. Podes manter este Echo como recordação, mas o mapa e algumas funcionalidades já não estarão disponíveis.</string>
     <string name="echo_viewer_keep">Manter Echo</string>
@@ -2359,4 +2363,15 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="notification_chat_summary_multiple">%1$s novas mensagens</string>
     <string name="notification_group_untitled">Grupo</string>
     <string name="notification_chat_self">Tu</string>
+    <string name="message_requests_recent_empty_title">Não existem pedidos de mensagens recentes</string>
+    <string name="message_requests_recent_empty_description">Os pedidos com mais de 30 dias não são mostrados aqui.</string>
+    <string name="message_requests_view_all">Ver tudo</string>
+    <string name="message_requests_load_more">Mostrar mais pedidos de mensagens</string>
+    <string name="message_requests_hidden_row">Pedidos ocultos</string>
+    <string name="message_requests_hidden_preferences">Gerir preferências de palavras filtradas</string>
+    <string name="message_requests_privacy_description">Abre uma conversa para saber mais sobre quem enviou a mensagem. A outra pessoa não saberá que viste o pedido até o aceitares.</string>
+    <string name="message_requests_privacy_settings">Decide quem pode enviar-te mensagens</string>
+    <string name="message_requests_delete_all">Eliminar todos</string>
+    <string name="message_requests_delete_all_confirmation_title">Eliminar todos os pedidos?</string>
+    <string name="message_requests_delete_all_confirmation_message">Esta ação não pode ser anulada.</string>
 </resources>

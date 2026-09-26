@@ -1443,6 +1443,10 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="echo_viewer_leave">Opuść</string>
     <string name="toast_action_echo_left">Opuszczono Echo</string>
     <string name="toast_action_echo_deleted">Echo usunięte</string>
+    <string name="toast_action_message_request_deleted">Usunięto prośbę o wiadomość</string>
+    <string name="toast_action_message_requests_deleted">Usunięto prośby o wiadomość</string>
+    <string name="toast_action_message_request_reported">Zgłoszono prośbę o wiadomość</string>
+    <string name="toast_action_message_request_accepted">Zaakceptowano prośbę o wiadomość</string>
     <string name="echo_viewer_incomplete_title">Niepełne Echo</string>
     <string name="echo_viewer_incomplete_body">Jeden z oryginalnych momentów jest już niedostępny. Możesz zachować to Echo jako wspomnienie, ale mapa i niektóre funkcje nie są już dostępne.</string>
     <string name="echo_viewer_keep">Zachowaj Echo</string>
@@ -2973,4 +2977,15 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="messaging_toast_deleted">Rozmowa usunięta</string>
     <string name="messaging_toast_archived">Czat zarchiwizowano</string>
     <string name="messaging_toast_unarchived">Czat przywrócono z archiwum</string>
+    <string name="message_requests_recent_empty_title">Brak ostatnich próśb o wiadomość</string>
+    <string name="message_requests_recent_empty_description">Prośby starsze niż 30 dni nie są tutaj wyświetlane.</string>
+    <string name="message_requests_view_all">Zobacz wszystkie</string>
+    <string name="message_requests_load_more">Pokaż więcej próśb o wiadomość</string>
+    <string name="message_requests_hidden_row">Ukryte prośby</string>
+    <string name="message_requests_hidden_preferences">Zarządzaj preferencjami filtrowanych słów</string>
+    <string name="message_requests_privacy_description">Otwórz czat, aby dowiedzieć się więcej o osobie, która wysłała wiadomość. Nie będzie wiedzieć, że prośba została wyświetlona, dopóki jej nie zaakceptujesz.</string>
+    <string name="message_requests_privacy_settings">Zdecyduj, kto może wysyłać Ci wiadomości</string>
+    <string name="message_requests_delete_all">Usuń wszystkie</string>
+    <string name="message_requests_delete_all_confirmation_title">Usunąć wszystkie prośby?</string>
+    <string name="message_requests_delete_all_confirmation_message">Tej czynności nie można cofnąć.</string>
 </resources>

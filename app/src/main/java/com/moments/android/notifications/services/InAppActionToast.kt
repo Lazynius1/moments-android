@@ -100,6 +100,18 @@ data class InAppActionToast(
         fun echoDeleted(): InAppActionToast =
             create(prefix = str(R.string.toast_action_echo_deleted))
 
+        fun messageRequestDeleted(): InAppActionToast =
+            create(prefix = str(R.string.toast_action_message_request_deleted))
+
+        fun messageRequestsDeleted(): InAppActionToast =
+            create(prefix = str(R.string.toast_action_message_requests_deleted))
+
+        fun messageRequestReported(): InAppActionToast =
+            create(prefix = str(R.string.toast_action_message_request_reported))
+
+        fun messageRequestAccepted(): InAppActionToast =
+            create(prefix = str(R.string.toast_action_message_request_accepted))
+
         fun followed(username: String): InAppActionToast = personToast(
             prefix = str(R.string.toast_action_followed),
             username = username,

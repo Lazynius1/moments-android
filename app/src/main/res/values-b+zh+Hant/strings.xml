@@ -1443,6 +1443,10 @@
     <string name="echo_viewer_leave">離開</string>
     <string name="toast_action_echo_left">已離開 Echo</string>
     <string name="toast_action_echo_deleted">Echo 已刪除</string>
+    <string name="toast_action_message_request_deleted">已刪除訊息邀請</string>
+    <string name="toast_action_message_requests_deleted">已刪除訊息邀請</string>
+    <string name="toast_action_message_request_reported">已檢舉訊息邀請</string>
+    <string name="toast_action_message_request_accepted">已接受訊息邀請</string>
     <string name="echo_viewer_incomplete_title">Echo 不完整</string>
     <string name="echo_viewer_incomplete_body">其中一個原始 Moments 已無法使用。你可以保留這個 Echo 作為回憶，但地圖和部分功能已無法使用。</string>
     <string name="echo_viewer_keep">保留 Echo</string>
@@ -2973,4 +2977,15 @@
     <string name="messaging_toast_deleted">已刪除對話</string>
     <string name="messaging_toast_archived">聊天已封存</string>
     <string name="messaging_toast_unarchived">聊天已取消封存</string>
+    <string name="message_requests_recent_empty_title">沒有近期訊息要求</string>
+    <string name="message_requests_recent_empty_description">超過 30 天的要求不會顯示在這裡。</string>
+    <string name="message_requests_view_all">查看全部</string>
+    <string name="message_requests_load_more">顯示更多訊息要求</string>
+    <string name="message_requests_hidden_row">隱藏的訊息要求</string>
+    <string name="message_requests_hidden_preferences">管理篩選字詞偏好設定</string>
+    <string name="message_requests_privacy_description">Open a chat to learn more about who sent the message. They won\'t know you\'ve seen the request until you accept it.</string>
+    <string name="message_requests_privacy_settings">Decide who can send you messages</string>
+    <string name="message_requests_delete_all">全部刪除</string>
+    <string name="message_requests_delete_all_confirmation_title">要刪除所有要求嗎？</string>
+    <string name="message_requests_delete_all_confirmation_message">此動作無法復原。</string>
 </resources>

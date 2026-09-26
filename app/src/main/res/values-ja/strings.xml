@@ -1443,6 +1443,10 @@
     <string name="echo_viewer_leave">抜ける</string>
     <string name="toast_action_echo_left">Echoから退出しました</string>
     <string name="toast_action_echo_deleted">Echoを削除しました</string>
+    <string name="toast_action_message_request_deleted">メッセージリクエストを削除しました</string>
+    <string name="toast_action_message_requests_deleted">メッセージリクエストを削除しました</string>
+    <string name="toast_action_message_request_reported">メッセージリクエストを報告しました</string>
+    <string name="toast_action_message_request_accepted">メッセージリクエストを承認しました</string>
     <string name="echo_viewer_incomplete_title">未完成のEcho</string>
     <string name="echo_viewer_incomplete_body">元のMomentの1つが利用できなくなっています。このEchoを思い出として残すことはできますが、地図や一部の機能は利用できません。</string>
     <string name="echo_viewer_keep">Echoを残す</string>
@@ -2973,4 +2977,15 @@
     <string name="messaging_toast_deleted">トークを削除しました</string>
     <string name="messaging_toast_archived">チャットをアーカイブしました</string>
     <string name="messaging_toast_unarchived">チャットのアーカイブを解除しました</string>
+    <string name="message_requests_recent_empty_title">最近のメッセージリクエストはありません</string>
+    <string name="message_requests_recent_empty_description">30日以上前のリクエストはここには表示されません。</string>
+    <string name="message_requests_view_all">すべて見る</string>
+    <string name="message_requests_load_more">さらにメッセージリクエストを表示</string>
+    <string name="message_requests_hidden_row">非表示のリクエスト</string>
+    <string name="message_requests_hidden_preferences">フィルターしたワードの設定を管理</string>
+    <string name="message_requests_privacy_description">Open a chat to learn more about who sent the message. They won\'t know you\'ve seen the request until you accept it.</string>
+    <string name="message_requests_privacy_settings">Decide who can send you messages</string>
+    <string name="message_requests_delete_all">すべて削除</string>
+    <string name="message_requests_delete_all_confirmation_title">すべてのリクエストを削除しますか？</string>
+    <string name="message_requests_delete_all_confirmation_message">この操作は元に戻せません。</string>
 </resources>

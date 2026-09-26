@@ -139,6 +139,7 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private val BannerCapsule = RoundedCornerShape(percent = 50)
+private val BannerCardShape = RoundedCornerShape(16.dp)
 
 /**
  * Port de `InAppBannerView.swift` + `InAppBannerWindowPresenter`.
@@ -479,12 +480,12 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
                 .offset { IntOffset(0, dragOffsetY.roundToInt()) }
                 .shadow(
                     elevation = 8.dp,
-                    shape = BannerCapsule,
+                    shape = BannerCardShape,
                     ambientColor = Color.Black.copy(alpha = 0.08f),
                     spotColor = Color.Black.copy(alpha = 0.08f),
                 )
                 .momentsChromeGlass(
-                    shape = BannerCapsule,
+                    shape = BannerCardShape,
                     interactive = false,
                     style = MomentsGlassStyle.NATIVE,
                 )
@@ -494,19 +495,19 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
                             drawContent()
                             val strokeWidth = 2.dp.toPx()
                             val inset = strokeWidth / 2f
-                            val capsule = Path().apply {
+                            val bannerOutline = Path().apply {
                                 addRoundRect(
                                     RoundRect(
                                         left = inset,
                                         top = inset,
                                         right = size.width - inset,
                                         bottom = size.height - inset,
-                                        cornerRadius = CornerRadius(size.height / 2f),
+                                        cornerRadius = CornerRadius(16.dp.toPx(), 16.dp.toPx()),
                                     ),
                                 )
                             }
                             val measure = PathMeasure()
-                            measure.setPath(capsule, forceClosed = false)
+                            measure.setPath(bannerOutline, forceClosed = false)
                             val segment = Path()
                             measure.getSegment(
                                 startDistance = 0f,
@@ -677,12 +678,12 @@ private fun CompactInAppBanner(
                 .offset { IntOffset(0, dragOffsetY.roundToInt()) }
                 .shadow(
                     elevation = 8.dp,
-                    shape = BannerCapsule,
+                    shape = BannerCardShape,
                     ambientColor = Color.Black.copy(alpha = 0.08f),
                     spotColor = Color.Black.copy(alpha = 0.08f),
                 )
                 .momentsChromeGlass(
-                    shape = BannerCapsule,
+                    shape = BannerCardShape,
                     interactive = false,
                     style = MomentsGlassStyle.NATIVE,
                 )
@@ -727,7 +728,7 @@ private fun CompactInAppBanner(
             Box(
                 Modifier
                     .matchParentSize()
-                    .clip(BannerCapsule)
+                    .clip(BannerCardShape)
                     .background(accentWash),
             )
             Row(

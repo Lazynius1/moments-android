@@ -1,8 +1,11 @@
 package com.moments.android.views.components
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,7 +19,10 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,7 +43,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
-import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.services.privacy.FollowStateStore
@@ -109,24 +114,21 @@ fun ModernFollowButton(
 
     val isCompact = style == ModernFollowButtonStyle.COMPACT
     val isProfileHeader = style == ModernFollowButtonStyle.PROFILE_HEADER
-    val showsLeadIcon = !isProfileHeader
+    // En Android las acciones de relación se leen mejor como botones compactos de texto.
+    // Reservamos los iconos para los estados de audiencia, no para "Seguir".
+    val showsLeadIcon = false
     var showUnfollowConfirm by remember { mutableStateOf(false) }
     var showCancelRequestConfirm by remember { mutableStateOf(false) }
 
     val fontSize = when (style) {
-        ModernFollowButtonStyle.STANDARD -> 14
-        ModernFollowButtonStyle.COMPACT -> 11
-        ModernFollowButtonStyle.PROFILE_HEADER -> 13
+        ModernFollowButtonStyle.STANDARD -> 13
+        ModernFollowButtonStyle.COMPACT -> 10
+        ModernFollowButtonStyle.PROFILE_HEADER -> 12
     }
     val hPadding = when (style) {
-        ModernFollowButtonStyle.STANDARD -> 16.dp
+        ModernFollowButtonStyle.STANDARD -> 12.dp
         ModernFollowButtonStyle.COMPACT -> 10.dp
-        ModernFollowButtonStyle.PROFILE_HEADER -> 18.dp
-    }
-    val vPadding = when (style) {
-        ModernFollowButtonStyle.STANDARD -> 8.dp
-        ModernFollowButtonStyle.COMPACT -> 6.dp
-        ModernFollowButtonStyle.PROFILE_HEADER -> 10.dp
+        ModernFollowButtonStyle.PROFILE_HEADER -> 14.dp
     }
     val spacing = when (style) {
         ModernFollowButtonStyle.STANDARD -> 6.dp
@@ -168,27 +170,25 @@ fun ModernFollowButton(
         }
     }
 
-    Row(
-        modifier
-            .alpha(
-                when {
-                    !hasResolvedRelationship -> 0f
-                    renderState == FollowButtonState.REQUEST_PENDING -> 0.78f
-                    else -> 1f
-                },
-            )
-            .momentsChromeGlass(
-                shape = RoundedCornerShape(percent = 50),
-                interactive = renderState.isActionable,
-            )
-            .clickable(
-                enabled = !isLoading && renderState.isActionable && hasResolvedRelationship,
-                onClick = handleTap,
-            )
-            .padding(horizontal = hPadding, vertical = vPadding),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing),
-    ) {
+    val isPrimaryAction = renderState == FollowButtonState.CAN_FOLLOW ||
+        renderState == FollowButtonState.CAN_REQUEST_FOLLOW
+    val isDark = isSystemInDarkTheme()
+    val primaryContainer = if (isDark) Color(0xFFFAF9F6) else Color(0xFF0B1215)
+    val primaryContent = if (isDark) Color(0xFF0B1215) else Color(0xFFFAF9F6)
+    val secondaryContent = colors.primary
+    val shape = RoundedCornerShape(10.dp)
+    val enabled = !isLoading && renderState.isActionable && hasResolvedRelationship
+    val visualHeight = if (isCompact) 32.dp else 36.dp
+    val buttonModifier = modifier
+        .alpha(
+            when {
+                !hasResolvedRelationship -> 0f
+                renderState == FollowButtonState.REQUEST_PENDING -> 0.78f
+                else -> 1f
+            },
+        )
+        .height(visualHeight)
+    val buttonContent: @Composable RowScope.() -> Unit = {
         if (isLoading) {
             MomentsCircularProgressIndicator(
                 modifier = Modifier.size(if (isCompact) 11.dp else 14.dp),
@@ -199,19 +199,19 @@ fun ModernFollowButton(
                 AudienceIconView(
                     audience = ContentAudience.MUTUALS,
                     size = if (isCompact) 11.dp else 13.dp,
-                    tintColor = colors.primary,
+                    tintColor = if (isPrimaryAction) primaryContent else secondaryContent,
                 )
             } else if (showsLeadIcon) {
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = colors.primary,
+                    tint = if (isPrimaryAction) primaryContent else secondaryContent,
                     modifier = Modifier.size(if (isCompact) 11.dp else 14.dp),
                 )
             }
             Text(
                 text = title,
-                color = colors.primary,
+                color = if (isPrimaryAction) primaryContent else secondaryContent,
                 fontSize = with(density) { legacyPoppinsSize(context, fontSize).toSp() },
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -220,11 +220,46 @@ fun ModernFollowButton(
                 Icon(
                     Icons.Filled.KeyboardArrowDown,
                     contentDescription = null,
-                    tint = colors.primary,
+                    tint = if (isPrimaryAction) primaryContent else secondaryContent,
                     modifier = Modifier.size(10.dp),
                 )
             }
         }
+    }
+
+    if (isPrimaryAction) {
+        Button(
+            onClick = handleTap,
+            enabled = enabled,
+            modifier = buttonModifier,
+            shape = shape,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = primaryContainer,
+                contentColor = primaryContent,
+            ),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                horizontal = hPadding,
+                vertical = 0.dp,
+            ),
+            content = buttonContent,
+        )
+    } else {
+        OutlinedButton(
+            onClick = handleTap,
+            enabled = enabled,
+            modifier = buttonModifier,
+            shape = shape,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = secondaryContent),
+            border = BorderStroke(
+                width = 1.dp,
+                color = secondaryContent.copy(alpha = if (isDark) 0.32f else 0.24f),
+            ),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                horizontal = hPadding,
+                vertical = 0.dp,
+            ),
+            content = buttonContent,
+        )
     }
 
     if (showUnfollowConfirm) {

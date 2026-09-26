@@ -1,5 +1,6 @@
 package com.moments.android.views.profile.core.sections
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,6 +33,8 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,7 +65,6 @@ import com.moments.android.extensions.InterestEmojiHelper
 import com.moments.android.extensions.ProfileChromeControlsCluster
 import com.moments.android.extensions.ProfileChromeGlassMetrics
 import com.moments.android.extensions.ProfileChromeIconButton
-import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.components.VerifiedBadge
@@ -198,7 +200,6 @@ fun ModernProfileHeader(
     val stories = uid?.let(storyViewModel::storiesFor).orEmpty()
     val dark = isSystemInDarkTheme()
     val content = if (dark) Color.White else Color(0xFF0B1215)
-    val controlSurface = if (dark) Color(0xFF151D21) else Color.White
 
     Column(
         modifier.fillMaxWidth().padding(horizontal = 20.dp),
@@ -280,23 +281,18 @@ fun ModernProfileHeader(
             Spacer(Modifier.width(0.dp))
         }
 
-        Row(
+        OutlinedButton(
+            onClick = onEditProfile,
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(50))
-                .momentsChromeGlass(
-                    RoundedCornerShape(50),
-                    interactive = true,
-                    tint = controlSurface,
-                )
+                .height(36.dp)
                 .profileMomentZoomSource(
                     sourceID = ProfileOwnZoomSource.EDIT_PROFILE,
-                    cornerRadius = 50.dp,
-                )
-                .clickable(onClick = onEditProfile)
-                .padding(vertical = 10.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
+                    cornerRadius = 10.dp,
+                ),
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = content),
+            border = BorderStroke(1.dp, content.copy(alpha = if (dark) 0.32f else 0.24f)),
         ) {
             Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(15.dp), tint = content)
             Spacer(Modifier.width(7.dp))

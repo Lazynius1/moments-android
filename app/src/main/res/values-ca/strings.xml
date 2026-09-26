@@ -1103,6 +1103,10 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="echo_viewer_leave">Sortir</string>
     <string name="toast_action_echo_left">Has sortit de l’Echo</string>
     <string name="toast_action_echo_deleted">Echo eliminat</string>
+    <string name="toast_action_message_request_deleted">Sol·licitud de missatge eliminada</string>
+    <string name="toast_action_message_requests_deleted">Sol·licituds de missatge eliminades</string>
+    <string name="toast_action_message_request_reported">Sol·licitud de missatge reportada</string>
+    <string name="toast_action_message_request_accepted">Sol·licitud de missatge acceptada</string>
     <string name="echo_viewer_incomplete_title">Echo incomplet</string>
     <string name="echo_viewer_incomplete_body">Un dels moments originals ja no està disponible. Pots conservar aquest Echo com a record, però el mapa i algunes funcions ja no estaran disponibles.</string>
     <string name="echo_viewer_keep">Conservar Echo</string>
@@ -2366,4 +2370,15 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="notification_chat_summary_multiple">%1$s missatges nous</string>
     <string name="notification_group_untitled">Grup</string>
     <string name="notification_chat_self">Tu</string>
+    <string name="message_requests_recent_empty_title">No hi ha sol·licituds de missatges recents</string>
+    <string name="message_requests_recent_empty_description">No es mostren sol·licituds de fa més de 30 dies.</string>
+    <string name="message_requests_view_all">Veure-ho tot</string>
+    <string name="message_requests_load_more">Mostra més sol·licituds de missatges</string>
+    <string name="message_requests_hidden_row">Sol·licituds ocultes</string>
+    <string name="message_requests_hidden_preferences">Gestiona les preferències de paraules filtrades</string>
+    <string name="message_requests_privacy_description">Obre un xat per obtenir més informació sobre qui t\'envia el missatge. L\'altra persona no sabrà que has vist la sol·licitud fins que l\'acceptis.</string>
+    <string name="message_requests_privacy_settings">Decideix qui et pot enviar missatges</string>
+    <string name="message_requests_delete_all">Elimina-les totes</string>
+    <string name="message_requests_delete_all_confirmation_title">Voleu eliminar totes les sol·licituds?</string>
+    <string name="message_requests_delete_all_confirmation_message">Aquesta acció no es pot desfer.</string>
 </resources>

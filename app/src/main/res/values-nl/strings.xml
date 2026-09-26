@@ -1443,6 +1443,10 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="echo_viewer_leave">Verlaten</string>
     <string name="toast_action_echo_left">Je hebt de Echo verlaten</string>
     <string name="toast_action_echo_deleted">Echo verwijderd</string>
+    <string name="toast_action_message_request_deleted">Berichtverzoek verwijderd</string>
+    <string name="toast_action_message_requests_deleted">Berichtverzoeken verwijderd</string>
+    <string name="toast_action_message_request_reported">Berichtverzoek gemeld</string>
+    <string name="toast_action_message_request_accepted">Berichtverzoek geaccepteerd</string>
     <string name="echo_viewer_incomplete_title">Onvolledige Echo</string>
     <string name="echo_viewer_incomplete_body">Een van de oorspronkelijke momenten is niet meer beschikbaar. Je kunt deze Echo bewaren als herinnering, maar de kaart en sommige functies zijn niet meer beschikbaar.</string>
     <string name="echo_viewer_keep">Echo bewaren</string>
@@ -2973,4 +2977,15 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="messaging_toast_deleted">Gesprek verwijderd</string>
     <string name="messaging_toast_archived">Chat gearchiveerd</string>
     <string name="messaging_toast_unarchived">Chat uit archief gehaald</string>
+    <string name="message_requests_recent_empty_title">Geen recente berichtverzoeken</string>
+    <string name="message_requests_recent_empty_description">Verzoeken ouder dan 30 dagen worden hier niet getoond.</string>
+    <string name="message_requests_view_all">Alles bekijken</string>
+    <string name="message_requests_load_more">Meer berichtverzoeken weergeven</string>
+    <string name="message_requests_hidden_row">Verborgen verzoeken</string>
+    <string name="message_requests_hidden_preferences">Voorkeuren voor gefilterde woorden beheren</string>
+    <string name="message_requests_privacy_description">Open een chat voor meer informatie over wie je een bericht stuurt. Die persoon weet pas dat je het verzoek hebt gezien wanneer je het accepteert.</string>
+    <string name="message_requests_privacy_settings">Bepaal wie je berichten kan sturen</string>
+    <string name="message_requests_delete_all">Alles verwijderen</string>
+    <string name="message_requests_delete_all_confirmation_title">Alle verzoeken verwijderen?</string>
+    <string name="message_requests_delete_all_confirmation_message">Deze actie kan niet ongedaan worden gemaakt.</string>
 </resources>

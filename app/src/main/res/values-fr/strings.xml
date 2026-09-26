@@ -1085,6 +1085,10 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="echo_viewer_leave">Quitter</string>
     <string name="toast_action_echo_left">Vous avez quitté l’Echo</string>
     <string name="toast_action_echo_deleted">Echo supprimé</string>
+    <string name="toast_action_message_request_deleted">Demande de message supprimée</string>
+    <string name="toast_action_message_requests_deleted">Demandes de message supprimées</string>
+    <string name="toast_action_message_request_reported">Demande de message signalée</string>
+    <string name="toast_action_message_request_accepted">Demande de message acceptée</string>
     <string name="echo_viewer_incomplete_title">Echo incomplet</string>
     <string name="echo_viewer_incomplete_body">L’un des moments d’origine n’est plus disponible. Vous pouvez conserver cet Echo comme souvenir, mais la carte et certaines fonctions ne sont plus disponibles.</string>
     <string name="echo_viewer_keep">Conserver l’Echo</string>
@@ -2425,4 +2429,15 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="notification_chat_summary_multiple">%1$s nouveaux messages</string>
     <string name="notification_group_untitled">Groupe</string>
     <string name="notification_chat_self">Vous</string>
+    <string name="message_requests_recent_empty_title">Aucune demande de message récente</string>
+    <string name="message_requests_recent_empty_description">Les demandes de plus de 30 jours ne sont pas affichées ici.</string>
+    <string name="message_requests_view_all">Voir tout</string>
+    <string name="message_requests_load_more">Afficher plus de demandes de messages</string>
+    <string name="message_requests_hidden_row">Demandes masquées</string>
+    <string name="message_requests_hidden_preferences">Gérer les préférences de mots filtrés</string>
+    <string name="message_requests_privacy_description">Ouvrez une discussion pour en savoir plus sur la personne qui vous écrit. Elle ne saura pas que vous avez vu sa demande avant que vous l\'acceptiez.</string>
+    <string name="message_requests_privacy_settings">Décidez qui peut vous envoyer des messages</string>
+    <string name="message_requests_delete_all">Tout supprimer</string>
+    <string name="message_requests_delete_all_confirmation_title">Supprimer toutes les demandes ?</string>
+    <string name="message_requests_delete_all_confirmation_message">Cette action est irréversible.</string>
 </resources>

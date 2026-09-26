@@ -1103,6 +1103,10 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="echo_viewer_leave">Verlassen</string>
     <string name="toast_action_echo_left">Du hast das Echo verlassen</string>
     <string name="toast_action_echo_deleted">Echo gelöscht</string>
+    <string name="toast_action_message_request_deleted">Nachrichtenanfrage gelöscht</string>
+    <string name="toast_action_message_requests_deleted">Nachrichtenanfragen gelöscht</string>
+    <string name="toast_action_message_request_reported">Nachrichtenanfrage gemeldet</string>
+    <string name="toast_action_message_request_accepted">Nachrichtenanfrage angenommen</string>
     <string name="echo_viewer_incomplete_title">Unvollständiges Echo</string>
     <string name="echo_viewer_incomplete_body">Einer der ursprünglichen Moments ist nicht mehr verfügbar. Du kannst dieses Echo als Erinnerung behalten, aber die Karte und einige Funktionen sind nicht mehr verfügbar.</string>
     <string name="echo_viewer_keep">Echo behalten</string>
@@ -2384,4 +2388,15 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="notification_chat_summary_multiple">%1$s neue Nachrichten</string>
     <string name="notification_group_untitled">Gruppe</string>
     <string name="notification_chat_self">Du</string>
+    <string name="message_requests_recent_empty_title">Keine aktuellen Nachrichtenanfragen</string>
+    <string name="message_requests_recent_empty_description">Anfragen, die älter als 30 Tage sind, werden hier nicht angezeigt.</string>
+    <string name="message_requests_view_all">Alle ansehen</string>
+    <string name="message_requests_load_more">Weitere Nachrichtenanfragen anzeigen</string>
+    <string name="message_requests_hidden_row">Ausgeblendete Anfragen</string>
+    <string name="message_requests_hidden_preferences">Einstellungen für gefilterte Wörter verwalten</string>
+    <string name="message_requests_privacy_description">Öffne einen Chat, um mehr über die Person zu erfahren, die dir schreibt. Sie erfährt erst nach deiner Annahme, dass du die Anfrage gesehen hast.</string>
+    <string name="message_requests_privacy_settings">Lege fest, wer dir Nachrichten senden kann</string>
+    <string name="message_requests_delete_all">Alle löschen</string>
+    <string name="message_requests_delete_all_confirmation_title">Alle Anfragen löschen?</string>
+    <string name="message_requests_delete_all_confirmation_message">Diese Aktion kann nicht rückgängig gemacht werden.</string>
 </resources>

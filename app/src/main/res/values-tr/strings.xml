@@ -1443,6 +1443,10 @@ Bu izinleri cihazının ayarlarından değiştirebilirsin. İzinleri kapatırsan
     <string name="echo_viewer_leave">Ayrıl</string>
     <string name="toast_action_echo_left">Echo’dan ayrıldın</string>
     <string name="toast_action_echo_deleted">Echo silindi</string>
+    <string name="toast_action_message_request_deleted">Mesaj isteği silindi</string>
+    <string name="toast_action_message_requests_deleted">Mesaj istekleri silindi</string>
+    <string name="toast_action_message_request_reported">Mesaj isteği bildirildi</string>
+    <string name="toast_action_message_request_accepted">Mesaj isteği kabul edildi</string>
     <string name="echo_viewer_incomplete_title">Echo tamamlanamadı</string>
     <string name="echo_viewer_incomplete_body">Orijinal anlardan biri artık kullanılamıyor. Bu Echo\'yu anı olarak saklayabilirsin ancak harita ve bazı özellikler artık kullanılamayacak.</string>
     <string name="echo_viewer_keep">Echo\'yu sakla</string>
@@ -2973,4 +2977,15 @@ Bu izinleri cihazının ayarlarından değiştirebilirsin. İzinleri kapatırsan
     <string name="messaging_toast_deleted">Sohbet silindi</string>
     <string name="messaging_toast_archived">Sohbet arşivlendi</string>
     <string name="messaging_toast_unarchived">Sohbet arşivden çıkarıldı</string>
+    <string name="message_requests_recent_empty_title">Yakın tarihli mesaj isteği yok</string>
+    <string name="message_requests_recent_empty_description">30 günden eski istekler burada gösterilmez.</string>
+    <string name="message_requests_view_all">Tümünü gör</string>
+    <string name="message_requests_load_more">Daha fazla mesaj isteği göster</string>
+    <string name="message_requests_hidden_row">Gizli istekler</string>
+    <string name="message_requests_hidden_preferences">Filtrelenen kelime tercihlerini yönet</string>
+    <string name="message_requests_privacy_description">Open a chat to learn more about who sent the message. They won\'t know you\'ve seen the request until you accept it.</string>
+    <string name="message_requests_privacy_settings">Decide who can send you messages</string>
+    <string name="message_requests_delete_all">Tümünü sil</string>
+    <string name="message_requests_delete_all_confirmation_title">Tüm istekler silinsin mi?</string>
+    <string name="message_requests_delete_all_confirmation_message">Bu işlem geri alınamaz.</string>
 </resources>

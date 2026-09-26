@@ -1071,6 +1071,10 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="echo_viewer_leave">Lascia</string>
     <string name="toast_action_echo_left">Hai lasciato l’Echo</string>
     <string name="toast_action_echo_deleted">Echo eliminato</string>
+    <string name="toast_action_message_request_deleted">Richiesta di messaggio eliminata</string>
+    <string name="toast_action_message_requests_deleted">Richieste di messaggio eliminate</string>
+    <string name="toast_action_message_request_reported">Richiesta di messaggio segnalata</string>
+    <string name="toast_action_message_request_accepted">Richiesta di messaggio accettata</string>
     <string name="echo_viewer_incomplete_title">Echo incompleto</string>
     <string name="echo_viewer_incomplete_body">Uno dei moment originali non è più disponibile. Puoi conservare questo Echo come ricordo, ma la mappa e alcune funzioni non sono più disponibili.</string>
     <string name="echo_viewer_keep">Mantieni Echo</string>
@@ -2367,4 +2371,15 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="notification_chat_summary_multiple">%1$s nuovi messaggi</string>
     <string name="notification_group_untitled">Gruppo</string>
     <string name="notification_chat_self">Tu</string>
+    <string name="message_requests_recent_empty_title">Nessuna richiesta di messaggio recente</string>
+    <string name="message_requests_recent_empty_description">Le richieste più vecchie di 30 giorni non vengono mostrate qui.</string>
+    <string name="message_requests_view_all">Vedi tutto</string>
+    <string name="message_requests_load_more">Mostra altre richieste di messaggi</string>
+    <string name="message_requests_hidden_row">Richieste nascoste</string>
+    <string name="message_requests_hidden_preferences">Gestisci le preferenze delle parole filtrate</string>
+    <string name="message_requests_privacy_description">Apri una chat per saperne di più su chi ti invia il messaggio. L\'altra persona non saprà che hai visto la richiesta finché non la accetti.</string>
+    <string name="message_requests_privacy_settings">Decidi chi può inviarti messaggi</string>
+    <string name="message_requests_delete_all">Elimina tutte</string>
+    <string name="message_requests_delete_all_confirmation_title">Eliminare tutte le richieste?</string>
+    <string name="message_requests_delete_all_confirmation_message">Questa azione non può essere annullata.</string>
 </resources>

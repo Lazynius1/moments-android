@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -46,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
-import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.ChatAccessState
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.models.MomentsNotification
@@ -91,7 +91,8 @@ fun InAppMessageQuickReplyPanel(
     val previewSp = with(density) { legacyPoppinsSize(context, 13).toSp() }
     val fieldSp = with(density) { legacyPoppinsSize(context, 15).toSp() }
 
-    val panelShape = RoundedCornerShape(24.dp)
+    val panelShape = RoundedCornerShape(20.dp)
+    val panelSurface = if (isDark) Color(0xFF151D21) else Color.White
     val primary = LocalContentColor.current
     val secondary = primary.copy(alpha = 0.62f)
     val accent = MaterialTheme.colorScheme.primary
@@ -113,7 +114,7 @@ fun InAppMessageQuickReplyPanel(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .momentsChromeGlass(panelShape, interactive = true)
+            .background(panelSurface, panelShape)
             .border(1.dp, accent.copy(alpha = 0.25f), panelShape)
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),

@@ -1071,6 +1071,10 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="echo_viewer_leave">Sair</string>
     <string name="toast_action_echo_left">Você saiu do Echo</string>
     <string name="toast_action_echo_deleted">Echo excluído</string>
+    <string name="toast_action_message_request_deleted">Solicitação de mensagem excluída</string>
+    <string name="toast_action_message_requests_deleted">Solicitações de mensagem excluídas</string>
+    <string name="toast_action_message_request_reported">Solicitação de mensagem denunciada</string>
+    <string name="toast_action_message_request_accepted">Solicitação de mensagem aceita</string>
     <string name="echo_viewer_incomplete_title">Echo incompleto</string>
     <string name="echo_viewer_incomplete_body">Um dos moments originais não está mais disponível. Você pode manter este Echo como lembrança, mas o mapa e algumas funções não estarão mais disponíveis.</string>
     <string name="echo_viewer_keep">Manter Echo</string>
@@ -2362,4 +2366,15 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="notification_chat_summary_multiple">%1$s novas mensagens</string>
     <string name="notification_group_untitled">Grupo</string>
     <string name="notification_chat_self">Você</string>
+    <string name="message_requests_recent_empty_title">Nenhuma solicitação de mensagem recente</string>
+    <string name="message_requests_recent_empty_description">Solicitações com mais de 30 dias não são mostradas aqui.</string>
+    <string name="message_requests_view_all">Ver tudo</string>
+    <string name="message_requests_load_more">Mostrar mais solicitações de mensagens</string>
+    <string name="message_requests_hidden_row">Solicitações ocultas</string>
+    <string name="message_requests_hidden_preferences">Gerenciar preferências de palavras filtradas</string>
+    <string name="message_requests_privacy_description">Abra um chat para saber mais sobre quem enviou a mensagem. A pessoa não saberá que você viu a solicitação até aceitá-la.</string>
+    <string name="message_requests_privacy_settings">Decida quem pode enviar mensagens para você</string>
+    <string name="message_requests_delete_all">Excluir todas</string>
+    <string name="message_requests_delete_all_confirmation_title">Excluir todas as solicitações?</string>
+    <string name="message_requests_delete_all_confirmation_message">Esta ação não pode ser desfeita.</string>
 </resources>

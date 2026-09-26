@@ -1443,6 +1443,10 @@
     <string name="echo_viewer_leave">나가기</string>
     <string name="toast_action_echo_left">Echo에서 나갔어요</string>
     <string name="toast_action_echo_deleted">Echo를 삭제했어요</string>
+    <string name="toast_action_message_request_deleted">메시지 요청이 삭제되었습니다</string>
+    <string name="toast_action_message_requests_deleted">메시지 요청이 삭제되었습니다</string>
+    <string name="toast_action_message_request_reported">메시지 요청이 신고되었습니다</string>
+    <string name="toast_action_message_request_accepted">메시지 요청이 수락되었습니다</string>
     <string name="echo_viewer_incomplete_title">완성되지 않은 Echo</string>
     <string name="echo_viewer_incomplete_body">원본 Moments 중 하나를 더 이상 이용할 수 없어요. 이 Echo를 추억으로 간직할 수는 있지만, 지도와 일부 기능은 더 이상 이용할 수 없어요.</string>
     <string name="echo_viewer_keep">Echo 간직하기</string>
@@ -2973,4 +2977,15 @@
     <string name="messaging_toast_deleted">대화를 삭제했어요</string>
     <string name="messaging_toast_archived">채팅을 보관했어요</string>
     <string name="messaging_toast_unarchived">채팅 보관을 해제했어요</string>
+    <string name="message_requests_recent_empty_title">최근 메시지 요청이 없습니다</string>
+    <string name="message_requests_recent_empty_description">30일이 지난 요청은 여기에 표시되지 않습니다.</string>
+    <string name="message_requests_view_all">모두 보기</string>
+    <string name="message_requests_load_more">메시지 요청 더 보기</string>
+    <string name="message_requests_hidden_row">숨겨진 요청</string>
+    <string name="message_requests_hidden_preferences">필터링된 단어 환경설정 관리</string>
+    <string name="message_requests_privacy_description">Open a chat to learn more about who sent the message. They won\'t know you\'ve seen the request until you accept it.</string>
+    <string name="message_requests_privacy_settings">Decide who can send you messages</string>
+    <string name="message_requests_delete_all">모두 삭제</string>
+    <string name="message_requests_delete_all_confirmation_title">모든 요청을 삭제할까요?</string>
+    <string name="message_requests_delete_all_confirmation_message">이 작업은 되돌릴 수 없습니다.</string>
 </resources>

@@ -49,6 +49,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -198,6 +199,11 @@ fun MessagingView(
     val groupRequests = remember { com.moments.android.views.messaging.groups.GroupRequestsStore(scope) }
     DisposableEffect(groupRequests) { groupRequests.start(); onDispose { groupRequests.stop() } }
     var showingRequests by remember { mutableStateOf(false) }
+    var showingMessageRequestPrivacy by remember { mutableStateOf(false) }
+    var showingMessageRequestMute by remember { mutableStateOf(false) }
+    var showingHiddenMessageRequests by remember { mutableStateOf(false) }
+    var editingMessageRequests by remember { mutableStateOf(false) }
+    var canEditMessageRequests by remember { mutableStateOf(false) }
     var showingArchived by remember { mutableStateOf(false) }
     var showingStatusSelector by remember { mutableStateOf(false) }
     var pendingChatContext by remember { mutableStateOf<PendingChatContext?>(null) }
@@ -382,21 +388,68 @@ fun MessagingView(
             return
         }
         showingRequests -> {
-            BackHandler { showingRequests = false }
+            BackHandler {
+                editingMessageRequests = false
+                showingRequests = false
+            }
             Column(Modifier.fillMaxSize().background(colors.surfaceBackground).statusBarsPadding()) {
                 MessagingDestinationHeader(
-                    title = stringResource(R.string.message_requests_title),
-                    onBack = { showingRequests = false },
+                    title = stringResource(if (showingHiddenMessageRequests) R.string.message_requests_hidden_row else R.string.message_requests_title),
+                    onBack = {
+                        editingMessageRequests = false
+                        showingRequests = false
+                    },
+                    trailingAction = if (showingHiddenMessageRequests) {
+                        null
+                    } else {
+                        {
+                            TextButton(
+                                onClick = { editingMessageRequests = !editingMessageRequests },
+                                enabled = canEditMessageRequests || editingMessageRequests,
+                            ) {
+                                Text(stringResource(if (editingMessageRequests) R.string.common_done else R.string.common_edit))
+                            }
+                        }
+                    },
                 )
                 MessageRequestsView(
                     service = requestService,
+                    isEditing = editingMessageRequests,
+                    onEditingChange = { editingMessageRequests = it },
+                    onCanEditChange = { canEditMessageRequests = it },
                     onOpenRequest = { request ->
+                        editingMessageRequests = false
                         showingRequests = false
                         val fallback = context.getString(R.string.messaging_user_default)
                         pendingChatContext = PendingChatContext.incoming(request, fallback)
                     },
+                    onOpenPrivacySettings = {
+                        editingMessageRequests = false
+                        showingRequests = false
+                        showingMessageRequestPrivacy = true
+                    },
+                    onOpenMuteSettings = {
+                        editingMessageRequests = false
+                        showingRequests = false
+                        showingMessageRequestMute = true
+                    },
+                    onShowingHiddenRequests = { showingHiddenMessageRequests = it },
                 )
             }
+            return
+        }
+        showingMessageRequestPrivacy -> {
+            BackHandler { showingMessageRequestPrivacy = false; showingRequests = true }
+            com.moments.android.views.settings.SettingsView(
+                onNavigateBack = { showingMessageRequestPrivacy = false; showingRequests = true },
+            )
+            return
+        }
+        showingMessageRequestMute -> {
+            BackHandler { showingMessageRequestMute = false; showingRequests = true }
+            com.moments.android.views.settings.MuteSettingsView(
+                onNavigateBack = { showingMessageRequestMute = false; showingRequests = true },
+            )
             return
         }
         showingArchived -> {
@@ -676,7 +729,11 @@ fun MessagingView(
 }
 
 @Composable
-private fun MessagingDestinationHeader(title: String, onBack: () -> Unit) {
+private fun MessagingDestinationHeader(
+    title: String,
+    onBack: () -> Unit,
+    trailingAction: (@Composable () -> Unit)? = null,
+) {
     val colors = rememberAdaptiveColors()
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
@@ -685,7 +742,8 @@ private fun MessagingDestinationHeader(title: String, onBack: () -> Unit) {
         IconButton(onClick = onBack) {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = colors.primary)
         }
-        Text(title, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = colors.primary)
+        Text(title, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = colors.primary, modifier = Modifier.weight(1f))
+        trailingAction?.invoke()
     }
 }
 
