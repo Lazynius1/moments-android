@@ -31,7 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
-import com.moments.android.views.messaging.components.momentsScrollEdgeChrome
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.views.profile.core.sections.momentZoomNavigationSurface
 import com.moments.android.views.profile.core.sections.profileGridNavigationChrome
 import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
@@ -174,7 +174,8 @@ fun SettingsSubsectionWrapper(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
-                .background(canvas),
+                .background(canvas)
+                .momentsScrollEdgeChrome(),
         ) {
             content()
         }
@@ -193,5 +194,4 @@ fun Modifier.settingsSubsectionNavigationChrome(): Modifier = composed {
     this
         .momentZoomNavigationSurface(isDark)
         .profileGridNavigationChrome()
-        .momentsScrollEdgeChrome()
 }

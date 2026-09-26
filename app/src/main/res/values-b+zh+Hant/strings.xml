@@ -807,8 +807,8 @@
     <string name="modern_comments_view_one_more_reply">查看另外 1 則回覆</string>
     <string name="modern_comments_hide_replies">隱藏回覆</string>
     <string name="modern_comments_edited">（已編輯）</string>
-    <string name="modern_comments_empty_title">目前還沒有留言</string>
-    <string name="modern_comments_empty_description">成為第一個留言的人吧</string>
+    <string name="modern_comments_empty_title">開始對話</string>
+    <string name="modern_comments_empty_description">搶先留下第一則留言。</string>
     <string name="modern_comments_sort_newest">最新</string>
     <string name="modern_comments_sort_oldest">最早</string>
     <string name="modern_comments_sort_most_liked">獲得最多讚</string>

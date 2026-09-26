@@ -66,6 +66,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.coordinators.AppRouter
 import com.moments.android.coordinators.LegacyNavigationBridge
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.Moment
 import com.moments.android.models.MomentsNotification
@@ -284,7 +285,11 @@ fun NotificationsScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 when {
                     isLoading -> {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .momentsScrollEdgeChrome(),
+                        ) {
                             item {
                                 NotificationTabBar(
                                     selectedTab = selectedTab,
@@ -302,7 +307,11 @@ fun NotificationsScreen(
                         }
                     }
                     groupedNotifications.isEmpty() -> {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .momentsScrollEdgeChrome(),
+                        ) {
                             item {
                                 NotificationTabBar(
                                     selectedTab = selectedTab,
@@ -510,7 +519,8 @@ private fun NotificationsList(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer { clip = false },
+            .graphicsLayer { clip = false }
+            .momentsScrollEdgeChrome(),
     ) {
         item {
             NotificationTabBar(

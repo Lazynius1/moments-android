@@ -84,7 +84,6 @@ import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.messaging.components.ChatVideoPlayBadge
-import com.moments.android.views.messaging.components.momentsScrollEdgeChrome
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -242,7 +241,7 @@ fun SavedMomentsView(
             moment = moment,
             moments = accessible,
             initialIndex = resolvedIndex,
-            presentation = MomentZoomPresentationKind.Carousel,
+            presentation = MomentZoomPresentationKind.Saved,
             setDestination = { zoomDestination = it },
             zoomIDPrefix = "saved",
         )
@@ -318,7 +317,6 @@ fun SavedMomentsView(
         Modifier
             .fillMaxSize()
             .momentZoomNavigationSurface(isDark)
-            .momentsScrollEdgeChrome()
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding(),

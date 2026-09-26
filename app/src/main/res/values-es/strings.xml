@@ -711,8 +711,8 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="modern_comments_view_more_replies">Ver %1$d respuestas más</string>
     <string name="modern_comments_hide_replies">Ocultar respuestas</string>
     <string name="modern_comments_edited">(editado)</string>
-    <string name="modern_comments_empty_title">No hay comentarios aún</string>
-    <string name="modern_comments_empty_description">Sé el primero en comentar este momento</string>
+    <string name="modern_comments_empty_title">Empieza la conversación</string>
+    <string name="modern_comments_empty_description">Sé la primera persona en dejar un comentario.</string>
     <string name="modern_comments_sort_newest">Más recientes</string>
     <string name="modern_comments_sort_oldest">Más antiguos</string>
     <string name="modern_comments_sort_most_liked">Más populares</string>

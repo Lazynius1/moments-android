@@ -421,7 +421,10 @@ fun ExploreMomentDetailView(
                 }
             }
 
-            MomentDetailSolidTopChrome(modifier = Modifier.align(Alignment.TopCenter)) {
+            MomentDetailSolidTopChrome(
+                modifier = Modifier.align(Alignment.TopCenter),
+                softBottomEdge = true,
+            ) {
                 FeedPinnedTopChrome(
                     title = stringResource(R.string.explore_title),
                     onDismiss = onNavigateBack,

@@ -453,7 +453,7 @@ fun LocationMomentDetailView(
                     .align(Alignment.TopCenter)
                     .zIndex(10f),
             ) {
-                MomentDetailSolidTopChrome {
+                MomentDetailSolidTopChrome(softBottomEdge = true) {
                     FeedPinnedTopChrome(
                         title = locationDisplayTitle.ifBlank {
                             stringResource(R.string.feed_location_default)

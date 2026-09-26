@@ -53,7 +53,6 @@ import com.moments.android.views.messaging.services.ChatService
 import com.moments.android.views.messaging.services.LiveLocationSharingService
 import com.moments.android.views.misc.WhatsNewPresentationCoordinator
 import com.moments.android.views.misc.WhatsNewView
-import com.moments.android.views.profile.incognito.IncognitoGlobalOverlay
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.MomentsTheme
 import com.moments.android.views.shared.Surface
@@ -106,8 +105,6 @@ fun MomentsApp(
     val deactivatedUser by AuthService.deactivatedUserData.collectAsState()
     val isVerifyingAccount by AuthService.isVerifyingAccount.collectAsState()
     val isRegistering by AuthService.isRegistering.collectAsState()
-
-    val incognitoActive by IncognitoModeService.isActive.collectAsState()
 
     // Restore Credentials may restore the Firebase session after Android has restored the
     // app data (including a reinstall/restore), before exposing the normal login UI.
@@ -230,14 +227,6 @@ fun MomentsApp(
                 Modifier
                     .align(Alignment.TopCenter)
                     .zIndex(1500f),
-            )
-        }
-
-        if (incognitoActive && signedIn) {
-            IncognitoGlobalOverlay(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(1600f),
             )
         }
 

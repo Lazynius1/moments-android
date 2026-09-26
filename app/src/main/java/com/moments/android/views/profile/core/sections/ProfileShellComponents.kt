@@ -59,6 +59,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.models.Moment
 import com.moments.android.views.components.momentRefresh
 import com.moments.android.views.profile.core.ProfileFloatingTabBar
@@ -221,6 +222,7 @@ fun ModernProfileContentView(
                     Modifier
                         .fillMaxSize()
                         .verticalScroll(scrollState)
+                        .momentsScrollEdgeChrome()
                         .padding(bottom = safeBottom + 100.dp),
                 ) {
                     Spacer(Modifier.height(statusTop + ProfileHeaderCollapseMetrics.topContentInset))

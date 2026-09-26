@@ -50,7 +50,6 @@ import com.moments.android.views.feed.controls.FeedType
 import com.moments.android.views.feed.moments.FeedMomentCardLayout
 import com.moments.android.views.feed.core.FeedViewModel
 import com.moments.android.views.feed.core.ModernEmptyFeedView
-import com.moments.android.views.messaging.components.momentsScrollEdgeChrome
 import com.moments.android.views.shared.ScreenshotProtectedView
 import kotlinx.coroutines.flow.collectLatest
 
@@ -259,10 +258,7 @@ fun FeedListSection(
                 state = listState,
                 contentPadding = contentTopPadding,
                 verticalArrangement = Arrangement.spacedBy(rowSpacing),
-                // iOS .momentsScrollEdgeChrome()
-                modifier = Modifier
-                    .fillMaxSize()
-                    .momentsScrollEdgeChrome(),
+                modifier = Modifier.fillMaxSize(),
             ) {
                 if (viewModel.isLoading && displayedMoments.isEmpty()) {
                     items(4) { FeedPostSkeletonView() }

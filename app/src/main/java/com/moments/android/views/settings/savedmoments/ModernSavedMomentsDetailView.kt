@@ -458,9 +458,11 @@ fun ModernSavedMomentsDetailView(
                 }
             }
 
-            MomentDetailSolidTopChrome(modifier = Modifier.align(Alignment.TopCenter)) {
+            MomentDetailSolidTopChrome(
+                modifier = Modifier.align(Alignment.TopCenter),
+                softBottomEdge = true,
+            ) {
                 ModernSavedDetailHeader(
-                    moment = currentDomainMoment,
                     onDismiss = onDismiss,
                     onRemove = {
                         currentDomainMoment?.let { requestRemove(it) }
@@ -686,16 +688,13 @@ fun ModernSavedMomentsDetailView(
 /** Port de `ModernSavedDetailHeader`. */
 @Composable
 fun ModernSavedDetailHeader(
-    moment: Moment?,
     onDismiss: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isDark = isSystemInDarkTheme()
     val primaryText = if (isDark) Color.White else Color.Black.copy(alpha = 0.9f)
-    val secondaryText = if (isDark) Color.White.copy(alpha = 0.65f) else Color.Black.copy(alpha = 0.55f)
     val iconColor = if (isDark) Color.White else Color.Black.copy(alpha = 0.85f)
-    val avatarStroke = if (isDark) Color.White.copy(0.25f) else Color.Black.copy(0.16f)
 
     Column(
         modifier
@@ -719,42 +718,15 @@ fun ModernSavedDetailHeader(
                 standaloneGlass = false,
             )
 
-            if (moment != null) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    AsyncSavedProfileImageView(
-                        userId = moment.authorId,
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(CircleShape)
-                            .border(1.dp, avatarStroke, CircleShape),
-                    )
-                    Column {
-                        LiveUsernameText(
-                            userId = moment.authorId,
-                            fallbackUsername = moment.username,
-                            color = primaryText,
-                            style = androidx.compose.ui.text.TextStyle(
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            MomentsFormat.relativeTime(moment.timestamp),
-                            fontSize = 10.sp,
-                            color = secondaryText,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            } else {
-                Spacer(Modifier.weight(1f))
-            }
+            Text(
+                text = stringResource(R.string.profile_tab_saved),
+                color = primaryText,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
 
             Box(
                 Modifier

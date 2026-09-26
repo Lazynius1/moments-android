@@ -56,6 +56,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
 import com.moments.android.models.Moment
@@ -232,6 +233,7 @@ fun SharedActivityView(
                 Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
+                    .momentsScrollEdgeChrome()
                     .padding(bottom = 32.dp),
             ) {
                 SharedActivityHero(

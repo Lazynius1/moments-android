@@ -950,6 +950,7 @@ fun ReelVideoView(
         ModernCommentsSheet(
             moment = feedMoment,
             keepBackgroundVisible = true,
+            locksToMedium = true,
             onSheetOffsetChanged = { offsetPx ->
                 commentsSheetTopFraction = (offsetPx / windowHeightPx).coerceIn(0f, 1f)
             },

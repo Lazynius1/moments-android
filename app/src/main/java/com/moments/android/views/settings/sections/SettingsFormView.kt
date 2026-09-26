@@ -35,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.moments.android.R
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.settings.SettingsProfileColors
 import com.moments.android.views.settings.SettingsRoute
@@ -121,6 +122,7 @@ fun SettingsFormView(
                 .padding(padding)
                 .consumeWindowInsets(padding)
                 .verticalScroll(rememberScrollState())
+                .momentsScrollEdgeChrome()
                 .padding(horizontal = 8.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {

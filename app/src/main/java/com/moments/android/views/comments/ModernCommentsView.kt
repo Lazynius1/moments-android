@@ -5,6 +5,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,15 +13,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -34,12 +41,13 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -55,6 +63,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -95,6 +104,8 @@ import com.moments.android.services.social.AffinityTracker
 import com.moments.android.notifications.services.InAppActionToast
 import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.utilities.HapticManager
+import com.moments.android.utilities.EmojiReactionDefaults
+import com.moments.android.utilities.EmojiUsageTracker
 import com.moments.android.utilities.MentionDraftToken
 import com.moments.android.views.components.CommentRowSkeletonList
 import com.moments.android.views.components.LiveUsernameContent
@@ -103,7 +114,6 @@ import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
-import com.moments.android.views.shared.MomentsSheetPinnedFooter
 import com.moments.android.views.story.StoryRingAvatarView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -133,6 +143,7 @@ fun ModernCommentsView(
             NavigationEventBus.emit(CoordinatorNavigationEvent.NavigateToUserProfileInFeed(userId))
         }
     },
+    headerDragModifier: Modifier = Modifier,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -141,6 +152,11 @@ fun ModernCommentsView(
     val meLabel = stringResource(R.string.common_me)
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid
     val authUser by AuthService.currentUser.collectAsState()
+    val emojiUsageTracker = remember { EmojiUsageTracker() }
+    val emojiUsageRevision by emojiUsageTracker.revision.collectAsState()
+    val quickCommentEmojis = remember(emojiUsageRevision) {
+        emojiUsageTracker.orderedEmojis(EmojiReactionDefaults.comments)
+    }
 
     var comments by remember { mutableStateOf<List<Comment>>(emptyList()) }
     var mutedUserIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -477,6 +493,7 @@ fun ModernCommentsView(
     Column(modifier.fillMaxWidth().fillMaxSize().background(colors.surfaceBackground)) {
         if (moment.disableComments) {
             CommentsHeader(
+                modifier = headerDragModifier,
                 authorId = moment.authorId,
                 fallbackUsername = moment.username,
                 isLoading = false,
@@ -511,6 +528,7 @@ fun ModernCommentsView(
             Spacer(Modifier.weight(1f))
         } else {
             CommentsHeader(
+                modifier = headerDragModifier,
                 authorId = moment.authorId,
                 fallbackUsername = moment.username,
                 isLoading = isLoading,
@@ -522,22 +540,32 @@ fun ModernCommentsView(
             Box(
                 Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .clipToBounds(),
             ) {
                 when {
                     isLoading -> CommentRowSkeletonList(
                         rows = 4,
                         modifier = Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
                             .padding(horizontal = 16.dp)
-                            .padding(top = 8.dp, bottom = 8.dp),
+                            .padding(top = 8.dp, bottom = 168.dp),
                     )
                     rootComments.isEmpty() -> {
-                        ModernEmptyCommentsView(modifier = Modifier.fillMaxSize())
+                        ModernEmptyCommentsView(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
+                                .padding(bottom = 168.dp),
+                        )
                     }
                     else -> {
                         LazyColumn(
-                            Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 104.dp, top = 8.dp, start = 8.dp, end = 8.dp),
+                            Modifier
+                                .fillMaxSize()
+                                .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
+                            contentPadding = PaddingValues(bottom = 168.dp, top = 8.dp, start = 8.dp, end = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             items(rootComments, key = { it.id ?: it.hashCode().toString() }) { comment ->
@@ -584,9 +612,19 @@ fun ModernCommentsView(
                         }
                     }
                 }
-                MomentsSheetPinnedFooter(
-                    modifier = Modifier,
+                // Overlay propio: la superficie tiene la altura visible real, así
+                // que footer + reacciones pueden anclarse localmente al fondo.
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(colors.surfaceBackground)
+                        .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
                 ) {
+                HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = colors.primary.copy(alpha = if (isSystemInDarkTheme()) 0.16f else 0.10f),
+                )
                 replyToComment?.let { reply ->
                     val preview = reply.content.take(50) + if (reply.content.length > 50) "..." else ""
                     Row(
@@ -641,6 +679,21 @@ fun ModernCommentsView(
                             activeNewCommentMention = null
                         },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    )
+                }
+
+                if (editingCommentId == null) {
+                    QuickCommentEmojiRow(
+                        emojis = quickCommentEmojis,
+                        enabled = !isLoading,
+                        onEmojiTap = { emoji ->
+                            HapticManager.shared.lightImpact()
+                            emojiUsageTracker.increment(emoji)
+                            newComment += emoji
+                            activeNewCommentMention = CommentMentionDraft.detectToken(newComment)
+                            newCommentMentions =
+                                CommentMentionDraft.sanitizedMentions(newCommentMentions, newComment)
+                        },
                     )
                 }
 
@@ -735,7 +788,36 @@ fun ModernCommentsView(
 }
 
 @Composable
+private fun QuickCommentEmojiRow(
+    emojis: List<String>,
+    enabled: Boolean,
+    onEmojiTap: (String) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp)
+            .horizontalScroll(rememberScrollState())
+            .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        emojis.forEach { emoji ->
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clickable(enabled = enabled) { onEmojiTap(emoji) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(text = emoji, fontSize = 30.sp)
+            }
+        }
+    }
+}
+
+@Composable
 private fun CommentsHeader(
+    modifier: Modifier = Modifier,
     authorId: String,
     fallbackUsername: String,
     isLoading: Boolean,
@@ -745,8 +827,7 @@ private fun CommentsHeader(
 ) {
     val colors = rememberAdaptiveColors()
     val isDark = isSystemInDarkTheme()
-    // Pegado al drag handle del ModalBottomSheet (sin gap grande encima del título).
-    Box(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 8.dp)) {
+    Box(modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 8.dp)) {
         Column(
             Modifier.align(Alignment.Center),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -821,43 +902,37 @@ private fun ModernEmptyCommentsView(modifier: Modifier = Modifier) {
     Column(
         modifier
             .fillMaxWidth()
-            .padding(vertical = 40.dp, horizontal = 40.dp),
+            .padding(vertical = 16.dp, horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
     ) {
         Box(
             Modifier
-                .size(80.dp)
-                .background(colors.controlSurface, CircleShape)
-                .border(2.dp, colors.controlStroke, CircleShape),
+                .size(54.dp)
+                .background(colors.primary.copy(alpha = 0.055f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Outlined.ChatBubbleOutline,
+                Icons.Outlined.Forum,
                 contentDescription = null,
-                tint = colors.primary,
-                modifier = Modifier.size(40.dp),
+                tint = colors.secondary,
+                modifier = Modifier.size(29.dp),
             )
         }
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                stringResource(R.string.modern_comments_empty_title),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp,
-                color = colors.primary,
-            )
-            Text(
-                stringResource(R.string.modern_comments_empty_description),
-                fontSize = 14.sp,
-                color = colors.secondary,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                "💭",
-                fontSize = 24.sp,
-                modifier = Modifier.padding(top = 0.dp),
-            )
-        }
+        Text(
+            stringResource(R.string.modern_comments_empty_title),
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 17.sp,
+            color = colors.primary,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            stringResource(R.string.modern_comments_empty_description),
+            fontSize = 14.sp,
+            color = colors.secondary,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+        )
     }
 }
 

@@ -63,7 +63,7 @@ import com.moments.android.services.firestore.searchUsersUncapped
 import com.moments.android.services.social.BestFriendsService
 import com.moments.android.utilities.momentsEmptyStateAppear
 import com.moments.android.views.components.UserRowSkeletonList
-import com.moments.android.views.messaging.components.momentsScrollEdgeChrome
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await

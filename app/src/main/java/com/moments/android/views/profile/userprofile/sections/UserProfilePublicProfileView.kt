@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moments.android.R
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.views.components.momentRefresh
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.profile.core.SocialConnectionTab
@@ -150,6 +151,7 @@ fun UserModernPublicProfileView(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
+                .momentsScrollEdgeChrome()
                 .padding(bottom = safeAreaBottom + 120.dp),
         ) {
             Spacer(Modifier.height(statusTop + ProfileHeaderCollapseMetrics.topContentInset))

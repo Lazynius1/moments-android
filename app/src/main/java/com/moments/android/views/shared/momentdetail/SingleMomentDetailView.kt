@@ -305,7 +305,10 @@ fun SingleMomentDetailView(
                 }
             }
 
-            MomentDetailSolidTopChrome(modifier = Modifier.align(Alignment.TopCenter)) {
+            MomentDetailSolidTopChrome(
+                modifier = Modifier.align(Alignment.TopCenter),
+                softBottomEdge = true,
+            ) {
                 FeedPinnedTopChrome(
                     title = resolvedChromeTitle,
                     onDismiss = onDismiss,

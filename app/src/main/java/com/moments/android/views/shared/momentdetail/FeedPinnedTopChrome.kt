@@ -23,6 +23,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,16 +88,43 @@ fun rememberMomentDetailContentTopInset(
 @Composable
 fun MomentDetailSolidTopChrome(
     modifier: Modifier = Modifier,
+    softBottomEdge: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colors = rememberAdaptiveColors()
+    val fadeTail = if (softBottomEdge) 48.dp else 0.dp
     Column(
         modifier
             .fillMaxWidth()
-            .background(colors.surfaceBackground)
+            .then(
+                if (softBottomEdge) {
+                    Modifier.drawWithCache {
+                        val fadeHeight = fadeTail.toPx()
+                        val solidHeight = (size.height - fadeHeight).coerceAtLeast(0f)
+                        val fade = Brush.verticalGradient(
+                            colors = listOf(colors.surfaceBackground, colors.surfaceBackground.copy(alpha = 0f)),
+                            startY = solidHeight,
+                            endY = size.height,
+                        )
+                        onDrawBehind {
+                            drawRect(
+                                color = colors.surfaceBackground,
+                                size = Size(size.width, solidHeight),
+                            )
+                            drawRect(
+                                brush = fade,
+                                topLeft = Offset(0f, solidHeight),
+                                size = Size(size.width, fadeHeight),
+                            )
+                        }
+                    }
+                } else {
+                    Modifier.background(colors.surfaceBackground)
+                },
+            )
             .statusBarsPadding()
             .padding(top = ProfileHeaderCollapseMetrics.topChromePadding)
-            .padding(bottom = 4.dp),
+            .padding(bottom = 4.dp + fadeTail),
     ) {
         content()
     }

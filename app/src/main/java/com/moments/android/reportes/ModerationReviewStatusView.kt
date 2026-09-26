@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.views.components.momentRefresh
 import com.moments.android.views.feed.rememberAdaptiveColors
@@ -200,6 +201,7 @@ private fun ModerationReviewListView(
         modifier = modifier
             .fillMaxSize()
             .momentRefresh(onRefresh)
+            .momentsScrollEdgeChrome()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

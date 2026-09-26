@@ -28,6 +28,8 @@ import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.notifications.services.NotificationService
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.ContentAudience
+import com.moments.android.services.privacy.FollowButtonState
+import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.views.feed.reactions.ReactionType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -557,11 +559,17 @@ class FirestoreService(
     }
 
     suspend fun unfollowUser(currentUserId: String, targetUserId: String, announce: Boolean = true) {
+        val previousFollowState = FollowStateStore.state(currentUserId, targetUserId)
+            ?: FollowButtonState.FOLLOWING
         LocalPersistenceService.toggleFollowLocallyAsync(currentUserId, targetUserId, isFollow = false)
         require(currentUserId != targetUserId) { "Cannot unfollow yourself" }
 
         if (announce) {
-            val deferred = beginDeferredUnfollowIfPossible(currentUserId, targetUserId)
+            val deferred = beginDeferredUnfollowIfPossible(
+                currentUserId,
+                targetUserId,
+                previousFollowState,
+            )
             if (deferred) return
             commitUnfollowUser(currentUserId, targetUserId, announceAfter = true)
             return
@@ -574,17 +582,18 @@ class FirestoreService(
     private suspend fun beginDeferredUnfollowIfPossible(
         currentUserId: String,
         targetUserId: String,
+        previousFollowState: FollowButtonState,
     ): Boolean {
         val cached = com.moments.android.services.cache.UserCacheService.getCachedUser(targetUserId)
         val cachedName = cached?.username?.trim().orEmpty()
         if (cachedName.isNotEmpty()) {
-            presentDeferredUnfollowToast(currentUserId, targetUserId, cachedName)
+            presentDeferredUnfollowToast(currentUserId, targetUserId, cachedName, previousFollowState)
             return true
         }
         val target = runCatching { fetchUserProfile(targetUserId) }.getOrNull()
         val username = target?.username?.trim().orEmpty()
         if (username.isEmpty()) return false
-        presentDeferredUnfollowToast(currentUserId, targetUserId, username)
+        presentDeferredUnfollowToast(currentUserId, targetUserId, username, previousFollowState)
         return true
     }
 
@@ -592,12 +601,14 @@ class FirestoreService(
         currentUserId: String,
         targetUserId: String,
         username: String,
+        previousFollowState: FollowButtonState,
     ) {
         val undo: () -> Unit = {
             globalFirestoreScope.launch {
                 LocalPersistenceService.toggleFollowLocallyAsync(currentUserId, targetUserId, isFollow = true)
             }
             followingCache["${currentUserId}_$targetUserId"] = true
+            FollowStateStore.setState(previousFollowState, currentUserId, targetUserId)
         }
         val onExpire: () -> Unit = {
             globalFirestoreScope.launch {

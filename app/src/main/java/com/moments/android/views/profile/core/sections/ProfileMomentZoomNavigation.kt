@@ -13,8 +13,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.moments.android.R
 import com.moments.android.models.HighlightedStory
 import com.moments.android.models.Moment
 import com.moments.android.utilities.HapticManager
@@ -225,9 +227,7 @@ fun MomentZoomDetailDestination(
     ) {
         val contentMod = Modifier.fillMaxSize()
         when (val presentation = destination.presentation) {
-            MomentZoomPresentationKind.Carousel,
-            MomentZoomPresentationKind.Saved,
-            -> {
+            MomentZoomPresentationKind.Carousel -> {
                 ModernMomentDetailView(
                     moments = moments,
                     onDismiss = {
@@ -237,6 +237,20 @@ fun MomentZoomDetailDestination(
                     initialIndex = destination.initialIndex,
                     initialMomentId = destination.initialMomentId,
                     restrictPlaybackToInitialIndex = destination.restrictPlaybackToInitialIndex,
+                    modifier = contentMod,
+                )
+            }
+            MomentZoomPresentationKind.Saved -> {
+                ModernMomentDetailView(
+                    moments = moments,
+                    onDismiss = {
+                        onMapPresentedChanged(false)
+                        onDismiss()
+                    },
+                    initialIndex = destination.initialIndex,
+                    initialMomentId = destination.initialMomentId,
+                    restrictPlaybackToInitialIndex = destination.restrictPlaybackToInitialIndex,
+                    chromeTitle = stringResource(R.string.profile_tab_saved),
                     modifier = contentMod,
                 )
             }

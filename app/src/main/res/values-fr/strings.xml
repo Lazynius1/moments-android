@@ -649,8 +649,8 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="modern_comments_view_more_replies">Voir %1$d réponses de plus</string>
     <string name="modern_comments_hide_replies">Masquer les réponses</string>
     <string name="modern_comments_edited">(modifié)</string>
-    <string name="modern_comments_empty_title">Pas encore de commentaires</string>
-    <string name="modern_comments_empty_description">Soyez le premier à commenter ce moment</string>
+    <string name="modern_comments_empty_title">Lancez la conversation</string>
+    <string name="modern_comments_empty_description">Laissez le premier commentaire.</string>
     <string name="modern_comments_sort_newest">Plus récents</string>
     <string name="modern_comments_sort_oldest">Plus anciens</string>
     <string name="modern_comments_sort_most_liked">Les plus aimés</string>

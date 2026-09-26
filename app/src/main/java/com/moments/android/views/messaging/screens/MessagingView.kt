@@ -93,6 +93,7 @@ import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.extensions.ProfileChromeControlsCluster
 import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.models.AppUser
 import com.moments.android.models.OnlineStatus
 import com.moments.android.services.firestore.FirestoreService
@@ -989,7 +990,9 @@ private fun MessagingConversationList(
                 (convRows + reqRows).sortedByDescending { it.timestamp.time }
             }
             LazyColumn(
-                Modifier.fillMaxSize(),
+                Modifier
+                    .fillMaxSize()
+                    .momentsScrollEdgeChrome(),
                 userScrollEnabled = conversationMenuSelection == null,
             ) {
                 items(
@@ -1194,7 +1197,11 @@ private fun MessagingSearchResults(
             viewModel.searchedUsers.isEmpty() &&
             viewModel.searchedMessages.isEmpty() &&
             searchText.isNotEmpty()
-    LazyColumn(Modifier.fillMaxSize()) {
+    LazyColumn(
+        Modifier
+            .fillMaxSize()
+            .momentsScrollEdgeChrome(),
+    ) {
         if (viewModel.filteredConversations.isNotEmpty()) {
             item {
                 Text(
@@ -1391,7 +1398,11 @@ private fun GlassmorphicNewConversationView(
             ) {
                 Text(stringResource(R.string.messaging_no_results), color = colors.primary, fontWeight = FontWeight.SemiBold)
             }
-            else -> LazyColumn(Modifier.fillMaxSize()) {
+            else -> LazyColumn(
+                Modifier
+                    .fillMaxSize()
+                    .momentsScrollEdgeChrome(),
+            ) {
                 items(users, key = { it.id }) { user ->
                     Row(
                         Modifier

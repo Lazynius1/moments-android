@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.moments.android.R
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageStatus
 import com.moments.android.views.messaging.core.MessageType
@@ -766,7 +767,10 @@ fun ClusterGalleryView(
 
         if (tab == ClusterGalleryTab.LINKS && scope == ClusterGalleryScope.CONVERSATION_SHARED) {
             LazyColumn(
-                Modifier.weight(1f).padding(horizontal = gallerySpacing, vertical = 16.dp),
+                Modifier
+                    .weight(1f)
+                    .momentsScrollEdgeChrome()
+                    .padding(horizontal = gallerySpacing, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(gallerySpacing),
             ) {
                 columnItems(visible, key = { it.id }) { message ->
@@ -790,6 +794,7 @@ fun ClusterGalleryView(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .momentsScrollEdgeChrome()
                     .padding(horizontal = gallerySpacing, vertical = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(gallerySpacing),
                 verticalItemSpacing = gallerySpacing,
@@ -1113,7 +1118,9 @@ fun GlassmorphicMediaSelectionSheet(
             columns = GridCells.Fixed(2),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 24.dp),
+            modifier = Modifier
+                .momentsScrollEdgeChrome()
+                .padding(horizontal = 24.dp),
         ) {
             items(messages, key = { it.id }) { message ->
                 Box(

@@ -635,8 +635,8 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="modern_comments_view_more_replies">%1$d weitere Antworten ansehen</string>
     <string name="modern_comments_hide_replies">Antworten ausblenden</string>
     <string name="modern_comments_edited">(bearbeitet)</string>
-    <string name="modern_comments_empty_title">Noch keine Kommentare</string>
-    <string name="modern_comments_empty_description">Sei die erste Person, die diesen Moment kommentiert</string>
+    <string name="modern_comments_empty_title">Starte die Unterhaltung</string>
+    <string name="modern_comments_empty_description">Schreibe den ersten Kommentar.</string>
     <string name="modern_comments_sort_newest">Neueste</string>
     <string name="modern_comments_sort_oldest">Älteste</string>
     <string name="modern_comments_sort_most_liked">Meistgelikt</string>

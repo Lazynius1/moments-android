@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
 import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.extensions.momentsScrollEdgeChrome as sharedMomentsScrollEdgeChrome
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.core.PendingChatContext
@@ -121,8 +122,10 @@ fun Modifier.chatInteractivePopEnabled(): Modifier = this
 fun Modifier.navigationInteractivePopEnabled(): Modifier = chatInteractivePopEnabled()
 fun Modifier.messagingListEdgeToEdge(): Modifier = this
 fun Modifier.chatBottomScrollEdgeHidden(): Modifier = this
-fun Modifier.chatScrollEdgeEffect(hardBottomEdge: Boolean = false): Modifier = this
-fun Modifier.momentsScrollEdgeChrome(hardBottomEdge: Boolean = false): Modifier = chatScrollEdgeEffect(hardBottomEdge)
+fun Modifier.chatScrollEdgeEffect(hardBottomEdge: Boolean = false): Modifier =
+    sharedMomentsScrollEdgeChrome(hardBottomEdge)
+fun Modifier.momentsScrollEdgeChrome(hardBottomEdge: Boolean = false): Modifier =
+    sharedMomentsScrollEdgeChrome(hardBottomEdge)
 
 @Composable
 fun ChatBottomWallpaperEdgeFade(

@@ -807,8 +807,8 @@
     <string name="modern_comments_view_one_more_reply">답글 1개 더 보기</string>
     <string name="modern_comments_hide_replies">답글 숨기기</string>
     <string name="modern_comments_edited">(수정됨)</string>
-    <string name="modern_comments_empty_title">아직 댓글이 없어요</string>
-    <string name="modern_comments_empty_description">이 모먼트에 첫 댓글을 남겨 보세요</string>
+    <string name="modern_comments_empty_title">대화를 시작해 보세요</string>
+    <string name="modern_comments_empty_description">첫 댓글을 남겨 보세요.</string>
     <string name="modern_comments_sort_newest">최신순</string>
     <string name="modern_comments_sort_oldest">오래된 순</string>
     <string name="modern_comments_sort_most_liked">좋아요 많은 순</string>

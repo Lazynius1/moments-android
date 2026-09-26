@@ -429,7 +429,10 @@ fun ModernMomentDetailView(
                 }
             }
 
-            MomentDetailSolidTopChrome(modifier = Modifier.align(Alignment.TopCenter)) {
+            MomentDetailSolidTopChrome(
+                modifier = Modifier.align(Alignment.TopCenter),
+                softBottomEdge = true,
+            ) {
                 ProfileMomentDetailChrome(
                     moment = currentMoment,
                     chromeTitleOverride = chromeTitle,
@@ -677,13 +680,15 @@ private fun ProfileMomentDetailChrome(
                     )
                 }
             }
-            Text(
-                stringResource(R.string.profile_tab_moments),
-                fontWeight = FontWeight.Medium,
-                fontSize = 11.sp,
-                color = colors.secondary,
-                maxLines = 1,
-            )
+            if (override.isEmpty()) {
+                Text(
+                    stringResource(R.string.profile_tab_moments),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 11.sp,
+                    color = colors.secondary,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }

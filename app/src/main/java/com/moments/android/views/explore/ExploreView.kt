@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.moments.android.R
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.Moment
 import com.moments.android.models.cache.CachedSearch
@@ -252,6 +253,7 @@ fun ExploreView(
                             Modifier
                                 .fillMaxSize()
                                 .verticalScroll(rememberScrollState())
+                                .momentsScrollEdgeChrome()
                                 .padding(bottom = 24.dp),
                             verticalArrangement = Arrangement.spacedBy(24.dp),
                         ) {

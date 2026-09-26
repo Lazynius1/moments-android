@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.utilities.MomentsFormat
@@ -105,6 +106,7 @@ fun MessageRequestsView(
             LazyColumn(
                 Modifier
                     .fillMaxSize()
+                    .momentsScrollEdgeChrome()
                     .padding(top = 2.dp, bottom = 24.dp),
             ) {
                 items(

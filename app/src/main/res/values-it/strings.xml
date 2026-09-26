@@ -635,8 +635,8 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="modern_comments_view_more_replies">Vedi altre %1$d risposte</string>
     <string name="modern_comments_hide_replies">Nascondi risposte</string>
     <string name="modern_comments_edited">(modificato)</string>
-    <string name="modern_comments_empty_title">Ancora nessun commento</string>
-    <string name="modern_comments_empty_description">Sii il primo a commentare questo momento</string>
+    <string name="modern_comments_empty_title">Inizia la conversazione</string>
+    <string name="modern_comments_empty_description">Lascia il primo commento.</string>
     <string name="modern_comments_sort_newest">Più recenti</string>
     <string name="modern_comments_sort_oldest">Meno recenti</string>
     <string name="modern_comments_sort_most_liked">Più apprezzati</string>

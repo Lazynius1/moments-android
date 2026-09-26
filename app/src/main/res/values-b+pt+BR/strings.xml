@@ -635,8 +635,8 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="modern_comments_view_more_replies">Ver mais %1$d respostas</string>
     <string name="modern_comments_hide_replies">Ocultar respostas</string>
     <string name="modern_comments_edited">(editado)</string>
-    <string name="modern_comments_empty_title">Ainda não há comentários</string>
-    <string name="modern_comments_empty_description">Seja a primeira pessoa a comentar neste momento</string>
+    <string name="modern_comments_empty_title">Comece a conversa</string>
+    <string name="modern_comments_empty_description">Seja a primeira pessoa a comentar.</string>
     <string name="modern_comments_sort_newest">Mais recentes</string>
     <string name="modern_comments_sort_oldest">Mais antigos</string>
     <string name="modern_comments_sort_most_liked">Mais curtidos</string>

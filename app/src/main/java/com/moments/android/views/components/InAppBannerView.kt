@@ -4,8 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.PathMeasure
@@ -14,13 +12,13 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
@@ -31,9 +29,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -68,6 +68,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -100,6 +101,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
@@ -154,6 +156,7 @@ fun InAppBannerView(modifier: Modifier = Modifier) {
     val visible by InAppNotificationService.showBanner.collectAsState()
     val notification by InAppNotificationService.currentNotification.collectAsState()
     val actionToast by InAppNotificationService.actionToast.collectAsState()
+    val hostGeneration by InAppNotificationService.hostGeneration.collectAsState()
     val incognitoActive by IncognitoModeService.isActive.collectAsState()
     var isQuickReplyExpanded by remember { mutableStateOf(false) }
 
@@ -175,6 +178,7 @@ fun InAppBannerView(modifier: Modifier = Modifier) {
 
     if (!showHost) return
 
+    key(hostGeneration) {
     Dialog(
         onDismissRequest = {},
         properties = DialogProperties(
@@ -212,22 +216,14 @@ fun InAppBannerView(modifier: Modifier = Modifier) {
                 .wrapContentWidth()
                 .wrapContentHeight()
                 .statusBarsPadding()
-                .padding(top = 8.dp)
-                .animateContentSize(
-                    animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow),
-                ),
+                .padding(top = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val phase = incognitoPhase
             if (phase != null) {
                 Row(
-                    modifier = Modifier.animateContentSize(
-                        animationSpec = spring(
-                            dampingRatio = 0.82f,
-                            stiffness = Spring.StiffnessMediumLow,
-                        ),
-                    ),
+                    modifier = Modifier,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -239,24 +235,18 @@ fun InAppBannerView(modifier: Modifier = Modifier) {
                                 targetState = phase,
                                 transitionSpec = {
                                     (
-                                        fadeIn(tween(180)) +
-                                            expandHorizontally(
-                                                animationSpec = spring(
-                                                    dampingRatio = 0.82f,
-                                                    stiffness = Spring.StiffnessMediumLow,
-                                                ),
-                                                expandFrom = Alignment.CenterHorizontally,
+                                        fadeIn(tween(140, easing = LinearOutSlowInEasing)) +
+                                            scaleIn(
+                                                initialScale = 0.96f,
+                                                animationSpec = tween(140, easing = LinearOutSlowInEasing),
                                             )
                                         ) togetherWith (
-                                        fadeOut(tween(120)) +
-                                            shrinkHorizontally(
-                                                animationSpec = spring(
-                                                    dampingRatio = 0.82f,
-                                                    stiffness = Spring.StiffnessMediumLow,
-                                                ),
-                                                shrinkTowards = Alignment.CenterHorizontally,
+                                        fadeOut(tween(90, easing = FastOutLinearInEasing)) +
+                                            scaleOut(
+                                                targetScale = 0.98f,
+                                                animationSpec = tween(90, easing = FastOutLinearInEasing),
                                             )
-                                        ) using SizeTransform(clip = false)
+                                        )
                                 },
                                 label = "incognitoChromeMorph",
                             ) { targetPhase ->
@@ -314,6 +304,7 @@ fun InAppBannerView(modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
     }
 }
 
@@ -380,6 +371,9 @@ private fun UnifiedIncognitoChrome(
                                     }
                                     val emphasis = toast.emphasis
                                     if (!emphasis.isNullOrEmpty()) {
+                                        if (toast.prefix.lastOrNull()?.isLetterOrDigit() == true) {
+                                            append(" ")
+                                        }
                                         withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
                                             append(emphasis)
                                         }
@@ -451,6 +445,7 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
     var dragOffsetY by remember(toast.id) { mutableFloatStateOf(0f) }
     val subtitle = toast.subtitle?.trim().orEmpty()
     val hasUndo = toast.undo != null
+    val maxBannerWidth = if (clustered) 280.dp else 340.dp
     val undoProgress = remember(toast.id) { Animatable(1f) }
 
     LaunchedEffect(toast.id) {
@@ -472,13 +467,15 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
     ) {
     Box(
         modifier = Modifier
-            .widthIn(max = if (clustered) 280.dp else 340.dp)
+            .widthIn(max = maxBannerWidth)
             .then(if (clustered) Modifier else Modifier.padding(horizontal = 20.dp)),
         contentAlignment = Alignment.TopCenter,
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .wrapContentWidth()
+                .widthIn(max = maxBannerWidth)
+                .width(IntrinsicSize.Max)
                 .offset { IntOffset(0, dragOffsetY.roundToInt()) }
                 .shadow(
                     elevation = 8.dp,
@@ -546,7 +543,7 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
         ) {
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(1f, fill = false)
                     .clickable { InAppNotificationService.dismissManually() },
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
@@ -557,6 +554,9 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
                         }
                         val emphasis = toast.emphasis
                         if (!emphasis.isNullOrEmpty()) {
+                            if (toast.prefix.lastOrNull()?.isLetterOrDigit() == true) {
+                                append(" ")
+                            }
                             withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
                                 append(emphasis)
                             }
@@ -568,7 +568,11 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
                     color = LocalContentColor.current,
                     fontSize = titleSp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    autoSize = TextAutoSize.StepBased(
+                        minFontSize = 8.sp,
+                        maxFontSize = titleSp,
+                        stepSize = 0.5.sp,
+                    ),
                 )
                 if (subtitle.isNotEmpty()) {
                     Text(

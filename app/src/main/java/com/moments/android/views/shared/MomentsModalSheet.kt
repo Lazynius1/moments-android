@@ -1,12 +1,15 @@
 package com.moments.android.views.shared
 
+import android.view.WindowManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
@@ -22,11 +25,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
@@ -39,6 +44,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,6 +53,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import com.moments.android.views.feed.rememberAdaptiveColors
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -85,6 +93,12 @@ fun MomentsModalSheet(
     scrimColor: Color? = null,
     /** false ≡ bloquear swipe-to-dismiss y tap en scrim (M3 confirmValueChange). */
     dismissEnabled: Boolean = true,
+    /** false mantiene el detent parcial y rechaza el salto a Expanded. */
+    allowExpanded: Boolean = true,
+    /** Promueve temporalmente al anchor superior cuando aparece el teclado. */
+    expandOnIme: Boolean = false,
+    /** Altura exacta del anchor superior; 0.72 ≡ detent intermedio, no large. */
+    expandedHeightFraction: Float? = null,
     /** Posición Y real del borde superior; permite coordinar el contenido de fondo. */
     onSheetOffsetChanged: ((Float) -> Unit)? = null,
     content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit,
@@ -94,10 +108,29 @@ fun MomentsModalSheet(
     } else {
         containerColor
     }
+    val density = LocalDensity.current
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    val currentImeVisible by rememberUpdatedState(imeVisible)
+    // ModalBottomSheet se aloja en su propio Dialog. Para el sheet de Reels no
+    // queremos que `adjustResize` recalcule sus detents al abrir el teclado:
+    // el panel conserva su geometría y el footer se ancla al IME mediante
+    // MomentsSheetPinnedFooter.
+    val view = LocalView.current
+    DisposableEffect(view, expandOnIme) {
+        if (!expandOnIme) return@DisposableEffect onDispose { }
+        val window = (view.parent as? DialogWindowProvider)?.window
+        if (window == null) return@DisposableEffect onDispose { }
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val previousSoftInputMode = window.attributes.softInputMode
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+        onDispose { window.setSoftInputMode(previousSoftInputMode) }
+    }
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = largeOnly,
         confirmValueChange = { newValue ->
-            dismissEnabled || newValue != SheetValue.Hidden
+            (dismissEnabled || newValue != SheetValue.Hidden) &&
+                (allowExpanded || (expandOnIme && currentImeVisible) || newValue != SheetValue.Expanded)
         },
     )
     // largeOnly: forzar Expanded (si no, en fullScreenDialog/Creator a veces queda
@@ -107,12 +140,30 @@ fun MomentsModalSheet(
             sheetState.expand()
         }
     }
+    LaunchedEffect(sheetState, expandOnIme, imeVisible) {
+        if (!expandOnIme) return@LaunchedEffect
+        if (imeVisible) {
+            sheetState.expand()
+        } else if (sheetState.currentValue == SheetValue.Expanded) {
+            sheetState.partialExpand()
+        }
+    }
     LaunchedEffect(sheetState, onSheetOffsetChanged) {
         val observer = onSheetOffsetChanged ?: return@LaunchedEffect
         snapshotFlow { runCatching { sheetState.requireOffset() }.getOrNull() }
             .collect { offset -> offset?.let(observer) }
     }
     val scope = rememberCoroutineScope()
+    // `fillMaxHeight(fraction)` sólo establece un mínimo: un hijo con `weight`
+    // puede seguir estirando el ModalBottomSheet hasta large. Calculamos una
+    // altura exacta para que el detent alto de Reels quede realmente al 72%.
+    val constrainedSheetHeight = expandedHeightFraction?.let { fraction ->
+        with(density) {
+            (LocalWindowInfo.current.containerSize.height * fraction.coerceIn(0.5f, 0.9f))
+                .roundToInt()
+                .toDp()
+        }
+    }
     val dismissSheet: () -> Unit = {
         scope.launch {
             sheetState.hide()
@@ -121,6 +172,9 @@ fun MomentsModalSheet(
     }
 
     ModalBottomSheet(
+        modifier = constrainedSheetHeight?.let { height ->
+            Modifier.height(height)
+        } ?: Modifier,
         onDismissRequest = {
             if (dismissEnabled) onDismissRequest()
         },

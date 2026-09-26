@@ -1,15 +1,19 @@
 package com.moments.android.views.profile.incognito
 
+import android.os.Build
+import android.view.RoundedCorner
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,14 +47,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -64,7 +71,6 @@ import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import com.moments.android.views.feed.rememberAdaptiveColors
-import kotlin.math.min
 
 private val BannerCapsule = RoundedCornerShape(percent = 50)
 
@@ -76,17 +82,45 @@ private val BannerCapsule = RoundedCornerShape(percent = 50)
 @Composable
 fun IncognitoGlobalOverlay(modifier: Modifier = Modifier) {
     val isDark = isSystemInDarkTheme()
+    val density = LocalDensity.current
+    val view = LocalView.current
+    var rootInsets by remember(view) {
+        mutableStateOf<android.view.WindowInsets?>(view.rootWindowInsets)
+    }
 
     val transition = rememberInfiniteTransition(label = "incognitoEdge")
-    val pulse by transition.animateFloat(
-        initialValue = 1.5f,
-        targetValue = 2.4f,
+    val pulseAlpha by transition.animateFloat(
+        initialValue = 0.52f,
+        targetValue = 0.92f,
         animationSpec = infiniteRepeatable(tween(2_200), repeatMode = RepeatMode.Reverse),
         label = "edgePulse",
     )
 
     BoxWithConstraints(modifier.fillMaxSize()) {
-        val cornerRadius = min(maxWidth.value, maxHeight.value) * 0.136f
+        LaunchedEffect(view, maxWidth, maxHeight) {
+            withFrameNanos { }
+            rootInsets = view.rootWindowInsets
+        }
+
+        fun deviceCornerRadius(position: Int): androidx.compose.ui.unit.Dp {
+            val radiusPx = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                rootInsets?.getRoundedCorner(position)?.radius
+            } else {
+                null
+            }
+            return if (radiusPx != null && radiusPx > 0) {
+                with(density) { radiusPx.toDp() }
+            } else {
+                28.dp
+            }
+        }
+
+        val shape = RoundedCornerShape(
+            topStart = deviceCornerRadius(RoundedCorner.POSITION_TOP_LEFT),
+            topEnd = deviceCornerRadius(RoundedCorner.POSITION_TOP_RIGHT),
+            bottomEnd = deviceCornerRadius(RoundedCorner.POSITION_BOTTOM_RIGHT),
+            bottomStart = deviceCornerRadius(RoundedCorner.POSITION_BOTTOM_LEFT),
+        )
 
         Box(
             Modifier
@@ -95,19 +129,18 @@ fun IncognitoGlobalOverlay(modifier: Modifier = Modifier) {
                 .border(
                     width = 1.15.dp,
                     color = if (isDark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.28f),
-                    shape = RoundedCornerShape(cornerRadius.dp),
+                    shape = shape,
                 ),
         )
         Box(
             Modifier
                 .fillMaxSize()
-                .padding(1.dp)
-                .blur(pulse.dp)
+                .padding(2.dp)
+                .graphicsLayer { alpha = pulseAlpha }
                 .border(
-                    width = 3.2.dp,
-                    color = (if (isDark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.13f))
-                        .copy(alpha = if (isDark) 0.95f else 0.88f),
-                    shape = RoundedCornerShape(cornerRadius.dp),
+                    width = 2.2.dp,
+                    color = if (isDark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.13f),
+                    shape = shape,
                 ),
         )
     }
@@ -204,8 +237,20 @@ fun IncognitoBannerPill(
 
             AnimatedVisibility(
                 visible = isExpanded && !showsCompactOnly,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
+                enter = fadeIn(
+                    tween(durationMillis = 150, easing = LinearOutSlowInEasing),
+                ) + scaleIn(
+                    initialScale = 0.96f,
+                    transformOrigin = TransformOrigin(0.5f, 0f),
+                    animationSpec = tween(durationMillis = 150, easing = LinearOutSlowInEasing),
+                ),
+                exit = fadeOut(
+                    tween(durationMillis = 90, easing = FastOutLinearInEasing),
+                ) + scaleOut(
+                    targetScale = 0.98f,
+                    transformOrigin = TransformOrigin(0.5f, 0f),
+                    animationSpec = tween(durationMillis = 90, easing = FastOutLinearInEasing),
+                ),
             ) {
                 Column(
                     Modifier

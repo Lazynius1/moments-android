@@ -807,8 +807,8 @@ Anda dapat mengubah izin ini di pengaturan perangkat. Jika izin dinonaktifkan, b
     <string name="modern_comments_view_one_more_reply">Lihat 1 balasan lainnya</string>
     <string name="modern_comments_hide_replies">Sembunyikan balasan</string>
     <string name="modern_comments_edited">(diedit)</string>
-    <string name="modern_comments_empty_title">Belum ada komentar</string>
-    <string name="modern_comments_empty_description">Jadilah yang pertama mengomentari momen ini</string>
+    <string name="modern_comments_empty_title">Mulai percakapan</string>
+    <string name="modern_comments_empty_description">Jadilah yang pertama berkomentar.</string>
     <string name="modern_comments_sort_newest">Terbaru</string>
     <string name="modern_comments_sort_oldest">Terlama</string>
     <string name="modern_comments_sort_most_liked">Paling banyak disukai</string>

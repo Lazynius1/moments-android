@@ -19,6 +19,13 @@ object EmojiReactionDefaults {
     )
 
     val emojiSlider: List<String> = listOf("😍", "🔥", "😂", "🥹", "❤️", "👏", "🙌", "💯")
+
+    /** Barra rápida del compositor de comentarios; el uso reordena la lista. */
+    val comments: List<String> = listOf(
+        "❤️", "😂", "🔥", "👏", "😍", "😮", "😢", "🙌",
+        "👍", "💯", "🥹", "✨", "💕", "🎉", "🙏🏻", "✌🏻",
+        "⚡", "😊", "😡", "🥰",
+    )
 }
 
 object EmojiUsageStore {

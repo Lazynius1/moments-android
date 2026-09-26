@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -237,7 +238,7 @@ object IncognitoModeService {
         val lastUpdatedAt: Date?,
     )
 
-    private suspend fun callBackend(action: Action, token: String): BackendResponse {
+    private suspend fun callBackend(action: Action, token: String): BackendResponse = withContext(Dispatchers.IO) {
         val projectId = FirebaseApp.getInstance().options.projectId
             ?: throw IllegalStateException("Missing Firebase project ID")
         val url = URL("https://europe-southwest1-$projectId.cloudfunctions.net/${action.endpoint}")
@@ -256,7 +257,7 @@ object IncognitoModeService {
             val raw = (if (code in 200..299 || code == 409) connection.inputStream else connection.errorStream)
                 ?.bufferedReader()?.readText().orEmpty()
             if (code !in 200..299 && code != 409) throw java.io.IOException("HTTP $code")
-            return parseBackendResponse(raw)
+            parseBackendResponse(raw)
         } finally {
             connection.disconnect()
         }

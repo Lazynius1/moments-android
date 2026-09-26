@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -84,7 +85,8 @@ fun ActivityCollapsibleFilterScroll(
             Column(
                 Modifier
                     .fillMaxSize()
-                    .verticalScroll(scrollState),
+                    .verticalScroll(scrollState)
+                    .momentsScrollEdgeChrome(),
             ) {
                 Box(
                     Modifier

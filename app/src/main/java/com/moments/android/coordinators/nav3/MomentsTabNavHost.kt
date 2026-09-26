@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.DialogProperties
@@ -25,6 +27,7 @@ import com.moments.android.coordinators.CoordinatorNavigationEvent
 import com.moments.android.coordinators.MainViewModel
 import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.notifications.screens.NotificationsScreen
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.views.creator.CreatorView
 import com.moments.android.views.explore.ExploreView
 import com.moments.android.views.feed.core.FeedView
@@ -67,6 +70,16 @@ fun MomentsTabNavHost(
         )
     }
     val showCreatorView = navigator.contains(MomentsNavKey.Creator)
+    val activeRoute = navigationState.backStacks[navigationState.topLevelRoute]?.lastOrNull()
+
+    LaunchedEffect(activeRoute) {
+        if (activeRoute.isFullScreenDialogRoute()) {
+            // DialogScene se adjunta al final del frame; recrear después el host global
+            // mantiene timer/toasts por encima sin usar tipos de ventana privados.
+            withFrameNanos { }
+            InAppNotificationService.bringHostToFront()
+        }
+    }
 
     val provider: (NavKey) -> NavEntry<NavKey> = { key ->
         when (key) {
@@ -271,4 +284,19 @@ fun MomentsTabNavHost(
         sceneStrategies = listOf(dialogStrategy),
         modifier = modifier.fillMaxSize(),
     )
+}
+
+private fun NavKey?.isFullScreenDialogRoute(): Boolean = when (this) {
+    MomentsNavKey.Creator,
+    MomentsNavKey.ShowNotifications,
+    is MomentsNavKey.Notifications,
+    MomentsNavKey.ShowMessages,
+    MomentsNavKey.ShowNova,
+    is MomentsNavKey.Conversation,
+    is MomentsNavKey.Moment,
+    MomentsNavKey.ShowStories,
+    is MomentsNavKey.Story,
+    is MomentsNavKey.StoryChain,
+    -> true
+    else -> false
 }

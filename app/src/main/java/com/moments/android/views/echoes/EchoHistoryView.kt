@@ -55,6 +55,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.models.Echo
 import com.moments.android.models.EchoStatus
 import com.moments.android.services.social.EchoService
@@ -162,6 +163,7 @@ fun EchoHistoryView(
                         Modifier
                             .fillMaxWidth()
                             .weight(1f, fill = true)
+                            .momentsScrollEdgeChrome()
                             .padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
@@ -352,6 +354,7 @@ private fun EchoHistoryInfoSheet(onDismiss: () -> Unit, primary: Color) {
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())
+                .momentsScrollEdgeChrome()
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {

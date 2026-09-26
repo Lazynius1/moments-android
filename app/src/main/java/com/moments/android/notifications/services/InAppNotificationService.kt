@@ -32,6 +32,9 @@ object InAppNotificationService {
     private val _showBanner = MutableStateFlow(false)
     val showBanner: StateFlow<Boolean> = _showBanner.asStateFlow()
 
+    private val _hostGeneration = MutableStateFlow(0L)
+    val hostGeneration: StateFlow<Long> = _hostGeneration.asStateFlow()
+
     private var dismissJob: Job? = null
     private var pendingExpireAction: (() -> Unit)? = null
     private var listenerStartTime = Date()
@@ -90,6 +93,14 @@ object InAppNotificationService {
 
     fun showActionToast(toast: InAppActionToast) {
         enqueue(BannerQueueItem.Toast(toast))
+    }
+
+    /**
+     * Recreate the lightweight banner window after a Nav3 DialogScene is attached,
+     * so the global in-app chrome remains above full-screen destinations.
+     */
+    fun bringHostToFront() {
+        _hostGeneration.value += 1L
     }
 
     fun dismissHeldActionToast() {

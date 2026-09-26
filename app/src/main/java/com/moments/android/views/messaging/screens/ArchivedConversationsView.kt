@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.utilities.momentsEmptyStateAppear
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.components.ConversationContextMenuInsets
@@ -117,7 +118,9 @@ fun ArchivedConversationsView(
                 ArchivedEmptyState()
             } else {
                 LazyColumn(
-                    Modifier.fillMaxSize(),
+                    Modifier
+                        .fillMaxSize()
+                        .momentsScrollEdgeChrome(),
                     userScrollEnabled = conversationMenuSelection == null,
                 ) {
                     items(

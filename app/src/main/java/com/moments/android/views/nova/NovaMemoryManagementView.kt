@@ -57,6 +57,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.extensions.momentsScrollEdgeChrome
 import com.moments.android.extensions.timeAgoDisplay
 import com.moments.android.utilities.momentsEmptyStateAppear
 import com.moments.android.views.nova.memory.NovaContextStore
@@ -260,6 +261,7 @@ private fun MemoryContent(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .momentsScrollEdgeChrome()
             .padding(horizontal = 20.dp)
             .padding(top = 4.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(26.dp),
