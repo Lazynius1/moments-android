@@ -50,7 +50,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HourglassFull
@@ -108,6 +107,10 @@ import androidx.compose.ui.window.DialogWindowProvider
 import android.view.Gravity
 import android.view.WindowManager
 import coil.compose.AsyncImage
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
@@ -385,8 +388,13 @@ private fun UnifiedIncognitoChrome(
                                 },
                                 color = LocalContentColor.current,
                                 fontSize = titleSp,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
+                                autoSize = TextAutoSize.StepBased(
+                                    minFontSize = 10.sp,
+                                    maxFontSize = titleSp,
+                                    stepSize = 0.5.sp,
+                                ),
                             )
                             toast.subtitle?.trim()?.takeIf { it.isNotEmpty() }?.let { sub ->
                                 Text(
@@ -396,6 +404,11 @@ private fun UnifiedIncognitoChrome(
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
+                                    autoSize = TextAutoSize.StepBased(
+                                        minFontSize = 9.sp,
+                                        maxFontSize = subtitleSp,
+                                        stepSize = 0.5.sp,
+                                    ),
                                 )
                             }
                         }
@@ -569,8 +582,9 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
                     color = LocalContentColor.current,
                     fontSize = titleSp,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     autoSize = TextAutoSize.StepBased(
-                        minFontSize = 8.sp,
+                        minFontSize = 10.sp,
                         maxFontSize = titleSp,
                         stepSize = 0.5.sp,
                     ),
@@ -583,6 +597,11 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        autoSize = TextAutoSize.StepBased(
+                            minFontSize = 9.sp,
+                            maxFontSize = subtitleSp,
+                            stepSize = 0.5.sp,
+                        ),
                     )
                 }
             }
@@ -592,19 +611,24 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
                     modifier = Modifier.size(16.dp),
                     strokeWidth = 2.dp,
                 )
-            } else {
+            } else if (toast.bridgesToIncognitoPill || toast.isIncognitoPaused) {
                 Icon(
-                    imageVector = if (toast.bridgesToIncognitoPill || toast.isIncognitoPaused) {
-                        Icons.Filled.VisibilityOff
-                    } else {
-                        Icons.Filled.CheckCircle
-                    },
+                    imageVector = Icons.Filled.VisibilityOff,
                     contentDescription = null,
                     modifier = Modifier
                         .size(16.dp)
                         .clickable { InAppNotificationService.dismissManually() },
                     tint = LocalContentColor.current,
                 )
+            } else {
+                key(toast.id) {
+                    InAppBannerSuccessCheckmark(
+                        isDark = isDark,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable { InAppNotificationService.dismissManually() },
+                    )
+                }
             }
 
             toast.undo?.let {
@@ -621,6 +645,33 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
         }
     }
     }
+}
+
+@Composable
+private fun InAppBannerSuccessCheckmark(
+    isDark: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val composition by rememberLottieComposition(
+        LottieCompositionSpec.RawRes(
+            if (isDark) {
+                R.raw.in_app_success_checkmark_dark
+            } else {
+                R.raw.in_app_success_checkmark_light
+            },
+        ),
+    )
+    val progress by animateLottieCompositionAsState(
+        composition = composition,
+        iterations = 1,
+        isPlaying = composition != null,
+        speed = 1f,
+    )
+    LottieAnimation(
+        composition = composition,
+        progress = { progress },
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -756,6 +807,12 @@ private fun CompactInAppBanner(
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = headlineSp,
                                 maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                autoSize = TextAutoSize.StepBased(
+                                    minFontSize = 10.sp,
+                                    maxFontSize = headlineSp,
+                                    stepSize = 0.5.sp,
+                                ),
                             )
                         }
                         when {
@@ -765,6 +822,12 @@ private fun CompactInAppBanner(
                                 fontWeight = FontWeight.Medium,
                                 fontSize = detailSp,
                                 maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                autoSize = TextAutoSize.StepBased(
+                                    minFontSize = 9.sp,
+                                    maxFontSize = detailSp,
+                                    stepSize = 0.5.sp,
+                                ),
                             )
                             isSystemModerationBanner(notification) -> Text(
                                 text = moderationBannerText(notification),
@@ -772,6 +835,12 @@ private fun CompactInAppBanner(
                                 fontWeight = FontWeight.Medium,
                                 fontSize = detailSp,
                                 maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                autoSize = TextAutoSize.StepBased(
+                                    minFontSize = 9.sp,
+                                    maxFontSize = detailSp,
+                                    stepSize = 0.5.sp,
+                                ),
                             )
                         }
                     }

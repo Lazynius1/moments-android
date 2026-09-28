@@ -7,9 +7,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -42,7 +39,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -61,7 +57,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
-import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -78,12 +73,14 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import coil.size.Size as CoilSize
 import com.moments.android.R
+import com.moments.android.models.Moment
 import com.moments.android.models.MomentGridPreviewSettings
 import com.moments.android.utilities.HapticManager
+import com.moments.android.views.components.hiddenlayers.HiddenLayersStaticPreviewSurface
+import com.moments.android.views.profile.core.GridPreviewThumbnailFrame
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
-import kotlinx.coroutines.launch
 
 /**
  * Port de `ProfileGridPreviewEditorView.swift`.
@@ -91,6 +88,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun ProfileGridPreviewEditorView(
+    moment: Moment,
     imageUrl: String,
     feedCrop: com.moments.android.models.MediaItemFeedCrop? = null,
     initialSettings: MomentGridPreviewSettings,
@@ -111,13 +109,14 @@ fun ProfileGridPreviewEditorView(
     var appliedInitial by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
-    val painter = rememberAsyncImagePainter(
-        model = ImageRequest.Builder(context)
+    val cardImageRequest = remember(imageUrl, feedCrop) {
+        ImageRequest.Builder(context)
             .data(imageUrl)
             .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(feedCrop))
             .size(CoilSize.ORIGINAL)
-            .build(),
-    )
+            .build()
+    }
+    val painter = rememberAsyncImagePainter(model = cardImageRequest)
     val painterState = painter.state
     val isLoading = painterState is AsyncImagePainter.State.Loading ||
         (painterState is AsyncImagePainter.State.Empty)
@@ -209,7 +208,8 @@ fun ProfileGridPreviewEditorView(
                         Spacer(Modifier.height(10.dp))
 
                         PreviewCropArea(
-                            imageUrl = imageUrl,
+                            moment = moment,
+                            imageModel = cardImageRequest,
                             imageSize = imageSizePx,
                             cropSide = cropSideDp,
                             cropSidePx = cropSidePx,
@@ -321,7 +321,8 @@ private fun HeaderCircleButton(onClick: () -> Unit, content: @Composable () -> U
 
 @Composable
 private fun PreviewCropArea(
-    imageUrl: String,
+    moment: Moment,
+    imageModel: Any,
     imageSize: Size,
     cropSide: Dp,
     cropSidePx: Float,
@@ -337,7 +338,6 @@ private fun PreviewCropArea(
     val minScale = if (fitMode == MomentGridPreviewSettings.FitMode.FILL) 1f else 0.5f
     val cropHeight = cropSide / ProfileMomentsGridMetrics.portraitAspectRatio
     val cropHeightPx = with(LocalDensity.current) { cropHeight.toPx() }
-    val scope = rememberCoroutineScope()
 
     // Estado vivo sin reiniciar pointerInput (≡ iOS DragGesture + MagnifyGesture).
     val latestScale = rememberUpdatedState(scale)
@@ -368,8 +368,6 @@ private fun PreviewCropArea(
                     var lastSpan = 0f
                     var moved = false
                     var lastEventUptime = down.uptimeMillis
-                    val velocityTracker = VelocityTracker()
-                    velocityTracker.addPosition(down.uptimeMillis, down.position)
 
                     while (true) {
                         val event = awaitPointerEvent()
@@ -403,7 +401,6 @@ private fun PreviewCropArea(
                                 latestOnChange.value(workingScale, workingOffset, true)
                             }
                             lastSpan = span
-                            velocityTracker.resetTracking()
                         } else {
                             lastSpan = 0f
                             if (previous != null) {
@@ -418,8 +415,6 @@ private fun PreviewCropArea(
                                     fitMode,
                                 )
                                 latestOnChange.value(workingScale, workingOffset, true)
-                                val change = pressed.first()
-                                velocityTracker.addPosition(change.uptimeMillis, change.position)
                             }
                         }
 
@@ -446,41 +441,17 @@ private fun PreviewCropArea(
                     }
                     lastTapUptime = 0L
 
-                    // Inercia ligera ≡ iOS velocity * 0.04 + easeOut 0.22.
-                    val velocity = velocityTracker.calculateVelocity()
-                    val proposed = Offset(
-                        workingOffset.x + velocity.x * 0.04f,
-                        workingOffset.y + velocity.y * 0.04f,
-                    )
-                    val clamped = limitOffset(
-                        proposed,
-                        imageSize,
-                        workingScale,
-                        cropSidePx,
-                        cropHeightPx,
-                        fitMode,
-                    )
-                    if (clamped != workingOffset) {
-                        val start = workingOffset
-                        scope.launch {
-                            val anim = Animatable(start, Offset.VectorConverter)
-                            anim.animateTo(clamped, tween(220)) {
-                                latestOnChange.value(workingScale, value, true)
-                            }
-                            latestOnChange.value(workingScale, anim.value, false)
-                            HapticManager.shared.lightImpact()
-                        }
-                    } else {
-                        latestOnChange.value(workingScale, workingOffset, false)
-                        HapticManager.shared.lightImpact()
-                    }
+                    // El media ya siguió el dedo con límites en cada evento.
+                    // Sin inercia al soltar no hay salto ni rebote final.
+                    latestOnChange.value(workingScale, workingOffset, false)
+                    HapticManager.shared.lightImpact()
                 }
             },
         contentAlignment = Alignment.Center,
     ) {
         // Blur backdrop ≡ Image(uiImage.blur)
         AsyncImage(
-            model = imageUrl,
+            model = imageModel,
             contentDescription = null,
             modifier = Modifier
                 .fillMaxSize()
@@ -501,23 +472,49 @@ private fun PreviewCropArea(
                     ),
             )
         }
-        AsyncImage(
-            model = imageUrl,
-            contentDescription = null,
-            modifier = Modifier
-                .graphicsLayer {
-                    scaleX = scale * (if (isInteracting) 1.005f else 1f)
-                    scaleY = scale * (if (isInteracting) 1.005f else 1f)
-                    translationX = offset.x
-                    translationY = offset.y
-                }
-                .fillMaxSize(),
-            contentScale = if (fitMode == MomentGridPreviewSettings.FitMode.FIT) {
-                ContentScale.Fit
-            } else {
-                ContentScale.Crop
-            },
+        val liveSettings = MomentGridPreviewSettings(
+            scale = scale.toDouble(),
+            offsetX = (offset.x / cropSidePx).toDouble(),
+            offsetY = (offset.y / cropSidePx).toDouble(),
+            fitMode = fitMode,
+            background = background,
         )
+
+        GridPreviewThumbnailFrame(
+            width = cropSide,
+            height = cropHeight,
+            settings = liveSettings,
+        ) { transform ->
+            AsyncImage(
+                model = imageModel,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = transform.contentScale,
+                alignment = transform.alignment,
+            )
+        }
+
+        if (moment.hasHiddenLayers) {
+            HiddenLayersStaticPreviewSurface(
+                moment = moment,
+                settings = MomentGridPreviewSettings(
+                    scale = 1.0,
+                    offsetX = 0.0,
+                    offsetY = 0.0,
+                    fitMode = fitMode,
+                    background = background,
+                ),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offset.x
+                        translationY = offset.y
+                    },
+            )
+        }
+
         // Mask dim around crop already clipped — iOS destinationOut outside window;
         // here crop IS the window, so only dim isn't needed inside. Keep subtle edge via border.
 

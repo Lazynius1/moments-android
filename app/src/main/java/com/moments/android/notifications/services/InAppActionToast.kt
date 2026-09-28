@@ -156,7 +156,7 @@ data class InAppActionToast(
 
         fun muted(
             username: String,
-            undo: () -> Unit,
+            undo: (() -> Unit)? = null,
             onExpire: (() -> Unit)? = null,
         ): InAppActionToast = personToast(
             prefix = str(R.string.toast_action_muted),
@@ -164,6 +164,24 @@ data class InAppActionToast(
             suffix = suffix(R.string.toast_action_muted_suffix),
             undo = undo,
             onExpire = onExpire,
+        )
+
+        fun profileUpdated(): InAppActionToast = create(prefix = str(R.string.toast_action_profile_updated))
+
+        fun profilePhotoUpdated(): InAppActionToast = create(prefix = str(R.string.toast_action_profile_photo_updated))
+
+        fun profilePhotoRemoved(): InAppActionToast = create(prefix = str(R.string.toast_action_profile_photo_removed))
+
+        fun highlightCreated(): InAppActionToast = create(prefix = str(R.string.toast_action_highlight_created))
+
+        fun highlightUpdated(): InAppActionToast = create(prefix = str(R.string.toast_action_highlight_updated))
+
+        fun highlightDeleted(): InAppActionToast = create(prefix = str(R.string.toast_action_highlight_deleted))
+
+        fun leftBestFriends(username: String): InAppActionToast = personToast(
+            prefix = str(R.string.toast_action_best_friends_left_prefix),
+            username = username,
+            suffix = suffix(R.string.toast_action_best_friends_left_suffix),
         )
 
         fun momentUnsaved(

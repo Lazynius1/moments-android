@@ -4,6 +4,14 @@ import com.google.firebase.firestore.FieldValue
 import com.moments.android.models.CustomAudienceList
 import kotlinx.coroutines.tasks.await
 
+const val MAX_CUSTOM_AUDIENCE_MEMBERS = 1_000
+
+private fun validateAudienceMembers(members: Collection<String>) {
+    require(members.size <= MAX_CUSTOM_AUDIENCE_MEMBERS) {
+        "An audience list can contain at most $MAX_CUSTOM_AUDIENCE_MEMBERS members"
+    }
+}
+
 /** Port de FirestoreAudienceRepository.swift. */
 suspend fun FirestoreService.saveCustomAudienceForContent(
     contentType: String,
@@ -68,8 +76,12 @@ suspend fun FirestoreService.createCustomAudienceList(
     members: List<String>,
     color: String,
     icon: String,
+    imagePath: String? = null,
+    listId: String? = null,
 ): String {
-    val ref = db.collection("users").document(userId).collection("customAudienceLists").document()
+    validateAudienceMembers(members)
+    val collection = db.collection("users").document(userId).collection("customAudienceLists")
+    val ref = if (listId.isNullOrBlank()) collection.document() else collection.document(listId)
     val data = mutableMapOf<String, Any>(
         "name" to name,
         "members" to members,
@@ -79,6 +91,7 @@ suspend fun FirestoreService.createCustomAudienceList(
         "updatedAt" to FieldValue.serverTimestamp(),
     )
     if (description.isNotBlank()) data["description"] = description
+    if (!imagePath.isNullOrBlank()) data["imagePath"] = imagePath
     ref.set(data).await()
     return ref.id
 }
@@ -92,7 +105,9 @@ suspend fun FirestoreService.updateCustomAudienceList(
     members: List<String>,
     color: String,
     icon: String,
+    imagePath: String? = null,
 ) {
+    validateAudienceMembers(members)
     val update = mutableMapOf<String, Any>(
         "name" to name,
         "members" to members,
@@ -106,6 +121,7 @@ suspend fun FirestoreService.updateCustomAudienceList(
     } else {
         update["description"] = description
     }
+    update["imagePath"] = imagePath ?: FieldValue.delete()
     db.collection("users").document(userId)
         .collection("customAudienceLists").document(listId)
         .update(update)
@@ -123,6 +139,7 @@ suspend fun FirestoreService.fetchCustomListDetails(listId: String, ownerId: Str
 }
 
 suspend fun FirestoreService.addMembersToCustomList(listId: String, ownerId: String, memberIds: List<String>) {
+    require(memberIds.size <= MAX_CUSTOM_AUDIENCE_MEMBERS)
     db.collection("users").document(ownerId)
         .collection("customAudienceLists").document(listId)
         .update(

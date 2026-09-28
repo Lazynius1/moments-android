@@ -979,7 +979,7 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="audience_description_custom">Escolhe pessoas específicas</string>
     <string name="audience_description_custom_list">Usar uma lista personalizada</string>
     <string name="audience_description_only_me">Conteúdo privado, só tu o podes ver</string>
-    <string name="audience_predefined">Sugestões</string>
+    <string name="audience_predefined">Público predefinido</string>
     <string name="audience_custom_people_hint">Escolhe pessoas específicas</string>
     <string name="creator_location_search">Procurar localização...</string>
     <string name="creator_location_nearby">Locais próximos</string>
@@ -2374,4 +2374,22 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="message_requests_delete_all">Eliminar todos</string>
     <string name="message_requests_delete_all_confirmation_title">Eliminar todos os pedidos?</string>
     <string name="message_requests_delete_all_confirmation_message">Esta ação não pode ser anulada.</string>
+    <string name="hidden_layers_hint_appearance_title">Aparência ao descobrir</string>
+    <string name="hidden_layers_hint_appearance_a11y">Aparência da camada oculta</string>
+    <string name="hidden_layers_hint_style_black_and_white">P&amp;B</string>
+    <string name="hidden_layers_hint_style_actual">Ouro</string>
+    <string name="hidden_layers_hint_style_polar">Polar</string>
+    <string name="hidden_layers_hint_style_ember">Brasa</string>
+    <string name="hidden_layers_hint_style_ultraviolet">Ultra</string>
+    <string name="hidden_layers_hint_style_aurora">Aurora</string>
+    <string name="hidden_layers_hint_style_rose">Rosa</string>
+    <string name="hidden_layers_hint_style_plasma">Plasma</string>
+    <string name="hidden_layers_hint_style_daylight">Céu</string>
+    <string name="audience_manage_members">Gerir membros</string>
+    <string name="audience_list_updated">Lista atualizada</string>
+    <string name="audience_list_members_removed_single">Removeste %1$s da lista %2$s</string>
+    <string name="audience_list_members_removed_plural">Removeste %1$s e mais %2$d pessoas da lista %3$s</string>
+    <string name="audience_manage_members_remove_title">Remover membros da lista?</string>
+    <string name="audience_manage_members_remove_single">Estás prestes a remover %1$s de “%2$s”. Esta alteração será guardada imediatamente.</string>
+    <string name="audience_manage_members_remove_plural">Estás prestes a remover %1$s e mais %2$d pessoas de “%3$s”. Esta alteração será guardada imediatamente.</string>
 </resources>

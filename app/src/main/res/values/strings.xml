@@ -969,10 +969,10 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="audience_description_custom">Choose specific people</string>
     <string name="audience_description_custom_list">Use a custom list</string>
     <string name="audience_description_only_me">Private content, only you can see it</string>
-    <string name="audience_selection_title">Audience</string>
-    <string name="audience_selection_subtitle">Who can see this moment?</string>
-    <string name="audience_predefined">Suggested</string>
-    <string name="audience_custom_lists">Your lists</string>
+    <string name="audience_selection_title">Select Audience</string>
+    <string name="audience_selection_subtitle">Choose who can see this content</string>
+    <string name="audience_predefined">Predefined audience</string>
+    <string name="audience_custom_lists">Custom lists</string>
     <string name="audience_custom_lists_empty">No custom lists yet</string>
     <string name="audience_custom_people_hint">Choose specific people</string>
     <string name="audience_people_count">%1$d people</string>
@@ -1161,6 +1161,17 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="hidden_layers_empty_audio_subtitle">Record a short audio that only appears when discovered.</string>
     <string name="hidden_layers_empty_image_subtitle">Use a hidden polaroid to hide another photo inside the post.</string>
     <string name="hidden_layers_unlock_title">Availability</string>
+    <string name="hidden_layers_hint_appearance_title">Appearance on discovery</string>
+    <string name="hidden_layers_hint_appearance_a11y">Hidden layer appearance</string>
+    <string name="hidden_layers_hint_style_black_and_white">B&amp;W</string>
+    <string name="hidden_layers_hint_style_actual">Gold</string>
+    <string name="hidden_layers_hint_style_polar">Polar</string>
+    <string name="hidden_layers_hint_style_ember">Ember</string>
+    <string name="hidden_layers_hint_style_ultraviolet">Ultra</string>
+    <string name="hidden_layers_hint_style_aurora">Aurora</string>
+    <string name="hidden_layers_hint_style_rose">Rose</string>
+    <string name="hidden_layers_hint_style_plasma">Plasma</string>
+    <string name="hidden_layers_hint_style_daylight">Sky</string>
     <string name="hidden_layers_unlock_now">Now</string>
     <string name="hidden_layers_unlock_scheduled">Scheduled</string>
     <string name="hidden_layers_unlock_opens">Opens</string>
@@ -3032,4 +3043,12 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="whats_new_nova_230_description">Daily spark, a refreshed look, and attaching a photo no longer posts a Moment by accident.</string>
     <string name="whats_new_offline_230_title">Offline &amp; polish</string>
     <string name="whats_new_offline_230_description">Better offline behavior, steadier relationship states, and polished copy in every language.</string>
+    <string name="audience_manage_members">Manage members</string>
+    <string name="audience_list_updated">List updated</string>
+    <string name="audience_list_members_removed_single">You removed %1$s from %2$s</string>
+    <string name="audience_list_members_removed_plural">You removed %1$s and %2$d more from %3$s</string>
+    <string name="audience_manage_members_remove_title">Remove members from the list?</string>
+    <string name="audience_manage_members_remove_single">You’re about to remove %1$s from “%2$s”. This change will be saved immediately.</string>
+    <string name="audience_manage_members_remove_plural">You’re about to remove %1$s and %2$d more people from “%3$s”. This change will be saved immediately.</string>
+    <string name="audience_members_limit">An audience list can contain at most %1$d members</string>
 </resources>

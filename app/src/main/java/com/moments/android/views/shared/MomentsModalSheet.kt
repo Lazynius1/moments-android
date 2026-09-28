@@ -1,88 +1,72 @@
 package com.moments.android.views.shared
 
 import android.view.WindowManager
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import com.moments.android.views.feed.rememberAdaptiveColors
-import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
-/**
- * [SheetState] del [MomentsModalSheet] anfitrión — para anclar footers a la zona
- * visible (medium/large) sin cambiar la altura medida del contenido.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-val LocalMomentsSheetState = staticCompositionLocalOf<SheetState?> { null }
+private val LocalMomentsSheetDragModifier = staticCompositionLocalOf<Modifier> { Modifier }
 
 /**
- * Modal bottom sheet Material 3
- * ([m3.material.io/components/bottom-sheets](https://m3.material.io/components/bottom-sheets/overview)).
+ * Bottom sheet propio, con los mismos detents y arrastre que los comentarios.
  *
- * - `largeOnly = false` → PartiallyExpanded + Expanded
- * - `largeOnly = true` → solo Expanded
- *
- * Estilo Moments (unificado):
- * - Canvas = AdaptiveColors.surfaceBackground (handle + contenido mismo color).
- * - Cabecera pegada al handle ([MomentsSheetHeader]); sin chevron de dismiss
- *   (el drag handle / swipe cierra).
- *
- * M3 mide el contenido a altura expanded; en medium solo se ve la franja superior.
- * Footers/inputs: usar [MomentsSheetPinnedFooter] — **no** redimensionar el
- * contenido con [SheetState.requireOffset] (provoca lag y elimina el ancla medium).
+ * El panel nace siempre del borde inferior y aumenta su propia altura de medium a
+ * large: no se convierte en una pantalla completa ni deja que Material recalcule
+ * los detents al aparecer el teclado.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MomentsModalSheet(
     onDismissRequest: () -> Unit,
@@ -91,15 +75,15 @@ fun MomentsModalSheet(
     shape: Shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     showDragHandle: Boolean = true,
     scrimColor: Color? = null,
-    /** false ≡ bloquear swipe-to-dismiss y tap en scrim (M3 confirmValueChange). */
+    /** false bloquea swipe-to-dismiss y tap en scrim. */
     dismissEnabled: Boolean = true,
-    /** false mantiene el detent parcial y rechaza el salto a Expanded. */
+    /** false mantiene el detent medium y rechaza el salto a large. */
     allowExpanded: Boolean = true,
-    /** Promueve temporalmente al anchor superior cuando aparece el teclado. */
+    /** Promueve temporalmente al detent large cuando aparece el teclado. */
     expandOnIme: Boolean = false,
-    /** Altura exacta del anchor superior; 0.72 ≡ detent intermedio, no large. */
+    /** Límite superior del sheet; siempre deja una franja de la vista de fondo visible. */
     expandedHeightFraction: Float? = null,
-    /** Posición Y real del borde superior; permite coordinar el contenido de fondo. */
+    /** Posición Y real del borde superior; permite coordinar la vista de fondo. */
     onSheetOffsetChanged: ((Float) -> Unit)? = null,
     content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit,
 ) {
@@ -109,89 +93,164 @@ fun MomentsModalSheet(
         containerColor
     }
     val density = LocalDensity.current
-    val imeVisible = WindowInsets.ime.getBottom(density) > 0
-    val currentImeVisible by rememberUpdatedState(imeVisible)
-    // ModalBottomSheet se aloja en su propio Dialog. Para el sheet de Reels no
-    // queremos que `adjustResize` recalcule sus detents al abrir el teclado:
-    // el panel conserva su geometría y el footer se ancla al IME mediante
-    // MomentsSheetPinnedFooter.
-    val view = LocalView.current
-    DisposableEffect(view, expandOnIme) {
-        if (!expandOnIme) return@DisposableEffect onDispose { }
-        val window = (view.parent as? DialogWindowProvider)?.window
-        if (window == null) return@DisposableEffect onDispose { }
-
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        val previousSoftInputMode = window.attributes.softInputMode
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
-        onDispose { window.setSoftInputMode(previousSoftInputMode) }
-    }
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = largeOnly,
-        confirmValueChange = { newValue ->
-            (dismissEnabled || newValue != SheetValue.Hidden) &&
-                (allowExpanded || (expandOnIme && currentImeVisible) || newValue != SheetValue.Expanded)
-        },
-    )
-    // largeOnly: forzar Expanded (si no, en fullScreenDialog/Creator a veces queda
-    // PartiallyExpanded → handle a media pantalla y el contenido se recompone al subir).
-    LaunchedEffect(sheetState, largeOnly) {
-        if (largeOnly && sheetState.currentValue != SheetValue.Expanded) {
-            sheetState.expand()
-        }
-    }
-    LaunchedEffect(sheetState, expandOnIme, imeVisible) {
-        if (!expandOnIme) return@LaunchedEffect
-        if (imeVisible) {
-            sheetState.expand()
-        } else if (sheetState.currentValue == SheetValue.Expanded) {
-            sheetState.partialExpand()
-        }
-    }
-    LaunchedEffect(sheetState, onSheetOffsetChanged) {
-        val observer = onSheetOffsetChanged ?: return@LaunchedEffect
-        snapshotFlow { runCatching { sheetState.requireOffset() }.getOrNull() }
-            .collect { offset -> offset?.let(observer) }
-    }
+    val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
-    // `fillMaxHeight(fraction)` sólo establece un mínimo: un hijo con `weight`
-    // puede seguir estirando el ModalBottomSheet hasta large. Calculamos una
-    // altura exacta para que el detent alto de Reels quede realmente al 72%.
-    val constrainedSheetHeight = expandedHeightFraction?.let { fraction ->
-        with(density) {
-            (LocalWindowInfo.current.containerSize.height * fraction.coerceIn(0.5f, 0.9f))
-                .roundToInt()
-                .toDp()
+    val windowHeightPx = LocalWindowInfo.current.containerSize.height.toFloat().coerceAtLeast(1f)
+    var imeVisible by remember { mutableStateOf(false) }
+    val mediumFraction = 0.72f
+    // .96 coincide con large de comentarios: visible, pero nunca fullscreen.
+    val requestedLargeFraction = expandedHeightFraction ?: 0.96f
+    val largeFraction = requestedLargeFraction.coerceIn(mediumFraction, 0.96f)
+    val initialFraction = if (largeOnly) largeFraction else mediumFraction
+    var selectedFraction by remember { mutableFloatStateOf(initialFraction) }
+    var isDragging by remember { mutableStateOf(false) }
+    var dragHeightPx by remember { mutableStateOf<Float?>(null) }
+    var dragStartHeightPx by remember { mutableFloatStateOf(0f) }
+    var dragTravelPx by remember { mutableFloatStateOf(0f) }
+    var isClosing by remember { mutableStateOf(false) }
+    val animatedHeightPx = remember { Animatable(0f) }
+    val renderedHeightPx = (dragHeightPx ?: animatedHeightPx.value).coerceAtLeast(0f)
+
+    LaunchedEffect(windowHeightPx) {
+        if (animatedHeightPx.value == 0f) {
+            animatedHeightPx.animateTo(windowHeightPx * initialFraction, modalSheetSpring())
         }
     }
-    val dismissSheet: () -> Unit = {
+    LaunchedEffect(imeVisible, windowHeightPx, selectedFraction, isDragging, isClosing) {
+        if (isDragging || isClosing) return@LaunchedEffect
+        val targetFraction = when {
+            imeVisible && expandOnIme && allowExpanded -> largeFraction
+            else -> selectedFraction
+        }
+        animatedHeightPx.animateTo(windowHeightPx * targetFraction, modalSheetSpring())
+    }
+    LaunchedEffect(onSheetOffsetChanged, windowHeightPx) {
+        val observer = onSheetOffsetChanged ?: return@LaunchedEffect
+        snapshotFlow {
+            (windowHeightPx - (dragHeightPx ?: animatedHeightPx.value)).coerceAtLeast(0f)
+        }.collect(observer)
+    }
+
+    fun dismissAnimated() {
+        if (!dismissEnabled || isClosing) return
+        isClosing = true
+        focusManager.clearFocus(force = true)
         scope.launch {
-            sheetState.hide()
+            dragHeightPx = null
+            animatedHeightPx.animateTo(0f, modalSheetSpring())
             onDismissRequest()
         }
     }
 
-    ModalBottomSheet(
-        modifier = constrainedSheetHeight?.let { height ->
-            Modifier.height(height)
-        } ?: Modifier,
-        onDismissRequest = {
-            if (dismissEnabled) onDismissRequest()
-        },
-        sheetState = sheetState,
-        shape = shape,
-        containerColor = canvas,
-        tonalElevation = 0.dp,
-        scrimColor = scrimColor ?: BottomSheetDefaults.ScrimColor,
-        dragHandle = if (showDragHandle) {
-            { BottomSheetDefaults.DragHandle() }
-        } else {
-            null
-        },
+    val dragModifier = Modifier.pointerInput(
+        windowHeightPx, largeOnly, allowExpanded, largeFraction, imeVisible,
     ) {
-        CompositionLocalProvider(LocalMomentsSheetState provides sheetState) {
-            content(dismissSheet)
+        detectVerticalDragGestures(
+            onDragStart = {
+                isDragging = true
+                dragTravelPx = 0f
+                dragStartHeightPx = dragHeightPx ?: animatedHeightPx.value
+                scope.launch { animatedHeightPx.stop() }
+            },
+            onVerticalDrag = { change, dragAmount ->
+                change.consume()
+                dragTravelPx += dragAmount
+                if (imeVisible && dragTravelPx > 4f) focusManager.clearFocus(force = true)
+                val proposed = dragStartHeightPx - dragTravelPx
+                val floor = windowHeightPx * initialFraction * 0.30f
+                val ceiling = windowHeightPx * when {
+                    largeOnly -> largeFraction
+                    allowExpanded -> largeFraction
+                    else -> mediumFraction
+                }
+                dragHeightPx = modalSheetRubberBand(proposed, floor, ceiling, windowHeightPx)
+            },
+            onDragCancel = {
+                val current = dragHeightPx ?: animatedHeightPx.value
+                dragHeightPx = null
+                isDragging = false
+                scope.launch {
+                    animatedHeightPx.snapTo(current)
+                    animatedHeightPx.animateTo(windowHeightPx * selectedFraction, modalSheetSpring())
+                }
+            },
+            onDragEnd = {
+                val current = dragHeightPx ?: animatedHeightPx.value
+                dragHeightPx = null
+                isDragging = false
+                scope.launch {
+                    animatedHeightPx.snapTo(current)
+                    val mediumHeight = windowHeightPx * initialFraction
+                    if (current < mediumHeight * 0.55f && dismissEnabled) {
+                        dismissAnimated()
+                    } else if (!largeOnly && allowExpanded && current >=
+                        (windowHeightPx * (mediumFraction + largeFraction) / 2f)
+                    ) {
+                        selectedFraction = largeFraction
+                        animatedHeightPx.animateTo(windowHeightPx * largeFraction, modalSheetSpring())
+                    } else {
+                        selectedFraction = initialFraction
+                        animatedHeightPx.animateTo(windowHeightPx * initialFraction, modalSheetSpring())
+                    }
+                }
+            },
+        )
+    }
+
+    Dialog(
+        onDismissRequest = ::dismissAnimated,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+        ),
+    ) {
+        val view = LocalView.current
+        val dialogImeVisible = WindowInsets.ime.getBottom(density) > 0
+        LaunchedEffect(dialogImeVisible) { imeVisible = dialogImeVisible }
+        val window = (view.parent as? DialogWindowProvider)?.window
+        DisposableEffect(view) {
+            if (window == null) return@DisposableEffect onDispose { }
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            window.setDimAmount(0f)
+            val previousSoftInputMode = window.attributes.softInputMode
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
+            onDispose { window.setSoftInputMode(previousSoftInputMode) }
         }
+
+        BackHandler(onBack = ::dismissAnimated)
+        Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(scrimColor ?: Color.Black.copy(alpha = 0.32f))
+                    .clickable(enabled = dismissEnabled, onClick = ::dismissAnimated),
+            )
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(with(density) { renderedHeightPx.toDp() })
+                    .shadow(24.dp, shape, clip = false),
+                color = canvas,
+                shape = shape,
+                tonalElevation = 0.dp,
+            ) {
+                // El canvas puede llegar al borde inferior, pero el contenido no
+                // debe quedar por debajo de la barra/botones de navegación.
+                Column(Modifier.fillMaxSize().navigationBarsPadding()) {
+                    if (showDragHandle) ModalSheetDragHandle(dragModifier)
+                    CompositionLocalProvider(LocalMomentsSheetDragModifier provides dragModifier) {
+                        content(::dismissAnimated)
+                    }
+                }
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { onSheetOffsetChanged?.invoke(windowHeightPx) }
     }
 }
 
@@ -208,8 +267,9 @@ fun MomentsSheetHeader(
     trailing: @Composable (() -> Unit)? = null,
 ) {
     val colors = rememberAdaptiveColors()
+    val dragModifier = LocalMomentsSheetDragModifier.current
     Box(
-        modifier
+        modifier.then(dragModifier)
             .fillMaxWidth()
             .padding(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 8.dp),
     ) {
@@ -242,72 +302,42 @@ fun MomentsSheetHeader(
     }
 }
 
-/**
- * Footer/composer anclado al borde inferior *visible* del sheet (medium o large).
- *
- * Debe vivir dentro de un [androidx.compose.foundation.layout.Box] hermano del
- * contenido scrollable. Solo este composable lee el offset del sheet (recomposiciones
- * baratas al arrastrar). No cambia la altura medida del contenido.
- *
- * @return padding inferior recomendado para la lista (altura del footer).
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BoxScope.MomentsSheetPinnedFooter(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
-): Dp {
-    val sheetState = LocalMomentsSheetState.current
-    val density = LocalDensity.current
-    val windowHeightPx = LocalWindowInfo.current.containerSize.height
-    // IME + nav: recomponer al abrir/cerrar teclado (composer de comentarios, etc.).
-    val bottomInsetPx = WindowInsets.ime
-        .union(WindowInsets.navigationBars)
-        .getBottom(density)
-    var footerHeightPx by remember { mutableIntStateOf(0) }
-    var parentOffsetWithinSheetPx by remember { mutableFloatStateOf(Float.NaN) }
-
-    // Lectura aislada: solo este footer se recompone mientras arrastras el sheet.
-    val sheetOffsetPx = if (sheetState != null) {
-        runCatching { sheetState.requireOffset() }.getOrDefault(Float.NaN)
-    } else {
-        Float.NaN
-    }
-    val parentTopPx = if (sheetOffsetPx.isNaN() || parentOffsetWithinSheetPx.isNaN()) {
-        Float.NaN
-    } else {
-        sheetOffsetPx + parentOffsetWithinSheetPx
-    }
-    val yPx = if (parentTopPx.isNaN() || footerHeightPx <= 0) {
-        0
-    } else {
-        val systemContentBottomPx = windowHeightPx - bottomInsetPx
-        (systemContentBottomPx - parentTopPx - footerHeightPx)
-            .roundToInt()
-            .coerceAtLeast(0)
-    }
-
-    Column(
+private fun ModalSheetDragHandle(modifier: Modifier = Modifier) {
+    val colors = rememberAdaptiveColors()
+    Box(
         modifier
             .fillMaxWidth()
-            .align(Alignment.TopStart)
-            .onSizeChanged { footerHeightPx = it.height }
-            .onGloballyPositioned { coordinates ->
-                val currentSheetOffset = runCatching { sheetState?.requireOffset() }
-                    .getOrNull()
-                    ?.takeUnless { it.isNaN() }
-                    ?: return@onGloballyPositioned
-                val parentTopInWindow = coordinates.parentLayoutCoordinates
-                    ?.localToWindow(Offset.Zero)
-                    ?.y
-                    ?: return@onGloballyPositioned
-                parentOffsetWithinSheetPx = parentTopInWindow - currentSheetOffset
-            }
-            .offset { IntOffset(0, yPx) },
-        content = content,
-    )
-
-    return with(density) {
-        footerHeightPx.coerceAtLeast(0).toDp().coerceAtLeast(72.dp)
+            // 18.dp de hit-area arriba; el pill va abajo para pegar el título.
+            .height(18.dp),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Box(
+            Modifier
+                .padding(bottom = 2.dp)
+                .size(width = 36.dp, height = 5.dp)
+                .background(colors.primary.copy(alpha = 0.25f), CircleShape),
+        )
     }
+}
+
+private fun modalSheetSpring() = spring<Float>(
+    dampingRatio = 0.88f,
+    stiffness = Spring.StiffnessMediumLow,
+)
+
+private fun modalSheetRubberBand(
+    proposed: Float,
+    lowerBound: Float,
+    upperBound: Float,
+    dimension: Float,
+): Float = when {
+    proposed < lowerBound -> lowerBound - modalSheetRubberBandDistance(lowerBound - proposed, dimension)
+    proposed > upperBound -> upperBound + modalSheetRubberBandDistance(proposed - upperBound, dimension)
+    else -> proposed
+}
+
+private fun modalSheetRubberBandDistance(distance: Float, dimension: Float): Float {
+    val coefficient = 0.34f
+    return (distance * coefficient * dimension) / (dimension + coefficient * distance)
 }

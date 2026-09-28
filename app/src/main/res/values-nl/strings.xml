@@ -916,10 +916,10 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="audience_description_custom">Kies specifieke mensen</string>
     <string name="audience_description_custom_list">Gebruik een aangepaste lijst</string>
     <string name="audience_description_only_me">Privécontent, alleen jij kunt dit zien</string>
-    <string name="audience_selection_title">Doelgroep</string>
-    <string name="audience_selection_subtitle">Wie kan dit moment zien?</string>
-    <string name="audience_predefined">Voorgesteld</string>
-    <string name="audience_custom_lists">Jouw lijsten</string>
+    <string name="audience_selection_title">Doelgroep selecteren</string>
+    <string name="audience_selection_subtitle">Kies wie deze content kan zien</string>
+    <string name="audience_predefined">Vooraf ingestelde doelgroep</string>
+    <string name="audience_custom_lists">Aangepaste lijsten</string>
     <string name="audience_custom_lists_empty">Je hebt nog geen aangepaste lijsten</string>
     <string name="audience_custom_people_hint">Kies specifieke mensen</string>
     <string name="audience_people_count">%1$d mensen</string>
@@ -1108,6 +1108,17 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="hidden_layers_empty_audio_subtitle">Neem een kort audiofragment op dat alleen tevoorschijn komt als iemand het ontdekt.</string>
     <string name="hidden_layers_empty_image_subtitle">Gebruik een verborgen polaroid om nog een foto in je post te verbergen.</string>
     <string name="hidden_layers_unlock_title">Beschikbaarheid</string>
+    <string name="hidden_layers_hint_appearance_title">Uiterlijk bij ontdekken</string>
+    <string name="hidden_layers_hint_appearance_a11y">Uiterlijk van verborgen laag</string>
+    <string name="hidden_layers_hint_style_black_and_white">Z/W</string>
+    <string name="hidden_layers_hint_style_actual">Goud</string>
+    <string name="hidden_layers_hint_style_polar">Polar</string>
+    <string name="hidden_layers_hint_style_ember">Gloed</string>
+    <string name="hidden_layers_hint_style_ultraviolet">Ultra</string>
+    <string name="hidden_layers_hint_style_aurora">Aurora</string>
+    <string name="hidden_layers_hint_style_rose">Roze</string>
+    <string name="hidden_layers_hint_style_plasma">Plasma</string>
+    <string name="hidden_layers_hint_style_daylight">Hemel</string>
     <string name="hidden_layers_unlock_now">Nu</string>
     <string name="hidden_layers_unlock_scheduled">Ingepland</string>
     <string name="hidden_layers_unlock_opens">Opent</string>
@@ -2988,4 +2999,12 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="message_requests_delete_all">Alles verwijderen</string>
     <string name="message_requests_delete_all_confirmation_title">Alle verzoeken verwijderen?</string>
     <string name="message_requests_delete_all_confirmation_message">Deze actie kan niet ongedaan worden gemaakt.</string>
+    <string name="audience_manage_members">Leden beheren</string>
+    <string name="audience_list_updated">Lijst bijgewerkt</string>
+    <string name="audience_list_members_removed_single">Je hebt %1$s uit de lijst %2$s verwijderd</string>
+    <string name="audience_list_members_removed_plural">Je hebt %1$s en nog %2$d personen uit de lijst %3$s verwijderd</string>
+    <string name="audience_manage_members_remove_title">Leden uit de lijst verwijderen?</string>
+    <string name="audience_manage_members_remove_single">Je gaat %1$s uit ‘%2$s’ verwijderen. Deze wijziging wordt meteen opgeslagen.</string>
+    <string name="audience_manage_members_remove_plural">Je gaat %1$s en nog %2$d personen uit ‘%3$s’ verwijderen. Deze wijziging wordt meteen opgeslagen.</string>
+    <string name="stories_reaction_sent">Reactie verzonden</string>
 </resources>

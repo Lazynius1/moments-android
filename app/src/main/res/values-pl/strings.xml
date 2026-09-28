@@ -916,10 +916,10 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="audience_description_custom">Wybierz konkretne osoby</string>
     <string name="audience_description_custom_list">Użyj własnej listy</string>
     <string name="audience_description_only_me">Prywatne treści widoczne tylko dla Ciebie</string>
-    <string name="audience_selection_title">Odbiorcy</string>
-    <string name="audience_selection_subtitle">Kto może zobaczyć ten moment?</string>
-    <string name="audience_predefined">Sugerowane</string>
-    <string name="audience_custom_lists">Twoje listy</string>
+    <string name="audience_selection_title">Wybierz odbiorców</string>
+    <string name="audience_selection_subtitle">Wybierz, kto może zobaczyć tę treść</string>
+    <string name="audience_predefined">Gotowa grupa odbiorców</string>
+    <string name="audience_custom_lists">Własne listy</string>
     <string name="audience_custom_lists_empty">Nie masz jeszcze własnych list</string>
     <string name="audience_custom_people_hint">Wybierz konkretne osoby</string>
     <string name="audience_people_count">%1$d osób</string>
@@ -1108,6 +1108,17 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="hidden_layers_empty_audio_subtitle">Nagraj krótkie audio, które pojawi się dopiero po odkryciu.</string>
     <string name="hidden_layers_empty_image_subtitle">Użyj ukrytego polaroidu, aby schować w poście kolejne zdjęcie.</string>
     <string name="hidden_layers_unlock_title">Dostępność</string>
+    <string name="hidden_layers_hint_appearance_title">Wygląd przy odkryciu</string>
+    <string name="hidden_layers_hint_appearance_a11y">Wygląd ukrytej warstwy</string>
+    <string name="hidden_layers_hint_style_black_and_white">C/B</string>
+    <string name="hidden_layers_hint_style_actual">Złoto</string>
+    <string name="hidden_layers_hint_style_polar">Polar</string>
+    <string name="hidden_layers_hint_style_ember">Żar</string>
+    <string name="hidden_layers_hint_style_ultraviolet">Ultra</string>
+    <string name="hidden_layers_hint_style_aurora">Aurora</string>
+    <string name="hidden_layers_hint_style_rose">Róż</string>
+    <string name="hidden_layers_hint_style_plasma">Plazma</string>
+    <string name="hidden_layers_hint_style_daylight">Niebo</string>
     <string name="hidden_layers_unlock_now">Teraz</string>
     <string name="hidden_layers_unlock_scheduled">Zaplanowane</string>
     <string name="hidden_layers_unlock_opens">Otwiera się</string>
@@ -2988,4 +2999,12 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="message_requests_delete_all">Usuń wszystkie</string>
     <string name="message_requests_delete_all_confirmation_title">Usunąć wszystkie prośby?</string>
     <string name="message_requests_delete_all_confirmation_message">Tej czynności nie można cofnąć.</string>
+    <string name="audience_manage_members">Zarządzaj członkami</string>
+    <string name="audience_list_updated">Lista zaktualizowana</string>
+    <string name="audience_list_members_removed_single">Usunięto użytkownika %1$s z listy %2$s</string>
+    <string name="audience_list_members_removed_plural">Usunięto użytkownika %1$s i jeszcze %2$d osób z listy %3$s</string>
+    <string name="audience_manage_members_remove_title">Usunąć członków z listy?</string>
+    <string name="audience_manage_members_remove_single">Za chwilę usuniesz użytkownika %1$s z listy „%2$s”. Ta zmiana zostanie zapisana natychmiast.</string>
+    <string name="audience_manage_members_remove_plural">Za chwilę usuniesz użytkownika %1$s i jeszcze %2$d osób z listy „%3$s”. Ta zmiana zostanie zapisana natychmiast.</string>
+    <string name="stories_reaction_sent">Reakcja wysłana</string>
 </resources>

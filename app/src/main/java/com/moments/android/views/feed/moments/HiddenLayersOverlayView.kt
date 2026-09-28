@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.extensions.MomentsChromeGlass
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.HiddenLayerImageFrameStyle
 import com.moments.android.models.HiddenLayerPresentationStyle
@@ -83,6 +84,7 @@ import com.moments.android.services.firestore.fetchHiddenLayers
 import com.moments.android.services.firestore.recordHiddenLayerDiscovery
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MomentsFormat
+import com.moments.android.views.components.hiddenlayers.HiddenLayerHintAppearanceView
 import com.moments.android.views.components.hiddenlayers.HiddenLayerLayout
 import com.moments.android.views.creator.HiddenLayerRemotePolaroidPreview
 import java.util.Calendar
@@ -452,19 +454,20 @@ fun HiddenLayersOverlayView(
                 contentAlignment = Alignment.Center,
             ) {
                 if (revealed) {
-                    RevealedLayerContent(
+                    HiddenLayerRevealedContent(
                         layer = layer,
                         frameWidthPx = frame.width,
                         frameHeightPx = frame.height,
                         shouldAutoplay = layer.id in autoplayIds,
                     )
                 } else if (showIntroShimmer || !wasSeen(layer.id)) {
-                    PresenceHint(
+                    HiddenLayerHintAppearanceView(
                         type = layer.type,
                         shape = layer.shape,
+                        style = layer.hintStyle ?: MomentHiddenLayer.HintStyle.ACTUAL,
+                        isSeen = wasSeen(layer.id),
+                        delaySec = index * 0.12,
                         isIntro = showIntroShimmer,
-                        delayMs = index * 120L,
-                        seen = wasSeen(layer.id),
                     )
                 }
                 if (layer.id in revealBurstIds) {
@@ -479,9 +482,10 @@ fun HiddenLayersOverlayView(
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter).padding(top = 14.dp),
         ) {
+            val isDark = isSystemInDarkTheme()
             Text(
                 text = topHintText.orEmpty(),
-                color = Color.White,
+                color = MomentsChromeGlass.contentColor(isDark),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
@@ -492,12 +496,17 @@ fun HiddenLayersOverlayView(
     }
 }
 
+/**
+ * Contenido revelado compartido por overlay de feed y preview estático de grid.
+ * ≡ iOS reveals con `isAnimated` (false en thumbnails).
+ */
 @Composable
-private fun RevealedLayerContent(
+fun HiddenLayerRevealedContent(
     layer: MomentHiddenLayer,
     frameWidthPx: Float,
     frameHeightPx: Float,
-    shouldAutoplay: Boolean,
+    shouldAutoplay: Boolean = false,
+    isAnimated: Boolean = true,
 ) {
     when (layer.type) {
         MomentHiddenLayer.LayerType.TEXT -> {
@@ -505,6 +514,7 @@ private fun RevealedLayerContent(
                 layer = layer,
                 frameWidthPx = frameWidthPx,
                 frameHeightPx = frameHeightPx,
+                isAnimated = isAnimated,
             )
         }
         MomentHiddenLayer.LayerType.IMAGE -> {
@@ -520,6 +530,7 @@ private fun RevealedLayerContent(
                     imageScale = layer.imageScale ?: 1.0,
                     canvasWidthPx = frameWidthPx,
                     canvasHeightPx = frameHeightPx,
+                    isAnimated = isAnimated,
                 )
             }
         }
@@ -530,7 +541,8 @@ private fun RevealedLayerContent(
                     audioURL = url,
                     duration = layer.duration ?: 15.0,
                     frameWidthPx = frameWidthPx,
-                    shouldAutoplay = shouldAutoplay,
+                    shouldAutoplay = shouldAutoplay && isAnimated,
+                    isAnimated = isAnimated,
                 )
             }
         }
@@ -539,15 +551,23 @@ private fun RevealedLayerContent(
 
 /** Port de `HiddenLayerTextReveal` + `TypewriterText`. */
 @Composable
-private fun HiddenLayerTextReveal(
+internal fun HiddenLayerTextReveal(
     layer: MomentHiddenLayer,
     frameWidthPx: Float,
     frameHeightPx: Float,
+    isAnimated: Boolean = true,
 ) {
     val density = LocalDensity.current
     val isDark = isSystemInDarkTheme()
-    var appearProgress by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(layer.id) {
+    // Thumbnails: texto ya completo (sin typewriter / mask).
+    var appearProgress by remember(layer.id, isAnimated) {
+        mutableFloatStateOf(if (isAnimated) 0f else 1f)
+    }
+    LaunchedEffect(layer.id, isAnimated) {
+        if (!isAnimated) {
+            appearProgress = 1f
+            return@LaunchedEffect
+        }
         val charCount = layer.text?.length ?: 0
         val durationMs = (max(0.6, min(2.5, charCount * 0.045)) * 1000).toLong()
         delay(200)
@@ -597,7 +617,11 @@ private fun HiddenLayerTextReveal(
         else -> FontWeight.SemiBold
     }
     val rawText = layer.text.orEmpty()
-    val visibleCount = (rawText.length * appearProgress).toInt().coerceIn(0, rawText.length)
+    val visibleText = if (isAnimated) {
+        rawText.take((rawText.length * appearProgress).toInt().coerceIn(0, rawText.length))
+    } else {
+        rawText
+    }
     var fittedScale by remember(layer.id, rawText, frameWidthPx, frameHeightPx) {
         mutableFloatStateOf(1f)
     }
@@ -638,50 +662,47 @@ private fun HiddenLayerTextReveal(
             HiddenLayerPresentationStyle.MINIMAL_TEXT -> Unit
         }
 
-        // Typewriter + sweep mask
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    alpha = if (appearProgress > 0f) 1f else 0f
-                    val s = 0.96f + appearProgress * 0.04f
-                    scaleX = s
-                    scaleY = s
+        Text(
+            text = visibleText,
+            color = foreground,
+            fontSize = fontSize * fittedScale,
+            fontFamily = fontFamily,
+            fontWeight = fontWeight,
+            maxLines = 5,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            onTextLayout = { result ->
+                if (result.hasVisualOverflow && fittedScale > 0.6f) {
+                    fittedScale = (fittedScale - 0.05f).coerceAtLeast(0.6f)
                 }
-                .clip(
-                    // Approximate horizontal reveal mask via clip to progress width
-                    RoundedCornerShape(0.dp),
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 11.dp)
+                .then(
+                    if (isAnimated) {
+                        Modifier.graphicsLayer {
+                            alpha = if (appearProgress > 0f) 1f else 0f
+                            val s = 0.96f + appearProgress * 0.04f
+                            scaleX = s
+                            scaleY = s
+                        }
+                    } else {
+                        Modifier
+                    },
                 ),
-        ) {
-            Text(
-                text = rawText.take(visibleCount),
-                color = foreground,
-                fontSize = fontSize * fittedScale,
-                fontFamily = fontFamily,
-                fontWeight = fontWeight,
-                maxLines = 5,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                onTextLayout = { result ->
-                    if (result.hasVisualOverflow && fittedScale > 0.6f) {
-                        fittedScale = (fittedScale - 0.05f).coerceAtLeast(0.6f)
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 14.dp, vertical = 11.dp),
-            )
-        }
+        )
     }
 }
 
 /** Port de `HiddenLayerAudioReveal` + `HiddenLayerAudioTagView`. */
 @Composable
-private fun HiddenLayerAudioReveal(
+internal fun HiddenLayerAudioReveal(
     audioURL: String,
     duration: Double,
     frameWidthPx: Float,
     shouldAutoplay: Boolean,
+    isAnimated: Boolean = true,
 ) {
     val density = LocalDensity.current
     val scale = max(0.7f, min(2.4f, frameWidthPx / 88f))
@@ -695,6 +716,7 @@ private fun HiddenLayerAudioReveal(
             audioURL = audioURL,
             duration = duration,
             shouldAutoplay = shouldAutoplay,
+            isAnimated = isAnimated,
         )
     }
 }
@@ -704,11 +726,12 @@ private fun HiddenLayerAudioTagView(
     audioURL: String,
     duration: Double,
     shouldAutoplay: Boolean,
+    isAnimated: Boolean = true,
 ) {
     var isPlaying by remember { mutableStateOf(false) }
     var isPreparing by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
-    var didAppear by remember { mutableStateOf(false) }
+    var didAppear by remember { mutableStateOf(!isAnimated) }
     var waveHeights by remember { mutableStateOf(listOf(10f, 14f, 10f)) }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
     val scope = rememberCoroutineScope()
@@ -797,7 +820,11 @@ private fun HiddenLayerAudioTagView(
         onDispose { stopPlayback() }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(isAnimated, shouldAutoplay) {
+        if (!isAnimated) {
+            didAppear = true
+            return@LaunchedEffect
+        }
         delay(300)
         didAppear = true
         if (shouldAutoplay) startPlayback()
@@ -806,11 +833,17 @@ private fun HiddenLayerAudioTagView(
     Box(
         Modifier
             .size(72.dp)
-            .momentsChromeGlass(CircleShape, interactive = true)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = { togglePlayback() },
+            .momentsChromeGlass(CircleShape, interactive = isAnimated)
+            .then(
+                if (isAnimated) {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { togglePlayback() },
+                    )
+                } else {
+                    Modifier
+                },
             ),
         contentAlignment = Alignment.Center,
     ) {
@@ -855,7 +888,7 @@ private fun HiddenLayerAudioTagView(
 
 /** Port de `HiddenLayerImageReveal`. */
 @Composable
-private fun HiddenLayerImageReveal(
+internal fun HiddenLayerImageReveal(
     url: String,
     caption: String?,
     captionStyle: HiddenLayerTextStyle?,
@@ -865,6 +898,7 @@ private fun HiddenLayerImageReveal(
     imageScale: Double,
     canvasWidthPx: Float,
     canvasHeightPx: Float,
+    @Suppress("UNUSED_PARAMETER") isAnimated: Boolean = true,
 ) {
     Box(
         Modifier
@@ -887,180 +921,6 @@ private fun HiddenLayerImageReveal(
             canvasWidthPx = canvasWidthPx,
             canvasHeightPx = canvasHeightPx,
         )
-    }
-}
-
-@Composable
-private fun PresenceHint(
-    type: MomentHiddenLayer.LayerType,
-    shape: MomentHiddenLayer.LayerShape,
-    isIntro: Boolean,
-    delayMs: Long,
-    seen: Boolean,
-) {
-    if (!isIntro && seen) return
-
-    val baseColor = Color(1f, 0.92f, 0.62f)
-    val accentColor = Color(0.98f, 0.82f, 0.42f)
-    val radiusDp = when (type) {
-        MomentHiddenLayer.LayerType.TEXT -> 16.dp
-        MomentHiddenLayer.LayerType.AUDIO -> 14.dp
-        MomentHiddenLayer.LayerType.IMAGE -> 18.dp
-    }
-    val density = LocalDensity.current
-    val radiusPx = with(density) { radiusDp.toPx() }
-
-    var started by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(delayMs)
-        started = true
-    }
-    if (!started && !isIntro) return
-
-    val infinite = rememberInfiniteTransition(label = "hlPresence")
-    val pulse by infinite.animateFloat(
-        initialValue = 0.94f,
-        targetValue = 1.06f,
-        animationSpec = infiniteRepeatable(
-            tween(if (isIntro) 1200 else 2400),
-            RepeatMode.Reverse,
-        ),
-        label = "hlPulse",
-    )
-    val shimmerPhase by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(3200), RepeatMode.Restart),
-        label = "hlShimmer",
-    )
-    val orbitPhase by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(4500), RepeatMode.Restart),
-        label = "hlOrbit",
-    )
-    val glintOpacity by infinite.animateFloat(
-        initialValue = 0.2f,
-        targetValue = if (isIntro) 0.95f else 0.72f,
-        animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Reverse),
-        label = "hlGlint",
-    )
-
-    Box(
-        Modifier
-            .fillMaxSize()
-            .graphicsLayer { scaleX = pulse; scaleY = pulse },
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(
-            Modifier
-                .size(radiusDp * 2.5f)
-                .blur(if (isIntro) 12.dp else 8.dp),
-        ) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        baseColor.copy(alpha = if (isIntro) 0.45f else 0.32f),
-                        accentColor.copy(alpha = if (isIntro) 0.22f else 0.14f),
-                        Color.Transparent,
-                    ),
-                ),
-                radius = radiusPx * 1.6f,
-            )
-        }
-        Canvas(
-            Modifier
-                .size(radiusDp * 2)
-                .graphicsLayer { rotationZ = shimmerPhase * 360f },
-        ) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = if (isIntro) 0.72f else 0.54f),
-                        baseColor.copy(alpha = if (isIntro) 0.62f else 0.44f),
-                        Color.Transparent,
-                    ),
-                ),
-                radius = radiusPx,
-            )
-        }
-        Box(
-            Modifier
-                .offset(x = (-radiusDp * 0.4f), y = (-radiusDp * 0.4f))
-                .size(8.dp)
-                .alpha(glintOpacity)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        listOf(Color.White, Color.White.copy(0.4f), Color.Transparent),
-                    ),
-                ),
-        )
-        if (isIntro || !seen) {
-            HiddenLayerHintOrbit(
-                type = type,
-                progress = orbitPhase,
-                isIntro = isIntro,
-                modifier = Modifier
-                    .size(radiusDp * 2.5f)
-                    .alpha(if (isIntro) 1f else 0.72f),
-            )
-        }
-        @Suppress("UNUSED_VARIABLE")
-        val shapeHint = shape
-    }
-}
-
-@Composable
-private fun HiddenLayerHintOrbit(
-    type: MomentHiddenLayer.LayerType,
-    progress: Float,
-    isIntro: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val baseRadius = when (type) {
-        MomentHiddenLayer.LayerType.TEXT -> 18f
-        MomentHiddenLayer.LayerType.AUDIO -> 16f
-        MomentHiddenLayer.LayerType.IMAGE -> 17f
-    }
-    val sizes = listOf(2.5f, 1.8f, 3.5f, 1.5f, 2.2f, 2.0f, 3.0f, 1.6f, 2.8f, 2.4f, 3.2f, 1.4f)
-    val density = LocalDensity.current
-
-    Box(modifier, contentAlignment = Alignment.Center) {
-        repeat(12) { index ->
-            val uniqueRadius = baseRadius +
-                kotlin.math.sin(index * 1.5) * 3 +
-                if (isIntro) kotlin.math.sin(progress * Math.PI * 4 + index) * 2 else 0.0
-            val speedMultiplier = 1.0 + (index % 3) * 0.2
-            val angle = (progress * speedMultiplier * Math.PI * 2) + (Math.PI * 2 / 12 * index)
-            val ox = kotlin.math.cos(angle) * uniqueRadius
-            val oy = kotlin.math.sin(angle) * uniqueRadius
-            val sparkSize = sizes[index % sizes.size]
-            val phaseScale = progress * Math.PI * (8 + index % 4) + index
-            val scale = (0.7 + kotlin.math.abs(kotlin.math.sin(phaseScale)) * 0.6).toFloat()
-            val phaseOpacity = progress * Math.PI * (6 + index % 3) + index
-            val baseOpacity = if (isIntro) 0.6 else 0.4
-            val opacity = (baseOpacity + kotlin.math.abs(kotlin.math.cos(phaseOpacity)) * (1.0 - baseOpacity)).toFloat()
-            val color = when (index % 4) {
-                0 -> Color(1f, 0.98f, 0.85f)
-                1 -> Color(1f, 0.92f, 0.62f)
-                2 -> Color(1f, 0.85f, 0.45f)
-                else -> Color(1f, 0.95f, 0.75f)
-            }
-            Box(
-                Modifier
-                    .offset {
-                        IntOffset(
-                            with(density) { ox.toFloat().dp.toPx() }.roundToInt(),
-                            with(density) { oy.toFloat().dp.toPx() }.roundToInt(),
-                        )
-                    }
-                    .size((sparkSize * scale).dp)
-                    .alpha(opacity)
-                    .clip(CircleShape)
-                    .background(color),
-            )
-        }
     }
 }
 

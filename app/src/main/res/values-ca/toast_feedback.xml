@@ -1,0 +1,10 @@
+<resources>
+    <string name="toast_action_profile_updated">Perfil actualitzat</string>
+    <string name="toast_action_profile_photo_updated">Foto de perfil actualitzada</string>
+    <string name="toast_action_profile_photo_removed">Foto de perfil eliminada</string>
+    <string name="toast_action_highlight_created">Destacat creat</string>
+    <string name="toast_action_highlight_updated">Destacat actualitzat</string>
+    <string name="toast_action_highlight_deleted">Destacat eliminat</string>
+    <string name="toast_action_best_friends_left_prefix">Has sortit dels millors amics de </string>
+    <string name="toast_action_best_friends_left_suffix"></string>
+</resources>

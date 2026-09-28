@@ -67,6 +67,8 @@ import com.moments.android.extensions.MomentsGlassStyle
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Story
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.content.StoryTrayService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.performance.MotionPolicy
@@ -425,7 +427,6 @@ fun FeedStoryRingPreviewOverlay(
                 R.string.story_context_menu_mute_confirm_title,
                 resolvedUsername,
             )
-            val muteSuccess = stringResource(R.string.story_context_menu_mute_success_with_hint)
             val muteFailed = stringResource(R.string.story_context_menu_action_failed)
             val mutedUserId = selection.userId
             GlassmorphicStoryConfirmationDialog(
@@ -445,7 +446,8 @@ fun FeedStoryRingPreviewOverlay(
                                 .await()
                         }.onSuccess {
                             onMuted(mutedUserId)
-                            successMessage = muteSuccess
+                            successMessage = null
+                            InAppNotificationService.showActionToast(InAppActionToast.muted(resolvedUsername))
                             delay(900)
                             dismissOverlay()
                         }.onFailure { error ->

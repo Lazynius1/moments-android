@@ -23,8 +23,8 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -60,6 +61,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +77,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -85,6 +88,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.fastForEach
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.moments.android.R
@@ -95,6 +99,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 
 /** Asset de galería para el grid del crop (Uri ≡ PHAsset). */
 data class ProfilePhotoAsset(
@@ -200,7 +205,14 @@ fun PhotoCropEditorView(
         if (hasMediaPermission) loadLibrary(selectedAlbum)
     }
 
-    Box(modifier.fillMaxSize().background(canvas)) {
+    // El crop también se usa desde diálogos fullscreen: reserva status/navigation bars
+    // para que cerrar y guardar nunca queden bajo el sistema.
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(canvas)
+            .safeDrawingPadding(),
+    ) {
         when {
             isLoadingImage -> CropLoadingState(
                 label = R.string.profile_crop_loading,
@@ -234,6 +246,33 @@ fun PhotoCropEditorView(
                         },
                     )
 
+                    // El canvas de recorte no pertenece al scroll de la galería:
+                    // así el gesto vertical siempre hace pan de la foto y no
+                    // desplaza la biblioteca por encima de él.
+                    CropAreaView(
+                        bitmap = bitmap!!,
+                        scale = scale,
+                        offset = offset,
+                        isDragging = isDragging,
+                        isZooming = isZooming,
+                        processing = isProcessing,
+                        dark = dark,
+                        primary = primary,
+                        onTransformCommit = { nextScale, nextOffset ->
+                            scale = nextScale
+                            lastScale = nextScale
+                            offset = nextOffset
+                        },
+                        onDragging = { isDragging = it },
+                        onZooming = { isZooming = it },
+                        onDoubleTap = {
+                            view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                            scale = 1f
+                            lastScale = 1f
+                            offset = Offset.Zero
+                        },
+                    )
+
                     Column(
                         Modifier
                             .weight(1f)
@@ -241,29 +280,6 @@ fun PhotoCropEditorView(
                             .padding(bottom = 40.dp),
                         verticalArrangement = Arrangement.spacedBy(18.dp),
                     ) {
-                        CropAreaView(
-                            bitmap = bitmap!!,
-                            scale = scale,
-                            offset = offset,
-                            isDragging = isDragging,
-                            isZooming = isZooming,
-                            processing = isProcessing,
-                            dark = dark,
-                            primary = primary,
-                            onScale = { scale = it; lastScale = it },
-                            onOffset = { offset = it },
-                            onDragging = { isDragging = it },
-                            onZooming = { isZooming = it },
-                            onDoubleTap = {
-                                view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-                                scale = 1f
-                                lastScale = 1f
-                                offset = Offset.Zero
-                            },
-                            limitOffset = { proposed, imageSize, cropPx ->
-                                limitCropOffset(proposed, imageSize, scale, cropPx)
-                            },
-                        )
 
                         Box(Modifier.padding(horizontal = 20.dp)) {
                             Row(
@@ -421,14 +437,31 @@ private fun CropAreaView(
     processing: Boolean,
     dark: Boolean,
     primary: Color,
-    onScale: (Float) -> Unit,
-    onOffset: (Offset) -> Unit,
+    onTransformCommit: (Float, Offset) -> Unit,
     onDragging: (Boolean) -> Unit,
     onZooming: (Boolean) -> Unit,
     onDoubleTap: () -> Unit,
-    limitOffset: (Offset, Size, Float) -> Offset,
 ) {
     val density = LocalDensity.current
+    // Estado live durante el gesto (≡ MomentFeedCropCanvas / ProfileGridPreviewEditor):
+    // pointerInput estable; scale/offset no van en las keys (reinicio = pan a trompicones).
+    var liveScale by remember(bitmap) { mutableFloatStateOf(scale) }
+    var liveOffset by remember(bitmap) { mutableStateOf(offset) }
+    val latestOnCommit = rememberUpdatedState(onTransformCommit)
+    val latestOnDragging = rememberUpdatedState(onDragging)
+    val latestOnZooming = rememberUpdatedState(onZooming)
+    val latestOnDoubleTap = rememberUpdatedState(onDoubleTap)
+    val latestProcessing = rememberUpdatedState(processing)
+    val latestLiveScale = rememberUpdatedState(liveScale)
+    val latestLiveOffset = rememberUpdatedState(liveOffset)
+
+    LaunchedEffect(scale, offset, bitmap) {
+        if (!isDragging && !isZooming) {
+            liveScale = scale
+            liveOffset = offset
+        }
+    }
+
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
@@ -454,34 +487,120 @@ private fun CropAreaView(
                 .background((if (dark) Color.Black else Color.White).copy(if (dark) 0.18f else 0.08f)),
         )
 
-        // Foreground fit image with pan/zoom
+        // Foreground fit: layout fijo + graphicsLayer (≡ CropViewWrapper / MomentFeedCropCanvas).
         Box(
             Modifier
                 .fillMaxSize()
                 .clip(RoundedCornerShape(0))
-                .pointerInput(bitmap, processing, scale, offset) {
-                    if (processing) return@pointerInput
-                    detectTapGestures(onDoubleTap = { onDoubleTap() })
-                }
-                .pointerInput(bitmap, processing, scale, offset) {
-                    if (processing) return@pointerInput
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        onDragging(true)
-                        onZooming(zoom != 1f)
-                        val nextScale = (scale * zoom).coerceIn(MinCropScale, MaxCropScale)
-                        onScale(nextScale)
-                        onOffset(
-                            limitOffset(
-                                Offset(offset.x + pan.x, offset.y + pan.y),
-                                imageSize,
-                                cropPx,
-                            ),
-                        )
+                .pointerInput(bitmap, cropPx, imageSize) {
+                    // Un solo detector: pan inmediato + pinch + double-tap,
+                    // sin que detectTapGestures robe el pointer.
+                    var lastTapUptime = 0L
+                    var lastTapPos = Offset.Zero
+
+                    awaitEachGesture {
+                        if (latestProcessing.value) {
+                            awaitFirstDown(requireUnconsumed = false)
+                            return@awaitEachGesture
+                        }
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        latestOnDragging.value(true)
+
+                        var workingScale = latestLiveScale.value
+                        var workingOffset = latestLiveOffset.value
+                        var lastCentroid: Offset? = null
+                        var lastSpan = 0f
+                        var moved = false
+                        var lastEventUptime = down.uptimeMillis
+
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            event.changes.fastForEach {
+                                lastEventUptime = max(lastEventUptime, it.uptimeMillis)
+                            }
+                            val pressed = event.changes.filter { it.pressed }
+                            if (pressed.isEmpty()) break
+
+                            val centroid = pressed
+                                .fold(Offset.Zero) { acc, c -> acc + c.position } / pressed.size.toFloat()
+                            val previous = lastCentroid
+                            lastCentroid = centroid
+
+                            if (pressed.size >= 2) {
+                                moved = true
+                                latestOnZooming.value(true)
+                                val span = (pressed[0].position - pressed[1].position).getDistance()
+                                    .coerceAtLeast(0.001f)
+                                if (lastSpan > 0f) {
+                                    val zoom = span / lastSpan
+                                    val damped = zoom.toDouble().pow(0.9).toFloat()
+                                    val proposedScale =
+                                        (workingScale * damped).coerceIn(MinCropScale, MaxCropScale)
+                                    val ratio = proposedScale / max(workingScale, 0.001f)
+                                    workingScale = proposedScale
+                                    workingOffset = limitCropOffset(
+                                        Offset(workingOffset.x * ratio, workingOffset.y * ratio),
+                                        imageSize,
+                                        workingScale,
+                                        cropPx,
+                                    )
+                                    liveScale = workingScale
+                                    liveOffset = workingOffset
+                                    latestOnCommit.value(workingScale, workingOffset)
+                                }
+                                lastSpan = span
+                            } else {
+                                lastSpan = 0f
+                                if (previous != null) {
+                                    val pan = centroid - previous
+                                    if (pan.getDistance() > 0.5f) moved = true
+                                    workingOffset = limitCropOffset(
+                                        Offset(workingOffset.x + pan.x, workingOffset.y + pan.y),
+                                        imageSize,
+                                        workingScale,
+                                        cropPx,
+                                    )
+                                    liveOffset = workingOffset
+                                    latestOnCommit.value(workingScale, workingOffset)
+                                }
+                            }
+
+                            event.changes.fastForEach {
+                                if (it.positionChanged()) it.consume()
+                            }
+                        }
+
+                        val isQuickTap = !moved && (lastEventUptime - down.uptimeMillis) < 280
+                        if (isQuickTap) {
+                            val isDouble = lastTapUptime > 0L &&
+                                (lastEventUptime - lastTapUptime) < 320 &&
+                                (down.position - lastTapPos).getDistance() < 56f
+                            if (isDouble) {
+                                lastTapUptime = 0L
+                                workingScale = 1f
+                                workingOffset = Offset.Zero
+                                liveScale = 1f
+                                liveOffset = Offset.Zero
+                                latestOnDragging.value(false)
+                                latestOnZooming.value(false)
+                                latestOnCommit.value(1f, Offset.Zero)
+                                latestOnDoubleTap.value()
+                                return@awaitEachGesture
+                            }
+                            lastTapUptime = lastEventUptime
+                            lastTapPos = down.position
+                            latestOnDragging.value(false)
+                            latestOnZooming.value(false)
+                            return@awaitEachGesture
+                        }
+                        lastTapUptime = 0L
+
+                        liveScale = workingScale
+                        liveOffset = workingOffset
+                        latestOnCommit.value(workingScale, workingOffset)
+                        latestOnDragging.value(false)
+                        latestOnZooming.value(false)
                     }
-                }
-                .pointerInput(Unit) {
-                    // Gesture end approximation: clear drag/zoom flags after idle via transform end
-                    // detectTransformGestures doesn't expose onEnd; clear on next frame via parent
                 },
             contentAlignment = Alignment.Center,
         ) {
@@ -490,13 +609,13 @@ private fun CropAreaView(
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
-                    .width(with(density) { (base.width * scale).toDp() })
-                    .height(with(density) { (base.height * scale).toDp() })
+                    .width(with(density) { base.width.toDp() })
+                    .height(with(density) { base.height.toDp() })
                     .graphicsLayer {
-                        translationX = offset.x
-                        translationY = offset.y
-                        scaleX = pressScale
-                        scaleY = pressScale
+                        scaleX = liveScale * pressScale
+                        scaleY = liveScale * pressScale
+                        translationX = liveOffset.x
+                        translationY = liveOffset.y
                     },
             )
         }
@@ -534,13 +653,6 @@ private fun CropAreaView(
             modifier = Modifier.fillMaxSize(),
         ) {
             CropHelpGrid(primary = primary, side = maxWidth)
-        }
-
-        // Clear drag/zoom when gesture settles: listen via LaunchedEffect on scale/offset churn
-        LaunchedEffect(scale, offset) {
-            kotlinx.coroutines.delay(120)
-            onDragging(false)
-            onZooming(false)
         }
     }
 }

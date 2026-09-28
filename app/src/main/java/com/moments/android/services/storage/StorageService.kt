@@ -73,6 +73,19 @@ object StorageService {
         return uploadModeratedAvatar(image, conversationId = groupId)
     }
 
+    /** Imagen privada de personalización; no requiere moderación al verla solo su propietario. */
+    suspend fun uploadAudienceListImage(userId: String, listId: String, image: Bitmap): String {
+        val imageData = image.storageUploadJpegData(
+            compressionQuality = 0.82f,
+            maxPixelDimension = 720,
+        ) ?: throw StorageError.InvalidData
+        val target = StoragePathBuilder.build(
+            userId,
+            StorageUploadDomain.AudienceListImage(listId),
+        )
+        return uploader.upload(target, MediaUploadPayload.Data(imageData))
+    }
+
     private suspend fun uploadModeratedAvatar(image: Bitmap, conversationId: String?): String {
         val imageData = image.storageUploadJpegData(
             compressionQuality = 0.75f,

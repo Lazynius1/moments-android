@@ -1011,6 +1011,8 @@ object BackgroundMomentUploadService {
                     textStyle = HiddenLayerTextStyle.from(item.textStyle)
                         ?: HiddenLayerTextStyle.CLEAN,
                     presentationStyle = HiddenLayerPresentationStyle.from(item.presentationStyle),
+                    hintStyle = MomentHiddenLayer.HintStyle.from(item.hintStyle)
+                        ?: MomentHiddenLayer.HintStyle.BLACK_AND_WHITE,
                     unlockMode = MomentHiddenLayer.UnlockMode.from(item.unlockMode),
                     unlockAt = item.unlockAt,
                     authorTimezoneIdentifier = item.authorTimezoneIdentifier,
@@ -1135,6 +1137,7 @@ object BackgroundMomentUploadService {
             imageFrameStyle = if (draft.type == MomentHiddenLayer.LayerType.IMAGE) draft.imageFrameStyle else null,
             textStyle = draft.textStyle,
             presentationStyle = draft.presentationStyle,
+            hintStyle = draft.hintStyle,
             unlockMode = draft.unlockMode,
             unlockAt = if (draft.unlockMode == MomentHiddenLayer.UnlockMode.SCHEDULED) draft.unlockAt else null,
             authorTimezoneIdentifier = draft.authorTimezoneIdentifier,

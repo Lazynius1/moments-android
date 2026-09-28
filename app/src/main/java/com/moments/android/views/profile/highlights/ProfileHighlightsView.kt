@@ -51,6 +51,8 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.models.HighlightedStory
 import com.moments.android.models.Story
 import com.moments.android.services.content.BackendFeedService
@@ -222,6 +224,9 @@ fun ProfileHighlightsView(
                                         val id = highlight.id ?: return@DropdownMenuItem
                                         scope.launch {
                                             runCatching { FirestoreService().deleteHighlight(userId, id) }
+                                                .onSuccess {
+                                                    InAppNotificationService.showActionToast(InAppActionToast.highlightDeleted())
+                                                }
                                                 .onFailure { errorMessage = it.message }
                                             reload()
                                         }

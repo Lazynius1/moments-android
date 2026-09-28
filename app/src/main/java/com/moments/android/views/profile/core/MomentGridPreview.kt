@@ -9,10 +9,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.ScaleFactor
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moments.android.models.Moment
@@ -45,6 +49,47 @@ val Moment.canAdjustGridPreview: Boolean
     get() = previewImageURLString != null
 
 /**
+ * Transformación de dibujo del media dentro de la celda.
+ *
+ * Es importante que zoom y pan formen parte del escalado/alineación de la
+ * imagen completa. Transformar un Box del tamaño de la celda mueve un viewport
+ * ya recortado y no reproduce el resultado de SwiftUI (además puede descubrir
+ * franjas vacías al desplazarlo).
+ */
+data class GridPreviewMediaTransform(
+    val contentScale: ContentScale,
+    val alignment: Alignment,
+)
+
+private class GridPreviewContentScale(
+    private val base: ContentScale,
+    private val userScale: Float,
+) : ContentScale {
+    override fun computeScaleFactor(srcSize: Size, dstSize: Size): ScaleFactor {
+        val baseFactor = base.computeScaleFactor(srcSize, dstSize)
+        return ScaleFactor(
+            scaleX = baseFactor.scaleX * userScale,
+            scaleY = baseFactor.scaleY * userScale,
+        )
+    }
+}
+
+private class GridPreviewAlignment(
+    private val normalizedX: Float,
+    private val normalizedY: Float,
+) : Alignment {
+    override fun align(size: IntSize, space: IntSize, layoutDirection: LayoutDirection): IntOffset {
+        val centeredX = (space.width - size.width) / 2f
+        val centeredY = (space.height - size.height) / 2f
+        return IntOffset(
+            x = (centeredX + normalizedX * space.width).toInt(),
+            // Los ajustes históricos normalizan ambos ejes con el ancho.
+            y = (centeredY + normalizedY * space.width).toInt(),
+        )
+    }
+}
+
+/**
  * Port de `GridPreviewThumbnailFrame`.
  * [content] recibe el [ContentScale] equivalente a `.aspectRatio(contentMode:)`.
  */
@@ -52,7 +97,7 @@ val Moment.canAdjustGridPreview: Boolean
 fun GridPreviewThumbnailFrame(
     size: Dp,
     settings: MomentGridPreviewSettings,
-    content: @Composable (ContentScale) -> Unit,
+    content: @Composable (GridPreviewMediaTransform) -> Unit,
 ) {
     GridPreviewThumbnailFrame(width = size, height = size, settings = settings, content = content)
 }
@@ -66,13 +111,23 @@ fun GridPreviewThumbnailFrame(
     width: Dp,
     height: Dp,
     settings: MomentGridPreviewSettings,
-    content: @Composable (ContentScale) -> Unit,
+    content: @Composable (GridPreviewMediaTransform) -> Unit,
 ) {
-    val contentScale = if (settings.fitMode == MomentGridPreviewFitMode.FIT) {
+    val baseContentScale = if (settings.fitMode == MomentGridPreviewFitMode.FIT) {
         ContentScale.Fit
     } else {
         ContentScale.Crop
     }
+    val transform = GridPreviewMediaTransform(
+        contentScale = GridPreviewContentScale(
+            base = baseContentScale,
+            userScale = settings.scale.toFloat(),
+        ),
+        alignment = GridPreviewAlignment(
+            normalizedX = settings.offsetX.toFloat(),
+            normalizedY = settings.offsetY.toFloat(),
+        ),
+    )
     val background = if (settings.background == MomentGridPreviewBackground.BLACK) {
         Color.Black
     } else {
@@ -92,19 +147,7 @@ fun GridPreviewThumbnailFrame(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = settings.scale.toFloat()
-                    scaleY = settings.scale.toFloat()
-                    translationX = settings.offsetX.toFloat() * width.toPx()
-                    translationY = settings.offsetY.toFloat() * width.toPx()
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            content(contentScale)
-        }
+        content(transform)
     }
 }
 

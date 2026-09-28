@@ -993,7 +993,7 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="audience_description_custom">Choisissez des personnes spécifiques</string>
     <string name="audience_description_custom_list">Utiliser une liste personnalisée</string>
     <string name="audience_description_only_me">Contenu privé, visible uniquement par vous</string>
-    <string name="audience_predefined">Suggestions</string>
+    <string name="audience_predefined">Audience prédéfinie</string>
     <string name="audience_custom_people_hint">Choisissez des personnes spécifiques</string>
     <string name="creator_location_search">Rechercher un lieu...</string>
     <string name="creator_location_nearby">Lieux à proximité</string>
@@ -2440,4 +2440,22 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="message_requests_delete_all">Tout supprimer</string>
     <string name="message_requests_delete_all_confirmation_title">Supprimer toutes les demandes ?</string>
     <string name="message_requests_delete_all_confirmation_message">Cette action est irréversible.</string>
+    <string name="hidden_layers_hint_appearance_title">Apparence à la découverte</string>
+    <string name="hidden_layers_hint_appearance_a11y">Apparence de la couche cachée</string>
+    <string name="hidden_layers_hint_style_black_and_white">N&amp;B</string>
+    <string name="hidden_layers_hint_style_actual">Or</string>
+    <string name="hidden_layers_hint_style_polar">Polaire</string>
+    <string name="hidden_layers_hint_style_ember">Braise</string>
+    <string name="hidden_layers_hint_style_ultraviolet">Ultra</string>
+    <string name="hidden_layers_hint_style_aurora">Aurora</string>
+    <string name="hidden_layers_hint_style_rose">Rose</string>
+    <string name="hidden_layers_hint_style_plasma">Plasma</string>
+    <string name="hidden_layers_hint_style_daylight">Ciel</string>
+    <string name="audience_manage_members">Gérer les membres</string>
+    <string name="audience_list_updated">Liste mise à jour</string>
+    <string name="audience_list_members_removed_single">Vous avez retiré %1$s de la liste %2$s</string>
+    <string name="audience_list_members_removed_plural">Vous avez retiré %1$s et %2$d autres personnes de la liste %3$s</string>
+    <string name="audience_manage_members_remove_title">Retirer des membres de la liste ?</string>
+    <string name="audience_manage_members_remove_single">Vous allez retirer %1$s de « %2$s ». Cette modification sera enregistrée immédiatement.</string>
+    <string name="audience_manage_members_remove_plural">Vous allez retirer %1$s et %2$d autres personnes de « %3$s ». Cette modification sera enregistrée immédiatement.</string>
 </resources>

@@ -38,6 +38,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.views.profile.core.ProfileColors
 import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 
@@ -151,7 +153,14 @@ fun HighlightCreateFlowView(
                             modifier = Modifier
                                 .size(32.dp)
                                 .clickable(enabled = vm.canSave && !vm.isSaving) {
-                                    vm.save { if (it == null) onDismiss() }
+                                    vm.save {
+                                        if (it == null) {
+                                            InAppNotificationService.showActionToast(
+                                                if (vm.isEditMode) InAppActionToast.highlightUpdated() else InAppActionToast.highlightCreated(),
+                                            )
+                                            onDismiss()
+                                        }
+                                    }
                                 }
                                 .padding(4.dp),
                         )
@@ -178,7 +187,12 @@ fun HighlightCreateFlowView(
             confirmButton = {
                 TextButton({
                     deleteConfirm = false
-                    vm.deleteHighlight { if (it == null) onDismiss() }
+                    vm.deleteHighlight {
+                        if (it == null) {
+                            InAppNotificationService.showActionToast(InAppActionToast.highlightDeleted())
+                            onDismiss()
+                        }
+                    }
                 }) {
                     Text(stringResource(R.string.common_delete), color = Color.Red)
                 }

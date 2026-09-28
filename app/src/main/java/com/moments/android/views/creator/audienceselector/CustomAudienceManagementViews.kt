@@ -1,10 +1,5 @@
 package com.moments.android.views.creator.audienceselector
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,8 +29,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -82,13 +79,18 @@ import com.moments.android.extensions.fromHex
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
 import com.moments.android.models.CustomAudienceList
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.firestore.fetchNewConversationSuggestions
 import com.moments.android.services.firestore.searchUsers
+import com.moments.android.services.storage.StorageService
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.components.AudienceIconView
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -118,6 +120,19 @@ fun CustomAudienceSelector(
     var searchText by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<AppUser>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
+    var suggestedUsers by remember { mutableStateOf<List<AppUser>>(emptyList()) }
+    var isLoadingSuggestions by remember { mutableStateOf(true) }
+    val isShowingSuggestions = searchText.trim().isEmpty()
+    val displayedUsers = if (isShowingSuggestions) suggestedUsers else searchResults
+
+    LaunchedEffect(Unit) {
+        suggestedUsers = withContext(Dispatchers.IO) {
+            runCatching {
+                FirestoreService().fetchNewConversationSuggestions(recentPartnerIds = emptyList())
+            }.getOrDefault(emptyList())
+        }
+        isLoadingSuggestions = false
+    }
 
     LaunchedEffect(searchText) {
         val q = searchText.trim()
@@ -143,7 +158,7 @@ fun CustomAudienceSelector(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .padding(top = 20.dp, bottom = 12.dp),
+                    .padding(top = 4.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -210,24 +225,47 @@ fun CustomAudienceSelector(
                     inner()
                 },
             )
+            if (searchText.isNotEmpty()) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = null,
+                    tint = Color.Gray,
+                    modifier = Modifier.size(18.dp).clickable {
+                        searchText = ""
+                        searchResults = emptyList()
+                        isSearching = false
+                    },
+                )
+            }
         }
 
-        if (isSearching) {
+        if (isSearching || (isShowingSuggestions && isLoadingSuggestions)) {
             Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp, color = AudienceBlue)
+                CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp, color = content)
             }
         } else {
             LazyColumn(
                 Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                items(searchResults, key = { it.id }) { user ->
+                if (isShowingSuggestions && displayedUsers.isNotEmpty()) {
+                    item {
+                        Text(
+                            stringResource(R.string.messaging_new_suggestions),
+                            color = content.copy(alpha = 0.6f),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+                items(displayedUsers, key = { it.id }) { user ->
                     val selected = selectedUsers.any { it.id == user.id }
-                    // iOS: UserSelectionCard (AudienceSelectionView.swift)
-                    UserSelectionCard(
+                    AudienceMemberSelectionRow(
                         user = user,
                         isSelected = selected,
+                        isSelectionEnabled = true,
                         onToggle = {
                             onSelectedUsersChange(
                                 if (selected) selectedUsers.filterNot { it.id == user.id }
@@ -239,7 +277,7 @@ fun CustomAudienceSelector(
             }
         }
 
-        if (selectedUsers.isNotEmpty()) {
+        if (!embeddedInFlow && selectedUsers.isNotEmpty()) {
             Text(
                 stringResource(R.string.audience_selectPeople, selectedUsers.size),
                 color = Color.White,
@@ -332,9 +370,6 @@ fun CustomAudienceListsView(
     var selectedList by remember { mutableStateOf<CustomAudienceList?>(null) }
     var showingDeleteAlert by remember { mutableStateOf(false) }
     var listToDelete by remember { mutableStateOf<CustomAudienceList?>(null) }
-    var showingDeleteFeedback by remember { mutableStateOf(false) }
-    var deletedListName by remember { mutableStateOf("") }
-    val scope = rememberCoroutineScope()
 
     DisposableEffect(viewModel) {
         viewModel.loadLists()
@@ -350,14 +385,6 @@ fun CustomAudienceListsView(
         if (embeddedInFlow) onEditList?.invoke(list) else selectedList = list
     }
 
-    fun showDeleteFeedback() {
-        showingDeleteFeedback = true
-        scope.launch {
-            delay(1500)
-            showingDeleteFeedback = false
-        }
-    }
-
     if (showingDeleteAlert) {
         AlertDialog(
             onDismissRequest = { showingDeleteAlert = false },
@@ -369,10 +396,13 @@ fun CustomAudienceListsView(
                 TextButton(onClick = {
                     val list = listToDelete
                     if (list != null) {
-                        deletedListName = list.name
                         viewModel.deleteList(list)
                         onListsChanged?.invoke()
-                        showDeleteFeedback()
+                        InAppNotificationService.showActionToast(
+                            InAppActionToast.create(
+                                prefix = context.getString(R.string.audience_deleteList_success, list.name),
+                            ),
+                        )
                     }
                     showingDeleteAlert = false
                     listToDelete = null
@@ -432,26 +462,25 @@ fun CustomAudienceListsView(
                     Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp)
-                        .padding(top = 0.dp, bottom = 8.dp),
+                        .padding(top = 4.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    // Solo back en flujo anidado; en sheet root dismiss = handle (sin chevron).
-                    if (embeddedInFlow) {
-                        Box(
-                            Modifier
-                                .size(40.dp)
-                                .momentsChromeGlass(CircleShape, interactive = true)
-                                .clickable { onBack?.invoke() },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                                null,
-                                tint = content,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .momentsChromeGlass(CircleShape, interactive = true)
+                            .clickable {
+                                if (embeddedInFlow) onBack?.invoke() else onDismiss?.invoke()
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (embeddedInFlow) Icons.AutoMirrored.Filled.KeyboardArrowLeft else Icons.Filled.KeyboardArrowDown,
+                            null,
+                            tint = content,
+                            modifier = Modifier.size(18.dp),
+                        )
                     }
                     Spacer(Modifier.weight(1f))
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -508,24 +537,6 @@ fun CustomAudienceListsView(
             }
         }
 
-        AnimatedVisibility(
-            visible = showingDeleteFeedback,
-            enter = slideInVertically { it } + fadeIn(),
-            exit = slideOutVertically { it } + fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter),
-        ) {
-            Text(
-                stringResource(R.string.audience_deleteList_success, deletedListName),
-                color = Color.White,
-                fontWeight = FontWeight.Medium,
-                fontSize = 15.sp,
-                modifier = Modifier
-                    .padding(bottom = 24.dp)
-                    .shadow(10.dp, RoundedCornerShape(50), spotColor = Color.Black.copy(0.2f))
-                    .background(AudienceBlue, RoundedCornerShape(50))
-                    .padding(horizontal = 18.dp, vertical = 12.dp),
-            )
-        }
     }
 }
 
@@ -625,7 +636,13 @@ fun ManageableCustomListCard(
                 Modifier.size(56.dp).background(tint.copy(0.15f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(listIconVector(list.icon), null, tint = tint, modifier = Modifier.size(24.dp))
+                CustomAudienceListIcon(
+                    icon = list.icon,
+                    imagePath = list.imagePath,
+                    tint = tint,
+                    emojiFontSize = 24.sp,
+                    modifier = Modifier.size(if (list.imagePath == null) 24.dp else 64.dp),
+                )
             }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -675,6 +692,7 @@ class CustomAudienceListsViewModel {
         private set
 
     private var listener: ListenerRegistration? = null
+    private val storageScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun loadLists() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: run {
@@ -709,6 +727,12 @@ class CustomAudienceListsViewModel {
             .collection("users").document(userId)
             .collection("customAudienceLists").document(listId)
             .delete()
+            .addOnSuccessListener {
+                val imagePath = list.imagePath ?: return@addOnSuccessListener
+                storageScope.launch {
+                    runCatching { StorageService.deleteMedia(imagePath) }
+                }
+            }
     }
 
     fun clear() {

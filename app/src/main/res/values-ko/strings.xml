@@ -916,10 +916,10 @@
     <string name="audience_description_custom">볼 사람을 직접 선택해요</string>
     <string name="audience_description_custom_list">맞춤 리스트를 사용해요</string>
     <string name="audience_description_only_me">나만 볼 수 있는 비공개 콘텐츠예요</string>
-    <string name="audience_selection_title">공개 대상</string>
-    <string name="audience_selection_subtitle">이 Moment를 볼 수 있는 사람은 누구인가요?</string>
-    <string name="audience_predefined">추천</string>
-    <string name="audience_custom_lists">내 리스트</string>
+    <string name="audience_selection_title">공개 대상 선택</string>
+    <string name="audience_selection_subtitle">이 콘텐츠를 볼 수 있는 사람을 선택하세요</string>
+    <string name="audience_predefined">기본 공개 대상</string>
+    <string name="audience_custom_lists">맞춤 목록</string>
     <string name="audience_custom_lists_empty">아직 맞춤 리스트가 없어요</string>
     <string name="audience_custom_people_hint">볼 사람을 직접 선택해요</string>
     <string name="audience_people_count">%1$d명</string>
@@ -1108,6 +1108,17 @@
     <string name="hidden_layers_empty_audio_subtitle">발견했을 때만 나타나는 짧은 오디오를 녹음하세요.</string>
     <string name="hidden_layers_empty_image_subtitle">숨겨진 폴라로이드로 게시물 안에 다른 사진을 숨기세요.</string>
     <string name="hidden_layers_unlock_title">공개 시점</string>
+    <string name="hidden_layers_hint_appearance_title">발견 시 모양</string>
+    <string name="hidden_layers_hint_appearance_a11y">숨겨진 레이어 모양</string>
+    <string name="hidden_layers_hint_style_black_and_white">흑백</string>
+    <string name="hidden_layers_hint_style_actual">골드</string>
+    <string name="hidden_layers_hint_style_polar">폴라</string>
+    <string name="hidden_layers_hint_style_ember">엠버</string>
+    <string name="hidden_layers_hint_style_ultraviolet">울트라</string>
+    <string name="hidden_layers_hint_style_aurora">오로라</string>
+    <string name="hidden_layers_hint_style_rose">로즈</string>
+    <string name="hidden_layers_hint_style_plasma">플라즈마</string>
+    <string name="hidden_layers_hint_style_daylight">스카이</string>
     <string name="hidden_layers_unlock_now">지금</string>
     <string name="hidden_layers_unlock_scheduled">예약됨</string>
     <string name="hidden_layers_unlock_opens">공개</string>
@@ -2988,4 +2999,12 @@
     <string name="message_requests_delete_all">모두 삭제</string>
     <string name="message_requests_delete_all_confirmation_title">모든 요청을 삭제할까요?</string>
     <string name="message_requests_delete_all_confirmation_message">이 작업은 되돌릴 수 없습니다.</string>
+    <string name="audience_manage_members">멤버 관리</string>
+    <string name="audience_list_updated">리스트 업데이트됨</string>
+    <string name="audience_list_members_removed_single">%1$s님을 %2$s 리스트에서 삭제했습니다</string>
+    <string name="audience_list_members_removed_plural">%1$s님과 추가 %2$d명을 %3$s 리스트에서 삭제했습니다</string>
+    <string name="audience_manage_members_remove_title">리스트에서 멤버를 삭제할까요?</string>
+    <string name="audience_manage_members_remove_single">%1$s님을 “%2$s”에서 삭제합니다. 변경 사항은 즉시 저장됩니다.</string>
+    <string name="audience_manage_members_remove_plural">%1$s님과 추가 %2$d명을 “%3$s”에서 삭제합니다. 변경 사항은 즉시 저장됩니다.</string>
+    <string name="stories_reaction_sent">리액션을 보냈어요</string>
 </resources>

@@ -1,15 +1,14 @@
 package com.moments.android.views.creator.audienceselector
 
+import android.graphics.Bitmap
+import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,6 +27,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -43,8 +43,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -53,6 +58,7 @@ import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,6 +75,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -89,22 +96,30 @@ import com.moments.android.extensions.fromHex
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
 import com.moments.android.models.CustomAudienceList
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.createCustomAudienceList
 import com.moments.android.services.firestore.fetchCustomLists
 import com.moments.android.services.firestore.fetchMutuals
+import com.moments.android.services.firestore.fetchNewConversationSuggestions
 import com.moments.android.services.firestore.searchUsers
 import com.moments.android.services.firestore.updateCustomAudienceList
+import com.moments.android.services.firestore.MAX_CUSTOM_AUDIENCE_MEMBERS
+import com.moments.android.services.storage.StorageService
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.components.AudienceIconMetrics
 import com.moments.android.views.components.AudienceIconView
 import com.moments.android.views.components.VerifiedBadge
+import com.moments.android.views.creator.EmojiPickerView
+import com.moments.android.views.profile.editor.sections.ProfileLibraryCropEntryView
+import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 private val CanvasDark = Color(0xFF0B1215)
 private val CanvasLight = Color(0xFFFAF9F6)
@@ -139,6 +154,7 @@ fun AudienceSelectionView(
     val dark = isSystemInDarkTheme()
     val canvas = if (dark) CanvasDark else CanvasLight
     val content = if (dark) Color.White else Color.Black
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     var flowDestination by remember { mutableStateOf<FlowDestination>(FlowDestination.Main) }
@@ -146,7 +162,6 @@ fun AudienceSelectionView(
     var customLists by remember { mutableStateOf<List<CustomAudienceList>>(emptyList()) }
     var isLoadingLists by remember { mutableStateOf(true) }
     var selectedUsersForCustom by remember { mutableStateOf<List<AppUser>>(emptyList()) }
-    var showingSaveFeedback by remember { mutableStateOf(false) }
 
     fun navigate(to: FlowDestination, forward: Boolean = true) {
         navigatingForward = forward
@@ -167,11 +182,9 @@ fun AudienceSelectionView(
     }
 
     fun showSaveFeedback() {
-        showingSaveFeedback = true
-        scope.launch {
-            delay(2000)
-            showingSaveFeedback = false
-        }
+        InAppNotificationService.showActionToast(
+            InAppActionToast.create(prefix = context.getString(R.string.audience_saved)),
+        )
     }
 
     fun resetSelection() {
@@ -242,7 +255,16 @@ fun AudienceSelectionView(
                         onCustomSelectedUsersChange(selectedUsersForCustom.map { it.id })
                         navigate(FlowDestination.Main, forward = false)
                     },
-                    onBack = { navigate(FlowDestination.Main, forward = false) },
+                    onBack = {
+                        val updatedIds = selectedUsersForCustom.map { it.id }
+                        val didChange = updatedIds.toSet() != customSelectedUsers.toSet()
+                        onCustomSelectedUsersChange(updatedIds)
+                        onSelectedAudienceChange(ContentAudience.CUSTOM)
+                        onSelectedListIdChange(null)
+                        onSelectedListNameChange(null)
+                        if (didChange) showSaveFeedback()
+                        navigate(FlowDestination.Main, forward = false)
+                    },
                     embeddedInFlow = true,
                 )
                 FlowDestination.ManageLists -> CustomAudienceListsView(
@@ -283,25 +305,6 @@ fun AudienceSelectionView(
             }
         }
 
-        AnimatedVisibility(
-            visible = showingSaveFeedback,
-            enter = slideInVertically { it } + fadeIn(),
-            exit = slideOutVertically { it } + fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter),
-        ) {
-            Text(
-                text = stringResource(R.string.audience_saved),
-                color = Color.White,
-                fontWeight = FontWeight.Medium,
-                fontSize = 16.sp,
-                modifier = Modifier
-                    .padding(bottom = 100.dp)
-                    .shadow(10.dp, RoundedCornerShape(25.dp), spotColor = Color.Black.copy(0.3f))
-                    .background(AudienceBlue, RoundedCornerShape(25.dp))
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-            )
-        }
-
         @Suppress("UNUSED_VARIABLE")
         val keepName = selectedListName
     }
@@ -328,33 +331,34 @@ private fun AudienceSelectionMainContent(
     Column(Modifier.fillMaxSize()) {
         Column(
             Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                // El handle del MomentsModalSheet ya aporta el margen superior.
+                // Mantener aquí 20.dp separaba demasiado el título en Android.
+                .padding(top = 4.dp, bottom = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                stringResource(R.string.audience_selection_title),
+                color = content,
+                fontWeight = FontWeight.Bold,
+                fontSize = with(density) { legacyPoppinsSize(context, 24).toSp() },
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                stringResource(R.string.audience_selection_subtitle),
+                color = secondary,
+                fontSize = with(density) { legacyPoppinsSize(context, 16).toSp() },
+                textAlign = TextAlign.Center,
+            )
+        }
+        Column(
+            Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 32.dp),
         ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .padding(top = 0.dp, bottom = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    stringResource(R.string.audience_selection_title),
-                    color = content,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = with(density) { legacyPoppinsSize(context, 16).toSp() },
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    stringResource(R.string.audience_selection_subtitle),
-                    color = secondary,
-                    fontSize = with(density) { legacyPoppinsSize(context, 12).toSp() },
-                    textAlign = TextAlign.Center,
-                )
-            }
-
             Column(
                 Modifier.padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -399,7 +403,7 @@ private fun AudienceSelectionMainContent(
                         Spacer(Modifier.weight(1f))
                         Text(
                             stringResource(R.string.audience_manage),
-                            color = AudienceBlue,
+                            color = content,
                             fontWeight = FontWeight.Medium,
                             fontSize = with(density) { legacyPoppinsSize(context, 14).toSp() },
                             modifier = Modifier.clickable(onClick = onManageLists),
@@ -411,7 +415,7 @@ private fun AudienceSelectionMainContent(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            CircularProgressIndicator(Modifier.size(18.dp), color = AudienceBlue, strokeWidth = 2.dp)
+                            CircularProgressIndicator(Modifier.size(18.dp), color = content, strokeWidth = 2.dp)
                             Text(
                                 stringResource(R.string.audience_loadingLists),
                                 color = content.copy(alpha = 0.6f),
@@ -428,11 +432,6 @@ private fun AudienceSelectionMainContent(
                                     Modifier
                                         .width(100.dp)
                                         .height(140.dp)
-                                        .border(
-                                            1.dp,
-                                            AudienceBlue.copy(alpha = 0.3f),
-                                            RoundedCornerShape(20.dp),
-                                        )
                                         .clickable(onClick = onCreateList)
                                         .padding(top = 12.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -442,11 +441,11 @@ private fun AudienceSelectionMainContent(
                                         Modifier.size(48.dp).momentsChromeGlass(CircleShape, interactive = true),
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        Icon(Icons.Filled.Add, null, tint = AudienceBlue, modifier = Modifier.size(20.dp))
+                                        Icon(Icons.Filled.Add, null, tint = content, modifier = Modifier.size(20.dp))
                                     }
                                     Text(
                                         stringResource(R.string.audience_create),
-                                        color = AudienceBlue,
+                                        color = content,
                                         fontWeight = FontWeight.Medium,
                                         fontSize = with(density) { legacyPoppinsSize(context, 14).toSp() },
                                     )
@@ -550,7 +549,7 @@ private fun EmptyCustomListsViewModern(content: Color, onCreateList: () -> Unit)
                 Brush.linearGradient(
                     listOf(
                         if (dark) Color.White.copy(0.1f) else Color.Black.copy(0.1f),
-                        AudienceBlue.copy(0.2f),
+                        if (dark) Color.White.copy(0.04f) else Color.Black.copy(0.04f),
                     ),
                 ),
                 RoundedCornerShape(16.dp),
@@ -603,6 +602,7 @@ fun CreateCustomListView(
 ) {
     val dark = isSystemInDarkTheme()
     val content = if (dark) Color.White else Color.Black
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var listName by remember { mutableStateOf("") }
     var listDescription by remember { mutableStateOf("") }
@@ -610,6 +610,9 @@ fun CreateCustomListView(
     var selectedIcon by remember { mutableStateOf(CustomAudienceList.predefinedIcons.first()) }
     var selectedMembers by remember { mutableStateOf(setOf<String>()) }
     var showingMemberPicker by remember { mutableStateOf(false) }
+    var showingEmojiPicker by remember { mutableStateOf(false) }
+    var showingImageCrop by remember { mutableStateOf(false) }
+    var selectedImage by remember { mutableStateOf<Bitmap?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     val tint = Color.fromHex(selectedColor)
 
@@ -619,7 +622,6 @@ fun CreateCustomListView(
             onSelectedMembersChange = { selectedMembers = it },
             embeddedInFlow = true,
             onBack = { showingMemberPicker = false },
-            onConfirm = { showingMemberPicker = false },
             modifier = modifier,
         )
         return
@@ -635,7 +637,44 @@ fun CreateCustomListView(
                 onSelectedMembersChange = { selectedMembers = it },
                 embeddedInFlow = false,
                 onBack = { showingMemberPicker = false },
-                onConfirm = { showingMemberPicker = false },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+
+    if (showingEmojiPicker) {
+        // Igual que las reacciones de comentarios: sheet grande, pero nunca fullscreen.
+        MomentsModalSheet(
+            onDismissRequest = { showingEmojiPicker = false },
+            largeOnly = false,
+            containerColor = if (dark) CanvasDark else CanvasLight,
+            expandedHeightFraction = 0.78f,
+        ) { dismiss ->
+            EmojiPickerView(
+                onDismiss = dismiss,
+                onSelect = { emoji ->
+                    selectedIcon = emoji
+                    selectedImage = null
+                    showingEmojiPicker = false
+                    HapticManager.shared.lightImpact()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+
+    if (showingImageCrop) {
+        Dialog(
+            onDismissRequest = { showingImageCrop = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            ProfileLibraryCropEntryView(
+                onImageCropped = { bitmap ->
+                    selectedImage = bitmap
+                    showingImageCrop = false
+                    HapticManager.shared.lightImpact()
+                },
+                onDismiss = { showingImageCrop = false },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -650,19 +689,19 @@ fun CreateCustomListView(
                 .padding(bottom = 34.dp),
             verticalArrangement = Arrangement.spacedBy(32.dp),
         ) {
-            if (embeddedInFlow) {
-                EmbeddedFlowHeader(
-                    title = stringResource(R.string.audience_create_action),
-                    subtitle = stringResource(R.string.audience_custom_lists),
-                    content = content,
-                    onBack = { onBack?.invoke() },
-                )
-            }
+            EmbeddedFlowHeader(
+                title = stringResource(R.string.audience_create_action),
+                subtitle = stringResource(R.string.audience_custom_lists),
+                content = content,
+                onBack = { onBack?.invoke() },
+            )
             ListHeroPreview(
                 name = listName.ifEmpty { stringResource(R.string.audience_list_placeholder) },
                 memberCount = selectedMembers.size,
                 colorHex = selectedColor,
                 icon = selectedIcon,
+                localImage = selectedImage,
+                isUploadingImage = isLoading && selectedImage != null,
                 content = content,
                 heroSize = 86.dp,
                 iconSize = 36.dp,
@@ -684,8 +723,13 @@ fun CreateCustomListView(
                     },
                     onIcon = {
                         selectedIcon = it
+                        selectedImage = null
                         HapticManager.shared.lightImpact()
                     },
+                    localImage = selectedImage,
+                    imagePath = null,
+                    onEmoji = { showingEmojiPicker = true },
+                    onPhoto = { showingImageCrop = true },
                     content = content,
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -727,8 +771,13 @@ fun CreateCustomListView(
                             val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@clickable
                             isLoading = true
                             scope.launch {
+                                var uploadedPath: String? = null
                                 runCatching {
                                     withContext(Dispatchers.IO) {
+                                        val listId = UUID.randomUUID().toString()
+                                        uploadedPath = selectedImage?.let {
+                                            StorageService.uploadAudienceListImage(uid, listId, it)
+                                        }
                                         FirestoreService().createCustomAudienceList(
                                             userId = uid,
                                             name = listName,
@@ -736,12 +785,25 @@ fun CreateCustomListView(
                                             members = selectedMembers.toList(),
                                             color = selectedColor,
                                             icon = selectedIcon,
+                                            imagePath = uploadedPath,
+                                            listId = listId,
                                         )
                                     }
                                 }.onSuccess {
                                     isLoading = false
+                                    InAppNotificationService.showActionToast(
+                                        InAppActionToast.create(prefix = context.getString(R.string.audience_saved)),
+                                    )
                                     onCompleted?.invoke()
-                                }.onFailure { isLoading = false }
+                                }.onFailure { error ->
+                                    uploadedPath?.let { path ->
+                                        runCatching { withContext(Dispatchers.IO) { StorageService.deleteMedia(path) } }
+                                    }
+                                    isLoading = false
+                                    InAppNotificationService.showActionToast(
+                                        InAppActionToast.create(prefix = error.localizedMessage ?: error.message.orEmpty()),
+                                    )
+                                }
                             }
                         }
                         .padding(vertical = 18.dp),
@@ -874,6 +936,7 @@ fun EditCustomListView(
 ) {
     val dark = isSystemInDarkTheme()
     val content = if (dark) Color.White else Color.Black
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var listName by remember { mutableStateOf(list.name) }
     var listDescription by remember { mutableStateOf(list.description.orEmpty()) }
@@ -884,14 +947,140 @@ fun EditCustomListView(
         mutableStateOf(list.icon ?: CustomAudienceList.predefinedIcons.first())
     }
     var selectedMembers by remember { mutableStateOf(list.members.toSet()) }
+    var selectedImage by remember { mutableStateOf<Bitmap?>(null) }
+    var selectedImagePath by remember { mutableStateOf(list.imagePath) }
+    var persistedImagePath by remember { mutableStateOf(list.imagePath) }
+    var persistedName by remember { mutableStateOf(list.name) }
+    var persistedDescription by remember { mutableStateOf(list.description.orEmpty()) }
+    var persistedColor by remember { mutableStateOf(list.color ?: CustomAudienceList.predefinedColors.first()) }
+    var persistedIcon by remember { mutableStateOf(list.icon ?: CustomAudienceList.predefinedIcons.first()) }
+    var persistedMembers by remember { mutableStateOf(list.members.toSet()) }
     var showingMemberPicker by remember { mutableStateOf(false) }
+    var showingEmojiPicker by remember { mutableStateOf(false) }
+    var showingImageCrop by remember { mutableStateOf(false) }
     var currentMembers by remember { mutableStateOf<List<AppUser>>(emptyList()) }
     var filteredMembers by remember { mutableStateOf<List<AppUser>>(emptyList()) }
     var isLoadingMembers by remember { mutableStateOf(false) }
     var visibleMembersLimit by remember { mutableIntStateOf(12) }
     var isLoading by remember { mutableStateOf(false) }
     val membersPageSize = 12
-    val tint = Color.fromHex(selectedColor)
+    fun persistSnapshot() {
+        persistedName = listName
+        persistedDescription = listDescription
+        persistedColor = selectedColor
+        persistedIcon = selectedIcon
+        persistedMembers = selectedMembers
+        persistedImagePath = selectedImagePath
+    }
+
+    fun hasUnsavedChanges(): Boolean =
+        listName != persistedName ||
+            listDescription != persistedDescription ||
+            selectedColor != persistedColor ||
+            selectedIcon != persistedIcon ||
+            selectedMembers != persistedMembers ||
+            selectedImage != null ||
+            selectedImagePath != persistedImagePath
+
+    fun saveList(
+        successMessageRes: Int = R.string.audience_saved,
+        onSuccess: () -> Unit,
+    ) {
+        if (isLoading) return
+        if (!hasUnsavedChanges()) {
+            onSuccess()
+            return
+        }
+        if (listName.isBlank()) return
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val listId = list.id ?: return
+        isLoading = true
+        scope.launch {
+            var uploadedPath: String? = null
+            var resolvedImagePath = selectedImagePath
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    selectedImage?.let { bitmap ->
+                        uploadedPath = StorageService.uploadAudienceListImage(uid, listId, bitmap)
+                        resolvedImagePath = uploadedPath
+                    }
+                    FirestoreService().updateCustomAudienceList(
+                        userId = uid,
+                        listId = listId,
+                        name = listName,
+                        description = listDescription,
+                        members = selectedMembers.toList(),
+                        color = selectedColor,
+                        icon = selectedIcon,
+                        imagePath = resolvedImagePath,
+                    )
+                    if (persistedImagePath != null && persistedImagePath != resolvedImagePath) {
+                        runCatching { StorageService.deleteMedia(persistedImagePath.orEmpty()) }
+                    }
+                }
+            }.onSuccess {
+                isLoading = false
+                selectedImage = null
+                selectedImagePath = resolvedImagePath
+                persistSnapshot()
+                InAppNotificationService.showActionToast(
+                    InAppActionToast.create(prefix = context.getString(successMessageRes)),
+                )
+                onSuccess()
+            }.onFailure { error ->
+                uploadedPath?.let { path ->
+                    scope.launch(Dispatchers.IO) { runCatching { StorageService.deleteMedia(path) } }
+                }
+                isLoading = false
+                InAppNotificationService.showActionToast(
+                    InAppActionToast.create(prefix = error.localizedMessage ?: error.message.orEmpty()),
+                )
+            }
+        }
+    }
+
+    suspend fun removeMembers(users: List<AppUser>): Result<Unit> {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+            ?: return Result.failure(IllegalStateException("Unauthenticated"))
+        val listId = list.id
+            ?: return Result.failure(IllegalStateException("Missing list id"))
+        val removedIds = users.map { it.id }.toSet()
+        val updated = selectedMembers - removedIds
+        var uploadedPath: String? = null
+        var resolvedImagePath = selectedImagePath
+        val result = runCatching {
+            withContext(Dispatchers.IO) {
+                selectedImage?.let { bitmap ->
+                    uploadedPath = StorageService.uploadAudienceListImage(uid, listId, bitmap)
+                    resolvedImagePath = uploadedPath
+                }
+                FirestoreService().updateCustomAudienceList(
+                    userId = uid,
+                    listId = listId,
+                    name = listName,
+                    description = listDescription,
+                    members = updated.toList(),
+                    color = selectedColor,
+                    icon = selectedIcon,
+                    imagePath = resolvedImagePath,
+                )
+                if (persistedImagePath != null && persistedImagePath != resolvedImagePath) {
+                    runCatching { StorageService.deleteMedia(persistedImagePath.orEmpty()) }
+                }
+            }
+        }
+        if (result.isSuccess) {
+            selectedImage = null
+            selectedImagePath = resolvedImagePath
+            selectedMembers = updated
+            persistSnapshot()
+        } else {
+            uploadedPath?.let { path ->
+                withContext(Dispatchers.IO) { runCatching { StorageService.deleteMedia(path) } }
+            }
+        }
+        return result
+    }
 
     fun reloadMembers() {
         scope.launch {
@@ -920,9 +1109,15 @@ fun EditCustomListView(
         MemberPickerView(
             selectedMembers = selectedMembers,
             onSelectedMembersChange = { selectedMembers = it },
+            existingMemberIDs = persistedMembers,
+            listName = listName,
             embeddedInFlow = true,
-            onBack = { showingMemberPicker = false },
-            onConfirm = { showingMemberPicker = false },
+            onBack = {
+                saveList(successMessageRes = R.string.audience_list_updated) {
+                    showingMemberPicker = false
+                }
+            },
+            onRemoveMembers = ::removeMembers,
             modifier = modifier,
         )
         return
@@ -936,40 +1131,89 @@ fun EditCustomListView(
             MemberPickerView(
                 selectedMembers = selectedMembers,
                 onSelectedMembersChange = { selectedMembers = it },
+                existingMemberIDs = persistedMembers,
+                listName = listName,
                 embeddedInFlow = false,
-                onBack = { showingMemberPicker = false },
-                onConfirm = { showingMemberPicker = false },
+                onBack = {
+                    saveList(successMessageRes = R.string.audience_list_updated) {
+                        showingMemberPicker = false
+                    }
+                },
+                onRemoveMembers = ::removeMembers,
                 modifier = Modifier.fillMaxSize(),
             )
         }
     }
 
-    Column(
-        modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 34.dp),
-        verticalArrangement = Arrangement.spacedBy(32.dp),
-    ) {
-        if (embeddedInFlow) {
-            EmbeddedFlowHeader(
-                title = stringResource(R.string.common_edit),
-                subtitle = list.name,
-                content = content,
-                onBack = { onBack?.invoke() },
+    if (showingEmojiPicker) {
+        // Reutiliza el mismo sheet grande y sólido de comentarios/reacciones.
+        MomentsModalSheet(
+            onDismissRequest = { showingEmojiPicker = false },
+            largeOnly = false,
+            containerColor = if (dark) CanvasDark else CanvasLight,
+            expandedHeightFraction = 0.78f,
+        ) { dismiss ->
+            EmojiPickerView(
+                onDismiss = dismiss,
+                onSelect = { emoji ->
+                    selectedIcon = emoji
+                    selectedImage = null
+                    selectedImagePath = null
+                    showingEmojiPicker = false
+                    HapticManager.shared.lightImpact()
+                },
+                modifier = Modifier.fillMaxWidth(),
             )
         }
-        ListHeroPreview(
+    }
+
+    if (showingImageCrop) {
+        Dialog(
+            onDismissRequest = { showingImageCrop = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            ProfileLibraryCropEntryView(
+                onImageCropped = { bitmap ->
+                    selectedImage = bitmap
+                    selectedImagePath = null
+                    showingImageCrop = false
+                    HapticManager.shared.lightImpact()
+                },
+                onDismiss = { showingImageCrop = false },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+
+    Column(modifier.fillMaxSize()) {
+        EmbeddedFlowHeader(
+            title = stringResource(R.string.common_edit),
+            subtitle = list.name,
+            content = content,
+            onBack = { saveList { onCompleted?.invoke() ?: onBack?.invoke() } },
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 34.dp),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
+        ) {
+            ListHeroPreview(
             name = listName.ifEmpty { stringResource(R.string.audience_list_placeholder) },
             memberCount = selectedMembers.size,
             colorHex = selectedColor,
             icon = selectedIcon,
+            imagePath = selectedImagePath,
+            localImage = selectedImage,
+            isUploadingImage = isLoading && selectedImage != null,
             content = content,
             heroSize = 76.dp,
             iconSize = 32.dp,
         )
-        Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
             ListNameDescriptionFields(
                 listName = listName,
                 onNameChange = { listName = it },
@@ -986,114 +1230,30 @@ fun EditCustomListView(
                 },
                 onIcon = {
                     selectedIcon = it
+                    selectedImage = null
+                    selectedImagePath = null
                     HapticManager.shared.lightImpact()
                 },
+                imagePath = selectedImagePath,
+                localImage = selectedImage,
+                onEmoji = { showingEmojiPicker = true },
+                onPhoto = { showingImageCrop = true },
                 content = content,
             )
-            // membersManagementSection
-            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(stringResource(R.string.audience_members), color = content, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                        Text(
-                            stringResource(R.string.audience_members_count_long, selectedMembers.size),
-                            color = Color.Gray,
-                            fontSize = 12.sp,
-                        )
-                    }
-                    Row(
-                        Modifier.clickable { showingMemberPicker = true },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Box(Modifier.size(24.dp).momentsChromeGlass(CircleShape, interactive = true), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.Add, null, tint = content, modifier = Modifier.size(11.dp))
-                        }
-                        Text(stringResource(R.string.audience_list_add), color = content, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                    }
-                }
-                when {
-                    isLoadingMembers -> Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                        MomentsCircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                    }
-                    currentMembers.isEmpty() -> Column(
-                        Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Icon(Icons.Filled.Person, null, tint = Color.Gray.copy(0.3f), modifier = Modifier.size(40.dp))
-                        Text(stringResource(R.string.audience_list_empty), color = Color.Gray, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                        Text(stringResource(R.string.audience_list_emptyAlt), color = Color.Gray, fontSize = 12.sp)
-                    }
-                    else -> {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            filteredMembers.take(visibleMembersLimit).forEach { member ->
-                                MemberRowWithRemove(
-                                    user = member,
-                                    onRemove = {
-                                        selectedMembers = selectedMembers - member.id
-                                        reloadMembers()
-                                    },
-                                )
-                            }
-                        }
-                        if (filteredMembers.size > visibleMembersLimit) {
-                            val more = minOf(membersPageSize, filteredMembers.size - visibleMembersLimit)
-                            Row(
-                                Modifier.padding(top = 4.dp).clickable { visibleMembersLimit += membersPageSize },
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Box(Modifier.size(24.dp).momentsChromeGlass(CircleShape, interactive = true), contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Filled.KeyboardArrowDown, null, tint = content, modifier = Modifier.size(14.dp))
-                                }
-                                Text(stringResource(R.string.audience_list_loadMoreMembers, more), color = content, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                            }
-                        }
-                    }
-                }
-            }
-            val canSave = listName.isNotBlank() && !isLoading
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .shadow(15.dp, RoundedCornerShape(24.dp), spotColor = tint.copy(0.3f))
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Brush.linearGradient(listOf(tint, tint.copy(0.8f))))
-                    .clickable(enabled = canSave) {
-                        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@clickable
-                        val listId = list.id ?: return@clickable
-                        isLoading = true
-                        scope.launch {
-                            runCatching {
-                                withContext(Dispatchers.IO) {
-                                    FirestoreService().updateCustomAudienceList(
-                                        userId = uid,
-                                        listId = listId,
-                                        name = listName,
-                                        description = listDescription,
-                                        members = selectedMembers.toList(),
-                                        color = selectedColor,
-                                        icon = selectedIcon,
-                                    )
-                                }
-                            }.onSuccess {
-                                isLoading = false
-                                onCompleted?.invoke()
-                            }.onFailure { isLoading = false }
-                        }
-                    }
-                    .padding(vertical = 18.dp),
-                contentAlignment = Alignment.Center,
+            Row(
+                Modifier.fillMaxWidth().clickable { showingMemberPicker = true },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
-                } else {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Check, null, tint = Color.White)
-                        Text(stringResource(R.string.common_save), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    }
+                Box(Modifier.size(40.dp).momentsChromeGlass(CircleShape, interactive = true), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.Add, null, tint = content, modifier = Modifier.size(17.dp))
                 }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(stringResource(R.string.audience_picker_title), color = content, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text(stringResource(R.string.audience_members_count_long, selectedMembers.size), color = content.copy(0.6f), fontSize = 12.sp)
+                }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = content.copy(0.6f), modifier = Modifier.size(20.dp))
+            }
             }
         }
     }
@@ -1150,51 +1310,53 @@ fun MemberRowWithRemove(user: AppUser, onRemove: () -> Unit, modifier: Modifier 
 fun MemberPickerView(
     selectedMembers: Set<String>,
     onSelectedMembersChange: (Set<String>) -> Unit,
+    existingMemberIDs: Set<String> = emptySet(),
+    listName: String? = null,
     embeddedInFlow: Boolean = false,
     onBack: (() -> Unit)? = null,
-    onConfirm: (() -> Unit)? = null,
+    onRemoveMembers: (suspend (List<AppUser>) -> Result<Unit>)? = null,
     modifier: Modifier = Modifier,
 ) {
     val dark = isSystemInDarkTheme()
     val canvas = if (dark) CanvasDark else CanvasLight
     val content = if (dark) Color.White else Color.Black
     val secondary = content.copy(alpha = if (dark) 0.65f else 0.62f)
+    val context = LocalContext.current
+    var currentExistingIds by remember(existingMemberIDs) { mutableStateOf(existingMemberIDs) }
+    var showingManageMembers by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<AppUser>>(emptyList()) }
+    var suggestedUsers by remember { mutableStateOf<List<AppUser>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
-    var hasSearched by remember { mutableStateOf(false) }
-    var selectedUsersData by remember { mutableStateOf<List<AppUser>>(emptyList()) }
-    var selectedCarouselVisibleLimit by remember { mutableIntStateOf(12) }
-    val selectedCarouselPageSize = 10
+    var isLoadingSuggestions by remember { mutableStateOf(true) }
+    val hasSearched = searchText.trim().length >= 2
 
     LaunchedEffect(selectedMembers) {
-        if (selectedMembers.isEmpty()) {
-            selectedUsersData = emptyList()
-            return@LaunchedEffect
-        }
-        selectedUsersData = selectedUsersData.filter { it.id in selectedMembers }
-        val missing = selectedMembers - selectedUsersData.map { it.id }.toSet()
-        if (missing.isNotEmpty()) {
-            val fetched = withContext(Dispatchers.IO) {
-                runCatching { FirestoreService().fetchUsers(missing.toList()) }.getOrDefault(emptyList())
-            }
-            selectedUsersData = (selectedUsersData + fetched).distinctBy { it.id }
-        }
-        selectedCarouselVisibleLimit = 12
+        currentExistingIds = currentExistingIds.intersect(selectedMembers)
     }
 
-    LaunchedEffect(searchText) {
-        val q = searchText.trim()
-        if (q.isEmpty()) {
-            hasSearched = false
+    LaunchedEffect(currentExistingIds) {
+        isLoadingSuggestions = true
+        suggestedUsers = withContext(Dispatchers.IO) {
+            runCatching {
+                FirestoreService().fetchNewConversationSuggestions(recentPartnerIds = emptyList())
+            }.getOrDefault(emptyList()).filterNot { it.id in currentExistingIds }
+        }
+        isLoadingSuggestions = false
+    }
+
+    LaunchedEffect(searchText, currentExistingIds) {
+        val query = searchText.trim()
+        if (query.length < 2) {
             searchResults = emptyList()
+            isSearching = false
             return@LaunchedEffect
         }
-        if (q.length < 2) return@LaunchedEffect
-        hasSearched = true
         isSearching = true
         searchResults = withContext(Dispatchers.IO) {
-            runCatching { FirestoreService().searchUsers(q, limit = 20) }.getOrDefault(emptyList())
+            runCatching { FirestoreService().searchUsers(query, limit = 20) }
+                .getOrDefault(emptyList())
+                .filterNot { it.id in currentExistingIds }
         }
         isSearching = false
     }
@@ -1202,123 +1364,37 @@ fun MemberPickerView(
     fun toggle(user: AppUser) {
         if (user.id in selectedMembers) {
             onSelectedMembersChange(selectedMembers - user.id)
-            selectedUsersData = selectedUsersData.filterNot { it.id == user.id }
-        } else {
+        } else if (selectedMembers.size < MAX_CUSTOM_AUDIENCE_MEMBERS) {
             onSelectedMembersChange(selectedMembers + user.id)
-            if (selectedUsersData.none { it.id == user.id }) {
-                selectedUsersData = selectedUsersData + user
-            }
+        } else {
+            InAppNotificationService.showActionToast(
+                InAppActionToast.create(prefix = context.getString(R.string.audience_members_limit, MAX_CUSTOM_AUDIENCE_MEMBERS)),
+            )
         }
     }
 
+    if (showingManageMembers && listName != null) {
+        AudienceManageMembersView(
+            selectedMembers = selectedMembers,
+            memberIDs = currentExistingIds.intersect(selectedMembers),
+            listName = listName,
+            onSelectedMembersChange = onSelectedMembersChange,
+            onBack = { showingManageMembers = false },
+            onRemoveMembers = onRemoveMembers,
+            modifier = modifier,
+        )
+        return
+    }
+
     Column(modifier.fillMaxSize().background(if (!embeddedInFlow) canvas else Color.Transparent)) {
-        if (embeddedInFlow) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 20.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier.size(40.dp).momentsChromeGlass(CircleShape, interactive = true).clickable { onBack?.invoke() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = content, modifier = Modifier.size(18.dp))
-                }
-                Spacer(Modifier.weight(1f))
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.audience_picker_title), color = content, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
-                    Text(stringResource(R.string.audience_members), color = secondary, fontSize = 13.sp)
-                }
-                Spacer(Modifier.weight(1f))
-                Text(
-                    stringResource(R.string.common_confirm),
-                    color = content,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    modifier = Modifier
-                        .graphicsLayer { alpha = if (selectedMembers.isEmpty()) 0.45f else 1f }
-                        .momentsChromeGlass(RoundedCornerShape(50), interactive = selectedMembers.isNotEmpty())
-                        .clickable(enabled = selectedMembers.isNotEmpty()) { onConfirm?.invoke() }
-                        .padding(horizontal = 14.dp, vertical = 9.dp),
-                )
-            }
-        } else {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 16.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.audience_actions_cancel),
-                    color = secondary,
-                    fontSize = 16.sp,
-                    modifier = Modifier.clickable { onBack?.invoke() },
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    stringResource(R.string.audience_picker_title),
-                    color = content,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 17.sp,
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    stringResource(R.string.common_confirm),
-                    color = AudienceTeal,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
-                    modifier = Modifier
-                        .graphicsLayer { alpha = if (selectedMembers.isEmpty()) 0.45f else 1f }
-                        .clickable(enabled = selectedMembers.isNotEmpty()) { onConfirm?.invoke() },
-                )
-            }
-        }
-        if (selectedUsersData.isNotEmpty()) {
-            val visible = selectedUsersData.take(selectedCarouselVisibleLimit)
-            val hidden = (selectedUsersData.size - selectedCarouselVisibleLimit).coerceAtLeast(0)
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(bottom = 6.dp),
-            ) {
-                items(visible, key = { it.id }) { user ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box {
-                            UserAvatarCircle(user, 48.dp)
-                            Icon(
-                                Icons.Filled.Close,
-                                null,
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .offset(4.dp, (-4).dp)
-                                    .size(16.dp)
-                                    .background(Color.Black.copy(0.5f), CircleShape)
-                                    .clickable { toggle(user) }
-                                    .padding(2.dp),
-                            )
-                        }
-                        Text(user.username, color = content, fontSize = 11.sp, maxLines = 1, modifier = Modifier.width(60.dp), textAlign = TextAlign.Center)
-                    }
-                }
-                if (hidden > 0) {
-                    item {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.clickable { selectedCarouselVisibleLimit += selectedCarouselPageSize },
-                        ) {
-                            Box(
-                                Modifier.size(48.dp).background(AudienceTeal.copy(0.18f), CircleShape),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text("+$hidden", color = AudienceTeal, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                            }
-                            Text(stringResource(R.string.audience_more), color = secondary, fontSize = 10.sp)
-                        }
-                    }
-                }
-            }
-        }
-        // searchBar
+        MemberPickerHeader(
+            title = stringResource(R.string.audience_picker_title),
+            subtitle = stringResource(R.string.audience_members),
+            content = content,
+            secondary = secondary,
+            onBack = { onBack?.invoke() },
+        )
+
         Row(
             Modifier
                 .padding(horizontal = 16.dp)
@@ -1348,117 +1424,303 @@ fun MemberPickerView(
                     Icons.Filled.Close,
                     null,
                     tint = secondary,
-                    modifier = Modifier.size(18.dp).clickable {
-                        searchText = ""
-                        hasSearched = false
-                        searchResults = emptyList()
-                    },
+                    modifier = Modifier.size(18.dp).clickable { searchText = "" },
                 )
             }
         }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            when {
-                !hasSearched -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.padding(horizontal = 40.dp),
-                    ) {
-                        Icon(Icons.Filled.Person, null, tint = secondary, modifier = Modifier.size(50.dp))
-                        Text(stringResource(R.string.audience_picker_initialTitle), color = content, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                        Text(stringResource(R.string.audience_picker_initialDescription), color = secondary, fontSize = 14.sp, textAlign = TextAlign.Center)
-                    }
-                }
-                isSearching -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        MomentsCircularProgressIndicator()
-                        Text(stringResource(R.string.common_searching), color = secondary, fontSize = 16.sp)
-                    }
-                }
-                searchResults.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.padding(horizontal = 40.dp),
-                    ) {
-                        Icon(Icons.Filled.Person, null, tint = secondary, modifier = Modifier.size(50.dp))
-                        Text(stringResource(R.string.common_no_results), color = content, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                        Text(
-                            stringResource(R.string.audience_picker_noResultsDescription, searchText),
-                            color = secondary,
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-                else -> LazyColumn(
-                    Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    items(searchResults, key = { it.id }) { user ->
-                        UserSelectionRowEnhanced(
-                            user = user,
-                            isSelected = user.id in selectedMembers,
-                            onToggle = { toggle(user) },
-                        )
-                    }
-                }
-            }
-        }
-        if (selectedMembers.isNotEmpty()) {
+
+        if (listName != null) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 10.dp, bottom = 14.dp),
+                    .clickable { showingManageMembers = true }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Column(
-                    Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.audience_picker_selectedCount, selectedMembers.size),
-                        color = content,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                    )
-                    Text(
-                        stringResource(R.string.audience_picker_selectedDescription),
-                        color = secondary,
-                        fontSize = 12.sp,
-                    )
+                Box(Modifier.size(36.dp).momentsChromeGlass(CircleShape, interactive = true), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.Group, null, tint = content, modifier = Modifier.size(16.dp))
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(R.string.common_clear),
-                        color = Color.Red,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp,
-                        modifier = Modifier
-                            .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
-                            .clickable { onSelectedMembersChange(emptySet()) }
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                    )
-                    Text(
-                        stringResource(R.string.common_confirm),
-                        color = content,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        modifier = Modifier
-                            .graphicsLayer { alpha = if (selectedMembers.isEmpty()) 0.45f else 1f }
-                            .momentsChromeGlass(RoundedCornerShape(50), interactive = selectedMembers.isNotEmpty())
-                            .clickable(enabled = selectedMembers.isNotEmpty()) { onConfirm?.invoke() }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(stringResource(R.string.audience_manage_members), color = content, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text(stringResource(R.string.audience_members_count_long, currentExistingIds.intersect(selectedMembers).size), color = secondary, fontSize = 12.sp)
+                }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = secondary, modifier = Modifier.size(20.dp))
+            }
+        }
+
+        when {
+            isSearching || (!hasSearched && isLoadingSuggestions) -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    MomentsCircularProgressIndicator()
+                    Text(stringResource(R.string.common_searching), color = secondary, fontSize = 16.sp)
+                }
+            }
+            hasSearched && searchResults.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(40.dp)) {
+                    Icon(Icons.Filled.Person, null, tint = secondary, modifier = Modifier.size(50.dp))
+                    Text(stringResource(R.string.common_no_results), color = content, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                    Text(stringResource(R.string.audience_picker_noResultsDescription, searchText), color = secondary, fontSize = 14.sp, textAlign = TextAlign.Center)
+                }
+            }
+            else -> {
+                val users = if (hasSearched) searchResults else suggestedUsers
+                if (users.isEmpty()) {
+                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.padding(40.dp)) {
+                            Icon(Icons.Filled.Person, null, tint = secondary, modifier = Modifier.size(50.dp))
+                            Text(stringResource(R.string.audience_picker_initialTitle), color = content, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                            Text(stringResource(R.string.audience_picker_initialDescription), color = secondary, fontSize = 14.sp, textAlign = TextAlign.Center)
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        if (!hasSearched) {
+                            item {
+                                Text(
+                                    stringResource(R.string.messaging_new_suggestions),
+                                    color = secondary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
+                                )
+                            }
+                        }
+                        items(users, key = { it.id }) { user ->
+                            AudienceMemberSelectionRow(
+                                user = user,
+                                isSelected = user.id in selectedMembers,
+                                isSelectionEnabled = true,
+                                onToggle = { toggle(user) },
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
 
+@Composable
+private fun MemberPickerHeader(
+    title: String,
+    subtitle: String,
+    content: Color,
+    secondary: Color,
+    onBack: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 4.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(40.dp).momentsChromeGlass(CircleShape, interactive = true).clickable(onClick = onBack),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = content, modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.weight(1f))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(title, color = content, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
+            Text(subtitle, color = secondary, fontSize = 13.sp)
+        }
+        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.size(40.dp))
+    }
+}
+
+@Composable
+private fun AudienceManageMembersView(
+    selectedMembers: Set<String>,
+    memberIDs: Set<String>,
+    listName: String,
+    onSelectedMembersChange: (Set<String>) -> Unit,
+    onBack: () -> Unit,
+    onRemoveMembers: (suspend (List<AppUser>) -> Result<Unit>)?,
+    modifier: Modifier = Modifier,
+) {
+    val dark = isSystemInDarkTheme()
+    val content = if (dark) Color.White else Color.Black
+    val secondary = content.copy(alpha = 0.62f)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var members by remember { mutableStateOf<List<AppUser>>(emptyList()) }
+    var selectedForRemoval by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var isEditing by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(true) }
+    var isRemoving by remember { mutableStateOf(false) }
+    var showingConfirmation by remember { mutableStateOf(false) }
+    val selectedUsers = members.filter { it.id in selectedForRemoval }
+
+    LaunchedEffect(memberIDs) {
+        members = if (memberIDs.isEmpty()) emptyList() else withContext(Dispatchers.IO) {
+            runCatching { FirestoreService().fetchUsers(memberIDs.toList()) }.getOrDefault(emptyList())
+        }
+        isLoading = false
+    }
+
+    Column(modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(top = 4.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(40.dp).momentsChromeGlass(CircleShape, interactive = true).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = content, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(stringResource(R.string.audience_manage_members), color = content, fontWeight = FontWeight.SemiBold, fontSize = 19.sp)
+                Text(stringResource(R.string.audience_members_count_short, members.size), color = secondary, fontSize = 12.sp)
+            }
+            Spacer(Modifier.weight(1f))
+            if (selectedForRemoval.isEmpty()) {
+                Text(
+                    stringResource(R.string.common_edit),
+                    color = content,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .width(54.dp)
+                        .clickable(enabled = members.isNotEmpty() && !isRemoving) { isEditing = true }
+                        .padding(vertical = 10.dp),
+                    textAlign = TextAlign.Center,
+                )
+            } else {
+                Row(
+                    Modifier
+                        .width(54.dp)
+                        .momentsChromeGlass(RoundedCornerShape(50), interactive = !isRemoving)
+                        .clickable(enabled = !isRemoving) { showingConfirmation = true }
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.Delete, null, tint = Color.Red, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(selectedForRemoval.size.toString(), color = Color.Red, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                }
+            }
+        }
+        if (isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { MomentsCircularProgressIndicator() }
+        } else {
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                items(members, key = { it.id }) { user ->
+                    AudienceMemberSelectionRow(
+                        user = user,
+                        isSelected = user.id in selectedForRemoval,
+                        isSelectionEnabled = isEditing,
+                        onToggle = {
+                            if (isEditing) {
+                                selectedForRemoval = if (user.id in selectedForRemoval) selectedForRemoval - user.id else selectedForRemoval + user.id
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    if (showingConfirmation) {
+        val first = selectedUsers.firstOrNull()
+        val message = when {
+            first == null -> ""
+            selectedUsers.size == 1 -> context.getString(R.string.audience_manage_members_remove_single, first.username, listName)
+            else -> context.getString(R.string.audience_manage_members_remove_plural, first.username, selectedUsers.size - 1, listName)
+        }
+        AlertDialog(
+            onDismissRequest = { showingConfirmation = false },
+            title = { Text(stringResource(R.string.audience_manage_members_remove_title)) },
+            text = { Text(message) },
+            dismissButton = { TextButton(onClick = { showingConfirmation = false }) { Text(stringResource(R.string.audience_actions_cancel)) } },
+            confirmButton = {
+                TextButton(
+                    enabled = !isRemoving,
+                    onClick = {
+                        showingConfirmation = false
+                        isRemoving = true
+                        scope.launch {
+                            val result = onRemoveMembers?.invoke(selectedUsers)
+                                ?: Result.failure(IllegalStateException("Missing member removal handler"))
+                            result.onSuccess {
+                                val removedIds = selectedForRemoval
+                                onSelectedMembersChange(selectedMembers - removedIds)
+                                members = members.filterNot { it.id in removedIds }
+                                val subtitle = if (selectedUsers.size == 1) {
+                                    context.getString(R.string.audience_list_members_removed_single, selectedUsers.first().username, listName)
+                                } else {
+                                    context.getString(R.string.audience_list_members_removed_plural, selectedUsers.first().username, selectedUsers.size - 1, listName)
+                                }
+                                selectedForRemoval = emptySet()
+                                isEditing = false
+                                InAppNotificationService.showActionToast(
+                                    InAppActionToast.create(prefix = context.getString(R.string.audience_list_updated), subtitle = subtitle),
+                                )
+                            }.onFailure { error ->
+                                InAppNotificationService.showActionToast(InAppActionToast.create(prefix = error.localizedMessage ?: error.message.orEmpty()))
+                            }
+                            isRemoving = false
+                        }
+                    },
+                ) { Text(stringResource(R.string.common_delete), color = Color.Red) }
+            },
+        )
+    }
+}
+
 // MARK: - Card / Fila de Usuario
+
+@Composable
+fun AudienceMemberSelectionRow(
+    user: AppUser,
+    isSelected: Boolean,
+    isSelectionEnabled: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val dark = isSystemInDarkTheme()
+    val content = if (dark) Color.White else Color.Black
+    val unselected = content.copy(alpha = if (dark) 0.28f else 0.20f)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clickable(enabled = isSelectionEnabled, onClick = onToggle)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        UserAvatarCircle(user, 44.dp)
+        Row(
+            Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(user.username, color = content, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1)
+            if (user.isVerified) VerifiedBadge(size = 13.dp)
+        }
+        if (isSelectionEnabled) {
+            Box(
+                Modifier
+                    .size(26.dp)
+                    .background(if (isSelected) content else Color.Transparent, CircleShape)
+                    .border(if (isSelected) 0.dp else 1.5.dp, unselected, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isSelected) {
+                    Icon(Icons.Filled.Check, null, tint = if (dark) Color.Black else Color.White, modifier = Modifier.size(12.dp))
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun UserSelectionCard(user: AppUser, isSelected: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
@@ -1529,9 +1791,19 @@ private fun UserSelectionRowBase(
 // MARK: - Shared helpers (UI pieces used by Create/Edit)
 
 @Composable
-private fun EmbeddedFlowHeader(title: String, subtitle: String, content: Color, onBack: () -> Unit) {
+private fun EmbeddedFlowHeader(
+    title: String,
+    subtitle: String,
+    content: Color,
+    onBack: () -> Unit,
+    onConfirm: (() -> Unit)? = null,
+    confirmEnabled: Boolean = true,
+    isConfirming: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
     Row(
-        Modifier.fillMaxWidth().padding(top = 20.dp),
+        // El sheet ya reserva el handle; no duplicar ese aire antes del título.
+        modifier.fillMaxWidth().padding(top = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -1547,7 +1819,24 @@ private fun EmbeddedFlowHeader(title: String, subtitle: String, content: Color, 
             Text(subtitle, color = content.copy(0.55f), fontSize = 13.sp)
         }
         Spacer(Modifier.weight(1f))
-        Spacer(Modifier.size(40.dp))
+        if (onConfirm == null) {
+            Spacer(Modifier.size(40.dp))
+        } else {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .graphicsLayer { alpha = if (confirmEnabled) 1f else 0.45f }
+                    .momentsChromeGlass(CircleShape, interactive = confirmEnabled)
+                    .clickable(enabled = confirmEnabled, onClick = onConfirm),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isConfirming) {
+                    CircularProgressIndicator(Modifier.size(18.dp), color = content, strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Filled.Check, null, tint = content, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
     }
 }
 
@@ -1557,11 +1846,18 @@ private fun ListHeroPreview(
     memberCount: Int,
     colorHex: String,
     icon: String,
+    imagePath: String? = null,
+    localImage: Bitmap? = null,
+    isUploadingImage: Boolean = false,
     content: Color,
     heroSize: androidx.compose.ui.unit.Dp,
     iconSize: androidx.compose.ui.unit.Dp,
 ) {
     val tint = Color.fromHex(colorHex)
+    val hasImage = localImage != null || !imagePath.isNullOrBlank()
+    // ≡ iOS create: círculo decorativo 60pt; edit: foto a imageSize = vidrio (76).
+    val innerSize = heroSize * 0.7f
+    val isCustomEmoji = !hasImage && icon !in CustomAudienceList.predefinedIcons
     Column(
         Modifier.fillMaxWidth().padding(vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1573,11 +1869,53 @@ private fun ListHeroPreview(
                 Modifier.size(heroSize).momentsChromeGlass(CircleShape, interactive = false),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    Modifier.size(heroSize * 0.7f).background(tint.copy(0.1f), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(listIconVector(icon), null, tint = tint, modifier = Modifier.size(iconSize))
+                if (hasImage) {
+                    // Foto: llena el vidrio entero (≡ iOS imageSize del hero).
+                    when {
+                        localImage != null -> Image(
+                            bitmap = localImage.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(heroSize).clip(CircleShape),
+                        )
+                        else -> AsyncImage(
+                            model = imagePath,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(heroSize).clip(CircleShape),
+                        )
+                    }
+                } else {
+                    Box(
+                        Modifier.size(innerSize).background(tint.copy(0.1f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        // Emoji custom: usa todo el círculo interior (antes iconSize
+                        // lo recortaba por métricas del glifo). Iconos Material: tamaño tipográfico.
+                        CustomAudienceListIcon(
+                            icon = icon,
+                            imagePath = null,
+                            tint = tint,
+                            emojiFontSize = if (isCustomEmoji) {
+                                (innerSize.value * 0.62f).sp
+                            } else {
+                                iconSize.value.sp
+                            },
+                            modifier = Modifier.size(if (isCustomEmoji) innerSize else iconSize),
+                        )
+                    }
+                }
+                if (isUploadingImage) {
+                    Box(
+                        Modifier.size(heroSize).background(Color.Black.copy(alpha = 0.38f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size((heroSize.value * 0.30f).dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                        )
+                    }
                 }
             }
         }
@@ -1645,9 +1983,24 @@ private fun PersonalizationPickers(
     selectedIcon: String,
     onColor: (String) -> Unit,
     onIcon: (String) -> Unit,
+    imagePath: String? = null,
+    localImage: Bitmap? = null,
+    onEmoji: () -> Unit,
+    onPhoto: () -> Unit,
     content: Color,
 ) {
     val dark = isSystemInDarkTheme()
+    var showingColorPicker by remember { mutableStateOf(false) }
+    if (showingColorPicker) {
+        AudienceColorPickerDialog(
+            initialHex = selectedColor,
+            onDismiss = { showingColorPicker = false },
+            onConfirm = {
+                onColor(it)
+                showingColorPicker = false
+            },
+        )
+    }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(R.string.audience_personalization), color = content, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
@@ -1661,6 +2014,17 @@ private fun PersonalizationPickers(
                         .border(if (selected) 3.dp else 0.dp, content, CircleShape)
                         .clickable { onColor(color) },
                 )
+            }
+            item {
+                Box(
+                    Modifier
+                        .size(42.dp)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clickable { showingColorPicker = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Palette, null, tint = content, modifier = Modifier.size(20.dp))
+                }
             }
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
@@ -1687,8 +2051,89 @@ private fun PersonalizationPickers(
                     )
                 }
             }
+            item {
+                val isCustomEmoji = selectedIcon !in CustomAudienceList.predefinedIcons && imagePath == null && localImage == null
+                Box(
+                    Modifier
+                        .size(52.dp)
+                        .graphicsLayer { scaleX = if (isCustomEmoji) 1.1f else 1f; scaleY = if (isCustomEmoji) 1.1f else 1f }
+                        .background(
+                            if (isCustomEmoji) Color.fromHex(selectedColor).copy(0.15f)
+                            else if (dark) Color.White.copy(0.06f) else Color.Black.copy(0.03f),
+                            CircleShape,
+                        )
+                        .clickable(onClick = onEmoji),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(if (isCustomEmoji) selectedIcon else "😊", fontSize = 22.sp)
+                }
+            }
+            item {
+                val photoSelected = localImage != null || imagePath != null
+                Box(
+                    Modifier
+                        .size(52.dp)
+                        .background(
+                            if (photoSelected) Color.fromHex(selectedColor).copy(0.15f)
+                            else if (dark) Color.White.copy(0.06f) else Color.Black.copy(0.03f),
+                            CircleShape,
+                        )
+                        .clickable(onClick = onPhoto),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    when {
+                        localImage != null -> Image(
+                            bitmap = localImage.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                        )
+                        imagePath != null -> AsyncImage(
+                            model = imagePath,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
+                        )
+                        else -> Icon(Icons.Filled.Photo, null, tint = content.copy(0.45f), modifier = Modifier.size(22.dp))
+                    }
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun AudienceColorPickerDialog(
+    initialHex: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    val parsed = remember(initialHex) { runCatching { AndroidColor.parseColor("#$initialHex") }.getOrDefault(AndroidColor.BLACK) }
+    var red by remember { mutableIntStateOf(AndroidColor.red(parsed)) }
+    var green by remember { mutableIntStateOf(AndroidColor.green(parsed)) }
+    var blue by remember { mutableIntStateOf(AndroidColor.blue(parsed)) }
+    val preview = Color(red, green, blue)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.common_color)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.fillMaxWidth().height(54.dp).background(preview, RoundedCornerShape(16.dp)))
+                Text("R · $red")
+                Slider(value = red.toFloat(), onValueChange = { red = it.toInt() }, valueRange = 0f..255f)
+                Text("G · $green")
+                Slider(value = green.toFloat(), onValueChange = { green = it.toInt() }, valueRange = 0f..255f)
+                Text("B · $blue")
+                Slider(value = blue.toFloat(), onValueChange = { blue = it.toInt() }, valueRange = 0f..255f)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.audience_actions_cancel)) } },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(String.format("%02X%02X%02X", red, green, blue)) }) {
+                Text(stringResource(R.string.common_confirm))
+            }
+        },
+    )
 }
 
 @Composable
@@ -1723,4 +2168,3 @@ private fun UserAvatarCircle(user: AppUser, size: androidx.compose.ui.unit.Dp) {
         }
     }
 }
-

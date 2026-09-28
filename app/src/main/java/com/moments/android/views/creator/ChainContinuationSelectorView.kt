@@ -48,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -58,6 +59,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.AppUser
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchCustomLists
 import com.moments.android.views.components.AudienceIconMetrics
@@ -90,6 +93,8 @@ fun CustomUserSelectorView(
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val originalSelection = remember { selectedUsers.toSet() }
     var users by remember { mutableStateOf<List<AppUser>>(emptyList()) }
     LaunchedEffect(selectedUsers) {
         if (selectedUsers.isEmpty()) {
@@ -107,7 +112,16 @@ fun CustomUserSelectorView(
             onSelectedUsersChange(users.map { it.id })
             onDismiss()
         },
-        onBack = onBack ?: onDismiss,
+        onBack = {
+            val updatedIds = users.map { it.id }
+            onSelectedUsersChange(updatedIds)
+            if (updatedIds.toSet() != originalSelection) {
+                InAppNotificationService.showActionToast(
+                    InAppActionToast.create(prefix = context.getString(R.string.audience_saved)),
+                )
+            }
+            onBack?.invoke() ?: onDismiss()
+        },
         embeddedInFlow = true,
         modifier = modifier,
     )
@@ -440,7 +454,7 @@ private fun ChainContinuationMainContent(
                         )
                         Text(
                             stringResource(R.string.audience_manage),
-                            color = Color(0xFF007AFF),
+                            color = content,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.clickable(onClick = onManageLists),
@@ -477,11 +491,6 @@ private fun ChainContinuationMainContent(
                                         Modifier
                                             .width(100.dp)
                                             .height(140.dp)
-                                            .border(
-                                                width = 1.dp,
-                                                color = Color(0xFF007AFF).copy(alpha = 0.3f),
-                                                shape = RoundedCornerShape(20.dp),
-                                            )
                                             .clickable(onClick = onCreateList)
                                             .padding(vertical = 12.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -493,11 +502,11 @@ private fun ChainContinuationMainContent(
                                                 .momentsChromeGlass(CircleShape, interactive = true),
                                             contentAlignment = Alignment.Center,
                                         ) {
-                                            Icon(Icons.Filled.Add, null, tint = Color(0xFF007AFF))
+                                            Icon(Icons.Filled.Add, null, tint = content)
                                         }
                                         Text(
                                             stringResource(R.string.audience_create),
-                                            color = Color(0xFF007AFF),
+                                            color = content,
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Medium,
                                         )
@@ -616,7 +625,7 @@ private fun EmptyCustomListsCard(
                 brush = Brush.linearGradient(
                     listOf(
                         content.copy(alpha = 0.1f),
-                        Color(0xFF007AFF).copy(alpha = 0.2f),
+                        content.copy(alpha = 0.05f),
                     ),
                 ),
                 shape = RoundedCornerShape(16.dp),

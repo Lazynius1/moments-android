@@ -561,13 +561,14 @@ private fun SharedProfileMomentsGrid(
                     isProtected = (moment.audience?.lowercase() ?: "") != "everyone",
                 ) {
                     Box(Modifier.size(cellSize), contentAlignment = Alignment.BottomStart) {
-                        GridPreviewThumbnailFrame(size = cellSize, settings = moment.gridPreviewSettings) { contentScale ->
+                        GridPreviewThumbnailFrame(size = cellSize, settings = moment.gridPreviewSettings) { transform ->
                             val url = moment.previewImageURLString
                             if (!url.isNullOrBlank()) {
                                 AsyncImage(
                                     model = url,
                                     contentDescription = null,
-                                    contentScale = contentScale,
+                                    contentScale = transform.contentScale,
+                                    alignment = transform.alignment,
                                     modifier = Modifier.fillMaxSize(),
                                 )
                             } else {
@@ -590,11 +591,12 @@ private fun SharedProfileMomentsGrid(
         } else {
             snapshotURLs.take(4).forEach { url ->
                 Box(Modifier.size(cellSize)) {
-                    GridPreviewThumbnailFrame(size = cellSize, settings = MomentGridPreviewSettings.DEFAULT) { contentScale ->
+                    GridPreviewThumbnailFrame(size = cellSize, settings = MomentGridPreviewSettings.DEFAULT) { transform ->
                         AsyncImage(
                             model = url,
                             contentDescription = null,
-                            contentScale = contentScale,
+                            contentScale = transform.contentScale,
+                            alignment = transform.alignment,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }

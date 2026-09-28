@@ -716,13 +716,14 @@ private fun FooterActionButton(
 @Composable
 private fun FeedPostProfilePreviewMomentThumb(moment: Moment, size: Dp) {
     Box(contentAlignment = Alignment.BottomStart) {
-        GridPreviewThumbnailFrame(size = size, settings = moment.gridPreviewSettings) { contentScale ->
+        GridPreviewThumbnailFrame(size = size, settings = moment.gridPreviewSettings) { transform ->
             val url = moment.previewImageURLString
             if (!url.isNullOrBlank()) {
                 AsyncImage(
                     model = url,
                     contentDescription = null,
-                    contentScale = contentScale,
+                    contentScale = transform.contentScale,
+                    alignment = transform.alignment,
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {

@@ -23,7 +23,7 @@ suspend fun FirestoreService.searchUsers(query: String, limit: Int = 10): List<A
         @Suppress("UNCHECKED_CAST")
         runCatching { AppUser.from(doc.id, doc.data as Map<String, Any?>) }.getOrNull()
     }
-    return applySearchMuteFilterIfNeeded(users).take(limit.coerceAtLeast(1))
+    return applySearchVisibilityFilter(users).take(limit.coerceAtLeast(1))
 }
 
 /** Port de searchUsers(query:) sin limit — trim + exclude self + limit 30. */
@@ -41,7 +41,7 @@ suspend fun FirestoreService.searchUsersUncapped(query: String): List<AppUser> {
         @Suppress("UNCHECKED_CAST")
         runCatching { AppUser.from(doc.id, doc.data as Map<String, Any?>) }.getOrNull()
     }.filter { it.id != currentUserId }
-    return applySearchMuteFilterIfNeeded(users)
+    return applySearchVisibilityFilter(users)
 }
 
 suspend fun FirestoreService.fetchUsersInBatches(userIds: List<String>): List<AppUser> {
@@ -92,7 +92,10 @@ suspend fun FirestoreService.fetchPublicUsersPage(
         @Suppress("UNCHECKED_CAST")
         runCatching { AppUser.from(doc.id, doc.data as Map<String, Any?>) }.getOrNull()
     }
-    return PublicUsersPage(users = users, lastDocument = snap.documents.lastOrNull())
+    return PublicUsersPage(
+        users = applySearchVisibilityFilter(users),
+        lastDocument = snap.documents.lastOrNull(),
+    )
 }
 
 suspend fun FirestoreService.fetchNewConversationSuggestions(
@@ -117,7 +120,7 @@ suspend fun FirestoreService.fetchNewConversationSuggestions(
     val merged = mergeNewConversationSuggestions(
         orderedRecentIds, recentUsers, mutualUsers, followingUsers, currentUserId, limit,
     )
-    return applySearchMuteFilterIfNeeded(merged)
+    return applySearchVisibilityFilter(merged)
 }
 
 private fun uniquePreservingOrder(values: List<String>): List<String> {
@@ -147,18 +150,32 @@ private fun mergeNewConversationSuggestions(
     return merged.take(limit)
 }
 
-private suspend fun FirestoreService.applySearchMuteFilterIfNeeded(users: List<AppUser>): List<AppUser> {
+/**
+ * Hides accounts that cannot interact with the signed-in user from people
+ * pickers, search results, and suggested contacts.
+ */
+private suspend fun FirestoreService.applySearchVisibilityFilter(users: List<AppUser>): List<AppUser> {
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return users
+    // A candidate profile already carries its own block list, so hide accounts
+    // that blocked the signed-in user before reading the current profile.
+    val candidates = users.filter { it.id != currentUserId && currentUserId !in it.blockedUsers }
     val snap = db.collection("users").document(currentUserId).get().await()
     @Suppress("UNCHECKED_CAST")
-    val muteSettings = snap.data?.get("muteSettings") as? Map<String, Any?> ?: return users
-    val hideFromSearch = muteSettings["hideFromSearch"] as? Boolean ?: false
-    if (!hideFromSearch) return users
-    @Suppress("UNCHECKED_CAST")
-    val mutedUsers = (muteSettings["mutedUsers"] as? List<*>)?.filterIsInstance<String>()
+    val blockedUsers = (snap.data?.get("blockedUsers") as? List<*>)?.filterIsInstance<String>()
         ?.filter { it.isNotEmpty() }
         ?.toSet()
         .orEmpty()
-    if (mutedUsers.isEmpty()) return users
-    return users.filter { it.id !in mutedUsers }
+    @Suppress("UNCHECKED_CAST")
+    val muteSettings = snap.data?.get("muteSettings") as? Map<String, Any?>
+    val hideFromSearch = muteSettings?.get("hideFromSearch") as? Boolean ?: false
+    @Suppress("UNCHECKED_CAST")
+    val mutedUsers = if (hideFromSearch) {
+        (muteSettings.get("mutedUsers") as? List<*>)?.filterIsInstance<String>()
+        ?.filter { it.isNotEmpty() }
+        ?.toSet()
+        .orEmpty()
+    } else {
+        emptySet<String>()
+    }
+    return candidates.filter { it.id !in blockedUsers && it.id !in mutedUsers }
 }

@@ -628,6 +628,7 @@ fun ProfileView(
             largeOnly = true,
         ) {
             ProfileGridPreviewEditorView(
+                moment = moment,
                 imageUrl = imageUrl,
                 feedCrop = moment.primaryVisibleMediaItem?.feedCrop,
                 initialSettings = moment.gridPreviewSettings,

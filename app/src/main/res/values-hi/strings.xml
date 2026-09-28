@@ -916,10 +916,10 @@
     <string name="audience_description_custom">कुछ खास लोगों को चुनें</string>
     <string name="audience_description_custom_list">कस्टम लिस्ट इस्तेमाल करें</string>
     <string name="audience_description_only_me">प्राइवेट कंटेंट, जिसे सिर्फ़ आप देख सकते हैं</string>
-    <string name="audience_selection_title">ऑडियंस</string>
-    <string name="audience_selection_subtitle">यह मोमेंट कौन देख सकता है?</string>
-    <string name="audience_predefined">सुझाए गए</string>
-    <string name="audience_custom_lists">आपकी लिस्ट</string>
+    <string name="audience_selection_title">ऑडियंस चुनें</string>
+    <string name="audience_selection_subtitle">चुनें कि यह कॉन्टेंट कौन देख सकता है</string>
+    <string name="audience_predefined">पहले से तय ऑडियंस</string>
+    <string name="audience_custom_lists">कस्टम सूचियाँ</string>
     <string name="audience_custom_lists_empty">अभी कोई कस्टम लिस्ट नहीं है</string>
     <string name="audience_custom_people_hint">कुछ खास लोगों को चुनें</string>
     <string name="audience_people_count">%1$d लोग</string>
@@ -1108,6 +1108,17 @@
     <string name="hidden_layers_empty_audio_subtitle">एक छोटा ऑडियो रिकॉर्ड करें, जो सिर्फ़ खोजने पर दिखाई देगा।</string>
     <string name="hidden_layers_empty_image_subtitle">पोस्ट के अंदर दूसरी फ़ोटो छिपाने के लिए एक छिपा हुआ पोलरॉइड इस्तेमाल करें।</string>
     <string name="hidden_layers_unlock_title">उपलब्धता</string>
+    <string name="hidden_layers_hint_appearance_title">खोज पर दिखावट</string>
+    <string name="hidden_layers_hint_appearance_a11y">छिपी परत की दिखावट</string>
+    <string name="hidden_layers_hint_style_black_and_white">B&amp;W</string>
+    <string name="hidden_layers_hint_style_actual">गोल्ड</string>
+    <string name="hidden_layers_hint_style_polar">पोलर</string>
+    <string name="hidden_layers_hint_style_ember">एम्बर</string>
+    <string name="hidden_layers_hint_style_ultraviolet">अल्ट्रा</string>
+    <string name="hidden_layers_hint_style_aurora">ऑरोरा</string>
+    <string name="hidden_layers_hint_style_rose">रोज़</string>
+    <string name="hidden_layers_hint_style_plasma">प्लाज़्मा</string>
+    <string name="hidden_layers_hint_style_daylight">स्काई</string>
     <string name="hidden_layers_unlock_now">अभी</string>
     <string name="hidden_layers_unlock_scheduled">शेड्यूल किया गया</string>
     <string name="hidden_layers_unlock_opens">खुलेगा</string>
@@ -2988,4 +2999,12 @@
     <string name="message_requests_delete_all">सभी हटाएं</string>
     <string name="message_requests_delete_all_confirmation_title">सभी अनुरोध हटाएं?</string>
     <string name="message_requests_delete_all_confirmation_message">इस क्रिया को वापस नहीं किया जा सकता।</string>
+    <string name="audience_manage_members">सदस्यों को मैनेज करें</string>
+    <string name="audience_list_updated">सूची अपडेट की गई</string>
+    <string name="audience_list_members_removed_single">आपने %1$s को %2$s सूची से हटा दिया</string>
+    <string name="audience_list_members_removed_plural">आपने %1$s और %2$d अन्य लोगों को %3$s सूची से हटा दिया</string>
+    <string name="audience_manage_members_remove_title">सूची से सदस्य हटाएँ?</string>
+    <string name="audience_manage_members_remove_single">आप %1$s को “%2$s” से हटाने वाले हैं। यह बदलाव तुरंत सेव हो जाएगा।</string>
+    <string name="audience_manage_members_remove_plural">आप %1$s और %2$d अन्य लोगों को “%3$s” से हटाने वाले हैं। यह बदलाव तुरंत सेव हो जाएगा।</string>
+    <string name="stories_reaction_sent">रिएक्शन भेज दिया गया</string>
 </resources>

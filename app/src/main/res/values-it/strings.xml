@@ -979,7 +979,7 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="audience_description_custom">Scegli persone specifiche</string>
     <string name="audience_description_custom_list">Usa una lista personalizzata</string>
     <string name="audience_description_only_me">Contenuto privato, visibile solo a te</string>
-    <string name="audience_predefined">Suggeriti</string>
+    <string name="audience_predefined">Pubblico predefinito</string>
     <string name="audience_custom_people_hint">Scegli persone specifiche</string>
     <string name="creator_location_search">Cerca posizione...</string>
     <string name="creator_location_nearby">Luoghi vicini</string>
@@ -2382,4 +2382,22 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="message_requests_delete_all">Elimina tutte</string>
     <string name="message_requests_delete_all_confirmation_title">Eliminare tutte le richieste?</string>
     <string name="message_requests_delete_all_confirmation_message">Questa azione non può essere annullata.</string>
+    <string name="hidden_layers_hint_appearance_title">Aspetto alla scoperta</string>
+    <string name="hidden_layers_hint_appearance_a11y">Aspetto del layer nascosto</string>
+    <string name="hidden_layers_hint_style_black_and_white">B/N</string>
+    <string name="hidden_layers_hint_style_actual">Oro</string>
+    <string name="hidden_layers_hint_style_polar">Polare</string>
+    <string name="hidden_layers_hint_style_ember">Brace</string>
+    <string name="hidden_layers_hint_style_ultraviolet">Ultra</string>
+    <string name="hidden_layers_hint_style_aurora">Aurora</string>
+    <string name="hidden_layers_hint_style_rose">Rosa</string>
+    <string name="hidden_layers_hint_style_plasma">Plasma</string>
+    <string name="hidden_layers_hint_style_daylight">Cielo</string>
+    <string name="audience_manage_members">Gestisci membri</string>
+    <string name="audience_list_updated">Lista aggiornata</string>
+    <string name="audience_list_members_removed_single">Hai rimosso %1$s dalla lista %2$s</string>
+    <string name="audience_list_members_removed_plural">Hai rimosso %1$s e altre %2$d persone dalla lista %3$s</string>
+    <string name="audience_manage_members_remove_title">Rimuovere membri dalla lista?</string>
+    <string name="audience_manage_members_remove_single">Stai per rimuovere %1$s da “%2$s”. Questa modifica verrà salvata immediatamente.</string>
+    <string name="audience_manage_members_remove_plural">Stai per rimuovere %1$s e altre %2$d persone da “%3$s”. Questa modifica verrà salvata immediatamente.</string>
 </resources>

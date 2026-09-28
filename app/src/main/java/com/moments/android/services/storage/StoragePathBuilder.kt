@@ -6,6 +6,10 @@ import java.util.UUID
 
 sealed class StorageUploadDomain {
     data class ProfileAvatar(val uploadId: String = UUID.randomUUID().toString()) : StorageUploadDomain()
+    data class AudienceListImage(
+        val listId: String,
+        val imageId: String = UUID.randomUUID().toString(),
+    ) : StorageUploadDomain()
     data class NovaConversationImage(
         val conversationId: String,
         val messageId: String,
@@ -56,6 +60,12 @@ object StoragePathBuilder {
                 path = "users/$safeUserId/profile/avatar/${sanitized(domain.uploadId)}.jpg"
                 contentType = "image/jpeg"
                 metadata["type"] = "profile_picture"
+            }
+            is StorageUploadDomain.AudienceListImage -> {
+                path = "users/$safeUserId/audience_lists/${sanitized(domain.listId)}/${sanitized(domain.imageId)}.jpg"
+                contentType = "image/jpeg"
+                metadata["type"] = "audience_list_image"
+                metadata["listId"] = sanitized(domain.listId)
             }
             is StorageUploadDomain.NovaConversationImage -> {
                 path = "users/$safeUserId/nova/${sanitized(domain.conversationId)}/${sanitized(domain.messageId)}/${sanitized(domain.imageId)}.enc"

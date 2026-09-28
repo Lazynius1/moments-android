@@ -916,10 +916,10 @@ Anda dapat mengubah izin ini di pengaturan perangkat. Jika izin dinonaktifkan, b
     <string name="audience_description_custom">Pilih orang tertentu</string>
     <string name="audience_description_custom_list">Gunakan daftar kustom</string>
     <string name="audience_description_only_me">Konten pribadi, hanya Anda yang dapat melihatnya</string>
-    <string name="audience_selection_title">Audiens</string>
-    <string name="audience_selection_subtitle">Siapa yang dapat melihat momen ini?</string>
-    <string name="audience_predefined">Disarankan</string>
-    <string name="audience_custom_lists">Daftar Anda</string>
+    <string name="audience_selection_title">Pilih audiens</string>
+    <string name="audience_selection_subtitle">Pilih siapa yang dapat melihat konten ini</string>
+    <string name="audience_predefined">Audiens bawaan</string>
+    <string name="audience_custom_lists">Daftar khusus</string>
     <string name="audience_custom_lists_empty">Belum ada daftar kustom</string>
     <string name="audience_custom_people_hint">Pilih orang tertentu</string>
     <string name="audience_people_count">%1$d orang</string>
@@ -1108,6 +1108,17 @@ Anda dapat mengubah izin ini di pengaturan perangkat. Jika izin dinonaktifkan, b
     <string name="hidden_layers_empty_audio_subtitle">Rekam audio singkat yang hanya muncul saat ditemukan.</string>
     <string name="hidden_layers_empty_image_subtitle">Gunakan polaroid tersembunyi untuk menyisipkan foto lain ke dalam postingan.</string>
     <string name="hidden_layers_unlock_title">Ketersediaan</string>
+    <string name="hidden_layers_hint_appearance_title">Tampilan saat ditemukan</string>
+    <string name="hidden_layers_hint_appearance_a11y">Tampilan lapisan tersembunyi</string>
+    <string name="hidden_layers_hint_style_black_and_white">H&amp;P</string>
+    <string name="hidden_layers_hint_style_actual">Emas</string>
+    <string name="hidden_layers_hint_style_polar">Polar</string>
+    <string name="hidden_layers_hint_style_ember">Bara</string>
+    <string name="hidden_layers_hint_style_ultraviolet">Ultra</string>
+    <string name="hidden_layers_hint_style_aurora">Aurora</string>
+    <string name="hidden_layers_hint_style_rose">Mawar</string>
+    <string name="hidden_layers_hint_style_plasma">Plasma</string>
+    <string name="hidden_layers_hint_style_daylight">Langit</string>
     <string name="hidden_layers_unlock_now">Sekarang</string>
     <string name="hidden_layers_unlock_scheduled">Terjadwal</string>
     <string name="hidden_layers_unlock_opens">Terbuka</string>
@@ -2988,4 +2999,12 @@ Anda dapat mengubah izin ini di pengaturan perangkat. Jika izin dinonaktifkan, b
     <string name="message_requests_delete_all">Hapus semua</string>
     <string name="message_requests_delete_all_confirmation_title">Hapus semua permintaan?</string>
     <string name="message_requests_delete_all_confirmation_message">Tindakan ini tidak dapat dibatalkan.</string>
+    <string name="audience_manage_members">Kelola anggota</string>
+    <string name="audience_list_updated">Daftar diperbarui</string>
+    <string name="audience_list_members_removed_single">Anda menghapus %1$s dari daftar %2$s</string>
+    <string name="audience_list_members_removed_plural">Anda menghapus %1$s dan %2$d orang lainnya dari daftar %3$s</string>
+    <string name="audience_manage_members_remove_title">Hapus anggota dari daftar?</string>
+    <string name="audience_manage_members_remove_single">Anda akan menghapus %1$s dari “%2$s”. Perubahan ini akan langsung disimpan.</string>
+    <string name="audience_manage_members_remove_plural">Anda akan menghapus %1$s dan %2$d orang lainnya dari “%3$s”. Perubahan ini akan langsung disimpan.</string>
+    <string name="stories_reaction_sent">Reaksi terkirim</string>
 </resources>

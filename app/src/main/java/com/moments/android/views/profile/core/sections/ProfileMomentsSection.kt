@@ -62,8 +62,10 @@ import com.moments.android.R
 import com.moments.android.models.Moment
 import com.moments.android.services.cache.VideoThumbnailCache
 import com.moments.android.views.components.ActivityGridAudienceIcon
+import com.moments.android.views.components.hiddenlayers.HiddenLayersStaticPreviewSurface
 import com.moments.android.views.creator.audienceselector.ContentAudience
 import com.moments.android.views.messaging.components.ChatVideoPlayBadge
+import com.moments.android.views.profile.core.GridPreviewMediaTransform
 import com.moments.android.views.profile.core.GridPreviewThumbnailFrame
 import com.moments.android.views.profile.core.gridPreviewSettings
 import kotlin.math.max
@@ -292,21 +294,51 @@ private fun ProfileThumbnailImage(
     portrait: Boolean,
     feedCrop: com.moments.android.models.MediaItemFeedCrop? = null,
 ) {
-    val image: @Composable (ContentScale) -> Unit = { contentScale ->
-        AsyncImage(
-            model = coil.request.ImageRequest.Builder(LocalContext.current)
-                .data(profileThumbnailUrl(url))
-                .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(feedCrop))
-                .build(),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = contentScale,
-        )
+    val mediaAndLayers: @Composable (GridPreviewMediaTransform, Boolean) -> Unit = { transform, appliesGridTransform ->
+        Box(Modifier.fillMaxSize()) {
+            AsyncImage(
+                model = coil.request.ImageRequest.Builder(LocalContext.current)
+                    .data(profileThumbnailUrl(url))
+                    .transformations(com.moments.android.views.creator.creatoruikit.feedCropTransformations(feedCrop))
+                    .build(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = transform.contentScale,
+                alignment = transform.alignment,
+            )
+            if (moment.hasHiddenLayers) {
+                HiddenLayersStaticPreviewSurface(
+                    moment = moment,
+                    settings = moment.gridPreviewSettings,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (appliesGridTransform) {
+                                Modifier.graphicsLayer {
+                                    scaleX = moment.gridPreviewSettings.scale.toFloat()
+                                    scaleY = moment.gridPreviewSettings.scale.toFloat()
+                                    translationX = moment.gridPreviewSettings.offsetX.toFloat() * cellWidth.toPx()
+                                    translationY = moment.gridPreviewSettings.offsetY.toFloat() * cellWidth.toPx()
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ),
+                )
+            }
+        }
     }
     if (portrait) {
-        Box(Modifier.size(cellWidth, cellHeight)) { image(ContentScale.Crop) }
+        Box(Modifier.size(cellWidth, cellHeight)) {
+            mediaAndLayers(
+                GridPreviewMediaTransform(ContentScale.Crop, Alignment.Center),
+                false,
+            )
+        }
     } else {
-        GridPreviewThumbnailFrame(cellWidth, cellHeight, moment.gridPreviewSettings, image)
+        GridPreviewThumbnailFrame(cellWidth, cellHeight, moment.gridPreviewSettings) { transform ->
+            mediaAndLayers(transform, true)
+        }
     }
 }
 
@@ -331,19 +363,58 @@ private fun ProfileThumbnailVideo(
         thumbnail = VideoThumbnailCache.thumbnail(resolvedUrl)
         loading = false
     }
-    val content: @Composable (ContentScale) -> Unit = { contentScale ->
-        thumbnail?.let { bmp ->
-            val cropped = remember(bmp, feedCrop) {
-                if (feedCrop == null || feedCrop.isFullBounds) bmp
-                else com.moments.android.views.creator.creatoruikit.MomentFeedCrop.cropBitmap(bmp, feedCrop)
+    val mediaAndLayers: @Composable (GridPreviewMediaTransform, Boolean) -> Unit = { transform, appliesGridTransform ->
+        Box(Modifier.fillMaxSize()) {
+            thumbnail?.let { bmp ->
+                val cropped = remember(bmp, feedCrop) {
+                    if (feedCrop == null || feedCrop.isFullBounds) bmp
+                    else com.moments.android.views.creator.creatoruikit.MomentFeedCrop.cropBitmap(bmp, feedCrop)
+                }
+                androidx.compose.foundation.Image(
+                    cropped.asImageBitmap(),
+                    null,
+                    Modifier.fillMaxSize(),
+                    contentScale = transform.contentScale,
+                    alignment = transform.alignment,
+                )
+            } ?: ProfileMediaPlaceholder(
+                loading,
+                R.string.profile_thumbnail_video_uploading,
+                R.string.profile_thumbnail_video,
+            )
+            if (moment.hasHiddenLayers) {
+                HiddenLayersStaticPreviewSurface(
+                    moment = moment,
+                    settings = moment.gridPreviewSettings,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (appliesGridTransform) {
+                                Modifier.graphicsLayer {
+                                    scaleX = moment.gridPreviewSettings.scale.toFloat()
+                                    scaleY = moment.gridPreviewSettings.scale.toFloat()
+                                    translationX = moment.gridPreviewSettings.offsetX.toFloat() * cellWidth.toPx()
+                                    translationY = moment.gridPreviewSettings.offsetY.toFloat() * cellWidth.toPx()
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ),
+                )
             }
-            androidx.compose.foundation.Image(cropped.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = contentScale)
-        } ?: ProfileMediaPlaceholder(loading, R.string.profile_thumbnail_video_uploading, R.string.profile_thumbnail_video)
+        }
     }
     if (portrait) {
-        Box(Modifier.size(cellWidth, cellHeight)) { content(ContentScale.Crop) }
+        Box(Modifier.size(cellWidth, cellHeight)) {
+            mediaAndLayers(
+                GridPreviewMediaTransform(ContentScale.Crop, Alignment.Center),
+                false,
+            )
+        }
     } else {
-        GridPreviewThumbnailFrame(cellWidth, cellHeight, moment.gridPreviewSettings, content)
+        GridPreviewThumbnailFrame(cellWidth, cellHeight, moment.gridPreviewSettings) { transform ->
+            mediaAndLayers(transform, true)
+        }
     }
 }
 

@@ -916,10 +916,10 @@
     <string name="audience_description_custom">選擇特定的人</string>
     <string name="audience_description_custom_list">使用自訂名單</string>
     <string name="audience_description_only_me">私人內容，只有你能查看</string>
-    <string name="audience_selection_title">受眾</string>
-    <string name="audience_selection_subtitle">誰可以查看這則動態？</string>
-    <string name="audience_predefined">建議</string>
-    <string name="audience_custom_lists">你的名單</string>
+    <string name="audience_selection_title">選擇受眾</string>
+    <string name="audience_selection_subtitle">選擇可以查看這項內容的人</string>
+    <string name="audience_predefined">預設受眾</string>
+    <string name="audience_custom_lists">自訂清單</string>
     <string name="audience_custom_lists_empty">目前沒有自訂名單</string>
     <string name="audience_custom_people_hint">選擇特定的人</string>
     <string name="audience_people_count">%1$d 人</string>
@@ -1108,6 +1108,17 @@
     <string name="hidden_layers_empty_audio_subtitle">錄製一段只有被發現時才會出現的短音訊。</string>
     <string name="hidden_layers_empty_image_subtitle">使用隱藏的拍立得，在貼文中藏入另一張照片。</string>
     <string name="hidden_layers_unlock_title">可用時間</string>
+    <string name="hidden_layers_hint_appearance_title">發現時外觀</string>
+    <string name="hidden_layers_hint_appearance_a11y">隱藏圖層外觀</string>
+    <string name="hidden_layers_hint_style_black_and_white">黑白</string>
+    <string name="hidden_layers_hint_style_actual">金</string>
+    <string name="hidden_layers_hint_style_polar">極地</string>
+    <string name="hidden_layers_hint_style_ember">餘燼</string>
+    <string name="hidden_layers_hint_style_ultraviolet">紫外</string>
+    <string name="hidden_layers_hint_style_aurora">極光</string>
+    <string name="hidden_layers_hint_style_rose">玫瑰</string>
+    <string name="hidden_layers_hint_style_plasma">電漿</string>
+    <string name="hidden_layers_hint_style_daylight">天空</string>
     <string name="hidden_layers_unlock_now">現在</string>
     <string name="hidden_layers_unlock_scheduled">已排程</string>
     <string name="hidden_layers_unlock_opens">開啟時間</string>
@@ -2988,4 +2999,12 @@
     <string name="message_requests_delete_all">全部刪除</string>
     <string name="message_requests_delete_all_confirmation_title">要刪除所有要求嗎？</string>
     <string name="message_requests_delete_all_confirmation_message">此動作無法復原。</string>
+    <string name="audience_manage_members">管理成員</string>
+    <string name="audience_list_updated">名單已更新</string>
+    <string name="audience_list_members_removed_single">你已將 %1$s 從名單「%2$s」移除</string>
+    <string name="audience_list_members_removed_plural">你已將 %1$s 和另外 %2$d 人從名單「%3$s」移除</string>
+    <string name="audience_manage_members_remove_title">要從名單移除成員嗎？</string>
+    <string name="audience_manage_members_remove_single">你即將把 %1$s 從「%2$s」移除。這項變更會立即儲存。</string>
+    <string name="audience_manage_members_remove_plural">你即將把 %1$s 和另外 %2$d 人從「%3$s」移除。這項變更會立即儲存。</string>
+    <string name="stories_reaction_sent">已傳送反應</string>
 </resources>

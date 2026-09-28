@@ -611,14 +611,23 @@ class StoryViewModel(
         }
     }
 
-    fun sendReaction(toUserId: String, storyId: String, reaction: String) {
-        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+    fun sendReaction(
+        toUserId: String,
+        storyId: String,
+        reaction: String,
+        completion: (Result<Unit>) -> Unit = {},
+    ) {
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: run {
+            completion(Result.failure(IllegalStateException("Unauthenticated")))
+            return
+        }
         viewModelScope.launch {
-            runCatching {
+            val result = runCatching {
                 storyRepository.addReaction(toUserId, storyId, currentUserId, reaction)
                 fetchReactions(toUserId, storyId)
                 AffinityTracker.trackInteraction(AffinityInteractionType.STORY_REACTION, toUserId)
             }
+            completion(result)
         }
     }
 

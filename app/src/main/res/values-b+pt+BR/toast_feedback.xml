@@ -1,0 +1,10 @@
+<resources>
+    <string name="toast_action_profile_updated">Perfil atualizado</string>
+    <string name="toast_action_profile_photo_updated">Foto do perfil atualizada</string>
+    <string name="toast_action_profile_photo_removed">Foto do perfil removida</string>
+    <string name="toast_action_highlight_created">Destaque criado</string>
+    <string name="toast_action_highlight_updated">Destaque atualizado</string>
+    <string name="toast_action_highlight_deleted">Destaque excluído</string>
+    <string name="toast_action_best_friends_left_prefix">Você saiu dos melhores amigos de </string>
+    <string name="toast_action_best_friends_left_suffix"></string>
+</resources>

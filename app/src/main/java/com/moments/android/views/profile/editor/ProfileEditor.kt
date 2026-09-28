@@ -83,6 +83,8 @@ import com.moments.android.services.firestore.removeProfilePicture
 import com.moments.android.services.firestore.updateProfilePicture
 import com.moments.android.services.storage.StorageService
 import com.moments.android.services.storage.ModerationError
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.views.creator.creatoruikit.CameraCapture
 import com.moments.android.views.creator.creatoruikit.CameraCaptureMediaType
 import com.moments.android.views.permissions.CameraAccessBoundary
@@ -125,7 +127,10 @@ fun GridPhotoPickerView(
     ProfileLibraryCropEntryView(
         onImageCropped = { bitmap ->
             scope.launch {
-                uploadProfileImage(bitmap)?.let(onImageUploaded)
+                uploadProfileImage(bitmap)?.let {
+                    onImageUploaded(it)
+                    InAppNotificationService.showActionToast(InAppActionToast.profilePhotoUpdated())
+                }
                 onDismiss()
             }
         },
@@ -235,6 +240,7 @@ fun ModernEditProfileView(
                 currentProfileImage = bitmap
                 pendingProfileImage = null
                 isProfileImageUploading = false
+                InAppNotificationService.showActionToast(InAppActionToast.profilePhotoUpdated())
             }.onFailure { error ->
                 pendingProfileImage = null
                 isProfileImageUploading = false
@@ -263,6 +269,7 @@ fun ModernEditProfileView(
                 currentProfileImage = null
                 profileImagePath = null
                 isLoading = false
+                InAppNotificationService.showActionToast(InAppActionToast.profilePhotoRemoved())
             }.onFailure {
                 isLoading = false
                 errorMessage = context.getString(
@@ -283,6 +290,7 @@ fun ModernEditProfileView(
         scope.launch {
             delay(100)
             isLoading = false
+            InAppNotificationService.showActionToast(InAppActionToast.profileUpdated())
             onDismiss()
         }
     }

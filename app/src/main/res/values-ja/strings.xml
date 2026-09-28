@@ -916,10 +916,10 @@
     <string name="audience_description_custom">特定の人を選択します</string>
     <string name="audience_description_custom_list">カスタムリストを使用します</string>
     <string name="audience_description_only_me">非公開コンテンツです。自分だけが見られます</string>
-    <string name="audience_selection_title">公開範囲</string>
-    <string name="audience_selection_subtitle">このMomentを見られる人</string>
-    <string name="audience_predefined">おすすめ</string>
-    <string name="audience_custom_lists">あなたのリスト</string>
+    <string name="audience_selection_title">公開範囲を選択</string>
+    <string name="audience_selection_subtitle">このコンテンツを見られる人を選択</string>
+    <string name="audience_predefined">既定の公開範囲</string>
+    <string name="audience_custom_lists">カスタムリスト</string>
     <string name="audience_custom_lists_empty">カスタムリストはまだありません</string>
     <string name="audience_custom_people_hint">特定の人を選択します</string>
     <string name="audience_people_count">%1$d人</string>
@@ -1108,6 +1108,17 @@
     <string name="hidden_layers_empty_audio_subtitle">見つけたときだけ再生される短い音声を録音できます。</string>
     <string name="hidden_layers_empty_image_subtitle">隠しポラロイドを使って、投稿の中に別の写真を隠せます。</string>
     <string name="hidden_layers_unlock_title">公開タイミング</string>
+    <string name="hidden_layers_hint_appearance_title">発見時の見た目</string>
+    <string name="hidden_layers_hint_appearance_a11y">隠しレイヤーの見た目</string>
+    <string name="hidden_layers_hint_style_black_and_white">白黒</string>
+    <string name="hidden_layers_hint_style_actual">ゴールド</string>
+    <string name="hidden_layers_hint_style_polar">ポーラー</string>
+    <string name="hidden_layers_hint_style_ember">エンバー</string>
+    <string name="hidden_layers_hint_style_ultraviolet">ウルトラ</string>
+    <string name="hidden_layers_hint_style_aurora">オーロラ</string>
+    <string name="hidden_layers_hint_style_rose">ローズ</string>
+    <string name="hidden_layers_hint_style_plasma">プラズマ</string>
+    <string name="hidden_layers_hint_style_daylight">スカイ</string>
     <string name="hidden_layers_unlock_now">今すぐ</string>
     <string name="hidden_layers_unlock_scheduled">予約済み</string>
     <string name="hidden_layers_unlock_opens">公開</string>
@@ -2988,4 +2999,12 @@
     <string name="message_requests_delete_all">すべて削除</string>
     <string name="message_requests_delete_all_confirmation_title">すべてのリクエストを削除しますか？</string>
     <string name="message_requests_delete_all_confirmation_message">この操作は元に戻せません。</string>
+    <string name="audience_manage_members">メンバーを管理</string>
+    <string name="audience_list_updated">リストを更新しました</string>
+    <string name="audience_list_members_removed_single">%1$sをリスト「%2$s」から削除しました</string>
+    <string name="audience_list_members_removed_plural">%1$sと他%2$d人をリスト「%3$s」から削除しました</string>
+    <string name="audience_manage_members_remove_title">リストからメンバーを削除しますか？</string>
+    <string name="audience_manage_members_remove_single">%1$sを「%2$s」から削除します。この変更はすぐに保存されます。</string>
+    <string name="audience_manage_members_remove_plural">%1$sと他%2$d人を「%3$s」から削除します。この変更はすぐに保存されます。</string>
+    <string name="stories_reaction_sent">リアクションを送信しました</string>
 </resources>

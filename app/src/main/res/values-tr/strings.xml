@@ -916,10 +916,10 @@ Bu izinleri cihazının ayarlarından değiştirebilirsin. İzinleri kapatırsan
     <string name="audience_description_custom">Belirli kişileri seç</string>
     <string name="audience_description_custom_list">Özel bir liste kullan</string>
     <string name="audience_description_only_me">Gizli içerik; yalnızca sen görebilirsin</string>
-    <string name="audience_selection_title">Hedef kitle</string>
-    <string name="audience_selection_subtitle">Bu momenti kimler görebilir?</string>
-    <string name="audience_predefined">Önerilenler</string>
-    <string name="audience_custom_lists">Listelerin</string>
+    <string name="audience_selection_title">Hedef kitleyi seç</string>
+    <string name="audience_selection_subtitle">Bu içeriği kimlerin görebileceğini seç</string>
+    <string name="audience_predefined">Hazır hedef kitle</string>
+    <string name="audience_custom_lists">Özel listeler</string>
     <string name="audience_custom_lists_empty">Henüz özel listen yok</string>
     <string name="audience_custom_people_hint">Belirli kişileri seç</string>
     <string name="audience_people_count">%1$d kişi</string>
@@ -1108,6 +1108,17 @@ Bu izinleri cihazının ayarlarından değiştirebilirsin. İzinleri kapatırsan
     <string name="hidden_layers_empty_audio_subtitle">Yalnızca keşfedildiğinde ortaya çıkacak kısa bir ses kaydet.</string>
     <string name="hidden_layers_empty_image_subtitle">Gönderinin içine başka bir fotoğraf gizlemek için gizli bir polaroid kullan.</string>
     <string name="hidden_layers_unlock_title">Kullanılabilirlik</string>
+    <string name="hidden_layers_hint_appearance_title">Keşfederken görünüm</string>
+    <string name="hidden_layers_hint_appearance_a11y">Gizli katman görünümü</string>
+    <string name="hidden_layers_hint_style_black_and_white">S/B</string>
+    <string name="hidden_layers_hint_style_actual">Altın</string>
+    <string name="hidden_layers_hint_style_polar">Polar</string>
+    <string name="hidden_layers_hint_style_ember">Kor</string>
+    <string name="hidden_layers_hint_style_ultraviolet">Ultra</string>
+    <string name="hidden_layers_hint_style_aurora">Aurora</string>
+    <string name="hidden_layers_hint_style_rose">Gül</string>
+    <string name="hidden_layers_hint_style_plasma">Plazma</string>
+    <string name="hidden_layers_hint_style_daylight">Gökyüzü</string>
     <string name="hidden_layers_unlock_now">Şimdi</string>
     <string name="hidden_layers_unlock_scheduled">Planlandı</string>
     <string name="hidden_layers_unlock_opens">Açılış zamanı</string>
@@ -2988,4 +2999,12 @@ Bu izinleri cihazının ayarlarından değiştirebilirsin. İzinleri kapatırsan
     <string name="message_requests_delete_all">Tümünü sil</string>
     <string name="message_requests_delete_all_confirmation_title">Tüm istekler silinsin mi?</string>
     <string name="message_requests_delete_all_confirmation_message">Bu işlem geri alınamaz.</string>
+    <string name="audience_manage_members">Üyeleri yönet</string>
+    <string name="audience_list_updated">Liste güncellendi</string>
+    <string name="audience_list_members_removed_single">%1$s, %2$s listesinden çıkarıldı</string>
+    <string name="audience_list_members_removed_plural">%1$s ve %2$d kişi daha %3$s listesinden çıkarıldı</string>
+    <string name="audience_manage_members_remove_title">Üyeler listeden çıkarılsın mı?</string>
+    <string name="audience_manage_members_remove_single">%1$s, “%2$s” listesinden çıkarılacak. Bu değişiklik hemen kaydedilecek.</string>
+    <string name="audience_manage_members_remove_plural">%1$s ve %2$d kişi daha “%3$s” listesinden çıkarılacak. Bu değişiklik hemen kaydedilecek.</string>
+    <string name="stories_reaction_sent">Tepki gönderildi</string>
 </resources>

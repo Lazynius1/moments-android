@@ -141,6 +141,7 @@ data class CustomAudienceList(
     val updatedAt: Date = Date(),
     val color: String? = null,
     val icon: String? = null,
+    val imagePath: String? = null,
 ) {
     override fun equals(other: Any?): Boolean = other is CustomAudienceList && id == other.id
 
@@ -154,16 +155,21 @@ data class CustomAudienceList(
         "updatedAt" to Timestamp(updatedAt),
         "color" to color,
         "icon" to icon,
+        "imagePath" to imagePath,
     )
 
     companion object {
         val predefinedColors = listOf(
             "FF6B6B", "4ECDC4", "45B7D1", "FFA07A",
             "98D8C8", "F7DC6F", "BB8FCE", "85C1E2",
+            "FF9F1C", "2EC4B6", "3A86FF", "8338EC",
+            "FF006E", "06D6A0", "118AB2", "6C757D",
         )
         val predefinedIcons = listOf(
             "person.3.fill", "briefcase.fill", "house.fill", "graduationcap.fill",
             "heart.fill", "star.fill", "flag.fill", "bolt.fill",
+            "person.2.fill", "building.2.fill", "book.fill", "gamecontroller.fill",
+            "music.note", "airplane", "fork.knife", "camera.fill",
         )
 
         fun from(id: String?, data: Map<String, Any?>): CustomAudienceList? {
@@ -177,6 +183,7 @@ data class CustomAudienceList(
                 updatedAt = MediaItem.anyToDate(data["updatedAt"]) ?: Date(),
                 color = data["color"] as? String,
                 icon = data["icon"] as? String,
+                imagePath = data["imagePath"] as? String,
             )
         }
     }

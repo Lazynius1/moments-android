@@ -15,19 +15,28 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Flag
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Flight
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.Icon
@@ -36,15 +45,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.fromHex
 import com.moments.android.extensions.momentsChromeGlass
@@ -70,7 +84,56 @@ internal fun listIconVector(icon: String?): ImageVector = when (icon) {
     "star.fill" -> Icons.Filled.Star
     "flag.fill" -> Icons.Filled.Flag
     "bolt.fill" -> Icons.Filled.Bolt
+    "person.2.fill" -> Icons.Filled.Groups
+    "building.2.fill" -> Icons.Filled.Business
+    "book.fill" -> Icons.Filled.MenuBook
+    "gamecontroller.fill" -> Icons.Filled.SportsEsports
+    "music.note" -> Icons.Filled.MusicNote
+    "airplane" -> Icons.Filled.Flight
+    "fork.knife" -> Icons.Filled.Restaurant
+    "camera.fill" -> Icons.Filled.CameraAlt
     else -> Icons.Filled.Group // person.3.fill / null
+}
+
+@Composable
+internal fun CustomAudienceListIcon(
+    icon: String?,
+    imagePath: String?,
+    tint: Color,
+    emojiFontSize: androidx.compose.ui.unit.TextUnit = 20.sp,
+    modifier: Modifier = Modifier,
+) {
+    when {
+        !imagePath.isNullOrBlank() -> AsyncImage(
+            model = imagePath,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier.clip(CircleShape),
+        )
+        icon != null && icon !in CustomAudienceList.predefinedIcons -> Box(
+            modifier = modifier,
+            contentAlignment = Alignment.Center,
+        ) {
+            // El glifo emoji desborda el em-box: caja = tamaño pedido + Text
+            // unbounded para que no se recorte dentro del círculo interior del hero.
+            Text(
+                text = icon,
+                fontSize = emojiFontSize,
+                lineHeight = emojiFontSize,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Visible,
+                modifier = Modifier.wrapContentSize(unbounded = true),
+            )
+        }
+        else -> Icon(
+            imageVector = listIconVector(icon),
+            contentDescription = null,
+            tint = tint,
+            modifier = modifier,
+        )
+    }
 }
 
 @Composable
@@ -137,11 +200,12 @@ fun CustomListRow(
                 .background(tint.copy(alpha = if (isSelected) 0.2f else 0.1f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                listIconVector(list.icon),
-                contentDescription = null,
+            CustomAudienceListIcon(
+                icon = list.icon,
+                imagePath = list.imagePath,
                 tint = tint.copy(alpha = if (isSelected) 1f else 0.8f),
-                modifier = Modifier.size(20.dp),
+                emojiFontSize = 20.sp,
+                modifier = Modifier.size(if (list.imagePath == null) 20.dp else 48.dp),
             )
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -289,7 +353,13 @@ fun CustomListCard(
                     .background(tint.copy(alpha = if (isSelected) 0.2f else 0.1f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(listIconVector(list.icon), null, tint = tint, modifier = Modifier.size(20.dp))
+                CustomAudienceListIcon(
+                    icon = list.icon,
+                    imagePath = list.imagePath,
+                    tint = tint,
+                    emojiFontSize = 20.sp,
+                    modifier = Modifier.size(if (list.imagePath == null) 20.dp else 56.dp),
+                )
             }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -375,11 +445,12 @@ fun CustomListRowModern(
                 .background(tint.copy(alpha = if (isSelected) 0.15f else 0.1f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                listIconVector(list.icon),
-                null,
+            CustomAudienceListIcon(
+                icon = list.icon,
+                imagePath = list.imagePath,
                 tint = tint.copy(alpha = if (isSelected) 1f else 0.8f),
-                modifier = Modifier.size(20.dp),
+                emojiFontSize = 20.sp,
+                modifier = Modifier.size(if (list.imagePath == null) 20.dp else 48.dp),
             )
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

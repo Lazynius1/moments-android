@@ -776,6 +776,11 @@ private fun JSONObject.toMoment(): Moment {
         scheduledDate = optLongOrNull("scheduledDate")?.let { Date(it) },
         isPinned = if (has("isPinned") && !isNull("isPinned") && optBoolean("isPinned")) true else null,
         pinnedAt = optLongOrNull("pinnedAt")?.let { Date(it) },
+        gridPreviewScale = optDoubleOrNull("gridPreviewScale"),
+        gridPreviewOffsetX = optDoubleOrNull("gridPreviewOffsetX"),
+        gridPreviewOffsetY = optDoubleOrNull("gridPreviewOffsetY"),
+        gridPreviewFitMode = stringOrNull("gridPreviewFitMode"),
+        gridPreviewBackground = stringOrNull("gridPreviewBackground"),
         hasHiddenLayers = optBoolean("hasHiddenLayers"),
         hiddenLayerCount = optInt("hiddenLayerCount"),
     )

@@ -108,6 +108,7 @@ import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
+import com.moments.android.views.settings.SettingsProfileColors
 import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -828,7 +829,9 @@ private fun MinimalToggleRow(
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = Color(0xFFE91E63),
+                // ≡ iOS `.tint(.green)` / systemGreen
+                checkedTrackColor = SettingsProfileColors.toggleTint,
+                checkedBorderColor = Color.Transparent,
             ),
         )
     }

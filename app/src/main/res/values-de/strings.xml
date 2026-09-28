@@ -1011,7 +1011,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="audience_description_custom">Bestimmte Personen auswählen</string>
     <string name="audience_description_custom_list">Eine individuelle Liste verwenden</string>
     <string name="audience_description_only_me">Privater Inhalt, nur du kannst ihn sehen</string>
-    <string name="audience_predefined">Vorschläge</string>
+    <string name="audience_predefined">Vordefinierte Zielgruppe</string>
     <string name="audience_custom_people_hint">Bestimmte Personen auswählen</string>
     <string name="creator_location_search">Ort suchen...</string>
     <string name="creator_location_nearby">Orte in der Nähe</string>
@@ -2399,4 +2399,22 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="message_requests_delete_all">Alle löschen</string>
     <string name="message_requests_delete_all_confirmation_title">Alle Anfragen löschen?</string>
     <string name="message_requests_delete_all_confirmation_message">Diese Aktion kann nicht rückgängig gemacht werden.</string>
+    <string name="hidden_layers_hint_appearance_title">Erscheinung beim Entdecken</string>
+    <string name="hidden_layers_hint_appearance_a11y">Erscheinung der versteckten Ebene</string>
+    <string name="hidden_layers_hint_style_black_and_white">S/W</string>
+    <string name="hidden_layers_hint_style_actual">Gold</string>
+    <string name="hidden_layers_hint_style_polar">Polar</string>
+    <string name="hidden_layers_hint_style_ember">Glut</string>
+    <string name="hidden_layers_hint_style_ultraviolet">Ultra</string>
+    <string name="hidden_layers_hint_style_aurora">Aurora</string>
+    <string name="hidden_layers_hint_style_rose">Rose</string>
+    <string name="hidden_layers_hint_style_plasma">Plasma</string>
+    <string name="hidden_layers_hint_style_daylight">Himmel</string>
+    <string name="audience_manage_members">Mitglieder verwalten</string>
+    <string name="audience_list_updated">Liste aktualisiert</string>
+    <string name="audience_list_members_removed_single">%1$s wurde aus der Liste %2$s entfernt</string>
+    <string name="audience_list_members_removed_plural">%1$s und %2$d weitere Personen wurden aus der Liste %3$s entfernt</string>
+    <string name="audience_manage_members_remove_title">Mitglieder aus der Liste entfernen?</string>
+    <string name="audience_manage_members_remove_single">%1$s wird aus „%2$s“ entfernt. Diese Änderung wird sofort gespeichert.</string>
+    <string name="audience_manage_members_remove_plural">%1$s und %2$d weitere Personen werden aus „%3$s“ entfernt. Diese Änderung wird sofort gespeichert.</string>
 </resources>

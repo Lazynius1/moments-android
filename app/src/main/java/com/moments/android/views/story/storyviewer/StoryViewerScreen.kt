@@ -110,6 +110,8 @@ import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.MediaItem
 import com.moments.android.models.StickerData
 import com.moments.android.models.Story
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.persistence.StorySeenStateService
 import com.moments.android.services.social.BestFriendsService
@@ -506,6 +508,17 @@ fun StoryViewerScreen(
         showFeedback(text, isError = false, isProgress = true)
     }
 
+    fun clearFeedback() {
+        successHideJob?.cancel()
+        successHideJob = null
+        successMessageText = null
+        successMessageIsProgress = false
+    }
+
+    fun showDeliveryBanner(message: String) {
+        InAppNotificationService.showActionToast(InAppActionToast.create(prefix = message))
+    }
+
     fun markStoryAsViewedIfNeeded() {
         // ≡ iOS: no excluye own story en el guard del viewer
         if (!isDeckPageActive) return
@@ -528,7 +541,6 @@ fun StoryViewerScreen(
         showQuickActions = false
         // ≡ deleteStory() iOS: success → toast → 1.8s → onStoryDeleted ?? onNext
         fun onDeletedOk() {
-            showSuccess(context.getString(R.string.story_context_menu_delete_success))
             scope.launch {
                 delay(1_800)
                 if (onStoryDeleted != null) onStoryDeleted.invoke() else onNextState.value()
@@ -557,7 +569,6 @@ fun StoryViewerScreen(
             runCatching { firestore.unfollowUser(uid, story.authorId) }
                 .onSuccess {
                     onUnfollowAuthor()
-                    showSuccess(context.getString(R.string.story_context_menu_unfollow_success))
                 }
                 .onFailure {
                     showSuccess(context.getString(R.string.story_context_menu_action_failed))
@@ -576,7 +587,7 @@ fun StoryViewerScreen(
                     .update("muteSettings.mutedUsers", FieldValue.arrayUnion(story.authorId)).await()
             }.onSuccess {
                 onMuteAuthor()
-                showSuccess(context.getString(R.string.story_context_menu_mute_success_with_hint))
+                InAppNotificationService.showActionToast(InAppActionToast.muted(story.username))
             }.onFailure {
                 showSuccess(context.getString(R.string.story_context_menu_action_failed))
             }
@@ -593,7 +604,7 @@ fun StoryViewerScreen(
                     val uid = FirebaseAuth.getInstance().currentUser?.uid
                     if (uid != null) StorySeenStateService.invalidate(uid, story.authorId)
                     onLeaveBestFriends()
-                    showSuccess(context.getString(R.string.best_friends_opt_out_success))
+                    InAppNotificationService.showActionToast(InAppActionToast.leftBestFriends(story.username))
                     delay(2_000)
                     onNextState.value()
                 }
@@ -625,7 +636,8 @@ fun StoryViewerScreen(
         storyViewModel?.sendMessage(story.authorId, storyId, text) { result ->
             result.onSuccess {
                 onSendMessage(text)
-                showSuccess(context.getString(R.string.stories_message_sent))
+                clearFeedback()
+                showDeliveryBanner(context.getString(R.string.stories_message_sent))
             }.onFailure { error ->
                 messageText = text
                 showFeedback(
@@ -635,7 +647,8 @@ fun StoryViewerScreen(
             }
         } ?: run {
             onSendMessage(text)
-            showSuccess(context.getString(R.string.stories_message_sent))
+            clearFeedback()
+            showDeliveryBanner(context.getString(R.string.stories_message_sent))
         }
     }
 
@@ -649,8 +662,22 @@ fun StoryViewerScreen(
     ) {
         val storyId = story.id ?: return
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        storyViewModel?.sendReaction(story.authorId, storyId, emoji)
-            ?: scope.launch { runCatching { storyRepository.addReaction(story.authorId, storyId, uid, emoji) } }
+        fun onReactionResult(result: Result<Unit>) {
+            result.onSuccess {
+                showDeliveryBanner(context.getString(R.string.stories_reaction_sent))
+            }.onFailure { error ->
+                showFeedback(
+                    error.localizedMessage ?: context.getString(R.string.story_context_menu_action_failed),
+                    isError = true,
+                )
+            }
+        }
+        storyViewModel?.sendReaction(story.authorId, storyId, emoji, ::onReactionResult)
+            ?: scope.launch {
+                onReactionResult(
+                    runCatching { storyRepository.addReaction(story.authorId, storyId, uid, emoji) },
+                )
+            }
         emojiUsageTracker.increment(emoji)
         val widthDp = with(density) { widthPx.toDp().value }
         val heightDp = with(density) { heightPx.toDp().value }
@@ -731,9 +758,12 @@ fun StoryViewerScreen(
             }
             storyViewModel?.sendEphemeralMoment(story.authorId, storyId, bytes) { result ->
                 result.onSuccess {
-                    showSuccess(context.getString(R.string.stories_moment_sent))
+                    showDeliveryBanner(context.getString(R.string.stories_moment_sent))
                 }.onFailure { error ->
-                    showSuccess(error.localizedMessage ?: context.getString(R.string.story_context_menu_action_failed))
+                    showFeedback(
+                        error.localizedMessage ?: context.getString(R.string.story_context_menu_action_failed),
+                        isError = true,
+                    )
                 }
                 scope.launch {
                     delay(500)
@@ -1776,7 +1806,8 @@ fun StoryViewerScreen(
                                         layoutWidthDp = downloadLayoutWidthDp,
                                     )
                                     if (ok) {
-                                        showSuccess(context.getString(R.string.stories_saved_video))
+                                        clearFeedback()
+                                        showDeliveryBanner(context.getString(R.string.stories_saved_video))
                                         onSaveStory()
                                     } else {
                                         showFeedback(

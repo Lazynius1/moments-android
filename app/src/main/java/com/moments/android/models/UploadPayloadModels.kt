@@ -90,6 +90,7 @@ data class CachedHiddenLayerDraft(
     val duration: Double?,
     val textStyle: String,
     val presentationStyle: String,
+    val hintStyle: String,
     val unlockMode: String,
     val unlockAt: Date?,
     val authorTimezoneIdentifier: String?,
@@ -358,6 +359,7 @@ object UploadPayloadDecoder {
                                 d.duration?.let { put("duration", it) }
                                 put("textStyle", d.textStyle)
                                 put("presentationStyle", d.presentationStyle)
+                                put("hintStyle", d.hintStyle)
                                 put("unlockMode", d.unlockMode)
                                 d.unlockAt?.let { put("unlockAt", it.time) }
                                 d.authorTimezoneIdentifier?.let { put("authorTimezoneIdentifier", it) }
@@ -543,6 +545,7 @@ object UploadPayloadDecoder {
             duration = obj.optDouble("duration").takeIf { obj.has("duration") && !obj.isNull("duration") },
             textStyle = obj.optString("textStyle", "classic"),
             presentationStyle = obj.optString("presentationStyle", "glassCard"),
+            hintStyle = obj.optString("hintStyle", "blackAndWhite"),
             unlockMode = obj.optString("unlockMode", "immediate"),
             unlockAt = obj.optLong("unlockAt").takeIf { obj.has("unlockAt") && !obj.isNull("unlockAt") }?.let { Date(it) },
             authorTimezoneIdentifier = obj.optString("authorTimezoneIdentifier").takeIf { obj.has("authorTimezoneIdentifier") && !obj.isNull("authorTimezoneIdentifier") },

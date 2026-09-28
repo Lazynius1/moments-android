@@ -829,10 +829,10 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="audience_description_custom">Elige personas específicas</string>
     <string name="audience_description_custom_list">Usar una lista personalizada</string>
     <string name="audience_description_only_me">Contenido privado, solo tú puedes verlo</string>
-    <string name="audience_selection_title">Audiencia</string>
-    <string name="audience_selection_subtitle">¿Quién puede ver este momento?</string>
-    <string name="audience_predefined">Sugeridas</string>
-    <string name="audience_custom_lists">Tus listas</string>
+    <string name="audience_selection_title">Seleccionar Audiencia</string>
+    <string name="audience_selection_subtitle">Elige quién puede ver este contenido</string>
+    <string name="audience_predefined">Audiencia predefinida</string>
+    <string name="audience_custom_lists">Listas personalizadas</string>
     <string name="audience_custom_lists_empty">Aún no hay listas personalizadas</string>
     <string name="audience_custom_people_hint">Elige personas concretas</string>
     <string name="audience_people_count">%1$d personas</string>
@@ -1020,6 +1020,17 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="hidden_layers_empty_audio_subtitle">Graba un audio corto que solo aparezca cuando lo descubran.</string>
     <string name="hidden_layers_empty_image_subtitle">Usa una polaroid oculta para esconder otra foto dentro del post.</string>
     <string name="hidden_layers_unlock_title">Disponibilidad</string>
+    <string name="hidden_layers_hint_appearance_title">Apariencia al descubrir</string>
+    <string name="hidden_layers_hint_appearance_a11y">Apariencia de la capa oculta</string>
+    <string name="hidden_layers_hint_style_black_and_white">B&amp;N</string>
+    <string name="hidden_layers_hint_style_actual">Oro</string>
+    <string name="hidden_layers_hint_style_polar">Polar</string>
+    <string name="hidden_layers_hint_style_ember">Ascua</string>
+    <string name="hidden_layers_hint_style_ultraviolet">Ultra</string>
+    <string name="hidden_layers_hint_style_aurora">Aurora</string>
+    <string name="hidden_layers_hint_style_rose">Rosa</string>
+    <string name="hidden_layers_hint_style_plasma">Plasma</string>
+    <string name="hidden_layers_hint_style_daylight">Cielo</string>
     <string name="hidden_layers_unlock_now">Ahora</string>
     <string name="hidden_layers_unlock_scheduled">Programada</string>
     <string name="hidden_layers_unlock_opens">Se abre</string>
@@ -2832,4 +2843,12 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="whats_new_nova_230_description">Chispa diaria, aspecto renovado, y adjuntar una foto ya no publica un Momento por accidente.</string>
     <string name="whats_new_offline_230_title">Offline y pulido</string>
     <string name="whats_new_offline_230_description">Mejor comportamiento sin conexión, estados de relación más estables y textos pulidos en todos los idiomas.</string>
+    <string name="audience_manage_members">Gestionar miembros</string>
+    <string name="audience_list_updated">Lista actualizada</string>
+    <string name="audience_list_members_removed_single">Has eliminado a %1$s de la lista %2$s</string>
+    <string name="audience_list_members_removed_plural">Has eliminado a %1$s y %2$d más de la lista %3$s</string>
+    <string name="audience_manage_members_remove_title">¿Eliminar miembros de la lista?</string>
+    <string name="audience_manage_members_remove_single">Vas a eliminar a %1$s de «%2$s». Este cambio se guardará inmediatamente.</string>
+    <string name="audience_manage_members_remove_plural">Vas a eliminar a %1$s y %2$d personas más de «%3$s». Este cambio se guardará inmediatamente.</string>
+    <string name="audience_members_limit">Una lista de audiencia puede contener como máximo %1$d miembros</string>
 </resources>

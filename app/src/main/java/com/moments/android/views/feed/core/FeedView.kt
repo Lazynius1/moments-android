@@ -831,13 +831,6 @@ fun FeedView(
                 onDismissNotificationSummary = { showNotificationSummary = false },
             )
 
-            com.moments.android.services.content.ForYouFeedbackNotice(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    // ≡ iOS overlayGap 8pt sobre la tab bar (el dock ya está fuera del Box).
-                    .padding(bottom = 8.dp)
-                    .zIndex(1500f)
-            )
 
             FeedStoryRingPreviewOverlay(
                 selection = storyRingPreviewSelection,

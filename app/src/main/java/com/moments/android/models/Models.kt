@@ -671,6 +671,8 @@ data class MomentHiddenLayer(
     val imageFrameStyle: HiddenLayerImageFrameStyle? = null,
     val textStyle: HiddenLayerTextStyle? = null,
     val presentationStyle: HiddenLayerPresentationStyle = HiddenLayerPresentationStyle.GLASS_CARD,
+    /** Nil = capas legacy anteriores a apariencias; nuevas → [HintStyle.BLACK_AND_WHITE]. */
+    val hintStyle: HintStyle? = HintStyle.BLACK_AND_WHITE,
     val unlockMode: UnlockMode = UnlockMode.IMMEDIATE,
     val unlockAt: Date? = null,
     val authorTimezoneIdentifier: String? = null,
@@ -691,6 +693,23 @@ data class MomentHiddenLayer(
     enum class LayerShape(val raw: String) {
         CIRCLE("circle"), ROUNDED_RECT("roundedRect");
         companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: ROUNDED_RECT }
+    }
+
+    /** ≡ iOS `MomentHiddenLayer.HintStyle`. */
+    enum class HintStyle(val raw: String) {
+        BLACK_AND_WHITE("blackAndWhite"),
+        ACTUAL("actual"),
+        POLAR("polar"),
+        EMBER("ember"),
+        ULTRAVIOLET("ultraviolet"),
+        AURORA("aurora"),
+        ROSE("rose"),
+        PLASMA("plasma"),
+        DAYLIGHT("daylight");
+
+        companion object {
+            fun from(raw: String?) = entries.firstOrNull { it.raw == raw }
+        }
     }
 
     enum class ModerationState(val raw: String) {
@@ -737,6 +756,8 @@ data class MomentHiddenLayer(
             imageFrameStyle = HiddenLayerImageFrameStyle.from(data["imageFrameStyle"] as? String),
             textStyle = HiddenLayerTextStyle.from(data["textStyle"] as? String),
             presentationStyle = HiddenLayerPresentationStyle.from(data["presentationStyle"] as? String),
+            // Ausente en Firestore → null (legacy → viewer usa .actual).
+            hintStyle = HintStyle.from(data["hintStyle"] as? String),
             unlockMode = UnlockMode.from(data["unlockMode"] as? String),
             unlockAt = MediaItem.anyToDate(data["unlockAt"]),
             authorTimezoneIdentifier = data["authorTimezoneIdentifier"] as? String,
@@ -1583,6 +1604,7 @@ fun MomentHiddenLayer.toMap(): Map<String, Any> = buildMap {
     imageFrameStyle?.let { put("imageFrameStyle", it.raw) }
     textStyle?.let { put("textStyle", it.raw) }
     put("presentationStyle", presentationStyle.raw)
+    hintStyle?.let { put("hintStyle", it.raw) }
     put("unlockMode", unlockMode.raw)
     unlockAt?.let { put("unlockAt", Timestamp(it)) }
     authorTimezoneIdentifier?.let { put("authorTimezoneIdentifier", it) }

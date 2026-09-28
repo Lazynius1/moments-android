@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -117,6 +118,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -140,6 +143,7 @@ import com.moments.android.models.MomentHiddenLayer
 import com.moments.android.utilities.HapticManager
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.components.InteractiveAudioStickerView
+import com.moments.android.views.components.hiddenlayers.HiddenLayerHintAppearanceView
 import com.moments.android.views.components.hiddenlayers.HiddenLayerLayout
 import com.moments.android.views.creator.components.StoryFontRegistry
 import com.moments.android.views.creator.creatoruikit.creatorNormalizedUp
@@ -191,6 +195,7 @@ data class HiddenLayerDraft(
     val duration: Double? = null,
     val textStyle: HiddenLayerTextStyle = HiddenLayerTextStyle.CLEAN,
     val presentationStyle: HiddenLayerPresentationStyle = HiddenLayerPresentationStyle.GLASS_CARD,
+    val hintStyle: MomentHiddenLayer.HintStyle = MomentHiddenLayer.HintStyle.BLACK_AND_WHITE,
     val unlockMode: MomentHiddenLayer.UnlockMode = MomentHiddenLayer.UnlockMode.IMMEDIATE,
     val unlockAt: Date? = null,
     val authorTimezoneIdentifier: String? = TimeZone.getDefault().id,
@@ -225,6 +230,7 @@ data class HiddenLayerDraft(
         duration = duration,
         textStyle = textStyle.raw,
         presentationStyle = presentationStyle.raw,
+        hintStyle = hintStyle.raw,
         unlockMode = unlockMode.raw,
         unlockAt = unlockAt,
         authorTimezoneIdentifier = authorTimezoneIdentifier,
@@ -512,7 +518,7 @@ fun HiddenLayersEditorView(
         }
     }
 
-    // Canvas estable: el dock ocupa siempre 156dp en layout y crece sobre el media al editar.
+    // Reserva de layout idle = 156dp (iOS). Al editar, overlay a 402dp ≡ iOS dockHeight.
     BoxWithConstraints(
         modifier
             .fillMaxWidth()
@@ -524,8 +530,10 @@ fun HiddenLayersEditorView(
         val verticalSpacing = 10.dp
         val topPadding = 6.dp
         val bottomPadding = 8.dp
+        // Reserva de layout idle = 156dp. Overlay vacío ~220 (título+CTA+switcher);
+        // al editar, 402dp ≡ iOS dockHeight con picker de apariencia.
         val dockSlotHeightDp = 156.dp
-        val dockVisualHeightDp = if (dockEditorLayerIndex != null) 272.dp else 180.dp
+        val dockVisualHeightDp = if (dockEditorLayerIndex != null) 402.dp else 220.dp
         val headerBlock = topPadding + headerHeight
         val maxCanvasHeightDp = (
             maxHeight - headerBlock - dockSlotHeightDp - bottomPadding - verticalSpacing * 2
@@ -947,6 +955,17 @@ fun HiddenLayersEditorView(
                             }
                         }
 
+                        HiddenLayerHintStylePicker(
+                            style = layers[index].hintStyle,
+                            onStyleChange = { style ->
+                                updateAt(index) { it.copy(hintStyle = style) }
+                                HapticManager.shared.selection()
+                            },
+                            primaryText = primaryText,
+                            secondaryText = secondaryText,
+                            isDark = isDark,
+                        )
+
                         when (layers[index].type) {
                             MomentHiddenLayer.LayerType.TEXT -> {
                                 // ≡ iOS TextField + momentsChromeGlass corner 18
@@ -1318,72 +1337,68 @@ fun HiddenLayersEditorView(
                         )
                     } // editing dock VStack
                 } else {
-                    // ≡ empty state iOS L589–628 — tab typeSwitcher siempre visible
-                    Box(
+                    // ≡ empty state iOS L601–639 — VStack + Spacer + typeSwitcher
+                    Column(
                         Modifier
                             .fillMaxSize()
                             .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Column(
-                            Modifier.align(Alignment.TopCenter),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(3.dp),
-                            ) {
-                                Text(
-                                    emptyStateTitle(selectedDockType),
-                                    color = primaryText,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 17.sp,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                Text(
-                                    emptyStateSubtitle(selectedDockType),
-                                    color = secondaryText,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
-                            Row(
-                                Modifier
-                                    .alpha(if (canCreate) 1f else 0.48f)
-                                    .momentsChromeGlass(RoundedCornerShape(50), interactive = canCreate)
-                                    .clickable(enabled = canCreate) {
-                                        createLayer(selectedDockType)
-                                        HapticManager.shared.success()
-                                    }
-                                    .padding(horizontal = 16.dp, vertical = 9.dp)
-                                    .widthIn(min = 168.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                            ) {
-                                // ≡ iOS plusActionIcon: plus.bubble / waveform.badge.plus / photo.badge.plus
-                                Icon(
-                                    plusActionIcon(selectedDockType),
-                                    null,
-                                    tint = primaryText,
-                                    modifier = Modifier.size(14.dp),
-                                )
-                                Text(
-                                    addActionTitle(selectedDockType),
-                                    color = primaryText,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                )
-                            }
+                            Text(
+                                emptyStateTitle(selectedDockType),
+                                color = primaryText,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Text(
+                                emptyStateSubtitle(selectedDockType),
+                                color = secondaryText,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
+                        Row(
+                            Modifier
+                                .alpha(if (canCreate) 1f else 0.48f)
+                                .momentsChromeGlass(RoundedCornerShape(50), interactive = canCreate)
+                                .clickable(enabled = canCreate) {
+                                    createLayer(selectedDockType)
+                                    HapticManager.shared.success()
+                                }
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                                .widthIn(min = 168.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                        ) {
+                            Icon(
+                                plusActionIcon(selectedDockType),
+                                null,
+                                tint = primaryText,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Text(
+                                addActionTitle(selectedDockType),
+                                color = primaryText,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                            )
+                        }
+                        Spacer(Modifier.weight(1f))
                         TypeSwitcherPill(
-                            modifier = Modifier.align(Alignment.BottomCenter),
                             activeType = selectedDockType,
                             primaryText = primaryText,
                             secondaryText = secondaryText,
@@ -2497,6 +2512,121 @@ private fun HiddenLayerScheduleSheet(
             )
         }
     }
+}
+
+@Composable
+private fun HiddenLayerHintStylePicker(
+    style: MomentHiddenLayer.HintStyle,
+    onStyleChange: (MomentHiddenLayer.HintStyle) -> Unit,
+    primaryText: Color,
+    secondaryText: Color,
+    isDark: Boolean,
+) {
+    val a11yLabel = stringResource(R.string.hidden_layers_hint_appearance_a11y)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = a11yLabel
+            },
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            stringResource(R.string.hidden_layers_hint_appearance_title),
+            color = secondaryText,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp,
+        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            MomentHiddenLayer.HintStyle.entries.forEach { candidate ->
+                HiddenLayerHintStyleOption(
+                    style = candidate,
+                    isSelected = candidate == style,
+                    primaryText = primaryText,
+                    isDark = isDark,
+                    onClick = { onStyleChange(candidate) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HiddenLayerHintStyleOption(
+    style: MomentHiddenLayer.HintStyle,
+    isSelected: Boolean,
+    primaryText: Color,
+    isDark: Boolean,
+    onClick: () -> Unit,
+) {
+    val previewBg = if (style == MomentHiddenLayer.HintStyle.BLACK_AND_WHITE) {
+        if (isDark) Color.Black else Color.White
+    } else {
+        if (isSelected) Color.Black else Color.Black.copy(0.42f)
+    }
+    Column(
+        Modifier
+            .width(58.dp)
+            .padding(4.dp)
+            .border(
+                width = if (isSelected) 1.5.dp else 0.75.dp,
+                color = primaryText.copy(if (isSelected) 0.76f else 0.12f),
+                shape = RoundedCornerShape(16.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(4.dp)
+            .graphicsLayer { alpha = if (isSelected) 1f else 0.52f },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Box(
+            Modifier
+                .size(58.dp, 52.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(previewBg),
+            contentAlignment = Alignment.Center,
+        ) {
+            HiddenLayerHintAppearanceView(
+                type = MomentHiddenLayer.LayerType.TEXT,
+                shape = MomentHiddenLayer.LayerShape.CIRCLE,
+                style = style,
+                isSeen = !isSelected,
+                delaySec = 0.0,
+                isIntro = isSelected,
+                isActive = isSelected,
+                modifier = Modifier.graphicsLayer {
+                    val s = if (isSelected) 0.82f else 0.68f
+                    scaleX = s
+                    scaleY = s
+                },
+            )
+        }
+        Text(
+            hintStyleEditorName(style),
+            color = primaryText.copy(if (isSelected) 1f else 0.68f),
+            fontWeight = FontWeight.Medium,
+            fontSize = 11.sp,
+            maxLines = 1,
+        )
+    }
+}
+
+/** Nombres de estilo fijos (marca), sin localizar — paridad iOS `editorName` en EN. */
+private fun hintStyleEditorName(style: MomentHiddenLayer.HintStyle): String = when (style) {
+    MomentHiddenLayer.HintStyle.BLACK_AND_WHITE -> "B&W"
+    MomentHiddenLayer.HintStyle.ACTUAL -> "Gold"
+    MomentHiddenLayer.HintStyle.POLAR -> "Polar"
+    MomentHiddenLayer.HintStyle.EMBER -> "Ember"
+    MomentHiddenLayer.HintStyle.ULTRAVIOLET -> "Ultra"
+    MomentHiddenLayer.HintStyle.AURORA -> "Aurora"
+    MomentHiddenLayer.HintStyle.ROSE -> "Rose"
+    MomentHiddenLayer.HintStyle.PLASMA -> "Plasma"
+    MomentHiddenLayer.HintStyle.DAYLIGHT -> "Sky"
 }
 
 @Composable

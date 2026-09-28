@@ -1011,7 +1011,7 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="audience_description_custom">Tria persones específiques</string>
     <string name="audience_description_custom_list">Utilitzar una llista personalitzada</string>
     <string name="audience_description_only_me">Contingut privat, només tu pots veure\'l</string>
-    <string name="audience_predefined">Suggeriments</string>
+    <string name="audience_predefined">Audiència predefinida</string>
     <string name="audience_custom_people_hint">Tria persones específiques</string>
     <string name="creator_location_search">Cerca ubicació...</string>
     <string name="creator_location_nearby">Llocs propers</string>
@@ -2381,4 +2381,22 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="message_requests_delete_all">Elimina-les totes</string>
     <string name="message_requests_delete_all_confirmation_title">Voleu eliminar totes les sol·licituds?</string>
     <string name="message_requests_delete_all_confirmation_message">Aquesta acció no es pot desfer.</string>
+    <string name="hidden_layers_hint_appearance_title">Aparença en descobrir</string>
+    <string name="hidden_layers_hint_appearance_a11y">Aparença de la capa oculta</string>
+    <string name="hidden_layers_hint_style_black_and_white">B&amp;N</string>
+    <string name="hidden_layers_hint_style_actual">Or</string>
+    <string name="hidden_layers_hint_style_polar">Polar</string>
+    <string name="hidden_layers_hint_style_ember">Brasa</string>
+    <string name="hidden_layers_hint_style_ultraviolet">Ultra</string>
+    <string name="hidden_layers_hint_style_aurora">Aurora</string>
+    <string name="hidden_layers_hint_style_rose">Rosa</string>
+    <string name="hidden_layers_hint_style_plasma">Plasma</string>
+    <string name="hidden_layers_hint_style_daylight">Cel</string>
+    <string name="audience_manage_members">Gestionar membres</string>
+    <string name="audience_list_updated">Llista actualitzada</string>
+    <string name="audience_list_members_removed_single">Has eliminat %1$s de la llista %2$s</string>
+    <string name="audience_list_members_removed_plural">Has eliminat %1$s i %2$d persones més de la llista %3$s</string>
+    <string name="audience_manage_members_remove_title">Vols eliminar membres de la llista?</string>
+    <string name="audience_manage_members_remove_single">Eliminaràs %1$s de «%2$s». Aquest canvi es desarà immediatament.</string>
+    <string name="audience_manage_members_remove_plural">Eliminaràs %1$s i %2$d persones més de «%3$s». Aquest canvi es desarà immediatament.</string>
 </resources>

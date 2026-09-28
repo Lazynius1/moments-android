@@ -11,6 +11,8 @@ import androidx.compose.ui.unit.dp
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.incognito.IncognitoModeService
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.social.AffinityInteractionType
@@ -89,8 +91,30 @@ object ForYouPreferences {
         visibilityJobs.values.forEach { it.cancel() }
         visibilityJobs.clear()
     }
-    fun hide(moment: FeedMoment) = send(moment, true)
-    fun undo() { undoMoment?.let { send(it, false) } }
+    fun hide(moment: FeedMoment) {
+        val uid = owner() ?: return
+        if (moment.id.isBlank()) return
+        val original = prefs(uid).getStringSet("hidden", emptySet())!!.toSet()
+        prefs(uid).edit().putStringSet("hidden", original + momentKey(moment)).apply()
+        revision++
+        undoMoment = moment
+        InAppNotificationService.showActionToast(
+            InAppActionToast.create(
+                prefix = FirebaseApp.getInstance().applicationContext.getString(R.string.for_you_feedback_hidden),
+                undo = { undo() },
+                onExpire = { commitHiddenMoment(moment, uid, original) },
+            ),
+        )
+    }
+
+    fun undo() {
+        val moment = undoMoment ?: return
+        val uid = owner() ?: return
+        val restored = prefs(uid).getStringSet("hidden", emptySet())!!.toSet() - momentKey(moment)
+        prefs(uid).edit().putStringSet("hidden", restored).apply()
+        revision++
+        undoMoment = null
+    }
     fun dismissNotice() {
         if (isBusy) return
         noticeDismissJob?.cancel()
@@ -119,19 +143,17 @@ object ForYouPreferences {
         }
     }
 
-    private fun send(moment: FeedMoment, hiding: Boolean) {
+    private fun commitHiddenMoment(moment: FeedMoment, uid: String, original: Set<String>) {
         val user = FirebaseAuth.getInstance().currentUser ?: return
-        if (isBusy || moment.id.isBlank()) return
-        val uid = user.uid
-        val key = momentKey(moment)
-        val original = prefs(uid).getStringSet("hidden", emptySet())!!.toSet()
-        val updated = if (hiding) original + key else original - key
-        prefs(uid).edit().putStringSet("hidden", updated).apply()
-        revision++
+        if (isBusy || user.uid != uid) return
         isBusy = true
-        noticeOwner = uid
-        noticeDismissJob?.cancel()
-        notice = R.string.for_you_feedback_saving
+        InAppNotificationService.showActionToast(
+            InAppActionToast.create(
+                prefix = FirebaseApp.getInstance().applicationContext.getString(R.string.for_you_feedback_saving),
+                holds = true,
+                showsProgress = true,
+            ),
+        )
         undoMoment = null
         scope.launch {
             try {
@@ -147,7 +169,7 @@ object ForYouPreferences {
                         connection.setRequestProperty("Content-Type", "application/json")
                         connection.setRequestProperty("Authorization", "Bearer $token")
                         val body = JSONObject().put("action", "forYouFeedback").put("authorId", moment.authorId)
-                            .put("momentId", moment.id).put("intent", if (hiding) "hide" else "undo")
+                            .put("momentId", moment.id).put("intent", "hide")
                         connection.outputStream.bufferedWriter().use { it.write(body.toString()) }
                         check(connection.responseCode == 200)
                         val result = connection.inputStream.bufferedReader().use { JSONObject(it.readText()) }
@@ -155,17 +177,24 @@ object ForYouPreferences {
                     } finally { connection.disconnect() }
                 }
                 if (owner() == uid) {
-                    notice = if (hiding) R.string.for_you_feedback_hidden else R.string.for_you_feedback_restored
-                    undoMoment = if (hiding) moment else null
-                    scheduleNoticeDismiss()
+                    undoMoment = null
+                    InAppNotificationService.showActionToast(
+                        InAppActionToast.create(
+                            prefix = FirebaseApp.getInstance().applicationContext.getString(R.string.for_you_feedback_saved),
+                            subtitle = FirebaseApp.getInstance().applicationContext.getString(R.string.for_you_feedback_subtitle),
+                        ),
+                    )
                 }
             } catch (error: Exception) {
                 prefs(uid).edit().putStringSet("hidden", original).apply()
                 revision++
                 if (owner() == uid) {
-                    notice = R.string.for_you_feedback_failed
-                    undoMoment = if (hiding) null else moment
-                    scheduleNoticeDismiss()
+                    InAppNotificationService.showActionToast(
+                        InAppActionToast.create(
+                            prefix = FirebaseApp.getInstance().applicationContext.getString(R.string.for_you_feedback_failed),
+                        ),
+                    )
+                    undoMoment = null
                 }
             } finally { isBusy = false }
         }

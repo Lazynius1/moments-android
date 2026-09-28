@@ -174,10 +174,12 @@ object InAppNotificationService {
         dismissJob?.cancel()
         scope.launch {
             delay(500)
-            if (consumeExpire) consumePendingExpire() else pendingExpireAction = null
+            val expireAction = if (consumeExpire) pendingExpireAction else null
+            pendingExpireAction = null
             _currentNotification.value = null
             _actionToast.value = null
             isClearing = false
+            expireAction?.invoke()
             presentNextIfNeeded()
         }
     }
