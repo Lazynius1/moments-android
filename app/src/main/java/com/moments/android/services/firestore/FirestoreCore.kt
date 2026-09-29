@@ -4,6 +4,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FieldValue
 import com.moments.android.models.MediaItem
 import com.moments.android.services.network.NetworkMonitor
+import com.moments.android.services.social.StoryChainLimits
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -80,6 +81,9 @@ suspend fun FirestoreService.updateChainExpirationInBackground(chainId: String) 
 
     val storiesSnapshot = db.collectionGroup("stories")
         .whereEqualTo("chainId", chainId)
+        .whereEqualTo("audience", "everyone")
+        .orderBy("chainPosition", com.google.firebase.firestore.Query.Direction.ASCENDING)
+        .limit(StoryChainLimits.MAX_PARTS.toLong())
         .get()
         .await()
 

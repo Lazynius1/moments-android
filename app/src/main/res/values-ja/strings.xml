@@ -2500,7 +2500,7 @@
     <string name="settings_connections_pending">接続の公開範囲</string>
     <string name="settings_connections_pending_body">ConnectionVisibilityView（SettingsSections）の実装待ちです。</string>
     <string name="story_chains_loading">チェーンを読み込み中…</string>
-    <string name="story_chains_not_found">このチェーンにストーリーはありません</string>
+    <string name="story_chains_not_found">このチェーンは利用できなくなりました</string>
     <string name="story_chains_parts">%1$d/%2$dパート</string>
     <string name="story_chains_expired">• 期限切れ</string>
     <string name="story_chains_continue_story">ストーリーを続ける</string>
@@ -2771,6 +2771,8 @@
     <string name="story_chains_title_placeholder">チェーンのタイトルを入力</string>
     <string name="story_chains_continuing">続き：%1$s</string>
     <string name="story_chains_part_short">パート %1$d</string>
+    <string name="story_chains_start">最初</string>
+    <string name="story_chains_end">最後</string>
     <string name="story_chains_error_invalid_title">共有する前に、有効なチェーンのタイトルを追加してください。</string>
     <string name="story_chains_error_max_parts">このチェーンは最大%1$dパートに達しています</string>
     <string name="story_chains_error_expired">このチェーンの有効期限が切れています。</string>

@@ -73,6 +73,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
@@ -115,6 +116,7 @@ import com.moments.android.notifications.services.InAppNotificationService
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.persistence.StorySeenStateService
 import com.moments.android.services.social.BestFriendsService
+import com.moments.android.services.social.StoryChainLimits
 import com.moments.android.utilities.EmojiReactionDefaults
 import com.moments.android.utilities.EmojiUsageTracker
 import com.moments.android.utilities.MomentsAudioSession
@@ -242,6 +244,8 @@ fun StoryViewerScreen(
     var isHoldingStory by remember { mutableStateOf(false) }
     var zoomScale by remember { mutableFloatStateOf(1f) }
     var lastZoomScale by remember { mutableFloatStateOf(1f) }
+    var zoomOffset by remember { mutableStateOf(Offset.Zero) }
+    var zoomContainerSize by remember { mutableStateOf(Size.Zero) }
     var authorAllowsMessages by remember { mutableStateOf(true) }
     var authorAllowsReactions by remember { mutableStateOf(true) }
     var authorAllowsEphemeralPhotos by remember { mutableStateOf(true) }
@@ -385,6 +389,7 @@ fun StoryViewerScreen(
             showQuickActions ||
                 showActivity ||
                 showChain ||
+                showChainActions ||
                 showReactions ||
                 showStoryShareSheet ||
                 showStoryReactionEmojiPicker ||
@@ -710,7 +715,9 @@ fun StoryViewerScreen(
             val loaded = runCatching {
                 firestore.db.collectionGroup("stories")
                     .whereEqualTo("chainId", chainId)
+                    .whereEqualTo("audience", "everyone")
                     .orderBy("chainPosition")
+                    .limit(StoryChainLimits.MAX_PARTS.toLong())
                     .get().await()
                     .documents.mapNotNull { doc ->
                         @Suppress("UNCHECKED_CAST")
@@ -784,14 +791,24 @@ fun StoryViewerScreen(
 
     val interactionBlockedState = rememberUpdatedState(isStoryInteractionBlocked)
     var pinchGestureSeen by remember { mutableStateOf(false) }
-    val zoomGesture = rememberTransformableState { zoomChange, _, _ ->
+    val zoomGesture = rememberTransformableState { centroid, zoomChange, panChange, _ ->
         if (interactionBlockedState.value) return@rememberTransformableState
         // ≡ MagnifyGesture: acumular desde lastZoomScale al inicio del pinch
         if (!pinchGestureSeen) {
             zoomScale = lastZoomScale
             pinchGestureSeen = true
         }
-        zoomScale = (zoomScale * zoomChange).coerceIn(1f, 3f)
+        val oldScale = zoomScale.coerceAtLeast(0.001f)
+        val newScale = (oldScale * zoomChange).coerceIn(1f, 3f)
+        // Zoom/pan alrededor del centroide del gesto (API nueva de TransformableState).
+        val effectiveCentroid = if (centroid.isSpecified) {
+            centroid
+        } else {
+            Offset(zoomContainerSize.width / 2f, zoomContainerSize.height / 2f)
+        }
+        zoomOffset = zoomOffset + effectiveCentroid / oldScale -
+            effectiveCentroid / newScale - panChange / oldScale
+        zoomScale = newScale
     }
     LaunchedEffect(zoomGesture.isTransformInProgress) {
         if (zoomGesture.isTransformInProgress) {
@@ -807,18 +824,30 @@ fun StoryViewerScreen(
             return@LaunchedEffect
         }
         if (zoomScale < 1.2f) {
-            val anim = Animatable(zoomScale)
-            anim.animateTo(
-                targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = 0.7f,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
-            ) {
-                zoomScale = value
+            val startOffset = zoomOffset
+            val animScale = Animatable(zoomScale)
+            val animProgress = Animatable(0f)
+            val springSpec = spring<Float>(
+                dampingRatio = 0.7f,
+                stiffness = Spring.StiffnessMediumLow,
+            )
+            kotlinx.coroutines.coroutineScope {
+                launch {
+                    animScale.animateTo(1f, springSpec) { zoomScale = value }
+                }
+                launch {
+                    animProgress.animateTo(1f, springSpec) {
+                        val t = value
+                        zoomOffset = Offset(
+                            x = startOffset.x * (1f - t),
+                            y = startOffset.y * (1f - t),
+                        )
+                    }
+                }
             }
             lastZoomScale = 1f
             zoomScale = 1f
+            zoomOffset = Offset.Zero
         } else {
             lastZoomScale = zoomScale
         }
@@ -975,7 +1004,15 @@ fun StoryViewerScreen(
         Modifier
             .fillMaxSize()
             .background(canvasBg)
-            .graphicsLayer(scaleX = zoomScale, scaleY = zoomScale)
+            .onSizeChanged {
+                zoomContainerSize = Size(it.width.toFloat(), it.height.toFloat())
+            }
+            .graphicsLayer(
+                scaleX = zoomScale,
+                scaleY = zoomScale,
+                translationX = zoomOffset.x,
+                translationY = zoomOffset.y,
+            )
             .transformable(state = zoomGesture)
             .pointerInput(story.id, deckGestureGate) {
                 detectTapGestures(onTap = {
@@ -1389,7 +1426,15 @@ fun StoryViewerScreen(
                                     onProfileTap()
                                 },
                                 onMore = { toggleQuickActions() },
-                                onChain = { showChainActions = !showChainActions },
+                                onChain = {
+                                    val isOpeningChainActions = !showChainActions
+                                    showChainActions = isOpeningChainActions
+                                    if (isOpeningChainActions) {
+                                        pauseStoryPlayback()
+                                    } else {
+                                        resumeStoryPlayback()
+                                    }
+                                },
                             )
                         }
                         if (showChainActions && story.chainId != null) {
@@ -1399,6 +1444,7 @@ fun StoryViewerScreen(
                                 canContinue = canContinueChain,
                                 onViewChain = {
                                     showChainActions = false
+                                    pauseStoryPlayback()
                                     showChain = true
                                 },
                                 onContinue = {
@@ -1893,9 +1939,14 @@ fun StoryViewerScreen(
                         chainId = chainId,
                         chainTitle = chainTitle,
                         canContinueChain = canContinueChain,
+                        initialStory = story,
                         initialStoryId = story.id,
                         initialChainPosition = story.chainPosition,
                         onDismiss = { showChain = false },
+                        onOpenStory = { stories, index ->
+                            showChain = false
+                            onOpenChainStory(stories, index)
+                        },
                         onContinueChain = { id, title, position ->
                             showChain = false
                             onContinueChain(id, title, position)
@@ -2110,52 +2161,62 @@ private fun ChainActionsPanel(
                 maxLines = 1,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                stringResource(R.string.story_chains_view_chain),
-                color = primary,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                modifier = Modifier
-                    .weight(1f)
-                    .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
-                    .clickable(onClick = onViewChain)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            )
-            if (canContinue) {
+        Text(
+            stringResource(R.string.story_chains_view_chain),
+            color = primary,
+            fontWeight = FontWeight.Medium,
+            fontSize = 13.sp,
+            maxLines = 1,
+            modifier = Modifier
+                .fillMaxWidth()
+                .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
+                .clickable(onClick = onViewChain)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        )
+        if (canContinue) {
                 Text(
                     stringResource(R.string.story_chains_continue_story),
                     color = primary,
                     fontWeight = FontWeight.Medium,
                     fontSize = 13.sp,
+                    maxLines = 1,
                     modifier = Modifier
-                        .weight(1f)
+                        .fillMaxWidth()
                         .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
                         .clickable(onClick = onContinue)
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                 )
-            }
         }
         if (chainCount > 1) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val hasPrevious = currentChainIndex > 0
+                val hasNext = currentChainIndex < chainCount - 1
                 Text(
-                    stringResource(R.string.story_chains_previous_part),
-                    color = primary.copy(if (currentChainIndex > 0) 1f else 0.45f),
+                    if (hasPrevious) stringResource(R.string.story_chains_part_short, currentChainIndex)
+                    else stringResource(R.string.story_chains_start),
+                    color = primary.copy(if (hasPrevious) 1f else 0.45f),
                     fontSize = 13.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .weight(1f)
-                        .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = currentChainIndex > 0)
-                        .clickable(enabled = currentChainIndex > 0, onClick = onPreviousPart)
+                        .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = hasPrevious)
+                        .clickable(enabled = hasPrevious, onClick = onPreviousPart)
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                 )
                 Text(
-                    stringResource(R.string.story_chains_next_part),
-                    color = primary.copy(if (currentChainIndex < chainCount - 1) 1f else 0.45f),
+                    if (hasNext) stringResource(R.string.story_chains_part_short, currentChainIndex + 2)
+                    else stringResource(R.string.story_chains_end),
+                    color = primary.copy(if (hasNext) 1f else 0.45f),
                     fontSize = 13.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .weight(1f)
-                        .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = currentChainIndex < chainCount - 1)
-                        .clickable(enabled = currentChainIndex < chainCount - 1, onClick = onNextPart)
+                        .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = hasNext)
+                        .clickable(enabled = hasNext, onClick = onNextPart)
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                 )
             }

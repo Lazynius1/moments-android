@@ -853,7 +853,7 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="settings_account_management_desc">Desactivar o eliminar compte</string>
     <string name="maps_error_retry">Reintentar</string>
     <string name="story_chains_loading">Carregant cadena…</string>
-    <string name="story_chains_not_found">No s’han trobat històries en aquesta cadena</string>
+    <string name="story_chains_not_found">Aquesta cadena ja no està disponible</string>
     <string name="story_chains_parts">%1$d/%2$d parts</string>
     <string name="story_chains_expired">• Expirada</string>
     <string name="story_chains_continue_story">Continuar Història</string>
@@ -1772,6 +1772,8 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="story_chains_title_placeholder">Introdueix el títol de la cadena</string>
     <string name="story_chains_continuing">Continuant: %1$s</string>
     <string name="story_chains_part_short">Part %1$d</string>
+    <string name="story_chains_start">Inici</string>
+    <string name="story_chains_end">Final</string>
     <string name="story_chains_error_invalid_title">Afegeix un títol vàlid abans de compartir.</string>
     <string name="story_chains_error_max_parts">Aquesta cadena ha arribat al màxim de %1$d parts</string>
     <string name="story_chains_error_expired">Aquesta cadena ha caducat.</string>

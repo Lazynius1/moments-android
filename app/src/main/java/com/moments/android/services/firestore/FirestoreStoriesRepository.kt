@@ -340,6 +340,9 @@ private suspend fun FirestoreService.applyChainConfiguration(
     continuationCustomListName: String?,
 ) {
     if (chainId == null) return
+    // A chain is public by definition. Continuation settings below only
+    // decide who can contribute its next part.
+    storyData["audience"] = ContentAudience.EVERYONE.raw
     allowOthersToContinue?.let { storyData["allowOthersToContinue"] = it }
     continuationAudience?.let { storyData["continuationAudience"] = it.raw }
     continuationCustomViewers?.let { storyData["continuationCustomViewers"] = it }
@@ -347,10 +350,14 @@ private suspend fun FirestoreService.applyChainConfiguration(
     continuationCustomListName?.let { storyData["continuationCustomListName"] = it }
     if (chainPosition != 1) return
     val chainMetadata = mapOf(
+        // Compatible with the security rules and the metadata consumed by both apps.
+        "id" to chainId,
         "chainId" to chainId,
+        "createdBy" to userId,
         "authorId" to userId,
         "title" to (chainTitle ?: ""),
         "createdAt" to FieldValue.serverTimestamp(),
+        "partCount" to 1,
         "allowOthersToContinue" to (allowOthersToContinue ?: true),
         "continuationAudience" to (continuationAudience?.raw ?: "everyone"),
         "continuationCustomViewers" to (continuationCustomViewers ?: emptyList<String>()),

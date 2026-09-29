@@ -821,7 +821,7 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="profile_thumbnail_video_duration">%1$d:%2$02d</string>
     <string name="maps_error_retry">Riprova</string>
     <string name="story_chains_loading">Caricamento catena…</string>
-    <string name="story_chains_not_found">Nessuna storia trovata in questa catena</string>
+    <string name="story_chains_not_found">Questa catena non è più disponibile</string>
     <string name="story_chains_parts">%1$d/%2$d parti</string>
     <string name="story_chains_expired">• Scaduta</string>
     <string name="story_chains_continue_story">Continua storia</string>
@@ -1748,6 +1748,8 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="story_chains_title_placeholder">Inserisci il titolo della catena</string>
     <string name="story_chains_continuing">Continuando: %1$s</string>
     <string name="story_chains_part_short">Parte %d</string>
+    <string name="story_chains_start">Inizio</string>
+    <string name="story_chains_end">Fine</string>
     <string name="story_chains_error_invalid_title">Aggiungi un titolo valido alla catena prima di condividere.</string>
     <string name="story_chains_error_max_parts">Questa catena ha raggiunto il massimo di %1$d parti</string>
     <string name="story_chains_error_expired">Questa catena è scaduta.</string>

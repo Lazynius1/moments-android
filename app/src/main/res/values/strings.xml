@@ -2555,7 +2555,7 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="settings_connections_pending">Connection visibility</string>
     <string name="settings_connections_pending_body">Pending port of ConnectionVisibilityView (SettingsSections).</string>
     <string name="story_chains_loading">Loading chain…</string>
-    <string name="story_chains_not_found">No stories found in this chain</string>
+    <string name="story_chains_not_found">This chain is no longer available</string>
     <string name="story_chains_parts">%1$d/%2$d parts</string>
     <string name="story_chains_expired">• Expired</string>
     <string name="story_chains_continue_story">Continue Story</string>
@@ -2826,6 +2826,8 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="story_chains_title_placeholder">Enter the chain title</string>
     <string name="story_chains_continuing">Continuing: %1$s</string>
     <string name="story_chains_part_short">Part %1$d</string>
+    <string name="story_chains_start">Start</string>
+    <string name="story_chains_end">End</string>
     <string name="story_chains_error_invalid_title">Add a valid chain title before sharing.</string>
     <string name="story_chains_error_max_parts">This chain has reached the maximum of %1$d parts</string>
     <string name="story_chains_error_expired">This chain has expired.</string>

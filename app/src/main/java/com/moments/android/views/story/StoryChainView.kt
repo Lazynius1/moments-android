@@ -53,8 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import java.util.Date
 import coil.compose.AsyncImage
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
@@ -85,7 +84,9 @@ fun StoryChainView(
     chainTitle: String,
     canContinueChain: Boolean,
     onDismiss: () -> Unit,
+    onOpenStory: (List<Story>, Int) -> Unit = { _, _ -> },
     onContinueChain: (String, String, Int) -> Unit = { _, _, _ -> },
+    initialStory: Story? = null,
     initialStoryId: String? = null,
     initialChainPosition: Int? = null,
     modifier: Modifier = Modifier,
@@ -100,24 +101,24 @@ fun StoryChainView(
     var stories by remember(chainId) { mutableStateOf<List<Story>>(emptyList()) }
     var selectedIndex by remember(chainId) { mutableIntStateOf(0) }
     var didApplyInitialSelection by remember(chainId) { mutableStateOf(false) }
-    var chainStats by remember(chainId) { mutableStateOf(ChainStats(0, 0.0, false)) }
+    var chainStats by remember(chainId) {
+        val remaining = initialStory?.let { maxOf(0.0, (it.expirationDate.time - Date().time) / 1000.0) }
+        mutableStateOf(ChainStats(initialStory?.let { 1 } ?: 0, remaining ?: 0.0, remaining?.let { it <= 0.0 } ?: false))
+    }
     var showLimitAlert by remember { mutableStateOf(false) }
     var limitAlertMessage by remember { mutableStateOf("") }
-    // ≡ showStoriesViewer + fullScreenCover StoriesView(chainStories:)
-    var showStoriesViewer by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(chainId) {
         isLoading = true
-        stories = loadChainStories(chainId)
+        stories = loadChainStories(chainId, initialStory)
         isLoading = false
     }
 
     // ≡ loadChainStats on header appear (cuando ya hay contenido)
     LaunchedEffect(chainId, stories.isNotEmpty()) {
         if (stories.isEmpty() && isLoading) return@LaunchedEffect
-        chainStats = runCatching { StoryChainLimitsService.getChainStats(chainId) }
-            .getOrDefault(ChainStats(stories.size, 0.0, false))
+        chainStats = displayedChainStats(stories)
     }
 
     LaunchedEffect(stories) {
@@ -155,10 +156,8 @@ fun StoryChainView(
                         .padding(horizontal = 28.dp)
                         .momentsEmptyStateAppear(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
                 ) {
-                    CloseChip(primary, onDismiss)
-                    Spacer(Modifier.height(18.dp))
+                    Spacer(Modifier.weight(1f))
                     Icon(Icons.Filled.LinkOff, contentDescription = null, tint = primary, modifier = Modifier.size(26.dp))
                     Spacer(Modifier.height(10.dp))
                     Text(
@@ -167,6 +166,7 @@ fun StoryChainView(
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
                     )
+                    Spacer(Modifier.weight(1f))
                 }
             }
 
@@ -180,7 +180,6 @@ fun StoryChainView(
                         primary = primary,
                         secondary = secondary,
                         isDark = isDark,
-                        onDismiss = onDismiss,
                     )
 
                     LazyVerticalGrid(
@@ -203,7 +202,8 @@ fun StoryChainView(
                                 isDark = isDark,
                                 onTap = {
                                     selectedIndex = index
-                                    showStoriesViewer = true
+                                    onOpenStory(stories, index)
+                                    onDismiss()
                                 },
                             )
                         }
@@ -293,20 +293,6 @@ fun StoryChainView(
         )
     }
 
-    // ≡ .fullScreenCover StoriesView(chainStories:startAtIndex:)
-    if (showStoriesViewer && stories.isNotEmpty()) {
-        Dialog(
-            onDismissRequest = { showStoriesViewer = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            StoriesView(
-                explicitStories = stories,
-                startAtIndex = selectedIndex,
-                highlightTitle = chainTitle,
-                onDismiss = { showStoriesViewer = false },
-            )
-        }
-    }
 }
 
 @Composable
@@ -318,7 +304,6 @@ private fun ChainHeader(
     primary: Color,
     secondary: Color,
     isDark: Boolean,
-    onDismiss: () -> Unit,
 ) {
     Column(
         Modifier
@@ -327,24 +312,19 @@ private fun ChainHeader(
             .padding(top = 14.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            CloseChip(primary, onDismiss)
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
                 Text(stringResource(R.string.story_chains_chain), color = secondary, fontSize = 12.sp)
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    chainTitle,
-                    color = primary,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(Modifier.size(38.dp))
+                AdaptiveChainTitle(chainTitle, primary)
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        ) {
             val chipTint = if (isDark) Color.White.copy(alpha = 0.86f) else Color.Black.copy(alpha = 0.76f)
             // ≡ infoChip icon: "link"
             InfoChip(
@@ -392,17 +372,22 @@ private fun ChainHeader(
 }
 
 @Composable
-private fun CloseChip(tint: Color, onDismiss: () -> Unit) {
-    Box(
-        Modifier
-            .size(38.dp)
-            .momentsChromeGlass(CircleShape, interactive = true)
-            .clip(CircleShape)
-            .clickable(onClick = onDismiss),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(Icons.Filled.Close, contentDescription = null, tint = tint, modifier = Modifier.size(14.dp))
-    }
+private fun AdaptiveChainTitle(title: String, color: Color) {
+    var fontSize by remember(title) { mutableStateOf(24.sp) }
+
+    Text(
+        title,
+        color = color,
+        fontSize = fontSize,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        overflow = TextOverflow.Clip,
+        onTextLayout = { layoutResult ->
+            if (layoutResult.hasVisualOverflow && fontSize > 14.sp) {
+                fontSize = (fontSize.value - 1).sp
+            }
+        },
+    )
 }
 
 @Composable
@@ -524,10 +509,12 @@ private fun StoryChainGridItemView(
 }
 
 /** Equivalente al `collectionGroup("stories").whereField("chainId")` de `StoryChainViewModel`. */
-private suspend fun loadChainStories(chainId: String): List<Story> = runCatching {
+private suspend fun loadChainStories(chainId: String, fallbackStory: Story?): List<Story> = runCatching {
     val snapshot = FirestoreService().db.collectionGroup("stories")
         .whereEqualTo("chainId", chainId)
+        .whereEqualTo("audience", "everyone")
         .orderBy("chainPosition")
+        .limit(StoryChainLimits.MAX_PARTS.toLong())
         .get()
         .await()
     snapshot.documents.mapNotNull { doc ->
@@ -535,3 +522,16 @@ private suspend fun loadChainStories(chainId: String): List<Story> = runCatching
         Story.from(doc.id, doc.data as? Map<String, Any?> ?: return@mapNotNull null)
     }
 }.getOrDefault(emptyList())
+    .let { fetchedStories ->
+        if (fallbackStory == null || fetchedStories.any { it.id == fallbackStory.id }) {
+            fetchedStories
+        } else {
+            (fetchedStories + fallbackStory).sortedBy { it.chainPosition ?: Int.MAX_VALUE }
+        }
+    }
+
+private fun displayedChainStats(stories: List<Story>): ChainStats {
+    val expiration = stories.minOfOrNull { it.expirationDate.time } ?: return ChainStats(0, 0.0, false)
+    val remaining = maxOf(0.0, (expiration - Date().time) / 1000.0)
+    return ChainStats(stories.size, remaining, remaining <= 0.0)
+}

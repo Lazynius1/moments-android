@@ -3,6 +3,7 @@ package com.moments.android.services.social
 import android.content.Context
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.moments.android.R
 import kotlinx.coroutines.tasks.await
 import java.util.Calendar
@@ -37,19 +38,14 @@ object StoryChainLimitsService {
     private val firestore: FirebaseFirestore get() = FirebaseFirestore.getInstance()
 
     suspend fun canContinueChain(chainId: String, userId: String): Boolean {
-        val chainDoc = firestore.collection("storyChains").document(chainId).get().await()
-        if (!chainDoc.exists()) throw StoryChainLimitError.ChainNotFound
-        val createdAt = (chainDoc.get("createdAt") as? Timestamp)?.toDate()
-            ?: throw StoryChainLimitError.ChainNotFound
-
-        val expiration = Calendar.getInstance().apply {
-            time = createdAt
-            add(Calendar.HOUR_OF_DAY, StoryChainLimits.EXPIRATION_HOURS)
-        }.time
-        if (Date() > expiration) throw StoryChainLimitError.ChainExpired
+        // Verify the lifetime against part 1, not potentially stale metadata.
+        if (getRemainingTimeSeconds(chainId) <= 0.0) throw StoryChainLimitError.ChainExpired
 
         val storiesSnapshot = firestore.collectionGroup("stories")
             .whereEqualTo("chainId", chainId)
+            .whereEqualTo("audience", "everyone")
+            .orderBy("chainPosition", Query.Direction.ASCENDING)
+            .limit(StoryChainLimits.MAX_PARTS.toLong())
             .get()
             .await()
         if (storiesSnapshot.size() >= StoryChainLimits.MAX_PARTS) {
@@ -58,6 +54,7 @@ object StoryChainLimitsService {
 
         val userStories = firestore.collectionGroup("stories")
             .whereEqualTo("chainId", chainId)
+            .whereEqualTo("audience", "everyone")
             .whereEqualTo("authorId", userId)
             .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .limit(1)
@@ -77,6 +74,7 @@ object StoryChainLimitsService {
     suspend fun getNextChainPosition(chainId: String): Int {
         val storiesSnapshot = firestore.collectionGroup("stories")
             .whereEqualTo("chainId", chainId)
+            .whereEqualTo("audience", "everyone")
             .orderBy("chainPosition", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .limit(1)
             .get()
@@ -93,10 +91,21 @@ object StoryChainLimitsService {
     }
 
     suspend fun getRemainingTimeSeconds(chainId: String): Double {
-        val chainDoc = firestore.collection("storyChains").document(chainId).get().await()
-        if (!chainDoc.exists()) throw StoryChainLimitError.ChainNotFound
-        val createdAt = (chainDoc.get("createdAt") as? Timestamp)?.toDate()
-            ?: throw StoryChainLimitError.ChainNotFound
+        // The first part is authoritative. Global metadata remains a fallback
+        // for legacy chains that predate public story-chain reads.
+        val firstPart = firestore.collectionGroup("stories")
+            .whereEqualTo("chainId", chainId)
+            .whereEqualTo("audience", "everyone")
+            .orderBy("chainPosition", Query.Direction.ASCENDING)
+            .limit(1)
+            .get().await()
+        val createdAt = firstPart.documents.firstOrNull()?.getTimestamp("timestamp")?.toDate()
+            ?: run {
+                val chainDoc = firestore.collection("storyChains").document(chainId).get().await()
+                if (!chainDoc.exists()) throw StoryChainLimitError.ChainNotFound
+                chainDoc.getTimestamp("createdAt")?.toDate()
+                    ?: throw StoryChainLimitError.ChainNotFound
+            }
         val expiration = Calendar.getInstance().apply {
             time = createdAt
             add(Calendar.HOUR_OF_DAY, StoryChainLimits.EXPIRATION_HOURS)
@@ -107,6 +116,9 @@ object StoryChainLimitsService {
     suspend fun getChainStats(chainId: String): ChainStats {
         val partCount = firestore.collectionGroup("stories")
             .whereEqualTo("chainId", chainId)
+            .whereEqualTo("audience", "everyone")
+            .orderBy("chainPosition", Query.Direction.ASCENDING)
+            .limit(StoryChainLimits.MAX_PARTS.toLong())
             .get()
             .await()
             .size()

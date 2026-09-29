@@ -2500,7 +2500,7 @@ Anda dapat mengubah izin ini di pengaturan perangkat. Jika izin dinonaktifkan, b
     <string name="settings_connections_pending">Visibilitas koneksi</string>
     <string name="settings_connections_pending_body">Port ConnectionVisibilityView (SettingsSections) masih tertunda.</string>
     <string name="story_chains_loading">Memuat rantai…</string>
-    <string name="story_chains_not_found">Tidak ada cerita dalam rantai ini</string>
+    <string name="story_chains_not_found">Rangkaian ini sudah tidak tersedia</string>
     <string name="story_chains_parts">%1$d/%2$d bagian</string>
     <string name="story_chains_expired">• Kedaluwarsa</string>
     <string name="story_chains_continue_story">Lanjutkan cerita</string>
@@ -2771,6 +2771,8 @@ Anda dapat mengubah izin ini di pengaturan perangkat. Jika izin dinonaktifkan, b
     <string name="story_chains_title_placeholder">Masukkan judul rangkaian</string>
     <string name="story_chains_continuing">Melanjutkan: %1$s</string>
     <string name="story_chains_part_short">Bagian %1$d</string>
+    <string name="story_chains_start">Awal</string>
+    <string name="story_chains_end">Akhir</string>
     <string name="story_chains_error_invalid_title">Tambahkan judul rangkaian yang valid sebelum membagikannya.</string>
     <string name="story_chains_error_max_parts">Rangkaian ini sudah mencapai batas maksimum %1$d bagian</string>
     <string name="story_chains_error_expired">Rangkaian ini sudah berakhir.</string>

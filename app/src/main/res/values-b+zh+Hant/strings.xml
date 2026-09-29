@@ -2500,7 +2500,7 @@
     <string name="settings_connections_pending">連線可見度</string>
     <string name="settings_connections_pending_body">ConnectionVisibilityView（SettingsSections）尚待實作。</string>
     <string name="story_chains_loading">正在載入故事串…</string>
-    <string name="story_chains_not_found">此故事串中沒有找到任何限時動態</string>
+    <string name="story_chains_not_found">此接龍已無法使用</string>
     <string name="story_chains_parts">%1$d/%2$d 段</string>
     <string name="story_chains_expired">• 已過期</string>
     <string name="story_chains_continue_story">繼續故事串</string>
@@ -2771,6 +2771,8 @@
     <string name="story_chains_title_placeholder">輸入接龍標題</string>
     <string name="story_chains_continuing">接續：%1$s</string>
     <string name="story_chains_part_short">第 %1$d 部</string>
+    <string name="story_chains_start">開始</string>
+    <string name="story_chains_end">結束</string>
     <string name="story_chains_error_invalid_title">請先新增有效的接龍標題，再分享。</string>
     <string name="story_chains_error_max_parts">此接龍已達到最多 %1$d 部</string>
     <string name="story_chains_error_expired">此接龍已過期。</string>

@@ -2500,7 +2500,7 @@
     <string name="settings_connections_pending">कनेक्शन की दृश्यता</string>
     <string name="settings_connections_pending_body">ConnectionVisibilityView (SettingsSections) का पोर्ट लंबित है।</string>
     <string name="story_chains_loading">चेन लोड हो रही है…</string>
-    <string name="story_chains_not_found">इस चेन में कोई स्टोरी नहीं मिली</string>
+    <string name="story_chains_not_found">यह चेन अब उपलब्ध नहीं है</string>
     <string name="story_chains_parts">%1$d/%2$d भाग</string>
     <string name="story_chains_expired">• समाप्त हो गई</string>
     <string name="story_chains_continue_story">स्टोरी जारी रखें</string>
@@ -2771,6 +2771,8 @@
     <string name="story_chains_title_placeholder">चेन का शीर्षक डालें</string>
     <string name="story_chains_continuing">जारी है: %1$s</string>
     <string name="story_chains_part_short">भाग %1$d</string>
+    <string name="story_chains_start">शुरुआत</string>
+    <string name="story_chains_end">अंत</string>
     <string name="story_chains_error_invalid_title">शेयर करने से पहले चेन का सही शीर्षक जोड़ें।</string>
     <string name="story_chains_error_max_parts">इस चेन में अधिकतम %1$d भाग पूरे हो चुके हैं</string>
     <string name="story_chains_error_expired">इस चेन की समय-सीमा समाप्त हो गई है।</string>

@@ -2500,7 +2500,7 @@ Bu izinleri cihazının ayarlarından değiştirebilirsin. İzinleri kapatırsan
     <string name="settings_connections_pending">Bağlantı görünürlüğü</string>
     <string name="settings_connections_pending_body">ConnectionVisibilityView (SettingsSections) için uygulama henüz tamamlanmadı.</string>
     <string name="story_chains_loading">Zincir yükleniyor…</string>
-    <string name="story_chains_not_found">Bu zincirde hikâye bulunamadı</string>
+    <string name="story_chains_not_found">Bu zincir artık kullanılamıyor</string>
     <string name="story_chains_parts">%1$d/%2$d parça</string>
     <string name="story_chains_expired">• Süresi doldu</string>
     <string name="story_chains_continue_story">Hikâyeye devam et</string>
@@ -2771,6 +2771,8 @@ Bu izinleri cihazının ayarlarından değiştirebilirsin. İzinleri kapatırsan
     <string name="story_chains_title_placeholder">Zincir başlığını gir</string>
     <string name="story_chains_continuing">Devam ediyor: %1$s</string>
     <string name="story_chains_part_short">Bölüm %1$d</string>
+    <string name="story_chains_start">Başlangıç</string>
+    <string name="story_chains_end">Bitiş</string>
     <string name="story_chains_error_invalid_title">Paylaşmadan önce geçerli bir zincir başlığı ekle.</string>
     <string name="story_chains_error_max_parts">Bu zincir %1$d bölümlük maksimum sınıra ulaştı</string>
     <string name="story_chains_error_expired">Bu zincirin süresi doldu.</string>

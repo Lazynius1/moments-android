@@ -2500,7 +2500,7 @@
     <string name="settings_connections_pending">연결 공개 범위</string>
     <string name="settings_connections_pending_body">ConnectionVisibilityView(SettingsSections) 구현 대기 중입니다.</string>
     <string name="story_chains_loading">체인을 불러오는 중…</string>
-    <string name="story_chains_not_found">이 체인에서 스토리를 찾을 수 없어요</string>
+    <string name="story_chains_not_found">이 체인은 더 이상 사용할 수 없어요</string>
     <string name="story_chains_parts">%1$d/%2$d개 파트</string>
     <string name="story_chains_expired">• 만료됨</string>
     <string name="story_chains_continue_story">스토리 이어가기</string>
@@ -2771,6 +2771,8 @@
     <string name="story_chains_title_placeholder">체인 제목을 입력하세요</string>
     <string name="story_chains_continuing">이어지는 이야기: %1$s</string>
     <string name="story_chains_part_short">%1$d부</string>
+    <string name="story_chains_start">처음</string>
+    <string name="story_chains_end">끝</string>
     <string name="story_chains_error_invalid_title">공유하기 전에 올바른 체인 제목을 입력하세요.</string>
     <string name="story_chains_error_max_parts">이 체인은 최대 %1$d부까지 만들 수 있어요</string>
     <string name="story_chains_error_expired">이 체인은 만료되었어요.</string>

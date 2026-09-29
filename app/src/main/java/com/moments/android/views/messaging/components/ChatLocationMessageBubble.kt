@@ -218,10 +218,14 @@ fun ChatLocationMessageBubble(
                     modifier = Modifier.fillMaxSize(),
                 )
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    if (isLive && !senderId.isNullOrBlank()) {
-                        LiveLocationAvatarPin(senderId = senderId, avatarSize = 40.dp, isActive = isLiveActive)
+                    if (!senderId.isNullOrBlank()) {
+                        LiveLocationAvatarPin(
+                            senderId = senderId,
+                            avatarSize = 40.dp,
+                            isActive = !isLive || isLiveActive,
+                        )
                     } else {
-                        // ≡ iOS `mappin.circle.fill` rojo (estática; live sin senderId también pin)
+                        // Fallback para mensajes antiguos sin emisor.
                         Icon(
                             Icons.Default.LocationOn,
                             contentDescription = null,
@@ -516,8 +520,12 @@ fun ChatLocationDetailView(
                         allowOverlap(true)
                     },
                 ) {
-                    if (isLive && !senderId.isNullOrBlank()) {
-                        LiveLocationAvatarPin(senderId = senderId, avatarSize = 48.dp, isActive = isLiveActive)
+                    if (!senderId.isNullOrBlank()) {
+                        LiveLocationAvatarPin(
+                            senderId = senderId,
+                            avatarSize = 48.dp,
+                            isActive = !isLive || isLiveActive,
+                        )
                     } else {
                         Icon(
                             Icons.Default.LocationOn,

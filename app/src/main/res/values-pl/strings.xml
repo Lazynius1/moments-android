@@ -2500,7 +2500,7 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="settings_connections_pending">Widoczność połączeń</string>
     <string name="settings_connections_pending_body">Oczekuje na przeniesienie ConnectionVisibilityView (SettingsSections).</string>
     <string name="story_chains_loading">Ładowanie łańcucha…</string>
-    <string name="story_chains_not_found">Nie znaleziono relacji w tym łańcuchu</string>
+    <string name="story_chains_not_found">Ten łańcuch nie jest już dostępny</string>
     <string name="story_chains_parts">%1$d/%2$d części</string>
     <string name="story_chains_expired">• Wygasł</string>
     <string name="story_chains_continue_story">Kontynuuj relację</string>
@@ -2771,6 +2771,8 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="story_chains_title_placeholder">Wpisz tytuł łańcucha</string>
     <string name="story_chains_continuing">Ciąg dalszy: %1$s</string>
     <string name="story_chains_part_short">Część %1$d</string>
+    <string name="story_chains_start">Początek</string>
+    <string name="story_chains_end">Koniec</string>
     <string name="story_chains_error_invalid_title">Dodaj prawidłowy tytuł łańcucha, zanim go udostępnisz.</string>
     <string name="story_chains_error_max_parts">Ten łańcuch osiągnął maksymalną liczbę części: %1$d</string>
     <string name="story_chains_error_expired">Ten łańcuch wygasł.</string>

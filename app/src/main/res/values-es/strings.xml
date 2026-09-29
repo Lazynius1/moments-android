@@ -1594,7 +1594,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="location_moment_detail_delete_confirm">Eliminar</string>
     <string name="location_moment_detail_delete_message">¿Estás seguro de que quieres eliminar este momento? Esta acción no se puede deshacer.</string>
     <string name="story_chains_loading">Cargando cadena…</string>
-    <string name="story_chains_not_found">No se encontraron historias en esta cadena</string>
+    <string name="story_chains_not_found">Esta cadena ya no está disponible</string>
     <string name="story_chains_parts">%1$d/%2$d partes</string>
     <string name="story_chains_expired">• Expirada</string>
     <string name="story_chains_continue_story">Continuar Historia</string>
@@ -2323,6 +2323,8 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="story_chains_title_placeholder">Introduce el título de la cadena</string>
     <string name="story_chains_continuing">Continuando: %1$s</string>
     <string name="story_chains_part_short">Parte %1$d</string>
+    <string name="story_chains_start">Inicio</string>
+    <string name="story_chains_end">Final</string>
     <string name="story_chains_error_invalid_title">Añade un título válido antes de compartir.</string>
     <string name="story_chains_error_max_parts">Esta cadena ha alcanzado el máximo de %1$d partes</string>
     <string name="story_chains_error_expired">Esta cadena ha caducado.</string>

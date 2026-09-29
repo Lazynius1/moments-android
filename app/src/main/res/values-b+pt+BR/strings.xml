@@ -821,7 +821,7 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="profile_thumbnail_video_duration">%1$d:%2$02d</string>
     <string name="maps_error_retry">Tentar novamente</string>
     <string name="story_chains_loading">Carregando sequência…</string>
-    <string name="story_chains_not_found">Nenhum story encontrado nesta sequência</string>
+    <string name="story_chains_not_found">Esta sequência não está mais disponível</string>
     <string name="story_chains_parts">%1$d/%2$d partes</string>
     <string name="story_chains_expired">• Expirada</string>
     <string name="story_chains_continue_story">Continuar story</string>
@@ -1748,6 +1748,8 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="story_chains_title_placeholder">Digite o título da sequência</string>
     <string name="story_chains_continuing">Continuando: %1$s</string>
     <string name="story_chains_part_short">Parte %d</string>
+    <string name="story_chains_start">Início</string>
+    <string name="story_chains_end">Final</string>
     <string name="story_chains_error_invalid_title">Adicione um título válido antes de compartilhar.</string>
     <string name="story_chains_error_max_parts">Esta sequência atingiu o máximo de %1$d partes</string>
     <string name="story_chains_error_expired">Esta cadeia expirou.</string>

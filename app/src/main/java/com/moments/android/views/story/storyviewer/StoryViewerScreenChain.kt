@@ -56,6 +56,7 @@ internal object StoryViewerChainLogic {
         val ultimate = runCatching {
             db.collectionGroup("stories")
                 .whereEqualTo("chainId", chainId)
+                .whereEqualTo("audience", "everyone")
                 .whereEqualTo("chainPosition", 1)
                 .limit(1)
                 .get().await()

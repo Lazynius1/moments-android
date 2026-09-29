@@ -2500,7 +2500,7 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="settings_connections_pending">Zichtbaarheid van connecties</string>
     <string name="settings_connections_pending_body">Port van ConnectionVisibilityView (SettingsSections) in behandeling.</string>
     <string name="story_chains_loading">Reeks wordt geladen…</string>
-    <string name="story_chains_not_found">Geen verhalen gevonden in deze reeks</string>
+    <string name="story_chains_not_found">Deze reeks is niet meer beschikbaar</string>
     <string name="story_chains_parts">%1$d/%2$d onderdelen</string>
     <string name="story_chains_expired">• Verlopen</string>
     <string name="story_chains_continue_story">Verhaal voortzetten</string>
@@ -2771,6 +2771,8 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="story_chains_title_placeholder">Voer de titel van de keten in</string>
     <string name="story_chains_continuing">Vervolg: %1$s</string>
     <string name="story_chains_part_short">Deel %1$d</string>
+    <string name="story_chains_start">Begin</string>
+    <string name="story_chains_end">Einde</string>
     <string name="story_chains_error_invalid_title">Voeg een geldige ketentitel toe voordat je deelt.</string>
     <string name="story_chains_error_max_parts">Deze keten heeft het maximum van %1$d delen bereikt</string>
     <string name="story_chains_error_expired">Deze keten is verlopen.</string>

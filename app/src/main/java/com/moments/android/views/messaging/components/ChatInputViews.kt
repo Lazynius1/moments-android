@@ -272,6 +272,7 @@ fun GlassmorphicInputBar(
     allowsAttachments: Boolean = true,
     allowsVoiceRecording: Boolean = true,
     isAttachmentMenuOpen: Boolean = false,
+    composerFocusEpoch: Int = 0,
     onSend: () -> Unit,
     onCancelReply: () -> Unit = {},
     onCancelEdit: () -> Unit = {},
@@ -375,6 +376,12 @@ fun GlassmorphicInputBar(
             focusRequester.requestFocus()
             keyboardController?.show()
         }
+    }
+
+    LaunchedEffect(composerFocusEpoch) {
+        if (composerFocusEpoch <= 0) return@LaunchedEffect
+        focusRequester.requestFocus()
+        keyboardController?.show()
     }
 
     // Franja unificada: controles 44dp, campo plano al centro.

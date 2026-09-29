@@ -26,6 +26,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -63,7 +64,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import android.view.inputmethod.InputMethodManager
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -215,6 +218,7 @@ fun GlassmorphicChatView(
     val keyboardScrollCoordinator = rememberChatKeyboardScrollCoordinator()
     val messagePresentation = rememberChatMessagePresentationState()
     messagePresentation.rowFrameProvider = { listController.frameInWindow(it) }
+    var composerFocusEpoch by remember { mutableIntStateOf(0) }
     val listPresentation = rememberChatMessageListPresentation()
     val unreadDivider = remember(session) { ChatUnreadDividerController(session) }
     val voiceGestureState = remember { VoiceRecordingGestureState() }
@@ -260,7 +264,43 @@ fun GlassmorphicChatView(
     val forwardingPreferences by session.forwardingPreferences.collectAsState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val rootView = LocalView.current
     val scope = rememberCoroutineScope()
+
+    messagePresentation.hideKeyboardBeforeMenu = {
+        val open = keyboardScrollCoordinator.isVisible ||
+            keyboardScrollCoordinator.keyboardHeightPx > 0f ||
+            rootKeyboardInsetPx(rootView) > 8f
+        focusManager.clearFocus(force = true)
+        keyboardController?.hide()
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(rootView.windowToken, 0)
+        open
+    }
+    messagePresentation.runAfterKeyboardHidden = { onReady ->
+        scope.launch {
+            val startInset = maxOf(
+                rootKeyboardInsetPx(rootView),
+                keyboardScrollCoordinator.keyboardHeightPx,
+            )
+            val deadlineNs = System.nanoTime() + 280_000_000L
+            while (System.nanoTime() < deadlineNs) {
+                val inset = maxOf(
+                    rootKeyboardInsetPx(rootView),
+                    keyboardScrollCoordinator.keyboardHeightPx,
+                )
+                if (inset <= 24f) break
+                if (startInset > 0f && inset <= startInset * 0.2f) break
+                delay(8)
+            }
+            // Frames para que adjustResize + lista asienten el ancla.
+            delay(32)
+            onReady()
+        }
+    }
+    messagePresentation.requestComposerFocus = {
+        composerFocusEpoch += 1
+    }
 
     // ≡ iOS onChange(of: activeAttachmentSheet) → isTextFieldFocused = false
     LaunchedEffect(attachmentSheet) {
@@ -1193,6 +1233,7 @@ fun GlassmorphicChatView(
                     focusManager.clearFocus()
                     keyboardController?.hide()
                 },
+                composerFocusEpoch = composerFocusEpoch,
                 isGroup = conversation.isGroup,
                 groupSendLocked = conversation.isGroup &&
                     groupDirectory[conversation.id]?.sendPermission == "admins" &&
@@ -1819,6 +1860,14 @@ private fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+/** Inset IME real vía visible display frame (el host a veces come WindowInsets.ime). */
+private fun rootKeyboardInsetPx(view: android.view.View): Float {
+    val root = view.rootView
+    val visible = android.graphics.Rect()
+    root.getWindowVisibleDisplayFrame(visible)
+    return (root.height - visible.bottom).toFloat().coerceAtLeast(0f)
 }
 
 private fun messageIds(item: MessageItem): Set<String> = when (item) {

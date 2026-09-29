@@ -398,6 +398,7 @@ internal fun ChatComposerChrome(
     onReplyAfterAcceptance: (String, String) -> Unit = { _, _ -> },
     /** ≡ iOS `isTextFieldFocused = false` tras enviar request. */
     onPendingRequestSent: () -> Unit = {},
+    composerFocusEpoch: Int = 0,
     isGroup: Boolean = false,
     groupSendLocked: Boolean = false,
     groupMentionMembers: List<com.moments.android.views.messaging.groups.GroupMember> = emptyList(),
@@ -486,6 +487,7 @@ internal fun ChatComposerChrome(
                 allowsAttachments = !controller.isPendingChat || controller.pendingChatCanType,
                 allowsVoiceRecording = !controller.isPendingChat,
                 isAttachmentMenuOpen = isAttachmentMenuOpen,
+                composerFocusEpoch = composerFocusEpoch,
                 onCancelReply = onReplyingFinished,
                 onCancelEdit = {
                     onEditingFinished()
@@ -668,6 +670,9 @@ class ChatMessagePresentationState {
     var flashingMessageIds by mutableStateOf(emptySet<String>())
     /** ≡ iOS `chatListController.frameInWindow(forRowId:)`. */
     var rowFrameProvider: ((String) -> Rect?)? = null
+    var hideKeyboardBeforeMenu: (() -> Boolean)? = null
+    var requestComposerFocus: (() -> Unit)? = null
+    private var restoreComposerFocusAfterMenu = false
 
     fun presentMessageOptions(
         message: EnhancedMessage,
@@ -681,6 +686,10 @@ class ChatMessagePresentationState {
             ?: Rect.Zero
         // ≡ iOS guard anchorFrame.width > 0, height > 0
         if (frame.width <= 0f || frame.height <= 0f) return
+        if (menuSelection == null) {
+            restoreComposerFocusAfterMenu = hideKeyboardBeforeMenu?.invoke() == true
+        }
+        // ≡ iOS: menú al instante; el teclado baja en paralelo.
         menuSelection = ChatMessageMenuSelection(
             rowId = rowId,
             message = message,
@@ -692,7 +701,23 @@ class ChatMessagePresentationState {
         )
     }
 
-    fun clearMessageOptions() { menuSelection = null }
+    /** Re-ancla tras reflow del IME (la fila se mueve al expandir el viewport). */
+    fun refreshMenuAnchor(rowId: String) {
+        val current = menuSelection ?: return
+        if (current.rowId != rowId) return
+        val fresh = rowFrameProvider?.invoke(rowId)
+            ?.takeIf { it.width > 0f && it.height > 0f }
+            ?: return
+        if (fresh == current.anchorFrame) return
+        menuSelection = current.copy(anchorFrame = fresh)
+    }
+
+    fun clearMessageOptions() {
+        val restore = restoreComposerFocusAfterMenu
+        restoreComposerFocusAfterMenu = false
+        menuSelection = null
+        if (restore) requestComposerFocus?.invoke()
+    }
     fun updateMenuLiftOffset(rowId: String, offsetY: Float) {
         val current = menuSelection ?: return
         if (current.rowId != rowId || current.liftOffsetY == offsetY) return

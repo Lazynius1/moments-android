@@ -835,7 +835,7 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="profile_thumbnail_video_duration">%1$d:%2$02d</string>
     <string name="maps_error_retry">Réessayer</string>
     <string name="story_chains_loading">Chargement de la chaîne…</string>
-    <string name="story_chains_not_found">Aucune story trouvée dans cette chaîne</string>
+    <string name="story_chains_not_found">Cette chaîne n’est plus disponible</string>
     <string name="story_chains_parts">%1$d/%2$d parties</string>
     <string name="story_chains_expired">• Expirée</string>
     <string name="story_chains_continue_story">Continuer la story</string>
@@ -1763,6 +1763,8 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="story_chains_title_placeholder">Saisissez le titre de la chaîne</string>
     <string name="story_chains_continuing">Continuation : %1$s</string>
     <string name="story_chains_part_short">Partie %d</string>
+    <string name="story_chains_start">Début</string>
+    <string name="story_chains_end">Fin</string>
     <string name="story_chains_error_invalid_title">Ajoutez un titre valide avant de partager.</string>
     <string name="story_chains_error_max_parts">Cette chaîne a atteint le maximum de %1$d parties</string>
     <string name="story_chains_error_expired">Cette chaîne a expiré.</string>

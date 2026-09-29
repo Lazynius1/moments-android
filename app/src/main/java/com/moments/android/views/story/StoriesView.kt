@@ -61,6 +61,7 @@ import com.moments.android.reportes.ReportTarget
 import com.moments.android.services.auth.AuthService
 import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.social.StoryChainLimits
 import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import com.moments.android.views.story.storyviewer.GlassmorphicEmptyState
 import com.moments.android.views.story.storyviewer.StoryDeckPageRole
@@ -108,6 +109,7 @@ fun StoriesView(
     val viewModel = remember { StoryViewModel() }
     val firestore = remember { FirestoreService() }
     val scope = rememberCoroutineScope()
+    var activeHighlightTitle by remember { mutableStateOf(highlightTitle) }
     val deckGestureGate = remember { StoryDeckGestureGate() }
 
     MomentsTabBarHidden()
@@ -411,7 +413,9 @@ fun StoriesView(
             val loaded = runCatching {
                 firestore.db.collectionGroup("stories")
                     .whereEqualTo("chainId", chainId)
+                    .whereEqualTo("audience", "everyone")
                     .orderBy("chainPosition")
+                    .limit(StoryChainLimits.MAX_PARTS.toLong())
                     .get().await()
                     .documents.mapNotNull { doc ->
                         @Suppress("UNCHECKED_CAST")
@@ -430,6 +434,9 @@ fun StoriesView(
      * [loadedChain] viene del viewer (ya hidratado); si el autor no está en el ring, instala el carril.
      */
     fun navigateToChainStory(storyId: String, chainIndex: Int, loadedChain: List<Story> = emptyList()) {
+        loadedChain.getOrNull(chainIndex)?.chainTitle
+            ?.takeIf { it.isNotBlank() }
+            ?.let { activeHighlightTitle = it }
         // Ya en carril `__chain__`: solo avanzar índice (prev/next chrome)
         if (isInChainMode || hostUserIds.singleOrNull() == chainRailId) {
             val rail = when {
@@ -771,7 +778,7 @@ fun StoriesView(
                             storyIndex = storyIndex,
                             viewModel = viewModel,
                             isDeckPageActive = role == StoryDeckPageRole.CENTER && !isDraggingDeck,
-                            highlightTitle = if (role == StoryDeckPageRole.CENTER) highlightTitle else null,
+                            highlightTitle = if (role == StoryDeckPageRole.CENTER) activeHighlightTitle else null,
                             showingReportSheet = showingReportSheet,
                             showingBlockConfirmation = showingBlockConfirmation,
                             gestureGate = deckGestureGate,
@@ -824,7 +831,7 @@ fun StoriesView(
                         storyIndex = storyIndex,
                         viewModel = viewModel,
                         isDeckPageActive = true,
-                        highlightTitle = highlightTitle,
+                        highlightTitle = activeHighlightTitle,
                         showingReportSheet = showingReportSheet,
                         showingBlockConfirmation = showingBlockConfirmation,
                         gestureGate = deckGestureGate,

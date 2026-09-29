@@ -853,7 +853,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="settings_account_management_desc">Konto deaktivieren oder löschen</string>
     <string name="maps_error_retry">Erneut versuchen</string>
     <string name="story_chains_loading">Kette wird geladen…</string>
-    <string name="story_chains_not_found">Keine Stories in dieser Kette gefunden</string>
+    <string name="story_chains_not_found">Diese Kette ist nicht mehr verfügbar</string>
     <string name="story_chains_parts">%1$d/%2$d Teile</string>
     <string name="story_chains_expired">• Abgelaufen</string>
     <string name="story_chains_continue_story">Story fortsetzen</string>
@@ -1773,6 +1773,8 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="story_chains_title_placeholder">Gib den Titel der Kette ein</string>
     <string name="story_chains_continuing">Wird fortgesetzt: %1$s</string>
     <string name="story_chains_part_short">Teil %d</string>
+    <string name="story_chains_start">Anfang</string>
+    <string name="story_chains_end">Ende</string>
     <string name="story_chains_error_invalid_title">Füge einen gültigen Kettentitel hinzu, bevor du teilst.</string>
     <string name="story_chains_error_max_parts">Diese Kette hat das Maximum von %1$d Teilen erreicht</string>
     <string name="story_chains_error_expired">Diese Kette ist abgelaufen.</string>
