@@ -2401,4 +2401,10 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="audience_manage_members_remove_title">Vols eliminar membres de la llista?</string>
     <string name="audience_manage_members_remove_single">Eliminaràs %1$s de «%2$s». Aquest canvi es desarà immediatament.</string>
     <string name="audience_manage_members_remove_plural">Eliminaràs %1$s i %2$d persones més de «%3$s». Aquest canvi es desarà immediatament.</string>
+    <string name="onboarding_resume_banner">Acaba de crear el teu perfil</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">A prop teu</string>
+    <string name="maps_chrome_choose_city">Tria una ciutat</string>
+    <string name="maps_chrome_recenter">La meva ubicació</string>
 </resources>

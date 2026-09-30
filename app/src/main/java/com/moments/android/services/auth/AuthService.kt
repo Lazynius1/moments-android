@@ -233,6 +233,8 @@ object AuthService {
     }
 
     private suspend fun handleAuthStateChange(user: FirebaseUser?) {
+        // Un evento encolado puede pertenecer a la sesión anterior.
+        if (user?.uid != auth.currentUser?.uid) return
         invalidateChatScopedStateIfNeeded(user?.uid)
 
         if (transitionLock) {
@@ -659,7 +661,7 @@ object AuthService {
         _isRegistering.value = true
         OnboardingDraftStore.markStarted(OnboardingDraftContext.EMAIL)
         OnboardingDraftStore.update(
-            step = 3,
+            step = 5,
             username = username,
             email = email,
             selectedInterests = interests,
@@ -668,13 +670,13 @@ object AuthService {
 
         val usernameLower = username.lowercase()
         val usernameDoc = db.collection("usernames").document(usernameLower).get().await()
-        if (usernameDoc.exists()) {
+        val existingUser = auth.currentUser
+        val isResumingExistingAuth = existingUser?.email?.equals(email.trim(), ignoreCase = true) == true
+        val ownsUsername = isResumingExistingAuth && existingUser != null && usernameDoc.getString("userId") == existingUser.uid
+        if (usernameDoc.exists() && !ownsUsername) {
             clearRegistrationState()
             throw authError(R.string.auth_error_usernameUnavailable)
         }
-
-        val existingUser = auth.currentUser
-        val isResumingExistingAuth = existingUser?.email?.equals(email.trim(), ignoreCase = true) == true
 
         val finalizeRegistration: suspend (FirebaseUser, String) -> Unit = { user, userId ->
             OnboardingDraftStore.updateUID(userId)
@@ -824,21 +826,20 @@ object AuthService {
         return RegistrationSessionResolution.IncompleteProfile
     }
 
-    fun completeRegistration() {
-        scope.launch {
-            authMutex.withLock {
-                registrationState = RegistrationState.COMPLETING
-                authProcessingEnabled = true
-                transitionLock = true
-            }
-            val user = auth.currentUser ?: _currentFirebaseUser.value
-            if (user != null) {
-                handleRegistrationCompletion(user)
-            } else {
-                clearRegistrationState()
-                authMutex.withLock { transitionLock = false }
-            }
+    suspend fun completeRegistration(): Boolean {
+        authMutex.withLock {
+            registrationState = RegistrationState.COMPLETING
+            authProcessingEnabled = true
+            transitionLock = true
         }
+        val user = auth.currentUser
+        if (user != null) {
+            handleRegistrationCompletion(user)
+        } else {
+            clearRegistrationState()
+            authMutex.withLock { transitionLock = false }
+        }
+        return _isLoggedIn.value && _authState.value == AuthState.Authenticated
     }
 
     private suspend fun handleRegistrationCompletion(user: FirebaseUser?) {
@@ -850,7 +851,10 @@ object AuthService {
         // ≡ iOS: 1s para que Firestore esté listo
         delay(1_000)
 
+        if (auth.currentUser?.uid != user.uid) return
+
         val check = checkAccountStatus(user.uid)
+        if (auth.currentUser?.uid != user.uid) return
         _isVerifyingAccount.value = false
 
         if (check.isSuspended) return
@@ -862,30 +866,35 @@ object AuthService {
             // ≡ iOS: isRegistering→false a +2s; transitionLock→false a +3s (desde éxito)
             scope.launch {
                 delay(2_000)
+                if (auth.currentUser?.uid != user.uid) return@launch
                 _isRegistering.value = false
                 authMutex.withLock {
                     registrationState = RegistrationState.IDLE
                     authProcessingEnabled = true
                 }
                 delay(1_000)
+                if (auth.currentUser?.uid != user.uid) return@launch
                 authMutex.withLock { transitionLock = false }
             }
             return
         }
 
         val retry = retryUserFetchForNewUser(user.uid)
+        if (auth.currentUser?.uid != user.uid) return
         if (retry.isActive && retry.user != null) {
             FeedTypePreferences.save(FirebaseApp.getInstance().applicationContext, FeedType.ForYou)
             OnboardingDraftStore.clear()
             hydrateAuthenticatedSession(user, retry.user)
             scope.launch {
                 delay(2_000)
+                if (auth.currentUser?.uid != user.uid) return@launch
                 _isRegistering.value = false
                 authMutex.withLock {
                     registrationState = RegistrationState.IDLE
                     authProcessingEnabled = true
                 }
                 delay(1_000)
+                if (auth.currentUser?.uid != user.uid) return@launch
                 authMutex.withLock { transitionLock = false }
             }
         } else {
@@ -1350,6 +1359,7 @@ object AuthService {
         if (auth.currentUser != null) return
         val draft = OnboardingDraftStore.load() ?: return
         if (OnboardingDraftStore.isExpired(draft)) return
+        if (draft.context != OnboardingDraftContext.EMAIL) return
         beginOnboardingResumeWithoutAuthenticatedUser(draft)
     }
 

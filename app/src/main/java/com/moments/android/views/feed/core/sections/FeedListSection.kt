@@ -64,7 +64,7 @@ fun FeedListSection(
     onLoadMore: () -> Unit,
     onOpenUserProfile: (String) -> Unit,
     onOpenHashtag: (String) -> Unit,
-    onOpenLocation: (String, com.moments.android.models.Moment.LocationCoordinate?) -> Unit,
+    onOpenLocation: (String, com.moments.android.models.Moment.LocationCoordinate?, com.moments.android.services.content.FeedMoment) -> Unit,
     onOpenComments: (FeedMoment) -> Unit,
     onShare: (FeedMoment) -> Unit,
     isFeedHeaderHidden: Boolean = false,
@@ -285,7 +285,7 @@ fun FeedListSection(
                                         onOpenProfile = { onOpenUserProfile(moment.authorId) },
                                         onOpenHashtag = onOpenHashtag,
                                         onOpenLocation = { name, coordinate ->
-                                            onOpenLocation(name, coordinate)
+                                            onOpenLocation(name, coordinate, moment)
                                         },
                                         onOpenComments = { onOpenComments(moment) },
                                         onShare = { onShare(moment) },

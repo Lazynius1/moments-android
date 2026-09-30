@@ -2397,4 +2397,10 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="audience_manage_members_remove_title">Remover membros da lista?</string>
     <string name="audience_manage_members_remove_single">Você está prestes a remover %1$s de “%2$s”. Esta alteração será salva imediatamente.</string>
     <string name="audience_manage_members_remove_plural">Você está prestes a remover %1$s e mais %2$d pessoas de “%3$s”. Esta alteração será salva imediatamente.</string>
+    <string name="onboarding_resume_banner">Termine de criar seu perfil</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">Perto de você</string>
+    <string name="maps_chrome_choose_city">Escolha uma cidade</string>
+    <string name="maps_chrome_recenter">Minha localização</string>
 </resources>

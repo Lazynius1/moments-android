@@ -20,6 +20,7 @@ enum class AttachmentIcon(@DrawableRes val drawableRes: Int) {
     GIF(R.drawable.attachment_gif_icon),
     LOCATION(R.drawable.attachment_location_icon),
     LIVE_LOCATION(R.drawable.attachment_live_location_icon),
+    MAP(R.drawable.attachment_map_icon),
     VOICE(R.drawable.attachment_voice_icon),
     EPHEMERAL(R.drawable.attachment_ephemeral_icon),
     STORY_EPHEMERAL(R.drawable.attachment_story_ephemeral_icon),

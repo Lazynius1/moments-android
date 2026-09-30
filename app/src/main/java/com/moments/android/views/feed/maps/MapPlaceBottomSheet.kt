@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -55,12 +56,13 @@ import com.moments.android.views.creator.creatoruikit.feedCropTransformations
 import com.moments.android.views.feed.maps.mapPreferredFeedCrop
 import com.moments.android.views.feed.maps.mapPreferredImageUrl
 import com.moments.android.R
-import com.moments.android.extensions.momentsChromeGlass
+import androidx.compose.material3.MaterialTheme
 import com.moments.android.views.components.LocationMomentCardSkeletonView
 import com.moments.android.views.feed.maps.mapssections.MapBottomSheetGridCell
 import com.moments.android.views.feed.maps.mapssections.ModernLocationMomentRow
 import com.moments.android.views.feed.rememberAdaptiveColors
 import com.moments.android.views.story.StoryRingAvatarView
+import com.moments.android.views.components.LiveUsernameText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -84,14 +86,22 @@ fun MapPlaceBottomSheet(
     /** null ≡ iOS Binding opcional — no muestra chips (LocationMap). */
     timeFilter: MapDiscoverTimeFilter? = null,
     onTimeFilterChange: ((MapDiscoverTimeFilter) -> Unit)? = null,
+    socialMode: Boolean = false,
+    showsHeader: Boolean = true,
+    showsStoryStrip: Boolean = true,
+    contentHeight: androidx.compose.ui.unit.Dp = 520.dp,
+    hasMoreContent: Boolean = false,
+    paginationKey: String = "",
+    isLoadingMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
     onDismiss: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val colors = rememberAdaptiveColors()
-    val showsPlaceIndex = cluster.isAggregate && placeIndex.size > 1 && onPlaceTap != null
-    var viewMode by remember(cluster.id, showsPlaceIndex) {
-        mutableStateOf(if (showsPlaceIndex) MapPlaceSheetViewMode.List else MapPlaceSheetViewMode.Gallery)
+    val showsPlaceIndex = !socialMode && cluster.isAggregate && placeIndex.size > 1 && onPlaceTap != null
+    var viewMode by remember(cluster.id, showsPlaceIndex, socialMode) {
+        mutableStateOf(if (socialMode || showsPlaceIndex) MapPlaceSheetViewMode.List else MapPlaceSheetViewMode.Gallery)
     }
     var displayTitle by remember(cluster.id, cluster.displayName) { mutableStateOf(cluster.displayName) }
 
@@ -131,6 +141,8 @@ fun MapPlaceBottomSheet(
             viewMode = viewMode,
             onViewModeChange = { viewMode = it },
             onPlaceStoriesTap = onPlaceStoriesTap,
+            showsStoryPreview = !socialMode,
+            showsTitle = showsHeader,
         )
 
         if (timeFilter != null) {
@@ -138,6 +150,34 @@ fun MapPlaceBottomSheet(
                 selected = timeFilter,
                 onSelect = { onTimeFilterChange?.invoke(it) },
             )
+        }
+
+        if (showsStoryStrip && socialMode && !isLoading && cluster.stories.isNotEmpty()) {
+            val authors = cluster.stories.sortedByDescending { it.timestamp.time }.distinctBy { it.authorId }
+            LazyRow(
+                Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                items(authors, key = { it.authorId }) { story ->
+                    Column(
+                        Modifier.width(80.dp).clickable {
+                            onPlaceStoriesTap(cluster.copy(
+                                id = "${cluster.id}-${story.authorId}",
+                                stories = cluster.stories.filter { it.authorId == story.authorId },
+                                moments = emptyList(),
+                                friends = emptyList(),
+                            ))
+                        },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        StoryRingAvatarView(userId = story.authorId, size = 48.dp, lineWidth = 2.dp)
+                        LiveUsernameText(userId = story.authorId, fallbackUsername = story.username, prefix = "@",
+                            color = colors.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
         }
 
         when {
@@ -180,7 +220,7 @@ fun MapPlaceBottomSheet(
                         LazyColumn(
                             Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 480.dp),
+                                .heightIn(max = (contentHeight - 44.dp).coerceAtLeast(40.dp)),
                             contentPadding = PaddingValues(start = 20.dp, top = 0.dp, end = 20.dp, bottom = 30.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
@@ -206,12 +246,15 @@ fun MapPlaceBottomSheet(
                                         ) { onPlaceTap?.invoke(place) },
                                 )
                             }
+                            if (hasMoreContent) {
+                                item(key = "map-pagination") { MapPaginationFooter(paginationKey, isLoadingMore, onLoadMore) }
+                            }
                         }
                     }
                     cluster.moments.isNotEmpty() && viewMode == MapPlaceSheetViewMode.Gallery -> {
                         // Altura fija al max scrollable: no re-measure mid-fling si cambia el count.
                         val galleryRows = ((cluster.moments.size + 2) / 3).coerceAtLeast(1)
-                        val galleryHeight = minOf(520, galleryRows * 118).dp
+                        val galleryHeight = minOf((contentHeight - 44.dp).coerceAtLeast(40.dp), (galleryRows * 118 + if (hasMoreContent) 64 else 0).dp)
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(3),
                             modifier = Modifier
@@ -240,10 +283,13 @@ fun MapPlaceBottomSheet(
                                         },
                                 )
                             }
+                            if (hasMoreContent) {
+                                item(key = "map-pagination", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) { MapPaginationFooter(paginationKey, isLoadingMore, onLoadMore) }
+                            }
                         }
                     }
                     cluster.moments.isNotEmpty() -> {
-                        val listHeight = minOf(480, cluster.moments.size * 220 + 40).dp
+                        val listHeight = minOf((contentHeight - 44.dp).coerceAtLeast(40.dp), (cluster.moments.size * 220 + 40 + if (hasMoreContent) 64 else 0).dp)
                         LazyColumn(
                             Modifier
                                 .fillMaxWidth()
@@ -252,7 +298,7 @@ fun MapPlaceBottomSheet(
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             itemsIndexed(
-                                cluster.moments,
+                                cluster.moments.sortedByDescending { it.timestamp.time },
                                 key = { index, m -> m.id?.takeIf { it.isNotEmpty() } ?: "map-place-row-$index-${m.mapAvailabilityKey}" },
                             ) { _, moment ->
                                 ModernLocationMomentRow(
@@ -261,12 +307,19 @@ fun MapPlaceBottomSheet(
                                     onTap = { onMomentTap(it.id ?: it.mapAvailabilityKey) },
                                 )
                             }
+                            if (hasMoreContent) {
+                                item(key = "map-pagination") { MapPaginationFooter(paginationKey, isLoadingMore, onLoadMore) }
+                            }
                         }
                     }
                 }
             }
         }
+            if (hasMoreContent && cluster.moments.isEmpty() && !showsPlaceIndex && !isLoading) {
+            MapPaginationFooter(paginationKey, isLoadingMore, onLoadMore)
+        }
     }
+
 }
 
 @Composable
@@ -278,17 +331,19 @@ private fun MapPlaceSheetHeader(
     viewMode: MapPlaceSheetViewMode,
     onViewModeChange: (MapPlaceSheetViewMode) -> Unit,
     onPlaceStoriesTap: (MapPlaceCluster) -> Unit,
+    showsStoryPreview: Boolean,
+    showsTitle: Boolean = true,
 ) {
     val colors = rememberAdaptiveColors()
     Column {
-        Column(
+        if (showsTitle) Column(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            cluster.primaryStory?.let { story ->
+            cluster.primaryStory?.takeIf { showsStoryPreview }?.let { story ->
                 Box(
                     Modifier
                         .padding(bottom = 4.dp)
@@ -305,13 +360,13 @@ private fun MapPlaceSheetHeader(
                     if (cluster.storyCount > 1) {
                         Text(
                             "${cluster.storyCount}",
-                            color = Color.White,
+                            color = colors.surfaceBackground,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
                                 .offset(x = 4.dp, y = 4.dp)
-                                .background(colors.accent, CircleShape)
+                                .background(colors.primary, CircleShape)
                                 .padding(horizontal = 5.dp, vertical = 2.dp),
                         )
                     }
@@ -365,9 +420,11 @@ private fun MapPlaceSheetHeader(
 @Composable
 private fun MapPlaceWeatherChip(weather: WeatherData) {
     val colors = rememberAdaptiveColors()
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
     Row(
         Modifier
-            .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = false)
+            .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(percent = 50))
             .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -375,7 +432,7 @@ private fun MapPlaceWeatherChip(weather: WeatherData) {
         Icon(
             weather.condition.icon(),
             contentDescription = null,
-            tint = colors.accent,
+            tint = colors.primary,
             modifier = Modifier.size(11.dp),
         )
         Text(
@@ -385,6 +442,10 @@ private fun MapPlaceWeatherChip(weather: WeatherData) {
             fontSize = 11.sp,
         )
     }
+        Text("OpenWeather", color = colors.secondary, fontSize = 10.sp,
+            modifier = Modifier.clickable { uriHandler.openUri("https://openweathermap.org/") })
+    }
+
 }
 
 @Composable
@@ -395,7 +456,7 @@ private fun MapPlaceViewModeToggle(
     val colors = rememberAdaptiveColors()
     Row(
         Modifier
-            .momentsChromeGlass(RoundedCornerShape(14.dp), interactive = false)
+            .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(14.dp))
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -409,7 +470,7 @@ private fun MapPlaceViewModeToggle(
                         if (selected) {
                             Modifier.background(
                                 brush = Brush.linearGradient(
-                                    listOf(colors.accent, colors.accent.copy(alpha = 0.8f)),
+                                    listOf(colors.primary, colors.primary.copy(alpha = 0.8f)),
                                 ),
                             )
                         } else {
@@ -425,7 +486,7 @@ private fun MapPlaceViewModeToggle(
                 Icon(
                     if (mode == MapPlaceSheetViewMode.Gallery) Icons.Filled.GridView else Icons.Filled.List,
                     contentDescription = null,
-                    tint = if (selected) Color.White else colors.tertiary,
+                    tint = if (selected) colors.surfaceBackground else colors.tertiary,
                     modifier = Modifier.size(16.dp),
                 )
             }
@@ -450,15 +511,15 @@ private fun MapPlaceTimeFilterChips(
             val isSelected = filter == selected
             Text(
                 stringResource(filter.titleKeyRes),
-                color = if (isSelected) Color.White else colors.secondary,
+                color = if (isSelected) colors.surfaceBackground else colors.secondary,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 11.sp,
                 modifier = Modifier
                     .then(
                         if (isSelected) {
-                            Modifier.background(colors.accent, CircleShape)
+                            Modifier.background(colors.primary, CircleShape)
                         } else {
-                            Modifier.momentsChromeGlass(CircleShape, interactive = true)
+                            Modifier.background(MaterialTheme.colorScheme.surfaceContainer, CircleShape)
                         },
                     )
                     .clickable(
@@ -494,7 +555,7 @@ fun MapPlaceIndexRow(
 
     Row(
         modifier
-            .momentsChromeGlass(RoundedCornerShape(16.dp), interactive = true)
+            .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(16.dp))
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -514,14 +575,14 @@ fun MapPlaceIndexRow(
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 if (place.hasFreshStory) {
-                    Box(Modifier.size(7.dp).background(colors.accent, CircleShape))
+                    Box(Modifier.size(7.dp).background(colors.primary, CircleShape))
                 }
             }
             Text(metadata, color = colors.secondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (place.storyCount > 0) {
                 Text(
                     stringResource(R.string.maps_zone_sheet_stories_count, place.storyCount),
-                    color = colors.accent,
+                    color = colors.primary,
                     fontWeight = FontWeight.Medium,
                     fontSize = 11.sp,
                 )
@@ -559,6 +620,17 @@ fun MapPlaceIndexRow(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MapPaginationFooter(key: String, isLoading: Boolean, onLoadMore: () -> Unit) {
+    LaunchedEffect(key) { onLoadMore() }
+    Box(Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
+        if (isLoading) androidx.compose.material3.CircularProgressIndicator(Modifier.size(20.dp), color = rememberAdaptiveColors().primary, strokeWidth = 2.dp)
+        else androidx.compose.material3.TextButton(onClick = onLoadMore) {
+            Text(stringResource(R.string.feed_see_more), color = rememberAdaptiveColors().primary)
         }
     }
 }

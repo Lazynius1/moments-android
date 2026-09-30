@@ -1017,12 +1017,12 @@ private fun MessagingConversationList(
             !isSearching
 
     when {
-        viewModel.isLoading && viewModel.conversations.isEmpty() && !isSearching -> {
+        viewModel.isLoading && viewModel.conversations.isEmpty() && viewModel.archivedConversations.isEmpty() && outgoingPending.isEmpty() && !isSearching -> {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 MomentsCircularProgressIndicator()
             }
         }
-        error != null && viewModel.conversations.isEmpty() && !isSearching -> {
+        error != null && viewModel.conversations.isEmpty() && viewModel.archivedConversations.isEmpty() && outgoingPending.isEmpty() && !isSearching -> {
             MessagingErrorState(
                 message = error,
                 onRetry = {

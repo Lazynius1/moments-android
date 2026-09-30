@@ -91,7 +91,7 @@ object MapPlaceStoryFetcher {
 
     suspend fun fetchStories(previews: List<MapStoryPreview>): List<Story> {
         if (previews.isEmpty()) return emptyList()
-        val sorted = previews.sortedByDescending { it.timestamp.time }
+        val sorted = previews.sortedBy { it.timestamp.time }
         val grouped = sorted.groupBy { it.authorId }
         val fetchedByKey = withContext(Dispatchers.IO) {
             coroutineScope {

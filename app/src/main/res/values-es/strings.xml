@@ -2853,4 +2853,10 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="audience_manage_members_remove_single">Vas a eliminar a %1$s de «%2$s». Este cambio se guardará inmediatamente.</string>
     <string name="audience_manage_members_remove_plural">Vas a eliminar a %1$s y %2$d personas más de «%3$s». Este cambio se guardará inmediatamente.</string>
     <string name="audience_members_limit">Una lista de audiencia puede contener como máximo %1$d miembros</string>
+    <string name="onboarding_resume_banner">Termina de crear tu perfil</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">Cerca de ti</string>
+    <string name="maps_chrome_choose_city">Elige una ciudad</string>
+    <string name="maps_chrome_recenter">Mi ubicación</string>
 </resources>

@@ -28,6 +28,11 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -118,12 +123,12 @@ import com.moments.android.views.profile.core.sections.MomentZoomPresentationKin
 import com.moments.android.views.story.StoryRingAvatarView
 import com.moments.android.views.story.StorySegmentedRing
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.UUID
+import kotlin.math.pow
 
 /**
  * Port de `DiscoverMapView.swift` — mapa inline Discover (Explore).
@@ -136,6 +141,9 @@ fun DiscoverMapView(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     zoneName: String? = null,
+    initialLatitude: Double? = null,
+    initialLongitude: Double? = null,
+    originMoment: Moment? = null,
 ) {
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
@@ -149,6 +157,21 @@ fun DiscoverMapView(
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
 
+    var isSocialMap by remember { mutableStateOf(originMoment == null) }
+    var isBrowsingPlaces by remember { mutableStateOf(originMoment == null) }
+    var panelState by remember { mutableStateOf(MapPanelState.Small) }
+    var panelHeight by remember { mutableStateOf(80.dp) }
+    var paginationRegion by remember { mutableStateOf<MapRegionStore.Region?>(null) }
+    var paginationLocation by remember { mutableStateOf<String?>(null) }
+    var paginationFollowing by remember { mutableStateOf(false) }
+    var momentsCursor by remember { mutableStateOf<String?>(null) }
+    var storiesCursor by remember { mutableStateOf<String?>(null) }
+    var isLoadingMore by remember { mutableStateOf(false) }
+    var zoneSnapshot by remember { mutableStateOf<AndroidMapZoneSnapshot?>(null) }
+    var originCoordinate by remember {
+        mutableStateOf(originMoment?.locationCoordinate?.let { Point.fromLngLat(it.longitude, it.latitude) }
+            ?: if (initialLatitude != null && initialLongitude != null) Point.fromLngLat(initialLongitude, initialLatitude) else null)
+    }
     var contentFilter by remember { mutableStateOf(MapDiscoverContentFilter.All) }
     var timeFilter by remember { mutableStateOf(MapDiscoverTimeFilter.All) }
     var moments by remember { mutableStateOf<List<Moment>>(emptyList()) }
@@ -162,20 +185,23 @@ fun DiscoverMapView(
     var selectedPlaceCluster by remember { mutableStateOf<MapPlaceCluster?>(null) }
     var resolvedZoneName by remember { mutableStateOf(zoneName) }
     var discoverWeather by remember { mutableStateOf<WeatherData?>(null) }
-    var weatherEffectsEnabled by remember { mutableStateOf(true) }
+    var weatherEffectsEnabled by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
     var isViewActive by remember { mutableStateOf(true) }
+    var userPosition by remember { mutableStateOf<Point?>(null) }
+    var needsLocationSelection by remember { mutableStateOf(false) }
+    var searchToken by remember { mutableStateOf(UUID.randomUUID()) }
     var focusNonce by remember { mutableIntStateOf(0) }
     var focusCenter by remember { mutableStateOf<Point?>(null) }
     var focusZoom by remember { mutableStateOf(MomentsMapStyle.DEFAULT_ZOOM) }
     var currentRegion by remember {
         mutableStateOf(MapRegionStore.initialRegion(context))
     }
-    var regionSearchJob by remember { mutableStateOf<Job?>(null) }
     // Mapbox `subscribeMapIdle` también dispara al recrear las ViewAnnotations (iOS
     // `onMapCameraChange` no). Sin este guard: buscar → pins nuevos → idle → buscar…
     var lastSearchedRegionKey by remember { mutableStateOf("") }
+    var hasPerformedInitialSearch by remember { mutableStateOf(false) }
     var zoomDestination by remember { mutableStateOf<MomentZoomDestination?>(null) }
     var zoomMapMomentsPool by remember { mutableStateOf<List<Moment>>(emptyList()) }
     var resumeBottomSheetAfterDetail by remember { mutableStateOf(false) }
@@ -216,7 +242,7 @@ fun DiscoverMapView(
         MapPlaceClusterEngine.build(
             moments = filteredMoments,
             stories = filteredStories,
-            friendPins = friendPins,
+            friendPins = emptyList(),
             filter = contentFilter,
             centerLat = currentRegion.centerLat,
             centerLon = currentRegion.centerLon,
@@ -225,7 +251,7 @@ fun DiscoverMapView(
         )
     }
 
-    val sheetCluster = selectedPlaceCluster ?: MapPlaceClusterEngine.aggregateRegionCluster(
+    val sheetCluster = selectedPlaceCluster?.let { if (paginationLocation != null) it.copy(moments = filteredMoments, stories = filteredStories) else it } ?: MapPlaceClusterEngine.aggregateRegionCluster(
         title = resolvedZoneName ?: defaultTitle,
         moments = filteredMoments,
         stories = filteredStories,
@@ -241,6 +267,7 @@ fun DiscoverMapView(
     }
 
     val showsWeatherEffects = weatherEffectsEnabled && discoverWeather != null
+    val mapLegalInset = panelHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
 
     val initial = remember { MapRegionStore.initialRegion(context) }
     val mapViewportState = rememberMapViewportState {
@@ -259,77 +286,98 @@ fun DiscoverMapView(
     }
 
     fun updateBottomSheetForCurrentFilter() {
-        when (contentFilter) {
-            MapDiscoverContentFilter.Friends -> showingBottomSheet = false
-            MapDiscoverContentFilter.All, MapDiscoverContentFilter.Places -> {
-                showingBottomSheet = filteredMoments.isNotEmpty() || filteredStories.isNotEmpty()
-            }
+        if (filteredMoments.isEmpty() && filteredStories.isEmpty()) showingBottomSheet = false
+    }
+
+    fun regionSearchKey(region: MapRegionStore.Region): String = MapViewportQuery.key(region)
+
+    fun loadMore() {
+        if (isLoading || isLoadingMore || (momentsCursor == null && storiesCursor == null)) return
+        val token = searchToken
+        val postCursor = momentsCursor
+        val storyCursor = storiesCursor
+        isLoadingMore = true
+        LocationSearchService.searchContentPage(
+            region = paginationRegion, locationName = paginationLocation,
+            followingOnly = paginationFollowing,
+            momentsCursor = postCursor, storiesCursor = storyCursor,
+            loadMoments = postCursor != null, loadStories = storyCursor != null,
+        ) { payload ->
+            if (!isViewActive || searchToken != token) return@searchContentPage
+            moments = (moments + payload.moments).distinctBy { it.mapAvailabilityKey }
+            stories = (stories + payload.stories).distinctBy { "${it.authorId}|${it.id}" }
+            // Retain a failed cursor so the footer can retry that stream.
+            momentsCursor = if (payload.momentsError != null) postCursor else payload.momentsCursor
+            storiesCursor = if (payload.storiesError != null) storyCursor else payload.storiesCursor
+            isLoadingMore = false
+            if (payload.momentsError != null || payload.storiesError != null) errorMessage = partialMsg
         }
     }
 
-    fun regionSearchKey(region: MapRegionStore.Region): String {
-        fun r(v: Double) = (v * 100).toLong()
-        return "${r(region.centerLat)}|${r(region.centerLon)}|${r(region.longitudeDelta)}"
+    fun startPageQuery(region: MapRegionStore.Region?, place: String? = null) {
+        isLoading = true
+        isLoadingMore = false
+        errorMessage = null
+        hasRecoverableError = false
+        val token = UUID.randomUUID()
+        searchToken = token
+        paginationRegion = region
+        paginationLocation = place
+        paginationFollowing = !isSocialMap
+        momentsCursor = null
+        storiesCursor = null
+        LocationSearchService.searchContentPage(region = region, locationName = place, followingOnly = paginationFollowing) { payload ->
+            if (!isViewActive || searchToken != token) return@searchContentPage
+            if (!payload.isCompleteFailure) {
+                moments = payload.moments
+                stories = payload.stories
+                momentsCursor = payload.momentsCursor
+                storiesCursor = payload.storiesCursor
+            }
+            isLoading = false
+            hasPerformedInitialSearch = true
+            hasRecoverableError = payload.isCompleteFailure
+            errorMessage = when {
+                payload.isCompleteFailure -> unavailableMsg
+                payload.hasPartialFailure -> partialMsg
+                !payload.hasContent && payload.momentsCursor == null && payload.storiesCursor == null -> emptyMsg
+                else -> null
+            }
+        }
     }
 
     fun performRegionSearch() {
-        isLoading = true
-        errorMessage = null
-        hasRecoverableError = false
-        val region = currentRegion
-        lastSearchedRegionKey = regionSearchKey(region)
-        MapZoneContextService.zoneName(context, region.centerLat, region.centerLon) { name ->
-            if (isViewActive) resolvedZoneName = name ?: zoneName
+        isBrowsingPlaces = true
+        selectedPlaceCluster = null
+        zoneSnapshot = null
+        lastSearchedRegionKey = regionSearchKey(currentRegion)
+        startPageQuery(currentRegion)
+        val token = searchToken
+        MapZoneContextService.zoneName(context, currentRegion.centerLat, currentRegion.centerLon) { name ->
+            if (isViewActive && searchToken == token) resolvedZoneName = name ?: zoneName
         }
+        val region = currentRegion
         scope.launch {
             val weather = WeatherService.getWeatherSafely(region.centerLat, region.centerLon)
-            if (isViewActive) discoverWeather = weather
-        }
-        LocationSearchService.searchDiscoverContentInRegion(region) { payload ->
-            if (!isViewActive) return@searchDiscoverContentInRegion
-            moments = payload.moments
-            stories = payload.stories
-            friendPins = LocationSearchService.buildFriendActivityPins(
-                moments = payload.moments,
-                stories = payload.stories,
-                followingIds = followingIds,
-            )
-            isLoading = false
-            when {
-                payload.isCompleteFailure -> {
-                    errorMessage = unavailableMsg
-                    hasRecoverableError = true
-                    showingBottomSheet = false
-                }
-                payload.moments.isEmpty() && payload.stories.isEmpty() -> {
-                    errorMessage = emptyMsg
-                    hasRecoverableError = false
-                    showingBottomSheet = false
-                }
-                payload.hasPartialFailure -> {
-                    errorMessage = partialMsg
-                    hasRecoverableError = false
-                    selectedPlaceCluster = null
-                    showingBottomSheet = contentFilter != MapDiscoverContentFilter.Friends &&
-                        (payload.moments.isNotEmpty() || payload.stories.isNotEmpty())
-                }
-                else -> {
-                    errorMessage = null
-                    hasRecoverableError = false
-                    selectedPlaceCluster = null
-                    showingBottomSheet = contentFilter != MapDiscoverContentFilter.Friends &&
-                        (payload.moments.isNotEmpty() || payload.stories.isNotEmpty())
-                }
-            }
+            if (isViewActive && searchToken == token) discoverWeather = weather
         }
     }
 
-    fun scheduleRegionSearch() {
-        regionSearchJob?.cancel()
-        regionSearchJob = scope.launch {
-            delay(900)
-            if (isViewActive) performRegionSearch()
-        }
+    fun returnToZone() {
+        val saved = zoneSnapshot ?: return
+        searchToken = UUID.randomUUID()
+        isLoading = false
+        isLoadingMore = false
+        moments = saved.moments
+        stories = saved.stories
+        momentsCursor = saved.momentsCursor
+        storiesCursor = saved.storiesCursor
+        paginationRegion = saved.region
+        paginationLocation = null
+        paginationFollowing = saved.following
+        selectedPlaceCluster = null
+        zoneSnapshot = null
+        errorMessage = null
     }
 
     fun focusOn(point: Point, zoom: Double = MapRegionStore.zoomFromLongitudeDelta(0.06), autoSearch: Boolean = true) {
@@ -351,10 +399,13 @@ fun DiscoverMapView(
         LocationUtilities.getCurrentLocation(context) { point ->
             if (!isViewActive) return@getCurrentLocation
             if (point != null) {
+                userPosition = point
+                needsLocationSelection = false
                 focusOn(point)
             } else {
                 MapRegionStore.resolveFallbackRegion(context) { region ->
                     if (!isViewActive) return@resolveFallbackRegion
+                    needsLocationSelection = true
                     currentRegion = region
                     focusOn(region.center, region.zoom, autoSearch = true)
                 }
@@ -395,8 +446,8 @@ fun DiscoverMapView(
         if (cluster.stories.isEmpty() || isOpeningStory) return
         isOpeningStory = true
         val presentation = MapStoryViewerPresentation(
-            previews = cluster.stories,
-            initialPreviewId = startingAt?.id ?: cluster.primaryStory?.id,
+            previews = cluster.stories.sortedBy { it.timestamp.time },
+            initialPreviewId = startingAt?.id,
         )
         scope.launch {
             isOpeningStory = false
@@ -412,7 +463,10 @@ fun DiscoverMapView(
     }
 
     fun openPlaceCluster(cluster: MapPlaceCluster) {
+        if (selectedPlaceCluster == null) zoneSnapshot = AndroidMapZoneSnapshot(moments, stories, momentsCursor, storiesCursor, paginationRegion, paginationFollowing)
         selectedPlaceCluster = cluster
+        startPageQuery(null, cluster.displayName)
+        panelState = MapPanelState.Medium
         showingBottomSheet = true
     }
 
@@ -444,16 +498,17 @@ fun DiscoverMapView(
     }
 
     fun selectPlaceFromIndex(place: MapPlaceCluster) {
+        if (selectedPlaceCluster == null) {
+            zoneSnapshot = AndroidMapZoneSnapshot(moments, stories, momentsCursor, storiesCursor, paginationRegion, paginationFollowing)
+        }
         selectedPlaceCluster = place
-        focusOn(
-            Point.fromLngLat(place.longitude, place.latitude),
-            zoom = MapRegionStore.zoomFromLongitudeDelta(0.015),
-            autoSearch = false,
-        )
+        panelState = MapPanelState.Medium
+        focusOn(Point.fromLngLat(place.longitude, place.latitude), MapRegionStore.zoomFromLongitudeDelta(0.015), autoSearch = false)
+        startPageQuery(null, place.displayName)
     }
 
     fun closeDiscoverMap() {
-        regionSearchJob?.cancel()
+        isViewActive = false
         keyboard?.hide()
         isSearchActive = false
         searchText = ""
@@ -471,7 +526,7 @@ fun DiscoverMapView(
             .get()
             .addOnSuccessListener { snapshot ->
                 if (!isViewActive) return@addOnSuccessListener
-                val ids = snapshot.documents.map { it.id }.toSet()
+                val ids = snapshot.documents.map { it.getString("userId") ?: it.id }.toSet()
                 followingIds = ids
                 friendPins = LocationSearchService.buildFriendActivityPins(
                     moments = moments,
@@ -502,7 +557,13 @@ fun DiscoverMapView(
         }
     }
 
-    BackHandler(onBack = ::closeDiscoverMap)
+    BackHandler(enabled = zoomDestination == null && storyViewerPresentation == null) {
+        when {
+            selectedPlaceCluster != null && zoneSnapshot != null -> returnToZone()
+            panelState != MapPanelState.Small -> panelState = MapPanelState.Small
+            else -> closeDiscoverMap()
+        }
+    }
 
     LaunchedEffect(focusNonce) {
         val point = focusCenter ?: return@LaunchedEffect
@@ -515,18 +576,43 @@ fun DiscoverMapView(
     }
 
     LaunchedEffect(Unit) {
-        loadFollowingIds()
-        when {
-            LocationUtilities.hasForegroundPermission(context) -> bootstrapMapCenter()
-            else -> {
-                MapRegionStore.resolveFallbackRegion(context) { region ->
-                    if (isViewActive) {
-                        currentRegion = region
-                        focusOn(region.center, region.zoom, autoSearch = true)
-                    }
-                }
-                locationGate.requestAccess(context) { bootstrapMapCenter() }
+        if (LocationUtilities.hasForegroundPermission(context)) {
+            LocationUtilities.getCurrentLocation(context) { point ->
+                if (isViewActive) userPosition = point
             }
+        }
+        if (originMoment != null) {
+            moments = listOf(originMoment)
+            hasPerformedInitialSearch = true
+            val known = originCoordinate
+            if (known != null) {
+                focusOn(known, autoSearch = false)
+            } else {
+                val point = withContext(Dispatchers.IO) {
+                    runCatching {
+                        @Suppress("DEPRECATION")
+                        Geocoder(context, Locale.getDefault()).getFromLocationName(zoneName.orEmpty(), 1)
+                            ?.firstOrNull()?.let { Point.fromLngLat(it.longitude, it.latitude) }
+                    }.getOrNull()
+                }
+                if (isViewActive && point != null) {
+                    originCoordinate = point
+                    focusOn(point, autoSearch = false)
+                }
+            }
+        } else if (initialLatitude != null && initialLongitude != null) {
+            focusOn(Point.fromLngLat(initialLongitude, initialLatitude))
+        } else if (LocationUtilities.hasForegroundPermission(context)) {
+            bootstrapMapCenter()
+        } else {
+            MapRegionStore.resolveFallbackRegion(context) { region ->
+                if (isViewActive) {
+                    needsLocationSelection = true
+                    currentRegion = region
+                    focusOn(region.center, region.zoom, autoSearch = true)
+                }
+            }
+            locationGate.requestAccess(context) { bootstrapMapCenter() }
         }
     }
 
@@ -534,12 +620,7 @@ fun DiscoverMapView(
         isViewActive = true
         onDispose {
             isViewActive = false
-            regionSearchJob?.cancel()
         }
-    }
-
-    LaunchedEffect(isSearchActive) {
-        if (isSearchActive) searchFocus.requestFocus()
     }
 
     LaunchedEffect(showingBottomSheet) {
@@ -559,27 +640,58 @@ fun DiscoverMapView(
                 modifier = Modifier.fillMaxSize(),
                 mapViewportState = mapViewportState,
                 mapState = mapState,
+                scaleBar = {},
+                logo = { Logo(contentPadding = PaddingValues(start = 12.dp, bottom = mapLegalInset)) },
+                attribution = { Attribution(contentPadding = PaddingValues(start = 100.dp, bottom = mapLegalInset), alignment = Alignment.BottomStart) },
                 // ≡ iOS `.mapStyle(.standard(elevation: .realistic))`
                 style = { MomentsMapboxStandardStyle(realisticElevation = true) },
             ) {
                 MapEffect(Unit) { mapView ->
                     mapView.mapboxMap.subscribeMapIdle {
                         val state = mapView.mapboxMap.cameraState
-                        val lonDelta = MapRegionStore.longitudeDeltaFromZoom(state.zoom)
+                        val bounds = mapView.mapboxMap.coordinateBoundsForCamera(
+                            com.mapbox.maps.CameraOptions.Builder().center(state.center).zoom(state.zoom).pitch(state.pitch).bearing(state.bearing).build()
+                        )
+                        val west = bounds.southwest.longitude()
+                        val east = bounds.northeast.longitude()
+                        val longitudeSpan = (east - west).let { if (it < 0) it + 360 else it }
                         currentRegion = MapRegionStore.Region(
-                            centerLat = state.center.latitude(),
+                            centerLat = (bounds.southwest.latitude() + bounds.northeast.latitude()) / 2,
                             centerLon = state.center.longitude(),
-                            latitudeDelta = lonDelta,
-                            longitudeDelta = lonDelta,
+                            latitudeDelta = (bounds.northeast.latitude() - bounds.southwest.latitude()).coerceAtLeast(0.0001),
+                            longitudeDelta = longitudeSpan.coerceAtLeast(0.0001),
                         )
                         MapRegionStore.saveCamera(context, state.center, state.zoom)
-                        if (regionSearchKey(currentRegion) != lastSearchedRegionKey) {
-                            scheduleRegionSearch()
-                        }
+                        // Panning retains the last results until the user searches this area.
                     }
                 }
 
-                mapPlaceLayout.placeClusters.forEach { cluster ->
+                if (!isSocialMap && originMoment != null && originCoordinate != null) {
+                    ViewAnnotation(options = viewAnnotationOptions {
+                        geometry(originCoordinate!!)
+                        annotationAnchor { anchor(ViewAnnotationAnchor.CENTER) }
+                        allowOverlap(true)
+                    }) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val pinScale = (0.06 / currentRegion.longitudeDelta.coerceAtLeast(0.0001)).pow(0.12).coerceIn(0.72, 1.18).toFloat()
+                            MapMomentPin(originMoment, 1, Modifier.scale(pinScale).clickable {
+                                openMomentDetail(0, listOf(originMoment), zoneName ?: defaultTitle)
+                            })
+                            Column(
+                                Modifier.background(colors.surfaceBackground, RoundedCornerShape(12.dp))
+                                    .clickable { isSocialMap = true; panelState = MapPanelState.Medium; performRegionSearch() }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(zoneName ?: defaultTitle, color = secondary, fontSize = 11.sp, maxLines = 1)
+                                Text(stringResource(R.string.feed_see_more), color = primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+                mapPlaceLayout.placeClusters.filter { cluster ->
+                    isSocialMap || originMoment == null || cluster.moments.none { it.mapAvailabilityKey == originMoment.mapAvailabilityKey }
+                }.forEach { cluster ->
                     ViewAnnotation(
                         options = viewAnnotationOptions {
                             geometry(Point.fromLngLat(cluster.longitude, cluster.latitude))
@@ -643,238 +755,41 @@ fun DiscoverMapView(
             }
         }
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp)
-                .padding(top = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            // iOS: VStack centra sus hijos (los filter chips van centrados)
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
-                // iOS: HStack { pill; Spacer(); weather } — el pill toma su tamaño natural
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Row(
-                    Modifier
-                        .weight(1f, fill = false)
-                        .shadow(10.dp, RoundedCornerShape(percent = 50), clip = false)
-                        .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = false)
-                        .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(percent = 50))
-                        .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Box(
-                        Modifier
-                            .size(32.dp)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = ::closeDiscoverMap,
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Filled.Close, null, tint = primary, modifier = Modifier.size(18.dp))
-                    }
-                    Column {
-                        Text(
-                            title,
-                            color = primary,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            subtitle,
-                            color = tertiary,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-
-                Column(horizontalAlignment = Alignment.End) {
-                    Row(
-                        Modifier
-                            .shadow(10.dp, RoundedCornerShape(percent = 50), clip = false)
-                            .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
-                            .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(percent = 50))
-                            .padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            if (isSearchActive) Icons.Filled.Close else Icons.Filled.Search,
-                            contentDescription = null,
-                            tint = primary,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clickable {
-                                    HapticManager.shared.lightImpact()
-                                    isSearchActive = !isSearchActive
-                                    if (!isSearchActive) {
-                                        searchText = ""
-                                        keyboard?.hide()
-                                    }
-                                }
-                                .padding(2.dp),
-                        )
-                        Icon(
-                            Icons.Filled.MyLocation,
-                            contentDescription = null,
-                            tint = colors.accent,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clickable(onClick = ::recenterOnUser)
-                                .padding(2.dp),
-                        )
-                        discoverWeather?.let { weather ->
-                            Row(
-                                Modifier.clickable {
-                                    HapticManager.shared.lightImpact()
-                                    weatherEffectsEnabled = !weatherEffectsEnabled
-                                },
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    if (weatherEffectsEnabled) Icons.Filled.CloudOff else Icons.Filled.CloudOff,
-                                    null,
-                                    tint = if (weatherEffectsEnabled) colors.accent else primary.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(16.dp),
-                                )
-                                Column {
-                                    Text(
-                                        weather.temperatureFormatted,
-                                        color = primary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp,
-                                    )
-                                    Text(
-                                        weather.condition.name,
-                                        color = secondary,
-                                        fontSize = 9.sp,
-                                        maxLines = 1,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    if (discoverWeather != null && weatherEffectsEnabled) {
-                        Row(
-                            Modifier.padding(end = 8.dp, top = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Text(
-                                stringResource(R.string.weather_attribution_text),
-                                color = secondary.copy(alpha = 0.8f),
-                                fontSize = 7.sp,
-                            )
-                            Text(
-                                stringResource(R.string.weather_attribution_link),
-                                color = Color(0xFF007AFF).copy(alpha = 0.6f),
-                                fontSize = 7.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.clickable {
-                                    uriHandler.openUri("https://openweathermap.org/")
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-
-            AnimatedVisibility(visible = isSearchActive, enter = fadeIn(), exit = fadeOut()) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(Icons.Filled.Search, null, tint = secondary, modifier = Modifier.size(16.dp))
-                    BasicTextField(
-                        value = searchText,
-                        onValueChange = { searchText = it },
-                        singleLine = true,
-                        textStyle = TextStyle(
-                            color = primary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                        ),
-                        cursorBrush = SolidColor(colors.accent),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { performPlaceSearch() }),
-                        modifier = Modifier
-                            .weight(1f)
-                            .focusRequester(searchFocus),
-                        decorationBox = { inner ->
-                            if (searchText.isEmpty()) {
-                                Text(
-                                    stringResource(R.string.maps_search_placeholder),
-                                    color = secondary,
-                                    fontSize = 14.sp,
-                                )
-                            }
-                            inner()
-                        },
-                    )
-                }
-            }
-
-            MapFilterChipsSection(
-                selected = contentFilter,
-                onSelect = {
-                    HapticManager.shared.selection()
-                    contentFilter = it
-                    selectedPlaceCluster = null
-                    updateBottomSheetForCurrentFilter()
-                },
-            )
-
-            if (isLoading) {
-                Box(
-                    Modifier
-                        .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = false)
-                        .padding(10.dp),
-                ) {
-                    CircularProgressIndicator(
-                        Modifier.size(22.dp),
-                        color = colors.accent,
-                        strokeWidth = 2.dp,
-                    )
-                }
-            }
-
-            errorMessage?.let { message ->
-                if (hasRecoverableError && moments.isEmpty() && stories.isEmpty()) {
-                    DiscoverErrorCard(message = message, primary = primary, onRetry = ::performRegionSearch)
-                } else {
-                    DiscoverErrorBanner(message = message, primary = primary, onRetry = ::performRegionSearch)
-                }
+        MapImmersiveChrome(
+            title = if (needsLocationSelection) stringResource(R.string.maps_chrome_choose_city) else (resolvedZoneName ?: stringResource(R.string.maps_chrome_nearby)),
+            subtitle = subtitle,
+            isLoading = isLoading,
+            searchText = searchText,
+            onSearchTextChange = { searchText = it },
+            onClose = ::closeDiscoverMap,
+            onSearch = { needsLocationSelection = false; performPlaceSearch() },
+            onRecenter = ::recenterOnUser,
+            onOpenContent = { selectedPlaceCluster = null; showingBottomSheet = true },
+            showsSearchArea = hasPerformedInitialSearch && !isLoading && (!isBrowsingPlaces || regionSearchKey(currentRegion) != lastSearchedRegionKey),
+            onSearchArea = { selectedPlaceCluster = null; performRegionSearch() },
+            showsDock = false,
+            bottomInset = panelHeight + 12.dp,
+        )
+        errorMessage?.let { message ->
+            Box(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 16.dp).padding(top = 68.dp)) {
+                DiscoverErrorBanner(message = message, primary = primary, onRetry = ::performRegionSearch)
             }
         }
 
-        LocationPermissionGateHost(gate = locationGate)
-    }
-
-    if (showingBottomSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showingBottomSheet = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
-            // Sin esto cae al containerColor claro por defecto de Material3 y en modo
-            // oscuro el contenido (texto blanco) se pierde sobre fondo claro.
-            containerColor = colors.surfaceBackground,
-        ) {
+        if (zoomDestination == null && storyViewerPresentation == null && pendingStoryPresentation == null) {
+            MapImmersivePanel(
+                cluster = sheetCluster, state = panelState, onStateChange = { panelState = it },
+                onHeightChange = { panelHeight = it },
+                isLoading = isLoading, onStories = { openPlaceStories(sheetCluster) },
+                distance = (selectedPlaceCluster?.let { Point.fromLngLat(it.longitude, it.latitude) }
+                    ?: originCoordinate?.takeIf { !isSocialMap })?.let { target ->
+                    MapDistanceFormatter.string(context, userPosition?.latitude(), userPosition?.longitude(), target.latitude(), target.longitude())
+                },
+                onBack = if (selectedPlaceCluster != null && zoneSnapshot != null) ({ returnToZone() }) else null,
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxSize(0.92f),
+            ) { contentHeight ->
             MapPlaceBottomSheet(
+                socialMode = false,
                 cluster = sheetCluster,
                 isLoading = isLoading,
                 onMomentTap = { momentId ->
@@ -885,17 +800,26 @@ fun DiscoverMapView(
                 },
                 onPlaceStoriesTap = { openPlaceStories(it) },
                 weather = discoverWeather,
+                userLatitude = userPosition?.latitude(),
+                userLongitude = userPosition?.longitude(),
                 placeIndex = mapPlaceLayout.placeClusters,
                 onPlaceTap = { selectPlaceFromIndex(it) },
-                timeFilter = timeFilter,
-                onTimeFilterChange = {
-                    timeFilter = it
-                    selectedPlaceCluster = null
-                    updateBottomSheetForCurrentFilter()
-                },
+                showsHeader = false,
+                showsStoryStrip = false,
+                contentHeight = contentHeight,
+                hasMoreContent = momentsCursor != null || storiesCursor != null,
+                paginationKey = "${searchToken}|${momentsCursor}|${storiesCursor}",
+                isLoadingMore = isLoadingMore,
+                onLoadMore = ::loadMore,
                 onDismiss = { showingBottomSheet = false },
             )
+            }
         }
+        // The persistent sheet's navigation inset belongs to the panel, not the map.
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+            .windowInsetsBottomHeight(WindowInsets.navigationBars)
+            .background(colors.surfaceBackground))
+        LocationPermissionGateHost(gate = locationGate)
     }
 
     zoomDestination?.let { destination ->
@@ -960,7 +884,7 @@ private fun DiscoverErrorBanner(
         Text(message, color = primary, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 2)
         Text(
             stringResource(R.string.maps_error_retry),
-            color = colors.accent,
+            color = colors.primary,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.clickable(onClick = onRetry),
@@ -983,15 +907,15 @@ private fun DiscoverErrorCard(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Icon(Icons.Filled.WifiOff, null, tint = colors.accent, modifier = Modifier.size(28.dp))
+        Icon(Icons.Filled.WifiOff, null, tint = colors.primary, modifier = Modifier.size(28.dp))
         Text(message, color = primary, fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
         Text(
             stringResource(R.string.maps_error_retry),
-            color = Color.White,
+            color = colors.surfaceBackground,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier
-                .background(colors.accent, CircleShape)
+                .background(colors.primary, CircleShape)
                 .clickable(onClick = onRetry)
                 .padding(horizontal = 18.dp, vertical = 10.dp),
         )
@@ -1072,39 +996,26 @@ fun MapMomentPin(moment: Moment, count: Int, modifier: Modifier = Modifier) {
     // iOS: mapPreferredImageURL ?? mapPreferredVideoThumbnailURL
     val url = moment.mapPreferredImageUrl ?: moment.mapPreferredVideoThumbnailUrl
 
-    Box(modifier.size(pinSize), contentAlignment = Alignment.Center) {
+    Box(modifier.size(pinSize, maxOf(pinSize, mediaSize + 12.dp)), contentAlignment = Alignment.TopCenter) {
         // ≡ iOS `stackedPlaceholder` — pila de fotos detrás cuando count > 1.
         if (count > 1) {
             MapMomentStackedPlaceholder(mediaSize, isDark, (-7).dp, 5.dp, 0.88f, 0.55f)
             MapMomentStackedPlaceholder(mediaSize, isDark, 7.dp, (-5).dp, 0.88f, 0.7f)
         }
 
-        // iOS: .shadow(color: .black.opacity(0.28), radius: 7, y: 3) sobre el thumbnail.
-        // El shadow debe ir ANTES del clip o queda recortado y no se ve.
-        val thumbModifier = Modifier
-            .size(mediaSize)
-            .shadow(7.dp, CircleShape, ambientColor = Color.Black, spotColor = Color.Black)
-            .clip(CircleShape)
-        if (url != null) {
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = thumbModifier.border(2.5.dp, Color.White, CircleShape),
-            )
-        } else {
-            Box(
-                thumbModifier
-                    .background(Color.Black.copy(alpha = if (isDark) 0.35f else 0.15f))
-                    .border(2.5.dp, Color.White, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.Photo,
-                    null,
-                    tint = if (isDark) Color.White else Color.Black,
-                    modifier = Modifier.size(15.dp),
-                )
+        val head = mediaSize + 5.dp
+        val shape = com.moments.android.views.messaging.components.LocationAvatarPinSilhouette(22.dp, 2.dp, shortTip = true)
+        Box(Modifier.size(head, mediaSize + 12.dp), contentAlignment = Alignment.TopCenter) {
+            Box(Modifier.matchParentSize().shadow(7.dp, shape).background(Color.White, shape))
+            Box(Modifier.size(head), contentAlignment = Alignment.Center) {
+                val thumbModifier = Modifier.size(mediaSize).clip(CircleShape)
+                if (url != null) AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = thumbModifier)
+                else Box(thumbModifier.background(Color.Gray.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.Photo, null, tint = Color.Black, modifier = Modifier.size(15.dp))
+                }
+                Box(Modifier.align(Alignment.BottomEnd).offset(2.dp, 2.dp).size(22.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(androidx.compose.ui.res.painterResource(R.drawable.attachment_map_icon), null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                }
             }
         }
         if (count > 1) {
@@ -1225,6 +1136,7 @@ fun MapStoryPin(story: MapStoryPreview, modifier: Modifier = Modifier) {
 @Composable
 fun MapFriendActivityPinView(pin: MapFriendActivityPin, modifier: Modifier = Modifier) {
     val isDark = isSystemInDarkTheme()
+    val colors = rememberAdaptiveColors()
     Column(
         modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1240,12 +1152,19 @@ fun MapFriendActivityPinView(pin: MapFriendActivityPin, modifier: Modifier = Mod
         )
         Text(
             pin.username,
-            fontSize = 10.sp,
+            color = colors.primary,
+            fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             modifier = Modifier
-                .momentsChromeGlass(CircleShape, interactive = false)
-                .padding(horizontal = 6.dp, vertical = 3.dp),
+                .background(colors.surfaceBackground, RoundedCornerShape(50))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
         )
     }
 }
+
+private data class AndroidMapZoneSnapshot(
+    val moments: List<Moment>, val stories: List<MapStoryPreview>,
+    val momentsCursor: String?, val storiesCursor: String?,
+    val region: MapRegionStore.Region?, val following: Boolean,
+)

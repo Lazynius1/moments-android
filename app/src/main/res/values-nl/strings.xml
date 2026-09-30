@@ -3009,4 +3009,10 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="audience_manage_members_remove_single">Je gaat %1$s uit ‘%2$s’ verwijderen. Deze wijziging wordt meteen opgeslagen.</string>
     <string name="audience_manage_members_remove_plural">Je gaat %1$s en nog %2$d personen uit ‘%3$s’ verwijderen. Deze wijziging wordt meteen opgeslagen.</string>
     <string name="stories_reaction_sent">Reactie verzonden</string>
+    <string name="onboarding_resume_banner">Maak je profiel af</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">Bij jou in de buurt</string>
+    <string name="maps_chrome_choose_city">Kies een stad</string>
+    <string name="maps_chrome_recenter">Mijn locatie</string>
 </resources>

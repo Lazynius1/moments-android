@@ -1,5 +1,6 @@
 package com.moments.android.views.shared.momentdetail
 
+import com.moments.android.views.feed.maps.mapOriginMoment
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -373,6 +374,7 @@ fun SingleMomentDetailView(
                     locationName = selectedLocationName.ifEmpty {
                         stringResource(R.string.feed_location_default)
                     },
+                    originMoment = currentMoment.mapOriginMoment(),
                     latitude = selectedLocationLat,
                     longitude = selectedLocationLng,
                     onDismiss = { showingLocationMap = false },

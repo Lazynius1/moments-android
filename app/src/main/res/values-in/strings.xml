@@ -3009,4 +3009,10 @@ Anda dapat mengubah izin ini di pengaturan perangkat. Jika izin dinonaktifkan, b
     <string name="audience_manage_members_remove_single">Anda akan menghapus %1$s dari “%2$s”. Perubahan ini akan langsung disimpan.</string>
     <string name="audience_manage_members_remove_plural">Anda akan menghapus %1$s dan %2$d orang lainnya dari “%3$s”. Perubahan ini akan langsung disimpan.</string>
     <string name="stories_reaction_sent">Reaksi terkirim</string>
+    <string name="onboarding_resume_banner">Selesaikan pembuatan profilmu</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">Di dekatmu</string>
+    <string name="maps_chrome_choose_city">Pilih kota</string>
+    <string name="maps_chrome_recenter">Lokasi saya</string>
 </resources>

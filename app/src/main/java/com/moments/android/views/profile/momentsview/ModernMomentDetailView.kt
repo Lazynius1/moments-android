@@ -1,5 +1,6 @@
 package com.moments.android.views.profile.momentsview
 
+import com.moments.android.views.feed.maps.mapOriginMoment
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -157,6 +158,7 @@ fun ModernMomentDetailView(
     var selectedHashtag by remember { mutableStateOf("") }
     var showExploreWithHashtag by remember { mutableStateOf(false) }
     var showingLocationMap by remember { mutableStateOf(false) }
+    var selectedLocationMoment by remember { mutableStateOf<com.moments.android.services.content.FeedMoment?>(null) }
     var selectedLocationName by remember { mutableStateOf("") }
     var selectedLocationLat by remember { mutableStateOf<Double?>(null) }
     var selectedLocationLng by remember { mutableStateOf<Double?>(null) }
@@ -400,7 +402,8 @@ fun ModernMomentDetailView(
                                 showExploreWithHashtag = true
                             },
                             onOpenLocation = { name, coordinate ->
-                                selectedLocationName = name
+                                selectedLocationMoment = moment
+                                    selectedLocationName = name
                                 selectedLocationLat = coordinate?.latitude
                                 selectedLocationLng = coordinate?.longitude
                                 showingLocationMap = true
@@ -525,6 +528,7 @@ fun ModernMomentDetailView(
                     locationName = selectedLocationName.ifEmpty {
                         stringResource(R.string.feed_location_default)
                     },
+                    originMoment = selectedLocationMoment?.mapOriginMoment(),
                     latitude = selectedLocationLat,
                     longitude = selectedLocationLng,
                     onDismiss = { showingLocationMap = false },

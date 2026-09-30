@@ -80,6 +80,7 @@ class MessagingViewModel(
     var participantStates by mutableStateOf<Map<String, InboxParticipantState>>(emptyMap()); private set
     var draftTexts by mutableStateOf<Map<String, String>>(emptyMap()); private set
 
+    private var hasLoadedConversations = false
     var isLoading by mutableStateOf(true); private set
 
     private var isFirstFetch = true
@@ -114,10 +115,12 @@ class MessagingViewModel(
     }
 
     fun fetchConversations(userId: String) {
-        if (conversations.isEmpty()) {
+        if (conversations.isEmpty() && archivedConversations.isEmpty()) {
+            isLoading = true
+            errorMessage = null
             viewModelScope.launch {
-                val cached = sortConversationsForInbox(LocalPersistenceService.loadConversationsAsync())
-                if (cached.isNotEmpty() && conversations.isEmpty()) {
+                val cached = sortConversationsForInbox(LocalPersistenceService.loadConversationsAsync().filter { userId in it.participants })
+                if (currentUserId == userId && !hasLoadedConversations && cached.isNotEmpty() && conversations.isEmpty() && archivedConversations.isEmpty()) {
                     val active = reconcilingOptimisticReadState(cached.filterNot { it.isArchived(userId) }, userId)
                     val archived = reconcilingOptimisticReadState(cached.filter { it.isArchived(userId) }, userId)
                     conversations = active
@@ -128,8 +131,10 @@ class MessagingViewModel(
             }
         }
 
-        ChatService.fetchConversations(userId) { result ->
+        ChatService.fetchConversations(userId) inboxUpdate@{ result ->
+            if (currentUserId != userId) return@inboxUpdate
             result.onSuccess { incoming ->
+                hasLoadedConversations = true
                 val filtered = incoming.filter { !it.id.isNullOrEmpty() }
                 val active = reconcilingOptimisticReadState(
                     sortConversationsForInbox(filtered.filterNot { it.isArchived(userId) }),
@@ -159,7 +164,8 @@ class MessagingViewModel(
                     MessageCatchUpService.syncRecent(active + archived)
                 }
             }.onFailure { error ->
-                if (conversations.isEmpty()) {
+                isLoading = false
+                if (conversations.isEmpty() && archivedConversations.isEmpty()) {
                     errorMessage = localized(R.string.messaging_error_load_conversations, error.message.orEmpty())
                     isLoading = false
                 }
@@ -836,6 +842,7 @@ class MessagingViewModel(
     }
 
     fun stopListening() {
+        hasLoadedConversations = false
         ChatService.stopConversationsListener()
     }
 

@@ -3009,4 +3009,10 @@ Bu izinleri cihazının ayarlarından değiştirebilirsin. İzinleri kapatırsan
     <string name="audience_manage_members_remove_single">%1$s, “%2$s” listesinden çıkarılacak. Bu değişiklik hemen kaydedilecek.</string>
     <string name="audience_manage_members_remove_plural">%1$s ve %2$d kişi daha “%3$s” listesinden çıkarılacak. Bu değişiklik hemen kaydedilecek.</string>
     <string name="stories_reaction_sent">Tepki gönderildi</string>
+    <string name="onboarding_resume_banner">Profilini oluşturmayı tamamla</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">Yakınında</string>
+    <string name="maps_chrome_choose_city">Bir şehir seç</string>
+    <string name="maps_chrome_recenter">Konumum</string>
 </resources>

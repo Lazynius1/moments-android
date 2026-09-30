@@ -217,6 +217,14 @@ fun GlassmorphicMessageRow(
                 repliedMessage?.let {
                     StackedReplyQuote(it, isCurrentUser, otherParticipantName, callbacks.onReplyTap)
                 }
+                if (message.editedAt != null && !message.isDeleted) {
+                    Text(
+                        text = stringResource(R.string.chat_edited),
+                        fontSize = 11.sp,
+                        color = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()).timestampColor,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                }
                 ChatTranslationContainer(
                     text = message.content.orEmpty(),
                     messageId = message.id,

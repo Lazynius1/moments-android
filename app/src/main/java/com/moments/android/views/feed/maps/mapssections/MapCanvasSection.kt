@@ -104,6 +104,9 @@ fun MapCanvasSection(
     placeClusters: List<MapPlaceCluster> = emptyList(),
     onPlaceClusterTap: (MapPlaceCluster) -> Unit = {},
     onCameraIdle: ((center: Point, zoom: Double) -> Unit)? = null,
+    cameraTarget: Point? = null,
+    cameraZoom: Double = MomentsMapStyle.DEFAULT_ZOOM,
+    cameraRequest: Int = 0,
 ) {
     val context = LocalContext.current
     if (!FeedMaps.hasMapboxToken()) {
@@ -150,11 +153,12 @@ fun MapCanvasSection(
         }
     }
 
-    LaunchedEffect(location?.latitude, location?.longitude) {
-        val coord = location?.coordinate ?: return@LaunchedEffect
+    // A user pan updates results, not the camera command. Recenter only on explicit requests.
+    LaunchedEffect(cameraRequest) {
+        val target = cameraTarget ?: return@LaunchedEffect
         mapViewportState.setCameraOptions {
-            center(Point.fromLngLat(coord.longitude, coord.latitude))
-            zoom(MomentsMapStyle.DEFAULT_ZOOM)
+            center(target)
+            zoom(cameraZoom)
             pitch(MomentsMapStyle.CAMERA_PITCH)
         }
     }

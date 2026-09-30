@@ -147,6 +147,8 @@ data class MapDiscoverPayload(
     val source: String,
     val momentsError: MapServiceError?,
     val storiesError: MapServiceError?,
+    val momentsCursor: String? = null,
+    val storiesCursor: String? = null,
 ) {
     val hasContent: Boolean get() = moments.isNotEmpty() || stories.isNotEmpty()
     val isCompleteFailure: Boolean get() = !hasContent && momentsError != null && storiesError != null

@@ -1,5 +1,6 @@
 package com.moments.android.views.feed.core
 
+import com.moments.android.views.feed.maps.mapOriginMoment
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -72,6 +73,7 @@ fun FeedPresentations(
     showingLocationMap: Boolean,
     onShowingLocationMapChange: (Boolean) -> Unit,
     selectedLocationName: String,
+    selectedLocationMoment: com.moments.android.services.content.FeedMoment?,
     selectedLocationLatitude: Double?,
     selectedLocationLongitude: Double?,
     showMomentDetail: Boolean,
@@ -228,6 +230,7 @@ fun FeedPresentations(
                         locationName = selectedLocationName.ifEmpty {
                             stringResource(R.string.feed_location_default)
                         },
+                        originMoment = selectedLocationMoment?.mapOriginMoment(),
                         latitude = selectedLocationLatitude,
                         longitude = selectedLocationLongitude,
                         onDismiss = { onShowingLocationMapChange(false) },

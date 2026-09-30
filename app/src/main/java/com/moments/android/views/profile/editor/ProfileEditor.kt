@@ -245,7 +245,7 @@ fun ModernEditProfileView(
                 pendingProfileImage = null
                 isProfileImageUploading = false
                 profileImageUploadError = if (error is ModerationError.ContentRejected) {
-                    context.getString(R.string.profile_editor_profile_image_rejected)
+                    null // El rechazo ya se muestra en el banner común de la subida.
                 } else {
                     context.getString(
                         R.string.profile_editor_error_upload_image,

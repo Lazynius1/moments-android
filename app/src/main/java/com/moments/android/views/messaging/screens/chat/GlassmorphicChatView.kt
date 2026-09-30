@@ -277,27 +277,6 @@ fun GlassmorphicChatView(
         imm?.hideSoftInputFromWindow(rootView.windowToken, 0)
         open
     }
-    messagePresentation.runAfterKeyboardHidden = { onReady ->
-        scope.launch {
-            val startInset = maxOf(
-                rootKeyboardInsetPx(rootView),
-                keyboardScrollCoordinator.keyboardHeightPx,
-            )
-            val deadlineNs = System.nanoTime() + 280_000_000L
-            while (System.nanoTime() < deadlineNs) {
-                val inset = maxOf(
-                    rootKeyboardInsetPx(rootView),
-                    keyboardScrollCoordinator.keyboardHeightPx,
-                )
-                if (inset <= 24f) break
-                if (startInset > 0f && inset <= startInset * 0.2f) break
-                delay(8)
-            }
-            // Frames para que adjustResize + lista asienten el ancla.
-            delay(32)
-            onReady()
-        }
-    }
     messagePresentation.requestComposerFocus = {
         composerFocusEpoch += 1
     }

@@ -82,6 +82,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
 import com.moments.android.extensions.InterestEmojiHelper
 import com.moments.android.services.auth.AuthService
+import com.moments.android.services.auth.OnboardingDraftContext
+import com.moments.android.services.auth.OnboardingDraftStore
 import com.moments.android.services.compliance.AgePolicy
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -130,10 +132,32 @@ fun OnboardingScreen(
 
     val steps = remember(uiContext) { stepsFor(uiContext) }
     val totalSteps = steps.size
+    val draftContext = if (uiContext == OnboardingUiContext.EMAIL) OnboardingDraftContext.EMAIL else OnboardingDraftContext.GOOGLE
+    val initialDraft = remember(draftContext) {
+        val currentUID = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+        OnboardingDraftStore.load()?.takeIf {
+            it.context == draftContext && !OnboardingDraftStore.isExpired(it) &&
+                (it.firebaseUID == null || currentUID == null || it.firebaseUID == currentUID)
+        }
+    }
+    val initialStep = remember(initialDraft, uiContext) {
+        if (initialDraft == null) 1
+        else if (uiContext == OnboardingUiContext.EMAIL) {
+            val hasRegistrationSession = initialDraft.firebaseUID != null &&
+                com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == initialDraft.firebaseUID
+            when {
+                initialDraft.username.length < 3 -> 1
+                !isValidEmail(initialDraft.email) -> 2
+                !hasRegistrationSession -> initialDraft.step.coerceIn(1, 3)
+                initialDraft.selectedInterests.size >= INTERESTS_MIN -> 5
+                else -> 4
+            }
+        } else initialDraft.step.coerceIn(1, totalSteps)
+    }
 
-    var step by remember { mutableIntStateOf(1) }
-    var username by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
+    var step by remember { mutableIntStateOf(initialStep) }
+    var username by remember { mutableStateOf(initialDraft?.username.orEmpty()) }
+    var email by remember { mutableStateOf(initialDraft?.email.orEmpty()) }
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
     var usernameError by remember { mutableStateOf<String?>(null) }
@@ -141,14 +165,44 @@ fun OnboardingScreen(
     var emailError by remember { mutableStateOf<String?>(null) }
     var emailChecking by remember { mutableStateOf(false) }
     var usernameSuggestions by remember { mutableStateOf<List<String>>(emptyList()) }
-    var selectedInterests by remember { mutableStateOf<List<String>>(emptyList()) }
-    var photoUri by remember { mutableStateOf<Uri?>(null) }
-    var privacyAccepted by remember { mutableStateOf(false) }
-    var birthDate by remember { mutableStateOf(AgePolicy.defaultPickerBirthDate()) }
+    var selectedInterests by remember { mutableStateOf(initialDraft?.selectedInterests.orEmpty()) }
+    var photoUri by remember {
+        val savedPhoto = initialDraft?.profileImageFilename?.let { java.io.File(context.filesDir, "OnboardingDrafts/$it") }
+        mutableStateOf(savedPhoto?.takeIf { it.exists() }?.let(Uri::fromFile))
+    }
+    var privacyAccepted by remember { mutableStateOf(initialDraft?.privacyPolicyAccepted ?: false) }
+    var birthDate by remember { mutableStateOf(initialDraft?.birthDateMillis?.let(::Date) ?: AgePolicy.defaultPickerBirthDate()) }
     var showBirthDatePicker by remember { mutableStateOf(false) }
     var isCreating by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showPrivacy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(draftContext, step, username, email, selectedInterests, privacyAccepted, birthDate, isCreating) {
+        if (isCreating) return@LaunchedEffect
+        OnboardingDraftStore.markStarted(
+            draftContext,
+            firebaseUID = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid,
+        )
+        AuthService.persistOnboardingDraft(
+            context = draftContext,
+            step = step,
+            username = username,
+            email = email,
+            selectedInterests = selectedInterests,
+            privacyPolicyAccepted = privacyAccepted,
+            birthDate = birthDate,
+        )
+    }
+    LaunchedEffect(photoUri) {
+        val uri = photoUri ?: return@LaunchedEffect
+        // Una foto restaurada ya está guardada; no volver a escribirla.
+        if (uri.scheme == "file" && uri.path?.contains("/OnboardingDrafts/") == true) return@LaunchedEffect
+        val image = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { bitmapFrom(context, uri) }
+        if (image != null) {
+            OnboardingDraftStore.markStarted(draftContext)
+            OnboardingDraftStore.update(profileImage = image)
+        }
+    }
 
     val usernameFormatError = stringResource(R.string.register_err_username_format)
     val usernameUnavailableError = stringResource(R.string.register_err_username_unavailable)
@@ -198,18 +252,21 @@ fun OnboardingScreen(
     }
 
     val currentKind = steps.getOrElse(step - 1) { OnboardingStepKind.PREVIEW }
+    val hasEmailRegistrationSession = uiContext == OnboardingUiContext.EMAIL &&
+        com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email?.equals(email.trim(), ignoreCase = true) == true
 
     val canProceed = when (currentKind) {
         OnboardingStepKind.USERNAME -> username.length >= 3 && usernameError == null && !usernameChecking
         OnboardingStepKind.EMAIL -> isValidEmail(email.trim()) && emailError == null && !emailChecking
-        OnboardingStepKind.PASSWORD -> password.length >= 8
+        OnboardingStepKind.PASSWORD -> hasEmailRegistrationSession || password.length >= 8
         OnboardingStepKind.INTERESTS -> selectedInterests.size >= INTERESTS_MIN
         OnboardingStepKind.PREVIEW -> privacyAccepted && AgePolicy.isEligibleForAccount(birthDate)
     }
 
     fun goNext() {
+        if (isCreating) return
         if (step < totalSteps) {
-            step += 1
+            step += if (step == 2 && hasEmailRegistrationSession) 2 else 1
         } else {
             isCreating = true
             errorMessage = null
@@ -246,8 +303,13 @@ fun OnboardingScreen(
                     // Duración mínima para que se vea la animación de "creando perfil" (como iOS).
                     val elapsed = System.currentTimeMillis() - start
                     if (elapsed < 2500) delay(2500 - elapsed)
-                    AuthService.completeRegistration() // ≡ checkAndFinalizeRegistration
-                    onAuthenticated()
+                    // Mantener el overlay hasta confirmar la sesión y el perfil.
+                    if (AuthService.completeRegistration()) {
+                        onAuthenticated()
+                    } else {
+                        isCreating = false
+                        errorMessage = accountErrorMessage
+                    }
                 } catch (e: UsernameTakenException) {
                     isCreating = false; errorMessage = usernameTakenMessage
                 } catch (e: AuthService.AuthServiceException) {
@@ -269,7 +331,12 @@ fun OnboardingScreen(
     }
 
     fun goBack() {
-        if (step > 1) step -= 1 else onBack()
+        if (isCreating) return
+        if (step > 1) {
+            step -= if (step == 4 && hasEmailRegistrationSession) 2 else 1
+        } else {
+            onBack()
+        }
     }
 
     Box(Modifier.fillMaxSize().background(com.moments.android.views.shared.Surface)) {
@@ -282,6 +349,14 @@ fun OnboardingScreen(
             ) {
                 Spacer(Modifier.height(8.dp))
                 OnboardingStepHeader(kind = currentKind, showsLogo = step == 1)
+                if (initialDraft != null) {
+                    Text(
+                        text = stringResource(R.string.onboarding_resume_banner),
+                        color = AuthColors.secondary(0.82f),
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
                 Spacer(Modifier.height(28.dp))
 
                 Column(Modifier.widthIn(max = 400.dp).fillMaxWidth()) {

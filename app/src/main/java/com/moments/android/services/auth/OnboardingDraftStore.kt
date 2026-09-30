@@ -80,7 +80,10 @@ object OnboardingDraftStore {
         context: OnboardingDraftContext,
         firebaseUID: String? = null,
     ) {
-        val draft = load() ?: OnboardingDraft(context = context, firebaseUID = firebaseUID)
+        val draft = load()?.takeIf {
+            it.context == context && !isExpired(it) &&
+                (firebaseUID == null || it.firebaseUID == null || it.firebaseUID == firebaseUID)
+        } ?: OnboardingDraft(context = context, firebaseUID = firebaseUID)
         draft.context = context
         if (firebaseUID != null) draft.firebaseUID = firebaseUID
         draft.updatedAt = Date()
@@ -105,7 +108,7 @@ object OnboardingDraftStore {
         firebaseUID: String? = null,
     ) {
         val draft = load() ?: return
-        if (step != null) draft.step = step.coerceIn(1, 3)
+        if (step != null) draft.step = step.coerceIn(1, if (draft.context == OnboardingDraftContext.EMAIL) 5 else 3)
         if (username != null) draft.username = username
         if (email != null) draft.email = email
         if (selectedInterests != null) draft.selectedInterests = selectedInterests

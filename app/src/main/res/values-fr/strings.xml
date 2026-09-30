@@ -2460,4 +2460,10 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="audience_manage_members_remove_title">Retirer des membres de la liste ?</string>
     <string name="audience_manage_members_remove_single">Vous allez retirer %1$s de « %2$s ». Cette modification sera enregistrée immédiatement.</string>
     <string name="audience_manage_members_remove_plural">Vous allez retirer %1$s et %2$d autres personnes de « %3$s ». Cette modification sera enregistrée immédiatement.</string>
+    <string name="onboarding_resume_banner">Termine de créer ton profil</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">À proximité</string>
+    <string name="maps_chrome_choose_city">Choisis une ville</string>
+    <string name="maps_chrome_recenter">Ma position</string>
 </resources>

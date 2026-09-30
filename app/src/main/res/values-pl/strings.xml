@@ -3009,4 +3009,10 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="audience_manage_members_remove_single">Za chwilę usuniesz użytkownika %1$s z listy „%2$s”. Ta zmiana zostanie zapisana natychmiast.</string>
     <string name="audience_manage_members_remove_plural">Za chwilę usuniesz użytkownika %1$s i jeszcze %2$d osób z listy „%3$s”. Ta zmiana zostanie zapisana natychmiast.</string>
     <string name="stories_reaction_sent">Reakcja wysłana</string>
+    <string name="onboarding_resume_banner">Dokończ tworzenie swojego profilu</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">W pobliżu</string>
+    <string name="maps_chrome_choose_city">Wybierz miasto</string>
+    <string name="maps_chrome_recenter">Moja lokalizacja</string>
 </resources>

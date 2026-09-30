@@ -78,13 +78,15 @@ object LocationUtilities {
             return
         }
 
+        fun usable(location: Location): Boolean = location.hasAccuracy() && location.accuracy >= 0 && location.accuracy <= 5_000 &&
+            kotlin.math.abs(System.currentTimeMillis() - location.time) <= 60_000
         val last = listOfNotNull(
             runCatching { lm.getLastKnownLocation(LocationManager.GPS_PROVIDER) }.getOrNull(),
             runCatching { lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) }.getOrNull(),
             runCatching { lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER) }.getOrNull(),
-        ).maxByOrNull { it.time }
+        ).filter(::usable).maxByOrNull { it.time }
 
-        if (last != null && System.currentTimeMillis() - last.time < 60_000) {
+        if (last != null) {
             completion(Point.fromLngLat(last.longitude, last.latitude))
             return
         }
@@ -94,11 +96,13 @@ object LocationUtilities {
         fun finish(location: Location?) {
             if (finished) return
             finished = true
+            main.removeCallbacksAndMessages(null)
             completion(location?.let { Point.fromLngLat(it.longitude, it.latitude) })
         }
 
         val listener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
+                if (!usable(location)) return
                 runCatching { lm.removeUpdates(this) }
                 finish(location)
             }
@@ -110,20 +114,13 @@ object LocationUtilities {
             override fun onProviderDisabled(provider: String) = Unit
         }
 
-        val provider = when {
-            lm.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
-            lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-            else -> null
-        }
-        if (provider == null) {
-            finish(last)
-            return
-        }
-
-        runCatching {
-            lm.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper())
-        }.onFailure {
-            finish(last)
+        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+            .filter { runCatching { lm.isProviderEnabled(it) }.getOrDefault(false) }
+        val requested = providers.map { provider ->
+            runCatching { lm.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper()) }.isSuccess
+        }.any { it }
+        if (!requested) {
+            finish(null)
             return
         }
 
@@ -138,8 +135,8 @@ object LocationUtilities {
 object MapRegionStore {
     private const val PREFS = "discoverMap"
     private const val LAST_REGION_KEY = "discoverMap.lastRegion"
-    private const val DEFAULT_LAT_DELTA = 0.08
-    private const val DEFAULT_LON_DELTA = 0.08
+    private const val DEFAULT_LAT_DELTA = 12.0
+    private const val DEFAULT_LON_DELTA = 12.0
 
     /** Centro España ≈ iOS `spainCenter`. */
     val spainCenter: Point = Point.fromLngLat(-4.0, 40.0)
@@ -200,6 +197,9 @@ object MapRegionStore {
         val lon = parts[1].toDoubleOrNull() ?: return null
         val latDelta = parts[2].toDoubleOrNull() ?: return null
         val lonDelta = parts[3].toDoubleOrNull() ?: return null
+        if (!lat.isFinite() || !lon.isFinite() || lat !in -90.0..90.0 || lon !in -180.0..180.0 ||
+            !latDelta.isFinite() || !lonDelta.isFinite() || latDelta <= 0 || lonDelta <= 0 ||
+            (kotlin.math.abs(lat - 40) < 0.0001 && kotlin.math.abs(lon + 4) < 0.0001)) return null
         return Region(lat, lon, latDelta, lonDelta)
     }
 
@@ -258,6 +258,51 @@ object LocationSearchService {
                     storiesError = storiesResult.exceptionOrNull()?.toMapServiceError(),
                 ),
             )
+        }
+    }
+
+    /** A frozen viewport/location and independent encrypted cursors for both content types. */
+    fun searchContentPage(
+        region: MapRegionStore.Region? = null,
+        locationName: String? = null,
+        followingOnly: Boolean = false,
+        momentsCursor: String? = null,
+        storiesCursor: String? = null,
+        loadMoments: Boolean = true,
+        loadStories: Boolean = true,
+        completion: (MapDiscoverPayload) -> Unit,
+    ) {
+        val mode = if (locationName != null) MapQueryMode.Location(locationName)
+            else MapQueryMode.Region(requireNotNull(region))
+        CoroutineScope(Dispatchers.Main).launch {
+            val posts = async(Dispatchers.IO) {
+                runCatching {
+                    if (loadMoments) postMapEndpoint("getMapMomentsPage", mode, 60, followingOnly, true, momentsCursor) else null
+                }
+            }
+            val chains = async(Dispatchers.IO) {
+                runCatching {
+                    if (loadStories) postMapEndpoint("getMapStoriesPage", mode, 60, followingOnly, true, storiesCursor) else null
+                }
+            }
+            val postResult = posts.await()
+            val storyResult = chains.await()
+            val postJson = postResult.getOrNull()
+            val storyJson = storyResult.getOrNull()
+            completion(MapDiscoverPayload(
+                moments = postJson?.optJSONArray("moments")?.let { arr ->
+                    (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.toMapMoment() }
+                        .filter { it.isArchived != true && it.mapHasRenderableMedia }
+                }.orEmpty(),
+                stories = storyJson?.optJSONArray("stories")?.let { arr ->
+                    (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.toBackendMapStory()?.toStoryPreview() }
+                }.orEmpty(),
+                source = "backend",
+                momentsError = postResult.exceptionOrNull()?.toMapServiceError(),
+                storiesError = storyResult.exceptionOrNull()?.toMapServiceError(),
+                momentsCursor = postJson?.optStringOrNull("nextCursor"),
+                storiesCursor = storyJson?.optStringOrNull("nextCursor"),
+            ))
         }
     }
 
@@ -415,8 +460,14 @@ object LocationSearchService {
         }
     }
 
-    private suspend fun postMapEndpoint(functionName: String, mode: MapQueryMode, limit: Int): JSONObject {
+    private suspend fun postMapEndpoint(
+        functionName: String, mode: MapQueryMode, limit: Int,
+        followingOnly: Boolean = false, paginate: Boolean = false, cursor: String? = null,
+    ): JSONObject {
         val body = JSONObject().put("limit", limit)
+        if (followingOnly) body.put("scope", "following")
+        if (paginate) body.put("paginate", true)
+        if (cursor != null) body.put("cursor", cursor)
         when (mode) {
             is MapQueryMode.Location -> {
                 body.put("mode", "location")

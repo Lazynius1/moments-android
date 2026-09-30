@@ -3053,4 +3053,10 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="audience_manage_members_remove_single">You’re about to remove %1$s from “%2$s”. This change will be saved immediately.</string>
     <string name="audience_manage_members_remove_plural">You’re about to remove %1$s and %2$d more people from “%3$s”. This change will be saved immediately.</string>
     <string name="audience_members_limit">An audience list can contain at most %1$d members</string>
+    <string name="onboarding_resume_banner">Finish creating your profile</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">Nearby</string>
+    <string name="maps_chrome_choose_city">Choose a city</string>
+    <string name="maps_chrome_recenter">My location</string>
 </resources>

@@ -2402,4 +2402,10 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="audience_manage_members_remove_title">Rimuovere membri dalla lista?</string>
     <string name="audience_manage_members_remove_single">Stai per rimuovere %1$s da “%2$s”. Questa modifica verrà salvata immediatamente.</string>
     <string name="audience_manage_members_remove_plural">Stai per rimuovere %1$s e altre %2$d persone da “%3$s”. Questa modifica verrà salvata immediatamente.</string>
+    <string name="onboarding_resume_banner">Completa la creazione del tuo profilo</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">Vicino a te</string>
+    <string name="maps_chrome_choose_city">Scegli una città</string>
+    <string name="maps_chrome_recenter">La mia posizione</string>
 </resources>

@@ -34,6 +34,7 @@ import com.moments.android.services.firestore.updateProfilePicture
 import com.moments.android.services.messaging.ChatCacheStore
 import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.storage.StorageService
+import com.moments.android.services.storage.ModerationError
 import com.moments.android.views.creator.BackgroundMomentUploadService
 import com.moments.android.views.creator.BackgroundStoryUploadService
 import com.moments.android.views.messaging.services.ChatService
@@ -360,6 +361,11 @@ object OfflineSyncService {
                                 val url = StorageService.uploadProfileImage(payload.userId, bitmap)
                                 firestoreService.updateProfilePicture(payload.userId, url)
                             }.onSuccess { LocalPersistenceService.deleteActionAsync(action.id) }
+                                .onFailure { error ->
+                                    if (error is ModerationError.ContentRejected) {
+                                        LocalPersistenceService.deleteActionAsync(action.id)
+                                    }
+                                }
                         }
                     } else {
                         runCatching {

@@ -162,6 +162,7 @@ fun FeedView(
     var currentTimeMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     var showingLocationMap by remember { mutableStateOf(false) }
+    var selectedLocationMoment by remember { mutableStateOf<FeedMoment?>(null) }
     var selectedLocationName by remember { mutableStateOf("") }
     var selectedLocationLatitude by remember { mutableStateOf<Double?>(null) }
     var selectedLocationLongitude by remember { mutableStateOf<Double?>(null) }
@@ -543,6 +544,7 @@ fun FeedView(
         showingLocationMap = showingLocationMap,
         onShowingLocationMapChange = { showingLocationMap = it },
         selectedLocationName = selectedLocationName,
+        selectedLocationMoment = selectedLocationMoment,
         selectedLocationLatitude = selectedLocationLatitude,
         selectedLocationLongitude = selectedLocationLongitude,
         showMomentDetail = showMomentDetail,
@@ -626,7 +628,8 @@ fun FeedView(
                         showExploreWithHashtag = true
                         LegacyNavigationBridge.showExplore()
                     },
-                    onOpenLocation = { name, coordinate ->
+                    onOpenLocation = { name, coordinate, origin ->
+                        selectedLocationMoment = origin
                         selectedLocationName = name
                         selectedLocationLatitude = coordinate?.latitude
                         selectedLocationLongitude = coordinate?.longitude

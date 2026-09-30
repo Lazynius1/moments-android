@@ -1227,7 +1227,6 @@
     <string name="onboarding_email_title_password">Erstelle ein Passwort</string>
     <string name="onboarding_email_title_step1">Konto erstellen</string>
     <string name="onboarding_email_title_username">Wähle deinen Benutzernamen</string>
-    <string name="onboarding_resume_banner">Mach dort weiter, wo du aufgehört hast. Deine Daten wurden gespeichert.</string>
     <string name="onboarding_subtitle_step2">Foto und Interessen, damit wir dich kennenlernen</string>
     <string name="onboarding_subtitle_step3">Überprüfe alles, bevor du startest</string>
     <string name="onboarding_title_step2">Profil personalisieren</string>

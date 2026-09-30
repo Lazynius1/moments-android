@@ -3009,4 +3009,10 @@
     <string name="audience_manage_members_remove_single">你即將把 %1$s 從「%2$s」移除。這項變更會立即儲存。</string>
     <string name="audience_manage_members_remove_plural">你即將把 %1$s 和另外 %2$d 人從「%3$s」移除。這項變更會立即儲存。</string>
     <string name="stories_reaction_sent">已傳送反應</string>
+    <string name="onboarding_resume_banner">完成建立你的個人檔案</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">附近</string>
+    <string name="maps_chrome_choose_city">選擇城市</string>
+    <string name="maps_chrome_recenter">我的位置</string>
 </resources>

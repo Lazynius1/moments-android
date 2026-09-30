@@ -1183,7 +1183,6 @@
     <string name="onboarding_email_title_password">Créez un mot de passe</string>
     <string name="onboarding_email_title_step1">Créez votre compte</string>
     <string name="onboarding_email_title_username">Choisissez votre pseudo</string>
-    <string name="onboarding_resume_banner">Reprenez où vous vous étiez arrêté. Vos données ont été enregistrées.</string>
     <string name="onboarding_subtitle_step2">Photo et centres d\'intérêt pour mieux vous connaître</string>
     <string name="onboarding_subtitle_step3">Vérifiez tout avant de commencer</string>
     <string name="onboarding_title_step2">Personnalisez votre profil</string>

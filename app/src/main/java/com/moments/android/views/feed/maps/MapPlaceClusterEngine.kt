@@ -102,9 +102,6 @@ object MapPlaceClusterEngine {
         latitudeDelta: Double,
         longitudeDelta: Double,
     ): MapPlaceLayout {
-        if (filter == MapDiscoverContentFilter.Friends) {
-            return MapPlaceLayout(placeClusters = emptyList(), standaloneFriends = friendPins)
-        }
 
         val mergeRadius = mergeRadiusMeters(latitudeDelta, longitudeDelta)
         val precision = coordinatePrecision(latitudeDelta, longitudeDelta)
@@ -184,7 +181,7 @@ object MapPlaceClusterEngine {
         }
 
         val absorbedFriendIds = mutableSetOf<String>()
-        if (filter == MapDiscoverContentFilter.All) {
+        if (filter != MapDiscoverContentFilter.Places) {
             for (pin in friendPins) {
                 val index = clusters.indexOfFirst { cluster ->
                     shouldMerge(
@@ -345,7 +342,6 @@ object MapPlaceClusterEngine {
         lat1: Double, lon1: Double, lat2: Double, lon2: Double,
         radius: Double, name: String, otherName: String,
     ): Boolean {
-        if (name.isNotEmpty() && otherName.isNotEmpty() && name == otherName) return true
         return haversineMeters(lat1, lon1, lat2, lon2) <= radius
     }
 

@@ -71,6 +71,7 @@ fun LoginScreen(onAuthenticated: () -> Unit) {
     // en Firestore (login social nuevo, o reanudar un onboarding a medias al arrancar).
     // Sin esto el usuario entraba a la app sin username ni documento de usuario.
     val isRegistering by com.moments.android.services.auth.AuthService.isRegistering.collectAsState()
+    val onboardingContext by com.moments.android.services.auth.AuthService.resumingOnboardingContext.collectAsState()
     LaunchedEffect(isRegistering) {
         // Solo desde las pantallas de entrada: si ya se está en el alta por correo
         // (`Register`) no hay que secuestrarla — ese flujo crea su propio perfil y
@@ -115,7 +116,11 @@ fun LoginScreen(onAuthenticated: () -> Unit) {
                     }
                 },
                 onAuthenticated = onAuthenticated,
-                uiContext = OnboardingUiContext.SOCIAL,
+                uiContext = if (onboardingContext == com.moments.android.services.auth.OnboardingDraftContext.EMAIL) {
+                    OnboardingUiContext.EMAIL
+                } else {
+                    OnboardingUiContext.SOCIAL
+                },
             )
         }
     }

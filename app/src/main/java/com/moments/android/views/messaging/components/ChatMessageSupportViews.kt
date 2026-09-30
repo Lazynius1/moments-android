@@ -793,15 +793,6 @@ fun MessageTimestamp(
                 maxLines = 1,
                 softWrap = false,
             )
-            if (message.editedAt != null) {
-                Text(
-                    stringResource(R.string.chat_edited),
-                    fontSize = 11.sp,
-                    color = colors.timestampColor,
-                    maxLines = 1,
-                    softWrap = false,
-                )
-            }
             Text(
                 stringResource(R.string.chat_seen),
                 fontSize = 11.sp,
@@ -824,15 +815,6 @@ fun MessageTimestamp(
                 maxLines = 1,
                 softWrap = false,
             )
-            if (message.editedAt != null) {
-                Text(
-                    stringResource(R.string.chat_edited),
-                    fontSize = 11.sp,
-                    color = colors.timestampColor,
-                    maxLines = 1,
-                    softWrap = false,
-                )
-            }
             if (isCurrentUser) {
                 MessageStatusIcon(status)
             }

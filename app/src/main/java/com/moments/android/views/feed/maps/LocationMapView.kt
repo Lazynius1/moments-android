@@ -76,6 +76,8 @@ import com.moments.android.views.profile.core.sections.MomentZoomOpener
 import com.moments.android.views.profile.core.sections.MomentZoomPresentationKind
 import com.moments.android.views.shared.MomentsModalSheet
 import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -95,7 +97,19 @@ fun LocationMapView(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     momentCount: Int? = null,
+    originMoment: Moment? = null,
 ) {
+    if (!echoHistoryOnly) {
+        DiscoverMapView(
+            onDismiss = onDismiss,
+            modifier = modifier,
+            zoneName = locationName,
+            initialLatitude = latitude,
+            initialLongitude = longitude,
+            originMoment = originMoment,
+        )
+        return
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     MomentsTabBarHidden()
@@ -126,7 +140,7 @@ fun LocationMapView(
     var showingGallery by remember { mutableStateOf(false) }
     var selectedPlaceCluster by remember { mutableStateOf<MapPlaceCluster?>(null) }
     var currentWeather by remember { mutableStateOf<WeatherData?>(null) }
-    var weatherEffectsEnabled by remember { mutableStateOf(true) }
+    var weatherEffectsEnabled by remember { mutableStateOf(false) }
     var hasInitializedMap by remember { mutableStateOf(false) }
     var locationPermissionGranted by remember {
         mutableStateOf(LocationUtilities.hasForegroundPermission(context))
@@ -136,6 +150,9 @@ fun LocationMapView(
     var isViewActive by remember { mutableStateOf(true) }
     var showSearchInAreaButton by remember { mutableStateOf(false) }
     var lastNearbyQueryKey by remember { mutableStateOf("") }
+    var nearbySearchToken by remember { mutableStateOf(UUID.randomUUID()) }
+    var initialContentToken by remember { mutableStateOf(UUID.randomUUID()) }
+    var searchText by remember { mutableStateOf("") }
     var focusNonce by remember { mutableIntStateOf(0) }
     var focusCenter by remember { mutableStateOf<Point?>(null) }
     var focusZoom by remember { mutableStateOf(MapRegionStore.zoomFromLongitudeDelta(0.01)) }
@@ -265,6 +282,8 @@ fun LocationMapView(
     }
 
     fun loadLocationMoments() {
+        val initialToken = UUID.randomUUID()
+        initialContentToken = initialToken
         isLoadingMoments = true
         contentErrorMessage = null
         if (isEchoHistoryMode) {
@@ -286,7 +305,7 @@ fun LocationMapView(
                 if (result.moments.isNotEmpty()) {
                     result.moments.mapNotNull { it.location?.trim()?.takeIf(String::isNotEmpty) }
                         .firstOrNull()?.let { mapHeaderLocationName = it }
-                    showingBottomSheet = true
+                    showingBottomSheet = false
                 }
             }
             return
@@ -294,7 +313,7 @@ fun LocationMapView(
 
         val uid = FirebaseAuth.getInstance().currentUser?.uid
         LocationSearchService.searchMomentsByLocation(locationName, uid) { result ->
-            if (!isViewActive) return@searchMomentsByLocation
+            if (!isViewActive || initialContentToken != initialToken) return@searchMomentsByLocation
             isLoadingMoments = false
             result.fold(
                 onSuccess = { moments ->
@@ -303,7 +322,7 @@ fun LocationMapView(
                     if (moments.isNotEmpty() || locationStories.isNotEmpty()) {
                         errorMessage = null
                         contentErrorMessage = null
-                        showingBottomSheet = true
+                        showingBottomSheet = false
                     }
                 },
                 onFailure = {
@@ -318,14 +337,14 @@ fun LocationMapView(
             )
         }
         LocationSearchService.searchStoriesByLocation(locationName) { result ->
-            if (!isViewActive) return@searchStoriesByLocation
+            if (!isViewActive || initialContentToken != initialToken) return@searchStoriesByLocation
             result.fold(
                 onSuccess = { stories ->
                     locationStories = stories
                     if (stories.isNotEmpty() && locationMoments.isEmpty() && !isLoadingMoments) {
                         errorMessage = null
                         contentErrorMessage = null
-                        showingBottomSheet = true
+                        showingBottomSheet = false
                     } else if (stories.isNotEmpty()) {
                         errorMessage = null
                     }
@@ -342,43 +361,31 @@ fun LocationMapView(
         }
     }
 
-    fun nearbyQueryKey(region: MapRegionStore.Region): String {
-        val lat = (region.centerLat * 100).roundToHundredths()
-        val lon = (region.centerLon * 100).roundToHundredths()
-        val latDelta = (region.latitudeDelta * 100).roundToHundredths()
-        val lonDelta = (region.longitudeDelta * 100).roundToHundredths()
-        return "$lat|$lon|$latDelta|$lonDelta"
-    }
+    fun nearbyQueryKey(region: MapRegionStore.Region): String = MapViewportQuery.key(region)
 
     fun loadNearbyMoments(region: MapRegionStore.Region, queryKey: String) {
+        val token = UUID.randomUUID()
+        nearbySearchToken = token
+        initialContentToken = UUID.randomUUID()
+        isLoadingMoments = false
         isLoadingNearbyMoments = true
         lastNearbyQueryKey = queryKey
         contentErrorMessage = null
-        val uid = FirebaseAuth.getInstance().currentUser?.uid
-        LocationSearchService.searchMomentsInRegion(region, uid) { result ->
-            if (!isViewActive || lastNearbyQueryKey != queryKey) return@searchMomentsInRegion
+        LocationSearchService.searchDiscoverContentInRegion(region) { payload ->
+            if (!isViewActive || nearbySearchToken != token) return@searchDiscoverContentInRegion
             isLoadingNearbyMoments = false
-            result.fold(
-                onSuccess = { moments ->
-                    nearbyMoments = moments
-                    showSearchInAreaButton = false
-                    errorMessage = null
-                    contentErrorMessage = null
-                    selectedPlaceCluster = null
-                    if (moments.isNotEmpty()) {
-                        locationMoments = moments
-                        refreshMomentAvailability(moments)
-                        moments.mapNotNull { it.location?.trim()?.takeIf(String::isNotEmpty) }
-                            .firstOrNull()?.let { mapHeaderLocationName = it }
-                        showingBottomSheet = true
-                    }
-                },
-                onFailure = {
-                    nearbyMoments = emptyList()
-                    contentErrorMessage = unavailableMsg
-                    showSearchInAreaButton = true
-                },
-            )
+            if (payload.isCompleteFailure) {
+                lastNearbyQueryKey = ""
+                contentErrorMessage = unavailableMsg
+            } else {
+                nearbyMoments = payload.moments
+                locationMoments = payload.moments
+                locationStories = payload.stories
+                refreshMomentAvailability(payload.moments)
+                errorMessage = null
+                contentErrorMessage = if (payload.hasPartialFailure) partialMsg else null
+                if (!showingBottomSheet) selectedPlaceCluster = null
+            }
         }
     }
 
@@ -400,7 +407,7 @@ fun LocationMapView(
             if (filtered.isNotEmpty()) {
                 filtered.mapNotNull { it.location?.trim()?.takeIf(String::isNotEmpty) }
                     .firstOrNull()?.let { mapHeaderLocationName = it }
-                showingBottomSheet = true
+                showingBottomSheet = false
             }
             return
         }
@@ -424,17 +431,19 @@ fun LocationMapView(
     }
 
     fun setupDefaultLocation(showMessage: Boolean) {
-        val lat = 40.4168
-        val lon = -3.7038
+        val fallback = MapRegionStore.initialRegion(context)
+        val lat = fallback.centerLat
+        val lon = fallback.centerLon
         focusNonce += 1
         focusCenter = Point.fromLngLat(lon, lat)
-        focusZoom = MapRegionStore.zoomFromLongitudeDelta(0.05)
-        currentRegion = MapRegionStore.Region(lat, lon, 0.05, 0.05)
+        focusZoom = fallback.zoom
+        currentRegion = fallback
         hasInitializedMap = true
         isLoading = false
         // ≡ iOS `setupDefaultLocation`: mensaje en `errorMessage` → `modernErrorView`.
-        errorMessage = if (showMessage) defaultLocationMsg else null
-        mapHeaderLocationName = defaultTitle
+        errorMessage = null
+        contentErrorMessage = if (showMessage) context.getString(R.string.maps_error_location_load_failed) else null
+        mapHeaderLocationName = context.getString(R.string.maps_chrome_choose_city)
         nearbyMoments = emptyList()
         lastNearbyQueryKey = nearbyQueryKey(currentRegion)
         showSearchInAreaButton = true
@@ -490,9 +499,56 @@ fun LocationMapView(
             latitudeDelta = lonDelta,
             longitudeDelta = lonDelta,
         )
-        if (!hasInitializedMap) return
-        // iOS: cualquier cambio de región → showSearchInAreaButton = true
-        showSearchInAreaButton = true
+        // The explicit area-search action owns content refreshes.
+    }
+
+    fun searchForPlace() {
+        if (isLoading) return
+        val query = searchText.trim()
+        if (query.isEmpty()) return
+        scope.launch {
+            val point = withContext(Dispatchers.IO) {
+                runCatching {
+                    @Suppress("DEPRECATION")
+                    android.location.Geocoder(context, java.util.Locale.getDefault()).getFromLocationName(query, 1)
+                        ?.firstOrNull()?.let { Point.fromLngLat(it.longitude, it.latitude) }
+                }.getOrNull()
+            }
+            if (!isViewActive) return@launch
+            if (point == null) {
+                contentErrorMessage = context.getString(R.string.maps_error_no_results, query)
+                return@launch
+            }
+            selectedPlaceCluster = null
+            errorMessage = null
+            contentErrorMessage = null
+            hasInitializedMap = true
+            mapHeaderLocationName = query
+            focusNonce += 1
+            focusCenter = point
+            focusZoom = MapRegionStore.zoomFromLongitudeDelta(0.015)
+            handleMapRegionChanged(point, focusZoom)
+            searchInCurrentArea()
+        }
+    }
+
+    fun recenterOnUser() {
+        val center: () -> Unit = {
+            LocationUtilities.getCurrentLocation(context) { point ->
+                if (isViewActive && point != null) {
+                    selectedPlaceCluster = null
+                    userLatitude = point.latitude()
+                    userLongitude = point.longitude()
+                    focusNonce += 1
+                    focusCenter = point
+                    focusZoom = MapRegionStore.zoomFromLongitudeDelta(0.03)
+                    handleMapRegionChanged(point, focusZoom)
+                    searchInCurrentArea()
+                }
+            }
+        }
+        if (LocationUtilities.hasForegroundPermission(context)) center()
+        else locationGate.requestAccess(context, onGranted = center)
     }
 
     fun openPlaceStories(cluster: MapPlaceCluster, startingAt: MapStoryPreview? = null) {
@@ -568,6 +624,7 @@ fun LocationMapView(
     }
 
     fun closeLocationMap() {
+        isViewActive = false
         showingBottomSheet = false
         zoomDestination = null
         storyViewerPresentation = null
@@ -603,44 +660,9 @@ fun LocationMapView(
 
     LaunchedEffect(Unit) {
         if (mapHeaderLocationName.isBlank()) mapHeaderLocationName = locationName
-        when {
-            latitude != null && longitude != null -> setupMapWithCoordinate(latitude, longitude)
-            LocationMapViewSupport.isGenericLocationQuery(context, locationName) ->
-                setupDefaultLocation(showMessage = false)
-            LocationUtilities.hasForegroundPermission(context) -> {
-                LocationUtilities.getCurrentLocation(context) { point ->
-                    if (!isViewActive) return@getCurrentLocation
-                    if (point != null) {
-                        userLatitude = point.latitude()
-                        userLongitude = point.longitude()
-                    }
-                    if (point != null && LocationMapViewSupport.isGenericLocationQuery(context, locationName)) {
-                        setupMapWithCoordinate(point.latitude(), point.longitude())
-                    } else {
-                        geocodeAndSetup()
-                    }
-                }
-            }
-            else -> {
-                // iOS: solo pide permiso y espera authorizationStatus — no geocode en paralelo
-                locationGate.requestAccess(context) {
-                    locationPermissionGranted = LocationUtilities.hasForegroundPermission(context)
-                    LocationUtilities.getCurrentLocation(context) { point ->
-                        if (!isViewActive) return@getCurrentLocation
-                        if (point != null) {
-                            userLatitude = point.latitude()
-                            userLongitude = point.longitude()
-                        }
-                        if (point != null && LocationMapViewSupport.isGenericLocationQuery(context, locationName)) {
-                            setupMapWithCoordinate(point.latitude(), point.longitude())
-                        } else {
-                            geocodeAndSetup()
-                        }
-                    }
-                }
-            }
-        }
+        setupMapLocation()
     }
+
 
     LaunchedEffect(showingBottomSheet) {
         if (!showingBottomSheet) presentDeferredMapContent()
@@ -672,6 +694,9 @@ fun LocationMapView(
             else -> {
                 MapCanvasSection(
                     location = mapLocation,
+                    cameraTarget = focusCenter,
+                    cameraZoom = focusZoom,
+                    cameraRequest = focusNonce,
                     placeClusters = locationMapPlaceLayout.placeClusters,
                     onPlaceClusterTap = ::openPlaceCluster,
                     onCameraIdle = { center, zoom ->
@@ -696,185 +721,28 @@ fun LocationMapView(
             }
         }
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp)
-                .padding(top = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            // iOS: VStack centra sus hijos
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
+        MapImmersiveChrome(
+            title = selectedPlaceCluster?.displayName ?: effectiveHeaderLocationName,
+            subtitle = stringResource(R.string.maps_place_sheet_stats, sheetCluster.momentCount, sheetCluster.storyCount),
+            isLoading = isLoading || isLoadingMoments || isLoadingNearbyMoments,
+            searchText = searchText,
+            onSearchTextChange = { searchText = it },
+            onClose = ::closeLocationMap,
+            onSearch = ::searchForPlace,
+            onRecenter = ::recenterOnUser,
+            onOpenContent = { showingBottomSheet = true },
+            showsSearchArea = hasInitializedMap && !isLoading && !isLoadingMoments && !isLoadingNearbyMoments && nearbyQueryKey(currentRegion) != lastNearbyQueryKey,
+            onSearchArea = { selectedPlaceCluster = null; searchInCurrentArea() },
+        )
+        contentErrorMessage?.takeIf { errorMessage == null }?.let { message ->
             Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
-                // iOS: HStack { pill; Spacer(); weather } — el pill toma su tamaño natural
-                horizontalArrangement = Arrangement.SpaceBetween,
+                Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 16.dp).padding(top = 68.dp)
+                    .momentsChromeGlass(RoundedCornerShape(16.dp)).padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                MapHeaderSection(
-                    title = effectiveHeaderLocationName,
-                    subtitle = subtitle,
-                    closeStyle = MapHeaderCloseStyle.Location,
-                    onClose = ::closeLocationMap,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                currentWeather?.let { weather ->
-                    Column(horizontalAlignment = Alignment.End) {
-                        Row(
-                            Modifier
-                                .shadow(10.dp, RoundedCornerShape(percent = 50), clip = false)
-                                .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
-                                .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(percent = 50))
-                                .clickable {
-                                    HapticManager.shared.lightImpact()
-                                    weatherEffectsEnabled = !weatherEffectsEnabled
-                                }
-                                .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                weather.condition.icon(weatherEffectsEnabled),
-                                null,
-                                tint = if (weatherEffectsEnabled) {
-                                    weather.condition.accentColor()
-                                } else {
-                                    primary.copy(alpha = 0.7f)
-                                },
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Column {
-                                Text(weather.temperatureFormatted, color = primary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                Text(weather.condition.displayName(), color = secondary, fontSize = 9.sp, maxLines = 1)
-                            }
-                        }
-                        if (weatherEffectsEnabled) {
-                            Row(
-                                Modifier.padding(end = 8.dp, top = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                Text(stringResource(R.string.weather_attribution_text), color = secondary.copy(alpha = 0.8f), fontSize = 7.sp)
-                                Text(
-                                    stringResource(R.string.weather_attribution_link),
-                                    color = Color(0xFF007AFF).copy(alpha = 0.6f),
-                                    fontSize = 7.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.clickable {
-                                        uriHandler.openUri("https://openweathermap.org/")
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            contentErrorMessage?.takeIf { errorMessage == null }?.let { message ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .momentsChromeGlass(RoundedCornerShape(16.dp), interactive = false)
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Filled.Warning, null, tint = Color(0xFFFF9500), modifier = Modifier.size(14.dp))
-                    Text(
-                        message,
-                        color = primary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 2,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        stringResource(R.string.maps_error_retry),
-                        color = colors.accent,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.clickable(onClick = ::searchInCurrentArea),
-                    )
-                }
-            }
-
-            AnimatedVisibility(
-                visible = hasInitializedMap && showSearchInAreaButton && errorMessage == null && !isLoading,
-                enter = fadeIn() + slideInVertically(),
-                exit = fadeOut() + slideOutVertically(),
-            ) {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Row(
-                        Modifier
-                            .shadow(10.dp, RoundedCornerShape(percent = 50), clip = false)
-                            .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true)
-                            .clickable(onClick = ::searchInCurrentArea)
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (isLoadingNearbyMoments) {
-                            CircularProgressIndicator(Modifier.size(14.dp), color = colors.accent, strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Filled.Search, null, tint = primary, modifier = Modifier.size(14.dp))
-                        }
-                        Text(
-                            stringResource(R.string.maps_search_this_area),
-                            color = primary,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
-                        )
-                    }
-                }
-            }
-
-            if (locationMoments.isNotEmpty() && errorMessage == null && !isLoading) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalAlignment = Alignment.End,
-                ) {
-                    Column(
-                        Modifier
-                            .shadow(10.dp, RoundedCornerShape(30.dp), clip = false)
-                            .momentsChromeGlass(RoundedCornerShape(30.dp), interactive = true)
-                            .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(30.dp))
-                            .clickable {
-                                HapticManager.shared.lightImpact()
-                                // ≡ iOS: tap stats → toggle bottom sheet (no gallery)
-                                showingBottomSheet = !showingBottomSheet
-                            }
-                            .padding(horizontal = 10.dp, vertical = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        LocationStatItem(
-                            tintColor = colors.accent,
-                            icon = { Icon(Icons.Filled.Photo, null, tint = colors.accent, modifier = Modifier.size(12.dp)) },
-                            value = "${locationMoments.size}",
-                            label = stringResource(R.string.maps_stats_photos),
-                            primary = primary,
-                            tertiary = tertiary,
-                        )
-                        LocationStatItem(
-                            tintColor = Color(0xFF007AFF),
-                            icon = { Icon(Icons.Filled.People, null, tint = Color(0xFF007AFF), modifier = Modifier.size(12.dp)) },
-                            value = "${locationMoments.map { it.authorId }.toSet().size}",
-                            label = stringResource(R.string.maps_stats_users),
-                            primary = primary,
-                            tertiary = tertiary,
-                        )
-                        LocationStatItem(
-                            tintColor = Color(0xFFFF9500),
-                            icon = { Icon(Icons.Filled.CalendarMonth, null, tint = Color(0xFFFF9500), modifier = Modifier.size(12.dp)) },
-                            value = formatDateRange(locationMoments),
-                            label = stringResource(R.string.maps_stats_time),
-                            primary = primary,
-                            tertiary = tertiary,
-                        )
-                    }
-                }
+                Text(message, color = primary, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.maps_error_retry), color = colors.accent, modifier = Modifier.clickable(onClick = ::searchInCurrentArea))
             }
         }
 

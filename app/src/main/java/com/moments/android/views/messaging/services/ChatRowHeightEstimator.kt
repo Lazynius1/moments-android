@@ -107,7 +107,10 @@ object ChatRowHeightEstimator {
     }
 
     private fun estimatedHeight(item: MessageItem, bubbleWidth: Dp): Dp = when (item) {
-        is MessageItem.Single -> estimatedHeight(item.message, bubbleWidth)
+        is MessageItem.Single -> {
+            val editedLabelHeight = if (item.message.editedAt != null && !item.message.isDeleted) 20.dp else 0.dp
+            estimatedHeight(item.message, bubbleWidth) + editedLabelHeight
+        }
         is MessageItem.MediaCluster -> {
             if (item.messages.all { it.isDeleted }) deletedRowHeight
             else estimatedClusterHeight(item.messages.count { !it.isDeleted })

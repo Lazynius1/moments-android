@@ -3009,4 +3009,10 @@
     <string name="audience_manage_members_remove_single">आप %1$s को “%2$s” से हटाने वाले हैं। यह बदलाव तुरंत सेव हो जाएगा।</string>
     <string name="audience_manage_members_remove_plural">आप %1$s और %2$d अन्य लोगों को “%3$s” से हटाने वाले हैं। यह बदलाव तुरंत सेव हो जाएगा।</string>
     <string name="stories_reaction_sent">रिएक्शन भेज दिया गया</string>
+    <string name="onboarding_resume_banner">अपनी प्रोफ़ाइल बनाना पूरा करें</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">आपके आस-पास</string>
+    <string name="maps_chrome_choose_city">एक शहर चुनें</string>
+    <string name="maps_chrome_recenter">मेरा स्थान</string>
 </resources>

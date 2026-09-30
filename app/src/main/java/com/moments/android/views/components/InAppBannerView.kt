@@ -56,6 +56,7 @@ import androidx.compose.material.icons.filled.HourglassFull
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
@@ -463,7 +464,9 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
     val undoProgress = remember(toast.id) { Animatable(1f) }
 
     LaunchedEffect(toast.id) {
-        if (!toast.showsProgress) HapticManager.shared.success()
+        if (!toast.showsProgress) {
+            if (toast.isError) HapticManager.shared.error() else HapticManager.shared.success()
+        }
         if (hasUndo) {
             undoProgress.snapTo(1f)
             undoProgress.animateTo(
@@ -610,6 +613,15 @@ private fun ActionToastBanner(toast: InAppActionToast, clustered: Boolean = fals
                 MomentsCircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
                     strokeWidth = 2.dp,
+                )
+            } else if (toast.isError) {
+                Icon(
+                    imageVector = Icons.Filled.ErrorOutline,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable { InAppNotificationService.dismissManually() },
+                    tint = LocalContentColor.current,
                 )
             } else if (toast.bridgesToIncognitoPill || toast.isIncognitoPaused) {
                 Icon(

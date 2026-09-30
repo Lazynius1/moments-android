@@ -75,6 +75,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -1359,6 +1360,28 @@ fun StoryViewerScreen(
             // ≡ iOS: progressY = max(topInset+1, captureRect.minY - 26); header at minY + 26
             // SwiftUI `.position` centra el view en ese punto → offset(y - height/2)
             if (!isUIHidden) {
+                Box(
+                    Modifier
+                        .offset { IntOffset(captureRect.left.roundToInt(), captureRect.top.roundToInt()) }
+                        .size(
+                            width = with(density) { captureRect.width.toDp() },
+                            height = with(density) { captureRect.height.toDp() },
+                        )
+                        .clip(RoundedCornerShape(corner)),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(minOf(120.dp, with(density) { captureRect.height.toDp() }))
+                            .background(
+                                Brush.verticalGradient(
+                                    0f to Color.Black.copy(alpha = 0.48f),
+                                    0.4f to Color.Black.copy(alpha = 0.32f),
+                                    1f to Color.Transparent,
+                                ),
+                            ),
+                    )
+                }
                 val progressCenterY = maxOf(
                     topInset + with(density) { 1.dp.toPx() },
                     captureRect.top - with(density) { 26.dp.toPx() },
@@ -2072,14 +2095,16 @@ private fun StoryViewerHeaderChrome(
                     .clip(CircleShape)
                     .background(Color.Black.copy(0.16f)),
             )
-            Column {
+            Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         username,
                         color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                     if (isOwnStory) {
                         CurrentUserVerifiedBadge(size = 12.dp)
@@ -2089,7 +2114,7 @@ private fun StoryViewerHeaderChrome(
                 }
                 Text(
                     highlightTitle?.takeIf { it.isNotBlank() } ?: timeAgo,
-                    color = Color.White.copy(0.7f),
+                    color = Color.White.copy(0.85f),
                     fontSize = 11.sp,
                 )
             }

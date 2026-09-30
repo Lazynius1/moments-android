@@ -2419,4 +2419,10 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="audience_manage_members_remove_title">Mitglieder aus der Liste entfernen?</string>
     <string name="audience_manage_members_remove_single">%1$s wird aus „%2$s“ entfernt. Diese Änderung wird sofort gespeichert.</string>
     <string name="audience_manage_members_remove_plural">%1$s und %2$d weitere Personen werden aus „%3$s“ entfernt. Diese Änderung wird sofort gespeichert.</string>
+    <string name="onboarding_resume_banner">Vervollständige dein Profil</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">In deiner Nähe</string>
+    <string name="maps_chrome_choose_city">Wähle eine Stadt</string>
+    <string name="maps_chrome_recenter">Mein Standort</string>
 </resources>

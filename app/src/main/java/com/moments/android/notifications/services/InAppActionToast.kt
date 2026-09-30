@@ -20,6 +20,7 @@ data class InAppActionToast(
     val undo: (() -> Unit)? = null,
     val holds: Boolean = false,
     val showsProgress: Boolean = false,
+    val isError: Boolean = false,
     /** Tras el toast, el chrome hace morph a la pill Incognito. */
     val bridgesToIncognitoPill: Boolean = false,
     /** Toast de pausa: morph desde la pill. */
@@ -41,6 +42,7 @@ data class InAppActionToast(
             undo: (() -> Unit)? = null,
             holds: Boolean = false,
             showsProgress: Boolean = false,
+            isError: Boolean = false,
             bridgesToIncognitoPill: Boolean = false,
             isIncognitoPaused: Boolean = false,
             onExpire: (() -> Unit)? = null,
@@ -53,6 +55,7 @@ data class InAppActionToast(
             undo = undo,
             holds = holds,
             showsProgress = showsProgress,
+            isError = isError,
             bridgesToIncognitoPill = bridgesToIncognitoPill,
             isIncognitoPaused = isIncognitoPaused,
             onExpire = onExpire,
@@ -171,6 +174,11 @@ data class InAppActionToast(
         fun profilePhotoUpdated(): InAppActionToast = create(prefix = str(R.string.toast_action_profile_photo_updated))
 
         fun profilePhotoRemoved(): InAppActionToast = create(prefix = str(R.string.toast_action_profile_photo_removed))
+
+        fun profilePhotoRejected(): InAppActionToast = create(
+            prefix = str(R.string.profile_editor_profile_image_rejected),
+            isError = true,
+        )
 
         fun highlightCreated(): InAppActionToast = create(prefix = str(R.string.toast_action_highlight_created))
 

@@ -6,6 +6,8 @@ import android.net.Uri
 import com.google.firebase.storage.FirebaseStorage
 import com.moments.android.services.messaging.EncryptionService
 import com.moments.android.services.network.CloudFunctionsClient
+import com.moments.android.notifications.services.InAppActionToast
+import com.moments.android.notifications.services.InAppNotificationService
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +68,14 @@ object StorageService {
     // MARK: - Profile
 
     suspend fun uploadProfileImage(userId: String, image: Bitmap): String {
-        return uploadModeratedAvatar(image, conversationId = null)
+        return try {
+            uploadModeratedAvatar(image, conversationId = null)
+        } catch (error: ModerationError.ContentRejected) {
+            withContext(Dispatchers.Main.immediate) {
+                InAppNotificationService.showActionToast(InAppActionToast.profilePhotoRejected())
+            }
+            throw error
+        }
     }
 
     suspend fun uploadGroupImage(groupId: String, image: Bitmap): String {

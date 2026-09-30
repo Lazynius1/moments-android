@@ -3009,4 +3009,10 @@
     <string name="audience_manage_members_remove_single">%1$sを「%2$s」から削除します。この変更はすぐに保存されます。</string>
     <string name="audience_manage_members_remove_plural">%1$sと他%2$d人を「%3$s」から削除します。この変更はすぐに保存されます。</string>
     <string name="stories_reaction_sent">リアクションを送信しました</string>
+    <string name="onboarding_resume_banner">プロフィールの作成を完了しましょう</string>
+
+    <!-- Immersive map chrome -->
+    <string name="maps_chrome_nearby">近くの投稿</string>
+    <string name="maps_chrome_choose_city">都市を選択</string>
+    <string name="maps_chrome_recenter">現在地</string>
 </resources>

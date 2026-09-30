@@ -321,12 +321,12 @@ private fun ModalSheetDragHandle(modifier: Modifier = Modifier) {
     }
 }
 
-private fun modalSheetSpring() = spring<Float>(
+internal fun modalSheetSpring() = spring<Float>(
     dampingRatio = 0.88f,
     stiffness = Spring.StiffnessMediumLow,
 )
 
-private fun modalSheetRubberBand(
+internal fun modalSheetRubberBand(
     proposed: Float,
     lowerBound: Float,
     upperBound: Float,

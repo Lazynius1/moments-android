@@ -5,7 +5,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.util.LruCache
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -50,18 +49,28 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapbox.geojson.Point
@@ -96,6 +105,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.util.Date
 import kotlin.coroutines.resume
+import kotlin.math.atan2
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -223,6 +233,7 @@ fun ChatLocationMessageBubble(
                             senderId = senderId,
                             avatarSize = 40.dp,
                             isActive = !isLive || isLiveActive,
+                            isLive = isLive,
                         )
                     } else {
                         // Fallback para mensajes antiguos sin emisor.
@@ -525,6 +536,7 @@ fun ChatLocationDetailView(
                             senderId = senderId,
                             avatarSize = 48.dp,
                             isActive = !isLive || isLiveActive,
+                            isLive = isLive,
                         )
                     } else {
                         Icon(
@@ -674,41 +686,184 @@ private fun LocationActionButton(
     }
 }
 
-/** Port de `LiveLocationAvatarPin`. */
+/** Port de `LiveLocationAvatarPin` — gota B + `reversedMask` + icono live/fija. */
 @Composable
 fun LiveLocationAvatarPin(
     senderId: String,
     avatarSize: Dp = 44.dp,
     isActive: Boolean = true,
+    isLive: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(contentAlignment = Alignment.Center) {
+    val density = LocalDensity.current
+    val headDiameter = avatarSize + 8.dp
+    val tipHeight = headDiameter * 0.38f
+    val totalHeight = headDiameter + tipHeight
+    val cutoutSize = maxOf(18.dp, avatarSize * 0.48f)
+    val badgeShift = 2.dp
+    val pinShape = LocationAvatarPinSilhouette(cutoutSize, badgeShift)
+    val badgeIconSize = cutoutSize * 0.92f
+    val badgeIcon = if (isLive) AttachmentIcon.LIVE_LOCATION else AttachmentIcon.LOCATION
+    val badgeTint = when {
+        isLive && isActive -> Color(0xFF34C759) // ≡ SwiftUI .green
+        isLive -> Color.Black.copy(alpha = 0.55f)
+        else -> Color.Red
+    }
+
+    Box(
+        modifier = modifier.size(width = headDiameter, height = totalHeight),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val cut = with(density) { cutoutSize.toPx() }
+                    val shift = with(density) { badgeShift.toPx() }
+                    val head = with(density) { headDiameter.toPx() }
+                    drawCircle(
+                        color = Color.White,
+                        radius = cut / 2f,
+                        center = Offset(
+                            x = head - cut / 2f + shift,
+                            y = head - cut / 2f + shift,
+                        ),
+                        blendMode = BlendMode.SrcOver,
+                    )
+                },
+        ) {
             Box(
                 Modifier
-                    .size(avatarSize + 8.dp)
-                    .shadow(3.dp, CircleShape, ambientColor = Color.Black.copy(0.25f), spotColor = Color.Black.copy(0.25f))
-                    .clip(CircleShape)
-                    .background(Color.White),
+                    .matchParentSize()
+                    .shadow(
+                        3.dp,
+                        pinShape,
+                        ambientColor = Color.Black.copy(0.25f),
+                        spotColor = Color.Black.copy(0.25f),
+                    )
+                    .background(Color.White, pinShape),
             )
-            StoryRingAvatarView(userId = senderId, size = avatarSize)
-            if (!isActive) {
-                Box(
-                    Modifier
-                        .size(avatarSize)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.35f)),
+            Box(
+                Modifier.size(headDiameter),
+                contentAlignment = Alignment.Center,
+            ) {
+                StoryRingAvatarView(userId = senderId, size = avatarSize)
+                if (!isActive) {
+                    Box(
+                        Modifier
+                            .size(avatarSize)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.35f)),
+                    )
+                }
+            }
+        }
+
+        Box(
+            Modifier
+                .size(headDiameter)
+                .align(Alignment.TopCenter),
+        ) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = badgeShift, y = badgeShift)
+                    .size(badgeIconSize),
+                contentAlignment = Alignment.Center,
+            ) {
+                // Halo mínimo del mismo tint (≡ iOS blur 0.35 + opacity 0.55) + glifo.
+                AttachmentIconView(
+                    icon = badgeIcon,
+                    size = badgeIconSize,
+                    tintColor = badgeTint,
+                    modifier = Modifier
+                        .blur(0.35.dp)
+                        .graphicsLayer { alpha = 0.55f },
+                )
+                AttachmentIconView(
+                    icon = badgeIcon,
+                    size = badgeIconSize,
+                    tintColor = badgeTint,
                 )
             }
         }
-        Canvas(Modifier.size(width = 16.dp, height = 10.dp).offset(y = (-2).dp)) {
-            val path = Path().apply {
-                moveTo(size.width / 2f, size.height)
-                lineTo(0f, 0f)
-                lineTo(size.width, 0f)
-                close()
-            }
-            drawPath(path, Color.White)
+    }
+}
+
+/** ≡ iOS `LocationAvatarPinSilhouette` — path único cabeza + punta. */
+internal class LocationAvatarPinSilhouette(
+    private val badgeDiameter: Dp = 0.dp,
+    private val badgeShift: Dp = 2.dp,
+    private val shortTip: Boolean = false,
+) : Shape {
+    override fun createOutline(
+        size: androidx.compose.ui.geometry.Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val headR = size.width / 2f
+        val cx = size.width / 2f
+        val cy = headR
+        val tipX = cx
+        val tipY = size.height
+        val leftJoinX = cx - headR * (if (shortTip) 0.38f else 0.72f)
+        val leftJoinY = cy + headR * (if (shortTip) 0.925f else 0.70f)
+        val rightJoinX = cx + headR * (if (shortTip) 0.38f else 0.72f)
+        val rightJoinY = cy + headR * (if (shortTip) 0.925f else 0.70f)
+        val leftCtrlX = cx - headR * 0.35f
+        val leftCtrlY = cy + headR * 1.05f
+        val rightCtrlX = cx + headR * 0.35f
+        val rightCtrlY = cy + headR * 1.05f
+
+        // atan2 = matemático (CCW+); Android arcTo = 0° a las 3h, sweep+ = horario.
+        val leftDeg = Math.toDegrees(atan2(leftJoinY - cy, leftJoinX - cx).toDouble()).toFloat()
+        val rightDeg = Math.toDegrees(atan2(rightJoinY - cy, rightJoinX - cx).toDouble()).toFloat()
+        val topDeg = -90f
+
+        fun sweepClockwise(from: Float, to: Float): Float {
+            var sweep = to - from
+            if (sweep < 0f) sweep += 360f
+            return sweep
         }
+
+        val path = Path().apply {
+            // Cima → lado derecho → punta → lado izquierdo → cima.
+            moveTo(cx, cy - headR)
+            arcTo(
+                rect = androidx.compose.ui.geometry.Rect(
+                    left = cx - headR,
+                    top = cy - headR,
+                    right = cx + headR,
+                    bottom = cy + headR,
+                ),
+                startAngleDegrees = topDeg,
+                // De cima (−90) a rightJoin (~40) en sentido horario Android = por la derecha.
+                sweepAngleDegrees = sweepClockwise(topDeg, rightDeg),
+                forceMoveTo = false,
+            )
+            quadraticTo(rightCtrlX, rightCtrlY, tipX, tipY)
+            quadraticTo(leftCtrlX, leftCtrlY, leftJoinX, leftJoinY)
+            arcTo(
+                rect = androidx.compose.ui.geometry.Rect(
+                    left = cx - headR,
+                    top = cy - headR,
+                    right = cx + headR,
+                    bottom = cy + headR,
+                ),
+                startAngleDegrees = leftDeg,
+                // De leftJoin (~140) a cima (−90/+270) horario: por la izquierda hacia arriba.
+                sweepAngleDegrees = sweepClockwise(leftDeg, topDeg),
+                forceMoveTo = false,
+            )
+            close()
+            if (badgeDiameter > 0.dp) {
+                val badge = with(density) { badgeDiameter.toPx() }
+                val shift = with(density) { badgeShift.toPx() }
+                addOval(androidx.compose.ui.geometry.Rect(size.width - badge + shift, size.width - badge + shift, size.width + shift, size.width + shift))
+            }
+        }
+        return Outline.Generic(path)
     }
 }

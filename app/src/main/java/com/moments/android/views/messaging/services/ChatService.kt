@@ -10,6 +10,7 @@ import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.MetadataChanges
 import com.moments.android.MomentsApplication
 import com.moments.android.views.messaging.core.ChatMediaPurpose
 import com.moments.android.views.messaging.core.Conversation
@@ -136,6 +137,7 @@ object ChatService {
     private var hasGroupInbox = false
     private var directInbox = emptyList<Conversation>()
     private var groupInbox = emptyList<Conversation>()
+    private var inboxGeneration = 0
     private var groupInboxRevision = 0
 
     /** ≡ `ChatService.MessageHistoryPage`. */
@@ -1740,6 +1742,8 @@ object ChatService {
         conversationsListener = null
 
         groupConversationsListener?.remove()
+        val generation = ++inboxGeneration
+        var directRevision = 0
         inboxUserId = userId
         hasDirectInbox = false
         hasGroupInbox = false
@@ -1748,14 +1752,13 @@ object ChatService {
         lastPublishedInbox = null
         groupInboxRevision = 0
         groupConversationsListener = db.collection("groupConversations").whereArrayContains("participants", userId)
-            .addSnapshotListener { snapshot, error ->
-                if (FirebaseAuth.getInstance().currentUser?.uid != userId) return@addSnapshotListener
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+                if (generation != inboxGeneration || FirebaseAuth.getInstance().currentUser?.uid != userId) return@addSnapshotListener
                 if (error != null) {
-                    groupInbox = emptyList()
-                    hasGroupInbox = true
-                    publishInbox()
+                    inboxOnUpdate?.invoke(Result.failure(error))
                     return@addSnapshotListener
                 }
+                if (snapshot == null || (snapshot.metadata.isFromCache && snapshot.isEmpty)) return@addSnapshotListener
                 val revision = ++groupInboxRevision
                 com.moments.android.views.messaging.groups.GroupDirectory.groups.value = snapshot?.documents.orEmpty()
                     .map(com.moments.android.views.messaging.groups.GroupConversation::from).associateBy { it.id }
@@ -1776,7 +1779,7 @@ object ChatService {
                     }
                     val hydrated = hydrateConversationPreviews(parsed)
                     withContext(Dispatchers.Main) {
-                        if (revision == groupInboxRevision) {
+                        if (generation == inboxGeneration && revision == groupInboxRevision && FirebaseAuth.getInstance().currentUser?.uid == userId) {
                             groupInbox = hydrated
                             hasGroupInbox = true
                             publishInbox()
@@ -1787,16 +1790,15 @@ object ChatService {
         val listener = db.collection("conversations")
             .whereArrayContains("participants", userId)
             .orderBy("timestamp", Query.Direction.DESCENDING)
-            .addSnapshotListener { snapshot, error ->
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+                if (generation != inboxGeneration || FirebaseAuth.getInstance().currentUser?.uid != userId) return@addSnapshotListener
+                if (error == null && (snapshot == null || (snapshot.metadata.isFromCache && snapshot.isEmpty))) return@addSnapshotListener
+                val revision = ++directRevision
                 scope.launch {
                     if (error != null) {
                         withContext(Dispatchers.Main) {
-                            if (FirebaseAuth.getInstance().currentUser == null) {
-                                inboxOnUpdate?.invoke(Result.success(emptyList()))
-                            } else {
-                                directInbox = emptyList()
-                                hasDirectInbox = true
-                                publishInbox()
+                            if (generation == inboxGeneration && FirebaseAuth.getInstance().currentUser?.uid == userId) {
+                                inboxOnUpdate?.invoke(Result.failure(error))
                             }
                         }
                         return@launch
@@ -1851,6 +1853,7 @@ object ChatService {
 
                     val hydrated = hydrateConversationPreviews(conversations)
                     withContext(Dispatchers.Main) {
+                        if (generation != inboxGeneration || revision != directRevision || FirebaseAuth.getInstance().currentUser?.uid != userId) return@withContext
                         directInbox = hydrated
                         hasDirectInbox = true
                         publishInbox()
@@ -1863,6 +1866,7 @@ object ChatService {
     }
 
     fun stopConversationsListener() {
+        inboxGeneration += 1
         groupConversationsListener?.remove()
         groupConversationsListener = null
         conversationsListener?.remove()
