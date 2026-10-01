@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="story_music_title">音樂</string>
+    <string name="story_music_done">完成</string>
+    <string name="story_music_search">搜尋歌曲或藝人</string>
+    <string name="story_music_unavailable">音樂無法使用</string>
+    <string name="story_music_unavailable_detail">無法載入音樂，請稍後再試。</string>
+    <string name="story_music_retry">重試</string>
+    <string name="story_music_more">更多歌曲</string>
+    <string name="story_music_empty">找不到歌曲</string>
+    <string name="story_music_color">文字顏色</string>
+    <string name="story_music_lyrics">歌詞</string>
+    <string name="story_music_preview">預覽</string>
+    <string name="story_music_remove">移除音樂</string>
+    <string name="story_music_fragment">已選片段</string>
+    <string name="story_music_style_hidden">僅音樂</string>
+    <string name="story_music_style_title">標題</string>
+    <string name="story_music_style_card">卡片</string>
+    <string name="story_music_style_cover">封面</string>
+    <string name="story_music_style_lyrics">歌詞</string>
+    <string name="story_music_style_record">唱片</string>
+    <string name="story_music_tab_songs">歌曲</string>
+    <string name="story_music_tab_discover">探索</string>
+    <string name="story_music_tab_saved">已儲存</string>
+    <string name="story_music_save">儲存歌曲</string>
+    <string name="story_music_unsave">從已儲存移除</string>
+    <string name="story_music_posts">使用這首歌的貼文</string>
+    <string name="story_music_posts_placeholder">含音樂的貼文將顯示在這裡。</string>
+    <string name="story_music_saved_confirmation">歌曲已儲存至最愛</string>
+    <string name="story_music_unsaved_confirmation">歌曲已從最愛移除</string>
+</resources>

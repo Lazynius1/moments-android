@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -27,6 +25,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
@@ -41,6 +40,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -58,13 +58,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -84,8 +82,6 @@ import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.ScreenshotProtectionMode
 import com.moments.android.views.shared.tabbar.MomentsTabBarHidden
 import com.moments.android.views.story.StoryRingAvatarView
-import kotlin.math.abs
-import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -125,7 +121,7 @@ fun ConversationFullScreenMediaView(
     var isSendingReply by remember { mutableStateOf(false) }
     var showSaveResult by remember { mutableStateOf(false) }
     var saveResultMessage by remember { mutableStateOf("") }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
+
     var showingReactionBarForMessageId by remember { mutableStateOf<String?>(null) }
     var ephemeralRemaining by remember { mutableLongStateOf(0L) }
     var expandedVideoUrl by remember { mutableStateOf<String?>(null) }
@@ -197,19 +193,7 @@ fun ConversationFullScreenMediaView(
         modifier
             .fillMaxSize()
             .background(colors.chatBackground.first())
-            .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars))
-            .offset { IntOffset(0, dragOffset.roundToInt()) }
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragEnd = {
-                        if (abs(dragOffset) > 120f) onClose() else dragOffset = 0f
-                    },
-                    onDragCancel = { dragOffset = 0f },
-                    onVerticalDrag = { _, amount ->
-                        dragOffset = (dragOffset + amount).coerceAtLeast(0f)
-                    },
-                )
-            },
+            .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars)),
     ) {
         // Header ≡ headerView / avatarView (StoryRingAvatarView)
         Row(
@@ -219,7 +203,7 @@ fun ConversationFullScreenMediaView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = primaryOverlay)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back), tint = primaryOverlay)
             }
             if (current.senderId.isNotEmpty()) {
                 StoryRingAvatarView(
@@ -278,20 +262,28 @@ fun ConversationFullScreenMediaView(
                     Text(relativeTime, color = secondaryOverlay, fontSize = 11.sp, maxLines = 1)
                 }
             }
-            if (current.allowsSaving) {
-                IconButton(
-                    onClick = {
-                        saveConversationMediaToGallery(context, current) { ok, message ->
+            Row(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.common_close), tint = primaryOverlay)
+                }
+                if (current.allowsSaving) {
+                    IconButton(onClick = {
+                        saveConversationMediaToGallery(context, current) { _, message ->
                             saveResultMessage = message
                             showSaveResult = true
                         }
-                    },
-                ) {
-                    Icon(
-                        Icons.Default.Download,
-                        contentDescription = stringResource(R.string.conversation_settings_save_media),
-                        tint = primaryOverlay,
-                    )
+                    }) {
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = stringResource(R.string.conversation_settings_save_media),
+                            tint = primaryOverlay,
+                        )
+                    }
                 }
             }
         }
@@ -315,7 +307,7 @@ fun ConversationFullScreenMediaView(
                         .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    val body: @Composable () -> Unit = {
+                    val mediaBody: @Composable () -> Unit = {
                         when (item.type) {
                             SharedMedia.Type.IMAGE -> AsyncImage(
                                 item.originalUrl,
@@ -339,6 +331,16 @@ fun ConversationFullScreenMediaView(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(18.dp)),
                             )
+                        }
+                    }
+                    val body: @Composable () -> Unit = {
+                        Box(contentAlignment = Alignment.Center) {
+                            mediaBody()
+                            item.sourceMessage?.let { message ->
+                                com.moments.android.views.messaging.media.ChatMessageStaticOverlay(
+                                    message, interactive = true, animates = active, modifier = Modifier.matchParentSize(),
+                                )
+                            }
                         }
                     }
                     if (isScreenshotProtected(item)) {

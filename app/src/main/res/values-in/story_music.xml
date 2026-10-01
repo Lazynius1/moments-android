@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="story_music_title">Musik</string>
+    <string name="story_music_done">Selesai</string>
+    <string name="story_music_search">Cari lagu atau artis</string>
+    <string name="story_music_unavailable">Musik tidak tersedia</string>
+    <string name="story_music_unavailable_detail">Musik tidak dapat dimuat. Coba lagi nanti.</string>
+    <string name="story_music_retry">Coba lagi</string>
+    <string name="story_music_more">Lagu lainnya</string>
+    <string name="story_music_empty">Tidak ada lagu ditemukan</string>
+    <string name="story_music_color">Warna teks</string>
+    <string name="story_music_lyrics">Lirik</string>
+    <string name="story_music_preview">Pratinjau</string>
+    <string name="story_music_remove">Hapus musik</string>
+    <string name="story_music_fragment">Cuplikan dipilih</string>
+    <string name="story_music_style_hidden">Musik saja</string>
+    <string name="story_music_style_title">Judul</string>
+    <string name="story_music_style_card">Kartu</string>
+    <string name="story_music_style_cover">Sampul</string>
+    <string name="story_music_style_lyrics">Lirik</string>
+    <string name="story_music_style_record">Piringan</string>
+    <string name="story_music_tab_songs">Lagu</string>
+    <string name="story_music_tab_discover">Jelajahi</string>
+    <string name="story_music_tab_saved">Tersimpan</string>
+    <string name="story_music_save">Simpan lagu</string>
+    <string name="story_music_unsave">Hapus dari tersimpan</string>
+    <string name="story_music_posts">Postingan dengan lagu ini</string>
+    <string name="story_music_posts_placeholder">Postingan dengan musik akan muncul di sini.</string>
+    <string name="story_music_saved_confirmation">Lagu disimpan ke favorit</string>
+    <string name="story_music_unsaved_confirmation">Lagu dihapus dari favorit</string>
+</resources>

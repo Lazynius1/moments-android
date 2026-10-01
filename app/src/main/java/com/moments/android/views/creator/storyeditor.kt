@@ -137,6 +137,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -234,8 +235,8 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** Equivalente local de la edición inline que `StickerOverlayView.swift` habilita por tipo. */
-private fun stickerSupportsInlineEdit(sticker: StoryStickerDraft): Boolean = when (sticker.type) {
-    "poll", "question", "countdown", "quiz", "emojiSlider" -> true
+private fun stickerSupportsInlineEdit(sticker: StoryStickerDraft): Boolean = if(sticker.music != null) true else when (sticker.type) {
+    "poll", "question", "countdown", "quiz", "emojiSlider", "music" -> true
     "hashtag" -> sticker.hashtag.isNullOrBlank()
     else -> false
 }
@@ -328,6 +329,8 @@ fun StoryEditingView(
     var stickers by remember { mutableStateOf<List<StoryStickerDraft>>(emptyList()) }
     var sharedMomentCardTransforms by remember { mutableStateOf<Map<String, StoryStickerDraft>>(emptyMap()) }
     var showingStickerPicker by remember { mutableStateOf(false) }
+    var showingMusicPicker by remember { mutableStateOf(false) }
+    var musicOriginal by remember { mutableStateOf<StoryStickerDraft?>(null) }
     var nextStickerZ by remember { mutableIntStateOf(0) }
     // ≡ iOS chain context (storyeditor.swift)
     var chainId by remember { mutableStateOf<String?>(null) }
@@ -452,6 +455,7 @@ fun StoryEditingView(
         revealEffectColor = data.revealEffectColor,
         audioURL = data.audioURL,
         audioDuration = data.audioDuration,
+        music = data.music,
         momentId = data.momentId,
         mediaCount = data.mediaCount,
     )
@@ -550,6 +554,11 @@ fun StoryEditingView(
         val selectedId = activeEditingStickerId ?: selectedStickerId ?: return
         stickers = stickers.map { item ->
             if (item.id != selectedId) return@map item
+            if(item.music != null) {
+                val colors = com.moments.android.views.creator.components.StoryDrawingPalette.swatches
+                return@map item.copy(music = if(item.music.style == "card") item.music.copy(cardStyleVariant = ((item.music.cardStyleVariant ?: 0) + 1) % 6)
+                    else item.music.copy(colorHex = colors[(colors.indexOf(item.music.colorHex).coerceAtLeast(-1) + 1) % colors.size]))
+            }
             val next = ((item.styleVariant ?: 0) + 1) % 6
             item.copy(styleVariant = next)
         }
@@ -562,7 +571,9 @@ fun StoryEditingView(
         HapticManager.shared.lightImpact()
     }
 
-    fun stickerPalettePreviewColors(): List<Color> = listOf(
+    fun stickerPalettePreviewColors(): List<Color> = stickers.firstOrNull { it.id == (activeEditingStickerId ?: selectedStickerId) }?.music?.takeIf { it.style != "card" }?.let {
+        com.moments.android.views.creator.components.StoryDrawingPalette.swatches.take(3).map { hex -> Color(android.graphics.Color.parseColor("#$hex")) }
+    } ?: listOf(
         Color(0xFFFF5F6D),
         Color(0xFF9D4EDD),
         Color(0xFF4A00E0),
@@ -574,7 +585,7 @@ fun StoryEditingView(
     fun showsStickerPaletteButton(): Boolean {
         val targetId = activeEditingStickerId ?: selectedStickerId ?: return false
         val active = stickers.firstOrNull { it.id == targetId } ?: return false
-        return active.type in setOf("poll", "question", "quiz", "countdown", "emojiSlider", "shareMoment")
+        return (active.music != null && active.music.style !in setOf("record", "hidden")) || active.type in setOf("poll", "question", "quiz", "countdown", "emojiSlider", "shareMoment")
     }
 
     /** Sin transforms aún: solo text-only (media vacío), ≡ iOS `selectedMediaItems.isEmpty`. */
@@ -772,6 +783,7 @@ fun StoryEditingView(
     }
 
     fun focusInlineSticker(sticker: StoryStickerDraft) {
+        if(sticker.music != null) musicOriginal = sticker
         val existingFocus = focusedInlineStickerOriginal
         if (existingFocus?.id != sticker.id) {
             restoreFocusedInlineSticker()
@@ -1211,15 +1223,23 @@ fun StoryEditingView(
         return if (payload.isEmpty) null else payload
     }
 
+    suspend fun prepareMusicArtwork() {
+        val draft = stickers.firstOrNull { it.music != null } ?: return
+        val selection = draft.music ?: return
+        val bitmap = StoryDownloadComposer.renderMusicSticker(context, selection)
+        stickers = stickers.map { if(it.id == draft.id) it.copy(image = bitmap, music = selection.copy(rasterScale = 3.0)) else it }
+    }
+
     fun chatSend() {
         val send = onChatSend ?: return
         if (isPublishing) return
         finishTextEditing()
         isPublishing = true
-        val overlayPayload = chatOverlayPayload()
         val current = selectedMediaItems.firstOrNull()
         scope.launch {
             try {
+                prepareMusicArtwork()
+                val overlayPayload = chatOverlayPayload()
                 if (current != null && current.isVideo) {
                     val (tw, th) = storyRenderTargetSize()
                     val overlay = renderStoryOverlayImage(
@@ -1360,6 +1380,9 @@ fun StoryEditingView(
                 return@launch
             }
 
+            try { prepareMusicArtwork() } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+            catch (_: Exception) { isPublishing = false; return@launch }
+
             // Capturar estado en Main antes de dismiss (≡ iOS publishStoryAfterValidation)
             val baseMedia = media
             val capturedFilter = selectedFilter
@@ -1499,6 +1522,7 @@ fun StoryEditingView(
                             revealEffectColor = draft.revealEffectColor,
                             audioURL = draft.audioURL,
                             audioDuration = draft.audioDuration,
+                            music = draft.music,
                             momentId = draft.momentId,
                             mediaCount = draft.mediaCount,
                         ),
@@ -2031,6 +2055,33 @@ fun StoryEditingView(
                     StoryOverlayTrashZone(overlayDragState)
                 }
 
+                stickers.firstOrNull { it.id == activeEditingStickerId && it.music != null }?.let { draft ->
+                    draft.music?.let { music ->
+                        Row(
+                            modifier = Modifier.align(Alignment.TopCenter)
+                                .padding(top = 64.dp).zIndex(4000f)
+                                .widthIn(max = 280.dp)
+                                .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
+                                .clickable { showingMusicPicker = true }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            AsyncImage(
+                                model = music.track.artworkURL,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
+                            )
+                            Text(music.track.title, color = Color.White, fontSize = 14.sp,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false))
+                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null,
+                                tint = Color.White, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+
                 if (editingRevealId != null) {
                     RevealStickerEditorView(
                         stickers = stickers,
@@ -2045,6 +2096,18 @@ fun StoryEditingView(
                     onDismiss = { storyOverlayToast = null },
                     modifier = Modifier.fillMaxSize(),
                 )
+            }
+
+            // Music controls use the screen's safe bottom, outside the clipped 9:16 media canvas.
+            stickers.firstOrNull { it.id == activeEditingStickerId && it.music != null }?.let { draft ->
+                draft.music?.let { music ->
+                        com.moments.android.views.creator.components.music.StoryMusicInlineEditor(
+                            selection = music, allowsDuration = media?.isVideo != true,
+                            onChange = { value -> stickers = stickers.map { if(it.id == draft.id) it.copy(music = value) else it } },
+                            onChangeTrack = { showingMusicPicker = true },
+                            modifier = Modifier.align(Alignment.BottomCenter).zIndex(4000f).navigationBarsPadding().padding(bottom = 8.dp),
+                        )
+                }
             }
 
             // ≡ iOS topBarView overlay (oculto en reveal; en sticker edit → Done + palette)
@@ -2067,7 +2130,13 @@ fun StoryEditingView(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Spacer(Modifier.size(44.dp))
+                            if(stickers.any { it.id == activeEditingStickerId && it.music != null }) {
+                                IconButton(onClick = {
+                                    musicOriginal?.let { original -> stickers = stickers.map { if(it.id == original.id) original else it } }
+                                    activeEditingStickerId = null
+                                    restoreFocusedInlineSticker()
+                                }) { Icon(Icons.Filled.Close, stringResource(R.string.common_cancel), tint = controlFg) }
+                            } else Spacer(Modifier.size(44.dp))
                             Spacer(Modifier.weight(1f))
                             Text(
                                 stringResource(R.string.story_text_editor_done),
@@ -2741,6 +2810,20 @@ fun StoryEditingView(
             )
         }
 
+        if (showingMusicPicker) {
+            val existing = stickers.firstOrNull { it.music != null }
+            com.moments.android.views.creator.components.music.StoryMusicPicker(
+                existing = existing?.music, duration = if(media?.isVideo == true) (media.durationSeconds ?: 15.0) else (existing?.music?.duration ?: 15.0),
+                onApply = { value ->
+                    val replacement = existing?.copy(music = value.copy(style = existing.music?.style ?: value.style, colorHex = existing.music?.colorHex ?: value.colorHex, cardStyleVariant = existing.music?.cardStyleVariant))
+                        ?: StoryStickerDraft(type = "music", music = value, zIndex = stickers.size)
+                    stickers = stickers.filterNot { it.music != null } + replacement
+                    showingMusicPicker = false
+                    if(activeEditingStickerId != replacement.id) focusInlineSticker(replacement)
+                }, onDismiss = { showingMusicPicker = false },
+            )
+        }
+
         if (showingStickerPicker) {
             StickerPickerView(
                 onStickerCreated = { draft ->
@@ -2754,6 +2837,7 @@ fun StoryEditingView(
                 isVideo = media?.isVideo == true,
                 hasAudioSticker = stickers.any { it.type == "audio" },
                 onDismiss = { showingStickerPicker = false },
+                onMusicRequested = { showingStickerPicker = false; showingMusicPicker = true },
             )
         }
 
@@ -2977,6 +3061,11 @@ private fun StoryStickerChip(
                 .size(gifSize.width, gifSize.height)
                 .clip(RoundedCornerShape(14.dp)),
         )
+        return
+    }
+
+    if (sticker.music != null) {
+        com.moments.android.views.creator.components.music.StoryMusicArtwork(sticker.music)
         return
     }
 
@@ -3365,54 +3454,7 @@ private fun EmojiSliderPresetBar(
 
 
 /** ≡ iOS `StickerData.from` para chat — posiciones ya normalizadas en Android. */
-private fun StoryStickerDraft.toChatStickerData(zIndex: Int): StickerData = StickerData(
-    stickerId = id,
-    type = type,
-    content = content,
-    position = Point(normalizedX, normalizedY),
-    scale = scale,
-    rotation = rotationRadians,
-    zIndex = zIndex,
-    username = username,
-    userId = userId,
-    hashtag = hashtag,
-    location = location,
-    latitude = latitude,
-    longitude = longitude,
-    styleVariant = styleVariant,
-    cardLayoutVariant = cardLayoutVariant,
-    questionText = questionText,
-    pollOptions = pollOptions,
-    weatherSymbol = weatherSymbol,
-    linkURL = linkURL,
-    linkTitle = linkTitle,
-    countdownTitle = countdownTitle,
-    countdownTargetAtMs = countdownTargetAtMs,
-    sliderEmoji = sliderEmoji,
-    sliderPrompt = sliderPrompt,
-    caption = caption,
-    profileImagePath = profileImagePath,
-    sharedMediaPath = sharedMediaPath,
-    momentId = momentId,
-    mediaCount = mediaCount,
-    quizQuestion = quizQuestion,
-    quizOptions = quizOptions,
-    quizCorrectIndex = quizCorrectIndex,
-    revealType = revealType,
-    revealPattern = revealPattern,
-    revealPrimaryColor = revealPrimaryColor,
-    revealSecondaryColor = revealSecondaryColor,
-    revealEffectColor = revealEffectColor,
-    frameStyle = frameStyle,
-    contentScale = contentScale,
-    contentOffsetX = contentOffsetX,
-    contentOffsetY = contentOffsetY,
-    audioURL = audioURL,
-    audioDuration = audioDuration,
-    isAnimated = isAnimated,
-    gifURL = gifURL,
-    videoURL = videoURL,
-)
+private fun StoryStickerDraft.toChatStickerData(zIndex: Int): StickerData = toStickerData(zIndex)
 
 /** ≡ iOS `renderStoryWithOverlays` JPEG path for chat image send. */
 private fun renderChatImageJpeg(

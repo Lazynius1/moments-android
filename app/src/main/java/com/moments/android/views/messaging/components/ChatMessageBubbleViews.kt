@@ -16,6 +16,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -553,6 +554,7 @@ private fun AttachBubbleBadges(
 private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Boolean, position: ChatMessageGroupPosition, progress: Double?, downloadProgress: Double?, downloading: Boolean, callbacks: ChatMessageBubbleCallbacks) {
     val photoVideoSize = ChatBubbleLayoutWidth.cappedSize(208.dp, 272.dp)
     val mediaModifier = Modifier.size(photoVideoSize).clip(chatBubbleShape(outgoing, position))
+    Box(mediaModifier) {
     if (video) {
         GlassmorphicVideoMessage(
             videoUrl = message.mediaUrl,
@@ -564,7 +566,7 @@ private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Bool
             isDownloadingMedia = downloading,
             downloadProgress = downloadProgress,
             progress = progress,
-            modifier = mediaModifier,
+            modifier = Modifier.fillMaxSize(),
         )
     } else {
         GlassmorphicImageMessage(
@@ -577,8 +579,10 @@ private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Bool
             isDownloadingMedia = downloading,
             downloadProgress = downloadProgress,
             progress = progress,
-            modifier = mediaModifier,
+            modifier = Modifier.fillMaxSize(),
         )
+    }
+        com.moments.android.views.messaging.media.ChatMessageStaticOverlay(message, modifier = Modifier.matchParentSize())
     }
     LaunchedEffect(message.id) { callbacks.onHydrateMedia?.invoke(message) }
 }

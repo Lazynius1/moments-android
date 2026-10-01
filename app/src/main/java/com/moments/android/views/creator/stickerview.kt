@@ -180,6 +180,7 @@ private enum class StickerCatalogCategory(
     POLL("poll", R.string.sticker_category_poll, Icons.Filled.BarChart, 0xFFE840BD),
     QUIZ("quiz", R.string.sticker_category_quiz, Icons.Filled.Checklist, 0xFFFF9800),
     REVEAL("reveal", R.string.sticker_category_reveal, Icons.Filled.VisibilityOff, 0xFF9C27B0),
+    MUSIC("music", R.string.story_music_title, Icons.Filled.Mic, 0xFFB64BFF),
     AUDIO("audio", R.string.sticker_category_audio, Icons.Filled.Mic, 0xFFFF664D),
     FRAME("frame", R.string.sticker_category_frame, Icons.Filled.Photo, 0xFF6B73FF),
     EMOJI_SLIDER("emojiSlider", R.string.sticker_category_emoji_slider, Icons.Filled.Mood, 0xFFFC8F36),
@@ -218,6 +219,7 @@ fun StickerPickerView(
     isVideo: Boolean = false,
     hasAudioSticker: Boolean = false,
     onDismiss: () -> Unit,
+    onMusicRequested: () -> Unit = {},
 ) {
     val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
@@ -280,6 +282,7 @@ fun StickerPickerView(
 
     fun filteredCatalogCategories(): List<StickerCatalogCategory> {
         var base = StickerCatalogCategory.entries.toList()
+        if (!com.moments.android.BuildConfig.DEBUG) base = base.filter { it != StickerCatalogCategory.MUSIC }
         if (hasRevealSticker) base = base.filter { it != StickerCatalogCategory.REVEAL }
         if (isVideo || hasAudioSticker) base = base.filter { it != StickerCatalogCategory.AUDIO }
         // El buscador del catálogo es Giphy (GIFs), no filtra pills.
@@ -689,6 +692,7 @@ fun StickerPickerView(
                                                 }
                                                 StickerCatalogCategory.FRAME -> mode = StickerPickerMode.FRAME
                                                 StickerCatalogCategory.REVEAL -> mode = StickerPickerMode.REVEAL
+                                                StickerCatalogCategory.MUSIC -> onMusicRequested()
                                                 StickerCatalogCategory.AUDIO -> mode = StickerPickerMode.AUDIO
                                                 StickerCatalogCategory.HASHTAG -> emit(createHashtagPlaceholder())
                                                 StickerCatalogCategory.MENTION -> mode = StickerPickerMode.MENTION_INPUT

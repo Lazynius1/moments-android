@@ -2483,6 +2483,9 @@ fun SharedMediaThumbnail(media: SharedMedia, fillsGrid: Boolean = false, onTap: 
         } else {
             Spacer(Modifier.fillMaxWidth().height(if (fillsGrid) 118.dp else 100.dp))
         }
+        media.sourceMessage?.let { message ->
+            com.moments.android.views.messaging.media.ChatMessageStaticOverlay(message, modifier = Modifier.matchParentSize())
+        }
         if (media.type == SharedMedia.Type.VIDEO) {
             Icon(
                 Icons.Default.PlayArrow,

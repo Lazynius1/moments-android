@@ -61,6 +61,8 @@ data class MediaMessagePayload(
     val isVanishModeMessage: Boolean,
     val vanishExpiresAt: Date? = null,
     val replyTo: String? = null,
+    val stickers: List<StickerData>? = null,
+    val textOverlays: List<StoryTextOverlayMetadata>? = null,
 )
 
 data class FollowActionPayload(
@@ -174,6 +176,8 @@ fun MediaMessagePayload.encode(): ByteArray = JSONObject().apply {
     put("isVanishModeMessage", isVanishModeMessage)
     vanishExpiresAt?.let { put("vanishExpiresAt", it.time) }
     replyTo?.let { put("replyTo", it) }
+    textOverlays?.let { put("textOverlays", JSONArray(it.map { text -> JSONObject(text.toMap()) })) }
+    stickers?.let { put("stickers", JSONArray(it.map { sticker -> JSONObject(sticker.toMap()) })) }
 }.toString().toByteArray()
 
 fun FollowActionPayload.encode(): ByteArray = JSONObject().apply {

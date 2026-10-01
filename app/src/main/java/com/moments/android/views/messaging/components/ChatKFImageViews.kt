@@ -32,6 +32,7 @@ fun ChatKFImage(
     url: String?,
     modifier: Modifier = Modifier,
     downsamplingSize: DpSize? = null,
+    previewUrl: String? = null,
 ) {
     if (url.isNullOrBlank()) {
         ChatMediaResolvingPlaceholder(modifier)
@@ -55,7 +56,20 @@ fun ChatKFImage(
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = modifier,
-        loading = { ChatMediaResolvingPlaceholder(Modifier.fillMaxSize()) },
+        loading = {
+            if (!previewUrl.isNullOrBlank() && previewUrl != url) {
+                ChatKFImage(previewUrl, Modifier.fillMaxSize(), downsamplingSize)
+            } else {
+                ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
+            }
+        },
+        error = {
+            if (!previewUrl.isNullOrBlank() && previewUrl != url) {
+                ChatKFImage(previewUrl, Modifier.fillMaxSize(), downsamplingSize)
+            } else {
+                ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
+            }
+        },
         success = { SubcomposeAsyncImageContent(Modifier.fillMaxSize()) },
     )
 }

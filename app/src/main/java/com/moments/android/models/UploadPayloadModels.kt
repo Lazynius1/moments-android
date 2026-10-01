@@ -55,6 +55,7 @@ data class CachedStickerInteractionData(
     val contentOffsetY: Double? = null,
     val audioURL: String? = null,
     val audioDuration: Double? = null,
+    val music: StoryMusicSelection? = null,
 )
 
 data class CachedSticker(
@@ -512,6 +513,7 @@ object UploadPayloadDecoder {
                                             data.contentOffsetY?.let { put("contentOffsetY", it) }
                                             data.audioURL?.let { put("audioURL", it) }
                                             data.audioDuration?.let { put("audioDuration", it) }
+                                            data.music?.let { put("music", org.json.JSONObject(it.toMap())) }
                                         },
                                     )
                                 }
@@ -592,6 +594,7 @@ object UploadPayloadDecoder {
                 contentOffsetX = data.optDouble("contentOffsetX").takeIf { data.has("contentOffsetX") && !data.isNull("contentOffsetX") },
                 contentOffsetY = data.optDouble("contentOffsetY").takeIf { data.has("contentOffsetY") && !data.isNull("contentOffsetY") },
                 audioURL = data.optString("audioURL").takeIf { data.has("audioURL") && !data.isNull("audioURL") },
+                music = data.optJSONObject("music")?.let { StoryMusicSelection.from(storyMusicJsonMap(it)) },
                 audioDuration = data.optDouble("audioDuration").takeIf { data.has("audioDuration") && !data.isNull("audioDuration") },
             )
         }

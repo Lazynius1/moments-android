@@ -61,6 +61,7 @@ import com.moments.android.views.creator.StoryMediaPresentationMode
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
@@ -99,6 +100,43 @@ internal val LocalStoryExportVideoFrames = staticCompositionLocalOf<Map<String, 
 
 /** ≡ iOS `StoryDownloadComposer`. */
 internal object StoryDownloadComposer {
+    suspend fun renderMusicSticker(context: Context, selection: com.moments.android.models.StoryMusicSelection): Bitmap = coroutineScope {
+        if (selection.style == "hidden") return@coroutineScope Bitmap.createBitmap(3, 3, Bitmap.Config.ARGB_8888)
+        val activity = context.findActivity() ?: error("Music artwork requires an Activity")
+        selection.track.artworkURL?.let { url ->
+            val loader = coil.Coil.imageLoader(context)
+            loader.execute(coil.request.ImageRequest.Builder(context).data(url).allowHardware(false).build())
+        }
+        val renderer = StoryOfflineRenderer(activity, 900, 900, 300f, this) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                com.moments.android.views.creator.components.music.StoryMusicArtwork(selection, animates = false)
+            }
+        }
+        try {
+            renderer.prepare()
+            repeat(3) {
+                val bitmap = renderer.render(0, emptyMap(), emptyMap())
+                cropMusicArtwork(bitmap)?.let { return@coroutineScope it }
+                // Hardware render nodes may not have a display list on their first frame.
+                // Music is static vector/text artwork, so a software snapshot is also valid.
+                cropMusicArtwork(renderer.softwareSnapshot())?.let { return@coroutineScope it }
+                kotlinx.coroutines.delay(50)
+            }
+            error("Music artwork rendered empty")
+        } finally { renderer.close() }
+    }
+
+    private fun cropMusicArtwork(bitmap: Bitmap): Bitmap? {
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        var left = bitmap.width; var right = -1; var top = bitmap.height; var bottom = -1
+        pixels.forEachIndexed { index, pixel -> if (android.graphics.Color.alpha(pixel) > 8) {
+            val x = index % bitmap.width; val y = index / bitmap.width
+            left = minOf(left, x); right = maxOf(right, x); top = minOf(top, y); bottom = maxOf(bottom, y)
+        } }
+        return if (right < left) null else Bitmap.createBitmap(bitmap, left, top, right - left + 1, bottom - top + 1)
+    }
+
     private const val STILL_DURATION_US = 5_000_000L
 
     suspend fun exportAndSave(
@@ -560,6 +598,12 @@ private class StoryOfflineRenderer(
                 finally { rendered.recycle() }
             } else host.drawToBitmap(Bitmap.Config.ARGB_8888)
         }
+
+    suspend fun softwareSnapshot(): Bitmap = withContext(Dispatchers.Main.immediate) {
+        val host = checkNotNull(view)
+        layout(host)
+        host.drawToBitmap(Bitmap.Config.ARGB_8888)
+    }
 
     private suspend fun settle(owner: Recomposer) {
         // Animation waiters are paused, leaving only finite layout/recomposition work.

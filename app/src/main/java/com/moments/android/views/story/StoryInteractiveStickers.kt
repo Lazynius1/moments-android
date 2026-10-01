@@ -575,6 +575,23 @@ fun StoryRevealStickerOverlay(
  * Rascar al menos el 65 % de la cuadrícula 12×12 revela la story y lo persiste.
  */
 @Composable
+fun rememberRevealState(storyId: String): Boolean {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val preferences = remember(context) { context.getSharedPreferences("moments_story_stickers", Context.MODE_PRIVATE) }
+    val key = "reveal_revealed_$storyId"
+    var revealed by remember(preferences, key) { mutableStateOf(preferences.getBoolean(key, false)) }
+    DisposableEffect(preferences, key) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
+            if (changedKey == key) revealed = preferences.getBoolean(key, false)
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        revealed = preferences.getBoolean(key, false)
+        onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    return revealed
+}
+
+@Composable
 fun InteractiveRevealSticker(
     storyId: String = "",
     gestureGate: StoryDeckGestureGate? = null,

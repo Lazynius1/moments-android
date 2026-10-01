@@ -34,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -105,7 +104,7 @@ fun GlassmorphicImageMessage(
 ) {
     val a11yPhoto = stringResource(R.string.chat_a11y_photo)
     val a11yHint = stringResource(R.string.chat_a11y_open_media)
-    val blurredPreview = previewThumbnailUrl?.takeIf { it.isNotBlank() }
+    val preview = previewThumbnailUrl?.takeIf { it.isNotBlank() }
 
     Box(
         modifier
@@ -119,20 +118,26 @@ fun GlassmorphicImageMessage(
             isDownloadingMedia -> {
                 Box(Modifier.fillMaxSize()) {
                     when {
-                        !blurredPreview.isNullOrBlank() -> ChatKFImage(
-                            blurredPreview,
-                            Modifier.fillMaxSize().blur(22.dp),
+                        !imageUrl.isNullOrBlank() && imageUrl.startsWith("file:") -> ChatKFImage(
+                            imageUrl, Modifier.fillMaxSize(), downsamplingSize, preview,
+                        )
+                        !preview.isNullOrBlank() -> ChatKFImage(
+                            preview,
+                            Modifier.fillMaxSize(),
                             downsamplingSize,
                         )
-                        !imageUrl.isNullOrBlank() -> ChatKFImage(imageUrl, Modifier.fillMaxSize(), downsamplingSize)
+                        !imageUrl.isNullOrBlank() -> ChatKFImage(imageUrl, Modifier.fillMaxSize(), downsamplingSize, preview)
                         else -> Box(Modifier.fillMaxSize().background(Color.White.copy(0.1f)))
                     }
                     ChatMediaDownloadProgressOverlay(downloadProgress ?: 0.03)
                 }
             }
 
-            isResolvingMedia -> ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
-            !imageUrl.isNullOrBlank() -> ChatKFImage(imageUrl, Modifier.fillMaxSize(), downsamplingSize)
+            isResolvingMedia && imageUrl?.startsWith("file:") != true -> {
+                if (!preview.isNullOrBlank()) ChatKFImage(preview, Modifier.fillMaxSize(), downsamplingSize)
+                else ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
+            }
+            !imageUrl.isNullOrBlank() -> ChatKFImage(imageUrl, Modifier.fillMaxSize(), downsamplingSize, preview)
             else -> Box(
                 Modifier.fillMaxSize().background(Color.White.copy(0.1f)),
                 contentAlignment = Alignment.Center,
@@ -145,7 +150,7 @@ fun GlassmorphicImageMessage(
                 Modifier
                     .fillMaxSize()
                     .clip(mediaCorner)
-                    .background(Color.Black.copy(0.4f)),
+                    .background(Color.Black.copy(0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
                 MediaProgressRing(progress = max(progress ?: 0.03, 0.03), size = 60.dp, lineWidth = 4.dp)
@@ -169,7 +174,7 @@ fun GlassmorphicVideoMessage(
 ) {
     val a11yVideo = stringResource(R.string.chat_a11y_video)
     val a11yHint = stringResource(R.string.chat_a11y_open_media)
-    val blurredPreview = thumbnailUrl?.takeIf { it.isNotBlank() }
+    val preview = thumbnailUrl?.takeIf { it.isNotBlank() }
     val showPlayBadge = !isDownloadingMedia
 
     Box(
@@ -184,9 +189,9 @@ fun GlassmorphicVideoMessage(
             isDownloadingMedia -> {
                 Box(Modifier.fillMaxSize()) {
                     when {
-                        !blurredPreview.isNullOrBlank() -> ChatKFImage(
-                            blurredPreview,
-                            Modifier.fillMaxSize().blur(22.dp),
+                        !preview.isNullOrBlank() -> ChatKFImage(
+                            preview,
+                            Modifier.fillMaxSize(),
                             downsamplingSize,
                         )
                         !thumbnailUrl.isNullOrBlank() -> ChatKFImage(thumbnailUrl, Modifier.fillMaxSize(), downsamplingSize)
@@ -196,7 +201,7 @@ fun GlassmorphicVideoMessage(
                 }
             }
 
-            isResolvingMedia -> ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
+            isResolvingMedia && preview.isNullOrBlank() -> ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
             !thumbnailUrl.isNullOrBlank() -> ChatKFImage(thumbnailUrl, Modifier.fillMaxSize(), downsamplingSize)
             else -> Box(Modifier.fillMaxSize().background(Color.White.copy(0.1f)))
         }
@@ -205,7 +210,7 @@ fun GlassmorphicVideoMessage(
                 Modifier
                     .fillMaxSize()
                     .clip(mediaCorner)
-                    .background(Color.Black.copy(0.4f)),
+                    .background(Color.Black.copy(0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
                 MediaProgressRing(progress = max(progress ?: 0.03, 0.03), size = 60.dp, lineWidth = 4.dp)

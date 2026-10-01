@@ -75,6 +75,7 @@ internal object StoryStickerRebuild {
             contentOffsetY = interaction?.contentOffsetY,
             audioURL = interaction?.audioURL,
             audioDuration = interaction?.audioDuration,
+            music = interaction?.music,
             isAnimated = cached.isAnimated,
             gifURL = cached.gifURL,
             videoURL = cached.videoURL,
@@ -82,6 +83,9 @@ internal object StoryStickerRebuild {
     }
 
     private fun extractContent(cached: CachedSticker, bitmap: Bitmap?): String {
+        if(cached.interactionData?.music != null && bitmap != null) {
+            return Base64.encodeToString(ByteArrayOutputStream().apply { bitmap.compress(Bitmap.CompressFormat.PNG, 100, this) }.toByteArray(), Base64.NO_WRAP)
+        }
         // Selfie/emoji: PNG para conservar alpha (≡ iOS extractContent).
         if ((cached.type == "selfie" || cached.type == "emoji") && bitmap != null) {
             val png = ByteArrayOutputStream().apply {

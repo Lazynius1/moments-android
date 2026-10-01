@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="story_music_title">Müzik</string>
+    <string name="story_music_done">Bitti</string>
+    <string name="story_music_search">Şarkı veya sanatçı ara</string>
+    <string name="story_music_unavailable">Müzik kullanılamıyor</string>
+    <string name="story_music_unavailable_detail">Müzik yüklenemedi. Daha sonra tekrar dene.</string>
+    <string name="story_music_retry">Tekrar dene</string>
+    <string name="story_music_more">Daha fazla şarkı</string>
+    <string name="story_music_empty">Şarkı bulunamadı</string>
+    <string name="story_music_color">Metin rengi</string>
+    <string name="story_music_lyrics">Şarkı sözleri</string>
+    <string name="story_music_preview">Önizleme</string>
+    <string name="story_music_remove">Müziği kaldır</string>
+    <string name="story_music_fragment">Seçilen bölüm</string>
+    <string name="story_music_style_hidden">Yalnızca müzik</string>
+    <string name="story_music_style_title">Başlık</string>
+    <string name="story_music_style_card">Kart</string>
+    <string name="story_music_style_cover">Kapak</string>
+    <string name="story_music_style_lyrics">Şarkı sözleri</string>
+    <string name="story_music_style_record">Plak</string>
+    <string name="story_music_tab_songs">Şarkılar</string>
+    <string name="story_music_tab_discover">Keşfet</string>
+    <string name="story_music_tab_saved">Kaydedilenler</string>
+    <string name="story_music_save">Şarkıyı kaydet</string>
+    <string name="story_music_unsave">Kaydedilenlerden kaldır</string>
+    <string name="story_music_posts">Bu şarkıyı kullanan gönderiler</string>
+    <string name="story_music_posts_placeholder">Müzikli gönderiler burada görünecek.</string>
+    <string name="story_music_saved_confirmation">Şarkı favorilere kaydedildi</string>
+    <string name="story_music_unsaved_confirmation">Şarkı favorilerden kaldırıldı</string>
+</resources>

@@ -226,8 +226,15 @@ fun StoryViewerScreen(
         StoryPlaybackCoordinator(context.applicationContext)
     }
 
+    val musicPlaying = com.moments.android.views.creator.components.music.StoryMusicPlayback(
+        selection = story.stickers?.firstOrNull { it.music != null }?.music,
+        storyId = story.id, active = isDeckPageActive && !playbackCoordinator.isPaused,
+        elapsed = playbackCoordinator.progress * story.duration,
+    )
+
     // MARK: - State (espejo @State iOS)
     var messageText by remember { mutableStateOf("") }
+    var musicTrackSheet by remember { mutableStateOf<com.moments.android.models.StoryMusicTrack?>(null) }
     var showReactions by remember { mutableStateOf(false) }
     var showQuickActions by remember { mutableStateOf(false) }
     var isSavingStory by remember { mutableStateOf(false) }
@@ -325,7 +332,7 @@ fun StoryViewerScreen(
 
     val isStoryInteractionBlocked =
         isMenuInteractionActive ||
-            showQuickActions ||
+            musicTrackSheet != null || showQuickActions ||
             showActivity ||
             showChain ||
             showReactions ||
@@ -1273,6 +1280,7 @@ fun StoryViewerScreen(
                         initialSeekMs = ((if (didApplyInitialElapsed) 0.0 else initialElapsed) * 1000.0).toLong(),
                         modifier = Modifier.fillMaxSize(),
                     )
+                    androidx.compose.runtime.CompositionLocalProvider(com.moments.android.views.creator.components.music.LocalStoryMusicPlaying provides musicPlaying) {
                     StoryMediaOverlayRendererView(
                         // ≡ iOS: resolvedTextOverlays; drawingData nil (dibujo ya bakeado en media)
                         textOverlays = story.resolvedTextOverlays,
@@ -1299,6 +1307,8 @@ fun StoryViewerScreen(
                         },
                         modifier = Modifier.fillMaxSize(),
                     )
+
+                    }
                 }
             }
 
@@ -1436,6 +1446,8 @@ fun StoryViewerScreen(
                         Box(Modifier.onSizeChanged { headerH = it.height }) {
                             StoryViewerHeaderChrome(
                                 username = story.username,
+                                onMusicTap = { story.stickers?.firstOrNull { it.music != null }?.music?.track?.let { pauseStoryPlayback(); musicTrackSheet = it } },
+                                musicTitle = story.stickers?.firstOrNull { it.music != null }?.music?.let { it.track.title + " · " + it.track.artist },
                                 authorId = story.authorId,
                                 isOwnStory = isOwnStory,
                                 profileImagePath = story.profileImagePath,
@@ -2045,6 +2057,12 @@ fun StoryViewerScreen(
 
         // MARK: profileRoute via UserProfileZoomNavigationHost (shared-element, no Dialog)
 
+        musicTrackSheet?.let { track ->
+            com.moments.android.views.creator.components.music.StoryMusicTrackSheet(track) {
+                musicTrackSheet = null
+                resumeStoryPlayback()
+            }
+        }
         PermissionPrimerGateHost(gate = photosSaveGate)
     }
     } // UserProfileZoomNavigationHost
@@ -2053,6 +2071,8 @@ fun StoryViewerScreen(
 @Composable
 private fun StoryViewerHeaderChrome(
     username: String,
+    musicTitle: String? = null,
+    onMusicTap: () -> Unit = {},
     authorId: String,
     isOwnStory: Boolean,
     profileImagePath: String?,
@@ -2095,13 +2115,14 @@ private fun StoryViewerHeaderChrome(
                     .clip(CircleShape)
                     .background(Color.Black.copy(0.16f)),
             )
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         username,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
+                        lineHeight = 18.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
@@ -2111,12 +2132,20 @@ private fun StoryViewerHeaderChrome(
                     } else {
                         VerifiedBadgeView(userId = authorId, size = 12.dp)
                     }
+                    Text(
+                        highlightTitle?.takeIf { it.isNotBlank() } ?: timeAgo,
+                        color = Color.White.copy(0.85f),
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                Text(
-                    highlightTitle?.takeIf { it.isNotBlank() } ?: timeAgo,
-                    color = Color.White.copy(0.85f),
-                    fontSize = 11.sp,
-                )
+                musicTitle?.let {
+                    Text(it + " ›", color = Color.White, fontSize = 11.sp, lineHeight = 14.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable(onClick = onMusicTap))
+                }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

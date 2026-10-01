@@ -167,6 +167,12 @@ open class EnhancedChatViewModel(
         }
         scope.launch {
             ChatMediaDownloadProgressEvents.events.collect { event ->
+                // SharedFlow delivery may run after resolveForMessage completes and
+                // clears its progress. A late 100% must not resurrect the blurred
+                // download placeholder after the local file is already ready.
+                if (event.messageId !in downloadingMediaIds && event.messageId !in hydratingMediaIds) {
+                    return@collect
+                }
                 setDownloadProgress(event.messageId, event.progress)
             }
         }
@@ -1549,10 +1555,12 @@ open class EnhancedChatViewModel(
         replyTo: String? = null,
         mediaWidth: Int? = null,
         mediaHeight: Int? = null,
+        stickers: List<com.moments.android.models.StickerData>? = null,
+        textOverlays: List<com.moments.android.models.StoryTextOverlayMetadata>? = null,
     ) {
         if (data.isEmpty()) return
         if (conversationId.isBlank()) {
-            ensureConversationExists { if (!it.isNullOrBlank()) sendMediaMessage(data, type, fileName, mediaBatchId, replyTo, mediaWidth, mediaHeight) }
+            ensureConversationExists { if (!it.isNullOrBlank()) sendMediaMessage(data, type, fileName, mediaBatchId, replyTo, mediaWidth, mediaHeight, stickers, textOverlays) }
             return
         }
         val messageId = UUID.randomUUID().toString()
@@ -1574,13 +1582,15 @@ open class EnhancedChatViewModel(
                 status = MessageStatus.SENDING,
                 mediaBatchId = mediaBatchId,
                 replyTo = replyTo,
+                stickers = stickers,
+                textOverlays = textOverlays,
                 isVanishModeMessage = _vanishModeActive.value,
             ),
         )
         scope.launch {
             chatService.sendMediaMessage(
                 conversationId, currentUserId, type, data, fileName, messageId, mediaBatchId,
-                _vanishModeActive.value, null, replyTo,
+                _vanishModeActive.value, null, replyTo, stickers, textOverlays,
             )
                 .onSuccess {
                     finalizeOutgoingMediaMessage(messageId, it, fallbackMediaUrl = localPreview)

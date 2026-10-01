@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="story_music_title">संगीत</string>
+    <string name="story_music_done">हो गया</string>
+    <string name="story_music_search">गाने या कलाकार खोजें</string>
+    <string name="story_music_unavailable">संगीत उपलब्ध नहीं है</string>
+    <string name="story_music_unavailable_detail">संगीत लोड नहीं हो सका। बाद में फिर कोशिश करें।</string>
+    <string name="story_music_retry">फिर कोशिश करें</string>
+    <string name="story_music_more">और गाने</string>
+    <string name="story_music_empty">कोई गाना नहीं मिला</string>
+    <string name="story_music_color">टेक्स्ट का रंग</string>
+    <string name="story_music_lyrics">बोल</string>
+    <string name="story_music_preview">पूर्वावलोकन</string>
+    <string name="story_music_remove">संगीत हटाएँ</string>
+    <string name="story_music_fragment">चुना गया अंश</string>
+    <string name="story_music_style_hidden">केवल संगीत</string>
+    <string name="story_music_style_title">शीर्षक</string>
+    <string name="story_music_style_card">कार्ड</string>
+    <string name="story_music_style_cover">कवर</string>
+    <string name="story_music_style_lyrics">बोल</string>
+    <string name="story_music_style_record">रिकॉर्ड</string>
+    <string name="story_music_tab_songs">गाने</string>
+    <string name="story_music_tab_discover">खोजें</string>
+    <string name="story_music_tab_saved">सहेजे गए</string>
+    <string name="story_music_save">गाना सहेजें</string>
+    <string name="story_music_unsave">सहेजे गए से हटाएँ</string>
+    <string name="story_music_posts">इस गाने वाले पोस्ट</string>
+    <string name="story_music_posts_placeholder">संगीत वाले पोस्ट यहाँ दिखाई देंगे।</string>
+    <string name="story_music_saved_confirmation">गाना पसंदीदा में सहेजा गया</string>
+    <string name="story_music_unsaved_confirmation">गाना पसंदीदा से हटा दिया गया</string>
+</resources>

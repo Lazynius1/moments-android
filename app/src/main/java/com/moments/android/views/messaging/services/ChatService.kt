@@ -1329,6 +1329,8 @@ object ChatService {
         isVanishModeMessage: Boolean,
         vanishExpiresAt: Date?,
         replyTo: String?,
+        stickers: List<com.moments.android.models.StickerData>? = null,
+        textOverlays: List<com.moments.android.models.StoryTextOverlayMetadata>? = null,
     ): Result<EnhancedMessage> = runCatching {
         if (shouldQueueFirestoreOutbox()) {
             return@runCatching queueOfflineMediaMessage(
@@ -1344,6 +1346,8 @@ object ChatService {
                 isVanishModeMessage = isVanishModeMessage,
                 vanishExpiresAt = vanishExpiresAt,
                 replyTo = replyTo,
+                stickers = stickers,
+                textOverlays = textOverlays,
             )
         }
         val uploadResult = ChatServiceMediaPipeline.uploadMedia(
@@ -1372,6 +1376,8 @@ object ChatService {
             isVanishModeMessage = isVanishModeMessage,
             vanishExpiresAt = vanishExpiresAt,
             replyTo = replyTo,
+                stickers = stickers,
+                textOverlays = textOverlays,
         )
         sendMessage(message, useServerTimestamp = true).getOrThrow()
     }
@@ -1495,6 +1501,8 @@ object ChatService {
         isVanishModeMessage: Boolean,
         vanishExpiresAt: Date?,
         replyTo: String?,
+        stickers: List<com.moments.android.models.StickerData>? = null,
+        textOverlays: List<com.moments.android.models.StoryTextOverlayMetadata>? = null,
     ): EnhancedMessage {
         val fileExtension = ChatServiceMediaPipeline.fileExtensionFor(type)
         val localFile = ChatCacheStore.writeDecryptedMedia(
@@ -1517,6 +1525,8 @@ object ChatService {
             isVanishModeMessage = isVanishModeMessage,
             vanishExpiresAt = vanishExpiresAt,
             replyTo = replyTo,
+                stickers = stickers,
+                textOverlays = textOverlays,
         )
         LocalPersistenceService.saveActionAsync(
             CachedAction(
@@ -1541,6 +1551,8 @@ object ChatService {
             isVanishModeMessage = isVanishModeMessage,
             vanishExpiresAt = vanishExpiresAt,
             replyTo = replyTo,
+                stickers = stickers,
+                textOverlays = textOverlays,
         )
     }
 

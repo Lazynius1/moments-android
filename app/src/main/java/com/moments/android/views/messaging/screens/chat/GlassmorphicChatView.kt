@@ -1635,8 +1635,10 @@ fun GlassmorphicChatView(
 
     chatMediaViewerPresentation?.let { presentation ->
         ConversationFullScreenMediaView(
-            media = presentation.media,
-            mediaItems = presentation.mediaItems,
+            media = presentation.media.copy(sourceMessage = messages.firstOrNull { it.id == presentation.media.id } ?: presentation.media.sourceMessage),
+            mediaItems = presentation.mediaItems.map { item ->
+                item.copy(sourceMessage = messages.firstOrNull { it.id == item.id } ?: item.sourceMessage)
+            },
             currentUserId = session.currentUserId,
             otherParticipantName = displayName,
             displayReactions = session::displayReactions,

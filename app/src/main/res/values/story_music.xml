@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="story_music_title">Music</string>
+    <string name="story_music_done">Done</string>
+    <string name="story_music_search">Search songs or artists</string>
+    <string name="story_music_unavailable">Music unavailable</string>
+    <string name="story_music_unavailable_detail">Unable to load music. Try again later.</string>
+    <string name="story_music_retry">Retry</string>
+    <string name="story_music_more">More songs</string>
+    <string name="story_music_empty">No songs found</string>
+    <string name="story_music_color">Text color</string>
+    <string name="story_music_lyrics">Lyrics</string>
+    <string name="story_music_preview">Preview</string>
+    <string name="story_music_remove">Remove music</string>
+    <string name="story_music_fragment">Selected fragment</string>
+    <string name="story_music_style_hidden">Music only</string>
+    <string name="story_music_style_title">Title</string>
+    <string name="story_music_style_card">Card</string>
+    <string name="story_music_style_cover">Cover</string>
+    <string name="story_music_style_lyrics">Lyrics</string>
+    <string name="story_music_style_record">Record</string>
+    <string name="story_music_tab_songs">Songs</string>
+    <string name="story_music_tab_discover">Discover</string>
+    <string name="story_music_tab_saved">Saved</string>
+    <string name="story_music_save">Save song</string>
+    <string name="story_music_unsave">Remove from saved</string>
+    <string name="story_music_posts">Posts with this song</string>
+    <string name="story_music_posts_placeholder">Posts with music will appear here.</string>
+    <string name="story_music_saved_confirmation">Song saved to favorites</string>
+    <string name="story_music_unsaved_confirmation">Song removed from favorites</string>
+</resources>

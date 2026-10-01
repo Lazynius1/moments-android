@@ -285,7 +285,7 @@ object OfflineSyncService {
                             ChatService.sendMediaMessage(
                                 payload.conversationId, payload.senderId, type, mediaData,
                                 payload.fileName, payload.messageId, payload.mediaBatchId,
-                                payload.isVanishModeMessage, payload.vanishExpiresAt, payload.replyTo,
+                                payload.isVanishModeMessage, payload.vanishExpiresAt, payload.replyTo, payload.stickers, payload.textOverlays,
                             )
                         }
                         result.onSuccess { sent ->
@@ -539,6 +539,16 @@ object OfflineSyncService {
         )
     }.getOrNull()
 
+    private fun jsonOverlayValue(value: Any?): Any? = when (value) {
+        null, JSONObject.NULL -> null
+        is JSONObject -> jsonOverlayMap(value)
+        is org.json.JSONArray -> (0 until value.length()).map { jsonOverlayValue(value.opt(it)) }
+        else -> value
+    }
+
+    private fun jsonOverlayMap(value: JSONObject): Map<String, Any?> =
+        value.keys().asSequence().associateWith { jsonOverlayValue(value.opt(it)) }
+
     private fun decodeMediaMessagePayload(data: ByteArray): MediaMessagePayload? = runCatching {
         val o = JSONObject(String(data))
         MediaMessagePayload(
@@ -556,6 +566,15 @@ object OfflineSyncService {
             isVanishModeMessage = o.optBoolean("isVanishModeMessage"),
             vanishExpiresAt = o.optLong("vanishExpiresAt").takeIf { o.has("vanishExpiresAt") }?.let { Date(it) },
             replyTo = o.optString("replyTo").takeIf { o.has("replyTo") },
+            textOverlays = o.optJSONArray("textOverlays")?.let { array ->
+                (0 until array.length()).map { index -> com.moments.android.models.StoryTextOverlayMetadata.from(jsonOverlayMap(array.getJSONObject(index))) }
+            },
+            stickers = o.optJSONArray("stickers")?.let { array ->
+                (0 until array.length()).map { index ->
+                    val item = array.getJSONObject(index)
+                    com.moments.android.models.StickerData.from(jsonOverlayMap(item))
+                }
+            },
         )
     }.getOrNull()
 

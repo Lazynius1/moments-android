@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="story_music_title">Música</string>
+    <string name="story_music_done">Fet</string>
+    <string name="story_music_search">Cerca cançons o artistes</string>
+    <string name="story_music_unavailable">Música no disponible</string>
+    <string name="story_music_unavailable_detail">No s’ha pogut carregar la música. Torna-ho a provar més tard.</string>
+    <string name="story_music_retry">Torna-ho a provar</string>
+    <string name="story_music_more">Més cançons</string>
+    <string name="story_music_empty">No s’han trobat cançons</string>
+    <string name="story_music_color">Color del text</string>
+    <string name="story_music_lyrics">Lletra</string>
+    <string name="story_music_preview">Previsualitza</string>
+    <string name="story_music_remove">Elimina la música</string>
+    <string name="story_music_fragment">Fragment seleccionat</string>
+    <string name="story_music_style_hidden">Només música</string>
+    <string name="story_music_style_title">Títol</string>
+    <string name="story_music_style_card">Targeta</string>
+    <string name="story_music_style_cover">Portada</string>
+    <string name="story_music_style_lyrics">Lletra</string>
+    <string name="story_music_style_record">Disc</string>
+    <string name="story_music_tab_songs">Cançons</string>
+    <string name="story_music_tab_discover">Descobreix</string>
+    <string name="story_music_tab_saved">Desades</string>
+    <string name="story_music_save">Desar la cançó</string>
+    <string name="story_music_unsave">Treure de Desades</string>
+    <string name="story_music_posts">Publicacions amb aquesta cançó</string>
+    <string name="story_music_posts_placeholder">Les publicacions amb música apareixeran aquí.</string>
+    <string name="story_music_saved_confirmation">Cançó desada als preferits</string>
+    <string name="story_music_unsaved_confirmation">Cançó eliminada dels preferits</string>
+</resources>

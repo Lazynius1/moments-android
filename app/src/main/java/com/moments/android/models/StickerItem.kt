@@ -86,6 +86,7 @@ data class StickerInteractionData(
     val contentOffsetY: Double? = null,
     val audioURL: String? = null,
     val audioDuration: Double? = null,
+    val music: StoryMusicSelection? = null,
 )
 
 // MARK: - StickerItem (estado de editor; espejo de iOS)

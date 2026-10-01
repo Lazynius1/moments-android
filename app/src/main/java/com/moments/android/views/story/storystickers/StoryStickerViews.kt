@@ -804,6 +804,7 @@ private fun StoryStaticStickerView(
     gestureGate: StoryDeckGestureGate?,
 ) {
     when {
+        sticker.music != null -> com.moments.android.views.creator.components.music.StoryMusicArtwork(sticker.music, animates = false)
         sticker.type == "shareMoment" -> StorySharedMomentSticker(
             sticker = sticker,
             onClick = {},
@@ -862,6 +863,7 @@ fun StoryStickerView(
     val allowsHit = LocalStoryStickerHitTesting.current
     val gatedMentionTap: (String) -> Unit = { id -> if (allowsHit) onMentionTap(id) }
     when {
+        sticker.music != null -> com.moments.android.views.creator.components.music.StoryMusicArtwork(sticker.music)
         sticker.type == "shareMoment" -> StorySharedMomentSticker(
             sticker = sticker,
             onClick = {

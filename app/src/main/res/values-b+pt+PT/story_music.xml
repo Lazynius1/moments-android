@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="story_music_title">Música</string>
+    <string name="story_music_done">Concluído</string>
+    <string name="story_music_search">Pesquisar músicas ou artistas</string>
+    <string name="story_music_unavailable">Música indisponível</string>
+    <string name="story_music_unavailable_detail">Não foi possível carregar a música. Tenta novamente mais tarde.</string>
+    <string name="story_music_retry">Tentar novamente</string>
+    <string name="story_music_more">Mais músicas</string>
+    <string name="story_music_empty">Nenhuma música encontrada</string>
+    <string name="story_music_color">Cor do texto</string>
+    <string name="story_music_lyrics">Letra</string>
+    <string name="story_music_preview">Pré-visualizar</string>
+    <string name="story_music_remove">Remover música</string>
+    <string name="story_music_fragment">Excerto selecionado</string>
+    <string name="story_music_style_hidden">Só música</string>
+    <string name="story_music_style_title">Título</string>
+    <string name="story_music_style_card">Cartão</string>
+    <string name="story_music_style_cover">Capa</string>
+    <string name="story_music_style_lyrics">Letra</string>
+    <string name="story_music_style_record">Disco</string>
+    <string name="story_music_tab_songs">Músicas</string>
+    <string name="story_music_tab_discover">Descobrir</string>
+    <string name="story_music_tab_saved">Guardadas</string>
+    <string name="story_music_save">Guardar música</string>
+    <string name="story_music_unsave">Remover das guardadas</string>
+    <string name="story_music_posts">Publicações com esta música</string>
+    <string name="story_music_posts_placeholder">As publicações com música aparecerão aqui.</string>
+    <string name="story_music_saved_confirmation">Música guardada nos favoritos</string>
+    <string name="story_music_unsaved_confirmation">Música removida dos favoritos</string>
+</resources>

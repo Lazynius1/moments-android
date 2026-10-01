@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="story_music_title">Muziek</string>
+    <string name="story_music_done">Gereed</string>
+    <string name="story_music_search">Zoek nummers of artiesten</string>
+    <string name="story_music_unavailable">Muziek niet beschikbaar</string>
+    <string name="story_music_unavailable_detail">De muziek kon niet worden geladen. Probeer het later opnieuw.</string>
+    <string name="story_music_retry">Opnieuw proberen</string>
+    <string name="story_music_more">Meer nummers</string>
+    <string name="story_music_empty">Geen nummers gevonden</string>
+    <string name="story_music_color">Tekstkleur</string>
+    <string name="story_music_lyrics">Songtekst</string>
+    <string name="story_music_preview">Voorbeeld</string>
+    <string name="story_music_remove">Muziek verwijderen</string>
+    <string name="story_music_fragment">Geselecteerd fragment</string>
+    <string name="story_music_style_hidden">Alleen muziek</string>
+    <string name="story_music_style_title">Titel</string>
+    <string name="story_music_style_card">Kaart</string>
+    <string name="story_music_style_cover">Hoes</string>
+    <string name="story_music_style_lyrics">Songtekst</string>
+    <string name="story_music_style_record">Plaat</string>
+    <string name="story_music_tab_songs">Nummers</string>
+    <string name="story_music_tab_discover">Ontdek</string>
+    <string name="story_music_tab_saved">Opgeslagen</string>
+    <string name="story_music_save">Nummer opslaan</string>
+    <string name="story_music_unsave">Verwijderen uit opgeslagen</string>
+    <string name="story_music_posts">Posts met dit nummer</string>
+    <string name="story_music_posts_placeholder">Posts met muziek verschijnen hier.</string>
+    <string name="story_music_saved_confirmation">Nummer opgeslagen in favorieten</string>
+    <string name="story_music_unsaved_confirmation">Nummer verwijderd uit favorieten</string>
+</resources>

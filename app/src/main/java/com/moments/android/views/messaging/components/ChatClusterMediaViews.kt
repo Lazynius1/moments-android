@@ -55,7 +55,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -449,6 +448,7 @@ fun MediaGridTileView(
     ) {
         Box(Modifier.fillMaxSize()) {
             MediaGridTileContent(message, isDownloadingMedia)
+            com.moments.android.views.messaging.media.ChatMessageStaticOverlay(message, modifier = Modifier.matchParentSize())
         }
         when {
             isDownloadingMedia -> {
@@ -478,47 +478,20 @@ fun MediaGridTileView(
 @Composable
 private fun MediaGridTileContent(message: EnhancedMessage, isDownloadingMedia: Boolean) {
     val isDark = isSystemInDarkTheme()
-    when (message.type) {
-        MessageType.IMAGE -> when {
-            isDownloadingMedia -> {
-                val preview = message.previewThumbnailURLForDisplay
-                if (!preview.isNullOrBlank()) {
-                    AsyncImage(
-                        preview,
-                        null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().blur(18.dp),
-                    )
-                } else {
-                    ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
-                }
-            }
-
-            message.isMediaPendingResolution -> ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
-            !message.mediaUrl.isNullOrBlank() && message.localMediaFileIsReachable(message.mediaUrl!!) -> {
-                AsyncImage(message.mediaUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            }
-            else -> MediaGridTilePlaceholder(isVideo = false, isDark = isDark)
-        }
-        MessageType.VIDEO -> when {
-            isDownloadingMedia -> {
-                val preview = message.previewThumbnailURLForDisplay
-                if (!preview.isNullOrBlank()) {
-                    AsyncImage(preview, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(18.dp))
-                } else {
-                    ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
-                }
-            }
-
-            message.isMediaPendingResolution || message.needsVideoThumbnailForDisplay -> {
+    if (message.type == MessageType.IMAGE || message.type == MessageType.VIDEO) {
+        val source = if (message.type == MessageType.IMAGE) message.mediaUrl else message.thumbnailUrl
+        val preview = message.previewThumbnailURLForDisplay
+        when {
+            !source.isNullOrBlank() && message.localMediaFileIsReachable(source) &&
+                (source.startsWith("file:") || (!isDownloadingMedia && !message.isMediaPendingResolution)) ->
+                ChatKFImage(source, Modifier.fillMaxSize(), previewUrl = preview)
+            !preview.isNullOrBlank() -> ChatKFImage(preview, Modifier.fillMaxSize())
+            isDownloadingMedia || message.isMediaPendingResolution || message.needsVideoThumbnailForDisplay ->
                 ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
-            }
-            !message.thumbnailUrl.isNullOrBlank() && message.localMediaFileIsReachable(message.thumbnailUrl!!) -> {
-                AsyncImage(message.thumbnailUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            }
-            else -> MediaGridTilePlaceholder(isVideo = true, isDark = isDark)
+            else -> MediaGridTilePlaceholder(isVideo = message.type == MessageType.VIDEO, isDark = isDark)
         }
-        else -> MediaGridTilePlaceholder(isVideo = false, isDark = isDark)
+    } else {
+        MediaGridTilePlaceholder(isVideo = false, isDark = isDark)
     }
 }
 

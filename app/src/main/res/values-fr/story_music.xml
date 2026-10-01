@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="story_music_title">Musique</string>
+    <string name="story_music_done">Terminé</string>
+    <string name="story_music_search">Rechercher des chansons ou des artistes</string>
+    <string name="story_music_unavailable">Musique indisponible</string>
+    <string name="story_music_unavailable_detail">Impossible de charger la musique. Réessayez plus tard.</string>
+    <string name="story_music_retry">Réessayer</string>
+    <string name="story_music_more">Plus de chansons</string>
+    <string name="story_music_empty">Aucune chanson trouvée</string>
+    <string name="story_music_color">Couleur du texte</string>
+    <string name="story_music_lyrics">Paroles</string>
+    <string name="story_music_preview">Aperçu</string>
+    <string name="story_music_remove">Retirer la musique</string>
+    <string name="story_music_fragment">Extrait sélectionné</string>
+    <string name="story_music_style_hidden">Musique seule</string>
+    <string name="story_music_style_title">Titre</string>
+    <string name="story_music_style_card">Carte</string>
+    <string name="story_music_style_cover">Pochette</string>
+    <string name="story_music_style_lyrics">Paroles</string>
+    <string name="story_music_style_record">Disque</string>
+    <string name="story_music_tab_songs">Chansons</string>
+    <string name="story_music_tab_discover">Découvrir</string>
+    <string name="story_music_tab_saved">Enregistrées</string>
+    <string name="story_music_save">Enregistrer la chanson</string>
+    <string name="story_music_unsave">Retirer des chansons enregistrées</string>
+    <string name="story_music_posts">Publications avec cette chanson</string>
+    <string name="story_music_posts_placeholder">Les publications avec de la musique apparaîtront ici.</string>
+    <string name="story_music_saved_confirmation">Chanson ajoutée aux favoris</string>
+    <string name="story_music_unsaved_confirmation">Chanson retirée des favoris</string>
+</resources>

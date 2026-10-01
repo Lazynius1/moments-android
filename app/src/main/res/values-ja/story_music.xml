@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="story_music_title">音楽</string>
+    <string name="story_music_done">完了</string>
+    <string name="story_music_search">曲やアーティストを検索</string>
+    <string name="story_music_unavailable">音楽を利用できません</string>
+    <string name="story_music_unavailable_detail">音楽を読み込めませんでした。後でもう一度お試しください。</string>
+    <string name="story_music_retry">再試行</string>
+    <string name="story_music_more">他の曲</string>
+    <string name="story_music_empty">曲が見つかりません</string>
+    <string name="story_music_color">文字の色</string>
+    <string name="story_music_lyrics">歌詞</string>
+    <string name="story_music_preview">プレビュー</string>
+    <string name="story_music_remove">音楽を削除</string>
+    <string name="story_music_fragment">選択した部分</string>
+    <string name="story_music_style_hidden">音楽のみ</string>
+    <string name="story_music_style_title">タイトル</string>
+    <string name="story_music_style_card">カード</string>
+    <string name="story_music_style_cover">ジャケット</string>
+    <string name="story_music_style_lyrics">歌詞</string>
+    <string name="story_music_style_record">レコード</string>
+    <string name="story_music_tab_songs">曲</string>
+    <string name="story_music_tab_discover">見つける</string>
+    <string name="story_music_tab_saved">保存済み</string>
+    <string name="story_music_save">曲を保存</string>
+    <string name="story_music_unsave">保存済みから削除</string>
+    <string name="story_music_posts">この曲を使った投稿</string>
+    <string name="story_music_posts_placeholder">音楽付きの投稿がここに表示されます。</string>
+    <string name="story_music_saved_confirmation">曲をお気に入りに保存しました</string>
+    <string name="story_music_unsaved_confirmation">曲をお気に入りから削除しました</string>
+</resources>

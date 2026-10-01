@@ -148,7 +148,7 @@ private suspend fun FirestoreService.createStoryDocument(
     val isChain = chainId != null
     val resolvedExpirationHours = if (isChain) 48 else if (expirationHours == 48) 48 else 24
     val expirationDate = calculateStoryExpirationDate(isChain, chainId, resolvedExpirationHours)
-    val resolvedDuration = duration ?: if (mediaItem.type == MediaItem.MediaType.VIDEO) 60.0 else 15.0
+    val resolvedDuration = duration ?: if (mediaItem.type == MediaItem.MediaType.VIDEO) 60.0 else (stickers?.firstOrNull { it.music != null }?.music?.duration?.coerceIn(15.0, 60.0) ?: 15.0)
     val resolvedStoryId = storyId ?: UUID.randomUUID().toString()
     val resolvedTextOverlays = textOverlays?.takeIf { it.isNotEmpty() }
         ?: textOverlay?.let { listOf(it) }
@@ -274,7 +274,8 @@ private fun FirestoreService.makeStoryPayload(
 
 private fun serializedStorySticker(sticker: StickerData): Map<String, Any> = buildMap {
     // iOS escribe positionX/positionY (no mapa `position`).
-    put("type", sticker.type)
+    sticker.music?.let { put("music", it.toMap()) }
+    put("type", if(sticker.music != null) "generic" else sticker.type)
     put("content", sticker.content)
     put("positionX", sticker.position.x)
     put("positionY", sticker.position.y)

@@ -159,10 +159,13 @@ class GlassmorphicChatLifecycleController(
         when (mode) {
             com.moments.android.views.messaging.media.ChatMediaSendMode.VIEW_ONCE -> cameraOperations.sendViewOnce(data, mediaType, false, replyTo, overlayPayload)
             com.moments.android.views.messaging.media.ChatMediaSendMode.ALLOW_REPLAY -> cameraOperations.sendViewOnce(data, mediaType, true, replyTo, overlayPayload)
-            com.moments.android.views.messaging.media.ChatMediaSendMode.KEEP_IN_CHAT -> when (mediaType) {
-                ChatCameraCapturedMediaType.IMAGE -> cameraOperations.sendImage(data, replyTo)
-                ChatCameraCapturedMediaType.VIDEO -> cameraOperations.sendVideo(data, replyTo)
-            }
+            com.moments.android.views.messaging.media.ChatMediaSendMode.KEEP_IN_CHAT -> viewModel.sendMediaMessage(
+                data = data,
+                type = if (mediaType == ChatCameraCapturedMediaType.IMAGE) com.moments.android.views.messaging.core.MessageType.IMAGE else com.moments.android.views.messaging.core.MessageType.VIDEO,
+                replyTo = replyTo,
+                stickers = (overlayPayload as? com.moments.android.views.messaging.media.ChatMediaOverlayPayload)?.stickers,
+                textOverlays = (overlayPayload as? com.moments.android.views.messaging.media.ChatMediaOverlayPayload)?.textOverlays,
+            )
         }
         shouldShowCamera = false
     }

@@ -853,6 +853,7 @@ data class StickerData(
     val moderationCategory: String? = null,
     val audioURL: String? = null,
     val audioDuration: Double? = null,
+    val music: StoryMusicSelection? = null,
     val isAnimated: Boolean = false,
     val gifURL: String? = null,
     val videoURL: String? = null,
@@ -926,6 +927,7 @@ data class StickerData(
                 moderationState = data["moderationState"] as? String,
                 moderationReason = data["moderationReason"] as? String,
                 moderationCategory = data["moderationCategory"] as? String,
+                music = StoryMusicSelection.from(data["music"]),
                 audioURL = data["audioURL"] as? String,
                 audioDuration = (data["audioDuration"] as? Number)?.toDouble(),
                 isAnimated = isAnimated,
@@ -984,6 +986,7 @@ data class StickerData(
                 moderationCategory = null,
                 audioURL = interaction?.audioURL,
                 audioDuration = interaction?.audioDuration,
+                music = interaction?.music,
                 isAnimated = stickerItem.isAnimated,
                 gifURL = stickerItem.gifURL,
                 videoURL = stickerItem.videoURL,
@@ -1687,6 +1690,7 @@ fun StoryTextOverlayMetadata.toMap(): Map<String, Any> = buildMap {
 
 fun StickerData.toMap(): Map<String, Any> = buildMap {
     stickerId?.let { put("stickerId", it) }
+    music?.let { put("music", it.toMap()) }
     put("type", type)
     put("content", content)
     // ≡ iOS FirestoreStoriesRepository.serializedStorySticker — positionX/Y, no mapa `position`.

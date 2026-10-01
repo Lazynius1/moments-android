@@ -141,12 +141,40 @@ fun StoryMediaOverlayRendererView(
  * Superficie común para chats, archivo, cadenas, destacados y notificaciones.
  * Mantiene el canvas 9:16 y congela reproducción, GIF y motion.
  */
+/** Preserve story artwork bounds before scaling the complete overlay into a cell. */
+@Composable
+fun StoryCanvasOverlayView(
+    textOverlays: List<StoryTextOverlayMetadata>,
+    stickers: List<StickerData>,
+    storyId: String,
+    userId: String,
+    modifier: Modifier = Modifier,
+    renderingMode: StoryOverlayRenderingMode = StoryOverlayRenderingMode.THUMBNAIL,
+) {
+    BoxWithConstraints(modifier.clipToBounds()) {
+        val canvasWidth = maxOf(maxWidth, maxHeight * 9 / 16)
+        val referenceWidth = 375.dp
+        val referenceHeight = (375f * 16 / 9).dp
+        val overlayScale = canvasWidth / referenceWidth
+        StoryMediaOverlayRendererView(
+            textOverlays = textOverlays, stickers = stickers,
+            drawingData = null, storyId = storyId, userId = userId,
+            reportsDeckInteractionExclusion = false, allowsStickerHitTesting = false,
+            renderingMode = renderingMode,
+            modifier = Modifier.requiredSize(referenceWidth, referenceHeight)
+                .align(Alignment.Center)
+                .graphicsLayer { scaleX = overlayScale; scaleY = overlayScale },
+        )
+    }
+}
+
 @Composable
 fun StoryStaticPreviewSurface(
     story: Story,
     modifier: Modifier = Modifier,
     revealPolicy: StoryRevealThumbnailPolicy = StoryRevealThumbnailPolicy.CONCEALED,
 ) {
+    val revealed = com.moments.android.views.story.rememberRevealState(story.id.orEmpty())
     BoxWithConstraints(modifier.clipToBounds()) {
         val density = LocalDensity.current
         val targetWidthPx = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
@@ -164,14 +192,6 @@ fun StoryStaticPreviewSurface(
         }
         val canvasWidth = with(density) { canvasWidthPx.toDp() }
         val canvasHeight = with(density) { canvasHeightPx.toDp() }
-        // Los thumbnails pueden ser más estrechos que el tamaño base de un
-        // sticker (p. ej. el slider mide 260). SwiftUI conserva primero el
-        // canvas contractual de 375 pt y reduce el overlay completo. Hacemos lo
-        // mismo para que Compose no constriña cada sticker antes de escalarlo.
-        val referenceWidth = 375.dp
-        val referenceHeight = (375f / storyRatio).dp
-        val referenceWidthPx = with(density) { referenceWidth.toPx() }
-        val overlayScale = canvasWidthPx / referenceWidthPx.coerceAtLeast(1f)
 
         Box(
             Modifier
@@ -179,25 +199,14 @@ fun StoryStaticPreviewSurface(
                 .align(Alignment.Center),
         ) {
             StoryStaticPreviewMedia(story, Modifier.fillMaxSize())
-            StoryMediaOverlayRendererView(
+            StoryCanvasOverlayView(
                 textOverlays = story.resolvedTextOverlays,
                 stickers = story.stickers.orEmpty(),
-                drawingData = null,
-                storyId = story.id.orEmpty(),
-                userId = story.authorId,
-                reportsDeckInteractionExclusion = false,
-                allowsStickerHitTesting = false,
-                renderingMode = StoryOverlayRenderingMode.THUMBNAIL,
-                modifier = Modifier
-                    .requiredSize(referenceWidth, referenceHeight)
-                    .align(Alignment.Center)
-                    .graphicsLayer {
-                        scaleX = overlayScale
-                        scaleY = overlayScale
-                    },
+                storyId = story.id.orEmpty(), userId = story.authorId,
+                modifier = Modifier.matchParentSize(),
             )
             if (
-                revealPolicy == StoryRevealThumbnailPolicy.CONCEALED &&
+                revealPolicy == StoryRevealThumbnailPolicy.CONCEALED && !revealed &&
                 story.stickers.orEmpty().any { it.type == "reveal" }
             ) {
                 val reveal = story.stickers.orEmpty().first { it.type == "reveal" }
