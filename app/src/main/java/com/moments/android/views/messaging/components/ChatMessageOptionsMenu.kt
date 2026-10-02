@@ -226,9 +226,7 @@ fun ChatMessageRowChrome(
     @Suppress("UNUSED_PARAMETER") isOutgoing: Boolean,
     content: @Composable () -> Unit,
 ) {
-    CompositionLocalProvider(LocalChatOutgoingBubbleColor provides Color(0xFF3F6F8F)) {
-        content()
-    }
+    content()
 }
 
 @Composable

@@ -1,5 +1,5 @@
 <resources>
-    <string name="chat_wallpaper_title">Chatachtergrond</string>
+    <string name="chat_wallpaper_title">Chatstijl</string>
     <string name="chat_wallpaper_private">Alleen jij ziet deze achtergrond. Hij wordt voor dit gesprek opgeslagen en met je account gesynchroniseerd.</string>
     <string name="chat_wallpaper_photo">Foto kiezen</string>
     <string name="chat_wallpaper_color">Kleur</string>
@@ -8,7 +8,40 @@
     <string name="chat_wallpaper_save">Opslaan</string>
     <string name="chat_wallpaper_preview">Zo zien je berichten eruit</string>
     <string name="chat_wallpaper_error">De achtergrond kon niet worden opgeslagen of geladen. Probeer het opnieuw.</string>
-    <string name="chat_wallpaper_crop">Sleep de foto om het kader aan te passen en gebruik de schuifregelaar om in te zoomen.</string>
+    <string name="chat_wallpaper_crop">Sleep en knijp om de foto bij te snijden.</string>
     <string name="chat_wallpaper_back">Terug</string>
-    <string name="chat_wallpaper_saved">Chatachtergrond opgeslagen</string>
+    <string name="chat_wallpaper_saved">Chatstijl opgeslagen</string>
+    <string name="chat_wallpaper_frame">Foto bijsnijden</string>
+    <string name="chat_wallpaper_bubble_color">Kleur van verzonden berichten</string>
+
+    <string name="chat_wallpaper_styles">Stijlen</string>
+
+    <string name="chat_wallpaper_styles_hint">Wijzigt de achtergrond en de kleur van je verzonden berichten.</string>
+
+    <string name="chat_wallpaper_customize">Aanpassen</string>
+
+    <string name="chat_wallpaper_background">Achtergrond</string>
+
+    <string name="chat_wallpaper_preview_title">Voorbeeld</string>
+
+    <string name="chat_wallpaper_preset_aurora">Aurora</string>
+
+    <string name="chat_wallpaper_preset_coast">Kust</string>
+
+    <string name="chat_wallpaper_preset_dune">Duinen</string>
+
+    <string name="chat_wallpaper_preset_forest">Bos</string>
+
+    <string name="chat_wallpaper_preset_bloom">Bloesem</string>
+
+    <string name="chat_wallpaper_preset_midnight">Middernacht</string>
+
+    <string name="chat_wallpaper_preset_lagoon">Lagune</string>
+
+    <string name="chat_wallpaper_preset_clay">Klei</string>
+
+    <string name="chat_wallpaper_preset_cloud">Wolken</string>
+
+    <string name="chat_wallpaper_preset_citrus">Citrus</string>
+    <string name="chat_wallpaper_current">Huidige stijl</string>
 </resources>

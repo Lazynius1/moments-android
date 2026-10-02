@@ -215,8 +215,8 @@ fun ChatTextBubbleView(
         position = groupPosition,
     )
     val bubbleFill = if (isOutgoing) outgoingFill else colors.messageBubbleBackground
-    val textColor = if (isOutgoing) Color.White else colors.messageTextColor
-    val linkColor = if (isOutgoing) Color.White.copy(alpha = 0.92f) else Color.Blue
+    val textColor = if (isOutgoing) chatBubbleTextColor(outgoingFill) else colors.messageTextColor
+    val linkColor = if (isOutgoing) chatBubbleTextColor(outgoingFill).copy(alpha = 0.92f) else Color.Blue
     val isActiveSearchMatch = messageId != null && messageId == activeSearchId
     val highlightBg = Color(1f, 0.82f, 0.25f).copy(alpha = if (isActiveSearchMatch) 0.92f else 0.45f)
     val fontSizeSp = ChatMessageFont.bubbleSizeSp()
@@ -338,7 +338,7 @@ fun ChatTextBubbleView(
                                         .fillMaxHeight()
                                         .clip(RoundedCornerShape(50))
                                         .background(
-                                            if (isOutgoing) Color.White.copy(alpha = 0.78f)
+                                            if (isOutgoing) chatBubbleTextColor(outgoingFill).copy(alpha = 0.78f)
                                             else colors.receivedAccentColor,
                                         ),
                                 )

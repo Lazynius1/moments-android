@@ -1794,7 +1794,7 @@ private fun SettingsRows(
             colors,
             onVanish,
         )
-        SettingsRow(Icons.Default.Photo, R.string.chat_wallpaper_title, null, colors, onWallpaper)
+        SettingsRow(Icons.Default.Photo, R.string.chat_wallpaper_title, null, colors, onWallpaper, iconDrawable = R.drawable.chat_style_icon)
         SettingsRow(
             Icons.Default.Lock,
             R.string.conversation_settings_privacy_and_security,
@@ -1815,6 +1815,7 @@ private fun SettingsRow(
     action: () -> Unit,
     destructive: Boolean = false,
     subtitle: String? = null,
+    iconDrawable: Int? = null,
 ) {
     Row(
         Modifier
@@ -1823,12 +1824,21 @@ private fun SettingsRow(
             .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            icon,
-            null,
-            tint = if (destructive) MaterialTheme.colorScheme.error else colors.secondary,
-            modifier = Modifier.size(24.dp),
-        )
+        if (iconDrawable != null) {
+            Icon(
+                painter = androidx.compose.ui.res.painterResource(iconDrawable),
+                contentDescription = null,
+                tint = if (destructive) MaterialTheme.colorScheme.error else colors.secondary,
+                modifier = Modifier.size(24.dp),
+            )
+        } else {
+            Icon(
+                icon,
+                null,
+                tint = if (destructive) MaterialTheme.colorScheme.error else colors.secondary,
+                modifier = Modifier.size(24.dp),
+            )
+        }
         Column(Modifier.padding(start = 14.dp).weight(1f)) {
             Text(
                 stringResource(title),

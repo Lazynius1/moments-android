@@ -81,7 +81,7 @@ class UserProfileViewModel(
     var isCurrentUserBlocked by mutableStateOf(false); private set
     var isLoading by mutableStateOf(true); private set
     var followButtonState by mutableStateOf(FollowButtonState.CAN_FOLLOW); private set
-    var canViewContent by mutableStateOf(false); private set
+    var canViewContent by mutableStateOf(userId == FirebaseAuth.getInstance().currentUser?.uid); private set
     var canViewSocialLists by mutableStateOf(false); private set
     var isRefreshing by mutableStateOf(false); private set
     var isProfileUnavailable by mutableStateOf(false); private set
@@ -157,7 +157,8 @@ class UserProfileViewModel(
             launch { loadViewerContext(current) }
 
             // Restaurar la última decisión de privacidad conocida (no caer en "privado" sin red).
-            cachedCanViewContent(current)?.let { canViewContent = it }
+            if (current == userId) canViewContent = true
+            else cachedCanViewContent(current)?.let { canViewContent = it }
 
             // Caché local: perfil y moments (evita el flash a estado vacío sin bloquear la UI).
             val cached = withContext(Dispatchers.IO) {
@@ -845,6 +846,12 @@ class UserProfileViewModel(
 
     fun checkIfBlocked() {
         val current = currentUserId ?: return
+        if (current == userId) {
+            isBlockedByCurrentUser = false
+            isCurrentUserBlocked = false
+            canViewContent = true
+            return
+        }
         viewModelScope.launch {
             runCatching { firestoreService.checkIfBlocked(current, userId) }.getOrNull()?.let { result ->
                 isBlockedByCurrentUser = result.isBlockedByCurrentUser

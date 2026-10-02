@@ -1,5 +1,5 @@
 <resources>
-    <string name="chat_wallpaper_title">チャットの背景</string>
+    <string name="chat_wallpaper_title">チャットのスタイル</string>
     <string name="chat_wallpaper_private">この背景は自分にだけ表示されます。この会話用に保存され、アカウントと同期されます。</string>
     <string name="chat_wallpaper_photo">写真を選択</string>
     <string name="chat_wallpaper_color">色</string>
@@ -8,7 +8,40 @@
     <string name="chat_wallpaper_save">保存</string>
     <string name="chat_wallpaper_preview">メッセージはこのように表示されます</string>
     <string name="chat_wallpaper_error">背景を保存または読み込めませんでした。もう一度お試しください。</string>
-    <string name="chat_wallpaper_crop">写真をドラッグして位置を調整し、スライダーで拡大できます。</string>
+    <string name="chat_wallpaper_crop">ドラッグとピンチで写真の位置と大きさを調整します。</string>
     <string name="chat_wallpaper_back">戻る</string>
-    <string name="chat_wallpaper_saved">チャットの背景を保存しました</string>
+    <string name="chat_wallpaper_saved">チャットのスタイルを保存しました</string>
+    <string name="chat_wallpaper_frame">写真の位置を調整</string>
+    <string name="chat_wallpaper_bubble_color">送信メッセージの色</string>
+
+    <string name="chat_wallpaper_styles">スタイル</string>
+
+    <string name="chat_wallpaper_styles_hint">背景と送信メッセージの色を変更します。</string>
+
+    <string name="chat_wallpaper_customize">カスタマイズ</string>
+
+    <string name="chat_wallpaper_background">背景</string>
+
+    <string name="chat_wallpaper_preview_title">プレビュー</string>
+
+    <string name="chat_wallpaper_preset_aurora">オーロラ</string>
+
+    <string name="chat_wallpaper_preset_coast">海岸</string>
+
+    <string name="chat_wallpaper_preset_dune">砂丘</string>
+
+    <string name="chat_wallpaper_preset_forest">森</string>
+
+    <string name="chat_wallpaper_preset_bloom">花</string>
+
+    <string name="chat_wallpaper_preset_midnight">真夜中</string>
+
+    <string name="chat_wallpaper_preset_lagoon">ラグーン</string>
+
+    <string name="chat_wallpaper_preset_clay">粘土</string>
+
+    <string name="chat_wallpaper_preset_cloud">雲</string>
+
+    <string name="chat_wallpaper_preset_citrus">柑橘</string>
+    <string name="chat_wallpaper_current">現在のスタイル</string>
 </resources>

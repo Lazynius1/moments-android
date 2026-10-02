@@ -1,5 +1,5 @@
 <resources>
-    <string name="chat_wallpaper_title">Sohbet arka planı</string>
+    <string name="chat_wallpaper_title">Sohbet stili</string>
     <string name="chat_wallpaper_private">Bu arka planı yalnızca sen görürsün. Bu sohbet için kaydedilir ve hesabınla eşitlenir.</string>
     <string name="chat_wallpaper_photo">Fotoğraf seç</string>
     <string name="chat_wallpaper_color">Renk</string>
@@ -8,7 +8,40 @@
     <string name="chat_wallpaper_save">Kaydet</string>
     <string name="chat_wallpaper_preview">Mesajların böyle görünecek</string>
     <string name="chat_wallpaper_error">Arka plan kaydedilemedi veya yüklenemedi. Tekrar dene.</string>
-    <string name="chat_wallpaper_crop">Fotoğrafı sürükleyerek kadrajı ayarla ve kaydırıcıyla yakınlaştır.</string>
+    <string name="chat_wallpaper_crop">Fotoğrafı çerçevelemek için sürükleyin ve iki parmakla yakınlaştırın.</string>
     <string name="chat_wallpaper_back">Geri</string>
-    <string name="chat_wallpaper_saved">Sohbet arka planı kaydedildi</string>
+    <string name="chat_wallpaper_saved">Sohbet stili kaydedildi</string>
+    <string name="chat_wallpaper_frame">Fotoğrafı çerçevele</string>
+    <string name="chat_wallpaper_bubble_color">Gönderilen mesaj rengi</string>
+
+    <string name="chat_wallpaper_styles">Stiller</string>
+
+    <string name="chat_wallpaper_styles_hint">Duvar kâğıdını ve gönderdiğin mesajların rengini değiştirir.</string>
+
+    <string name="chat_wallpaper_customize">Özelleştir</string>
+
+    <string name="chat_wallpaper_background">Duvar kâğıdı</string>
+
+    <string name="chat_wallpaper_preview_title">Önizleme</string>
+
+    <string name="chat_wallpaper_preset_aurora">Aurora</string>
+
+    <string name="chat_wallpaper_preset_coast">Kıyı</string>
+
+    <string name="chat_wallpaper_preset_dune">Kumullar</string>
+
+    <string name="chat_wallpaper_preset_forest">Orman</string>
+
+    <string name="chat_wallpaper_preset_bloom">Çiçekler</string>
+
+    <string name="chat_wallpaper_preset_midnight">Gece yarısı</string>
+
+    <string name="chat_wallpaper_preset_lagoon">Lagün</string>
+
+    <string name="chat_wallpaper_preset_clay">Kil</string>
+
+    <string name="chat_wallpaper_preset_cloud">Bulutlar</string>
+
+    <string name="chat_wallpaper_preset_citrus">Narenciye</string>
+    <string name="chat_wallpaper_current">Mevcut stil</string>
 </resources>

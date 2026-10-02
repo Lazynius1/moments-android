@@ -481,7 +481,7 @@ fun GlassmorphicAudioMessage(
         VoiceMessageLayout.availableWaveformWidth(bubbleW, showsSpeedControl),
     )
 
-    val contentColor = if (isCurrentUser) Color.White else colors.messageTextColor
+    val contentColor = if (isCurrentUser) chatBubbleTextColor(outgoingFill) else colors.messageTextColor
     val waveformInactive = if (isCurrentUser) {
         contentColor.copy(alpha = if (dark) 0.22f else 0.28f)
     } else {

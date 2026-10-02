@@ -117,6 +117,7 @@ fun ConversationFullScreenMediaView(
     val pagerState = rememberPagerState(initialPage = start, pageCount = { paged.size })
     val current = paged.getOrElse(pagerState.currentPage) { media }
 
+    var zoomedMediaId by remember { mutableStateOf<String?>(null) }
     var replyText by remember { mutableStateOf("") }
     var isSendingReply by remember { mutableStateOf(false) }
     var showSaveResult by remember { mutableStateOf(false) }
@@ -297,7 +298,7 @@ fun ConversationFullScreenMediaView(
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
-                userScrollEnabled = paged.size > 1 && showingReactionBarForMessageId == null && expandedVideoUrl == null,
+                userScrollEnabled = zoomedMediaId != current.id && paged.size > 1 && showingReactionBarForMessageId == null && expandedVideoUrl == null,
             ) { page ->
                 val item = paged[page]
                 val active = page == pagerState.currentPage
@@ -343,15 +344,23 @@ fun ConversationFullScreenMediaView(
                             }
                         }
                     }
+                    val zoomableBody: @Composable () -> Unit = {
+                        if (item.type == SharedMedia.Type.IMAGE) {
+                            ChatZoomableMedia(item.id, active, onZoomChanged = { zoomed ->
+                                if (zoomed) zoomedMediaId = item.id
+                                else if (zoomedMediaId == item.id) zoomedMediaId = null
+                            }, content = body)
+                        } else body()
+                    }
                     if (isScreenshotProtected(item)) {
                         ScreenshotProtectedView(
                             isProtected = true,
                             fillsContainer = true,
                             // Chat fullscreen: FLAG_SECURE (vídeo + imagen). ContentSurface parpadea con ExoPlayer.
                             mode = ScreenshotProtectionMode.WindowFlag,
-                        ) { body() }
+                        ) { zoomableBody() }
                     } else {
-                        body()
+                        zoomableBody()
                     }
                 }
             }

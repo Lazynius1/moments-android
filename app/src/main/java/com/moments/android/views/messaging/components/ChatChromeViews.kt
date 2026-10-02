@@ -453,7 +453,7 @@ private fun Modifier.glassmorphicChrome(circle: Boolean): Modifier {
 @Composable
 fun GlassmorphicDateHeader(date: Date, modifier: Modifier = Modifier) {
     val colors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme())
-    // ≡ iOS: dateHeaderColor + glassmorphicChat + Capsule (texto legible en dark).
+    // Opaque date surface remains readable over personal wallpapers.
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Text(
             MomentsFormat.smartDate(date, MomentsFormat.DateContext.CHAT_SEPARATOR),
@@ -461,7 +461,7 @@ fun GlassmorphicDateHeader(date: Date, modifier: Modifier = Modifier) {
             fontSize = 12.sp,
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
-                .momentsChromeGlass(RoundedCornerShape(50), interactive = false)
+                .background(colors.messageBubbleBackground)
                 .padding(horizontal = 16.dp, vertical = 6.dp),
         )
     }

@@ -1,5 +1,5 @@
 <resources>
-    <string name="chat_wallpaper_title">Fons del xat</string>
+    <string name="chat_wallpaper_title">Estil del xat</string>
     <string name="chat_wallpaper_private">Només tu veus aquest fons. Es desa per a aquesta conversa i se sincronitza amb el teu compte.</string>
     <string name="chat_wallpaper_photo">Tria una foto</string>
     <string name="chat_wallpaper_color">Color</string>
@@ -8,7 +8,40 @@
     <string name="chat_wallpaper_save">Desa</string>
     <string name="chat_wallpaper_preview">Així es veuran els teus missatges</string>
     <string name="chat_wallpaper_error">No s’ha pogut desar o carregar el fons. Torna-ho a provar.</string>
-    <string name="chat_wallpaper_crop">Arrossega la foto per enquadrar-la i utilitza el control per ampliar-la.</string>
+    <string name="chat_wallpaper_crop">Arrossega i pessiga per enquadrar la foto.</string>
     <string name="chat_wallpaper_back">Enrere</string>
-    <string name="chat_wallpaper_saved">Fons del xat desat</string>
+    <string name="chat_wallpaper_saved">Estil del xat desat</string>
+    <string name="chat_wallpaper_frame">Enquadra la foto</string>
+    <string name="chat_wallpaper_bubble_color">Color dels missatges enviats</string>
+
+    <string name="chat_wallpaper_styles">Estils</string>
+
+    <string name="chat_wallpaper_styles_hint">Canvien el fons i el color dels missatges que envies.</string>
+
+    <string name="chat_wallpaper_customize">Personalitzar</string>
+
+    <string name="chat_wallpaper_background">Fons</string>
+
+    <string name="chat_wallpaper_preview_title">Previsualització</string>
+
+    <string name="chat_wallpaper_preset_aurora">Aurora</string>
+
+    <string name="chat_wallpaper_preset_coast">Costa</string>
+
+    <string name="chat_wallpaper_preset_dune">Dunes</string>
+
+    <string name="chat_wallpaper_preset_forest">Bosc</string>
+
+    <string name="chat_wallpaper_preset_bloom">Flors</string>
+
+    <string name="chat_wallpaper_preset_midnight">Mitjanit</string>
+
+    <string name="chat_wallpaper_preset_lagoon">Llacuna</string>
+
+    <string name="chat_wallpaper_preset_clay">Argila</string>
+
+    <string name="chat_wallpaper_preset_cloud">Núvols</string>
+
+    <string name="chat_wallpaper_preset_citrus">Cítrics</string>
+    <string name="chat_wallpaper_current">Estil actual</string>
 </resources>

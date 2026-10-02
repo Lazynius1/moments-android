@@ -1,5 +1,5 @@
 <resources>
-    <string name="chat_wallpaper_title">채팅 배경</string>
+    <string name="chat_wallpaper_title">채팅 스타일</string>
     <string name="chat_wallpaper_private">이 배경은 나에게만 보여요. 이 대화에 저장되고 계정과 동기화돼요.</string>
     <string name="chat_wallpaper_photo">사진 선택</string>
     <string name="chat_wallpaper_color">색상</string>
@@ -8,7 +8,40 @@
     <string name="chat_wallpaper_save">저장</string>
     <string name="chat_wallpaper_preview">메시지가 이렇게 보여요</string>
     <string name="chat_wallpaper_error">배경을 저장하거나 불러올 수 없어요. 다시 시도해 주세요.</string>
-    <string name="chat_wallpaper_crop">사진을 드래그해 위치를 조절하고 슬라이더로 확대하세요.</string>
+    <string name="chat_wallpaper_crop">드래그하고 두 손가락으로 확대 또는 축소하여 사진 구도를 조정하세요.</string>
     <string name="chat_wallpaper_back">뒤로</string>
-    <string name="chat_wallpaper_saved">채팅 배경이 저장됐어요</string>
+    <string name="chat_wallpaper_saved">채팅 스타일이 저장되었습니다</string>
+    <string name="chat_wallpaper_frame">사진 구도 조정</string>
+    <string name="chat_wallpaper_bubble_color">보낸 메시지 색상</string>
+
+    <string name="chat_wallpaper_styles">스타일</string>
+
+    <string name="chat_wallpaper_styles_hint">배경과 보낸 메시지의 색상을 변경합니다.</string>
+
+    <string name="chat_wallpaper_customize">맞춤 설정</string>
+
+    <string name="chat_wallpaper_background">배경</string>
+
+    <string name="chat_wallpaper_preview_title">미리보기</string>
+
+    <string name="chat_wallpaper_preset_aurora">오로라</string>
+
+    <string name="chat_wallpaper_preset_coast">해안</string>
+
+    <string name="chat_wallpaper_preset_dune">모래 언덕</string>
+
+    <string name="chat_wallpaper_preset_forest">숲</string>
+
+    <string name="chat_wallpaper_preset_bloom">꽃</string>
+
+    <string name="chat_wallpaper_preset_midnight">한밤중</string>
+
+    <string name="chat_wallpaper_preset_lagoon">라군</string>
+
+    <string name="chat_wallpaper_preset_clay">점토</string>
+
+    <string name="chat_wallpaper_preset_cloud">구름</string>
+
+    <string name="chat_wallpaper_preset_citrus">시트러스</string>
+    <string name="chat_wallpaper_current">현재 스타일</string>
 </resources>

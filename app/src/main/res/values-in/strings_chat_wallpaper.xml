@@ -1,5 +1,5 @@
 <resources>
-    <string name="chat_wallpaper_title">Latar chat</string>
+    <string name="chat_wallpaper_title">Gaya chat</string>
     <string name="chat_wallpaper_private">Hanya kamu yang melihat latar ini. Latar disimpan untuk percakapan ini dan disinkronkan dengan akunmu.</string>
     <string name="chat_wallpaper_photo">Pilih foto</string>
     <string name="chat_wallpaper_color">Warna</string>
@@ -8,7 +8,40 @@
     <string name="chat_wallpaper_save">Simpan</string>
     <string name="chat_wallpaper_preview">Seperti ini tampilan pesanmu</string>
     <string name="chat_wallpaper_error">Latar tidak dapat disimpan atau dimuat. Coba lagi.</string>
-    <string name="chat_wallpaper_crop">Geser foto untuk mengatur bingkai dan gunakan penggeser untuk memperbesar.</string>
+    <string name="chat_wallpaper_crop">Geser dan cubit untuk mengatur bingkai foto.</string>
     <string name="chat_wallpaper_back">Kembali</string>
-    <string name="chat_wallpaper_saved">Latar chat disimpan</string>
+    <string name="chat_wallpaper_saved">Gaya chat disimpan</string>
+    <string name="chat_wallpaper_frame">Atur bingkai foto</string>
+    <string name="chat_wallpaper_bubble_color">Warna pesan terkirim</string>
+
+    <string name="chat_wallpaper_styles">Gaya</string>
+
+    <string name="chat_wallpaper_styles_hint">Mengubah wallpaper dan warna pesan yang Anda kirim.</string>
+
+    <string name="chat_wallpaper_customize">Sesuaikan</string>
+
+    <string name="chat_wallpaper_background">Wallpaper</string>
+
+    <string name="chat_wallpaper_preview_title">Pratinjau</string>
+
+    <string name="chat_wallpaper_preset_aurora">Aurora</string>
+
+    <string name="chat_wallpaper_preset_coast">Pantai</string>
+
+    <string name="chat_wallpaper_preset_dune">Bukit pasir</string>
+
+    <string name="chat_wallpaper_preset_forest">Hutan</string>
+
+    <string name="chat_wallpaper_preset_bloom">Bunga</string>
+
+    <string name="chat_wallpaper_preset_midnight">Tengah malam</string>
+
+    <string name="chat_wallpaper_preset_lagoon">Laguna</string>
+
+    <string name="chat_wallpaper_preset_clay">Tanah liat</string>
+
+    <string name="chat_wallpaper_preset_cloud">Awan</string>
+
+    <string name="chat_wallpaper_preset_citrus">Jeruk</string>
+    <string name="chat_wallpaper_current">Gaya saat ini</string>
 </resources>

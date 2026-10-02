@@ -1,5 +1,5 @@
 <resources>
-    <string name="chat_wallpaper_title">Chat wallpaper</string>
+    <string name="chat_wallpaper_title">Chat style</string>
     <string name="chat_wallpaper_private">Only you see this wallpaper. It is saved for this conversation and synced with your account.</string>
     <string name="chat_wallpaper_photo">Choose photo</string>
     <string name="chat_wallpaper_color">Color</string>
@@ -8,7 +8,40 @@
     <string name="chat_wallpaper_save">Save</string>
     <string name="chat_wallpaper_preview">This is how your messages will look</string>
     <string name="chat_wallpaper_error">Could not save or load the wallpaper. Try again.</string>
-    <string name="chat_wallpaper_crop">Drag the photo to frame it and use the slider to zoom.</string>
+    <string name="chat_wallpaper_crop">Drag and pinch to frame the photo.</string>
     <string name="chat_wallpaper_back">Back</string>
-    <string name="chat_wallpaper_saved">Chat wallpaper saved</string>
+    <string name="chat_wallpaper_saved">Chat style saved</string>
+    <string name="chat_wallpaper_frame">Frame photo</string>
+    <string name="chat_wallpaper_bubble_color">Sent message color</string>
+
+    <string name="chat_wallpaper_styles">Styles</string>
+
+    <string name="chat_wallpaper_styles_hint">Changes the wallpaper and the color of your sent messages.</string>
+
+    <string name="chat_wallpaper_customize">Customize</string>
+
+    <string name="chat_wallpaper_background">Wallpaper</string>
+
+    <string name="chat_wallpaper_preview_title">Preview</string>
+
+    <string name="chat_wallpaper_preset_aurora">Aurora</string>
+
+    <string name="chat_wallpaper_preset_coast">Coast</string>
+
+    <string name="chat_wallpaper_preset_dune">Dunes</string>
+
+    <string name="chat_wallpaper_preset_forest">Forest</string>
+
+    <string name="chat_wallpaper_preset_bloom">Blossom</string>
+
+    <string name="chat_wallpaper_preset_midnight">Midnight</string>
+
+    <string name="chat_wallpaper_preset_lagoon">Lagoon</string>
+
+    <string name="chat_wallpaper_preset_clay">Clay</string>
+
+    <string name="chat_wallpaper_preset_cloud">Clouds</string>
+
+    <string name="chat_wallpaper_preset_citrus">Citrus</string>
+    <string name="chat_wallpaper_current">Current style</string>
 </resources>

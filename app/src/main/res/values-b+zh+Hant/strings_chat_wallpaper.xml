@@ -1,5 +1,5 @@
 <resources>
-    <string name="chat_wallpaper_title">聊天背景</string>
+    <string name="chat_wallpaper_title">聊天風格</string>
     <string name="chat_wallpaper_private">只有你能看到這個背景。它會為這段對話儲存，並與你的帳號同步。</string>
     <string name="chat_wallpaper_photo">選擇照片</string>
     <string name="chat_wallpaper_color">顏色</string>
@@ -8,7 +8,40 @@
     <string name="chat_wallpaper_save">儲存</string>
     <string name="chat_wallpaper_preview">你的訊息會像這樣顯示</string>
     <string name="chat_wallpaper_error">無法儲存或載入背景，請再試一次。</string>
-    <string name="chat_wallpaper_crop">拖曳照片調整構圖，並使用滑桿放大。</string>
+    <string name="chat_wallpaper_crop">拖曳並以雙指縮放來調整照片構圖。</string>
     <string name="chat_wallpaper_back">返回</string>
-    <string name="chat_wallpaper_saved">聊天背景已儲存</string>
+    <string name="chat_wallpaper_saved">已儲存聊天風格</string>
+    <string name="chat_wallpaper_frame">調整照片構圖</string>
+    <string name="chat_wallpaper_bubble_color">已傳送訊息的顏色</string>
+
+    <string name="chat_wallpaper_styles">風格</string>
+
+    <string name="chat_wallpaper_styles_hint">更改背景和你傳送的訊息顏色。</string>
+
+    <string name="chat_wallpaper_customize">自訂</string>
+
+    <string name="chat_wallpaper_background">背景</string>
+
+    <string name="chat_wallpaper_preview_title">預覽</string>
+
+    <string name="chat_wallpaper_preset_aurora">極光</string>
+
+    <string name="chat_wallpaper_preset_coast">海岸</string>
+
+    <string name="chat_wallpaper_preset_dune">沙丘</string>
+
+    <string name="chat_wallpaper_preset_forest">森林</string>
+
+    <string name="chat_wallpaper_preset_bloom">花朵</string>
+
+    <string name="chat_wallpaper_preset_midnight">午夜</string>
+
+    <string name="chat_wallpaper_preset_lagoon">潟湖</string>
+
+    <string name="chat_wallpaper_preset_clay">陶土</string>
+
+    <string name="chat_wallpaper_preset_cloud">雲朵</string>
+
+    <string name="chat_wallpaper_preset_citrus">柑橘</string>
+    <string name="chat_wallpaper_current">目前風格</string>
 </resources>

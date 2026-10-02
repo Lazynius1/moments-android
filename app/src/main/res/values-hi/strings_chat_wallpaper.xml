@@ -1,5 +1,5 @@
 <resources>
-    <string name="chat_wallpaper_title">चैट का बैकग्राउंड</string>
+    <string name="chat_wallpaper_title">चैट की शैली</string>
     <string name="chat_wallpaper_private">यह बैकग्राउंड केवल आपको दिखता है। यह इस बातचीत के लिए सहेजा जाता है और आपके खाते से सिंक होता है।</string>
     <string name="chat_wallpaper_photo">फ़ोटो चुनें</string>
     <string name="chat_wallpaper_color">रंग</string>
@@ -8,7 +8,40 @@
     <string name="chat_wallpaper_save">सहेजें</string>
     <string name="chat_wallpaper_preview">आपके संदेश ऐसे दिखेंगे</string>
     <string name="chat_wallpaper_error">बैकग्राउंड सहेजा या लोड नहीं किया जा सका। फिर कोशिश करें।</string>
-    <string name="chat_wallpaper_crop">फ़ोटो को खींचकर फ़्रेम करें और स्लाइडर से ज़ूम करें।</string>
+    <string name="chat_wallpaper_crop">फ़ोटो का फ़्रेम चुनने के लिए खींचें और दो उँगलियों से ज़ूम करें।</string>
     <string name="chat_wallpaper_back">वापस</string>
-    <string name="chat_wallpaper_saved">चैट का बैकग्राउंड सहेजा गया</string>
+    <string name="chat_wallpaper_saved">चैट की शैली सहेजी गई</string>
+    <string name="chat_wallpaper_frame">फ़ोटो का फ़्रेम चुनें</string>
+    <string name="chat_wallpaper_bubble_color">भेजे गए संदेशों का रंग</string>
+
+    <string name="chat_wallpaper_styles">शैलियाँ</string>
+
+    <string name="chat_wallpaper_styles_hint">वॉलपेपर और आपके भेजे गए संदेशों का रंग बदलता है।</string>
+
+    <string name="chat_wallpaper_customize">कस्टमाइज़ करें</string>
+
+    <string name="chat_wallpaper_background">वॉलपेपर</string>
+
+    <string name="chat_wallpaper_preview_title">प्रीव्यू</string>
+
+    <string name="chat_wallpaper_preset_aurora">ऑरोरा</string>
+
+    <string name="chat_wallpaper_preset_coast">तट</string>
+
+    <string name="chat_wallpaper_preset_dune">रेत के टीले</string>
+
+    <string name="chat_wallpaper_preset_forest">जंगल</string>
+
+    <string name="chat_wallpaper_preset_bloom">फूल</string>
+
+    <string name="chat_wallpaper_preset_midnight">आधी रात</string>
+
+    <string name="chat_wallpaper_preset_lagoon">लैगून</string>
+
+    <string name="chat_wallpaper_preset_clay">मिट्टी</string>
+
+    <string name="chat_wallpaper_preset_cloud">बादल</string>
+
+    <string name="chat_wallpaper_preset_citrus">साइट्रस</string>
+    <string name="chat_wallpaper_current">मौजूदा शैली</string>
 </resources>
